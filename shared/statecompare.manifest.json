@@ -451,7 +451,7 @@
         {
           "name": "barbArmyKnown",
           "compare": "exact",
-          "note": "the barbarians' knowledge base's records (`knowledgeLook` on `barbSeat.armyKnown`; the row `BK`) as a sorted multiset of (owner, unit type, turn seen, plot), as minorArmyKnown.",
+          "note": "the barbarians' knowledge base's records (`knowledgeLook` on `barbSeat.armyKnown`; the row `BK`) as a sorted multiset of (owner, unit type, turn seen, plot, damage), as minorArmyKnown.",
           "covers": [
             "Seat.armyKnown"
           ],
@@ -460,7 +460,8 @@
             "citystate_kb_owner",
             "citystate_kb_type",
             "citystate_kb_seen",
-            "citystate_kb_plot"
+            "citystate_kb_plot",
+            "citystate_kb_damage"
           ]
         },
         {
@@ -2162,7 +2163,7 @@
         {
           "name": "minorArmyKnown",
           "compare": "exact",
-          "note": "the records as a sorted multiset of (owner, unit type, turn seen, plot): the unit's identity (TS id, GPU pool slot) is not compared",
+          "note": "the records as a sorted multiset of (owner, unit type, turn seen, plot, damage): the unit's identity (TS id, GPU pool slot) is not compared",
           "covers": [
             "Seat.armyKnown"
           ],
@@ -2171,8 +2172,61 @@
             "citystate_kb_owner",
             "citystate_kb_type",
             "citystate_kb_seen",
-            "citystate_kb_plot"
+            "citystate_kb_plot",
+            "citystate_kb_damage"
           ]
+        },
+        {
+          "name": "minorOps",
+          "compare": "exact",
+          "covers": [
+            "CityState.ops"
+          ],
+          "planes": [
+            "mops_def",
+            "mops_id",
+            "mops_target",
+            "mops_rally",
+            "mops_bk_target",
+            "mops_bk_rally",
+            "mops_started",
+            "mops_estr",
+            "mops_str",
+            "mops_st",
+            "mops_ma",
+            "mops_mb",
+            "mops_bb",
+            "mops_tm",
+            "mops_mem",
+            "mops_cnt",
+            "mops_goal",
+            "mops_eng",
+            "mops_mins",
+            "mops_ready",
+            "mops_ong",
+            "mops_unit",
+            "mops_tstr",
+            "mops_mvs",
+            "mops_mvg",
+            "mops_free",
+            "mops_nfree",
+            "mops_size",
+            "mops_pick",
+            "mops_pick_target",
+            "mops_pick_rally"
+          ],
+          "note": "the minor's operations (`minorOpsRecord` / `_minor_ops`): the pool, the pick, per slot its definition, target, rally, backup, strengths and teams (members by pool slot, counts, goals, flags, unit, strength); the trees' node memories and Operation Move's stores are not compared"
+        },
+        {
+          "name": "minorCampsKnown",
+          "compare": "exact",
+          "covers": [
+            "CityState.campsKnown"
+          ],
+          "planes": [
+            "mops_camps"
+          ],
+          "note": "the camps the minor's knowledge base holds, in its order"
         },
         {
           "name": "minorProjectYield",

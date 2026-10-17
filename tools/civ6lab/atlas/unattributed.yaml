@@ -225,7 +225,7 @@
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
-  impl: [cpu/core/operations/nodes.ts:moveDest, cpu/core/tactical.ts:moveExec]
+  impl: [cpu/core/tactical.ts:passMoveExec, cpu/core/tactical.ts:moveExec]
   readings:
     - "H-1: the citizen pressure term — PARTLY READ"
     - "H-1: the city-states' quests — READ"
@@ -1544,7 +1544,10 @@
     - recording: h1_duelv1124
       turn: 84
       value: Granada's Harbor contract CANCELLED
-  impl: [cpu/core/aiContracts.ts:inHandCheck, cpu/core/operations/manager.ts:updateContracts]
+  impl:
+    - cpu/core/aiContracts.ts:inHandCheck
+    - cpu/harness/operationsAi.ts:updateContracts
+    - cpu/harness/operationsAi.ts:updateContracts
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -2490,8 +2493,11 @@
   status: PARTLY
   impl:
     - cpu/core/aiCityTrees.ts:CityTreeWorld
-    - cpu/core/operations/manager.ts:operationsTurn
-    - cpu/core/operations/manager.ts:cityDefense
+    - cpu/core/operations/manager.ts:operationsRun
+    - cpu/harness/operationsAi.ts:cityDefense
+    - cpu/core/minorOps.ts:minorOpsStart
+    - cpu/core/operations/manager.ts:startOperationNamed
+    - cpu/core/operations/manager.ts:operationsEvaluate
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -3424,6 +3430,7 @@
     - cpu/core/operations/assault.ts:attackUnitsExecute
     - cpu/core/tactical.ts:opNearbyTargets
     - gpu/core/sim_tactics.py:_barb_op_attack
+    - cpu/core/operations/assault.ts:UNIT_TARGETS
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -3536,7 +3543,7 @@
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
   impl:
-    - cpu/core/operations/nodes.ts:moveDest
+    - cpu/core/tactical.ts:passMoveExec
     - cpu/core/tactical.ts:moveExec
     - gpu/core/sim_tactics.py:_barb_move_exec
   readings:
@@ -3571,7 +3578,10 @@
     - recording: h1_duelv1128
       turn: 15
       value: City Defense, Operation Recruit, 3 units, Recruited 3
-  impl: [cpu/core/operations/nodes.ts:OP_NODES, cpu/core/operations/nodes.ts:recruitUnits]
+  impl:
+    - cpu/core/operations/nodes.ts:OP_NODES
+    - cpu/core/operations/nodes.ts:recruitUnits
+    - gpu/core/sim_minorops.py:_u_recruit
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"

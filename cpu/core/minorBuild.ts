@@ -53,7 +53,8 @@ import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityRe
 import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitIsMilitary } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
-import { cityStateTactics, knowledgeLook } from './tactical';
+import { knowledgeLook } from './tactical';
+import { cityStateMilitary, minorCampsLook } from './minorOps';
 import { tilesWithin } from '../../world/hex';
 import { hasRiver } from '../../world/query';
 import { engineId, gameTypeOf } from '../data/aliases';
@@ -104,7 +105,7 @@ export function minorPhase(state: GameState): void {
     minorTrade(state, cityState, !ordersHeld);
     const city = minorCity(cityState);
     cityStrikes(state, city, cityStrikeStrength(state, city));
-    if (!ordersHeld) cityStateTactics(state, cityState);
+    if (!ordersHeld) cityStateMilitary(state, cityState);
     minorKnowledge(state, cityState, false);
     // the boosts its turn earned (runs/h1_duelw1117 t1: every city-state
     // takes Pottery before its coastal city's Sailing eureka lands)
@@ -869,6 +870,7 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
  *  plots it sees (`cityStateSight`). */
 export function minorKnowledge(state: GameState, cityState: CityState, age: boolean): void {
   knowledgeLook(state, cityState, cityState.seat, cityStateSight(state, cityState.seat), age);
+  minorCampsLook(state, cityState);
 }
 /** THE COMBAT DESIRE of a minor (`combatDesire`) at its military AI's turn,
  *  `turn` the one its knowledge base's records were last aged to: the

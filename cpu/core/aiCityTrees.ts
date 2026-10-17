@@ -204,6 +204,8 @@ export interface CityTreeWorld {
   startOperation(name: string, plot: number): number | null;
   /** the operation's tree still runs */
   operationLive(tree: number): boolean;
+  /** the contracts the player's operations hold (the one contract book) */
+  heldContracts(): readonly number[];
   /** a lab's view of each tick: the tree, its root's status, its nodes'
    *  updates in walk order */
   trace?(tree: CityTree, root: number, updates: readonly string[]): void;
@@ -783,7 +785,7 @@ export function tickCityTrees(ai: CityAi, w: CityTreeWorld): void {
   }
   ai.reservations = ai.reservations.filter((r) => live(ai, r.tree));
   ai.trees = ai.trees.filter((t) => !t.done);
-  for (const id of reapContracts(ai, new Set(ai.trees.flatMap((t) => t.contracts)))) {
+  for (const id of reapContracts(ai, new Set([...ai.trees.flatMap((t) => t.contracts), ...w.heldContracts()]))) {
     delete ai.techContracts[id];
     delete ai.plotContracts[id];
   }

@@ -17,7 +17,7 @@ import { NO_PLOT, type OpTeam, type Operation } from './operation';
 import { generalizedAssignment } from '../aiAssignment';
 import { moveTo, opUnits, targetGone, unitsById, xy } from './operation';
 import type { OpsContext } from './nodes';
-import type { MajorAttackTargetView, MajorAttackView, MajorUnitView, MajorView } from '../../../ai/major/view';
+import type { MajorAttackTargetView, MajorUnitView, MajorView } from '../../../ai/major/view';
 
 
 /** a datum's value where the node holds the datum, `absent` where not (the
@@ -304,7 +304,7 @@ const operationDiplomacy: BtHandler<OpsContext> = {
     if (!action) return;
     const tag = dataTag(node, 'Contract');
     const held = tag ? run.blackboard.get(tag) : undefined;
-    if (typeof held === 'number' && ctx.diplomacy.has(held)) return;
+    if (typeof held === 'number' && ctx.diplomacy.some((d) => d.id === held)) return;
     const value = Number(run.blackboard.get(dataTag(node, 'Present Value') ?? '') ?? 0) || 0;
     const id = ctx.requestDiplomacy(action, enemy, value);
     if (tag) run.blackboard.set(tag, id);
@@ -399,9 +399,13 @@ const buildMilitaryImprovement: BtHandler<OpsContext> = {
 
 // OPERATION ATTACK UNITS' EXECUTION (0x80ceb0)
 
+/** the unit targets of the list (0x80c080: a civilian through a HIGH unit) */
+const UNIT_TARGETS = new Set(['CIVILIAN', 'RELIGIOUS', 'TRADER', 'LOW', 'MEDIUM', 'HIGH']);
+
 /** the targets an Attack Units node picks for a team (0x80bd20, 0x80be90,
- *  0x80bb50, 0x80b830): Attack Nearby Units — another player's targets at war
- *  with the seat (with an enemy named, of the enemy's but its civilians) within
+ *  0x80bb50, 0x80b830): Attack Nearby Units — another player's unit targets
+ *  (the list's units are of players hostile to the seat, the barbarians
+ *  among them; with an enemy named, the enemy's but its civilians) within
  *  the larger of 2 and a member's Movement left of it; else Attack Along
  *  March — another player's targets ahead of the battle line toward the
  *  target (the axial dot product above 0); else Attack Near Target — targets
@@ -417,8 +421,7 @@ function pickTargets(node: Parameters<BtHandler<OpsContext>['update']>[0], view:
   if (flag(node, 'Attack Nearby Units', false)) {
     return (k) => {
       const g = targets[k];
-      if (g.owner === seat) return false;
-      if (!view.atWar(seat, g.owner) && op.enemy === -1) return false;
+      if (!UNIT_TARGETS.has(g.type) || g.owner === seat) return false;
       if (op.enemy !== -1 && g.owner !== op.enemy && g.type !== 'CIVILIAN') return false;
       return members.some((u) => view.plotDistance(u.plot, g.plot) <= Math.max(2, u.movesLeft >> 8));
     };
@@ -445,74 +448,11 @@ function pickTargets(node: Parameters<BtHandler<OpsContext>['update']>[0], view:
   return () => true;
 }
 
-/** a unit's blow on a plot as the seat's action rows: beside it or at range
- *  the strike from where it stands; else the path's steps this turn, the
- *  last into the plot an attack */
-function strike(ctx: OpsContext, id: number, plot: number): void {
-  const view = ctx.view();
-  const units = view.units(ctx.seat);
-  const col = units.findIndex((u) => u.id === id);
-  if (col < 0) return;
-  const u = units[col];
-  const direct = view.strikeColumn(id, plot);
-  if (direct >= 0 && (u.ranged > 0 || view.plotDistance(u.plot, plot) === 1)) {
-    const row = units.map(() => -1);
-    row[col] = direct;
-    ctx.act([row]);
-    return;
-  }
-  const path = view.unitPath(id, plot);
-  if (path.length === 0) return;
-  const last = path[path.length - 2] ?? u.plot;
-  if (last !== u.plot) moveTo(ctx, u, last);
-  const v = ctx.view();
-  const at = v.units(ctx.seat).find((x) => x.id === id);
-  if (!at || at.movesLeft <= 0) return;
-  const c = v.strikeColumn(id, plot);
-  if (c < 0) return;
-  const row = v.units(ctx.seat).map(() => -1);
-  row[v.units(ctx.seat).findIndex((x) => x.id === id)] = c;
-  ctx.act([row]);
-}
-
-/** an assignment carried out (0x771f80): every unit to its plot, then the
- *  siege units' blows, the ranged units' (unless their melee strength is the
- *  greater and the target in their reach this turn), then the rest moving
- *  onto their targets */
-function carryOut(ctx: OpsContext, out: readonly MajorAttackView[]): void {
-  const now = (id: number) => ctx.view().units(ctx.seat).find((x) => x.id === id);
-  for (const a of out) {
-    const u = now(a.unit);
-    if (u && u.plot !== a.move) moveTo(ctx, u, a.move);
-  }
-  const done = new Set<number>();
-  for (const a of out) {
-    const u = now(a.unit);
-    if (!u || u.bombard <= 0 || u.movesLeft <= 0) continue;
-    if (a.attack >= 0) strike(ctx, a.unit, a.attack);
-    done.add(a.unit);
-  }
-  for (const a of out) {
-    const u = now(a.unit);
-    if (!u || done.has(a.unit) || u.ranged <= 0 || u.movesLeft <= 0) continue;
-    if (u.combat > u.ranged && ctx.view().unitReach(a.unit, 1).some((r) => r.plot === a.attack)) continue;
-    if (a.attack >= 0) strike(ctx, a.unit, a.attack);
-    done.add(a.unit);
-  }
-  for (const a of out) {
-    const u = now(a.unit);
-    if (!u || done.has(a.unit) || a.attack < 0 || u.movesLeft <= 0) continue;
-    strike(ctx, a.unit, a.attack);
-  }
-}
-
 /** per team: its members with Movement left and in no formation (a siege
  *  unit only against an enemy city), the targets the node picks logged, the
  *  attack assignment over them (`even` where unequal attacks are not allowed
- *  and one unit goes; `survive` always) logged and carried out in its order
- *  (0x771f80): every unit to its plot, then the siege units' blows, the
- *  ranged units' (unless their melee strength is the greater and the target
- *  beside them), then the rest moving onto their targets */
+ *  and one unit goes; `survive` always) carried out (the seat's `attack`)
+ *  and logged */
 function attackUnitsExecute(node: Parameters<BtHandler<OpsContext>['update']>[0], _run: unknown, ctx: OpsContext): void {
   const { op } = ctx;
   const view = ctx.view();
@@ -532,17 +472,16 @@ function attackUnitsExecute(node: Parameters<BtHandler<OpsContext>['update']>[0]
     picked.forEach((k, i) => {
       const g = targets[k];
       ctx.log(g.unitType
-        ? `${op.def.name}, Op Attack Units Targets, Target ${i}, Owner ${g.owner}, ${g.unitType}, ${xy(v, g.plot)}`
-        : `${op.def.name}, Op Attack Units Targets, Target ${i}, NULL TARGET`);
+        ? `${op.def}, Op Attack Units Targets, Target ${i}, Owner ${g.owner}, ${g.unitType}, ${xy(v, g.plot)}`
+        : `${op.def}, Op Attack Units Targets, Target ${i}, NULL TARGET`);
     });
     const set = new Set(picked);
-    const out = v.attackAssignment(ctx.seat, members.map((u) => u.id), (k) => set.has(k), !allowUnequal && members.length === 1, true);
+    const out = ctx.attack(members.map((u) => u.id), (k) => set.has(k), !allowUnequal && members.length === 1, true);
     for (const a of out) {
       const u = units.get(a.unit);
       if (!u) continue;
-      ctx.log(`${op.def.name}, Operation Attack Units, ${u.type}, At ${xy(v, u.plot)}, Move ${xy(v, a.move)}, Attack ${xy(v, a.attack)}`);
+      ctx.log(`${op.def}, Operation Attack Units, ${u.type}, At ${xy(v, u.plot)}, Move ${xy(v, a.move)}, Attack ${xy(v, a.attack)}`);
     }
-    carryOut(ctx, out);
   }
 }
 
@@ -554,8 +493,8 @@ const CITY_ATTACK_RANGE = 3;
 /** per team: its members alive with Movement left (0x56c690); the seat's
  *  COMBAT_DISTRICT targets within 3 of the operation's target; the
  *  assignment over them (neither filter of a losing exchange, the one of a
- *  blow that kills the unit kept), logged "Operation City Attack" and
- *  carried out */
+ *  blow that kills the unit kept) carried out and logged "Operation City
+ *  Attack" */
 function attackCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], _run: unknown, ctx: OpsContext): void {
   const { op } = ctx;
   if (op.target === NO_PLOT) return;
@@ -564,13 +503,12 @@ function attackCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0]
     const units = unitsById(v, ctx.seat);
     const members = t.members.map((id) => units.get(id)).filter((u): u is MajorUnitView => !!u && u.movesLeft > 0);
     const targets = v.attackTargets(ctx.seat);
-    const out = v.attackAssignment(ctx.seat, members.map((u) => u.id),
+    const out = ctx.attack(members.map((u) => u.id),
       (k) => targets[k].type === 'COMBAT_DISTRICT' && v.plotDistance(targets[k].plot, op.target) <= CITY_ATTACK_RANGE, false, true);
     for (const a of out) {
       const u = units.get(a.unit);
-      if (u) ctx.log(`${op.def.name}, Operation City Attack, ${u.type}, ${xy(v, u.plot)}, Move ${xy(v, a.move)}, Attack ${xy(v, a.attack)}`);
+      if (u) ctx.log(`${op.def}, Operation City Attack, ${u.type}, ${xy(v, u.plot)}, Move ${xy(v, a.move)}, Attack ${xy(v, a.attack)}`);
     }
-    carryOut(ctx, out);
   }
 }
 
@@ -625,7 +563,7 @@ function airAssaultExecute(node: Parameters<BtHandler<OpsContext>['update']>[0],
         if (col < 0) continue;
         const row = cv.units(ctx.seat).map((x) => (x.id === u.id ? col : -1));
         ctx.act([row]);
-        ctx.log(`${op.def.name}, Operation Air Attack, ${u.type}, ${xy(cv, u.plot)}, Attack ${xy(cv, g.plot)}`);
+        ctx.log(`${op.def}, Operation Air Attack, ${u.type}, ${xy(cv, u.plot)}, Attack ${xy(cv, g.plot)}`);
       }
     }
   }
@@ -643,7 +581,7 @@ function airAssaultExecute(node: Parameters<BtHandler<OpsContext>['update']>[0],
       bestD = d;
     }
     if (!best || best.column < 0) continue;
-    ctx.log(`${op.def.name}, Operation Air Attack, ${u.type}, ${xy(cv, u.plot)}, ReBase ${xy(cv, best.plot)}`);
+    ctx.log(`${op.def}, Operation Air Attack, ${u.type}, ${xy(cv, u.plot)}, ReBase ${xy(cv, best.plot)}`);
     const row = cv.units(ctx.seat).map((x) => (x.id === u.id ? best!.column : -1));
     ctx.act([row]);
   }
@@ -714,7 +652,7 @@ function pillageExecute(node: Parameters<BtHandler<OpsContext>['update']>[0], _r
     moveTo(ctx, best, spot);
     const after = now(best.id)?.plot ?? from;
     if (after === g.plot) pillageHere(ctx, best.id);
-    if (after !== from) ctx.log(`${op.def.name}, Operation Pillage City, ${best.type}, From ${xy(v0, from)}, Goal: ${xy(v0, g.plot)}, Move ${xy(v0, after)}`);
+    if (after !== from) ctx.log(`${op.def}, Operation Pillage City, ${best.type}, From ${xy(v0, from)}, Goal: ${xy(v0, g.plot)}, Move ${xy(v0, after)}`);
   }
 }
 
@@ -765,8 +703,8 @@ function siegeCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0],
     for (const id of opUnits(op)) {
       const u = now(id);
       if (!u || u.movesLeft <= 0 || u.range <= 0) continue;
-      ctx.log(`${op.def.name}, Operation Siege City Attack, ${u.type} ${xy(v, u.plot)}`);
-      strike(ctx, id, target);
+      ctx.log(`${op.def}, Operation Siege City Attack, ${u.type} ${xy(v, u.plot)}`);
+      ctx.strike(id, target);
     }
     return;
   }
@@ -841,7 +779,7 @@ function siegeCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0],
       const after = now(u.id)?.plot ?? from;
       if (after === from) continue;
       moved = true;
-      ctx.log(`${op.def.name}, Operation Siege City, ${u.type}, From ${xy(v, from)}, Goal: ${xy(v, s.plot)}, Move ${xy(v, after)}`);
+      ctx.log(`${op.def}, Operation Siege City, ${u.type}, From ${xy(v, from)}, Goal: ${xy(v, s.plot)}, Move ${xy(v, after)}`);
     }
   }
 }
@@ -856,7 +794,7 @@ const SIEGE_PASSES = 3;
 function moveOnto(ctx: OpsContext, u: MajorUnitView, plot: number): void {
   const v = ctx.view();
   const hostile = v.hostileUnits(ctx.seat).some((h) => h.plot === plot) || v.hostileCities(ctx.seat).some((c) => c.plot === plot);
-  if (hostile) strike(ctx, u.id, plot);
+  if (hostile) ctx.strike(u.id, plot);
   else moveTo(ctx, u, plot);
 }
 
@@ -877,7 +815,7 @@ function operationAttackExecute(_node: Parameters<BtHandler<OpsContext>['update'
   const { op } = ctx;
   const now = (id: number) => ctx.view().units(ctx.seat).find((x) => x.id === id);
   const line = (kind: string, u: MajorUnitView, at: number, rest = '') =>
-    ctx.log(`${op.def.name}, ${kind}, ${u.type}, At ${xy(ctx.view(), at)}${rest}`);
+    ctx.log(`${op.def}, ${kind}, ${u.type}, At ${xy(ctx.view(), at)}${rest}`);
   for (const t of op.teams) {
     const target = t.goals[1];
     if (target === NO_PLOT) continue;
@@ -918,7 +856,7 @@ function operationAttackExecute(_node: Parameters<BtHandler<OpsContext>['update'
         const u = now(id);
         if (!u || u.movesLeft <= 0 || u.range <= 0) continue;
         line('Attack Target Range Attack', u, u.plot);
-        strike(ctx, id, target);
+        ctx.strike(id, target);
       }
     }
     for (const id of [...t.members]) {

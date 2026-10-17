@@ -4,19 +4,21 @@ AI/CityBuild.cpp, AI/Economic.cpp; `tools/civ6lab/dll_readings.md` "C-96: the
 city events, trees and contracts"). Each city-state's turn after its step
 (`_minor_build`), as the game's Control Manager runs a player's lists:
 
- - B: the Economic AI's savings turn (0x687bf0, `_cv_savings_turn`);
+ - B: the Economic AI's savings turn (0x687bf0, `_cv_savings_turn`), the
+   military AI's turn (`_mops_evaluate`, sim_minorops.py);
  - A: the city's update (0x5ce680): its threat (0x5cbd10, `_minor_threat`),
    the contract in hand checked (0x5d7e00), the slots of trees no longer
    running freed, the plot analysis (0x5ce970, `_minor_plot_evals`), the
-   improvement pick (0x5c9a00) and the events — City Defense (no operation
-   manager runs in the engine: none starts), the building or unit event, the
-   district event, the improvement event — a city its AI first sees this
-   turn running none;
+   improvement pick (0x5c9a00) and the events — City Defense (its operation
+   manager's start, `_mops_start`), the building or unit event, the district
+   event, the improvement event — a city its AI first sees this turn running
+   none;
  - C: the Default Specialization where the queue is empty (0x5d4d70: the
    contract in hand where it takes the turn, else the pick), the purchases
    (0x5ce5b0's tail: a threatened city buys the first unit of its list while
    TryPurchaseUnits succeeds), the trees' tick (0x7ffdd0), their orders
-   carried out at once.
+   carried out at once; its operations' trees tick in its units' turn
+   (`_mops_run`).
 
 The city AI's state is the sim's `cai_*` planes (`CityAi`, sim_citytrees.py);
 a unit's id is its slot in the majors' pool. A Free City's AI is its Default
@@ -96,6 +98,8 @@ class SimMinorAi:
                                          torch.zeros_like(alive))
         self.citystate_savings[:, s] = torch.where(alive.unsqueeze(1), sav, self.citystate_savings[:, s])
         self.citystate_balance[:, s] = torch.where(alive, bal, self.citystate_balance[:, s])
+        # B: the military AI's turn
+        self._mops_evaluate(s)
         # A: the city's update
         f = self._cv_minor_facts(s)
         b_tab, u_tab, p_tab = self._cv_minor_tables(s, f)
@@ -1400,10 +1404,11 @@ class _MinorWorld:
         return v.reshape(plot.shape)
 
     def operation_live(self, ids):
-        return False
+        return self.sim._mops_live(self.s, ids)
 
     def start_operation(self, name, plot, mask):
-        return -1
+        T = self.sim._mops_tables()
+        return self.sim._mops_start(self.s, T.names.index(name), plot, plot, mask)
 
     def builder_type(self, imp):
         T = self.T

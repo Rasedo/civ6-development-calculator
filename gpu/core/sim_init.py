@@ -331,6 +331,8 @@ class SimInit:
         for _n, _v in vars(self.cityai).items():
             if torch.is_tensor(_v):
                 setattr(self, "cai_" + _n, _v)
+        # each minor's operation manager (`OpsAi`, gpu/core/sim_minorops.py)
+        self._init_minor_ops(rules, B, s_pad, device)
         # the strongest melee Combat Strength the minor has trained or bought — the base
         # its centre stands on (`holderStrength`, the Seat's `bestMeleeCS`)
         self.citystate_best_melee = torch.zeros(B, s_pad, dtype=torch.long, device=device)
@@ -352,6 +354,7 @@ class SimInit:
         self.citystate_kb_type = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_seen = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_plot = torch.full(_kb, -1, dtype=torch.int16, device=device)
+        self.citystate_kb_damage = torch.zeros(_kb, dtype=torch.int16, device=device)
         # its last turn's Production went toward a `fullyPowered` project
         # still running — the queue head `_minor_power` reads (`fullyPowered`)
         self.citystate_full_power = torch.zeros(B, s_pad, dtype=torch.bool, device=device)

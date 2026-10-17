@@ -1,7 +1,7 @@
 import type { GameState } from './types';
 import { boostOnKill, markBoost } from './boosts';
 import { civEraIndex } from './city';
-import { onHomeContinent, seatOf, citiesOf, isBarbSeat, isCiv, civOf } from './seats';
+import { onHomeContinent, seatOf, citiesOf, isBarbSeat, isCiv, civOf, isCityStateSeat } from './seats';
 import { getModifiers } from './effects';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
@@ -329,7 +329,11 @@ export function unitKillEvent(
   killer: { type: string; promos?: number; tileIndex?: number } | undefined,
   victim: { type: string; seat: number; formation?: number },
 ): void {
-  if (!isCiv(killerSeat)) return;
+  if (!isCiv(killerSeat)) {
+    // a city-state's kill lands its eurekas and inspirations alone
+    if (isCityStateSeat(killerSeat)) boostOnKill(state, killerSeat, killer?.type, victim.type, isBarbSeat(victim.seat));
+    return;
+  }
   // CIV6 (EFFECT_ADJUST_UNIT_POST_COMBAT_YIELD): "Combat victories provide
   // Culture/Faith equal to 50% of the Combat Strength of the defeated unit" —
   // a BARBARIAN victim pays too, so this stands above the era-score gate

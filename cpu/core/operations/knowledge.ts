@@ -42,3 +42,14 @@ export function lookArmy(records: ArmyRecords, view: MajorView, seat: number, tu
 
 /** the units the knowledge base holds of a player, in record order */
 export const knownArmy = (records: ArmyRecords, player: number): KnownUnit[] => [...records.values()].filter((r) => r.owner === player);
+
+/** the knowledge base's camps (m_barbarians +0x638, in their order): its
+ *  update drops a camp whose plot the seat sees with none there (0x5ebb30),
+ *  its look adds each camp on a plot it sees (0x7877e0 -> 0x5f0110), in plot
+ *  order */
+export function lookCamps(known: readonly number[], seen: (plot: number) => boolean, camps: Iterable<number>): number[] {
+  const now = new Set(camps);
+  const out = known.filter((p) => !seen(p) || now.has(p));
+  for (const p of [...now].sort((a, b) => a - b)) if (seen(p) && !out.includes(p)) out.push(p);
+  return out;
+}

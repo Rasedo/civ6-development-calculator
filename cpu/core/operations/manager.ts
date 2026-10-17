@@ -3,41 +3,43 @@
  * the reading is tools/civ6lab/dll_readings.md "C-97: the operations"), the
  * one manager of every party that runs operations: the majors and the
  * city-states (their limits by their leader trait); a party that settles
- * hands it its settling AI (OpsSettle).
+ * hands it its settling AI (OpsSettle). Its state is plain data (`OpsAi`):
+ * a city-state's lives in its state.
  *
- * Each turn of the seat: for a seat that settles, the settle evaluation's
- * AI_EVENT_DESIRE_SETTLE starts the "Settle New City" operation
- * (TriggeredBehaviorTrees TRIGGER_SETTLE_SPOT, through 0x800c60 -> 0x7265b0)
- * where the seat runs none;
- * the military AI's turn builds the candidates and evaluates them
- * (evaluate.ts) on the knowledge base's city records of the turn before;
- * the manager logs the valid ones' values and, the records refreshed, the
- * CITY VALUES; each city's threat and its City Defense (cityDefense); a
- * running operation's candidate names its backup (0x73e610); each
- * running operation logs its target and refreshes its strengths and its
- * teams' readiness (0x73eb60, 0x73f7d0, 0x73b360); the best new candidate
- * that starts itself — the highest Priority, then the best odds, the first
- * of equals — starts where the seat runs fewer of its OperationType than its
- * limits allow (0x726470); then each operation's tree ticks, an operation
- * whose tree ends complete.
+ * A seat's turn in three parts, as the game's Control Manager runs them:
+ *  - the military AI's turn (`operationsEvaluate`, list B): the operations
+ *    lose the units gone; for a seat that settles, the settle evaluation's
+ *    AI_EVENT_DESIRE_SETTLE starts the "Settle New City" operation
+ *    (TriggeredBehaviorTrees TRIGGER_SETTLE_SPOT, through 0x800c60 ->
+ *    0x7265b0) where the seat runs none; the candidates (evaluate.ts) on the
+ *    knowledge base's records of the turn before, the valid ones' values
+ *    logged; a running operation's candidate names its backup (0x73e610);
+ *    the best new candidate that starts itself — the highest Priority, then
+ *    the best odds, the first of equals — where the seat runs fewer of its
+ *    OperationType than its limits allow (0x726470) is the one to start;
+ *  - the cities' update (list A): a threatened city starts City Defense at
+ *    its plot (the defence event 0x5cced0 through the start by name 0x7265b0,
+ *    `startOperationNamed`);
+ *  - the operations' run (`operationsRun`, with the tree manager's tick):
+ *    each running operation logs its target and refreshes its strengths and
+ *    its teams' readiness (0x73eb60, 0x73f7d0, 0x73b360); the chosen
+ *    candidate starts; then each operation's tree ticks, an operation whose
+ *    tree ends complete.
  *
  * The operations live in the manager's pool (+0x2e0, 0x71e370): an operation
  * takes the slot freed last, else a new one, and the manager walks them in
  * slot order.
  */
 import { AI_LEADER_OP_LISTS, AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_LISTS, AI_TREES } from '../../data/aiOperations';
-import { compileTree, newRun, tick, type BtNode } from '../behaviorTree';
-import { NO_PLOT, addMember, newTeams, opUnits, xy, type Operation } from './operation';
+import { compileTree, tick, BT_FRESH, type BtNode, type BtRun } from '../behaviorTree';
+import { NO_PLOT, addMember, newTeams, opDef, opUnits, xy, type Operation } from './operation';
 import { OP_NODES, refreshStrengths, switchToBackup, type DiplomacyRequest, type OpsContext } from './nodes';
-import { CP_ACCEPTED, CP_FAILED, CP_IN_PROGRESS, contractBuilt, contractEvaluate, newContractBook, queueContract, reapContracts, type ContractBook,
-  type ContractItem, type ContractNodeWorld } from '../aiContracts';
+import type { ContractBook, ContractCity, ContractNodeWorld } from '../aiContracts';
 import { evaluate, type ArmyUnit, type Candidate } from './evaluate';
-import { knownArmy, lookArmy, type ArmyRecords } from './knowledge';
-import { cityValue } from './cityValue';
-import { cityThreat } from './cityThreat';
+import type { KnownUnit } from './knowledge';
 import type { AiOpDef, OpsSettle } from './types';
 import type { UnitProductionRow } from '../aiUnitProduction';
-import type { MajorKnownCityView, MajorView } from '../../../ai/major/view';
+import type { MajorAttackView, MajorKnownCityView, MajorUnitView, MajorView } from '../../../ai/major/view';
 
 export interface OpsAi {
   seat: number;
@@ -45,67 +47,66 @@ export interface OpsAi {
   slots: (Operation | null)[];
   /** the freed slots, the last freed on top */
   free: number[];
-  nextOp: number;
-  /** the seat's contracts (aiContracts.ts), its operations' trees' */
-  book: ContractBook;
-  nextContract: number;
-
   /** the players the seat prepares for war with (m_prepareForWarWith, set
    *  by PrepareForWarWith 0x724f30): their WAR definitions are candidates
    *  short of war */
-  prepareForWar: Set<number>;
-  /** the diplomatic requests its operations made (Operation Diplomacy), by
-   *  id; none of them is taken up here */
-  diplomacy: Map<number, DiplomacyRequest>;
-  /** the knowledge base's city records as the turn before left them (the
-   *  records refresh after the military AI's evaluation), null before the
-   *  first */
-  known: readonly MajorKnownCityView[] | null;
-  /** the knowledge base's army records and its camps (m_barbarians +0x638,
-   *  in their order) */
-  army: ArmyRecords;
-  camps: number[];
-  /** each city's threat (CityBuildAI +0x1b8, -1 none) and its defence
-   *  slot's operation (CityEvents slot 5, -1 none), by the city's plot */
-  threat: Map<number, number>;
-  defense: Map<number, number>;
+  prepareForWar: number[];
+  /** the diplomatic requests its operations made (Operation Diplomacy),
+   *  their ids their places; none of them is taken up here */
+  diplomacy: DiplomacyRequest[];
+  /** the new candidate the military AI's turn chose, started at the run */
+  pick: { def: string; enemy: number; target: number; rally: number } | null;
 }
 
-export interface OpsTurnEnv {
+/** what the manager reads and does beside its own state */
+export interface OpsEnv {
   turn: number;
   /** the view as the actions so far left the game */
   view(): MajorView;
-  /** carry out the seat's unit action rows now */
-  act(rows: number[][]): void;
-  /** the units the seat's cities trained as its turn began: the city, the
-   *  unit and its UnitType */
-  built: readonly { city: number; unit: number; type: string }[];
-  /** what a city of the seat produces once its turn's choice is made (the
-   *  Default Specialization runs before the trees tick), null for nothing */
-  producing(city: number): ContractItem | null;
+  /** the definitions the seat runs (null: its leader's list, `allowedOps`) */
+  defs: readonly string[] | null;
+  /** the knowledge base: a player's army records, the camps, the city
+   *  records as the turn before left them */
+  army(player: number): readonly KnownUnit[];
+  camps(): readonly number[];
+  known(): readonly MajorKnownCityView[];
+  /** a city's threat by its plot (CityBuildAI +0x1b8), -1 none */
+  threat(plot: number): number;
+  /** the seat's contract book, its next contract's id, its cities as the
+   *  contracts read them, the production a submission clears */
+  book(): ContractBook;
+  newContractId(): number;
+  contractCities(): readonly ContractCity[];
+  clearProduction(city: ContractCity): void;
+  /** the id the next operation's tree takes */
+  newOpId(): number;
   /** the seat's settling AI, none for a party that never settles */
   settle: OpsSettle | null;
   /** the seat's unit production entries (the military AI's +0x268) */
   unitRows(): readonly UnitProductionRow[];
+  /** the seat's orders: its unit action rows; a move; a blow; an attack
+   *  assignment over its units against the targets `keep` picks of its
+   *  tactical target list, carried out (the tactical pass's 0x771f80) */
+  act(rows: number[][]): void;
+  move(id: number, dest: number, mate: number): void;
+  strike(id: number, plot: number): void;
+  attack(ids: readonly number[], keep: (k: number) => boolean, even: boolean, survive: boolean): readonly MajorAttackView[];
+  /** Operation Move's update and execution for a team (`OpsContext`) */
+  moveUpdate: OpsContext['moveUpdate'];
+  moveExec: OpsContext['moveExec'];
+  /** the operation lines (AI_Operation.csv without its turn and player) and
+   *  the candidate lines (AI_Operation_Eval.csv) */
+  log(line: string): void;
+  logEval(line: string): void;
 }
 
-/** a turn's AI_Operation.csv lines and AI_Operation_Eval.csv lines, each
- *  without its turn and player, and the "CITY VALUES" its evaluation lines
- *  close with: per city the seat knows of another player, its value (24.8) */
-export interface OpsTurnLog {
-  lines: string[];
-  evals: string[];
-  cityValues: { plot: number; value: number }[];
-}
-
-export const newOpsAi = (seat: number): OpsAi => ({ seat, slots: [], free: [], nextOp: 0, book: newContractBook(), nextContract: 0,
-  prepareForWar: new Set(), diplomacy: new Map(), known: null, army: new Map() , camps: [], threat: new Map(), defense: new Map() });
+export const newOpsAi = (seat: number): OpsAi => ({ seat, slots: [], free: [], prepareForWar: [], diplomacy: [], pick: null });
 
 /** PrepareForWarWith (0x724f30): the seat prepares for war with the player,
  *  or no longer */
 export function prepareForWarWith(ai: OpsAi, player: number, on: boolean): void {
-  if (on) ai.prepareForWar.add(player);
-  else ai.prepareForWar.delete(player);
+  ai.prepareForWar = ai.prepareForWar.filter((p) => p !== player);
+  if (on) ai.prepareForWar.push(player);
 }
 
 /** THE WAR DECLARATIONS' NOT-READY HOOK (0x6742d0): the seat prepares for
@@ -114,7 +115,7 @@ export function prepareForWarWith(ai: OpsAi, player: number, on: boolean): void 
  *  declared friend nor its ally */
 export function notReadyHook(ai: OpsAi, view: MajorView, player: number): void {
   const majors = view.majors();
-  const n = majors.filter((q) => q !== ai.seat && (view.atWar(ai.seat, q) || ai.prepareForWar.has(q))).length;
+  const n = majors.filter((q) => q !== ai.seat && (view.atWar(ai.seat, q) || ai.prepareForWar.includes(q))).length;
   if (n > majors.length >> 1) return;
   if (view.declaredFriends(ai.seat, player) || view.allied(ai.seat, player)) return;
   prepareForWarWith(ai, player, true);
@@ -166,7 +167,6 @@ function treeOf(name: string): BtNode[] {
   return t;
 }
 
-
 /** the definitions a leader may run (Leaders.OperationList, else
  *  Default_List): its list's base first, then its own rows, a removing row
  *  dropping its definition */
@@ -209,11 +209,11 @@ const stagingPlots = (view: MajorView, seat: number): readonly number[] => view.
 
 /** start an operation (0x73a120): a pool slot, its teams, target and rally,
  *  its tree */
-function startOperation(ai: OpsAi, view: MajorView, def: AiOpDef, enemy: number, target: number, rally: number, turn: number,
-  log: (l: string) => void): Operation {
+function startOperation(ai: OpsAi, env: OpsEnv, def: AiOpDef, enemy: number, target: number, rally: number): Operation {
+  const nodes = treeOf(def.tree ?? '');
   const op: Operation = {
-    id: ai.nextOp++, def, enemy, target, rally, backup: null, teams: newTeams(def, view, target),
-    run: newRun(def.tree ?? '', treeOf(def.tree ?? '')), started: turn, enemyStrength: 0, strength: 0,
+    id: env.newOpId(), def: def.name, enemy, target, rally, backup: null, teams: newTeams(def, env.view(), target),
+    status: nodes.map(() => BT_FRESH), mem: nodes.map(() => ({})), bb: {}, done: false, started: env.turn, enemyStrength: 0, strength: 0,
     triggerUnits: [], triggerValue: 0, locked: false, allowUnitConstruction: false, contracts: [], formations: [],
   };
   for (const t of op.teams) {
@@ -222,8 +222,14 @@ function startOperation(ai: OpsAi, view: MajorView, def: AiOpDef, enemy: number,
   }
   const slot = ai.free.length ? ai.free.pop()! : ai.slots.length;
   ai.slots[slot] = op;
-  log(`${def.name}, Started`);
+  env.log(`${def.name}, Started`);
   return op;
+}
+
+/** the manager's start by name (0x7265b0): the definition against no enemy
+ *  at the plot, its rally the plot; the operation's id */
+export function startOperationNamed(ai: OpsAi, env: OpsEnv, name: string, plot: number): number {
+  return startOperation(ai, env, AI_OP_DEFS[name], -1, plot, plot).id;
 }
 
 function endOperation(ai: OpsAi, op: Operation): void {
@@ -233,117 +239,55 @@ function endOperation(ai: OpsAi, op: Operation): void {
   ai.free.push(k);
 }
 
-/** the knowledge base's camps: its update drops a camp whose plot the seat
- *  sees with none there (0x5ebb30), its look adds each camp on a plot the
- *  seat sees (0x7877e0 -> 0x5f0110) */
-function lookCamps(ai: OpsAi, view: MajorView): void {
-  const seen = view.plotsSeen(ai.seat);
-  const camps = new Set(view.campPlots());
-  ai.camps = ai.camps.filter((p) => !seen.has(p) || camps.has(p));
-  for (const p of [...camps].sort((a, b) => a - b)) if (seen.has(p) && !ai.camps.includes(p)) ai.camps.push(p);
-}
-
-/** THE CITIES' UPDATE (0x5ce680) as the operations read it: each city's
- *  threat (0x5cbd10, cityThreat); a threatened city whose defence slot holds
- *  no running operation starts City Defense at its plot (the defence event
- *  0x5cced0 through the manager's start by name 0x7265b0), the slot holding
- *  it */
-function cityDefense(ai: OpsAi, view: MajorView, turn: number, log: (l: string) => void): void {
-  const def = AI_OP_DEFS['City Defense'];
-  for (const city of view.cityPlots(ai.seat)) {
-    const threat = cityThreat(view, ai.seat, city, {
-      army: (p) => knownArmy(ai.army, p),
-      operationNear: (p, plot, dist) => opsOf(ai).some((o) => o.enemy === p && o.target !== NO_PLOT && view.plotDistance(o.target, plot) <= dist),
-    });
-    ai.threat.set(city, threat);
-    const slot = ai.defense.get(city) ?? -1;
-    if (slot !== -1 && opsOf(ai).some((o) => o.id === slot)) continue;
-    ai.defense.set(city, -1);
-    if (threat <= -1 || !def) continue;
-    ai.defense.set(city, startOperation(ai, view, def, -1, city, city, turn, log).id);
-  }
-}
-
 /** the seat's running operations of an OperationType */
-const count = (ai: OpsAi, type: string | null): number => opsOf(ai).filter((o) => o.def.operationType === type).length;
+const count = (ai: OpsAi, type: string | null): number => opsOf(ai).filter((o) => opDef(o).operationType === type).length;
 
 /** the seat's units in any operation */
 const assigned = (ai: OpsAi): Set<number> => new Set(opsOf(ai).flatMap(opUnits));
 
-/** the contracts as the seat's cities stand (their production the
- *  caller's): those no live operation's tree holds leave the book; a city
- *  producing an accepted contract's unit queues it (vt +0x38); a unit a city
- *  trained completes its queued contract (the completion signal 0x5f5650),
- *  the unit joining the operation whose tree made it (Release Unit When
- *  Built unset) */
-function updateContracts(ai: OpsAi, view: MajorView, env: OpsTurnEnv): void {
-  reapContracts(ai.book, new Set(opsOf(ai).flatMap((o) => o.contracts)));
-  const cities = view.contractCities(ai.seat).map((x) => ({ ...x, current: env.producing(x.id) }));
-  for (const c of ai.book.contracts) {
-    if (!c.unit || c.progress !== CP_ACCEPTED) continue;
-    const city = cities.find((x) => (c.city === -1 || x.id === c.city) && x.current?.unit === c.unit);
-    if (city) queueContract(c, city, () => true, () => undefined);
-  }
-  for (const b of env.built) {
-    contractBuilt(ai.book, b.city, { unit: b.type, building: null, district: null }, b.unit, (tree, id) => {
-      const op = opsOf(ai).find((o) => o.id === tree);
-      const unit = view.units(ai.seat).find((x) => x.id === id);
-      if (op && op.teams.length && unit && !assigned(ai).has(id)) addMember(op.teams[0], unit);
-    });
-  }
-  // the in-hand check (0x5d7e00): a queued contract's city values it, its
-  // turns the city's; one its city no longer produces FAILS
-  for (const c of ai.book.contracts) {
-    const city = c.queued && c.progress === CP_IN_PROGRESS ? cities.find((x) => x.id === c.city) : undefined;
-    if (city && !contractEvaluate(c, city)) c.progress = CP_FAILED;
-  }
+/** a unit a city trained for a contract an operation's tree made joins the
+ *  operation's first team, where no operation holds it already (the
+ *  completion signal 0x5f5650, Release Unit When Built unset); false where
+ *  no running operation made the contract */
+export function joinBuilt(ai: OpsAi, tree: number, unit: Pick<MajorUnitView, 'id' | 'type'>): boolean {
+  const op = opsOf(ai).find((o) => o.id === tree);
+  if (!op) return false;
+  if (op.teams.length && !assigned(ai).has(unit.id)) addMember(op.teams[0], unit);
+  return true;
 }
 
-/** what the shared contract nodes read of an operation's tree: the seat's
- *  book, its cities (their production cleared by the caller, none here: the
- *  majors' production stands on the record), the tree's own contracts */
-function contractWorld(ai: OpsAi, env: OpsTurnEnv, op: Operation): ContractNodeWorld {
-  const view = env.view();
-  return {
-    book: ai.book,
-    tree: { id: op.id, name: op.def.tree ?? op.def.name, get contracts() { return op.contracts; }, set contracts(v) { op.contracts = v; } },
-    turn: env.turn, cities: view.contractCities(ai.seat), newContractId: () => ai.nextContract++,
-    clearProduction: () => undefined, submitted: () => undefined,
-    techHeld: (t) => view.techsHeld(ai.seat).has(t), civicHeld: (c) => view.civicsHeld(ai.seat).has(c), holds: () => false,
-  };
-}
+/** the contracts the seat's running operations hold */
+export const opContracts = (ai: OpsAi): number[] => opsOf(ai).flatMap((o) => o.contracts);
 
-/** One turn of the seat's operations. */
-export function operationsTurn(ai: OpsAi, env: OpsTurnEnv): OpsTurnLog {
-  const lines: string[] = [];
-  const evals: string[] = [];
-  const log = (l: string) => lines.push(l);
+/** THE MILITARY AI'S TURN (list B): the units gone leave their operations;
+ *  the settle start; the candidates evaluated, logged, the backups named and
+ *  the new one to start chosen */
+export function operationsEvaluate(ai: OpsAi, env: OpsEnv): void {
   const view = env.view();
   // the seat's operations lose the units gone
   const live = new Set(view.units(ai.seat).map((u) => u.id));
   for (const op of opsOf(ai)) {
     for (const t of op.teams) t.members = t.members.filter((id) => live.has(id));
-    refreshStrengths(context(ai, env, op, log));
+    refreshStrengths(context(ai, env, op));
   }
-  updateContracts(ai, view, env);
-  const allowed = allowedOps(view.leaderType(ai.seat));
+  const allowed = env.defs ? env.defs.map((n) => AI_OP_DEFS[n]) : allowedOps(view.leaderType(ai.seat));
   const staging = stagingPlots(view, ai.seat);
-  const army = (p: number): readonly ArmyUnit[] => (p === ai.seat ? view.units(ai.seat) : knownArmy(ai.army, p));
+  const army = (p: number): readonly ArmyUnit[] => (p === ai.seat ? view.units(ai.seat) : env.army(p));
   const blank = (def: AiOpDef, enemy: number): Candidate => ({ def, enemy, presetRally: NO_PLOT, presetStrength: null, op: null,
     valid: false, odds: 0, value: 0, target: NO_PLOT, rally: NO_PLOT });
   // the military AI's turn (0x7271d0 -> 0x722d70): the candidates — the
   // running operations', then per other player at war with the seat or
   // prepared for war with its WAR definitions, then each allowed definition
-  // against no enemy — evaluated on the knowledge base's city records as the
-  // turn before left them
+  // against no enemy — evaluated on the knowledge base's records as the turn
+  // before left them
   const cands: Candidate[] = [];
-  for (const op of opsOf(ai)) cands.push({ ...blank(op.def, op.enemy), presetRally: op.target, presetStrength: op.strength, op });
+  for (const op of opsOf(ai)) cands.push({ ...blank(opDef(op), op.enemy), presetRally: op.target, presetStrength: op.strength, op });
   for (const p of view.players()) {
-    if (p === ai.seat || !(view.atWar(ai.seat, p) || ai.prepareForWar.has(p))) continue;
+    if (p === ai.seat || !(view.atWar(ai.seat, p) || ai.prepareForWar.includes(p))) continue;
     for (const def of allowed) if (def.enemyType === 'WAR') cands.push(blank(def, p));
   }
   for (const def of allowed) if (def.enemyType === 'NONE') cands.push(blank(def, -1));
-  const inputs = { settle: env.settle, camps: ai.camps, taken: new Set(opsOf(ai).map((o) => o.target)), known: ai.known ?? view.knownCities(ai.seat), army };
+  const inputs = { settle: env.settle, camps: env.camps(), taken: new Set(opsOf(ai).map((o) => o.target)), known: env.known, army };
   for (const c of cands) evaluate(view, ai.seat, c, staging, inputs);
   const { base, perWar } = limitsOf(view, ai.seat);
   // AI_EVENT_DESIRE_SETTLE (0x7265b0): for a seat that settles, Settle New City starts where the seat
@@ -356,7 +300,7 @@ export function operationsTurn(ai: OpsAi, env: OpsTurnEnv): OpsTurnLog {
   const settleType = settleDef.operationType ?? '';
   if (env.settle && settleCand && count(ai, settleType) < (base.get(settleType) ?? 0)) {
     const site = view.cityPlots(ai.seat).length > 0 ? env.settle?.best(-1) ?? null : null;
-    const op = startOperation(ai, view, settleDef, -1, site ? site.plot : settleCand.target, settleCand.rally, env.turn, log);
+    const op = startOperation(ai, env, settleDef, -1, site ? site.plot : settleCand.target, settleCand.rally);
     if (op.target === NO_PLOT) {
       const again: Candidate = { ...blank(settleDef, -1), presetRally: op.target, presetStrength: op.strength, op };
       evaluate(view, ai.seat, again, staging, inputs);
@@ -372,7 +316,7 @@ export function operationsTurn(ai: OpsAi, env: OpsTurnEnv): OpsTurnLog {
   let best: Candidate | null = null;
   for (const c of cands) {
     if (!c.valid) continue;
-    evals.push(`${c.enemy}, ${c.def.name}, ${(c.value / 256).toFixed(1)}`);
+    env.logEval(`${c.enemy}, ${c.def.name}, ${(c.value / 256).toFixed(1)}`);
     if (c.op) {
       c.op.backup = { target: c.target, rally: c.rally, enemy: c.enemy };
       continue;
@@ -383,58 +327,80 @@ export function operationsTurn(ai: OpsAi, env: OpsTurnEnv): OpsTurnLog {
     if (type && count(ai, type) >= (perWar.get(type) ?? 0) * wars + (base.get(type) ?? 0)) continue;
     best = c;
   }
-  // the knowledge base's city records refresh, and the CITY VALUES the
-  // manager logs after the evaluation lines read them: each known city of
-  // another player
-  const known = (ai.known = view.knownCities(ai.seat));
-  lookArmy(ai.army, view, ai.seat, env.turn);
-  lookCamps(ai, view);
-  const cityValues = known.filter((k) => k.owner !== ai.seat).map((k) => ({ plot: k.plot, value: cityValue(view, ai.seat, k, known, army) }));
-  cityDefense(ai, view, env.turn, log);
-  // each operation's target and teams
+  ai.pick = best ? { def: best.def.name, enemy: best.enemy, target: best.target, rally: best.rally } : null;
+}
+
+/** THE OPERATIONS' RUN (with the tree manager's tick): each operation's
+ *  target and teams logged; the chosen candidate started; the trees, in
+ *  slot order */
+export function operationsRun(ai: OpsAi, env: OpsEnv): void {
   for (const op of opsOf(ai)) {
-    log(`${op.def.name} running, TARGET ${xy(view, op.target)}`);
-    const ctx = context(ai, env, op, log);
-    refreshStrengths(ctx);
-    const units = new Map(view.units(ai.seat).map((u) => [u.id, u]));
+    const view = env.view();
+    env.log(`${op.def} running, TARGET ${xy(view, op.target)}`);
+    refreshStrengths(context(ai, env, op));
+    const units = new Map(env.view().units(ai.seat).map((u) => [u.id, u]));
     op.teams.forEach((t, k) => {
       const names = t.members.map((id) => units.get(id)?.type).filter(Boolean).map((n) => `${n}; `).join('');
-      log(`${op.def.name}, ,${k}, ${t.ready ? 'Ready' : 'Not Ready'}, ${names}`);
+      env.log(`${op.def}, ,${k}, ${t.ready ? 'Ready' : 'Not Ready'}, ${names}`);
     });
   }
-  if (best) startOperation(ai, view, best.def, best.enemy, best.target, best.rally, env.turn, log);
-  // the trees, in slot order
+  const pick = ai.pick;
+  ai.pick = null;
+  if (pick) startOperation(ai, env, AI_OP_DEFS[pick.def], pick.enemy, pick.target, pick.rally);
   for (const op of opsOf(ai)) {
-    tick(op.run, OP_NODES, context(ai, env, op, log));
-    if (op.run.done) {
-      log(`${op.def.name}, Operation complete`);
+    const run: BtRun = { name: op.def, nodes: treeOf(opDef(op).tree ?? ''), status: op.status, mem: op.mem,
+      blackboard: new Map(Object.entries(op.bb)), done: op.done };
+    tick(run, OP_NODES, context(ai, env, op));
+    op.bb = Object.fromEntries(run.blackboard);
+    op.done = run.done;
+    if (op.done) {
+      env.log(`${op.def}, Operation complete`);
       endOperation(ai, op);
     }
   }
-  return { lines, evals, cityValues };
 }
 
-function context(ai: OpsAi, env: OpsTurnEnv, op: Operation, log: (l: string) => void): OpsContext {
+/** what the shared contract nodes read of an operation's tree: the seat's
+ *  book and cities, the tree's own contracts */
+function contractWorld(ai: OpsAi, env: OpsEnv, op: Operation): ContractNodeWorld {
+  const view = env.view();
+  return {
+    book: env.book(),
+    tree: { id: op.id, name: opDef(op).tree ?? op.def, get contracts() { return op.contracts; }, set contracts(v) { op.contracts = v; } },
+    turn: env.turn,
+    get cities() { return env.contractCities(); },
+    newContractId: () => env.newContractId(),
+    clearProduction: (city) => env.clearProduction(city), submitted: () => undefined,
+    techHeld: (t) => view.techsHeld(ai.seat).has(t), civicHeld: (c) => view.civicsHeld(ai.seat).has(c), holds: () => false,
+  };
+}
+
+function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
   return {
     seat: ai.seat,
     turn: env.turn,
     view: env.view,
     act: env.act,
+    move: env.move,
+    strike: env.strike,
+    attack: env.attack,
+    moveUpdate: env.moveUpdate,
+    moveExec: env.moveExec,
     op,
     assigned: () => assigned(ai),
     others: () => opsOf(ai),
     contractWorld: () => contractWorld(ai, env, op),
     diplomacy: ai.diplomacy,
     requestDiplomacy: (action, enemy, value) => {
-      const id = ai.diplomacy.size;
-      ai.diplomacy.set(id, { id, action, enemy, value, turn: env.turn, op: op.id });
+      const id = ai.diplomacy.length;
+      ai.diplomacy.push({ id, action, enemy, value, turn: env.turn, op: op.id });
       return id;
     },
     settle: env.settle,
-    threat: (plot) => ai.threat.get(plot) ?? -1,
-    unitRows: () => env.unitRows(),
-    camps: () => ai.camps,
-    log,
+    threat: env.threat,
+    unitRows: env.unitRows,
+    camps: env.camps,
+    log: env.log,
   };
 }
 
@@ -453,17 +419,8 @@ export function remapUnits(ai: OpsAi, map: (id: number) => number | undefined): 
       const y = map(b);
       return x === undefined || y === undefined ? [] : [[x, y] as [number, number]];
     });
-    for (const [k, v] of op.run.blackboard) {
-      if (Array.isArray(v) && v.every((x) => typeof x === 'number')) op.run.blackboard.set(k, ids(v as number[]));
+    for (const [k, v] of Object.entries(op.bb)) {
+      if (Array.isArray(v) && v.every((x) => typeof x === 'number')) op.bb[k] = ids(v as number[]);
     }
-  }
-  // a record of a unit the map no longer names keeps a negative key of its
-  // own
-  const records = [...ai.army.values()];
-  let orphan = Math.min(0, ...records.map((r) => r.id)) - 1;
-  ai.army.clear();
-  for (const r of records) {
-    const id = r.id < 0 ? r.id : map(r.id) ?? orphan--;
-    ai.army.set(id, { ...r, id });
   }
 }

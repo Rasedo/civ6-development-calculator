@@ -2061,29 +2061,38 @@ class SimTactics:
 
     # ------------------------------------------------------- the raid's tree
 
-    def _barb_op_key(self, k: int, goal: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """tribe `k`'s operation's living members [B, P], their distance to
+    def _op_member_key(self, mem: torch.Tensor, goal: torch.Tensor, pre: str) -> tuple[torch.Tensor, torch.Tensor]:
+        """an operation's members `mem` [B, P] of pool `pre`: their distance to
         `goal` [B] and their order key (`nearestFirst`: the distance, then the
         pool slot)"""
+        tile = getattr(self, f"{pre}_unit_tile")
+        slotno = self.barb_unit_slotno if pre == "barb" else self.major_unit_pslot
+        d = self.pair_dist[tile.clamp(min=0), goal.clamp(min=0).unsqueeze(1)].to(torch.long)
+        key = d * (1 << 20) + slotno.clamp(min=0)
+        return d, key
+
+    def _barb_op_key(self, k: int, goal: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """tribe `k`'s operation's living members [B, P], their distance to
+        `goal` [B] and their order key"""
         mem = self.barb_unit_alive & self.barb_unit_op & (self.barb_unit_tribe == k)
-        d = self.pair_dist[self.barb_unit_tile.clamp(min=0), goal.clamp(min=0).unsqueeze(1)].to(torch.long)
-        key = d * (1 << 20) + self.barb_unit_slotno.clamp(min=0)
+        d, key = self._op_member_key(mem, goal, "barb")
         return mem, d, key
 
-    def _barb_reach_at(self, rows: torch.Tensor, us: torch.Tensor, goal: torch.Tensor, turns: int, moves: bool,
-                       rng: torch.Tensor, rowof: torch.Tensor, res: dict) -> torch.Tensor:
-        """`reachAt` for the barbarian at local slot `us` [N] in the games
-        `rows`: the first plot of its planning (closing order) within `turns`
-        — the goal itself at range 0, else a plot exactly `rng` from it with
-        none of its own military there but its own plot; `moves` asks
-        Movement left. -1 none."""
+    def _op_reach_at(self, rows: torch.Tensor, us: torch.Tensor, goal: torch.Tensor, turns: int, moves: bool,
+                     rng: torch.Tensor, rowof: torch.Tensor, res: dict, pre: str = "barb",
+                     seat: int = BARB_SEAT) -> torch.Tensor:
+        """`reachAt` for the unit at local slot `us` [N] of pool `pre` (its
+        player `seat`) in the games `rows`: the first plot of its planning
+        (closing order) within `turns` — the goal itself at range 0, else a
+        plot exactly `rng` from it with none of its own military there but its
+        own plot; `moves` asks Movement left. -1 none."""
         n = rowof[rows, us]
         ok_row = n >= 0
         nn = n.clamp(min=0)
         rt, rk, mv = res["turns"][nn], res["rank"][nn], res["moves"][nn]
         dq = self.pair_dist[goal.clamp(min=0)].to(torch.long)                     # [N, T]
-        here = self.barb_unit_tile[rows, us]
-        own = self._tac_own_mil(BARB_SEAT)[rows]
+        here = getattr(self, f"{pre}_unit_tile")[rows, us]
+        own = self._tac_own_mil(seat)[rows]
         at = torch.where(rng.unsqueeze(1) == 0, self._arange_bt[rows] == goal.unsqueeze(1),
                          (dq == rng.unsqueeze(1)) & (~own | (self._arange_bt[rows] == here.unsqueeze(1))))
         ok = at & (rt >= 0) & (rt <= turns) & ok_row.unsqueeze(1)
@@ -2094,19 +2103,28 @@ class SimTactics:
         best = key.min(dim=1)
         return torch.where(best.values < big, best.indices, torch.full_like(best.indices, -1))
 
-    def _barb_move_update(self, on: torch.Tensor, k: int, node: int, goal: torch.Tensor, target: bool, rng: int,
-                          spread: int, rowof: torch.Tensor, res: dict) -> tuple[torch.Tensor, torch.Tensor]:
-        """`moveUpdate` for tribe `k`'s operation in the games `on` at the
-        node's store `node` (11, 21, 24 -> 0, 1, 2): its status (1 SUCCESS, 2
-        RUNNING) and whether the team arrived."""
-        B, P = self.B, self.barb_unit_alive.shape[1]
+    def _barb_reach_at(self, rows: torch.Tensor, us: torch.Tensor, goal: torch.Tensor, turns: int, moves: bool,
+                       rng: torch.Tensor, rowof: torch.Tensor, res: dict) -> torch.Tensor:
+        """`reachAt` for a barbarian (`_op_reach_at`)"""
+        return self._op_reach_at(rows, us, goal, turns, moves, rng, rowof, res)
+
+    def _op_move_update(self, on: torch.Tensor, mem: torch.Tensor, dead: torch.Tensor, store: torch.Tensor,
+                        store_goal: torch.Tensor, goal: torch.Tensor, target: bool, rng: int, spread: int,
+                        rowof: torch.Tensor, res: dict, pre: str = "barb",
+                        seat: int = BARB_SEAT) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """`passMoveUpdate` for an operation's team in the games `on`: its
+        living members `mem` [B, P] of pool `pre`, `dead` [B] its members
+        killed, the node's store `store` [B, P] and the goal it holds it for
+        `store_goal` [B] (written in place where the store is kept): its status
+        (1 SUCCESS, 2 RUNNING), whether the team arrived, and the games whose
+        store the update kept (`rest`)."""
+        B = self.B
         dev = self.device
         bidx = torch.arange(B, device=dev)
         big = 1 << 40
-        mem, d, key = self._barb_op_key(k, goal)
-        dead = self.tribe_op_dead[:, k]
-        kept = self.tribe_store_goal[:, k, node] == goal
-        L = self.tribe_store[:, k, node] & kept.unsqueeze(1) & mem
+        d, key = self._op_member_key(mem, goal, pre)
+        kept = store_goal == goal
+        L = store & kept.unsqueeze(1) & mem
         others = mem & ~L
         has_oth = others.any(dim=1) | (dead > 0)
         okey = torch.where(others, key, torch.full_like(key, big))
@@ -2118,7 +2136,7 @@ class SimTactics:
         need = on & has_oth & has_head & ~arrived
         if bool(need.count_nonzero()):
             rows = need.nonzero(as_tuple=True)[0]
-            p = self._barb_reach_at(rows, hs[rows], goal[rows], 1, True, torch.full_like(rows, rng), rowof, res)
+            p = self._op_reach_at(rows, hs[rows], goal[rows], 1, True, torch.full_like(rows, rng), rowof, res, pre, seat)
             reach[rows] = p >= 0
         miss = on & has_oth & ~arrived
         lin = L & (d <= rng) & miss.unsqueeze(1)
@@ -2142,13 +2160,15 @@ class SimTactics:
         else:
             win = torch.zeros_like(arrived)
         rest = on & ~win
+        tile = getattr(self, f"{pre}_unit_tile")
+        P = mem.shape[1]
         if spread != 0:
             n_oth = others.sum(dim=1) + dead
             okey = torch.where(others, key, torch.full_like(key, big))
             order = okey.argsort(dim=1, stable=True)
             nv = others.sum(dim=1)
             M = int(nv.max()) if B else 0
-            tiles = self.barb_unit_tile.gather(1, order[:, :M]).clamp(min=0)          # [B, M]
+            tiles = tile.gather(1, order[:, :M]).clamp(min=0)          # [B, M]
             dd = d.gather(1, order[:, :M])
             valid = torch.arange(M, device=dev).unsqueeze(0) < nv.unsqueeze(1)
             end = (valid & (dd <= spread)).sum(dim=1)
@@ -2160,66 +2180,97 @@ class SimTactics:
             strays = n_oth - end
             arrived = arrived & ~(rest & (2 * strays >= n_oth))
         if spread > 0:
-            ot = torch.where(others, self.barb_unit_tile, torch.full_like(self.barb_unit_tile, -1))
+            ot = torch.where(others, tile, torch.full_like(tile, -1))
             near = torch.zeros_like(L)
             for j in range(P):
                 oj = ot[:, j]
                 if not bool((oj >= 0).any()):
                     continue
-                near |= (oj >= 0).unsqueeze(1) & (self.pair_dist[self.barb_unit_tile.clamp(min=0),
+                near |= (oj >= 0).unsqueeze(1) & (self.pair_dist[tile.clamp(min=0),
                                                                  oj.clamp(min=0).unsqueeze(1)].to(torch.long) <= spread)
             gone = L & near & rest.unsqueeze(1)
             arrived |= (gone & (d <= rng)).any(dim=1)
             L &= ~gone
         st = rest.nonzero(as_tuple=True)[0]
         if st.numel():
-            self.tribe_store[st, k, node] = L[st]
-            self.tribe_store_goal[st, k, node] = goal[st]
+            store[st] = L[st]
+            store_goal[st] = goal[st]
         status = torch.where(win | arrived, 1, 2)
-        return status, win | arrived
+        return status, win | arrived, rest
 
-    def _barb_move_exec(self, on: torch.Tensor, k: int, goal: torch.Tensor, rng: int, arrived: torch.Tensor,
-                        done: torch.Tensor, rowof: torch.Tensor, res: dict) -> None:
-        """`moveExec` for tribe `k`'s operation in the games `on`: nothing
-        where the team arrived; else each living member that can act,
-        nearest the goal first, its radius, its plot (its planning's at the
-        radius in the goal's region, else the ring walk's), its turn done,
-        its move order."""
-        go = on & ~arrived
+    def _barb_move_update(self, on: torch.Tensor, k: int, node: int, goal: torch.Tensor, target: bool, rng: int,
+                          spread: int, rowof: torch.Tensor, res: dict) -> tuple[torch.Tensor, torch.Tensor]:
+        """`moveUpdate` for tribe `k`'s operation in the games `on` at the
+        node's store `node` (11, 21, 24 -> 0, 1, 2): its status (1 SUCCESS, 2
+        RUNNING) and whether the team arrived."""
+        mem = self.barb_unit_alive & self.barb_unit_op & (self.barb_unit_tribe == k)
+        store = self.tribe_store[:, k, node].clone()
+        sg = self.tribe_store_goal[:, k, node].clone()
+        status, arrived, rest = self._op_move_update(on, mem, self.tribe_op_dead[:, k], store, sg, goal, target, rng, spread,
+                                                     rowof, res)
+        st = rest.nonzero(as_tuple=True)[0]
+        if st.numel():
+            self.tribe_store[st, k, node] = store[st]
+            self.tribe_store_goal[st, k, node] = sg[st]
+        return status, arrived
+
+    def _op_move_exec(self, on: torch.Tensor, mem: torch.Tensor, goal: torch.Tensor, rng: int, arrived: torch.Tensor,
+                      ready: torch.Tensor, done: torch.Tensor, rowof: torch.Tensor, res: dict, pre: str = "barb",
+                      seat: int = BARB_SEAT, zero: torch.Tensor | None = None,
+                      leader: bool = False) -> list:
+        """`passMoveExec` for an operation's team in the games `on`: nothing
+        where the operation is `ready` [B], the team arrived and the node names
+        no Leader Tag (`leader`); else each living member `mem` [B, P] that
+        can act, nearest the goal first: its radius (0 for a ship or a unit of
+        `zero` [B, P]; at least 1 where the goal is barred, and with a Leader
+        Tag named), its plot (its planning's at the radius in the goal's
+        region, else the ring walk's), its turn done, its move order. The
+        moves: per mover [B] its slot (-1 none), its plot before, its plot
+        after."""
+        skip = arrived & ready if not leader else torch.zeros_like(arrived)
+        go = on & ~skip
+        moves: list = []
         if not bool(go.count_nonzero()):
-            return
+            return moves
         B = self.B
         dev = self.device
         bidx = torch.arange(B, device=dev)
         big = 1 << 40
-        mem, d, key = self._barb_op_key(k, goal)
-        can = mem & ~done & (self.barb_unit_mp > 0) & go.unsqueeze(1)
+        d, key = self._op_member_key(mem, goal, pre)
+        alive_p = getattr(self, f"{pre}_unit_alive")
+        mp_p = getattr(self, f"{pre}_unit_mp")
+        tile_p = getattr(self, f"{pre}_unit_tile")
+        type_p = getattr(self, f"{pre}_unit_type")
+        can = mem & ~done & (mp_p > 0) & go.unsqueeze(1)
         order = torch.where(can, key, torch.full_like(key, big)).argsort(dim=1, stable=True)
         nm = can.sum(dim=1)
         region = self.tile_region.gather(1, goal.clamp(min=0).unsqueeze(1)).squeeze(1)
-        hostile = self._tac_hostile(BARB_SEAT)
-        foreign = self._tac_foreign(BARB_SEAT)
+        hostile = self._tac_hostile(seat)
+        foreign = self._tac_foreign(seat)
         ring = self._barb_ring[goal.clamp(min=0)]                                   # [B, 37]
         for j in range(int(nm.max()) if B else 0):
             us = order[:, j]
-            act = (j < nm) & self.barb_unit_alive[bidx, us] & ~done[bidx, us] & (self.barb_unit_mp[bidx, us] > 0)
+            act = (j < nm) & alive_p[bidx, us] & ~done[bidx, us] & (mp_p[bidx, us] > 0)
             if not bool(act.count_nonzero()):
                 continue
             rows = act.nonzero(as_tuple=True)[0]
             ur = us[rows]
             gr = goal[rows].clamp(min=0)
-            ut = self.barb_unit_type[rows, ur].clamp(min=0, max=self.NU - 1)
+            ut = type_p[rows, ur].clamp(min=0, max=self.NU - 1)
             naval = self.unit_naval.take(ut)
-            r = torch.where(naval, torch.zeros_like(ut), torch.clamp(self._tac_range(rows, ur), max=rng))
-            here = self.barb_unit_tile[rows, ur]
-            path = self._tac_search(rows, ur, BARB_SEAT, 1 << 30, True)["closed"] >= 0    # [N, T]
-            own = self._tac_own_mil(BARB_SEAT)[rows]
+            z = zero[rows, ur] if zero is not None else torch.zeros_like(naval)
+            r = torch.where(naval | z, torch.zeros_like(ut), torch.clamp(self._tac_range(rows, ur, pre), max=rng))
+            here = tile_p[rows, ur]
+            path = self._tac_search(rows, ur, seat, 1 << 30, True, pre=pre)["closed"] >= 0    # [N, T]
+            own = self._tac_own_mil(seat)[rows]
             barred = ((~path.gather(1, gr.unsqueeze(1)).squeeze(1)) | hostile[rows, gr] | own[torch.arange(rows.numel(), device=dev), gr]
                       | foreign[rows, gr])
             r = torch.where((here != gr) & barred, r.clamp(min=1), r)
+            if leader:
+                r = torch.where(~((here != gr) & barred) & (rng > 0) & ~z, r.clamp(min=1), r)
             dest = gr.clone()
             strike = torch.zeros_like(act[rows])
-            p = self._barb_reach_at(rows, ur, gr, _PLAN_TURNS, False, r, rowof, res)
+            p = self._op_reach_at(rows, ur, gr, _PLAN_TURNS, False, r, rowof, res, pre, seat)
             rg = region[rows]
             pin = (p >= 0) & (rg >= 0) & (self.tile_region[rows, p.clamp(min=0)] == rg)
             dest = torch.where(pin, p, dest)
@@ -2229,8 +2280,8 @@ class SimTactics:
                 n_c = 1 + 3 * r * r + 3 * r
                 anyown = (self.military_at[rows] >= 0) | (self.civilian_at[rows] >= 0) | (self.support_at[rows] >= 0)
                 seat_of = lambda pl: torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, -1))  # noqa: E731
-                mine = ((seat_of(self.military_at[rows]) == BARB_SEAT) | (seat_of(self.civilian_at[rows]) == BARB_SEAT)
-                        | (seat_of(self.support_at[rows]) == BARB_SEAT)) & anyown
+                mine = ((seat_of(self.military_at[rows]) == seat) | (seat_of(self.civilian_at[rows]) == seat)
+                        | (seat_of(self.support_at[rows]) == seat)) & anyown
                 best = torch.full_like(gr, -1)
                 best_d = torch.full_like(gr, -1)
                 best_in = torch.zeros_like(walk)
@@ -2259,8 +2310,19 @@ class SimTactics:
             hit[rows] = strike
             ms = torch.zeros(B, dtype=torch.bool, device=dev)
             ms[rows] = True
-            self._tac_move_to(ms & ~hit, us, full, strike=False)
-            self._tac_move_to(ms & hit, us, full, strike=True)
+            before = torch.where(ms, tile_p[bidx, us], torch.full_like(us, -1))
+            self._tac_move_to(ms & ~hit, us, full, pre, seat, strike=False)
+            self._tac_move_to(ms & hit, us, full, pre, seat, strike=True)
+            moves.append((torch.where(ms, us, torch.full_like(us, -1)), before, torch.where(ms, full, torch.full_like(us, -1))))
+        return moves
+
+    def _barb_move_exec(self, on: torch.Tensor, k: int, goal: torch.Tensor, rng: int, arrived: torch.Tensor,
+                        done: torch.Tensor, rowof: torch.Tensor, res: dict) -> None:
+        """`moveExec` for tribe `k`'s operation in the games `on`: nothing
+        where the team arrived (a raid's operation is ready, its nodes name no
+        Leader Tag); else its members move (`_op_move_exec`)."""
+        mem = self.barb_unit_alive & self.barb_unit_op & (self.barb_unit_tribe == k)
+        self._op_move_exec(on, mem, goal, rng, arrived, torch.ones_like(arrived), done, rowof, res)
 
     def _barb_op_attack(self, on: torch.Tensor, k: int, done: torch.Tensor, ai: torch.Tensor, order: torch.Tensor,
                         rowof: torch.Tensor, res: dict, tg: dict) -> None:
@@ -3287,7 +3349,8 @@ class SimTactics:
     def _minor_tactics(self, s: int) -> None:
         """A CITY-STATE'S TACTICAL TURN (`cityStateTactics`) for minor `s`:
         its unit pool (`_seat_pool_slots`), each unit's planning reach taken
-        before any moves, its tactical target list and danger map, then Attack
+        before any moves, its tactical target list and danger map, its
+        operations' run (`_mops_run`, their units theirs), then Attack
         High Priority, Move to Safety, Attack Medium and Low Priority, Heal,
         Chase Target (no strike) and Wander Near City in pool order, the
         homeland's Move to Safety; the rest end their turn."""
@@ -3319,6 +3382,9 @@ class SimTactics:
         tg = op["tg"]
         done = torch.zeros_like(units)
         alive = self.major_unit_alive
+        # its operations' run once the pass has its units' planning: their
+        # units' turns are the operations'
+        self._mops_run(s, act, op, done)
 
         def live() -> torch.Tensor:
             return units & ~done & alive & (self.major_unit_seat == seat)

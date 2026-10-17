@@ -329,6 +329,8 @@ const namesOf = (kind: string, id: string, prefix: string, known: object): strin
 import { AI_MODIFIER_READS } from '../core/aiModifiers';
 import { promotionWeight } from '../core/minorBuild';
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS, AI_CITY_EVENT_TYPES, AI_CITY_TREES } from '../data/aiCityTrees';
+import { AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_TEAMS, AI_TEAM_REQS, AI_TREES, AI_UNIT_AI, AI_UNIT_AI_PRIORITY } from '../data/aiOperations';
+import { MINOR_OP_DEFS } from '../core/minorOps';
 import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS, AI_UNIT_EFFICIENCY } from '../data/aiBuildTables';
 import { AI_YIELDS } from '../core/aiWeights';
 import type { Era } from '../data/techs';
@@ -1101,6 +1103,27 @@ export function buildRules() {
       cityEventTypes: AI_CITY_EVENT_TYPES,
       cityEventLists: Object.fromEntries(Object.entries(AI_CITY_EVENT_LISTS).map(([t, l]) => [t, AI_CITY_EVENTS[l]])),
       cityTrees: AI_CITY_TREES,
+    },
+    // the city-states' operations (`minorOps.ts`, cpu/core/operations): the
+    // definitions they run, their teams, the teams' requirements and the
+    // trees, each AI unit row's unit AI types, the UnitAiTypes of Priority,
+    // the operation limits of their trait (AiOperationTypes)
+    aiOperations: {
+      defs: MINOR_OP_DEFS.map((n) => AI_OP_DEFS[n]),
+      teams: Object.fromEntries(MINOR_OP_DEFS.map((n) => [n, AI_OP_TEAMS[n] ?? []])),
+      reqs: Object.fromEntries([...new Set(MINOR_OP_DEFS.flatMap((n) => (AI_OP_TEAMS[n] ?? []).map((t) => t.team)))]
+        .map((t) => [t, AI_TEAM_REQS[t] ?? []])),
+      trees: Object.fromEntries([...new Set(MINOR_OP_DEFS.map((n) => AI_OP_DEFS[n].tree ?? ''))].filter(Boolean).map((t) => [t, AI_TREES[t]])),
+      unitAi: AI_UNITS.map((u) => AI_UNIT_AI[u.type] ?? []),
+      priority: AI_UNIT_AI_PRIORITY,
+      // the odds' decay term (0x746920) by its exponent: 0.97 ^ e in single
+      // precision, as the engine's Math.pow takes it
+      oddsDecay: Array.from({ length: 1024 }, (_v, e) => Math.fround(Math.pow(Math.fround(0.97), e))),
+      limits: AI_OP_LIMIT_LISTS.filter((l) => l.trait === 'MINOR_CIV_DEFAULT_TRAIT' && l.system === 'AiOperationTypes')
+        .reduce<Record<string, number>>((acc, l) => {
+          for (const [k, v] of Object.entries(l.items)) acc[k] = (acc[k] ?? 0) + v;
+          return acc;
+        }, {}),
     },
     researchAi: {
       taskBias: RESEARCH_AI_TASK_BIAS,

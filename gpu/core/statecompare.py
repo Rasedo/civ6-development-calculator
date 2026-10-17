@@ -421,10 +421,10 @@ GAME = {
     "freeShortfall": lambda sim, b, rows: [int(sim.seat_shortfall[b, sim.FREE_ROW])],
     "freeResearch": lambda sim, b, rows: [_research_record(sim, b, sim.FR)],
     "barbArmyKnown": lambda sim, b, rows: [[x for r in sorted(
-        (int(o), int(t), int(n), int(p)) for k, o, t, n, p in zip(
+        (int(o), int(t), int(n), int(p), int(d)) for k, o, t, n, p, d in zip(
             sim.citystate_kb_slot[b, sim.BK].tolist(), sim.citystate_kb_owner[b, sim.BK].tolist(),
             sim.citystate_kb_type[b, sim.BK].tolist(), sim.citystate_kb_seen[b, sim.BK].tolist(),
-            sim.citystate_kb_plot[b, sim.BK].tolist()) if k != -2) for x in r]],
+            sim.citystate_kb_plot[b, sim.BK].tolist(), sim.citystate_kb_damage[b, sim.BK].tolist()) if k != -2) for x in r]],
     "storms": lambda sim, b, rows: [_storm_table(sim, b)],
     "droughts": lambda sim, b, rows: [_drought_table(sim, b)],
 }
@@ -942,10 +942,12 @@ CITY_STATE = {
         [x for i, v in enumerate(sim.citystate_kept[b, s].tolist()) if v != 0 for x in (i, v)] for s in rows],
     "minorArmyKnown": lambda sim, b, rows: [
         [x for r in sorted(
-            (int(o), int(t), int(n), int(p)) for k, o, t, n, p in zip(
+            (int(o), int(t), int(n), int(p), int(d)) for k, o, t, n, p, d in zip(
                 sim.citystate_kb_slot[b, s].tolist(), sim.citystate_kb_owner[b, s].tolist(),
                 sim.citystate_kb_type[b, s].tolist(), sim.citystate_kb_seen[b, s].tolist(),
-                sim.citystate_kb_plot[b, s].tolist()) if k != -2) for x in r] for s in rows],
+                sim.citystate_kb_plot[b, s].tolist(), sim.citystate_kb_damage[b, s].tolist()) if k != -2) for x in r] for s in rows],
+    "minorOps": lambda sim, b, rows: [_minor_ops(sim, b, s) for s in rows],
+    "minorCampsKnown": lambda sim, b, rows: [[int(x) for x in sim.mops_camps[b, s].tolist() if x >= 0] for s in rows],
     "minorProjectYield": lambda sim, b, rows: [
         [int(sim.city_proj_yield[b, sim._CITY_MINOR0 + s, 0]), float(sim.city_proj_conv[b, sim._CITY_MINOR0 + s, 0])]
         for s in rows
@@ -1021,6 +1023,48 @@ def _ai_trees(sim, b: int, s: int) -> list[int]:
     return out
 
 
+def _minor_ops(sim, b: int, s: int) -> list[int]:
+    """the minor's operations as `minorOpsRecord` reads them: the pool's
+    size, its free slots, the pick, per slot its definition (-1 free), id,
+    target, rally, backup, strengths, per team its team, its members' pool
+    slots (-1 unslotted, -2 gone), its requirements' counts, goals, flags,
+    unit, strength"""
+    from .sim_minorops import minor_ops_tables
+    T = minor_ops_tables(sim.rules)
+    size = int(sim.mops_size[b, s])
+    nf = int(sim.mops_nfree[b, s])
+    out = [size, nf] + [int(x) for x in sim.mops_free[b, s, :nf].tolist()]
+    pk = int(sim.mops_pick[b, s])
+    out += [pk, int(sim.mops_pick_target[b, s]) if pk >= 0 else -1, int(sim.mops_pick_rally[b, s]) if pk >= 0 else -1]
+    lo = sim.POOL_LO["major"]
+    for k in range(size):
+        d = int(sim.mops_def[b, s, k])
+        if d < 0:
+            out.append(-1)
+            continue
+        out += [d, int(sim.mops_id[b, s, k]), int(sim.mops_target[b, s, k]), int(sim.mops_rally[b, s, k]),
+                int(sim.mops_bk_target[b, s, k]), int(sim.mops_bk_rally[b, s, k]), int(sim.mops_estr[b, s, k]),
+                int(sim.mops_str[b, s, k])]
+        for ti in range(2):
+            tm = int(sim.mops_tm[b, s, k, ti])
+            if tm < 0:
+                out.append(-1)
+                continue
+            mem = [int(x) for x in sim.mops_mem[b, s, k, ti].tolist() if x >= 0]
+            slots = []
+            for u in mem:
+                g = u + lo
+                alive = bool(sim.unit_alive[b, g]) and int(sim.unit_seat[b, g]) == 100 + s
+                slots.append(int(sim.unit_pslot[b, g]) if alive else -2)
+            R = T.team_reqs[d][tm]["n"]
+            out += [tm, len(slots)] + slots + [R] + [int(x) for x in sim.mops_cnt[b, s, k, ti, :R].tolist()]
+            out += [int(x) for x in sim.mops_goal[b, s, k, ti].tolist()]
+            out += [int(bool(sim.mops_eng[b, s, k, ti])), int(bool(sim.mops_mins[b, s, k, ti])),
+                    int(bool(sim.mops_ready[b, s, k, ti])), int(bool(sim.mops_ong[b, s, k, ti])),
+                    int(sim.mops_unit[b, s, k, ti]), int(sim.mops_tstr[b, s, k, ti])]
+    return out
+
+
 def _ai_contracts(sim, b: int, s: int) -> list[int]:
     """the contracts by id: [id, tree, unit, building, district rows, goal
     kind, goal, plot, value, city, most turns, turns, progress, assign,
@@ -1031,7 +1075,8 @@ def _ai_contracts(sim, b: int, s: int) -> list[int]:
         if cid < 0:
             continue
         tree = int(sim.cai_c_tree[b, s, j])
-        live = any(bool(sim.cai_tr_alive[b, s, k]) and int(sim.cai_tr_id[b, s, k]) == tree for k in range(sim.cai_tr_id.shape[2]))
+        live = any(bool(sim.cai_tr_alive[b, s, k]) and int(sim.cai_tr_id[b, s, k]) == tree for k in range(sim.cai_tr_id.shape[2])) \
+            or any(int(sim.mops_def[b, s, k]) >= 0 and int(sim.mops_id[b, s, k]) == tree for k in range(sim.mops_id.shape[2]))
         rows.append([cid, tree, int(sim.cai_c_unit[b, s, j]), int(sim.cai_c_building[b, s, j]), int(sim.cai_c_district[b, s, j]),
                      int(sim.cai_c_goal_kind[b, s, j]), int(sim.cai_c_goal[b, s, j]), int(sim.cai_c_plot[b, s, j]),
                      int(sim.cai_c_value[b, s, j]), int(sim.cai_c_city[b, s, j]), int(sim.cai_c_max_turns[b, s, j]),

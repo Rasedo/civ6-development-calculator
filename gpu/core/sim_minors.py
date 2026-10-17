@@ -156,11 +156,13 @@ class SimMinors:
 
     def _minor_knowledge(self, s: int, age: bool) -> None:
         """`minorKnowledge` — minor `s`'s knowledge base's look over the plots
-        it sees (`_minor_sight`)."""
+        it sees (`_minor_sight`): its army records, its camps."""
         alive = self.citystate_alive[:, s]
         if not bool(alive.count_nonzero()):
             return
-        self._knowledge_look(s, 100 + s, self._minor_sight(s), alive, age)
+        sight = self._minor_sight(s)
+        self._knowledge_look(s, 100 + s, sight, alive, age)
+        self._mops_camps_look(s, sight, alive)
 
     def _knowledge_look(self, r: int, seat: int, sight: torch.Tensor, alive: torch.Tensor, age: bool) -> None:
         """`knowledgeLook` — the knowledge base's army records on row `r` of
@@ -209,11 +211,14 @@ class SimMinors:
                      torch.arange(K, device=dev).unsqueeze(0).expand(B, -1).contiguous())
         rec = rec[:, :U]
         hit = vis & (rec >= 0)
+        dmg = self.citystate_kb_damage[:, r]
+        hp_max = int(self.rules.combat["unitHp"])
         if bool(hit.count_nonzero()):
             b, u = hit.nonzero(as_tuple=True)
             k = rec[b, u]
             seen_t[b, k] = turn
             plot[b, k] = self.unit_tile[b, u].to(plot.dtype)
+            dmg[b, k] = (hp_max - self.unit_hp[b, u]).to(dmg.dtype)
         new = vis & (rec < 0)
         if bool(new.count_nonzero()):
             free = slot == -2
@@ -228,6 +233,7 @@ class SimMinors:
             typ[b, k] = self.unit_type[b, u].to(typ.dtype)
             seen_t[b, k] = turn
             plot[b, k] = self.unit_tile[b, u].to(plot.dtype)
+            dmg[b, k] = (hp_max - self.unit_hp[b, u]).to(dmg.dtype)
             nxt = self.citystate_kb_next[:, r]
             seq[b, k] = (nxt[b] + rank[b, u]).to(seq.dtype)
             self.citystate_kb_next[:, r] = nxt + new.sum(dim=1)
@@ -1356,7 +1362,8 @@ class SimMinors:
         self.citystate_prod_site[:, s] = torch.where(fin, torch.full_like(item, -1), self.citystate_prod_site[:, s])
         built = fin & ((u_row >= 0) | (b_row >= 0) | (d_row >= 0)) & self.citystate_ai_on[:, s]
         if bool(built.any()):
-            contract_built(self.cityai, s, -1, u_row, b_row, d_row, uid, built)
+            contract_built(self.cityai, s, -1, u_row, b_row, d_row, uid, built,
+                           join=lambda tree, unit, m: self._mops_join(s, tree, unit - self.POOL_LO["major"], m))
         return fin
 
     def _minor_upgrades(self, s: int, gained: torch.Tensor) -> None:

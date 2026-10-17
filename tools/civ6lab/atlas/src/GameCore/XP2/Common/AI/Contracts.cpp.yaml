@@ -46,7 +46,11 @@
     - recording: h1_duelv1121
       turn: 2
       value: Hunza's Builder contract 72.0 SUBMITTED by Build City Improvement, queued t3, COMPLETED t5
-  impl: [cpu/core/aiContracts.ts:contractBuilt, cpu/core/operations/manager.ts:updateContracts]
+  impl:
+    - cpu/core/aiContracts.ts:contractBuilt
+    - cpu/harness/operationsAi.ts:updateContracts
+    - cpu/core/operations/manager.ts:joinBuilt
+    - cpu/harness/operationsAi.ts:updateContracts
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]

@@ -150,7 +150,7 @@ function runScenario(sc: Scenario, variant: { ties: number[] }): unknown[] {
         if (kind !== 'move' && (tree.find((x) => x.id === u)?.charges ?? 0) <= 1) spent.add(u);
       },
       unitAlive: (u) => tree.some((x) => x.id === u) && !spent.has(u),
-      startOperation: () => null, operationLive: () => false,
+      startOperation: () => null, operationLive: () => false, heldContracts: () => [],
     };
     goalsReached(ai, (g) => techs.has(g) || civics.has(g), (g) => g === researching, (p) => sc.owned.includes(p));
     freeSlots(ai, w, sc.city);

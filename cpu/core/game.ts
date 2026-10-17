@@ -14,7 +14,7 @@ import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileF
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
-import { barbarianPhase, releaseBarbarians } from './tactical';
+import { barbarianPhase, barbariansBesideMinors, releaseBarbarians } from './tactical';
 import { cityLook } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
@@ -1583,7 +1583,9 @@ export function endTurn(state: GameState): void {
     eraInspirations(state);
   }
   seatPhase(state);
+  if (state.unitsMode) barbariansBesideMinors(state, true);
   minorPhase(state);
+  if (state.unitsMode) barbariansBesideMinors(state, false);
   freeCitiesPhase(state);
   theologicalCombatPhase(state);
   emergencySessions(state);

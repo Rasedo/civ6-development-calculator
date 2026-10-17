@@ -4946,7 +4946,9 @@ in gpu/core/sim_tactics.py; the score `barbPillageScore` (cpu/core/barbarians.ts
   SUCCESS arrived, else RUNNING (AlwaysRunning: RUNNING).
 - OPERATION MOVE'S EXECUTION (0x816cb0): none where the operation's teams
   gather (0x73aa60: op +0x5d0, or every team's 0x73ab20) and the update
-  found it arrived; per team its members listed at +0x74 "Nonmoving" (their
+  found it arrived, and the node names no Leader Tag (+0x7c, the tag's
+  AiType; -1 takes the skip, a tagged node moves its members every tick);
+  per team its members listed at +0x74 "Nonmoving" (their
   turn ends; the update clears the list each tick), the others with
   Movement, nearest the goal first: the radius the smaller of Range to goal
   and its attack range (0 in a formation or carrying the Leader Tag); at

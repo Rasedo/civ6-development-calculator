@@ -103,9 +103,10 @@
       value: "Xi'an threatened by the barbarians' Warrior and Scout: City Defense, Started"
   impl:
     - cpu/core/operations/cityThreat.ts:cityThreat
-    - cpu/core/operations/manager.ts:cityDefense
+    - cpu/harness/operationsAi.ts:cityDefense
     - cpu/core/minorCityAi.ts:minorThreat
     - gpu/core/sim_minorai.py:_minor_threat
+    - cpu/harness/operationsAi.ts:cityDefense
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
@@ -170,8 +171,9 @@
       value: City Defense, Started, TARGET 15:10
   impl:
     - cpu/core/aiCityTrees.ts:defenseEvent
-    - cpu/core/operations/manager.ts:cityDefense
-    - cpu/core/operations/manager.ts:operationsTurn
+    - cpu/harness/operationsAi.ts:cityDefense
+    - cpu/core/operations/manager.ts:operationsRun
+    - cpu/harness/operationsAi.ts:cityDefense
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
@@ -293,7 +295,8 @@
   impl:
     - cpu/core/aiCityTrees.ts:buildingEvent
     - cpu/core/aiCityTrees.ts:freeSlots
-    - cpu/core/operations/manager.ts:cityDefense
+    - cpu/harness/operationsAi.ts:cityDefense
+    - cpu/harness/operationsAi.ts:cityDefense
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

@@ -167,7 +167,7 @@ describe('the city events and trees (CityBuild.cpp, the tree nodes)', () => {
       builderType: () => 'UNIT_BUILDER', plotCity: () => 7, reachable: () => true, canPlaceDistrict: () => false, plotOwner: () => 2,
       buildersMakeDistricts: false, buildersMakeWonders: false, districtTie: () => 0, distance: () => 1,
       newContractId: () => ids++, newTreeId: () => 100 + ids++, log: (l) => lines.push(l), clearProduction: () => undefined,
-      order: () => undefined, unitAlive: () => true, startOperation: () => 500, operationLive: (t) => t === 500,
+      order: () => undefined, unitAlive: () => true, startOperation: () => 500, operationLive: (t) => t === 500, heldContracts: () => [],
     };
     const list = AI_CITY_EVENTS[AI_CITY_EVENT_LISTS.MINOR_CIV_DEFAULT_TRAIT];
     buildingEvent(ai, w, c, list.CITY_EVENT_UNIT_OR_BUILDING);

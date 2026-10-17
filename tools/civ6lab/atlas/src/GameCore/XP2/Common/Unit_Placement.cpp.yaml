@@ -48,8 +48,8 @@
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
   impl:
-    - cpu/core/operations/nodes.ts:barred
-    - cpu/core/operations/nodes.ts:moveDest
+    - cpu/core/tactical.ts:moveBarred
+    - cpu/core/tactical.ts:passMoveExec
     - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:safePlot
     - cpu/core/tactical.ts:stackedAt
@@ -90,7 +90,7 @@
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
   impl:
-    - cpu/core/operations/nodes.ts:barred
+    - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:enemyAt
     - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:wanderNearCamp
@@ -116,7 +116,7 @@
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
   impl:
-    - cpu/core/operations/nodes.ts:barred
+    - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:alternateLocation
     - cpu/core/tactical.ts:moveBarred
   readings:

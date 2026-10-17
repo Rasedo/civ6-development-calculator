@@ -11,7 +11,7 @@
  * times the smaller of the two players' best combat strengths. The units a
  * team takes leave the offer.
  */
-import { NO_PLOT, addMember, hasAiType, unitStrength, type Operation, type OpTeam } from './operation';
+import { NO_PLOT, addMember, hasAiType, teamDef, teamReqs, unitStrength, type Operation, type OpTeam } from './operation';
 import type { MajorUnitView, MajorView } from '../../../ai/major/view';
 
 export interface RecruitLog {
@@ -23,9 +23,10 @@ export interface RecruitLog {
  *  MaxPercentage of the members with `extra` more; a requirement it lacks
  *  whose MinPercentage is 1 bars it) */
 function passesOthers(team: OpTeam, unitType: string, skip: number, extra: number): boolean {
-  for (let j = 0; j < team.reqs.length; j++) {
+  const reqs = teamReqs(team);
+  for (let j = 0; j < reqs.length; j++) {
     if (j === skip) continue;
-    const r = team.reqs[j];
+    const r = reqs[j];
     if (hasAiType(unitType, r.aiType)) {
       if (r.max !== null && r.max >= 0 && team.counts[j] >= r.max) return false;
       if (r.maxPercentage >= 0 && team.counts[j] + extra > (team.members.length + extra) * r.maxPercentage) return false;
@@ -46,7 +47,7 @@ export function recruitMinimums(view: MajorView, team: OpTeam, offer: readonly M
   let met = true;
   const out: MajorUnitView[] = [];
   const members = team.members.length;
-  team.reqs.forEach((r, i) => {
+  teamReqs(team).forEach((r, i) => {
     let need = r.min ?? 0;
     const have = team.counts[i];
     if (have >= need) {
@@ -100,8 +101,9 @@ export function recruitStrength(view: MajorView, team: OpTeam, offer: readonly M
   const extra = taken.length;
   const eligible = offer.filter((u) => {
     let matched = false;
-    for (let j = 0; j < team.reqs.length; j++) {
-      const r = team.reqs[j];
+    const reqs = teamReqs(team);
+    for (let j = 0; j < reqs.length; j++) {
+      const r = reqs[j];
       if (hasAiType(u.type, r.aiType)) {
         if (r.max !== null && r.max >= 0 && team.counts[j] >= r.max) return false;
         if (r.maxPercentage >= 0 && team.counts[j] + 1 > (team.members.length + extra + 1) * r.maxPercentage) return false;
@@ -154,13 +156,14 @@ export function recruitOperation(view: MajorView, seat: number, op: Operation, o
     let pool = offer;
     const goal = inProgress ? team.goals[1] : team.goals[0];
     if (range > 0 && goal !== NO_PLOT) pool = pool.filter((u) => view.plotDistance(u.plot, goal) <= range);
-    const mins = recruitMinimums(view, team, pool, log, op.def.name);
+    const mins = recruitMinimums(view, team, pool, log, op.def);
     let taken = dedupe(mins.taken);
     if (mins.met || inProgress) {
-      const adv = inProgress ? team.def.ongoingStrengthAdvantage : team.def.initialStrengthAdvantage;
+      const t = teamDef(op, team);
+      const adv = inProgress ? t.ongoingStrengthAdvantage : t.initialStrengthAdvantage;
       const desired = desiredStrength(view, seat, op.enemy, adv, op.enemyStrength);
       const rest = pool.filter((u) => !taken.includes(u));
-      const str = recruitStrength(view, team, rest, taken, op.enemyStrength, desired, log, op.def.name, units);
+      const str = recruitStrength(view, team, rest, taken, op.enemyStrength, desired, log, op.def, units);
       taken = dedupe([...taken, ...str.taken]);
     }
     for (const u of taken) {

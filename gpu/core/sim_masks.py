@@ -1945,8 +1945,12 @@ class SimMasks:
         def_seat: torch.Tensor,
         attacker_slot: torch.Tensor,
         attacker_seat: torch.Tensor,
+        defender_slot: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """`flankCount` / `supportCount` for a UNIT defender on def_tile [B].
+        """`flankCount` / `supportCount` for a UNIT defender on def_tile [B]
+        (`defender_slot` its occupancy index: a planning that sets it on a
+        plot it does not stand on, as the AI's combat prediction does, counts
+        none of its support from where it stands).
 
         FLANKING counts the military units on the 6 adjacent tiles that the
         ATTACKER owns — "only units that are currently owned by the same player
@@ -1993,7 +1997,8 @@ class SimMasks:
         # unitDomain gate)
         e_mil = self._type_dom_mil[
             self.unit_type.gather(1, eslot.clamp(min=0)).clamp(min=0, max=self.NU - 1)]
-        friendly = (here & (n_seat == def_seat.unsqueeze(1))).long()             + (e_here & e_mil & (e_seat == def_seat.unsqueeze(1))).long()
+        not_self = (mslot != defender_slot.unsqueeze(1))
+        friendly = (here & not_self & (n_seat == def_seat.unsqueeze(1))).long()             + (e_here & e_mil & (eslot != defender_slot.unsqueeze(1)) & (e_seat == def_seat.unsqueeze(1))).long()
         sup = friendly.sum(dim=1) * self._flank_support_live(def_seat).long()
         in_district = (self._centre_seat_plane().gather(1, dt.unsqueeze(1)).squeeze(1) >= 0) \
             | self._encamp_live().gather(1, dt.unsqueeze(1)).squeeze(1)

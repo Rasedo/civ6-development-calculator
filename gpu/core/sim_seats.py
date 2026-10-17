@@ -12303,7 +12303,7 @@ class SimSeats:
         # flanking helps the hostile attacker (barb/civ at `here`), support
         # helps the defender, whichever seat it belongs to.
         _fl, _sp = self._flank_support(
-            tgt, d_seat, a_slot, a_seat)
+            tgt, d_seat, a_slot, a_seat, d_slot)
         # CIV6 (Impi): "+100% Flanking bonus" — the chassis's own
         # multiplier, beside the promotion's.
         atk_e = atk_e + (FLANKING_CS * self._promo_mult(at, a_promos, "FLANK_MULT")

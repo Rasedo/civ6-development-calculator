@@ -485,8 +485,9 @@ export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord
     if (r) {
       r.seen = state.turn;
       r.plot = u.tileIndex;
+      r.damage = UNIT_HP - u.hp;
     }
-    else kept.push({ id: u.id, owner: u.seat, type: u.type, seen: state.turn, plot: u.tileIndex });
+    else kept.push({ id: u.id, owner: u.seat, type: u.type, seen: state.turn, plot: u.tileIndex, damage: UNIT_HP - u.hp });
   }
   if (kept.length) holder.armyKnown = kept;
   else delete holder.armyKnown;
@@ -985,6 +986,12 @@ export function tacticsDrawing(): Unit | null {
 function finish(pass: Pass, u: Unit, move: string, plot = -1, attack = -1): void {
   pass.done.add(u.id);
   tacticsTrace?.(u, move, plot, attack);
+}
+
+/** the unit's turn in the pass done by a move outside the pass's own (an
+ *  operation's), the plot it went for */
+export function passFinish(pass: Pass, u: Unit, move: string, plot: number): void {
+  if (!pass.done.has(u.id)) finish(pass, u, move, plot);
 }
 
 const live = (state: GameState, pass: Pass, u: Unit) => !pass.done.has(u.id) && state.units.includes(u) && u.seat === pass.seat;
@@ -1575,6 +1582,20 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
   }
 }
 
+/** an operation's attack in the pass: the assignment of the units (in pool
+ *  order, as the pass walks them) over the pass's targets `keep` picks (their
+ *  units still on the map), `exchange` and `survive` its filters, carried
+ *  out (0x771f80) */
+export function passAttack(state: GameState, pass: Pass, ids: readonly number[], keep: (k: number) => boolean, exchange: boolean,
+  survive: boolean, move: string): Assigned[] {
+  const units = ids.map((id) => state.units.find((u) => u.id === id)).filter((u): u is Unit => !!u && pass.plan.has(u.id))
+    .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+  const targets = pass.targets.filter((t, k) => keep(k) && (!t.unit || state.units.includes(t.unit)));
+  const out = assignTo(state, pass, units, targets, exchange, survive);
+  carryOut(state, pass, out, move);
+  return out;
+}
+
 /**
  * ATTACK HIGH / MEDIUM / LOW PRIORITY (0x7784b0 with the target type; LOW
  * takes the RELIGIOUS targets too): each target of the type in the list's
@@ -2052,9 +2073,10 @@ function alternateLocation(state: GameState, unit: Unit, plot: number, range: nu
   return best;
 }
 
-/** a city-state's units the pass walks: its military units, of AI type
+/** the units a pass walks of a player of no full AI (a city-state, the Free
+ *  Cities) or of an operations probe: its military units, of AI type
  *  COMBAT (a civilian, a support unit none) */
-function minorAiTypeOf(u: Unit): number {
+export function militaryAiTypeOf(u: Unit): number {
   return unitDomain(u.type) === 'military' ? AI_COMBAT : -1;
 }
 
@@ -2062,7 +2084,8 @@ function minorAiTypeOf(u: Unit): number {
  * A CITY-STATE'S TACTICAL TURN (TacticalAI 0x771530 over Tactics.xml's
  * "Minor Civ Tactical" and "Minor Civ Homeland" lists): its unit pool
  * (`poolSlots`, slot 0 its founding Settler's), each unit's planning reach
- * taken before any moves, its tactical target list, then the moves in the
+ * taken before any moves, its tactical target list; its operations' run
+ * (`operations`: their units the operations'); then the moves in the
  * list's order, each walking the units the moves before it left, in pool
  * order — Attack High Priority, Move to Safety, Attack Medium Priority,
  * Attack Low Priority, Heal, Chase Target (no strike), Wander Near City
@@ -2070,12 +2093,13 @@ function minorAiTypeOf(u: Unit): number {
  * Formation not ported); the homeland's Move to Safety, then its End Turn
  * takes the rest.
  */
-export function cityStateTactics(state: GameState, cityState: CityState): void {
+export function cityStateTactics(state: GameState, cityState: CityState, operations: (pass: Pass) => void): void {
   const pool = (cityState.unitPool ??= { size: 1, free: [], dying: [] });
   poolSlots(pool, state.units.filter((u) => u.seat === cityState.seat));
   costsHeld = new Map();
   try {
-    const pass = openPass(state, cityState.seat, minorAiTypeOf);
+    const pass = openPass(state, cityState.seat, militaryAiTypeOf);
+    operations(pass);
     attackUnits(state, pass, 'HIGH');
     moveToSafety(state, pass);
     attackUnits(state, pass, 'MEDIUM');
@@ -2106,7 +2130,7 @@ export function freeCityTactics(state: GameState): void {
   poolSlots(pool, state.units.filter((u) => u.seat === FREE_SEAT));
   costsHeld = new Map();
   try {
-    const pass = openPass(state, FREE_SEAT, minorAiTypeOf);
+    const pass = openPass(state, FREE_SEAT, militaryAiTypeOf);
     attackUnits(state, pass, 'HIGH');
     attackUnits(state, pass, 'MEDIUM');
     moveToSafety(state, pass);
@@ -2169,15 +2193,15 @@ const RAID_RAID = 12;
 const RAID_HOME = 22;
 const RAID_NOTIFY = 25;
 
-/** the plot a unit of an operation stands on, -1 for a member killed */
-function memberAt(state: GameState, id: number): Unit | null {
-  return state.units.find((u) => u.id === id && isBarbSeat(u.seat)) ?? null;
+/** an operation's member of the player, null for one killed */
+function memberAtOf(state: GameState, seat: number, id: number): Unit | null {
+  return state.units.find((u) => u.id === id && u.seat === seat) ?? null;
 }
 
 /** the operation's living members in pool order (the engines take the pool
  *  slot for the team's order) */
 function opMembers(state: GameState, op: BarbOp): Unit[] {
-  return op.units.map((id) => memberAt(state, id)).filter((u): u is Unit => !!u)
+  return op.units.map((id) => memberAtOf(state, BARB_SEAT, id)).filter((u): u is Unit => !!u)
     .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
 }
 
@@ -2236,12 +2260,27 @@ function reachAt(state: GameState, pass: Pass, u: Unit, goal: number, turns: num
 function moveUpdate(state: GameState, pass: Pass, op: BarbOp, node: number, goal: number, target: boolean,
   range: number, spread: number): { status: number; arrived: boolean } {
   const stores = (op.store ??= {});
-  const kept = stores[node]?.goal === goal ? stores[node].list : [];
-  let list = kept.filter((id) => memberAt(state, id));
-  const others: { id: number; u: Unit | null; d: number }[] = op.units
+  const r = passMoveUpdate(state, pass, op.units, stores[node], goal, target, range, spread);
+  if (r.store) stores[node] = r.store;
+  return r;
+}
+
+/** a team's store at an Operation Move node: the members it holds out and
+ *  the goal it holds them for */
+export interface MoveStore { list: number[]; goal: number }
+
+/** OPERATION MOVE'S UPDATE (0x81a130, above) for a team of the pass's
+ *  player — its members, the node's store — the status (BT_OK, BT_RUN), the
+ *  team arrived, the store kept */
+export function passMoveUpdate(state: GameState, pass: Pass, members: readonly number[], store: MoveStore | undefined, goal: number,
+  target: boolean, range: number, spread: number): { status: number; arrived: boolean; store: MoveStore | undefined } {
+  const memberAt = (id: number) => memberAtOf(state, pass.seat, id);
+  const kept = store?.goal === goal ? store.list : [];
+  let list = kept.filter((id) => memberAt(id));
+  const others: { id: number; u: Unit | null; d: number }[] = members
     .filter((id) => !list.includes(id))
     .map((id) => {
-      const u = memberAt(state, id);
+      const u = memberAt(id);
       return { id, u, d: goalDistance(state, u, goal) };
     });
   const sortOthers = () => others.sort(nearestFirst);
@@ -2254,7 +2293,7 @@ function moveUpdate(state: GameState, pass: Pass, op: BarbOp, node: number, goal
     if (!arrived) {
       const keep: number[] = [];
       for (const id of list) {
-        const u = memberAt(state, id);
+        const u = memberAt(id);
         if (!u) continue;
         if (goalDistance(state, u, goal) <= range) {
           arrived = true;
@@ -2269,7 +2308,7 @@ function moveUpdate(state: GameState, pass: Pass, op: BarbOp, node: number, goal
       list = list.filter((id) => !others.some((o) => o.id === id));
     }
   } else {
-    const stored = list.map((id) => ({ id, u: memberAt(state, id) })).filter((o) => o.u)
+    const stored = list.map((id) => ({ id, u: memberAt(id) })).filter((o) => o.u)
       .map((o) => ({ ...o, d: goalDistance(state, o.u, goal) })).sort(nearestFirst);
     if (stored.length) {
       others.push(stored[0]);
@@ -2277,7 +2316,8 @@ function moveUpdate(state: GameState, pass: Pass, op: BarbOp, node: number, goal
       arrived = stored[0].d <= range;
     }
   }
-  if ((arrived || reach) && target) return { status: BT_OK, arrived: true };
+  // the store kept as it stood
+  if ((arrived || reach) && target) return { status: BT_OK, arrived: true, store };
   if (spread !== 0) {
     let end = others.findIndex((o) => o.d > spread);
     if (end < 0) end = others.length;
@@ -2296,15 +2336,14 @@ function moveUpdate(state: GameState, pass: Pass, op: BarbOp, node: number, goal
   if (spread > 0 && list.length) {
     const keep: number[] = [];
     for (const id of list) {
-      const u = memberAt(state, id);
+      const u = memberAt(id);
       const near = u && others.some((o) => o.u && plotDistance(state, o.u.tileIndex, u.tileIndex) <= spread);
       if (u && !near) { keep.push(id); continue; }
       if (u && goalDistance(state, u, goal) <= range) arrived = true;
     }
     list = keep;
   }
-  stores[node] = { list, goal };
-  return { status: arrived ? BT_OK : BT_RUN, arrived };
+  return { status: arrived ? BT_OK : BT_RUN, arrived, store: { list, goal } };
 }
 
 /** the goal barred to the unit (0x586360, 0x5862e0, 0x585eb0): no path to
@@ -2316,8 +2355,10 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
 }
 
 /**
- * OPERATION MOVE'S EXECUTION (0x816cb0): nothing where the update found the
- * team arrived; else each member left with Movement, nearest the goal
+ * OPERATION MOVE'S EXECUTION (0x816cb0): nothing where the operation is ready
+ * (0x73aa60: its units may be built, or every team ready; a raid's is), the
+ * update found the team arrived and the node names no Leader Tag (+0x7c,
+ * its UnitAiType; a raid's none); else each member left with Movement, nearest the goal
  * first, takes a move order (0x962030): its radius the smaller of the
  * node's range and its attack range (0 for a ship), at least 1 where the
  * goal is barred to it (`moveBarred`); the first plot of its planning of two
@@ -2328,17 +2369,30 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * goal with the attack flag.
  */
 function moveExec(state: GameState, pass: Pass, op: BarbOp, goal: number, range: number, arrived: boolean): void {
-  if (arrived) return;
+  passMoveExec(state, pass, op.units, goal, range, arrived, true);
+}
+
+/** OPERATION MOVE'S EXECUTION (0x816cb0, above) for a team of the pass's
+ *  player — zero: a unit whose radius is 0 (in a formation, or of the
+ *  node's Leader Tag), leaderNamed: the node names a Leader Tag, which
+ *  takes the others' radius to 1 at least: each mover, the plot it was on and
+ *  the plot it went for, in the order they moved */
+export function passMoveExec(state: GameState, pass: Pass, members: readonly number[], goal: number, range: number,
+  arrived: boolean, ready: boolean, zero: (u: Unit) => boolean = () => false, leaderNamed = false): { unit: Unit; from: number; dest: number }[] {
+  const out: { unit: Unit; from: number; dest: number }[] = [];
+  if (arrived && ready && !leaderNamed) return out;
   const region = state.map.tiles[goal].region ?? -1;
-  const movers = op.units.map((id) => memberAt(state, id))
+  const movers = members.map((id) => memberAtOf(state, pass.seat, id))
     .filter((u): u is Unit => !!u && canAct(state, pass, u))
     .map((u) => ({ u, d: plotDistance(state, u.tileIndex, goal) }))
     .sort(nearestFirst).map((x) => x.u!);
   for (const u of movers) {
     if (!canAct(state, pass, u)) continue;
-    let r = UNITS[u.type]?.naval ? 0 : Math.min(range, rangeOf(u));
+    const z = zero(u);
+    let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, rangeOf(u));
     const paths = pathPlots(state, u);
     if (u.tileIndex !== goal && moveBarred(state, u, goal, paths)) r = Math.max(1, r);
+    else if (range > 0 && leaderNamed && !z) r = Math.max(1, r);
     let dest = goal;
     let strike = false;
     const p = reachAt(state, pass, u, goal, PLAN_TURNS, false, r);
@@ -2364,8 +2418,10 @@ function moveExec(state: GameState, pass: Pass, op: BarbOp, goal: number, range:
       else strike = true;
     }
     finish(pass, u, 'Operation', dest);
+    out.push({ unit: u, from: u.tileIndex, dest });
     moveTo(state, u, dest, strike);
   }
+  return out;
 }
 
 /** OPERATION ATTACK UNITS' "nearby" targets (0x80bd20 -> 0x80c080): the unit
@@ -2465,7 +2521,7 @@ function raidTick(state: GameState, pass: Pass, tr: BarbTribe, op: BarbOp): void
     if ((tr.score ?? 0) < RAID_SCORE) {
       op.raidFrom ??= state.turn;
       exec.push(() => opAttackExec(state, pass, op));
-      const alive = op.units.some((id) => memberAt(state, id));
+      const alive = op.units.some((id) => memberAtOf(state, BARB_SEAT, id));
       let conc = BT_OK;
       if (!raidTargetGone(state, op) && !alive) conc = BT_FAIL;
       else {
@@ -2624,9 +2680,20 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
  *  engine's barbarian turn. Null outside a replay. */
 let barbHold: ((state: GameState) => void) | null = null;
 let barbRelease: ((state: GameState) => void) | null = null;
-export function holdBarbarians(fn: ((state: GameState) => void) | null, release: ((state: GameState) => void) | null = null): void {
+let barbMinors: ((state: GameState, on: boolean) => void) | null = null;
+export function holdBarbarians(fn: ((state: GameState) => void) | null, release: ((state: GameState) => void) | null = null,
+  minors: ((state: GameState, on: boolean) => void) | null = null): void {
   barbHold = fn;
   barbRelease = release;
+  barbMinors = minors;
+}
+
+/** the hold's units beside the city-states' turn: the units the hold keeps
+ *  stand where the city-states' look and AI see them while their turn runs
+ *  (`on`), and leave the engine's turn again after it. Nothing outside a
+ *  replay. */
+export function barbariansBesideMinors(state: GameState, on: boolean): void {
+  barbMinors?.(state, on);
 }
 
 /** the hold's second half, once the turn's end (its random events, its

@@ -18,7 +18,7 @@ function facts(recs: [number, string][], over: Partial<MilitaryFacts> = {}): Mil
       { seat: 100, atWar: false, tribe: false, flagged: false },
       { seat: 63, atWar: true, tribe: true, flagged: false },
     ],
-    records: ([[100, 'WARRIOR'], [100, 'WARRIOR'], ...recs] as [number, string][]).map(([owner, type], i) => ({ id: i, owner, type, seen: 10, plot: 5 })),
+    records: ([[100, 'WARRIOR'], [100, 'WARRIOR'], ...recs] as [number, string][]).map(([owner, type], i) => ({ id: i, owner, type, seen: 10, plot: 5, damage: 0 })),
     areaOf: () => 1, strength: (t) => STRENGTH[t] ?? 0, turn: 10, queuedUnits: [], warFooting: false, threatened: false, standingArmy: 0,
     ...over,
   };

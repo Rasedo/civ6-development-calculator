@@ -82,6 +82,9 @@ import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP } from '../data/cityStates';
+import { MINOR_OP_DEFS } from './minorOps';
+import { opsOf } from './operations/manager';
+import { AI_OP_TEAMS } from '../data/aiOperations';
 import { AI_DISTRICTS, AI_IMPROVEMENTS } from '../data/aiBuildTables';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX } from './aiCityBuild';
 import { engineId } from '../data/aliases';
@@ -211,6 +214,43 @@ function cityAiTrees(cs: CityState, state: GameState): number[] {
   }
   return out;
 }
+/** the minor's operations (`OpsAi`): its pool's size, its free slots in
+ *  order, the pick (definition, target, rally; -1s none), then per pool slot
+ *  [definition (-1 free), id, target, rally, backup target and rally, enemy
+ *  strength, strength] and per team (two) [its team (-1 none), its members'
+ *  count and each one's pool slot in join order (-1 unslotted, -2 gone), its
+ *  requirements' counts behind their number, the six goals, engaged,
+ *  minimums met, ready, ongoing, the unit to build (AI row), strength] */
+function minorOpsRecord(cs: CityState, state: GameState): number[] {
+  const ai = cs.ops;
+  if (!ai) return [0, 0, -1, -1, -1];
+  const out: number[] = [ai.slots.length, ai.free.length, ...ai.free];
+  out.push(ai.pick ? MINOR_OP_DEFS.indexOf(ai.pick.def) : -1, ai.pick?.target ?? -1, ai.pick?.rally ?? -1);
+  for (const op of ai.slots) {
+    if (!op) {
+      out.push(-1);
+      continue;
+    }
+    out.push(MINOR_OP_DEFS.indexOf(op.def), op.id, op.target, op.rally, op.backup?.target ?? -1, op.backup?.rally ?? -1,
+      op.enemyStrength, op.strength);
+    for (let k = 0; k < 2; k++) {
+      const t = op.teams[k];
+      if (!t) {
+        out.push(-1);
+        continue;
+      }
+      const slots = t.members.map((id) => {
+        const u = state.units.find((x) => x.id === id && x.seat === cs.seat);
+        return u ? u.slot ?? -1 : -2;
+      });
+      out.push((AI_OP_TEAMS[op.def] ?? []).findIndex((x) => x.team === t.team), slots.length, ...slots, t.counts.length, ...t.counts,
+        ...t.goals, t.engaged ? 1 : 0, t.minsMet ? 1 : 0, t.ready ? 1 : 0, t.ongoing ? 1 : 0,
+        t.unit ? AI_UNIT_INDEX.get(t.unit) ?? -1 : -1, t.strength);
+    }
+  }
+  return out;
+}
+
 /** the minor's contracts by id, each [id, tree, unit, building, district
  *  rows, goal kind (1 tech, 2 civic, 3 plot), goal, plot, value, city, most
  *  turns, turns, progress, assign, queued, held by its tree, listed] */
@@ -221,7 +261,7 @@ function cityAiContracts(cs: CityState): number[] {
   return [...ai.contracts].sort((a, b) => a.id - b.id).flatMap((c) => {
     const goal = ai.techContracts[c.id];
     const kind = goal === undefined ? (ai.plotContracts[c.id] !== undefined ? 3 : 0) : goal.startsWith('TECH_') ? 1 : 2;
-    const tree = ai.trees.find((t) => t.id === c.tree);
+    const tree = ai.trees.find((t) => t.id === c.tree) ?? (cs.ops ? opsOf(cs.ops).find((o) => o.id === c.tree) : undefined);
     return [c.id, c.tree, c.unit ? AI_UNIT_INDEX.get(c.unit) ?? -1 : -1, c.building ? AI_BUILDING_INDEX.get(c.building) ?? -1 : -1,
       c.district ? DISTRICT_ROW.get(c.district) ?? -1 : -1, kind, kind === 1 ? techCode(goal) : kind === 2 ? civicCode(goal) : -1,
       c.plot, c.value, c.city, c.maxTurns, c.turns, c.progress, c.assign ? 1 : 0, c.queued ? 1 : 0,
@@ -571,10 +611,10 @@ const GAME: Record<string, Extractor> = {
   // makes the seat
   freeResearch: (s) => [researchRecord(s.freeSeat?.research)],
   // the barbarians' knowledge base's army records (`knowledgeLook`), as a
-  // city-state's: owner, unit type, turn and plot last seen, sorted
+  // city-state's: owner, unit type, turn and plot last seen, damage, sorted
   barbArmyKnown: (s) => [(s.barbSeat.armyKnown ?? [])
-    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot])
-    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]).flat()],
+    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()],
   // the live storms in the order they began: the last serial, then per
   // record its serial, row, centre, turns left, and its struck plots sorted
   // behind their count
@@ -908,8 +948,10 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorProdKept: overCityStates((cityState) => Object.entries(cityState.prodRetained ?? {})
     .map(([k, v]) => [minorItemIdx(k), v] as const).sort((a, b) => a[0] - b[0]).flat()),
   minorArmyKnown: overCityStates((cityState) => (cityState.armyKnown ?? [])
-    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot])
-    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]).flat()),
+    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()),
+  minorOps: overCityStates((cityState, state) => minorOpsRecord(cityState, state)),
+  minorCampsKnown: overCityStates((cityState) => [...(cityState.campsKnown ?? [])]),
   minorProjectYield: overCityStates((cityState) => projectYieldCols(cityState.projectYield)),
   minorTreasury: overCityStates((cityState) => cityState.treasury),
   minorShortfall: overCityStates((cityState) => cityState.goldShortfall),

@@ -150,7 +150,7 @@ function targetsOf(view: MajorView, seat: number, c: Candidate, inputs: EvalInpu
  *  MaxTargetDefense (where it has one) left out */
 function enemyCities(view: MajorView, seat: number, c: Candidate, inputs: EvalInputs): Target[] {
   const { def } = c;
-  const cities = inputs.known;
+  const cities = inputs.known();
   const outclassed = view.bestCombatStrength(c.enemy) + 30 < view.bestCombatStrength(seat);
   const out: Target[] = [];
   for (const k of cities) {
@@ -187,7 +187,7 @@ export interface EvalInputs {
   taken: ReadonlySet<number>;
   /** the camps the knowledge base holds */
   camps: readonly number[];
-  known: readonly MajorKnownCityView[];
+  known(): readonly MajorKnownCityView[];
   /** a player's army as the knowledge base holds it (the seat's own: its
    *  units) */
   army: (player: number) => readonly ArmyUnit[];

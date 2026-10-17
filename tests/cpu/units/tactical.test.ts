@@ -3,7 +3,8 @@ import { BARB_SEAT, emptySeat, isBarbSeat, markCityCentre, seatOfCityState, setT
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { disbandUnit, grantedMoves, spawnUnit } from '../../../cpu/core/units';
 import { barbarianTechs, barbSlots, barbSlotsDying, raiseCamp, tribeDies, tribeOf } from '../../../cpu/core/barbarians';
-import { barbarianTactics, cityStateTactics, dangerPlane, enemyAt, knowledgeLook, plotDistance, reachPlots, refreshBarbarians, stackedAt, tacticalTargets, traceTactics } from '../../../cpu/core/tactical';
+import { cityStateMilitary } from '../../../cpu/core/minorOps';
+import { barbarianTactics, dangerPlane, enemyAt, knowledgeLook, plotDistance, reachPlots, refreshBarbarians, stackedAt, tacticalTargets, traceTactics } from '../../../cpu/core/tactical';
 import { DIRECTION_TYPES, neighborTile, tilesWithin } from '../../../world/hex';
 import { LCG_ADD, LCG_MUL } from '../../../cpu/core/rand';
 import type { CityState, GameState, Unit } from '../../../cpu/core/types';
@@ -227,7 +228,7 @@ describe("a city-state's tactical pass", () => {
       && !stackedAt(state, u, e.tile) && plotDistance(state, cs.centerIndex, e.tile) <= 5).map((e) => e.tile);
     expect(cands.length).toBeGreaterThan(1);
     const s0 = state.rngState;
-    cityStateTactics(state, cs);
+    cityStateMilitary(state, cs);
     const s1 = (Math.imul(LCG_MUL, s0) + LCG_ADD) >>> 0;
     expect(state.rngState).toBe(s1);
     expect(u.tileIndex).toBe(cands[((s1 >>> 16) * (cands.length & 0xffff)) >>> 16]);
@@ -241,7 +242,7 @@ describe("a city-state's tactical pass", () => {
     u.hp = 60;
     minorStart(state, cs);
     const s0 = state.rngState;
-    cityStateTactics(state, cs);
+    cityStateMilitary(state, cs);
     expect(u.tileIndex).toBe(at);
     expect(state.rngState).toBe(s0);
   });
@@ -252,12 +253,12 @@ describe("a city-state's tactical pass", () => {
     const a = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 11, 10).index, cs.seat)!;
     const b = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 10).index, cs.seat)!;
     minorStart(state, cs);
-    cityStateTactics(state, cs);
+    cityStateMilitary(state, cs);
     expect([a.slot, b.slot]).toEqual([1, 2]);
     expect(cs.unitPool!.dying).toEqual([0]);
     const c = spawnUnit(state, 'SLINGER', tileAtCoords(state.map, 10, 11).index, cs.seat)!;
     minorStart(state, cs);
-    cityStateTactics(state, cs);
+    cityStateMilitary(state, cs);
     expect(c.slot).toBe(0);
   });
 
@@ -279,7 +280,7 @@ describe("a city-state's tactical pass", () => {
     const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 14, 4).index, cs.seat)!;
     minorStart(state, cs);
     const s0 = state.rngState;
-    cityStateTactics(state, cs);
+    cityStateMilitary(state, cs);
     expect(state.rngState).toBe(s0);
     expect(plotDistance(state, u.tileIndex, tileAtCoords(state.map, 14, 4).index)).toBeGreaterThan(0);
     expect(plotDistance(state, u.tileIndex, cs.centerIndex)).toBeLessThan(10);
@@ -347,7 +348,7 @@ describe('the danger map and Move to Safety', () => {
     minorStart(state, cs);
     const d = dangerPlane(state, cs.seat);
     expect(d[at]).toBeGreaterThan(40);
-    cityStateTactics(state, cs);
+    cityStateMilitary(state, cs);
     expect(u.tileIndex).not.toBe(at);
     expect(d[u.tileIndex]).toBeLessThan(d[at]);
   });

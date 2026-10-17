@@ -9,7 +9,8 @@
 import type { OpsSettle } from './types';
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
   type BtHandler, type BtNode, type BtRun } from '../behaviorTree';
-import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opUnit, opUnits, targetGone, unitsById, xy, type OpTeam, type Operation } from './operation';
+import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opDef, opUnit, opUnits, targetGone, teamDef, teamReqs, unitsById, xy, type OpTeam,
+  type Operation } from './operation';
 import { chooseUnit, keepUnit } from './unitChoice';
 import type { UnitProductionRow } from '../aiUnitProduction';
 import { AI_UNITS } from '../../data/aiBuildTables';
@@ -17,7 +18,8 @@ import { AI_UNIT_INDEX } from '../aiCityBuild';
 import { FX } from '../aiValue';
 import { desiredStrength, recruitOperation } from './recruit';
 import { ASSAULT_NODES, attackUnitsExecute, operationAttackExecute, updateTeam } from './assault';
-import type { MajorUnitView, MajorView } from '../../../ai/major/view';
+import type { MajorAttackView, MajorUnitView, MajorView } from '../../../ai/major/view';
+import type { MoveStore } from '../tactical';
 import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, buildUnitNode, contractManagerNode, submitContract,
   treeContractOf, type AiContract, type ContractNodeWorld } from '../aiContracts';
 
@@ -40,6 +42,28 @@ export interface OpsContext {
   view(): MajorView;
   /** carry out the seat's unit action rows now */
   act(rows: number[][]): void;
+  /** the unit's move to the plot as far as its Movement carries it this
+   *  turn, `mate` (its formation's other unit, -1 none) stepping with it */
+  move(id: number, dest: number, mate: number): void;
+  /** the unit's blow on the plot: from where it stands beside it or in its
+   *  range, else along its path, the last step the attack */
+  strike(id: number, plot: number): void;
+  /** the attack assignment (the tactical pass's) over the units against the
+   *  seat's tactical targets `keep` picks — `even` refusing a losing
+   *  exchange, `survive` a blow that kills the unit — carried out
+   *  (0x771f80); the assignments */
+  attack(ids: readonly number[], keep: (k: number) => boolean, even: boolean, survive: boolean): readonly MajorAttackView[];
+  /** OPERATION MOVE's update for a team (0x81a130): its members, the node's
+   *  store for it, the goal, whether the goal is the target, Range to goal
+   *  and Unit distance — its status, arrived, the store kept */
+  moveUpdate(members: readonly number[], store: MoveStore | undefined, goal: number, target: boolean, range: number,
+    spread: number): { status: number; arrived: boolean; store: MoveStore | undefined };
+  /** OPERATION MOVE's execution for a team (0x816cb0): zero: a unit whose
+   *  radius is 0 (a formation's, the Leader Tag's), leaderNamed: the node
+   *  names a Leader Tag — each mover's type, its plot before, the plot it
+   *  went for and the plot it stands on */
+  moveExec(members: readonly number[], goal: number, range: number, arrived: boolean, ready: boolean,
+    zero: (id: number, type: string) => boolean, leaderNamed: boolean): readonly { type: string; from: number; dest: number; after: number }[];
   op: Operation;
   /** the units in any operation (none recruitable elsewhere) */
   assigned(): ReadonlySet<number>;
@@ -47,8 +71,8 @@ export interface OpsContext {
   others(): readonly Operation[];
   /** what the shared contract nodes read of the operation's tree */
   contractWorld(): ContractNodeWorld;
-  /** the seat's diplomatic requests standing, by id */
-  diplomacy: ReadonlyMap<number, DiplomacyRequest>;
+  /** the seat's diplomatic requests standing, their ids their places */
+  diplomacy: readonly DiplomacyRequest[];
   requestDiplomacy(action: string, enemy: number, value: number): number;
   /** the seat's settling AI, none for a party that never settles */
   settle: OpsSettle | null;
@@ -90,18 +114,18 @@ const changeTarget: BtHandler<OpsContext> = {
     const view = ctx.view();
     const backupOk = op.backup !== null && op.backup.target !== NO_PLOT;
     const swap = (why: string): number => {
-      ctx.log(`${op.def.name}, Operation Change Target ${why}`);
+      ctx.log(`${op.def}, Operation Change Target ${why}`);
       switchToBackup(op);
       return BT_SUCCESS;
     };
     if (!targetValid(ctx, op)) {
       if (backupOk) return swap('INVALID, Changing to backup');
-      ctx.log(`${op.def.name}, Operation Change Target INVALID, No backup`);
+      ctx.log(`${op.def}, Operation Change Target INVALID, No backup`);
       return BT_FAILURE;
     }
     if (dataBool(node, 'Always Swap') && backupOk) return swap('INVALID, Changing to backup');
     if (dataBool(node, 'Fail on Invalid Team') && !op.teams.every((t) => t.members.length > 0)) {
-      ctx.log(`${op.def.name}, Operation Change Target INVALID TEAM`);
+      ctx.log(`${op.def}, Operation Change Target INVALID TEAM`);
       return BT_FAILURE;
     }
     const tag = dataValue(node, 'Required Tag');
@@ -115,7 +139,7 @@ const changeTarget: BtHandler<OpsContext> = {
         if (view.unitReach(u.id, 1).some((r) => r.plot === op.target)) return BT_SUCCESS;
       }
       if (!found) {
-        ctx.log(`${op.def.name}, Operation Change Target MISSING REQURED UNIT`);
+        ctx.log(`${op.def}, Operation Change Target MISSING REQURED UNIT`);
         return BT_FAILURE;
       }
     }
@@ -126,7 +150,7 @@ const changeTarget: BtHandler<OpsContext> = {
     const failNeed = Math.trunc(desiredStrength(view, ctx.seat, op.enemy, failAmt, op.enemyStrength)) + op.enemyStrength;
     if (op.strength < backupNeed && backupOk) return swap('WEAK, Changing to backup');
     if (op.strength >= failNeed) return BT_SUCCESS;
-    ctx.log(`${op.def.name}, Operation Change Target TOO WEAK`);
+    ctx.log(`${op.def}, Operation Change Target TOO WEAK`);
     return BT_FAILURE;
   },
 };
@@ -152,7 +176,7 @@ function assaultTargetValid(ctx: OpsContext, op: Operation): boolean {
   if (!rec) return false;
   const marks = rec.districts.reduce((n, d) => n + (d.defense > 0 ? 1 : 0) + (d.walls > 0 ? 1 : 0), 0);
   if (marks <= rec.districts.length) return true;
-  if (op.def.targetParameter === 1) return true;
+  if (opDef(op).targetParameter === 1) return true;
   let sum = 0;
   let big = 0;
   for (const id of opUnits(op)) {
@@ -172,8 +196,9 @@ function assaultTargetValid(ctx: OpsContext, op: Operation): boolean {
  *  found on that still scores */
 export function targetValid(ctx: OpsContext, op: Operation): boolean {
   if (op.target === NO_PLOT) return false;
-  if (op.def.targetType === 'TARGET_ENEMY_COMBAT_DISTRICT') return assaultTargetValid(ctx, op);
-  if (op.def.targetType === 'TARGET_SETTLE_LOCATION') return ctx.settle?.canFoundAt(op.target) ?? false;
+  const type = opDef(op).targetType;
+  if (type === 'TARGET_ENEMY_COMBAT_DISTRICT') return assaultTargetValid(ctx, op);
+  if (type === 'TARGET_SETTLE_LOCATION') return ctx.settle?.canFoundAt(op.target) ?? false;
   return true;
 }
 
@@ -237,7 +262,7 @@ const recruitUnits: BtHandler<OpsContext> = {
     const busy = ctx.assigned();
     const offer = view.units(ctx.seat).filter((u) => !busy.has(u.id));
     recruitOperation(view, ctx.seat, op, offer, inProgress, range, units, (l) => ctx.log(l));
-    const lower = ctx.others().filter((o) => o !== op && !o.locked && o.def.priority < op.def.priority);
+    const lower = ctx.others().filter((o) => o !== op && !o.locked && opDef(o).priority < opDef(op).priority);
     const freed = lower.flatMap(opUnits).map((id) => units.get(id)).filter((u): u is MajorUnitView => !!u);
     if (freed.length) {
       const taken = recruitOperation(view, ctx.seat, op, [...freed], inProgress, range, units, (l) => ctx.log(l));
@@ -248,7 +273,7 @@ const recruitUnits: BtHandler<OpsContext> = {
     refreshStrengths(ctx);
     const after = opUnits(op).length;
     const unit = opUnit(op);
-    ctx.log(`${op.def.name}, Operation Recruit, ${after} units, Recruited ${after - before}, Contract for: ${unit ?? 'NONE'}`);
+    ctx.log(`${op.def}, Operation Recruit, ${after} units, Recruited ${after - before}, Contract for: ${unit ?? 'NONE'}`);
     if (m.done && after === 0) return BT_FAILURE;
     // the recruit's contract (the Contract ID tag): failed, the node fails;
     // completed, it leaves the tree
@@ -347,7 +372,8 @@ function teamUpdate(ctx: OpsContext, t: OpTeam): void {
   const view = ctx.view();
   const units = unitsById(view, ctx.seat);
   const types = t.members.map((id) => units.get(id)?.type).filter((x): x is string => !!x);
-  t.counts = t.reqs.map((r) => types.filter((u) => hasAiType(u, r.aiType)).length);
+  const reqs = teamReqs(t);
+  t.counts = reqs.map((r) => types.filter((u) => hasAiType(u, r.aiType)).length);
   t.strength = t.members.reduce((s, id) => {
     const u = units.get(id);
     return u ? s + memberStrength(u) : s;
@@ -357,7 +383,7 @@ function teamUpdate(ctx: OpsContext, t: OpTeam): void {
   const have: string[] = [];
   const full: string[] = [];
   let mins = true;
-  t.reqs.forEach((r, i) => {
+  reqs.forEach((r, i) => {
     if (r.dependence && !types.some((u) => hasAiType(u, r.dependence!))) return;
     const c = t.counts[i];
     if (r.min !== null && r.min >= 0) {
@@ -376,8 +402,9 @@ function teamUpdate(ctx: OpsContext, t: OpTeam): void {
   const reaches = (adv: number): boolean =>
     t.strength >= Math.trunc(op.enemyStrength + desiredStrength(view, ctx.seat, op.enemy, adv, op.enemyStrength));
   t.minsMet = mins;
-  t.ready = mins && (t.def.initialStrengthAdvantage === 0 || reaches(t.def.initialStrengthAdvantage));
-  t.ongoing = t.ready && (t.def.ongoingStrengthAdvantage === 0 || reaches(t.def.ongoingStrengthAdvantage));
+  const def = teamDef(op, t);
+  t.ready = mins && (def.initialStrengthAdvantage === 0 || reaches(def.initialStrengthAdvantage));
+  t.ongoing = t.ready && (def.ongoingStrengthAdvantage === 0 || reaches(def.ongoingStrengthAdvantage));
   const wanted = need.length ? need : have;
   const rows = ctx.unitRows();
   const old = t.unit;
@@ -465,123 +492,52 @@ const makeFormation: BtHandler<OpsContext> = {
   },
 };
 
-// OPERATION MOVE (0x81a130 update, 0x816cb0 execution)
-/** a team's members as the move orders them: those of the leader's AI type
- *  (all where the node names none), nearest the goal first, the first of
- *  equals in join order */
-function moveOrder(view: MajorView, units: ReadonlyMap<number, MajorUnitView>, ids: readonly number[], goal: number, leader: string | undefined): MajorUnitView[] {
-  const us = ids.map((id) => units.get(id)).filter((u): u is MajorUnitView => !!u && (!leader || hasAiType(u.type, leader)));
-  return us.map((u, k) => ({ u, k, d: view.plotDistance(u.plot, goal) })).sort((a, b) => a.d - b.d || a.k - b.k).map((x) => x.u);
-}
-
+// OPERATION MOVE (0x81a130 update, 0x816cb0 execution): each team's
+// update over its members and the node's store for it (`moveUpdate`), the
+// goal its slot (Move To: 0 the rally, 1 the target), Range to goal and Unit
+// distance (default 1); SUCCESS where every team's is, else RUNNING
+// (AlwaysRunning: RUNNING); a team with no goal FAILS. The execution moves
+// each team (`moveExec`) but one arrived of an operation ready, a unit in a
+// formation or of the node's Leader Tag on its goal itself
 const operationMove: BtHandler<OpsContext> = {
   update(node, run, ctx) {
     const m = run.mem[node.index];
-    const view = ctx.view();
-    const units = unitsById(view, ctx.seat);
     const slot = dataInt(node, 'Move To (enum)') ?? 1;
     const range = dataInt(node, 'Range to goal') ?? 0;
-    const unitDist = dataInt(node, 'Unit distance') ?? 0;
-    const leader = dataValue(node, 'Leader Tag');
-    m.arrived = false;
-    let running = false;
-    for (const t of ctx.op.teams) {
+    const spread = dataInt(node, 'Unit distance') ?? 1;
+    const arrived: boolean[] = [];
+    let all = true;
+    for (const [k, t] of ctx.op.teams.entries()) {
       const goal = t.goals[slot] ?? NO_PLOT;
       if (goal === NO_PLOT) return BT_FAILURE;
-      const order = moveOrder(view, units, t.members, goal, leader);
-      if (order.length === 0) continue;
-      const head = order[0];
-      let arrived = view.plotDistance(head.plot, goal) <= range;
-      if (unitDist > 0 && arrived) {
-        const all = moveOrder(view, units, t.members, goal, undefined);
-        const strays = all.filter((u) => view.plotDistance(u.plot, head.plot) > unitDist).length;
-        if (2 * strays >= all.length) arrived = false;
-      }
-      if (!arrived) running = true;
-      m.arrived = (m.arrived as boolean) || arrived;
+      const stores = (m.stores ??= {}) as Record<number, MoveStore>;
+      const r = ctx.moveUpdate(t.members, stores[k], goal, slot === 1, range, spread);
+      if (r.store) stores[k] = r.store;
+      arrived[k] = r.arrived;
+      if (r.status !== BT_SUCCESS) all = false;
     }
+    m.arrived = arrived;
     if (dataBool(node, 'AlwaysRunning')) return BT_RUNNING;
-    return running || !m.arrived ? BT_RUNNING : BT_SUCCESS;
+    return all ? BT_SUCCESS : BT_RUNNING;
   },
-  execute(node, _run, ctx) {
+  execute(node, run, ctx) {
+    const m = run.mem[node.index];
     const slot = dataInt(node, 'Move To (enum)') ?? 1;
     const range = dataInt(node, 'Range to goal') ?? 0;
     const leader = dataValue(node, 'Leader Tag');
-    for (const t of ctx.op.teams) {
+    const arrived = (m.arrived as boolean[] | undefined) ?? [];
+    const paired = new Set(ctx.op.formations.flat());
+    // the operation ready (0x73aa60): its units may be built, or every team ready
+    const ready = ctx.op.allowUnitConstruction || ctx.op.teams.every((t) => t.ready);
+    for (const [k, t] of ctx.op.teams.entries()) {
       const goal = t.goals[slot] ?? NO_PLOT;
       if (goal === NO_PLOT) continue;
-      const view = ctx.view();
-      const units = unitsById(view, ctx.seat);
-      const order = moveOrder(view, units, t.members, goal, undefined);
-      for (const first of order) {
-        const v = ctx.view();
-        const u = v.units(ctx.seat).find((x) => x.id === first.id);
-        if (!u) continue;
-        const pair = ctx.op.formations.find((f) => f.includes(u.id));
-        const mate = pair ? (pair[0] === u.id ? pair[1] : pair[0]) : -1;
-        const dest = moveDest(v, ctx.seat, u, goal, range, leader, mate);
-        const from = u.plot;
-        moveTo(ctx, u, dest);
-        const after = ctx.view().units(ctx.seat).find((x) => x.id === u.id)?.plot ?? from;
-        ctx.log(`${ctx.op.def.name}, Operation Move, ${u.type}, ${xy(v, from)}, ${xy(v, dest)}, ${xy(v, after)}`);
-      }
+      const v = ctx.view();
+      const moved = ctx.moveExec(t.members, goal, range, !!arrived[k], ready, (id, type) => paired.has(id) || (!!leader && hasAiType(type, leader)), !!leader);
+      for (const x of moved) ctx.log(`${ctx.op.def}, Operation Move, ${x.type}, ${xy(v, x.from)}, ${xy(v, x.dest)}, ${xy(ctx.view(), x.after)}`);
     }
   },
 };
-
-const military = (u: MajorUnitView): boolean => u.combat > 0 || u.ranged > 0;
-
-/** The plot a unit moves to for a goal (0x816cb0). Its search radius: the
- *  smaller of the node's Range to goal and the unit's own attack Range, 0 for
- *  a unit in a formation or one of the node's Leader Tag; at least 1 where
- *  the goal is barred to it — no path, a visible enemy there, or a unit
- *  that keeps it out (0x585eb0: its own of the same class, another
- *  player's) — and, the goal open, for a unit outside the Leader Tag and any
- *  formation where the node names one and its range is above 0. With a
- *  radius, of the plots within it of the goal (the ring walk 0x6aef0 with the
- *  test 0x815d50): one in the goal's region before one outside, then the
- *  nearest the unit, the first of equals in the walk; its own plot, or one
- *  with no other unit of the seat but its formation mate that its path
- *  reaches. Without one, or none found: the goal. */
-function moveDest(view: MajorView, seat: number, u: MajorUnitView, goal: number, range: number, leader: string | undefined, mate: number): number {
-  const inFormation = mate >= 0;
-  const tagged = !!leader && hasAiType(u.type, leader);
-  let r = Math.min(range, inFormation || tagged ? 0 : u.range);
-  const mine = view.units(seat);
-  if (u.plot !== goal && barred(view, seat, u, goal, mate)) r = Math.max(1, r);
-  else if (range > 0 && leader && !inFormation && !tagged) r = Math.max(1, r);
-  if (r <= 0) return goal;
-  const plots = view.plots();
-  const region = plots[goal].region;
-  let best = NO_PLOT;
-  let bestD = -1;
-  let bestIn = false;
-  for (const p of view.plotsRing(goal, r)) {
-    const inRegion = plots[p].region === region;
-    const d = view.plotDistance(u.plot, p);
-    if (bestD >= 0) {
-      if (inRegion === bestIn && d >= bestD) continue;
-      if (inRegion !== bestIn && !inRegion) continue;
-    }
-    if (p !== u.plot && (mine.some((x) => x.id !== u.id && x.id !== mate && x.plot === p) || view.unitPath(u.id, p).length === 0)) continue;
-    best = p;
-    bestD = d;
-    bestIn = inRegion;
-  }
-  return best === NO_PLOT ? goal : best;
-}
-
-/** the goal barred to the unit (0x586360, 0x5862e0, 0x585eb0): no path, a
- *  visible unit of a player at war with the seat there, or a unit there that
- *  keeps it out — one of the seat's own of its class (not its formation
- *  mate), or any of another player's */
-function barred(view: MajorView, seat: number, u: MajorUnitView, goal: number, mate: number): boolean {
-  if (view.unitPath(u.id, goal).length === 0) return true;
-  if (view.hostileUnits(seat).some((h) => h.plot === goal)) return true;
-  if (view.units(seat).some((x) => x.id !== u.id && x.id !== mate && x.plot === goal && military(x) === military(u))) return true;
-  return view.plotForeignUnits(seat, goal) > 0;
-}
-
 
 // SETTLE (0x7f0b30 update, 0x7ef530 execution): a unit that founds cities
 // whose planning reaches the target this turn; it founds there

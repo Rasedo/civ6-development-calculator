@@ -431,11 +431,12 @@ def in_hand_check(ai: CityAi, s: int, w, mask: torch.Tensor) -> None:
 
 
 def contract_built(ai: CityAi, s: int, city_id, unit: torch.Tensor, building: torch.Tensor, district: torch.Tensor,
-                   unit_id: torch.Tensor, mask: torch.Tensor) -> None:
+                   unit_id: torch.Tensor, mask: torch.Tensor, join=None) -> None:
     """`contractBuilt` where `mask`: each queued contract for the item bound
     to the city (a unit's, or to none) ACCEPTED or IN PROGRESS (a building's
     or district's any progress) COMPLETED; a unit's contract hands the unit
-    to its tree"""
+    to its tree — a city tree, else the operation whose tree made it
+    (`join(tree, unit, mask)`)"""
     cid = _l(city_id, unit).unsqueeze(1)
     q = ai.c_queued[:, s] & mask.unsqueeze(1) & (ai.c_id[:, s] >= 0)
     prog = ai.c_progress[:, s]
@@ -455,6 +456,8 @@ def contract_built(ai: CityAi, s: int, city_id, unit: torch.Tensor, building: to
             k = (ai.tr_id[:, s] == ai.c_tree[:, s, j].unsqueeze(1)).long().argmax(dim=1)
             has = (ai.tr_id[:, s] == ai.c_tree[:, s, j].unsqueeze(1)).any(dim=1)
             _tree_take_unit(ai, s, k, unit_id, g & has)
+            if join is not None:
+                join(ai.c_tree[:, s, j], unit_id, g & ~has)
 
 
 def _tree_take_unit(ai: CityAi, s: int, k: torch.Tensor, uid: torch.Tensor, mask: torch.Tensor) -> None:
@@ -471,10 +474,11 @@ def _tree_take_unit(ai: CityAi, s: int, k: torch.Tensor, uid: torch.Tensor, mask
         ai.tr_units[b, s, kk, int(free[0])] = uid[b]
 
 
-def reap_contracts(ai: CityAi, s: int) -> None:
-    """`reapContracts`: a contract lives while its tree runs and holds it, or
-    the city has it in hand"""
-    in_tree = ai.c_in_tree[:, s] & tree_live(ai, s, ai.c_tree[:, s])
+def reap_contracts(ai: CityAi, s: int, w) -> None:
+    """`reapContracts`: a contract lives while its tree — a city tree's, an
+    operation's (`w.operation_live`) — runs and holds it, or the city has it
+    in hand"""
+    in_tree = ai.c_in_tree[:, s] & (tree_live(ai, s, ai.c_tree[:, s]) | _b(w.operation_live(ai.c_tree[:, s]), ai.c_in_tree[:, s]))
     keep = in_tree | (ai.c_id[:, s] == ai.in_hand[:, s].unsqueeze(1))
     gone = (ai.c_id[:, s] >= 0) & ~keep
     ai.c_id[:, s] = torch.where(gone, torch.full_like(ai.c_id[:, s], -1), ai.c_id[:, s])
@@ -1430,4 +1434,4 @@ def tick_city_trees(ai: CityAi, s: int, w, turn: int, mask: torch.Tensor) -> Non
     ai.r_plot[:, s] = torch.where(dead, -1, ai.r_plot[:, s])
     ai.r_tree[:, s] = torch.where(dead, -1, ai.r_tree[:, s])
     ai.tr_id[:, s] = torch.where(ai.tr_alive[:, s], ai.tr_id[:, s], torch.full_like(ai.tr_id[:, s], -1))
-    reap_contracts(ai, s)
+    reap_contracts(ai, s, w)

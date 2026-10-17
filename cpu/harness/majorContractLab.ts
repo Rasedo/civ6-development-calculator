@@ -302,7 +302,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     }
     if (!cities.length) continue;
     const world: CityTreeWorld = {
-      turn, seat: p.id, cities: cities.map((c) => c.cf), units: treeUnits,
+      turn, seat: p.id, cities: cities.map((c) => c.cf), units: treeUnits, heldContracts: () => [],
       techHeld: (t) => research.techs.includes(t),
       civicHeld: (c) => research.civics.includes(c),
       canImprove: (plot, impType) => {

@@ -1,14 +1,15 @@
 /**
- * THE OPERATIONS BESIDE THE ACTION REPLAY: each AI major's and each
- * city-state's operations (cpu/core/operations) run on record t as the importer reads it
- * — the AI's own operation state carried from turn to turn, its units'
- * moves carried out on a copy of the state — and scored against the game's
- * own AI_Operation.csv and AI_Operation_Eval.csv of that game, line by line,
- * and against record t+1 for the plots its operation units end their turn
- * on. It reads; the record's moves still land.
+ * THE OPERATIONS BESIDE THE ACTION REPLAY: each AI major's operations
+ * (cpu/core/operations) run on record t as the importer reads it — the AI's
+ * own operation state carried from turn to turn, its units' moves carried
+ * out on a copy of the state — and each city-state's as the engine's own
+ * minor turn runs them (their lines handed in by the replay), scored
+ * against the game's own AI_Operation.csv and AI_Operation_Eval.csv of that
+ * game, line by line, and against record t+1 for the plots its operation
+ * units end their turn on. It reads; the record's moves still land.
  *
  * Measured per operation family (each operation name the port starts, and
- * every operation's lines together): per turn and AI major, every line the
+ * every operation's lines together): per turn and AI party, every line the
  * game logged for it against ours (the same text after the turn and the
  * player), by kind (Started, running TARGET, the team's Ready line, the
  * recruit lines, Operation Move, Operation Change Target, the attacks, the
@@ -25,14 +26,25 @@ import { citiesOf, seatOf } from '../core/seats';
 import { computeCityStats } from '../core/city';
 import { spawnUnit, unitFullMoves } from '../core/units';
 import type { GameState, Seat } from '../core/types';
-import { newOpsAi, notReadyHook, operationsTurn, opsOf, peaceMade, remapUnits, surpriseWarReady, type OpsAi } from '../core/operations/manager';
-import { knownArmy } from '../core/operations/knowledge';
+import {
+  joinBuilt, newOpsAi, notReadyHook, operationsEvaluate, operationsRun, opContracts, opsOf, peaceMade, remapUnits, startOperationNamed,
+  surpriseWarReady, type OpsAi, type OpsEnv,
+} from '../core/operations/manager';
+import { knownArmy, lookArmy, lookCamps, type ArmyRecords } from '../core/operations/knowledge';
+import { cityThreat } from '../core/operations/cityThreat';
+import { cityValue } from '../core/operations/cityValue';
 import { warValue } from '../../ai/major/warValue';
 import { opsSettle } from '../../ai/major/settle';
 import { seatUnitRows } from '../core/operations/unitRows';
-import type { MajorView } from '../../ai/major/view';
+import type { MajorKnownCityView, MajorView } from '../../ai/major/view';
+import { militaryAiTypeOf, openPass } from '../core/tactical';
+import { passOrders, passView } from '../core/opsOrders';
 import type { WarHooks } from './diploSender';
-import { opUnits } from '../core/operations/operation';
+import { NO_PLOT, opUnits } from '../core/operations/operation';
+import {
+  CP_ACCEPTED, CP_FAILED, CP_IN_PROGRESS, contractBuilt, contractEvaluate, newContractBook, queueContract, reapContracts, type ContractBook,
+  type ContractItem,
+} from '../core/aiContracts';
 import { engineRowOf } from './import';
 import { gameTypeOf } from '../data/aliases';
 import type { Catalog, TurnRecord } from './record';
@@ -137,6 +149,21 @@ const newTally = (): OperationsTally => ({ families: Object.fromEntries(FAMILIES
 
 const inFamily = (family: string, line: string): boolean => family === 'all' || opName(line) === family;
 
+/** an AI major's operations' state beside the replay: the manager's, its
+ *  contract book, its knowledge base (army records, camps, city records as
+ *  the turn before left them), its cities' threats and defence slots */
+interface MajorOps {
+  ai: OpsAi;
+  book: ContractBook;
+  nextContract: number;
+  nextOp: number;
+  army: ArmyRecords;
+  camps: number[];
+  known: readonly MajorKnownCityView[] | null;
+  threat: Map<number, number>;
+  defense: Map<number, number>;
+}
+
 export class OperationsProbe {
   private readonly log: Map<string, string[]>;
   private readonly evalLog: Map<string, string[]>;
@@ -145,7 +172,7 @@ export class OperationsProbe {
    *  war with */
   private readonly lastView = new Map<number, MajorView>();
   private readonly wars = new Map<number, Set<number>>();
-  private readonly ais = new Map<number, OpsAi>();
+  private readonly majors = new Map<number, MajorOps>();
   /** the record unit keys of the last record state's engine units, by seat */
   private keys = new Map<number, string>();
   /** the plots the operation units ended on, by record key, awaiting t+1 */
@@ -166,22 +193,22 @@ export class OperationsProbe {
     return {
       // on the view the seat's operations' turn left (its knowledge base)
       value: (view, owner, other, favoured) => {
-        const ai = this.ais.get(owner);
+        const m = this.majors.get(owner);
         const v = this.lastView.get(owner) ?? view;
-        const records = (p: number) => (ai ? knownArmy(ai.army, p) : []);
+        const records = (p: number) => (m ? knownArmy(m.army, p) : []);
         return warValue(v, owner, other, favoured, {
           army: (p) => (p === owner ? v.units(owner) : records(p)), records, turn: v.turn,
         });
       },
       // on the view the seat's operations' turn left: their units' ids
       ready: (_view, owner, other) => {
-        const ai = this.ais.get(owner);
+        const m = this.majors.get(owner);
         const v = this.lastView.get(owner);
-        return !!ai && !!v && surpriseWarReady(ai, v, other);
+        return !!m && !!v && surpriseWarReady(m.ai, v, other);
       },
       notReady: (view, owner, other) => {
-        const ai = this.ais.get(owner);
-        if (ai) notReadyHook(ai, view, other);
+        const m = this.majors.get(owner);
+        if (m) notReadyHook(m.ai, view, other);
       },
     };
   }
@@ -201,20 +228,21 @@ export class OperationsProbe {
     return out;
   }
 
-  /** at the pair's start, the AI's turn on record t (`state`, the import of
-   *  `rec`; `next` record t+1, `nextState` its import). Record t is read
-   *  before the AI major's start of turn: the units its cities finish at that
-   *  start (a unit record t+1 holds that record t does not, of the type a
-   *  city of the seat finishes this turn) stand at their city as its turn
-   *  begins, the other cities bank the turn's production; what a city
-   *  produces once its turn's choice is made is record t+1's. */
+  /** at the pair's start, the AI majors' turn on record t (`state`, the
+   *  import of `rec`; `next` record t+1, `nextState` its import). Record t
+   *  is read before the AI major's start of turn: the units its cities
+   *  finish at that start (a unit record t+1 holds that record t does not,
+   *  of the type a city of the seat finishes this turn) stand at their city
+   *  as its turn begins, the other cities bank the turn's production; what a
+   *  city produces once its turn's choice is made is record t+1's. */
   preTurn(rec: TurnRecord, state: GameState, next: TurnRecord, nextState: GameState): void {
     if (!this.active) return;
     const keys = this.unitKeys(rec);
     const copy = structuredClone(state);
     const had = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
     const built = new Map<number, { city: number; unit: number; type: string }[]>();
-    for (const [seat, player] of this.seats) {
+    const majors = [...this.seats].filter(([seat]) => seat < copy.seats.length);
+    for (const [seat, player] of majors) {
       const view = majorView(copy, this.inputs(copy.turn));
       const due = view.cityBuilds(seat).filter((b) => b.unitType && b.turnsLeft <= 1);
       for (const u of next.units) {
@@ -238,19 +266,38 @@ export class OperationsProbe {
     }
     const byKey = new Map([...keys].map(([id, k]) => [k, id]));
     // the AI's units carried over from the last record state
-    for (const ai of this.ais.values()) remapUnits(ai, (id) => {
+    const remap = (id: number) => {
       const k = this.keys.get(id);
       return k === undefined ? undefined : byKey.get(k);
-    });
+    };
+    for (const m of this.majors.values()) {
+      remapUnits(m.ai, remap);
+      const records = [...m.army.values()];
+      let orphan = Math.min(0, ...records.map((r) => r.id)) - 1;
+      m.army.clear();
+      for (const r of records) {
+        const id = r.id < 0 ? r.id : remap(r.id) ?? orphan--;
+        m.army.set(id, { ...r, id });
+      }
+    }
     this.keys = keys;
     // the AI acts at its turn's start: its units on their full Movement
-    for (const u of copy.units) if (this.seats.has(u.seat)) u.movesLeft = u.movesFull ?? unitFullMoves(copy, u);
+    for (const u of copy.units) if (majors.some(([seat]) => seat === u.seat)) u.movesLeft = u.movesFull ?? unitFullMoves(copy, u);
     const turn = copy.turn;
-    for (const [seat, player] of this.seats) {
+    for (const [seat, player] of majors) {
       if (!seatOf(copy, seat)) continue;
-      let ai = this.ais.get(seat);
-      if (!ai) this.ais.set(seat, (ai = newOpsAi(seat)));
-      let view = majorView(copy, this.inputs(turn));
+      let m = this.majors.get(seat);
+      if (!m) {
+        this.majors.set(seat, (m = { ai: newOpsAi(seat), book: newContractBook(), nextContract: 0, nextOp: 0, army: new Map(), camps: [], known: null,
+          threat: new Map(), defense: new Map() }));
+      }
+      const mo = m;
+      const { ai } = mo;
+      // the seat's units' orders go through a tactical pass on the copy, its
+      // operations reading the pass's planning and target list
+      const pass = openPass(copy, seat, militaryAiTypeOf);
+      const look = () => passView(copy, seat, pass, majorView(copy, this.inputs(turn)));
+      let view = look();
       const after = majorView(nextState, this.inputs(turn));
       // the military AI's unit production table, once a turn
       let rows: ReturnType<typeof seatUnitRows> | null = null;
@@ -258,27 +305,57 @@ export class OperationsProbe {
       const now = new Set(view.players().filter((p) => p !== seat && view.atWar(seat, p)));
       for (const p of this.wars.get(seat) ?? []) if (!now.has(p)) peaceMade(ai, p);
       this.wars.set(seat, now);
-      const out = operationsTurn(ai, {
+      const lines: string[] = [];
+      const evals: string[] = [];
+      const act = (r: number[][]) => {
+        applySeatUnitOrders(copy, seatOf(copy, seat) as Seat, r);
+        view = look();
+      };
+      const producing = (city: number): ContractItem | null => {
+        const plot = view.cityBuilds(seat).find((b) => b.city === city)?.plot;
+        const k = after.cityBuilds(seat).findIndex((b) => b.plot === plot);
+        return k < 0 ? null : after.contractCities(seat)[k].current;
+      };
+      const env: OpsEnv = {
         turn,
         view: () => view,
-        act: (rows) => {
-          applySeatUnitOrders(copy, seatOf(copy, seat) as Seat, rows);
-          view = majorView(copy, this.inputs(turn));
-        },
-        built: built.get(seat) ?? [],
+        defs: null,
+        army: (p) => knownArmy(mo.army, p),
+        camps: () => mo.camps,
+        known: () => mo.known ?? view.knownCities(seat),
+        threat: (plot) => mo.threat.get(plot) ?? -1,
+        book: () => mo.book,
+        newContractId: () => mo.nextContract++,
+        contractCities: () => view.contractCities(seat),
+        clearProduction: () => undefined,
+        newOpId: () => mo.nextOp++,
         settle: view.majors().includes(seat) ? opsSettle(() => view, seat) : null,
         unitRows: () => (rows ??= (() => {
           const counts = new Map<string, number>();
-          for (const r of ai.army.values()) counts.set(`${r.type}|${r.owner}`, (counts.get(`${r.type}|${r.owner}`) ?? 0) + 1);
+          for (const r of mo.army.values()) counts.set(`${r.type}|${r.owner}`, (counts.get(`${r.type}|${r.owner}`) ?? 0) + 1);
           return seatUnitRows(copy, seat, (u, p) => counts.get(`${u}|${p}`) ?? 0, view.players(), (p) => view.atWar(seat, p));
         })()),
-        producing: (city) => {
-          const plot = view.cityBuilds(seat).find((b) => b.city === city)?.plot;
-          const k = after.cityBuilds(seat).findIndex((b) => b.plot === plot);
-          return k < 0 ? null : after.contractCities(seat)[k].current;
-        },
-      });
-      const ours = out.lines.map(norm);
+        act,
+        ...passOrders(copy, seat, pass, () => {
+          view = look();
+        }),
+        log: (l) => lines.push(l),
+        logEval: (l) => evals.push(l),
+      };
+      updateContracts(mo, view, built.get(seat) ?? [], producing);
+      operationsEvaluate(ai, env);
+      // the knowledge base's records refresh, and the CITY VALUES the
+      // manager logs after the evaluation lines read them: each known city
+      // of another player
+      const known = (mo.known = view.knownCities(seat));
+      lookArmy(mo.army, view, seat, turn);
+      const seen = view.plotsSeen(seat);
+      mo.camps = lookCamps(mo.camps, (p) => seen.has(p), view.campPlots());
+      const army = (p: number) => (p === seat ? view.units(seat) : knownArmy(mo.army, p));
+      const cityValues = known.filter((k) => k.owner !== seat).map((k) => ({ plot: k.plot, value: cityValue(view, seat, k, known, army) }));
+      cityDefense(mo, env, view);
+      operationsRun(ai, env);
+      const ours = lines.map(norm);
       if (TRACE) {
         console.error(`== t${turn} p${player}`);
         const logs = this.log.get(`${turn}:${player}`) ?? [];
@@ -287,31 +364,71 @@ export class OperationsProbe {
           console.error(`${mark} log  ${logs[i] ?? '-'}\n${mark} ours ${ours[i] ?? '-'}`);
         }
         const ev = (this.evalLog.get(`${turn}:${player}`) ?? []).join(' | ');
-        console.error(`   eval log  ${ev}\n   eval ours ${out.evals.join(' | ')}`);
+        console.error(`   eval log  ${ev}\n   eval ours ${evals.join(' | ')}`);
         console.error(`   units ${view.units(seat).map((u) => `${u.id}:${u.type}@${u.plot}`).join(' ')}`);
-        console.error(`   contracts ${ai.book.contracts.map((c) => `${c.id}:${c.unit}:${c.progress}:tree${c.tree}:turns${c.turns}`).join(' ')}`);
-        console.error(`   ops ${opsOf(ai).map((o) => `${o.def.name}#${o.id}[${o.teams.map((t) => t.members.join(',')).join('|')}]`).join(' ')}`);
+        console.error(`   contracts ${mo.book.contracts.map((c) => `${c.id}:${c.unit}:${c.progress}:tree${c.tree}:turns${c.turns}`).join(' ')}`);
+        console.error(`   ops ${opsOf(ai).map((o) => `${o.def}#${o.id}[${o.teams.map((t) => t.members.join(',')).join('|')}]`).join(' ')}`);
       }
       this.lastView.set(seat, view);
-      this.compare(turn, player, ours);
-      // the eval lines name the enemy by the game's player id
-      const playerOf = new Map([...this.seatOfPlayer].map(([p, s]) => [s, p]));
-      const evals = out.evals.map((l) => l.replace(/^(-?\d+), /, (_m, s: string) => `${Number(s) < 0 ? s : playerOf.get(Number(s)) ?? s}, `));
-      this.compareEvals(this.tally.evals, turn, player, evals, true);
-      this.compareEvals(this.tally.warEvals, turn, player, evals, false);
+      this.score(turn, player, ours, evals);
       const names = new Map(rec.cities.map((c) => [c.y * rec.head.W + c.x, c.name.replace(/^LOC_CITY_NAME_/, '')]));
-      this.compareCityValues(turn, player, out.cityValues.map(({ plot, value }) => [names.get(plot) ?? '?', value]));
+      this.compareCityValues(turn, player, cityValues.map(({ plot, value }) => [names.get(plot) ?? '?', value]));
       for (const op of opsOf(ai)) {
         for (const id of opUnits(op)) {
           const u = view.units(seat).find((x) => x.id === id);
           const key = keys.get(id);
-          if (!u || !key) continue;
-          for (const family of FAMILIES) {
-            if (family === 'all' || family === op.def.name) this.ends.push({ family, player, turn, key, plot: u.plot, type: u.type });
-          }
+          if (u && key) this.end(op.def, player, turn, key, u.plot, u.type);
         }
       }
     }
+  }
+
+  /** a city-state's operations' turn as the engine ran it: its lines, its
+   *  candidate lines */
+  minorTurn(turn: number, player: number, lines: readonly string[], evals: readonly string[]): void {
+    if (!this.active) return;
+    const ours = lines.map(norm);
+    if (TRACE) {
+      const logs = this.log.get(`${turn}:${player}`) ?? [];
+      if (logs.length || ours.length) console.error(`== t${turn} p${player}`);
+      for (let i = 0; i < Math.max(logs.length, ours.length); i++) {
+        const mark = logs[i] === ours[i] ? '  ' : '!!';
+        console.error(`${mark} log  ${logs[i] ?? '-'}\n${mark} ours ${ours[i] ?? '-'}`);
+      }
+    }
+    this.score(turn, player, ours, evals);
+  }
+
+  /** a city-state's operation unit's plot after its units' turn, against
+   *  record t+1 (`b`) now */
+  minorEnd(b: TurnRecord, def: string, player: number, turn: number, key: string, plot: number, type: string): void {
+    const r = b.units.find((u) => `${u.owner}:${u.id}` === key);
+    if (!r) return;
+    const at = r.y * b.head.W + r.x;
+    for (const family of FAMILIES) {
+      if (family !== 'all' && family !== def) continue;
+      const t = this.tally.families[family];
+      t.plots++;
+      if (at === plot) t.plotsEqual++;
+      else if (family !== 'all' && t.misses.length < 30) t.misses.push(`t${turn} p${player} ${type} ${key}: ours plot ${plot}, record t+1 ${at}`);
+    }
+  }
+
+  /** an operation unit's plot after the moves, against record t+1's */
+  end(def: string, player: number, turn: number, key: string, plot: number, type: string): void {
+    for (const family of FAMILIES) {
+      if (family === 'all' || family === def) this.ends.push({ family, player, turn, key, plot, type });
+    }
+  }
+
+  /** a turn's lines and candidate lines against the logs */
+  private score(turn: number, player: number, ours: string[], evals: readonly string[]): void {
+    this.compare(turn, player, ours);
+    // the eval lines name the enemy by the game's player id
+    const playerOf = new Map([...this.seatOfPlayer].map(([p, s]) => [s, p]));
+    const named = evals.map((l) => l.replace(/^(-?\d+), /, (_m, s: string) => `${Number(s) < 0 ? s : playerOf.get(Number(s)) ?? s}, `));
+    this.compareEvals(this.tally.evals, turn, player, named, true);
+    this.compareEvals(this.tally.warEvals, turn, player, named, false);
   }
 
   private compare(turn: number, player: number, ours: string[]): void {
@@ -404,6 +521,54 @@ export class OperationsProbe {
       else if (e.family !== 'all' && t.misses.length < 30) t.misses.push(`t${e.turn} p${e.player} ${e.type} ${e.key}: ours plot ${e.plot}, record t+1 ${p}`);
     }
     this.ends = [];
+  }
+}
+
+/** the contracts as the major's cities stand (their production the
+ *  record's): those no live operation's tree holds leave the book; a city
+ *  producing an accepted contract's unit queues it (vt +0x38); a unit a city
+ *  trained completes its queued contract (the completion signal 0x5f5650),
+ *  the unit joining the operation whose tree made it; a queued contract's
+ *  city values it, one its city no longer produces FAILS (0x5d7e00) */
+function updateContracts(m: MajorOps, view: MajorView, built: readonly { city: number; unit: number; type: string }[],
+  producing: (city: number) => ContractItem | null): void {
+  const { ai, book } = m;
+  reapContracts(book, new Set(opContracts(ai)));
+  const cities = view.contractCities(ai.seat).map((x) => ({ ...x, current: producing(x.id) }));
+  for (const c of book.contracts) {
+    if (!c.unit || c.progress !== CP_ACCEPTED) continue;
+    const city = cities.find((x) => (c.city === -1 || x.id === c.city) && x.current?.unit === c.unit);
+    if (city) queueContract(c, city, () => true, () => undefined);
+  }
+  for (const b of built) {
+    contractBuilt(book, b.city, { unit: b.type, building: null, district: null }, b.unit, (tree, id) => {
+      const unit = view.units(ai.seat).find((x) => x.id === id);
+      if (unit) joinBuilt(ai, tree, unit);
+    });
+  }
+  for (const c of book.contracts) {
+    const city = c.queued && c.progress === CP_IN_PROGRESS ? cities.find((x) => x.id === c.city) : undefined;
+    if (city && !contractEvaluate(c, city)) c.progress = CP_FAILED;
+  }
+}
+
+/** THE MAJOR'S CITIES' UPDATE (0x5ce680) as the operations read it: each
+ *  city's threat (0x5cbd10, cityThreat); a threatened city whose defence
+ *  slot holds no running operation starts City Defense at its plot (the
+ *  defence event 0x5cced0), the slot holding it */
+function cityDefense(m: MajorOps, env: OpsEnv, view: MajorView): void {
+  const { ai } = m;
+  for (const city of view.cityPlots(ai.seat)) {
+    const threat = cityThreat(view, ai.seat, city, {
+      army: (p) => knownArmy(m.army, p),
+      operationNear: (p, plot, dist) => opsOf(ai).some((o) => o.enemy === p && o.target !== NO_PLOT && view.plotDistance(o.target, plot) <= dist),
+    });
+    m.threat.set(city, threat);
+    const slot = m.defense.get(city) ?? -1;
+    if (slot !== -1 && opsOf(ai).some((o) => o.id === slot)) continue;
+    m.defense.set(city, -1);
+    if (threat <= -1) continue;
+    m.defense.set(city, startOperationNamed(ai, env, 'City Defense', city));
   }
 }
 

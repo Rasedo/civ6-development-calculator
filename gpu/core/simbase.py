@@ -487,6 +487,7 @@ class Rules:
     ai_value: dict  # the AI's value tables (`aiValue.ts`): horizon, discountPct, the pseudo-yields, unlockShare
     research_ai: dict  # the research AI's constants (`aiResearch.ts`): taskBias, embarkAll
     ai_city_build: dict  # the city build AI's value tables (`aiCityBuild.ts`): DefaultValues, the improvements, features, resources, districts, projects, savings
+    ai_operations: dict  # the city-states' operations (`minorOps.ts`): the definitions, teams, requirements, trees, unit AI types, limits
     civic_ai: dict  # the civics AI's constants (`aiCivics.ts`): policyFloor
     c_repeat: torch.Tensor  # bool [NC]
     t_prereqs: list  # list of lists
@@ -743,6 +744,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         ai_value=r["aiValue"],
         research_ai=r["researchAi"],
         ai_city_build=r["aiCityBuild"],
+        ai_operations=r["aiOperations"],
         civic_ai=r["civicAi"],
         c_repeat=torch.tensor([bool(c["repeatable"]) for c in r["civics"]], dtype=torch.bool),
         t_prereqs=[t["prereqs"] for t in r["techs"]],
@@ -1202,6 +1204,12 @@ _MUTABLE = [
     "cai_c_plot", "cai_c_value", "cai_c_city", "cai_c_max_turns", "cai_c_turns", "cai_c_progress", "cai_c_assign", "cai_c_queued",
     "cai_c_in_tree", "cai_c_listed", "cai_in_hand", "cai_r_plot", "cai_r_tree", "cai_r_value", "cai_c_serial", "cai_t_serial",
     "citystate_kb_slot", "citystate_kb_owner", "citystate_kb_type", "citystate_kb_seen", "citystate_kb_plot",  # its knowledge base's army records
+    "citystate_kb_damage",  # the damage each record's unit had when last seen
+    # its operations (`OpsAi`, sim_minorops.py): the pool, the trees, the teams, the stores, the pick, the camps known
+    "mops_def", "mops_id", "mops_target", "mops_rally", "mops_bk_target", "mops_bk_rally", "mops_started", "mops_estr",
+    "mops_str", "mops_st", "mops_ma", "mops_mb", "mops_bb", "mops_tm", "mops_mem", "mops_cnt", "mops_goal", "mops_eng",
+    "mops_mins", "mops_ready", "mops_ong", "mops_unit", "mops_tstr", "mops_mvs", "mops_mvg", "mops_free", "mops_nfree",
+    "mops_size", "mops_pick", "mops_pick_target", "mops_pick_rally", "mops_camps",
     "citystate_kb_seq", "citystate_kb_next",  # the records' order
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on

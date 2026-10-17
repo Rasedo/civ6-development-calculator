@@ -45,6 +45,7 @@
     - cpu/core/tactical.ts:reachAt
     - gpu/core/sim_tactics.py:_barb_reach_at
     - cpu/core/operations/assault.ts:garrisonExecute
+    - cpu/core/opsOrders.ts:passView
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

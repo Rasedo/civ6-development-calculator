@@ -2,6 +2,7 @@ export * from '../../world/types';
 import type { ResearchEntry } from './aiResearch';
 import type { CivicEntry } from './aiCivics';
 import type { CityAi } from './aiCityTrees';
+import type { OpsAi } from './operations/manager';
 import type { EconomicMemory } from './aiEconomic';
 import type { GreatWork } from '../data/greatWorks';
 import type { QuestType } from '../data/quests';
@@ -1102,6 +1103,8 @@ export interface ArmyRecord {
   seen: number;
   /** the plot it was last seen on */
   plot: number;
+  /** its damage when last seen */
+  damage: number;
 }
 
 export interface CityState extends Seat {
@@ -1171,6 +1174,10 @@ export interface CityState extends Seat {
   cityAi?: CityAi;
   economy?: EconomicMemory;
   threat?: number;
+  /** its operation manager (`minorOps.ts`, `OpsAi`) and the camps its
+   *  knowledge base holds, in their order (m_barbarians +0x638) */
+  ops?: OpsAi;
+  campsKnown?: number[];
   /** its military AI's Combat Desire (`minorCombatDesire`), raw 24.8: its
    *  PSEUDOYIELD_UNIT_COMBAT weight */
   combatDesire?: number;

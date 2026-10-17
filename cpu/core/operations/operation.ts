@@ -1,24 +1,26 @@
 /**
- * THE MAJORS' OPERATIONS (GameCore_XP2 AI/Operation.cpp, AI/MilitaryAI;
- * the reading is tools/civ6lab/dll_readings.md "C-97: the operations").
+ * THE OPERATIONS (GameCore_XP2 AI/Operation.cpp, AI/MilitaryAI; the reading
+ * is tools/civ6lab/dll_readings.md "C-97: the operations").
  *
  * An operation is an AiOperationDefs row run against a target: its teams
  * (AiOperationTeams, each with its OpTeamRequirements), the units they
  * recruited, its target and rally plots, the backup target the manager's
  * candidate for it names (the best other target of its kind), the strengths
- * its tree's nodes weigh, and the behaviour tree it runs.
+ * its tree's nodes weigh, and the behaviour tree it runs. It is plain data:
+ * its rows by name, its tree's run between ticks as its node statuses,
+ * memories and tagged data.
  */
-import { AI_OP_TEAMS, AI_TEAM_REQS, AI_UNIT_AI } from '../../data/aiOperations';
+import { AI_OP_DEFS, AI_OP_TEAMS, AI_TEAM_REQS, AI_UNIT_AI } from '../../data/aiOperations';
 import type { AiOpDef, AiOpTeam, AiTeamReq } from './types';
-import type { BtRun } from '../behaviorTree';
+import type { BtMemory } from '../behaviorTree';
 import type { MajorUnitView, MajorView } from '../../../ai/major/view';
 import type { OpsContext } from './nodes';
 
 export const NO_PLOT = -1;
 
 export interface OpTeam {
-  def: AiOpTeam;
-  reqs: readonly AiTeamReq[];
+  /** its AiOperationTeams row's TeamName (`teamDef`, `teamReqs`) */
+  team: string;
   /** the members' unit ids in the order they joined */
   members: number[];
   /** per requirement, the members carrying its AI type */
@@ -44,7 +46,8 @@ export interface OpTeam {
 
 export interface Operation {
   id: number;
-  def: AiOpDef;
+  /** its AiOperationDefs row's name (`opDef`) */
+  def: string;
   /** the player the operation is against, -1 for none */
   enemy: number;
   target: number;
@@ -53,7 +56,12 @@ export interface Operation {
    *  target of its kind (op +0x3d8) */
   backup: { target: number; rally: number; enemy: number } | null;
   teams: OpTeam[];
-  run: BtRun;
+  /** its tree's run between ticks: each node's status and memory, the
+   *  tagged data, the root finished */
+  status: number[];
+  mem: BtMemory[];
+  bb: Record<string, unknown>;
+  done: boolean;
   started: number;
   /** the enemy strength about the target (op +0x510) and the teams' (op
    *  +0x4b0) */
@@ -74,6 +82,15 @@ export interface Operation {
   formations: [number, number][];
 }
 
+/** the operation's AiOperationDefs row */
+export const opDef = (op: Operation): AiOpDef => AI_OP_DEFS[op.def];
+
+/** the team's AiOperationTeams row of the operation */
+export const teamDef = (op: Operation, t: OpTeam): AiOpTeam => (AI_OP_TEAMS[op.def] ?? []).find((x) => x.team === t.team)!;
+
+/** the team's OpTeamRequirements */
+export const teamReqs = (t: OpTeam): readonly AiTeamReq[] => AI_TEAM_REQS[t.team] ?? [];
+
 /** the unit AI types a unit type carries (UnitAiInfos) */
 export const unitAiTypes = (unitType: string): readonly string[] => AI_UNIT_AI[unitType] ?? [];
 export const hasAiType = (unitType: string, ai: string): boolean => unitAiTypes(unitType).includes(ai);
@@ -81,7 +98,7 @@ export const hasAiType = (unitType: string, ai: string): boolean => unitAiTypes(
 export function newTeams(def: AiOpDef, view: MajorView, target: number): OpTeam[] {
   return (AI_OP_TEAMS[def.name] ?? []).filter((t) => teamApplies(t, view, target)).map((t) => {
     const reqs = AI_TEAM_REQS[t.team] ?? [];
-    return { def: t, reqs, members: [], counts: reqs.map(() => 0), goals: [NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT], engaged: false,
+    return { team: t.team, members: [], counts: reqs.map(() => 0), goals: [NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT], engaged: false,
       minsMet: false, ready: false, ongoing: false, unit: null, strength: 0 };
   });
 }
@@ -105,45 +122,17 @@ export const unitStrength = (u: MajorUnitView): number => Math.max(u.combat, u.r
 
 /** add a unit to a team (0x737f90): its id joins the members, each
  *  requirement it meets counts it */
-export function addMember(team: OpTeam, u: MajorUnitView): void {
+export function addMember(team: OpTeam, u: Pick<MajorUnitView, 'id' | 'type'>): void {
   if (team.members.includes(u.id)) return;
   team.members.push(u.id);
-  team.reqs.forEach((r, i) => {
+  teamReqs(team).forEach((r, i) => {
     if (hasAiType(u.type, r.aiType)) team.counts[i]++;
-  });
-}
-
-export function removeMember(team: OpTeam, u: MajorUnitView): void {
-  const k = team.members.indexOf(u.id);
-  if (k < 0) return;
-  team.members.splice(k, 1);
-  team.reqs.forEach((r, i) => {
-    if (hasAiType(u.type, r.aiType)) team.counts[i]--;
   });
 }
 
 /** the operation's unit to build (0x739cd0): the first team's that names
  *  one, null for none */
 export const opUnit = (op: Operation): string | null => op.teams.find((t) => t.unit !== null)?.unit ?? null;
-
-/** May the unit join the team without breaking a requirement's maximum
- *  (0x73be10 / 0x73c7c0)? Each requirement it carries: its count below the
- *  MaxNumber, its share with the unit at most MaxPercentage of the members
- *  with it; a requirement it lacks that wants every member (MinPercentage 1)
- *  bars it. `extra` counts the units already taken this pass. */
-export function fitsMaxima(team: OpTeam, unitType: string, extra: number, skip = -1): { fits: boolean; matched: boolean } {
-  let matched = false;
-  for (let j = 0; j < team.reqs.length; j++) {
-    if (j === skip) continue;
-    const r = team.reqs[j];
-    if (hasAiType(unitType, r.aiType)) {
-      if (r.max !== null && r.max >= 0 && team.counts[j] >= r.max) return { fits: false, matched };
-      if (r.maxPercentage >= 0 && team.counts[j] + 1 > (team.members.length + extra + 1) * r.maxPercentage) return { fits: false, matched };
-      matched = true;
-    } else if (r.minPercentage > 0 && r.minPercentage === 1) return { fits: false, matched };
-  }
-  return { fits: true, matched };
-}
 
 /** the units the operation holds, every team's, in team then join order */
 export function opUnits(op: Operation): number[] {
@@ -155,7 +144,7 @@ export function opUnits(op: Operation): number[] {
  *  or a settle site; any other kind always */
 export function targetGone(ctx: OpsContext, op: Operation): boolean {
   const view = ctx.view();
-  switch (op.def.targetType) {
+  switch (opDef(op).targetType) {
     case 'TARGET_BARBARIAN_CAMP':
       return !ctx.camps().includes(op.target);
     case 'TARGET_ENEMY_COMBAT_DISTRICT':
@@ -169,34 +158,12 @@ export function targetGone(ctx: OpsContext, op: Operation): boolean {
   }
 }
 
-/** a unit's move order to a plot: the steps of its path, as far as its
- *  Movement carries it this turn (the engine refuses the rest) */
+/** a unit's move to a plot (the seat's move order, as far as its Movement
+ *  carries it this turn), its formation's other unit with it */
 export function moveTo(ctx: OpsContext, u: MajorUnitView, dest: number): void {
   if (u.plot === dest || u.movesLeft <= 0) return;
-  const view = ctx.view();
-  const path = view.unitPath(u.id, dest);
-  if (path.length === 0) return;
-  const reach = new Map(view.unitReach(u.id, 1).map((r) => [r.plot, r] as const));
-  const units = view.units(ctx.seat);
-  const col = units.findIndex((x) => x.id === u.id);
-  if (col < 0) return;
-  // a formation's other unit steps with it
   const pair = ctx.op.formations.find((f) => f.includes(u.id));
-  const mate = pair ? units.findIndex((x) => x.id === (pair[0] === u.id ? pair[1] : pair[0])) : -1;
-  const together = mate >= 0 && units[mate].plot === u.plot;
-  const rows: number[][] = [];
-  let at = u.plot;
-  for (const p of path) {
-    const r = reach.get(p);
-    if (!r || r.turns > 1) break;
-    const row = units.map(() => -1);
-    const a = view.unitActionColumn(`MOVE_${view.stepDirection(at, p)}`);
-    row[col] = a;
-    if (together) row[mate] = a;
-    rows.push(row);
-    at = p;
-  }
-  if (rows.length) ctx.act(rows);
+  ctx.move(u.id, dest, pair ? (pair[0] === u.id ? pair[1] : pair[0]) : -1);
 }
 
 /** a plot as the operation logs write it, x:y (-9999:-9999 for none) */

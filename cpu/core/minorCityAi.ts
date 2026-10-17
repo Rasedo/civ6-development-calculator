@@ -5,20 +5,22 @@
  * turn after its turn start (the step works the item in hand, `minorBuild`),
  * as the game's Control Manager runs a player's lists:
  *
- *  - B: the Economic AI's savings turn (0x687bf0, `savingsTurn`);
+ *  - B: the Economic AI's savings turn (0x687bf0, `savingsTurn`), the
+ *    military AI's turn (`minorOpsEvaluate`);
  *  - A: the city's update (0x5ce680): its threat (0x5cbd10, `cityThreat`
- *    on its knowledge base's records, no operation of its own), the
- *    contract in hand checked (0x5d7e00), the slots of trees no longer
- *    running freed, the plot analysis (0x5ce970, `minorPlotEvals`), the
- *    improvement pick (0x5c9a00) and the events — City Defense (no
- *    operation manager runs in the engine: none starts), the building or
- *    unit event, the district event, the improvement event — a city its
- *    AI first sees this turn running none;
+ *    on its knowledge base's records; its operations, against no enemy,
+ *    leave it as it is), the contract in hand checked (0x5d7e00), the slots
+ *    of trees no longer running freed, the plot analysis (0x5ce970,
+ *    `minorPlotEvals`), the improvement pick (0x5c9a00) and the events —
+ *    City Defense (its operation manager's start, `minorOpsStart`), the
+ *    building or unit event, the district event, the improvement event — a
+ *    city its AI first sees this turn running none;
  *  - C: the Default Specialization where the queue is empty (0x5d4d70: the
  *    contract in hand where it takes the turn, else the pick), the
  *    purchases (0x5ce5b0's tail: a threatened city buys the first unit of
  *    its list while TryPurchaseUnits succeeds), the trees' tick (0x7ffdd0),
- *    their orders carried out at once.
+ *    their orders carried out at once; its operations' trees tick in its
+ *    units' turn (`cityStateMilitary`).
  *
  * The plot analysis covers the 37 plots within three of the centre in the
  * city's plot order (AI_CityBuild.csv's PLOT ANALYSIS LOG, the centre
@@ -54,6 +56,8 @@ import { newEconomicMemory, purchaseTurn, purchasePick, savingsTurn, type Purcha
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat } from './operations/cityThreat';
 import { majorView } from './majorView';
+import { minorOpContracts, minorOpLive, minorOpsEvaluate, minorOpsStart } from './minorOps';
+import { joinBuilt } from './operations/manager';
 import { minorCity } from './cityStates';
 import { campTiles, civOf, seatOf, tileSeat } from './seats';
 import { cityAppealResolver } from './governors';
@@ -417,9 +421,21 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
       else if (tile.resource) builderHarvest(state, unit.id);
     },
     unitAlive: (u) => !!unitOf(u) && !spent.has(u),
-    startOperation: () => null,
-    operationLive: () => false,
+    startOperation: (name, plot) => minorOpsStart(state, cs, name, plot),
+    operationLive: (id) => minorOpLive(cs, id),
+    heldContracts: () => minorOpContracts(cs),
   };
+}
+
+/** the minor's city as the contracts its operations submit read it */
+export function minorContractCity(state: GameState, cs: CityState): CityTreeCity {
+  const facts = minorBuildFacts(state, cs, minorKnownUnits(cs));
+  const tables: CityBuildTables = {
+    buildings: buildingTable(facts),
+    units: unitTable(facts).map((v) => v ?? FX_MIN),
+    projects: projectTable(minorProjectFacts(cs, facts)),
+  };
+  return minorTreeCity(state, cs, facts, tables, minorPickFacts(state, cs, facts), [], cs.threat ?? -1);
 }
 
 /** the minor's unit list for its purchases (CityBuildAI +0x650: the
@@ -499,8 +515,9 @@ export function minorAiTurn(state: GameState, cs: CityState): void {
   const fresh = !cs.cityAi;
   const ai = (cs.cityAi ??= newCityAi());
   const eco = (cs.economy ??= newEconomicMemory());
-  // B: the savings
+  // B: the savings, the military AI's turn
   savingsTurn(eco, Math.trunc(cs.treasury * FX), false);
+  minorOpsEvaluate(state, cs);
   // A: the city's update
   const known = minorKnownUnits(cs);
   const facts = minorBuildFacts(state, cs, known);
@@ -609,6 +626,8 @@ export function minorItemBuilt(cs: CityState, item: ContractItem, unitId: number
   if (!ai) return;
   contractBuilt(ai, minorCity(cs).id, item, unitId, (tree, unit) => {
     const t = ai.trees.find((x) => x.id === tree);
-    if (t && !t.units.includes(unit)) t.units.push(unit);
+    if (t) {
+      if (!t.units.includes(unit)) t.units.push(unit);
+    } else if (cs.ops && item.unit) joinBuilt(cs.ops, tree, { id: unit, type: item.unit });
   });
 }

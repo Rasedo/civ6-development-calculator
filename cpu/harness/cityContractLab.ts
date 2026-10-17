@@ -288,7 +288,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     const treeUnits: TreeUnit[] = [...beforeUnits, ...made].map((u) => ({ id: u.id, type: typeOf('unit', u.type), plot: u.tileIndex, charges: u.charges ?? 0 }));
     const spent = new Set<number>();
     const world: CityTreeWorld = {
-      turn, seat: player, cities: [cityFacts], units: treeUnits,
+      turn, seat: player, cities: [cityFacts], units: treeUnits, heldContracts: () => [],
       techHeld: (t) => research.techs.includes(t),
       civicHeld: (c) => research.civics.includes(c),
       canImprove: (plot, impType) => {

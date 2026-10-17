@@ -435,7 +435,7 @@
     - recording: h1_duelv1117
       turn: 20
       value: China's Attack Enemy City against Caguana (3) once prepared for war, no war declared
-  impl: [cpu/core/operations/manager.ts:blank, cpu/core/operations/manager.ts:operationsTurn]
+  impl: [cpu/core/operations/manager.ts:blank, cpu/core/operations/manager.ts:operationsRun]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"

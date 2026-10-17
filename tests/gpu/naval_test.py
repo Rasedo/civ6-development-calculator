@@ -636,11 +636,11 @@ def poke_flank_support(rules, path, GALLEY):
 
     # CIV6: both bonuses "are unlocked only after researching Military Tradition"
     sim.civ_civics[0, :, sim._flank_support_civic] = False
-    f_off, s_off = sim._flank_support(dtile, dseat, noatk, aseat)
+    f_off, s_off = sim._flank_support(dtile, dseat, noatk, aseat, noatk)
     assert int(f_off) == 0 and int(s_off) == 0, "no Military Tradition, no flanking and no support"
     sim.civ_civics[0, :, sim._flank_support_civic] = True
 
-    flank0, sup0 = sim._flank_support(dtile, dseat, noatk, aseat)
+    flank0, sup0 = sim._flank_support(dtile, dseat, noatk, aseat, noatk)
     assert int(sup0) >= 1, "a civ naval ally must count for support"
     assert int(flank0) >= 1, "a naval unit the ATTACKER owns must count for flanking"
 
@@ -648,14 +648,14 @@ def poke_flank_support(rules, path, GALLEY):
     # attacker shares its tile with a military unit that flanks like any other,
     # so only the attacker's own occupancy index drops out.
     self_slot = torch.tensor([mine + sim.POOL_LO["major"]])
-    flank_self, _ = sim._flank_support(dtile, dseat, self_slot, aseat)
+    flank_self, _ = sim._flank_support(dtile, dseat, self_slot, aseat, noatk)
     assert int(flank0) - int(flank_self) == 1, "the attacker itself must not flank"
 
     # CIV6: "embarked land units do not provide Flanking", but they "provide
     # Support like normal" — the one rule where the two part company.
     sim.major_unit_emb[0, ally] = True
     sim.major_unit_emb[0, mine] = True
-    flank1, sup1 = sim._flank_support(dtile, dseat, noatk, aseat)
+    flank1, sup1 = sim._flank_support(dtile, dseat, noatk, aseat, noatk)
     assert int(sup1) == int(sup0), "an embarked ally must still support"
     assert int(flank0) - int(flank1) == 1, "an embarked unit must stop flanking"
 
@@ -663,7 +663,7 @@ def poke_flank_support(rules, path, GALLEY):
     sim.major_unit_emb[0, mine] = False
     was_river = int(sim.river_mask[0, dt])
     sim.river_mask[0, dt] = 0b111111
-    flank2, _ = sim._flank_support(dtile, dseat, noatk, aseat)
+    flank2, _ = sim._flank_support(dtile, dseat, noatk, aseat, noatk)
     assert int(flank2) == 0, "a river on every edge must leave no flanker"
     sim.river_mask[0, dt] = was_river
     print(f"  9 flank/support OK (flank {int(flank0)}/support {int(sup0)}; embarked -> {int(flank1)}/{int(sup1)}, river -> 0)")

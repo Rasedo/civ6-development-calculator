@@ -55,7 +55,7 @@ import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GO
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
-import { barbarianTactics, cityStateTactics, dangerPlane, freeCityTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
+import { barbarianTactics, dangerPlane, freeCityTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
 import { barbSlots, barbSlotsDying, barbarianScouts, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
@@ -78,11 +78,14 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorOrders, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
 import { minorAiTurn, traceMinorAi } from '../core/minorCityAi';
+import { cityStateMilitary, traceMinorOps } from '../core/minorOps';
+import { opsOf } from '../core/operations/manager';
+import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, savingsTurn } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
@@ -231,6 +234,10 @@ interface Ctx {
   /** the majors' city production AI, asked at each production decision of
    *  an AI major's empty city (`CityBuildProbe`) */
   cityBuildAi: CityBuildProbe;
+  /** the operations measured (`OperationsProbe`), and the city-states'
+   *  operation lines and candidate lines of the pair, by seat */
+  operationsAi: OperationsProbe;
+  minorOps: Map<number, { lines: string[]; evals: string[] }>;
 }
 
 /** THE RESEARCH AI MEASURED: the choices the engine's research AI made (a
@@ -851,13 +858,14 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number): void {
   const founded = new Set(ctx.prev.cities.map((c) => c.owner));
   try {
     for (const cs of [...copy.cityStates].sort((x, y) => playerOf(x.seat) - playerOf(y.seat))) {
-      if (cs.centerIndex >= 0 && founded.has(playerOf(cs.seat))) cityStateTactics(copy, cs);
+      if (cs.centerIndex >= 0 && founded.has(playerOf(cs.seat))) cityStateMilitary(copy, cs);
     }
     freeCityTactics(copy);
   } finally {
     traceTactics(null);
     holdRng(held);
   }
+  minorOpsAfter(ctx, b, turn, copy, twin, keyOf);
   const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c) && minorAiSeat(c.seat)) ended.set(u, c.tileIndex);
   tallyMinorTactics(ctx, b, turn, moves, ended);
@@ -900,6 +908,34 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: Readonl
     // REPLAY_TRACE=minorTactics: each unit's move beside the game's
     if (TRACE.has('minorTactics')) console.error(`t${turn} ${key} ${u.type} ${m.move}->${m.plot} at ${end} | game ${game ?? '-'} at ${want}`);
   }
+}
+
+/** THE CITY-STATES' OPERATIONS after their units' turn on the copy: their
+ *  AI's state (the operations, the city AI's contracts and trees, the item
+ *  a submission cleared) the engine's again; their lines of the pair against
+ *  the game's logs, their units' plots against record t+1 */
+function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, twin: ReadonlyMap<Unit, Unit>,
+  keyOf: ReadonlyMap<Unit, string>): void {
+  const { state } = ctx;
+  for (const c of copy.cityStates) {
+    const cs = state.cityStates.find((x) => x.id === c.id);
+    if (!cs) continue;
+    if (c.ops) cs.ops = c.ops;
+    if (c.cityAi) cs.cityAi = c.cityAi;
+    if (!c.prodItem && cs.prodItem) minorSetItem(state, cs, null);
+    const player = ctx.playerOfSeat.get(cs.seat);
+    if (player === undefined) continue;
+    const got = ctx.minorOps.get(cs.seat);
+    ctx.operationsAi.minorTurn(turn, player, got?.lines ?? [], got?.evals ?? []);
+    for (const op of c.ops ? opsOf(c.ops) : []) {
+      for (const id of opUnits(op)) {
+        const u = copy.units.find((x) => x.id === id);
+        const key = u ? keyOf.get(twin.get(u)!) : undefined;
+        if (u && key) ctx.operationsAi.minorEnd(b, op.def, player, turn, key, u.tileIndex, gameTypeOf('unit', u.type, 'UNIT_'));
+      }
+    }
+  }
+  ctx.minorOps.clear();
 }
 
 /** A battle's unit set on the plot the log's steps had it: another unit of
@@ -3203,6 +3239,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const stream = streamHold(first.state, recs, first.playerOfSeat, history);
   holdRng(stream);
   if (TRACE.has('minorAi')) traceMinorAi((l) => console.error(l));
+
   // a city-state's army moves and fights as the record's moves and battles
   // say (`syncUnits`, `battle`) and its Trader goes where the record's
   // routes run (`routes`); its units' tactical turn runs on a copy beside
@@ -3279,8 +3316,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
     governorAi: new GovernorProbe(dumpPath, aiSeats, () => strategies.followedNow()),
     cityBuildAi: new CityBuildProbe(dumpPath, aiSeats, aiInputs),
+    operationsAi, minorOps: new Map(),
     religionPort: { seats: new Set(aiSeats.keys()), probe: religionAi, inputs: {}, pantheonTurn: new Map(), mustFound: new Set() },
   };
+  // the city-states' operation lines, gathered over the pair: their
+  // military AI's turn in the engine's turn, their run in their units' turn
+  // (`minorAi`)
+  traceMinorOps((seat, line, candidate) => {
+    let e = ctx.minorOps.get(seat);
+    if (!e) ctx.minorOps.set(seat, (e = { lines: [], evals: [] }));
+    (candidate ? e.evals : e.lines).push(line);
+  });
   // the record's units in the importer's order
   let k = 0;
   for (const u of recs[0].units) {
@@ -3430,6 +3476,14 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // back where the replay's own steps take them from (`syncUnits`)
       for (const [u, at] of barbFrom) u.tileIndex = at;
       takeBarbs(st, false);
+    }, (st, on) => {
+      // the city-states' turn sees them where the pair's first record holds
+      // them, before their own moves (the minors' look, threat and
+      // operations): back in the state while that turn runs, out after it
+      if (on) {
+        st.units.push(...barbs);
+        barbs.length = 0;
+      } else takeBarbs(st, false);
     });
     const tribesBefore = state.barbTribes?.length ?? 0;
     // THE CATCH-UP'S COUNT: the majors' research as the record holds it at
@@ -3697,6 +3751,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   report.subsystems = Object.fromEntries(Object.entries(report.subsystems).sort(([x], [y]) => x.localeCompare(y)));
   holdRng(null);
   traceMinorAi(null);
+  traceMinorOps(null);
   holdMinorCatchUp(null);
   holdResearchEra(null);
   holdMinorOrders(false);
