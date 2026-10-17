@@ -895,6 +895,11 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorResearchLeft: overCityStates((cityState) => [cityState.research.aiLeft ?? 0, cityState.research.aiLeftSeen ?? 0]),
   minorTechOverflow: overCityStates((cityState) => cityState.research.techOverflow ?? 0),
   minorCivicOverflow: overCityStates((cityState) => cityState.research.civicOverflow ?? 0),
+  // a city-state's boosts, civics past the tech table, and its barbarian kills
+  minorBoosted: overCityStates((cityState) => cityState.research.boosted
+    .map((id) => TECH_IDX.get(id) ?? (CIVIC_IDX.has(id) ? TECH_IDX.size + CIVIC_IDX.get(id)! : -1))
+    .filter((i) => i >= 0).sort((a, b) => a - b)),
+  minorBarbKills: overCityStates((cityState) => cityState.barbKills ?? 0),
   minorTechRetained: overCityStates((cityState) => [...TECH_IDX.keys()].map((id) => cityState.research.techRetained[id] ?? 0)),
   minorCivicRetained: overCityStates((cityState) => [...CIVIC_IDX.keys()].map((id) => cityState.research.civicRetained[id] ?? 0)),
   prodProgress: overCityStates((cityState) => cityState.prodProgress ?? 0),

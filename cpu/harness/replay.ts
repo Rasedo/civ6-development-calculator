@@ -44,7 +44,8 @@ import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from 
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
-import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra } from '../core/economy';
+import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
+import { computeCityStats } from '../core/city';
 import { researchAiChoice, researchAnalysis, type ResearchEntry } from '../core/aiResearch';
 import { civicAiChoice, civicAnalysis, type CivicEntry } from '../core/aiCivics';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
@@ -2663,6 +2664,39 @@ function minorBuilds(ctx: Ctx, b: TurnRecord, tally: MinorBuildTally): void {
   }
 }
 
+/** THE CITY-STATES' RESEARCH: each city-state's techs, civics, their
+ *  yields, choices, progress and costs after its turn against record t+1's
+ *  (`MinorResearchTally`); nothing imposed */
+function minorResearch(ctx: Ctx, b: TurnRecord, tally: MinorResearchTally): void {
+  const { state } = ctx;
+  for (const cs of state.cityStates) {
+    const rcs = ctx.next.state.cityStates.find((x) => x.centerIndex === cs.centerIndex);
+    const pid = ctx.playerOfSeat.get(cs.seat) ?? -1;
+    const pl = b.players.find((q) => q.id === pid);
+    if (!rcs || !pl) continue;
+    const y = computeCityStats(state, minorCity(cs)).total;
+    const r = cs.research;
+    const q = rcs.research;
+    const cost = (id: string | null, civic: boolean) => (id ? researchCost(state, id, civic, cs.seat) : null);
+    tally.rows.push([b.turn, pid, r.techs.length, q.techs.length, r.civics.length, q.civics.length,
+      r3(y.science), r3(Number(pl.scienceYield ?? 0)), r3(y.culture), r3(Number(pl.cultureYield ?? 0)), cs.population, rcs.population,
+      r.tech, q.tech, r3(r.techProgress), r3(Number(pl.researchProgress ?? q.techProgress)), cost(r.tech, false), pl.researchCost === undefined ? null : Number(pl.researchCost),
+      r.boosted.length, q.boosted.length, r.civic, q.civic, r3(r.civicProgress), r3(Number(pl.civicProgress ?? q.civicProgress)),
+      cost(r.civic, true), pl.civicCost === undefined ? null : Number(pl.civicCost),
+      r.boosted.filter((x) => !q.boosted.includes(x)).join(' '), q.boosted.filter((x) => !r.boosted.includes(x)).join(' ')]);
+  }
+  // the majors' counts beside them, whose holdings the catch-up reads
+  for (const s of state.seats) {
+    const pid = ctx.playerOfSeat.get(s.seat) ?? -1;
+    const q = seatOf(ctx.next.state, s.seat)?.research;
+    if (!q) continue;
+    const pl = b.players.find((x) => x.id === pid);
+    tally.majors.push([b.turn, pid, s.research.techs.length, q.techs.length, s.research.civics.length, q.civics.length,
+      r3(s.sciRate ?? 0), r3(Number(pl?.scienceYield ?? 0)), r3(s.culRate ?? 0), r3(Number(pl?.cultureYield ?? 0)), s.cities.length,
+      b.cities.filter((c) => c.owner === pid).length]);
+  }
+}
+
 /** the plots whose improvement the engine's own city-state, Free City or
  *  barbarian scripts changed in the turn take the record's: their builders'
  *  and raiders' decisions */
@@ -2983,6 +3017,8 @@ export interface ReplayReport {
   /** the city-states' items in hand after their turn against record t+1's
    *  queue heads (`minorBuilds`) */
   minorBuilds: MinorBuildTally;
+  /** the city-states' research against the record's (`minorResearch`) */
+  minorResearch: MinorResearchTally;
   /** where the replay stopped short of the last record, and why */
   stopped?: string;
   /** why the engine refused the decisions it refused, by kind and reason */
@@ -3034,6 +3070,20 @@ export interface BarbTally {
 /** the city-states' builds: the minor-turns compared, those whose item in
  *  hand after its turn is record t+1's queue head, per the record's item kind
  *  (unit, building, district, project, none), the first turn one differed */
+/** THE CITY-STATES' RESEARCH after each turn against record t+1's, one row
+ *  per minor-turn: [turn, player, techs ours, record, civics ours, record,
+ *  Science a turn ours, record, Culture ours, record, population ours,
+ *  record, the research ours, record, its progress ours, record, its cost
+ *  ours, record, boosts held ours, record, the civic ours, record, its
+ *  progress ours, record, its cost ours, record, the boosts ours alone, the record's
+ *  alone] */
+export interface MinorResearchTally {
+  rows: (number | string | null)[][];
+  /** each major's [turn, player, techs ours, record, civics ours, record,
+   *  Science a turn ours, record, Culture ours, record, cities ours, record] */
+  majors: number[][];
+}
+
 export interface MinorBuildTally {
   turns: number;
   same: number;
@@ -3146,7 +3196,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     researchScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } },
     civicAi: { major: newResearchTally(), minor: newResearchTally(), free: newResearchTally() },
     civicScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } }, barbTactics: {},
-    minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 }, minorBuilds: { turns: 0, same: 0, byKind: {}, samples: [] } };
+    minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 }, minorBuilds: { turns: 0, same: 0, byKind: {}, samples: [] }, minorResearch: { rows: [], majors: [] } };
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
   const first = importTurn(recs[0], cat, history);
@@ -3382,13 +3432,20 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       takeBarbs(st, false);
     });
     const tribesBefore = state.barbTribes?.length ?? 0;
+    // THE CATCH-UP'S COUNT: the majors' research as the record holds it at
+    // the city-states' starts — the majors' research is their decisions and
+    // their economy, not the city-states', so the count reads the game's.
     // THE ACTIVE PLAYER'S START runs first in the engine's turn, and in the
     // game after the city-states' starts the record's pair holds (record
-    // t+1 is read in its turn): their catch-up counts its research as its
-    // actions left it (runs/h1_duelw1121: Rome's Code of Laws at its start
-    // of t4, every minor's done at its own start of t4)
+    // t+1 is read in its turn): theirs counts its research as record t
+    // holds it (runs/h1_duelw1121: Rome's Code of Laws at its start of t4,
+    // every minor's done at its own start of t4); every other major's start
+    // came before theirs, its research as record t+1 holds it
     const active = state.seats[seatOfP(ctx, activePlayer(a))];
-    holdMinorCatchUp(active ? new Map([[active.seat, { techs: [...active.research.techs], civics: [...active.research.civics] }]]) : null);
+    holdMinorCatchUp(new Map(state.seats.map((s) => {
+      const r = seatOf(s === active ? recordA.state : read.state, s.seat)?.research ?? s.research;
+      return [s.seat, { techs: [...r.techs], civics: [...r.civics] }] as const;
+    })));
     // ...and the game era it opens comes after every other player's start and
     // actions of the pair: their research prices read the era before
     // (runs/h1_duelw1121: Horseback Riding at 72 for the minors through their
@@ -3451,6 +3508,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     }
     undoMinorPlots(ctx, improvements);
     minorBuilds(ctx, b, report.minorBuilds);
+    minorResearch(ctx, b, report.minorResearch);
     // REPLAY_TRACE=minorProd: each city-state's item, purse, units and research after the engine's turn
     if (TRACE.has('minorProd')) {
       for (const cs of state.cityStates) {

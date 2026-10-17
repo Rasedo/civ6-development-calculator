@@ -147,12 +147,45 @@ def test_resources(rules) -> None:
     print("  research resources OK")
 
 
+def civic_index() -> dict:
+    raw = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
+    return {c["id"]: i for i, c in enumerate(raw["civics"])}
+
+
+def test_minor_boosts(rules) -> None:
+    """a city-state's boosts (`detectBoosts` at its turn, tests/cpu/minors/
+    research-ai.test.ts): Feudalism's eureka on Stirrups in hand, Guilds'
+    filling Banking's kept progress, which completes"""
+    sim = build(rules)
+    ti, ci = tech_index(), civic_index()
+    s = 0
+    sim.game_era[0] = 0
+    sim.citystate_techs[0, s].zero_()
+    sim.citystate_civics[0, s].zero_()
+    sim.citystate_tech_boosted[0, s].zero_()
+    sim.citystate_civic_boosted[0, s].zero_()
+    sim.citystate_civics[0, s, ci["FEUDALISM"]] = True
+    sim.citystate_civics[0, s, ci["GUILDS"]] = True
+    sim.citystate_cur_tech[0, s] = ti["STIRRUPS"]
+    sim.citystate_tech_prog[0, s] = 10
+    sim.citystate_tech_retain[0, s].zero_()
+    sim.citystate_tech_retain[0, s, ti["BANKING"]] = 359
+    alive = torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+    alive[0] = True
+    sim._detect_minor_boosts(s, alive)
+    assert bool(sim.citystate_tech_boosted[0, s, ti["STIRRUPS"]]) and bool(sim.citystate_tech_boosted[0, s, ti["BANKING"]])
+    assert float(sim.citystate_tech_prog[0, s]) == 102, float(sim.citystate_tech_prog[0, s])
+    assert bool(sim.citystate_techs[0, s, ti["BANKING"]]) and float(sim.citystate_tech_retain[0, s, ti["BANKING"]]) == 0
+    print("  city-state boosts OK")
+
+
 def main() -> None:
     rules = load_rules()
     print(f"research_ai_test on {fixture_paths()[0].name}:")
     test_value(rules)
     test_analysis_and_choice(rules)
     test_resources(rules)
+    test_minor_boosts(rules)
     print("RESEARCH AI OK")
 
 

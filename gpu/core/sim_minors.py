@@ -19,7 +19,8 @@ class SimMinors:
         # upgrades a completion triggers, its city AI's turn (`_minor_ai_turn`:
         # its builds, purchases and trees, the trees' Builders' work), its
         # trade routes, its city's ranged strikes (the majors' own body,
-        # `cityStrikes`), its units' tactical turn; and its look again
+        # `cityStrikes`), its units' tactical turn; its look again; and the
+        # boosts the turn earned (`_detect_minor_boosts`)
         col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for s in range(self.S):
             alive = self.citystate_alive[:, s]
@@ -38,6 +39,93 @@ class SimMinors:
             self._city_strikes(self._CITY_MINOR0 + s, col0, alive)
             self._minor_tactics(s)
             self._minor_knowledge(s, False)
+            # the boosts its turn earned
+            self._detect_minor_boosts(s, alive)
+
+    def _detect_minor_boosts(self, s: int, active: torch.Tensor) -> None:
+        """`detectBoosts` for city-state `s`: every trigger read off the state
+        as it stands (`_boost_triggers` on its city row), then each target
+        landed (`_land_minor_boosts`), techs first; a city-state pays no
+        dedication"""
+        tab = self._boost_tables()
+        hit = self._boost_triggers(self._CITY_MINOR0 + s, s) & active.unsqueeze(1)
+        for target, held in (("tech", self.citystate_techs), ("civic", self.citystate_civics)):
+            w = torch.zeros_like(held[:, s])
+            for i, idx in tab["to_" + target]:
+                w[:, idx] |= hit[:, i]
+            if bool(w.count_nonzero()):
+                self._land_minor_boosts(s, w, target == "civic")
+
+    def _land_minor_boosts(self, s: int, want: torch.Tensor, is_civic: bool) -> torch.Tensor:
+        """`markBoost` on city-state `s` over every item at once: the items of
+        `want` [B, N] neither held nor boosted that carry a `Boosts` row are
+        marked boosted and their percent (`_boost_amount`, no points) lands as
+        progress — the item in hand's pool or the progress kept on it —,
+        never past its cost; an item that reaches its cost completes at once
+        (`_minor_complete_now`). Returns the items newly boosted."""
+        held = (self.citystate_civics if is_civic else self.citystate_techs)[:, s]
+        boosted = (self.citystate_civic_boosted if is_civic else self.citystate_tech_boosted)[:, s]
+        pct = self._civic_boost_pct if is_civic else self._tech_boost_pct
+        n = min(want.shape[1], held.shape[1], pct.numel())
+        newly = torch.zeros_like(held)
+        newly[:, :n] = want[:, :n] & ~held[:, :n] & ~boosted[:, :n] & (pct[:n] > 0).unsqueeze(0)
+        if not bool(newly.count_nonzero()):
+            return newly
+        boosted |= newly
+        cost_n = self._research_cost(is_civic)[:, :n]
+        prog = self.citystate_civic_prog if is_civic else self.citystate_tech_prog
+        retain = self.citystate_civic_retain if is_civic else self.citystate_tech_retain
+        cur = (self.citystate_cur_civic if is_civic else self.citystate_cur_tech)[:, s]
+        is_cur = torch.arange(n, device=self.device).unsqueeze(0) == cur.unsqueeze(1)
+        have = torch.where(is_cur, prog[:, s].unsqueeze(1), retain[:, s, :n])
+        amt = self._boost_amount(cost_n, pct[:n].long().unsqueeze(0), torch.zeros_like(cost_n[:, :1])).to(have.dtype)
+        add = torch.minimum(cost_n.to(have.dtype) - have, amt)
+        go = newly[:, :n] & (add > 0)
+        add = torch.where(go, add, torch.zeros_like(add))
+        prog[:, s] += (add * is_cur.to(add.dtype)).sum(dim=1)
+        retain[:, s, :n] += torch.where(is_cur, torch.zeros_like(add), add)
+        full = torch.zeros_like(held)
+        full[:, :n] = go & (have + add >= cost_n.to(have.dtype))
+        if bool(full.count_nonzero()):
+            self._minor_complete_now(s, full, is_civic)
+        return newly
+
+    def _minor_complete_now(self, s: int, full: torch.Tensor, is_civic: bool) -> None:
+        """`minorCompleteNow`: the items of `full` [B, N] COMPLETED outside
+        city-state `s`'s research step — held, the progress kept on them
+        spent, Urban Defenses' walls fitted; the item in hand makes the
+        completion's choice over the analysis its last turn left (none where
+        it has none), the completed row the key"""
+        held = self.citystate_civics if is_civic else self.citystate_techs
+        retain = self.citystate_civic_retain if is_civic else self.citystate_tech_retain
+        prog = self.citystate_civic_prog if is_civic else self.citystate_tech_prog
+        curp = self.citystate_cur_civic if is_civic else self.citystate_cur_tech
+        held[:, s] |= full
+        retain[:, s] = torch.where(full, torch.zeros_like(retain[:, s]), retain[:, s])
+        if not is_civic and 0 <= self._urban_def_tech < full.shape[1]:
+            hit = full[:, self._urban_def_tech]
+            if bool(hit.count_nonzero()):
+                self._minor_urban_fit(s, hit)
+        cur = curp[:, s]
+        on_cur = (cur >= 0) & full.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1)
+        if not bool(on_cur.count_nonzero()):
+            return
+        done = torch.where(on_cur, cur, torch.full_like(cur, -1))
+        curp[:, s] = torch.where(on_cur, torch.full_like(cur, -1), cur)
+        prog[:, s] = torch.where(on_cur, torch.zeros_like(prog[:, s]), prog[:, s])
+        if is_civic:
+            fire = on_cur & self.citystate_cai_valid[:, s]
+            if bool(fire.count_nonzero()):
+                ent = (self.citystate_cai_turns[:, s], self.citystate_cai_next[:, s], self.citystate_cai_base[:, s],
+                       self.citystate_cai_score[:, s], self.citystate_cai_owned[:, s])
+                self._cai_take(s, self._cai_choice(s, fire, ent, done))
+            return
+        fire = on_cur & self.citystate_ai_valid[:, s]
+        if bool(fire.count_nonzero()):
+            turns, base = self.citystate_ai_turns[:, s], self.citystate_ai_base[:, s]
+            score = self.citystate_ai_score[:, s] + self._rai_upstream(self.citystate_techs[:, s], base, turns)
+            pick, goal = self._rai_choice(s, fire, (turns, self.citystate_ai_next[:, s], base, score, self.citystate_ai_owned[:, s]), done)
+            self._rai_take(s, pick, goal)
 
     def _minor_sight(self, s: int) -> torch.Tensor:
         """[B, T] bool — `cityStateSight`: the plots minor `s` sees now — its

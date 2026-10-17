@@ -1185,6 +1185,7 @@ _MUTABLE = [
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
     "citystate_cur_tech", "citystate_cur_civic", "citystate_tech_retain", "citystate_civic_retain",  # the minor's research in hand and kept
     "citystate_tech_ovf", "citystate_civic_ovf",
+    "citystate_tech_boosted", "citystate_civic_boosted", "citystate_barb_kills",  # the minor's boosts and barbarian kills
     "citystate_tech_goal", "citystate_ai_turns", "citystate_ai_next", "citystate_ai_base", "citystate_ai_score", "citystate_ai_owned",
     "citystate_ai_valid", "citystate_ai_left", "citystate_ai_left_seen",  # the research AI's goal, its last turn's analysis, its turns left
     "citystate_cai_turns", "citystate_cai_next", "citystate_cai_base", "citystate_cai_score", "citystate_cai_owned",

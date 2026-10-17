@@ -928,6 +928,11 @@ CITY_STATE = {
     "minorResearchLeft": lambda sim, b, rows: [[int(sim.citystate_ai_left[b, s]), int(sim.citystate_ai_left_seen[b, s])] for s in rows],
     "minorTechOverflow": lambda sim, b, rows: [float(sim.citystate_tech_ovf[b, s]) for s in rows],
     "minorCivicOverflow": lambda sim, b, rows: [float(sim.citystate_civic_ovf[b, s]) for s in rows],
+    "minorBoosted": lambda sim, b, rows: [
+        [i for i, on in enumerate(sim.citystate_tech_boosted[b, s].tolist()) if on]
+        + [sim.citystate_techs.shape[2] + i for i, on in enumerate(sim.citystate_civic_boosted[b, s].tolist()) if on]
+        for s in rows],
+    "minorBarbKills": lambda sim, b, rows: [int(sim.citystate_barb_kills[b, s]) for s in rows],
     "minorTechRetained": lambda sim, b, rows: [sim.citystate_tech_retain[b, s].tolist() for s in rows],
     "minorCivicRetained": lambda sim, b, rows: [sim.citystate_civic_retain[b, s].tolist() for s in rows],
     "prodProgress": lambda sim, b, rows: [float(sim.citystate_prod[b, s]) for s in rows],

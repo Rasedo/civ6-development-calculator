@@ -133,6 +133,7 @@
     - cpu/core/aiResearch.ts:researchCompletionChoice
     - cpu/core/minorBuild.ts:minorResearch
     - cpu/core/types.ts:ResearchState
+    - cpu/core/minorBuild.ts:minorCompleteNow
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on the entries as they stand, then the c..."

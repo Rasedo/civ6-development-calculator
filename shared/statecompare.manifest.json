@@ -2077,6 +2077,28 @@
           ]
         },
         {
+          "name": "minorBoosted",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.boosted"
+          ],
+          "planes": [
+            "citystate_tech_boosted",
+            "citystate_civic_boosted"
+          ],
+          "note": "the techs and civics boosted, the civics offset past the tech table"
+        },
+        {
+          "name": "minorBarbKills",
+          "compare": "exact",
+          "covers": [
+            "Seat.barbKills"
+          ],
+          "planes": [
+            "citystate_barb_kills"
+          ]
+        },
+        {
           "name": "minorTechRetained",
           "compare": "milli",
           "covers": [

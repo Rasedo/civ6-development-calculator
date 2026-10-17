@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { emptySeat, seatOfCityState } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { researchAnalysis, researchChoice, researchCompletionChoice, techValue } from '../../../cpu/core/aiResearch';
+import { detectBoosts } from '../../../cpu/core/boosts';
 import type { CityState, GameState } from '../../../cpu/core/types';
 
 // THE RESEARCH AI (tools/civ6lab/dll_readings.md "H-1: the research AI");
@@ -113,5 +114,25 @@ describe("the research AI's choice (0x763020, 0x75d530)", () => {
     const c = researchChoice(state, cs.seat, ents, null, (n) => (seen.push(n), 2))!;
     expect(seen).toEqual([5]);
     expect(c).toEqual({ tech: 'MINING', goal: null });
+  });
+});
+
+describe("a city-state's boosts (detectBoosts at its turn)", () => {
+  it("lands a civic's eureka on the item in hand and completes one it fills", () => {
+    const state = makeState(makeMap(12, 12));
+    const cs = minor(state);
+    // runs/h1_duelw1117 t71: every city-state's Stirrups boosted by Feudalism
+    cs.research.civics = ['FEUDALISM'];
+    cs.research.tech = 'STIRRUPS';
+    cs.research.techProgress = 10;
+    // Banking's by Guilds, on progress kept a point short of the cost
+    cs.research.civics.push('GUILDS');
+    cs.research.techRetained.BANKING = 359;
+    detectBoosts(state, cs.seat);
+    expect(cs.research.boosted).toEqual(expect.arrayContaining(['STIRRUPS', 'BANKING']));
+    expect(cs.research.techProgress).toBe(102);
+    // filled to its cost, Banking is held and its kept progress spent
+    expect(cs.research.techs).toContain('BANKING');
+    expect(cs.research.techRetained.BANKING).toBeUndefined();
   });
 });

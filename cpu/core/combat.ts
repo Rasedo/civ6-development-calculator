@@ -84,10 +84,10 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   markAntiquitySite(state, tileIndex, BARB_SEAT);
   const clearer = seatOf(state, unit.seat);
   if (clearer) clearer.treasury += CAMP_DISPERSAL_GOLD;
-  // CIV6 (BOOST_TRIGGER_CLEAR_CAMP): Military Tradition's inspiration, a
-  // major's at the clear (runs/h1_duelw1116 China: the camp cleared at t6,
-  // the inspiration read at t7)
-  if (clearer && isCiv(unit.seat)) boostOnEvent(state, unit.seat, 'CLEAR_CAMP');
+  // CIV6 (BOOST_TRIGGER_CLEAR_CAMP): Military Tradition's inspiration at the
+  // clear (runs/h1_duelw1116 China: the camp cleared at t6, the inspiration
+  // read at t7)
+  if (clearer) boostOnEvent(state, unit.seat, 'CLEAR_CAMP');
   // CIV6 (Epic Quest): "Receive a Tribal Village reward each time you capture
   // a barbarian outpost" — the install maps the camp to a goody hut outright,
   // so it is the SAME draw off the SAME table (`CAMP_GOODY_ROWS`).

@@ -1,5 +1,6 @@
 import { dedicationEvent, goldenBoostBonus } from './eras';
-import { seatOf, citiesOf, tileSeat, allianceLevelWith, isCiv, hiddenResourcesFor } from './seats';
+import { seatOf, citiesOf, tileSeat, allianceLevelWith, isCiv, hiddenResourcesFor, isCityStateSeat } from './seats';
+import { minorCity } from './cityStates';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import type { GameState, ResearchState, Seat } from './types';
 import { isExplored } from './fog';
@@ -102,10 +103,20 @@ function isLandCombat(type: string): boolean {
   return !!d && !d.naval && d.air === undefined && ((d.combat ?? 0) > 0 || d.ranged !== undefined);
 }
 
+/** the seat's cities as its boosts read them: a city-state's one city
+ *  (`minorCity`) */
+function boostCities(state: GameState, seat: number) {
+  if (isCityStateSeat(seat)) {
+    const cs = state.cityStates.find((c) => c.seat === seat);
+    return cs ? [minorCity(cs)] : [];
+  }
+  return citiesOf(state, seat);
+}
+
 /** the seat's completed districts, each city's registry walked */
 function completeDistricts(state: GameState, seat: number): string[] {
   const out: string[] = [];
-  for (const c of citiesOf(state, seat)) {
+  for (const c of boostCities(state, seat)) {
     for (const d of c.districts) if (state.map.tiles[d.tileIndex].districtComplete) out.push(d.type);
   }
   return out;
@@ -164,9 +175,9 @@ function stateTrigger(state: GameState, seat: number, b: BoostDef): boolean {
     case 'HAVE_X_DISTRICTS':
       return completeDistricts(state, seat).filter((d) => d === b.district).length >= n;
     case 'EMPIRE_POPULATION':
-      return citiesOf(state, seat).reduce((t, c) => t + c.population, 0) >= n;
+      return boostCities(state, seat).reduce((t, c) => t + c.population, 0) >= n;
     case 'CITY_POPULATION':
-      return citiesOf(state, seat).some((c) => c.population >= n);
+      return boostCities(state, seat).some((c) => c.population >= n);
     case 'CREATE_PANTHEON':
       return !!s.religion.pantheon;
     case 'FOUND_RELIGION':
@@ -178,17 +189,17 @@ function stateTrigger(state: GameState, seat: number, b: BoostDef): boolean {
     case 'MEET_X_CITY_STATES':
       return (state.cityStates ?? []).filter((cs) => cs.met.includes(seat)).length >= n;
     case 'HAVE_X_WONDERS':
-      return citiesOf(state, seat).reduce((t, c) => t + c.wonders.filter((w) => state.map.tiles[w.tileIndex].builtWonderComplete).length, 0) >= n;
+      return boostCities(state, seat).reduce((t, c) => t + c.wonders.filter((w) => state.map.tiles[w.tileIndex].builtWonderComplete).length, 0) >= n;
     case 'HAVE_WONDER_PAST_X_ERA':
       // a wonder of the era numbered `n` from the Ancient's 1 or later
-      return citiesOf(state, seat).some((c) => c.wonders.some((w) => state.map.tiles[w.tileIndex].builtWonderComplete
+      return boostCities(state, seat).some((c) => c.wonders.some((w) => state.map.tiles[w.tileIndex].builtWonderComplete
         && (WONDER_ERA_INDEX[w.id] ?? 0) + 1 >= n));
     case 'HAVE_X_BUILDINGS':
     case 'CONSTRUCT_BUILDING':
-      return citiesOf(state, seat).reduce((t, c) => t + c.buildings.filter((x) => x === b.building).length, 0) >= n;
+      return boostCities(state, seat).reduce((t, c) => t + c.buildings.filter((x) => x === b.building).length, 0) >= n;
     case 'HAVE_BUILDING_MOUNTAIN':
       // the building in a city whose district holding it borders a Mountain
-      return citiesOf(state, seat).some((c) => {
+      return boostCities(state, seat).some((c) => {
         if (!c.buildings.includes(b.building!)) return false;
         return c.districts.some((d) => d.type === BUILDINGS[b.building!].district
           && neighbors(state.map, state.map.tiles[d.tileIndex]).some(isMountain));
@@ -196,10 +207,13 @@ function stateTrigger(state: GameState, seat: number, b: BoostDef): boolean {
     case 'MAINTAIN_X_TRADE_ROUTES':
       return (s.tradeRoutes?.length ?? 0) >= n;
     case 'SETTLE_COAST':
-      return citiesOf(state, seat).some((c) => isCoastalLand(state.map, state.map.tiles[c.centerIndex]));
+      return boostCities(state, seat).some((c) => isCoastalLand(state.map, state.map.tiles[c.centerIndex]));
     case 'FIND_NATURAL_WONDER':
       // a natural wonder plot the seat has revealed (runs/h1_duelw1115 Rome's
-      // inspiration at t4, owning no plot beside one)
+      // inspiration at t4, owning no plot beside one); a city-state keeps no
+      // revealed plots and takes none (runs/h1_duelw1117-1128: no city-state's
+      // Astrology boosted)
+      if (isCityStateSeat(seat)) return false;
       return state.map.tiles.some((t) => naturalWonderAt(t) !== null && isExplored(state, seat, t.index));
     case 'OWN_X_UNITS_OF_TYPE':
       return ownUnits(state, seat, (t) => isUnitOf(t, b.unit!)) >= n;
@@ -235,6 +249,8 @@ function stateTrigger(state: GameState, seat: number, b: BoostDef): boolean {
       return k >= n;
     }
     case 'HAVE_GOVERNMENT_TIER': {
+      // a city-state holds no government
+      if (isCityStateSeat(seat)) return false;
       const g = seatGovernment(state, seat);
       return !!g && (GOVERNMENTS[g]?.tier ?? 0) >= b.govTier!;
     }
@@ -256,12 +272,12 @@ function grantEvent(state: GameState, seat: number, cls: string, hit: (b: BoostD
 }
 
 /** CIV6 (BOOST_TRIGGER_KILL_WITH / _KILL_SPECIFIC_UNIT / _NUM_BARBS_KILLED):
- *  a major's unit of `killerType` (none for a city's shot) destroyed a unit
- *  of `victimType`; a barbarian victim counts toward the seat's barbarian
- *  kills. */
+ *  a unit of `killerType` (none for a city's shot) of a seat that earns
+ *  boosts (`earnsBoosts`) destroyed a unit of `victimType`; a barbarian
+ *  victim counts toward the seat's barbarian kills. */
 export function boostOnKill(state: GameState, seat: number, killerType: string | undefined, victimType: string, barbVictim: boolean): void {
   const s = seatOf(state, seat) as Seat | undefined;
-  if (!s || !isCiv(seat)) return;
+  if (!s || !earnsBoosts(seat)) return;
   if (barbVictim) s.barbKills = (s.barbKills ?? 0) + 1;
   if (killerType) grantEvent(state, seat, 'KILL_WITH', (b) => isUnitOf(killerType, b.unit!));
   grantEvent(state, seat, 'KILL_SPECIFIC_UNIT', (b) => isUnitOf(victimType, b.unit!));
@@ -279,7 +295,14 @@ export function boostOnWarDeclared(state: GameState, declarer: number, target: n
  *  _ARTIFACT_EXTRACTED / _MEET_CIV): the event's boosts, each with its
  *  dedication */
 export function boostOnEvent(state: GameState, seat: number, cls: 'CLEAR_CAMP' | 'CREATED_NATIONAL_PARK' | 'ARTIFACT_EXTRACTED' | 'MEET_CIV'): void {
-  if (isCiv(seat)) grantEvent(state, seat, cls, () => true);
+  if (cls === 'CLEAR_CAMP' ? earnsBoosts(seat) : isCiv(seat)) grantEvent(state, seat, cls, () => true);
+}
+
+/** a seat whose own deeds earn boosts: a major or a city-state (the
+ *  city-states of runs/h1_duelw1117-1128 read Bronze Working's, Military
+ *  Science's and Military Tradition's on their kills and camp clears) */
+function earnsBoosts(seat: number): boolean {
+  return isCiv(seat) || isCityStateSeat(seat);
 }
 
 export function isBoosted(state: GameState, id: string, seat: number): boolean {

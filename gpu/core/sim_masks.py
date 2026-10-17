@@ -97,13 +97,23 @@ class SimMasks:
         t = self.major_unit_type.clamp(min=0, max=keep.numel() - 1)
         return (alive & keep[t]).sum(dim=1)
 
-    def _boost_triggers(self, row: int) -> torch.Tensor:
-        """[B, K] bool — `stateTrigger` for every Boosts row, seat row `row`:
-        each BoostClass the seat's standing state answers. An event class (a
-        kill, a camp, a declaration of war, a park, an artifact) lands where
-        its event happens; a class neither engine models never triggers."""
+    def _boost_triggers(self, row: int, s: int | None = None) -> torch.Tensor:
+        """[B, K] bool — `stateTrigger` for every Boosts row, seat row `row`
+        (a city-state's city row with its research row `s`): each BoostClass
+        the seat's standing state answers. An event class (a kill, a camp, a
+        declaration of war, a park, an artifact) lands where its event
+        happens; a class neither engine models never triggers. A city-state
+        holds no pantheon, religion, government, great person or alliance,
+        meets no city-state and keeps no revealed plots."""
         tab = self._boost_tables()
         B, dev = self.B, self.device
+        minor = s is not None
+        if minor:
+            techs, civics = self.citystate_techs[:, s], self.citystate_civics[:, s]
+            tboost, cboost = self.citystate_tech_boosted[:, s], self.citystate_civic_boosted[:, s]
+        else:
+            techs, civics = self.civ_techs[:, row], self.civ_civics[:, row]
+            tboost, cboost = self.civ_tech_boosted[:, row], self.civ_civic_boosted[:, row]
         alive = self.city_alive[:, row]
         pop = self.city_pop[:, row]
         seat = int(self._ROW_SEAT[row])
@@ -133,12 +143,16 @@ class SimMasks:
         out = torch.zeros(B, len(tab["rows"]), dtype=torch.bool, device=dev)
         # a row whose item every game holds or has boosted lands nothing: it
         # is not read
-        open_ = {"tech": (~self.civ_techs[:, row] & ~self.civ_tech_boosted[:, row]).any(dim=0).tolist(),
-                 "civic": (~self.civ_civics[:, row] & ~self.civ_civic_boosted[:, row]).any(dim=0).tolist()}
+        open_ = {"tech": (~techs & ~tboost).any(dim=0).tolist(),
+                 "civic": (~civics & ~cboost).any(dim=0).tolist()}
+        never = ("CREATE_PANTHEON", "FOUND_RELIGION", "MEET_X_CITY_STATES", "FIND_NATURAL_WONDER", "HAVE_X_GREAT_PEOPLE",
+                 "HAVE_AN_ALLIANCE", "HAVE_ALLIANCE_LEVEL_X", "HAVE_X_CITIES_FOLLOWING_YOUR_RELIGION", "HAVE_GOVERNMENT_TIER")
         for i, b in enumerate(tab["rows"]):
             if not open_[b["target"]][int(b["idx"])]:
                 continue
             cls, n = b["cls"], int(b["n"])
+            if minor and (cls in never or (cls == "TRAIN_UNIT" and int(b["gpClass"]) >= 0)):
+                continue
             if cls == "NUM_IMPROVED_TILES":
                 p = mine.sum(dim=1) >= n
             elif cls == "HAVE_X_IMPROVEMENTS":
@@ -161,7 +175,7 @@ class SimMasks:
                     # a city may hold SEVERAL of a repeatable district and the
                     # registry keeps ONE tile per type: the tile plane counts
                     ids = self.city_id[:, row]
-                    okd = (self.district == dtype) & self.district_complete & (self.tile_seat == row)
+                    okd = (self.district == dtype) & self.district_complete & (self.tile_seat == seat)
                     per = okd.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)
                     p = per.sum(dim=(1, 2)) >= n
                 else:
@@ -175,9 +189,9 @@ class SimMasks:
             elif cls == "FOUND_RELIGION":
                 p = self.civ_religion_done[:, row].clone()
             elif cls == "RESEARCH_TECH":
-                p = self.civ_techs[:, row, int(b["tech"])].clone()
+                p = techs[:, int(b["tech"])].clone()
             elif cls == "CULTURVATE_CIVIC":
-                p = self.civ_civics[:, row, int(b["civic"])].clone()
+                p = civics[:, int(b["civic"])].clone()
             elif cls == "MEET_X_CITY_STATES":
                 if not self.S:
                     continue
@@ -3965,6 +3979,18 @@ class SimMasks:
             self.tribe_alive[b] &= ~(self.tribe_plot[b] == tile[b])
             self._eff_version += 1  # a cleared outpost lifts its neighbours' appeal
             _s = int(seat[b])
+            if 100 <= _s < 100 + self.S:
+                # CIV6 (BOOST_TRIGGER_CLEAR_CAMP): a city-state's clear's boosts
+                _onb = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _onb[b] = True
+                tab = self._boost_tables()
+                for target in ("tech", "civic"):
+                    w = torch.zeros_like((self.citystate_civics if target == "civic" else self.citystate_techs)[:, _s - 100])
+                    for i, idx in tab["to_" + target]:
+                        if tab["rows"][i]["cls"] == "CLEAR_CAMP":
+                            w[:, idx] |= _onb
+                    if bool(w.count_nonzero()):
+                        self._land_minor_boosts(_s - 100, w, target == "civic")
             if 0 <= _s < self.n_majors:
                 # `campMoment`: through the Medieval game era, NEAR_YOUR_CITY
                 # with one of the seat's cities in range

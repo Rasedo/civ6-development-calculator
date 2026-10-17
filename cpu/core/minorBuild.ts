@@ -31,7 +31,8 @@ import { PROJECTS, projectConversionRate } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
 import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, gameProgressPct } from '../data/constants';
-import { canPlaceDistrictIn, fitEncampOuter, outerPool, wallsMax } from './rules';
+import { detectBoosts } from './boosts';
+import { canPlaceDistrictIn, fitEncampOuter, outerPool, urbanDefensesFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { freeCityBuildFacts, majorQueueItem } from './majorCityBuild';
 import { minorAiTurn, minorItemBuilt } from './minorCityAi';
@@ -84,7 +85,8 @@ import { combatDesire, type CombatDesire } from './aiMilitary';
  *  completion's upgrades, its city AI's turn (`minorAiTurn`: its builds,
  *  purchases and trees, the trees' Builders' work), its routes' walk and a
  *  free Trader's route, its city's ranged strikes (the majors' own body
- *  fired from the minor's centre strength), and last its army's walk. */
+ *  fired from the minor's centre strength), its army's walk, and last the
+ *  boosts the turn earned (`detectBoosts`). */
 export function minorPhase(state: GameState): void {
   for (const cityState of state.cityStates) {
     atRngPoint(state, { kind: 'seat', seat: cityState.seat, turn: state.turn });
@@ -104,6 +106,9 @@ export function minorPhase(state: GameState): void {
     cityStrikes(state, city, cityStrikeStrength(state, city));
     if (!ordersHeld) cityStateTactics(state, cityState);
     minorKnowledge(state, cityState, false);
+    // the boosts its turn earned (runs/h1_duelw1117 t1: every city-state
+    // takes Pottery before its coastal city's Sailing eureka lands)
+    detectBoosts(state, cityState.seat);
   }
 }
 
@@ -340,6 +345,38 @@ function takeChoice(r: ResearchState, c: ResearchChoice | null): void {
   if (!c) return;
   selectResearch(r, c.tech);
   r.goal = c.goal;
+}
+
+/** A city-state's or the Free Cities' item COMPLETED outside its research
+ *  step (a boost that filled it, `markBoost`): held, the progress kept on it
+ *  spent, Urban Defenses' walls fitted; the item in hand makes the
+ *  completion's choice over the analysis its last turn left, the completed
+ *  row the key (0x762d60, 0x6293e0) */
+export function minorCompleteNow(state: GameState, seat: number, id: string): void {
+  const r = seatOf(state, seat)?.research;
+  if (!r) return;
+  if (!TECHS[id]) {
+    if (r.civics.includes(id)) return;
+    r.civics.push(id);
+    delete r.civicRetained[id];
+    if (r.civic !== id) return;
+    r.civic = null;
+    r.civicProgress = 0;
+    if (r.civicAiEntries) takeCivic(r, civicChoice(state, seat, r.civicAiEntries, id, civicDraw(state)));
+    return;
+  }
+  if (r.techs.includes(id)) return;
+  r.techs.push(id);
+  delete r.techRetained[id];
+  if (id === URBAN_DEFENSES_TECH) {
+    const cs = state.cityStates.find((x) => x.seat === seat);
+    if (cs) minorUrbanFit(state, cs);
+    else urbanDefensesFit(state, seat);
+  }
+  if (r.tech !== id) return;
+  r.tech = null;
+  r.techProgress = 0;
+  if (r.aiEntries) takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries.map((e) => ({ ...e })), id, researchDraw(state)));
 }
 
 /** the civics AI's choice taken */

@@ -3154,6 +3154,35 @@ Laws 4.59 of 10 at 1121 t4). The engines read it at the minor's turn
 (`minorCatchUp`, inline in `_minor_research`) and never lower the
 progress; MINOR_CATCHUP_PCT is the 50.
 
+## C-96: the city-states' boosts — the records
+
+A city-state earns eurekas and inspirations as a major does: the records'
+techBoosts / civicBoosts of every city-state of runs/h1_duelw1117-1128
+grow to 9-17 by t250 (`.claude` mboost: CULTURVATE_CIVIC 44, RESEARCH_TECH
+37, CONSTRUCT_BUILDING 19, HAVE_X_IMPROVEMENTS 13, MAINTAIN_X_TRADE_ROUTES 7,
+SETTLE_COAST 6, OWN_X_UNITS_OF_TYPE 7, CLEAR_CAMP 4, NUM_BARBS_KILLED 3,
+KILL_WITH 2, the population, district and improved-plot classes). None of
+the five seeds' city-states reads Astrology's (FIND_NATURAL_WONDER) nor a
+government's (HAVE_GOVERNMENT_TIER). Every city-state of 1117 researches
+Pottery from t1 with its coastal city's Sailing eureka held at t3: the
+boosts a turn earns land after its research choice. The engines read the
+state triggers at the end of the minor's turn on its one city (`detectBoosts`
+/ `_detect_minor_boosts`), land them as a major's (`markBoost`,
+`_land_minor_boosts`; a boost filling an item completes it there, the item
+in hand making the completion's choice over its last analysis,
+`minorCompleteNow`), and take a kill's and a camp clear's at the event.
+
+The action replay's research gap: the replay's majors research the record's
+choices on the engine's Science, which runs short of the record's (1117
+China at t150 45.5 against 64.5) until the record's next choice lacks a
+prerequisite and the major stalls (China 24 techs t120-t230 against the
+record's 29-58). The catch-up reads the majors' holdings, so every
+city-state stalled with it (1117 t248: 90 techs against 189). The replay
+holds the catch-up's count at the record's majors (`holdMinorCatchUp`): the
+city-states' techs then stand at 187 / 189, 171 / 171, 204 / 212, 168 / 168
+at t248 and 128 / 136 at t200 (1128), their record catch-up completions 561
+of 626.
+
 ## H-1: a city-state meets a major by a look — PARTLY READ (the records)
 
 A city-state and a major meet when a look of either takes in the other:

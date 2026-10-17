@@ -229,7 +229,10 @@
     - recording: 1103
       turn: 12
       value: "A COMPLETION fires the delegate 0x6293e0 — the   government pass 0x625d70, then 0x626600 with the completed civic as the   key — over the entries the AI's last turn left, before this turn's   analysis"
-  impl: [cpu/core/minorBuild.ts:minorResearch, gpu/core/sim_civics.py:_cai_completion]
+  impl:
+    - cpu/core/minorBuild.ts:minorResearch
+    - gpu/core/sim_civics.py:_cai_completion
+    - cpu/core/minorBuild.ts:minorCompleteNow
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"

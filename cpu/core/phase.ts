@@ -30,7 +30,7 @@ import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBo
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MAX_HP } from '../data/cityStates';
-import { freeCityBuild, minorBestOfClass, minorResearch, trainableIn } from './minorBuild';
+import { freeCityBuild, minorBestOfClass, minorCompleteNow, minorResearch, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { freeCityTactics, plotDistance, tacticalTargets } from './tactical';
 import { plotsSeenNow } from './barbarians';
@@ -2637,6 +2637,10 @@ function researchAward(actor: Seat, effects: readonly ResearchEffect[]): void {
  * (EFFECT_GRANT_UNIT_IN_CITY) arrives in the capital at once.
  */
 export function completeResearchNow(state: GameState, seat: number, id: string): void {
+  if (!isCiv(seat)) {
+    minorCompleteNow(state, seat, id);
+    return;
+  }
   const actor = seatOf(state, seat) as Seat | undefined;
   if (!actor) return;
   const rsr = actor.research;

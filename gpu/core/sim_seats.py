@@ -5952,9 +5952,9 @@ class SimSeats:
     def _boost_on_kill(self, killer, killer_type, vict_type: torch.Tensor, vict_barb: torch.Tensor,
                        killed: torch.Tensor) -> None:
         """`boostOnKill`'s twin — CIV6 (BOOST_TRIGGER_KILL_WITH /
-        _KILL_SPECIFIC_UNIT / _NUM_BARBS_KILLED): a major's unit of
-        `killer_type` (None for a city's shot) destroyed a unit of
-        `vict_type`; a barbarian victim counts toward the seat's barbarian
+        _KILL_SPECIFIC_UNIT / _NUM_BARBS_KILLED): a unit of `killer_type`
+        (None for a city's shot) of a major or a city-state destroyed a unit
+        of `vict_type`; a barbarian victim counts toward the seat's barbarian
         kills. `killer` is a row int or a [B] seat tensor."""
         tab = self._boost_tables()
         repl = tab["repl"]
@@ -5982,6 +5982,28 @@ class SimSeats:
                 if bool(w.count_nonzero()):
                     newly = self._land_boosts(g, w, target == "civic")
                     self._dedication_event(g, ded, newly.sum(dim=1))
+        for s in range(self.S):
+            if isinstance(killer, int):
+                if killer != self._CITY_MINOR0 + s:
+                    continue
+                m = killed
+            else:
+                m = killed & (killer == 100 + s)
+            if not bool(m.count_nonzero()):
+                continue
+            self.citystate_barb_kills[:, s] += (m & vict_barb).long()
+            for target in ("tech", "civic"):
+                w = torch.zeros_like((self.citystate_civics if target == "civic" else self.citystate_techs)[:, s])
+                for i, idx in tab["to_" + target]:
+                    r = tab["rows"][i]
+                    if r["cls"] == "KILL_WITH" and killer_type is not None:
+                        w[:, idx] |= m & is_of(killer_type, int(r["unit"]))
+                    elif r["cls"] == "KILL_SPECIFIC_UNIT":
+                        w[:, idx] |= m & is_of(vict_type, int(r["unit"]))
+                    elif r["cls"] == "NUM_BARBS_KILLED":
+                        w[:, idx] |= m & (self.citystate_barb_kills[:, s] >= int(r["n"]))
+                if bool(w.count_nonzero()):
+                    self._land_minor_boosts(s, w, target == "civic")
 
     def _disciples_spread(self, killer, k_type: torch.Tensor, k_promos: torch.Tensor,
                           vict_barb: torch.Tensor, tile: torch.Tensor,

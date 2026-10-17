@@ -266,6 +266,11 @@ class SimInit:
         self.citystate_cur_civic = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         self.citystate_tech_retain = torch.zeros(B, r_pad, len(rules.t_cost), dtype=torch.float64, device=device)
         self.citystate_civic_retain = torch.zeros(B, r_pad, len(rules.c_cost), dtype=torch.float64, device=device)
+        # the boosts each row holds and its barbarian kills (`ResearchState.boosted`,
+        # `Seat.barbKills`): a city-state's own, the Free Cities' row unused
+        self.citystate_tech_boosted = torch.zeros(B, r_pad, len(rules.t_cost), dtype=torch.bool, device=device)
+        self.citystate_civic_boosted = torch.zeros(B, r_pad, len(rules.c_cost), dtype=torch.bool, device=device)
+        self.citystate_barb_kills = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.citystate_tech_ovf = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.citystate_civic_ovf = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         # the research AI's goal (-1 none) and its analysis of the minor's
