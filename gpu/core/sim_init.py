@@ -300,6 +300,9 @@ class SimInit:
         self.citystate_cai_score = torch.zeros(B, r_pad, nc_ai, dtype=torch.long, device=device)
         self.citystate_cai_owned = torch.zeros(B, r_pad, nc_ai, dtype=torch.bool, device=device)
         self.citystate_cai_valid = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
+        # its strength over every domain as its turn started, before its
+        # production (`Seat.unitStrength`, `_store_unit_strength`)
+        self.citystate_unit_strength = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # the minor's PRODUCTION toward the item in hand (`minorBuild`). The
         # built results live on the shared city planes (`city_bldg`,
         # `city_dist_tile`, `city_outer_hp`) at the minor's row and its units in

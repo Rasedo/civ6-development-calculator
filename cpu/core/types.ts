@@ -933,6 +933,10 @@ export interface Seat {
   /** CIV6 (Warlord's Throne): "Capturing an enemy City grants 20% bonus
    *  Production in all Cities for 5 turns" — the turns still to run. */
   conquestProdTurns?: number;
+  /** PlayerStats' strength over every domain without the treasury's
+   *  (0x4bd0d0(-1): +0x210 less +0x390), stored as the seat's turn starts,
+   *  before its production (`storeUnitStrength`); absent, none */
+  unitStrength?: number;
   bestMeleeCS: number;
   /** the strongest Ranged Strength of a unit the seat trained, bought or
    *  upgraded to (its formation's included; a siege chassis' Bombard and an

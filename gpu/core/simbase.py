@@ -1199,6 +1199,7 @@ _MUTABLE = [
     "citystate_ai_valid", "citystate_ai_left", "citystate_ai_left_seen",  # the research AI's goal, its last turn's analysis, its turns left
     "citystate_cai_turns", "citystate_cai_next", "citystate_cai_base", "citystate_cai_score", "citystate_cai_owned",
     "citystate_cai_valid",  # the civics AI's last turn's analysis
+    "citystate_unit_strength",  # the strength over every domain its turn start stored
     "citystate_item", "citystate_ovf", "citystate_kept",  # the minor's item in hand, overflow store and kept progress
     "citystate_treasury", "citystate_faith",
     "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",

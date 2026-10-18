@@ -1032,6 +1032,19 @@
   context:
     - ...(DLC GranColombia_Maya), no other. The map is built at the player's DoTurn (0x4e4560 -> 0x46cdd0 at 0x4e4aa4); the engines build it as each tactical pass opens, the hostile units' sear...
   review: imported
+- addr: 0x484910
+  final: 0x3078b0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 4
+      value: "0x153e40), which its start (0x153720) fills   with each Units row tagged CLASS_ANTI_CAVALRY — the camps' defenders   (runs/h1_duelv1121 t4-t12: a barbarian Spearman 3 from city-states 2's   and 4's ci"
+  readings:
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+  context:
+    - ...fenseStrength, 24.8), an explorer (PSEUDOYIELD_UNIT_EXPLORER) never, nor a barbarian's (0x484910) of a type in the barbarian manager's list (+0x298, its vector +0x2f0; 0x153e40), which...
+  review: imported
 - addr: 0x484a10
   final: 0x307950
   kind: function
@@ -3176,6 +3189,27 @@
   context:
     - "- The victory manager's Yields (GrandStrategic +0x508, inner +0xd8 = +0x638; 0x7c05e0 dumps it as \"Yields:\"): a followed strategy's Strategy_YieldPriorities rows add fx(Perc..."
   review: imported
+- addr: 0x7c62f0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 8
+      value: "Cases (the log's rolls tell a queue spawn from a clock one): 1124 camp (40,21): its scout home at t8's pass, then t9 W, t10 W, t11 S, t12 S with no \"Barbarian Ranged unit roll\" for them, the clock bac"
+    - recording: 1117
+      turn: 9
+      value: "1117 camp (9,24): home at t9, t10 W (no roll), t11 W, t12 W, t13 S, t14 S, the clock at t21 with its roll;"
+    - recording: 1124
+      turn: 22
+      value: "1124 camp (41,7): home at t22, t23 W, t24 W, t25 W, t26 S, t27 S, the clock at t34."
+    - recording: h1_duelw1127
+      turn: 35
+      value: The recruit's request (0x7c7580 -> 0x60a8c0, the unit evaluator +0x12d0) walks the player's units (+0x12e8 -> +0xd8) unassigned (+0x7d0 -1), alive, and the operation's units it took are then listed (0
+  impl: [cpu/core/barbarianOps.ts:inOps, gpu/core/sim_barbops.py:_bop_recruit]
+  readings: ["H-1: the raids — READ"]
+  context:
+    - "...Warrior 2162693, slot 5, taken before 1835024, slot 16, the older). The tribe's request (0x7c62f0, its vtable @d72bb8) walks that list: a unit of the tribe (+0x11d0) of each class (0x8c28..."
+  review: imported
 - addr: 0x7c6e50
   final: 0x53d060
   kind: function
@@ -4029,6 +4063,40 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ock reads (QueryPerformanceCounter through 0xcc6080) feed the scoped profiler (0x8c05a0 / 0x8c0640) and timing totals (0x5bce20, Player::Processor::EndTurn 0x7ed0a); none is compared to a...
+  review: imported
+- addr: 0x8c2880
+  final: 0x604cd0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 8
+      value: "Cases (the log's rolls tell a queue spawn from a clock one): 1124 camp (40,21): its scout home at t8's pass, then t9 W, t10 W, t11 S, t12 S with no \"Barbarian Ranged unit roll\" for them, the clock bac"
+    - recording: 1117
+      turn: 9
+      value: "1117 camp (9,24): home at t9, t10 W (no roll), t11 W, t12 W, t13 S, t14 S, the clock at t21 with its roll;"
+    - recording: 1124
+      turn: 22
+      value: "1124 camp (41,7): home at t22, t23 W, t24 W, t25 W, t26 S, t27 S, the clock at t34."
+    - recording: h1_duelw1127
+      turn: 35
+      value: The recruit's request (0x7c7580 -> 0x60a8c0, the unit evaluator +0x12d0) walks the player's units (+0x12e8 -> +0xd8) unassigned (+0x7d0 -1), alive, and the operation's units it took are then listed (0
+  readings: ["H-1: the raids — READ"]
+  context:
+    - "...7c62f0, its vtable @d72bb8) walks that list: a unit of the tribe (+0x11d0) of each class (0x8c2880 on the force's class lists, never CLASS_ZOMBIE) fills the class's count in order; the cla..."
+  review: imported
+- addr: 0x8ea750
+  final: 0x627bb0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 34
+      value: "+0x2600 is m_iTurnFounded, the field 0x8ea750's   CitiesFounded / TurnFounded reads: runs/h1_duelw1117 Caguana t34 keeps   the Warrior its Default Specialization set at t33 under the Harbor   contract"
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  context:
+    - "...rn or the last (city +0x2600 + 1 >= the game turn; +0x2600 is m_iTurnFounded, the field 0x8ea750's CitiesFounded / TurnFounded reads: runs/h1_duelw1117 Caguana t34 keeps the Warrior..."
   review: imported
 - addr: 0x93d570
   final: 0x64d740

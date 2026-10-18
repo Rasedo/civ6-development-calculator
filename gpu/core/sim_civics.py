@@ -157,9 +157,16 @@ class SimCivics:
         return torch.where(turns >= T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
 
     def _cai_strength(self, s: int) -> torch.Tensor:
-        """[B] minor `s`'s strength over every domain (`domainStrength`): per
-        unit the greater of its combat and ranged strengths x its hit points
-        left over its most, 24.8 truncated, the sum's whole part"""
+        """[B] minor `s`'s strength over every domain (`domainStrength`) as
+        its turn start stored it"""
+        return self.citystate_unit_strength[:, s]
+
+    def _store_unit_strength(self, s: int, live: torch.Tensor) -> None:
+        """`storeUnitStrength` where `live` [B]: minor `s`'s (the Free
+        Cities' at `FR`) strength over every domain as its turn starts,
+        before its production — per unit the greater of its combat and
+        ranged strengths x its hit points left over its most, 24.8
+        truncated, the sum's whole part"""
         seat = FREE_SEAT if s == self.FR else 100 + s
         mine = self.major_unit_alive & (self.major_unit_seat == seat)
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
@@ -167,7 +174,8 @@ class SimCivics:
         left = self.major_unit_hp.clamp(min=0) << 8
         hp = int(self.rules.combat["unitHp"]) << 8
         per = torch.div(torch.div(st * left, 256, rounding_mode="trunc") * 256, hp, rounding_mode="trunc")
-        return (per * mine.long()).sum(dim=1) >> 8
+        now = (per * mine.long()).sum(dim=1) >> 8
+        self.citystate_unit_strength[:, s] = torch.where(live, now, self.citystate_unit_strength[:, s])
 
     def _cai_best(self, ent, key: torch.Tensor) -> torch.Tensor:
         """`best` (0x6182e0): the comparator's row over the entries in table

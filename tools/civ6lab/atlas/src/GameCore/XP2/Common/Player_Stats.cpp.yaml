@@ -15,9 +15,11 @@
     - cpu/core/majorView.ts:militaryStrength
     - ai/major/view.ts:MajorView
     - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/majorView.ts:storeUnitStrength
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "...gth the rank conditions read (PlayerStats m_iMilitaryStrength, data +0x210, computed at 0x4bb1e0, stored as each player's turn starts, before its production): per unit max(Combat, Ra..."
   review: imported
@@ -81,6 +83,8 @@
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/majorView.ts:domainStrength
+    - cpu/core/majorView.ts:storeUnitStrength
+    - cpu/core/types.ts:Seat
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"

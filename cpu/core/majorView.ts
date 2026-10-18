@@ -504,7 +504,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     techCount: (i) => seat(i).research.techs.length,
     techsHeld: (i) => new Set(seat(i).research.techs.map((t) => gameTypeOf('tech', t, 'TECH_'))),
     militaryStrength: (i) => militaryStrength(state, i),
-    domainStrength: (i) => domainStrength(state, i),
+    domainStrength: (i) => seatOf(state, i)?.unitStrength ?? 0,
     treasury: (i) => seatOf(state, i)?.treasury ?? 0,
     actionOpen: (i, j, action) => {
       if (!isCiv(i) || !isCiv(j) || civsAtWar(state, i, j)) return false;
@@ -977,10 +977,15 @@ function militaryStrength(state: GameState, seat: number): number {
 }
 
 /** PlayerStats' strength over every domain (0x4bd0d0(-1): +0x210 less
- *  +0x390, their writer not read): `militaryStrength`'s unit term without
- *  its treasury's — runs/h1_duelv1127: a city-state's Military Tradition
- *  worth PV(20) a Warrior, its Regional Strength in AI_Military.csv */
-function domainStrength(state: GameState, seat: number): number {
+ *  +0x390, m_iMilitaryStrength less m_iMilitaryStrengthFromGold, computed at
+ *  0x4bb1e0 as the player's turn starts, before its production):
+ *  `militaryStrength`'s unit term without its treasury's, stored on the seat
+ *  — runs/h1_duelv1127: a city-state's Military Tradition worth PV(20) a
+ *  Warrior; runs/h1_duelw1121 Antioch: the Warrior its t13 production trains
+ *  counts in Military Tradition's value from t14 */
+export function storeUnitStrength(state: GameState, seat: number): void {
+  const s = seatOf(state, seat);
+  if (!s) return;
   let sum = 0;
   for (const u of unitsOf(state, seat)) {
     const d = UNITS[u.type];
@@ -988,7 +993,7 @@ function domainStrength(state: GameState, seat: number): number {
     const str = Math.max(d.combat ?? 0, d.ranged?.strength ?? 0) << 8;
     sum += Math.trunc((Math.trunc((str * (Math.max(0, u.hp) << 8)) / 256) * 256) / (UNIT_HP << 8));
   }
-  return sum >> 8;
+  s.unitStrength = sum >> 8;
 }
 
 /** a unit as the majors' AI reads it */

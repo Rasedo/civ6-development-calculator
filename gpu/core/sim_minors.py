@@ -30,6 +30,7 @@ class SimMinors:
             self._minor_levy_return(s)
             self._minor_power(s)
             gained = self._minor_economy(s)
+            self._store_unit_strength(s, alive)
             self._minor_build(s, self._minor_production(s))
             # its city AI's full update reads its growth here, before the growth
             g = self._cv_minor_facts(s).growth()

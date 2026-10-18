@@ -404,6 +404,20 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context: ["- EFFECT_ADJUST_DISTRICT_YIELD_CHANGE 0x6acd00: a district subject; Amount bare, span."]
   review: imported
+- addr: 0x6ad2b0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1117
+      value: "A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges   and its adjacency: the loop over Improvement_Adjacencies (+0x110..+0x118)   hands 0x365ae0 each row on its own (r8 = the row, r9d its yi"
+    - recording: h1_duelv1117
+      turn: 6
+      value: "LAB: the   Housing counted a second time at its whole value (the housing value's   whole part, as an analyzer's): runs/h1_duelv1117 Caguana's Farm rows   each the value without it plus exactly that wh"
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - ...e modifiers 0x7a4b20 unread (0x7b1320 calls the housing value once, over TilesRequired; 0x6ad2b0, an analyzer beside EFFECT_ADJUST_DISTRICT_AMENITY, calls it too).
+  review: imported
 - addr: 0x6adb20
   kind: function
   name: EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY

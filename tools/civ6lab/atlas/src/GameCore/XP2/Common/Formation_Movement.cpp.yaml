@@ -191,10 +191,26 @@
   context:
     - ...a no-op; 1, 2, 4 store the child's range off the range callback), neighbours 0x558d60 / 0x271b50, context 0x558ba0. The range callback 0x5579b0 memoises its answer on the (parent, chil...
   review: imported
+- addr: 0x271be0
+  final: 0x1a9a40
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 11
+      value: "runs/h1_duelw1121 t11: the   Horse Archer at 34:8 for 30:7 takes the path whose turn ends on the free   33:6, not the one through 33:7 / 32:7, both held by its own units."
+  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  context:
+    - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
+  review: imported
 - addr: 0x2720a0
   final: 0x1a9f00
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:enterable]
+  impl:
+    - cpu/core/tactical.ts:enterable
+    - cpu/core/tactical.ts:from
+    - gpu/core/sim_tactics.py:_tac_search
+  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported

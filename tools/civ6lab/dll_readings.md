@@ -4841,7 +4841,12 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   to the horizon); EFFECT_GRANT_COMBAT_ADJACENCY 0x6c4060 (Enable: the
   player's strength over every domain 0x4bd0d0(-1) = PlayerStats +0x210 -
   +0x390, bare, landing to the horizon — 20 a Warrior, AI_Military.csv's
-  Regional Strength); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0 for a
+  Regional Strength; m_iMilitaryStrength less m_iMilitaryStrengthFromGold
+  as 0x4bb1e0 stored them at the player's turn start, before its
+  production: runs/h1_duelw1121 Antioch's Warrior, trained by its t13
+  production (contract 28 COMPLETED at t13), first counts in Military
+  Tradition's value at t14, 186.9 -> 459.9, as logged; 1127 t13 player 2
+  likewise); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0 for a
   city-state (State Workforce, Early Empire every one exact).
 - MEASURED (`cpu/harness/researchValueLab.ts`, a row researchable now
   against its own value, the policy term on the logged Policies scores of

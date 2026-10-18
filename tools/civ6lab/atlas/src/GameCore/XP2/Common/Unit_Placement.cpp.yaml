@@ -56,6 +56,7 @@
     - cpu/core/tactical.ts:strike
     - cpu/core/tactical.ts:wanderNearCamp
     - cpu/core/tactical.ts:wanderNearCity
+    - cpu/core/tactical.ts:Ground
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -63,6 +64,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...hin 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220)..."
   context:

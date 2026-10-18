@@ -69,7 +69,7 @@ import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildi
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
-import { majorView } from './majorView';
+import { majorView, storeUnitStrength } from './majorView';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
 import { minorTradeValue } from './aiTrade';
@@ -98,6 +98,7 @@ export function minorPhase(state: GameState): void {
     minorLevyReturn(state, cityState);
     minorPower(state, cityState);
     const gained = minorEconomy(state, cityState);
+    storeUnitStrength(state, cityState.seat);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
     // its city AI's full update reads its growth here, before the growth
     // (runs/h1_duelv1121 Ayutthaya: the Granary's housing value from the

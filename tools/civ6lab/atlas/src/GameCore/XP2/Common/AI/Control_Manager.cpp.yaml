@@ -7,6 +7,7 @@
   final: 0x401ba0
   kind: function
   status: PARTLY
+  impl: [cpu/core/barbarianOps.ts:recruit, gpu/core/sim_barbops.py:_bop_recruit]
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -80,6 +81,7 @@
     - cpu/core/operations/nodes.ts:recruitUnits
     - cpu/core/barbarianOps.ts:recruit
     - gpu/core/sim_barbops.py:_bop_recruit
+    - cpu/core/barbarianOps.ts:fresh
   readings:
     - "H-1: the raids — READ"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"

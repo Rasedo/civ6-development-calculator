@@ -173,7 +173,11 @@
   final: 0xe4970
   kind: function
   status: PARTLY
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
+  impl: [cpu/core/operations/cityThreat.ts:campDefender]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per..."
@@ -191,6 +195,20 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...154220: the first BarbarianTribes row the camp meets — NAVAL on an AREA under 15 plots (0x153d60 reads the plot's +8, the CvArea pointer Plot:GetArea returns (0x25990), and its +4 plot..."
+  review: imported
+- addr: 0x153e40
+  final: 0xe5090
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 4
+      value: "0x153e40), which its start (0x153720) fills   with each Units row tagged CLASS_ANTI_CAVALRY — the camps' defenders   (runs/h1_duelv1121 t4-t12: a barbarian Spearman 3 from city-states 2's   and 4's ci"
+  impl: [cpu/core/operations/cityThreat.ts:campDefender, gpu/core/sim_minorai.py:_minor_threat]
+  readings:
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+  context:
+    - "...rian's (0x484910) of a type in the barbarian manager's list (+0x298, its vector +0x2f0; 0x153e40), which its start (0x153720) fills with each Units row tagged CLASS_ANTI_CAVALRY — the..."
   review: imported
 - addr: 0x153ea0
   final: 0xe50f0

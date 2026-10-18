@@ -354,6 +354,7 @@
     - cpu/core/aiPlotValue.ts:BASE_CHARGES
     - cpu/core/aiPlotValue.ts:improvementValue
     - gpu/core/sim_cityvalue.py:_cv_improvement
+    - cpu/core/aiPlotValue.ts:value
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
@@ -618,6 +619,7 @@
   impl:
     - cpu/core/aiPlotValue.ts:improvementYieldsValue
     - gpu/core/sim_cityvalue.py:_cv_improvement_yields
+    - cpu/core/aiPlotValue.ts:value
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"

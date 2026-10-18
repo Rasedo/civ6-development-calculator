@@ -815,6 +815,7 @@ class SimPhase:
         units the city was GRANTED go the same turn; any other Free Cities
         unit stays Free."""
         row = self.FREE_ROW
+        self._store_unit_strength(self.FR, torch.ones(self.B, dtype=torch.bool, device=self.device))
         alive = self.city_alive[:, row]
         if not bool(alive.count_nonzero()):
             zero = torch.zeros(self.B, dtype=torch.float64, device=self.device)

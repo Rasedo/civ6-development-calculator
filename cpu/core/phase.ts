@@ -32,6 +32,7 @@ import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, 
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, minorBestOfClass, minorCompleteNow, minorResearch, trainableIn } from './minorBuild';
+import { storeUnitStrength } from './majorView';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { freeCityTactics, plotDistance, tacticalTargets } from './tactical';
 import { plotsSeenNow } from './barbarians';
@@ -993,6 +994,7 @@ function joinFromFreeCity(state: GameState, city: City): void {
 export function freeCitiesPhase(state: GameState): void {
   const free = freeSeatOf(state);
   const urban = () => urbanDefensesFit(state, FREE_SEAT);
+  storeUnitStrength(state, FREE_SEAT);
   if (free.cities.length === 0) {
     minorResearch(state, free.research, FREE_SEAT, 0, 0, () => undefined, urban, []);
     return;
@@ -2713,6 +2715,7 @@ export function seatPhase(state: GameState): void {
 
   for (const actor of state.seats) {
     atRngPoint(state, { kind: 'seat', seat: actor.seat, turn: state.turn });
+    storeUnitStrength(state, actor.seat);
     const recU = state.seatActions?.[state.turn - 1]?.[actor.seat];
     if (actor.cities.length === 0) {
       // No city means no economy — but the UNITS still walk. A settler start
