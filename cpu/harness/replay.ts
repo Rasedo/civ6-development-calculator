@@ -869,7 +869,17 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number): void {
   minorOpsAfter(ctx, b, turn, copy, twin, keyOf);
   const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c) && minorAiSeat(c.seat)) ended.set(u, c.tileIndex);
-  tallyMinorTactics(ctx, b, turn, moves, ended);
+  const opOf = new Map<Unit, string>();
+  for (const c of copy.cityStates) {
+    for (const op of c.ops ? opsOf(c.ops) : []) {
+      for (const id of opUnits(op)) {
+        const u = copy.units.find((x) => x.id === id);
+        const real = u ? twin.get(u) : undefined;
+        if (real) opOf.set(real, op.def);
+      }
+    }
+  }
+  tallyMinorTactics(ctx, b, turn, moves, ended, opOf);
 }
 
 /**
@@ -879,7 +889,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number): void {
  * game's move taken (`minorAi:move` applied), or the record's imposed.
  */
 function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<Unit, { move: string; plot: number }>,
-  ended: ReadonlyMap<Unit, number>): void {
+  ended: ReadonlyMap<Unit, number>, opOf: ReadonlyMap<Unit, string>): void {
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
   const rows = ctx.tactical?.others.get(turn);
@@ -904,7 +914,9 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: Readonl
       count(ctx, 'minorAi:move', 'applied');
     } else {
       if (t.firstPlot === undefined) t.firstPlot = turn;
-      count(ctx, 'minorAi:move', 'fallback', ctx.playerOfSeat.get(u.seat), `${game ?? m.move}: the AI's ${end}, the game's ${want}`);
+      const op = opOf.get(u);
+      count(ctx, 'minorAi:move', 'fallback', ctx.playerOfSeat.get(u.seat),
+        `${game ?? m.move}: the AI's ${end}, the game's ${want} | ours ${op ? `${op} ` : ''}${tacticalCategory(m.move)}`);
     }
     // REPLAY_TRACE=minorTactics: each unit's move beside the game's
     if (TRACE.has('minorTactics')) console.error(`t${turn} ${key} ${u.type} ${m.move}->${m.plot} at ${end} | game ${game ?? '-'} at ${want}`);
@@ -923,6 +935,28 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
     if (!cs) continue;
     if (c.ops) cs.ops = c.ops;
     if (c.cityAi) cs.cityAi = c.cityAi;
+    // its knowledge base's look after its units' turn (`minorPhase`'s last),
+    // before the barbarians' turn: its units on the plots record t+1 holds
+    // them on, the others where the turn found them with record t+1's
+    // damage (the turn's engine pass looked before its moves)
+    if (c.centerIndex >= 0) {
+      const held: [Unit, number, number][] = [];
+      for (const [x, u] of twin) {
+        if (!copy.units.includes(x) || !state.units.includes(u)) continue;
+        held.push([x, x.tileIndex, x.hp]);
+        if (x.seat === c.seat) x.tileIndex = u.tileIndex;
+        else x.hp = u.hp;
+      }
+      minorKnowledge(copy, c, false);
+      for (const [x, at, hp] of held) {
+        x.tileIndex = at;
+        x.hp = hp;
+      }
+      if (c.armyKnown) cs.armyKnown = c.armyKnown;
+      else delete cs.armyKnown;
+      if (c.campsKnown) cs.campsKnown = c.campsKnown;
+      else delete cs.campsKnown;
+    }
     if (!c.prodItem && cs.prodItem) minorSetItem(state, cs, null);
     const player = ctx.playerOfSeat.get(cs.seat);
     if (player === undefined) continue;
@@ -3597,7 +3631,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     for (const u of [...state.units]) {
       if (standing.has(u) || mapped.has(u) || u.seat < state.seats.length) continue;
       disbandUnit(state, u.id);
-      count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat));
+      const cs = state.cityStates.find((c) => c.seat === u.seat);
+      const op = cs?.ops ? opsOf(cs.ops).find((o) => opUnits(o).includes(u.id))?.def : undefined;
+      count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat),
+        `${u.type}${op ? ` for ${op}` : ''}`);
     }
     undoMinorPlots(ctx, improvements);
     minorBuilds(ctx, b, report.minorBuilds);

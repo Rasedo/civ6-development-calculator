@@ -1115,7 +1115,13 @@ Cocoa included). The engines: `luxuryAmenities` / `_luxury_amenities`.
 - The city base's best melee (PlayerStats +0xf0, saved as
   m_iMaxMeleeStrengthTrained): 0x4c1a30, called as a unit is made (the
   city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the
-  era's starting units (0x4580b0 through 0x4c1c10), raises it to
+  player's start (0x4580b0 through UpdateMaxMeleeStrengthTrained 0x4c1c10,
+  which raises to its argument: the start era's row +0x40 or +0x44,
+  StartEras StartingMeleeStrengthMajor 20 / StartingMeleeStrengthMinor 25
+  in the Ancient era, the ranged at +0x50 / +0x54; the operations' desired
+  strength 0x723ab0 reads the stat, 1117-1128's city-states 25 before any
+  unit they train beats it — the recruit lines' 25 / 12.5, 0x16e7d0 on City
+  Defense's ongoing 1 and Attack Barb Camp's 0.5), raises it to
   0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in
   it — where 0x4bffa0 passes the unit row: its domain (row +0x1c) not 1, no
   tag 0x36c125c9 (no install or DLL name hashes to it) and its row +0x24
@@ -4979,7 +4985,10 @@ in gpu/core/sim_tactics.py; the score `barbPillageScore` (cpu/core/barbarians.ts
   found it arrived, and the node names no Leader Tag (+0x7c, the tag's
   AiType; -1 takes the skip, a tagged node moves its members every tick);
   per team its members listed at +0x74 "Nonmoving" (their
-  turn ends; the update clears the list each tick), the others with
+  turn ends; the update empties the list at each team, 0x81c080, and no
+  node fills it before the execution reads it: no recording logs
+  "Operation Move Nonmoving unit", 0 of 5,577 Operation Move lines on
+  1117-1128), the others with
   Movement, nearest the goal first: the radius the smaller of Range to goal
   and its attack range (0 in a formation or carrying the Leader Tag); at
   least 1 where the goal is barred (0x586360 no path, 0x5862e0 a unit at

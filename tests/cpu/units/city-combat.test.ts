@@ -318,11 +318,11 @@ describe("a city centre's standing strength", () => {
     const w = spawnUnit(state, 'WARRIOR', city.centerIndex, 1)!;
     expect(centreStrength(state, city)).toBe(25);
     w.seat = 0;
-    state.seats.find((s) => s.seat === 1)!.bestMeleeCS = 0;
+    state.seats.find((s) => s.seat === 1)!.bestMeleeCS = CITY_START_MELEE_MAJOR;
     expect(centreStrength(state, city)).toBe(10);
   });
 
-  it("a city-state's centre: max(its start melee, its best melee) - 10, the Palace, +1 per envoy", () => {
+  it("a city-state's centre: its best melee (from its start melee) - 10, the Palace, +1 per envoy", () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
     state.seats.push(emptySeat(1));
@@ -339,7 +339,7 @@ describe("a city centre's standing strength", () => {
     expect(centreStrength(state, minorCity(cs))).toBe(15 + PALACE_CITY_CS + 3 * ENVOY_CITY_CS);
     // a trained Warrior stays under the minor's own start value
     raiseBestTrained(state, cs.seat, 'WARRIOR');
-    expect(cs.bestMeleeCS).toBe(20);
+    expect(cs.bestMeleeCS).toBe(CITY_START_MELEE_MINOR);
     expect(centreStrength(state, minorCity(cs))).toBe(15 + 3 + 3);
     // the strongest melee it has trained, not its population or its type
     raiseBestTrained(state, cs.seat, 'SWORDSMAN');
@@ -366,12 +366,12 @@ describe('the base: the strongest melee ever trained or bought', () => {
   it('a unit granted or captured moves nothing; a trained one raises every centre at once', () => {
     const { state, capital, city, seat } = scene();
     spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 8, 8).index, 0);
-    expect(seat.bestMeleeCS).toBe(0);
+    expect(seat.bestMeleeCS).toBe(CITY_START_MELEE_MAJOR);
     expect(centreStrength(state, city)).toBe(10);
     state.seats.push(emptySeat(1));
     const taken = spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 20, 20).index, 1)!;
     reseatUnit(state, taken, 0);
-    expect(seat.bestMeleeCS).toBe(0);
+    expect(seat.bestMeleeCS).toBe(CITY_START_MELEE_MAJOR);
     commitProduction(state, 0, capital, { kind: 'unit', unit: 'WARRIOR', progress: 0 });
     capital.queue[0].progress = 10_000;
     endTurn(state);

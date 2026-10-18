@@ -395,6 +395,8 @@ export class OperationsProbe {
         const mark = logs[i] === ours[i] ? '  ' : '!!';
         console.error(`${mark} log  ${logs[i] ?? '-'}\n${mark} ours ${ours[i] ?? '-'}`);
       }
+      const ev = (this.evalLog.get(`${turn}:${player}`) ?? []).join(' | ');
+      if (ev || evals.length) console.error(`   eval log  ${ev}\n   eval ours ${evals.join(' | ')}`);
     }
     this.score(turn, player, ours, evals);
   }

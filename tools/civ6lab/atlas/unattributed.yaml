@@ -1070,7 +1070,7 @@
     - recording: 1106
       turn: 243
       value: "it also   clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land   and raised nothing — 0x4bffa0's row test, unnamed, a LAB line)."
-  impl: [cpu/harness/import.ts:newlyRevealed]
+  impl: [cpu/harness/import.ts:newlyRevealed, cpu/core/seats.ts:startMeleeCS]
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
@@ -2430,6 +2430,7 @@
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "...ckup\" FAILURE; Always Swap; Fail on Invalid Team; Required Tag; the strength gates over 0x723ab0 — WEAK to the backup, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7..."
   review: imported

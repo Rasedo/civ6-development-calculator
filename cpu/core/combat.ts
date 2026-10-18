@@ -33,7 +33,7 @@ import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disban
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_BOMBARD_VS_UNIT, CITY_MIN_STRIKE_CS, damageExponent, damageOf, damageRaw, COMBAT_MAX_HIT_POINTS, COMBAT_MINIMUM_DAMAGE, COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE, COMBAT_DEFENSE_DAMAGE_PERCENT_RANGED, COMBAT_DEFENSE_DAMAGE_PERCENT_BOMBARD } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_BOMBARD_VS_UNIT, CITY_MIN_STRIKE_CS, damageExponent, damageOf, damageRaw, COMBAT_MAX_HIT_POINTS, COMBAT_MINIMUM_DAMAGE, COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE, COMBAT_DEFENSE_DAMAGE_PERCENT_RANGED, COMBAT_DEFENSE_DAMAGE_PERCENT_BOMBARD } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
@@ -1062,15 +1062,14 @@ export function rangedCityPenalty(unitType: string, outerHp: number): number {
   return outerHp > 0 ? RANGED_CITY_PENALTY : 0;
 }
 
-/** The base a holder's centres and Encampments stand on: max(the start era's
- *  melee strength — a major's and a minor's each its own row — the strongest
- *  melee unit the seat has ever trained or bought, `Seat.bestMeleeCS`) - 10
- *  (`CITY_BASE_MELEE_CUT`). The Free Cities player trains toward no base of
- *  its own: its cities stand on their former owners' (`cityBaseSeat`). */
+/** The base a holder's centres and Encampments stand on: the best melee
+ *  strength the seat has trained (`Seat.bestMeleeCS`, from the start era's
+ *  column, `startMeleeCS`) - 10 (`CITY_BASE_MELEE_CUT`). The Free Cities
+ *  player trains toward no base of its own: its cities stand on their former
+ *  owners' (`cityBaseSeat`), its own the major's start. */
 function holderStrength(state: GameState, seat: number): number {
-  const start = isCityStateSeat(seat) ? CITY_START_MELEE_MINOR : CITY_START_MELEE_MAJOR;
-  const best = isFreeSeat(seat) ? 0 : seatOf(state, seat)?.bestMeleeCS ?? 0;
-  return Math.max(start, best) - CITY_BASE_MELEE_CUT;
+  const best = isFreeSeat(seat) ? CITY_START_MELEE_MAJOR : seatOf(state, seat)?.bestMeleeCS ?? 0;
+  return best - CITY_BASE_MELEE_CUT;
 }
 
 /** The seat whose base a city's centre stands on: its holder's, and a Free

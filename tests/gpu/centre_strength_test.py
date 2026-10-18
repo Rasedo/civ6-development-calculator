@@ -80,24 +80,24 @@ def a_capital(sim) -> tuple[int, int]:
 def test_base_and_palace(sim) -> None:
     r, j = a_capital(sim)
     clear(sim, int(sim.city_center[B0, r, j]))
-    sim.civ_best_melee[B0, r] = 0
+    sim.civ_best_melee[B0, r] = sim._city_start_melee_major
     assert int(sim._palace_city_cs) == 3
-    assert (sim._city_start_melee_major, sim._city_start_melee_minor, sim._city_base_melee_cut) == (20, 25, 10)
+    assert (sim._city_start_melee_major, sim._city_base_melee_cut) == (20, 10)
     assert strength(sim, r, j) == 10 + 3, strength(sim, r, j)
     sim.city_is_cap[B0, r, j] = False
     assert strength(sim, r, j) == 10, strength(sim, r, j)
     sim.civ_best_melee[B0, r] = 65
     assert strength(sim, r, j) == 55, strength(sim, r, j)
-    sim.civ_best_melee[B0, r] = 0
+    sim.civ_best_melee[B0, r] = sim._city_start_melee_major
     sim.city_is_cap[B0, r, j] = True
-    print("  1 the base and the Palace OK — max(20, best) - 10, +3 in the capital")
+    print("  1 the base and the Palace OK — the best melee (from the start era's 20) - 10, +3 in the capital")
 
 
 def test_districts(sim) -> None:
     r, j = a_capital(sim)
     sim.city_is_cap[B0, r, j] = False
     clear(sim, int(sim.city_center[B0, r, j]))
-    sim.civ_best_melee[B0, r] = 0
+    sim.civ_best_melee[B0, r] = sim._city_start_melee_major
     a, b = own_tiles(sim, r, j, 2)
     lay(sim, a, "CAMPUS")
     lay(sim, b, "AQUEDUCT")
@@ -160,7 +160,7 @@ def test_minor(sim) -> None:
     row = sim._CITY_MINOR0 + s
     ctr = int(sim.citystate_center[B0, s])
     clear(sim, ctr)
-    sim.citystate_best_melee[B0, s] = 0
+    sim.citystate_best_melee[B0, s] = int(sim.rules.combat["cityStartMeleeMinor"])
     sim.seat_citystate_envoys[B0, :, s] = 0
     sim.seat_citystate_envoys[B0, 0, s] = 2
     sim.seat_citystate_envoys[B0, 1, s] = 1
@@ -168,6 +168,7 @@ def test_minor(sim) -> None:
     # a Warrior merely created moves nothing; one trained stays under the
     # minor's own start value 25; the strongest melee it trains, not its
     # population or its type, raises the base
+    start = int(sim.rules.combat["cityStartMeleeMinor"])
     ring2 = ((sim.pair_dist[ctr] == 2) & ~sim.water[B0] & (sim.military_at[B0] < 0)
              & (sim.civilian_at[B0] < 0) & sim.passable[B0])
     at = int(ring2.long().argmax())
@@ -175,24 +176,25 @@ def test_minor(sim) -> None:
     one = torch.ones(sim.B, dtype=torch.bool)
     sim._spawn_unit(row, one, torch.full((sim.B,), at, dtype=torch.long),
                     torch.full((sim.B,), sim._warrior_idx, dtype=torch.long))
-    assert int(sim.citystate_best_melee[B0, s]) == 0, "a created Warrior raised the minor's base"
+    assert int(sim.citystate_best_melee[B0, s]) == start, "a created Warrior moved the minor's base"
     sim._minor_spawn(s, one, torch.full((sim.B,), sim._warrior_idx, dtype=torch.long))
-    assert int(sim.citystate_best_melee[B0, s]) == 20, "the minor's tracker missed its trained Warrior"
+    assert int(sim.citystate_best_melee[B0, s]) == start, "a trained Warrior moved the minor's base past its start"
     clear(sim, ctr)   # the trained Warrior lands on the centre: no garrison here
     assert strength(sim, row, 0) == 15 + 3 + 3, strength(sim, row, 0)
     sim.citystate_best_melee[B0, s] = 35
     assert strength(sim, row, 0) == 25 + 3 + 3, strength(sim, row, 0)
-    print("  4 the city-state OK — max(25, its best melee) - 10, the Palace, +1 per envoy")
+    print("  4 the city-state OK — its best melee (from its start 25) - 10, the Palace, +1 per envoy")
 
 
 def test_trained_or_bought() -> None:
     """runs/b95t_p1_mech_bought_20260927.jsonl: the base is the strongest melee
-    ever TRAINED or BOUGHT — raised at once, kept after the unit dies; a
-    starting, granted or captured unit moves nothing
+    ever TRAINED or BOUGHT from the start era's column — raised at once, kept
+    after the unit dies; a starting, granted or captured unit moves nothing
     (runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl)."""
     sim = build()
-    assert int(sim.civ_best_melee[B0].abs().sum()) == 0, "a starting unit raised a major's base"
-    assert int(sim.citystate_best_melee[B0].abs().sum()) == 0, "a starting unit raised a minor's base"
+    major, minor = sim._city_start_melee_major, int(sim.rules.combat["cityStartMeleeMinor"])
+    assert bool((sim.civ_best_melee[B0] == major).all()), "a major's best is not the start era's column"
+    assert bool((sim.citystate_best_melee[B0] == minor).all()), "a minor's best is not the start era's column"
     r = 0
     one = torch.ones(sim.B, dtype=torch.bool)
     sword = next(i for i, u in enumerate(sim.rules.units) if u["id"] == "SWORDSMAN")
@@ -200,7 +202,7 @@ def test_trained_or_bought() -> None:
     ctr = int(sim.city_center[B0, r, int(sim.city_alive[B0, r].nonzero().flatten()[0])])
     sim._spawn_unit(r, one, torch.full((sim.B,), ctr, dtype=torch.long),
                     torch.full((sim.B,), sword, dtype=torch.long))
-    assert int(sim.civ_best_melee[B0, r]) == 0, "a granted Swordsman raised the base"
+    assert int(sim.civ_best_melee[B0, r]) == major, "a granted Swordsman raised the base"
     sim._raise_best_trained(r, one, torch.full((sim.B,), sword, dtype=torch.long))
     assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[sword])
     sim._raise_best_trained(r, one, sim._warrior_idx)
@@ -218,7 +220,7 @@ def test_trained_or_bought() -> None:
     was = int(sim.civ_best_melee[B0, r])
     sim._raise_best_trained(r, one, full(jet))
     assert int(sim.civ_best_melee[B0, r]) == was, "an aircraft raised the base"
-    print("  5 trained or bought OK — a starting or granted unit moves nothing, the base never falls")
+    print("  5 trained or bought OK — from the start era's column; a starting or granted unit moves nothing, the base never falls")
 
 
 def main() -> None:

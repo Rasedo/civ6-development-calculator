@@ -30,7 +30,7 @@ import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, Ga
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, type MinorItem } from '../core/minorBuild';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, setMetTurnWith } from '../core/seats';
+import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, setMetTurnWith } from '../core/seats';
 import { routeOriginCenter, stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
@@ -2233,7 +2233,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     importPlayer(ctx, p, s);
     if (bool(p.major)) importAges(ctx, s, p, history);
     ctx.scopeSeat = undefined;
-    s.bestMeleeCS = history?.bestMelee.get(p.id) ?? 0;
+    s.bestMeleeCS = Math.max(startMeleeCS(seat), history?.bestMelee.get(p.id) ?? 0);
     s.bestRangedCS = history?.bestRanged.get(p.id) ?? 0;
     // the copies a price progression counts are the game's own, read off its
     // quote where one stands: a Builder taken back in the field moves no

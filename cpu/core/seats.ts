@@ -9,7 +9,7 @@ import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIAN
 import { GP_RESOURCE_REVEAL, gpPermOf } from '../data/greatPeople';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';
 import { RESOURCES, extractsResource } from '../../world/resources';
-import { emptyStockpile } from '../data/constants';
+import { CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, emptyStockpile } from '../data/constants';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { CIV_LEVELS, type CivLevelDef, type CivLevelId } from '../data/civLevels';
 
@@ -159,6 +159,14 @@ export function prophetsOf(seat: Seat): number {
   return (seat.gpActivated ?? []).filter((id) => GREAT_PEOPLE.PROPHET.some((p) => p.id === id)).length;
 }
 
+/** The best melee strength a player starts with (0x4580b0 through
+ *  UpdateMaxMeleeStrengthTrained 0x4c1c10): the start era's column, a
+ *  major's and a city-state's each its own; the barbarians and the Free
+ *  Cities none. */
+export function startMeleeCS(seat: number): number {
+  return isCityStateSeat(seat) ? CITY_START_MELEE_MINOR : isCiv(seat) ? CITY_START_MELEE_MAJOR : 0;
+}
+
 export function emptySeat(seat: number): Seat {
   return {
     seat,
@@ -174,7 +182,7 @@ export function emptySeat(seat: number): Seat {
     religion: { pantheon: null, founded: false, type: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     grantedTitles: 0,
     gpp: {}, gpEarned: [],
-    buildersTrained: 0, settlersTrained: 0, relicReserve: 0, bestMeleeCS: 0,
+    buildersTrained: 0, settlersTrained: 0, relicReserve: 0, bestMeleeCS: startMeleeCS(seat),
     projectsDone: [], spaceLy: -1, orbitalLasers: 0, stockpile: emptyStockpile(), camps: [], explored: [],
     darkBar: AGE_START_BARS[0], goldenBar: AGE_START_BARS[1],
   };

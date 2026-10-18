@@ -300,8 +300,7 @@ def test_the_minor_encampment_fights_as_its_centre(rules, path) -> None:
     d, _hrow, hcol, wtier, held = sim._encamp_terms(tt)
     csx = torch.full((sim.B,), s, dtype=torch.long)
     tier = int(sim._minor_walls_tier_at(csx)[B0])
-    want = (max(int(sim._city_start_melee_minor), int(sim.citystate_best_melee[B0, s]))
-            - int(sim._city_base_melee_cut) + int((sim.city_bldg[B0, row, 0].long() * sim._b_walls_cs).sum())
+    want = (int(sim.citystate_best_melee[B0, s]) - int(sim._city_base_melee_cut) + int((sim.city_bldg[B0, row, 0].long() * sim._b_walls_cs).sum())
             + int(sim._palace_city_cs) + int(sim._d_city_str[dv])
             + int(sim._minor_envoys_received()[B0, s]) * int(sim._envoy_city_cs))
     assert tier >= 1, "the walls did not reach the tier read"

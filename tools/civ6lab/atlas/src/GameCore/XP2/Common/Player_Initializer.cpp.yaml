@@ -14,7 +14,7 @@
     - recording: 1106
       turn: 243
       value: "it also   clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land   and raised nothing — 0x4bffa0's row test, unnamed, a LAB line)."
-  impl: [cpu/harness/import.ts:newlyRevealed]
+  impl: [cpu/harness/import.ts:newlyRevealed, cpu/core/seats.ts:startMeleeCS]
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"

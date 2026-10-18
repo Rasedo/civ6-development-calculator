@@ -3402,10 +3402,12 @@ class SimInit:
         # (`_centre_strength`): the Palace's, the garrison term's wounded loss
         # (`_garrison_cs`), a minor's per envoy
         self._palace_city_cs = int(rules.combat["palaceCityCs"])
-        # the holder's base: max(the start era's melee, the best melee
-        # fielded) less the cut (`_holder_strength`)
+        # the best melee each player starts with (`startMeleeCS`): the start
+        # era's column, a major's and a city-state's; the holder's base is
+        # the best less the cut (`_holder_strength`)
         self._city_start_melee_major = int(rules.combat["cityStartMeleeMajor"])
-        self._city_start_melee_minor = int(rules.combat["cityStartMeleeMinor"])
+        self.civ_best_melee.fill_(self._city_start_melee_major)
+        self.citystate_best_melee.fill_(int(rules.combat["cityStartMeleeMinor"]))
         self._city_base_melee_cut = int(rules.combat["cityBaseMeleeCut"])
         self._wounded_loss = torch.tensor(_wounded_loss_table(int(rules.combat["woundedDamageMultiplier"])),
                                           dtype=torch.long, device=device)

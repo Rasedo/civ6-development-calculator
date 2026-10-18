@@ -12986,11 +12986,10 @@ class SimSeats:
                            ctr_seat.clamp(min=0, max=self.n_majors - 1))
 
     def _holder_strength(self, hrow: torch.Tensor, hcol: torch.Tensor | None = None) -> torch.Tensor:
-        """[B] long — `holderStrength`, for a city-plane ROW per game: max(the
-        start era's melee strength — a major's and a minor's each its own row
-        — the strongest melee unit the holder has trained or bought, a major's
-        `civ_best_melee` and a city-state's `citystate_best_melee`) less the
-        cut. With the city's column `hcol`, a Free City stands on the row it
+        """[B] long — `holderStrength`, for a city-plane ROW per game: the
+        best melee strength the holder has trained, from the start era's
+        column — a major's `civ_best_melee` and a city-state's
+        `citystate_best_melee` — less the cut. With the city's column `hcol`, a Free City stands on the row it
         revolted from (`city_former`, `cityBaseSeat`); the Free Cities row
         itself trains toward no base."""
         bidx = self._bidx
@@ -13002,10 +13001,9 @@ class SimSeats:
         minor = (hrow >= self._CITY_MINOR0) & (hrow < self._CITY_MINOR0 + self.S)
         best = torch.where(major, self.civ_best_melee[bidx, hrow.clamp(max=self.n_majors - 1)],
                            torch.where(minor, self.citystate_best_melee[bidx, s0].to(self.civ_best_melee.dtype),
-                                       torch.zeros(self.B, dtype=self.civ_best_melee.dtype, device=self.device)))
-        start = torch.where(minor, torch.full_like(best, self._city_start_melee_minor),
-                            torch.full_like(best, self._city_start_melee_major))
-        return torch.maximum(best, start) - self._city_base_melee_cut
+                                       torch.full((self.B,), self._city_start_melee_major,
+                                                  dtype=self.civ_best_melee.dtype, device=self.device)))
+        return best - self._city_base_melee_cut
 
     def _city_garrisoned(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, RC] bool twice — CIV6 (REQUIREMENT_CITY_HAS_GARRISON_UNIT, the
