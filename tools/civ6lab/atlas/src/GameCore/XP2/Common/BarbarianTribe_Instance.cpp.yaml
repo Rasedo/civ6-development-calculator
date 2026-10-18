@@ -128,6 +128,7 @@
     - cpu/core/barbarians.ts:barbScoutLook
     - cpu/core/barbarianOps.ts:barbScoutTreeStart
     - gpu/core/sim_barb.py:_barb_scout_look
+    - cpu/core/barbarians.ts:othersSee
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"

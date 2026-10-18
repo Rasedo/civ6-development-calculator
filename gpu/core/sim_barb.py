@@ -464,7 +464,9 @@ class SimBarb:
 
     def _barb_scout_look(self, on: torch.Tensor, k: int) -> None:
         """`barbScoutLook` for tribe `k`'s living scout: the owned plots newly
-        in its sight, in plot order — per major the first, once its throttle
+        visible to the barbarian player by its sight (in it now, not at its
+        last look, seen by no other unit of theirs) holding an improvement or
+        a district, in plot order — per major the first, once its throttle
         allows, sends the scout home when none walks yet and spares the major
         further reports."""
         sc = self.barb_unit_alive & (self.barb_unit_tribe == k) & self.barb_unit_scout
@@ -482,6 +484,8 @@ class SimBarb:
         now = vis & (ts >= 0) & ((ts < BARB_SEAT) | (ts == FREE_SEAT))
         new = now & ~self.tribe_saw[rows, k]
         self.tribe_saw[rows, k] = now
+        new &= ~self._barb_others_see(rows, slot, new)
+        new &= (self.improvement[rows] >= 0) | (self.district[rows] >= 0) | self._centre_plane()[rows]
         T = self.T
         ar = torch.arange(T, device=self.device)
         best = torch.full((rows.numel(),), T, dtype=torch.long, device=self.device)
@@ -513,6 +517,23 @@ class SimBarb:
         hit = (self.city_id[r2, g2] == cid.unsqueeze(1)) & self.city_alive[r2, g2]
         cen = torch.where(hit, self.city_center[r2, g2], torch.full_like(self.city_center[r2, g2], self.T)).min(dim=1).values
         self.tribe_home_plot[r2, k] = torch.where(cen < self.T, cen, torch.full_like(cen, -1))
+
+    def _barb_others_see(self, rows: torch.Tensor, slot: torch.Tensor, plots: torch.Tensor) -> torch.Tensor:
+        """[N, T] of `plots` [N, T], those a barbarian unit other than the one
+        at local slot `slot` [N] sees where it stands (in games `rows`)"""
+        out = torch.zeros_like(plots)
+        if not bool(plots.any()):
+            return out
+        live = self.barb_unit_alive[rows] & (self.barb_unit_seat[rows] == BARB_SEAT) & (self.barb_unit_tile[rows] >= 0)
+        live[torch.arange(rows.numel(), device=self.device), slot] = False
+        for u in live.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            m = live[:, u]
+            ri = m.nonzero(as_tuple=True)[0]
+            r = rows[ri]
+            ut, pr = self.barb_unit_type[r, u], self.barb_unit_promos[r, u]
+            rad = self._unit_sight(ut, pr, torch.full_like(ut, BARB_SEAT), r)
+            out[ri] |= self._los_disk(r, self.barb_unit_tile[r, u], rad, self._sees_through(ut, pr)) & plots[ri]
+        return out
 
     def _barbarian_scouts(self) -> None:
         """`barbarianScouts`: each living tribe's scout looks where it stands."""

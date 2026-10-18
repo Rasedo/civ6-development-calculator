@@ -153,8 +153,8 @@ class SimBarbOps:
         team updated — its readiness (0x73fba0): a member carrying
         UNITAI_COMBAT, and the members' strength (each its larger of combat
         and ranged strength less a tenth of its damage) at the enemy's about
-        the target or more (the hostile units the barbarians see within 3 of
-        it; their best trained strength none, the desired advantage none)"""
+        the target or more (`_ops_enemy_str`; their best trained strength
+        none, the desired advantage none)"""
         self._barb_op_bury()
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
         combat_ai = self._bop_combat_ai.take(ut)
@@ -168,30 +168,9 @@ class SimBarbOps:
             mem = self._bop_members(k)
             mins = (mem & combat_ai).any(dim=1)
             strength = torch.where(mem, st, torch.zeros_like(st)).sum(dim=1)
-            enemy = self._hostile_str_about(BARB_SEAT, self.tribe_op_plot[:, k])
+            against = torch.where(self.tribe_op[:, k] == 2, self.tribe_op_seat[:, k], torch.full_like(self.tribe_op_seat[:, k], -1))
+            enemy = self._ops_enemy_str(BARB_SEAT, self.BK, self.tribe_op_plot[:, k], against)
             self.tribe_op_ready[:, k] = torch.where(on, mins & (strength >= enemy), self.tribe_op_ready[:, k])
-
-    def _hostile_str_about(self, seat: int, target: torch.Tensor) -> torch.Tensor:
-        """[B] the enemy strength about the target (0x73eb60): the hostile
-        units `seat` sees within 3 of it, each its larger of combat and
-        ranged strength (none for a bombard unit's ranged)"""
-        seen = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
-        tile = self.unit_tile
-        tc = tile.clamp(min=0)
-        vis = self.unit_alive & (tile >= 0) & seen.gather(1, tc) & self._seats_hostile(seat, self.unit_seat)
-        ut = self.unit_type.clamp(min=0, max=self.NU - 1)
-        if self._stealth_live:
-            stealthy = self._type_stealth.take(ut) | self._promo_flag(ut, self.unit_promos, "STEALTH")
-            vis = vis & ~(stealthy & self._stealth_hidden(seat).gather(1, tc) & (self.unit_seat != seat))
-        if self._spy_idx >= 0:
-            vis = vis & ~((self.unit_type == self._spy_idx) & (self.unit_seat != seat))
-        melee = self._type_combat.take(ut)
-        bomb = self._type_bombard.take(ut)
-        rng = torch.where(bomb > 0, torch.zeros_like(bomb), self._type_ranged_strength.take(ut))
-        vis &= (melee > 0) | (rng > 0) | (bomb > 0)
-        d = self.pair_dist[tc, target.clamp(min=0).unsqueeze(1)].to(torch.long)
-        m = vis & (d <= 3) & (target >= 0).unsqueeze(1)
-        return torch.where(m, torch.maximum(melee, rng), torch.zeros_like(melee)).sum(dim=1)
 
     # -- the trees' walk -----------------------------------------------------
 

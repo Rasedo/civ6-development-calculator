@@ -3330,12 +3330,13 @@ class SimMasks:
         in the games of `landed`: a land or naval fighting unit's Combat, a
         ranged chassis' included, with its formation's strength (`formation`,
         the tier it was made at) rises to it and never falls (`civ_best_melee`,
-        a minor's `citystate_best_melee`), read at once by every centre's base.
-        A unit created, granted or captured, an aircraft and a merge move
-        nothing (runs/b95t_p1_mech_bought_20260927.jsonl,
+        a minor's `citystate_best_melee`, the Free Cities' `free_best_melee`),
+        read at once by every centre's base but the Free Cities' (their own
+        flat one). A unit created, granted or captured, an aircraft and a merge
+        move nothing (runs/b95t_p1_mech_bought_20260927.jsonl,
         runs/b95t_p1_mech_create_keep_20260927T002928Z.jsonl,
-        runs/h1_duelw1107 t176 and t229). The Free Cities' base is its own flat
-        one, so it keeps no column."""
+        runs/h1_duelw1107 t176 and t229); the Free Cities keep no best Ranged
+        Strength."""
         if isinstance(type_idx, int):
             type_idx = torch.full((self.B,), type_idx, dtype=torch.long, device=self.device)
         ti = type_idx.clamp(min=0, max=self.NU - 1)
@@ -3361,6 +3362,8 @@ class SimMasks:
                 self.citystate_best_melee[:, s], cs.to(self.citystate_best_melee.dtype))
             self.citystate_best_ranged[:, s] = torch.maximum(
                 self.citystate_best_ranged[:, s], rs.to(self.citystate_best_ranged.dtype))
+        elif row == self.FREE_ROW:
+            self.free_best_melee = torch.maximum(self.free_best_melee, cs.to(self.free_best_melee.dtype))
 
     def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None, init_mp: torch.Tensor | None = None, far: bool = False) -> torch.Tensor:
         """`spawnUnit`. `far`: a GRANT, placed on the nearest plot that takes

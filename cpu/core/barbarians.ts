@@ -452,33 +452,60 @@ function cityCentreOf(state: GameState, t: Tile): number {
 }
 
 /**
- * A BARBARIAN SCOUT LOOKS from its plot: each owned plot newly in its sight
- * (a city's territory, any player's), in plot order, is a report (0x153ef0) — once
+ * A BARBARIAN SCOUT LOOKS from its plot: each owned plot newly visible to the
+ * barbarian player by its sight — in its sight now, not in it at its last
+ * look, and seen by no other unit of theirs (the sight update 0x58aa90 raises
+ * the report where the player's count on the plot goes from 0, 0x508d50) — of
+ * a player's territory, an improvement's or a district's, in plot order, is a
+ * report (0x153ef0) — once
  * the player's throttle allows, its tribe's scout walks home with a major's
  * city when none walks yet (0x1485c0), and the player is spared further reports
  * BARBARIAN_MAX_THROTTLE_PER_RAID less BARBARIAN_LOWER_THROTTLE_PER_DIFFICULTY
  * a handicap level turns.
  */
+/** of the plots, those another barbarian unit sees where it stands */
+function othersSee(state: GameState, unit: Unit, plots: readonly number[]): Set<number> {
+  const out = new Set<number>();
+  if (!plots.length) return out;
+  const { map } = state;
+  for (const o of state.units) {
+    if (o === unit || !isBarbSeat(o.seat) || o.tileIndex < 0) continue;
+    const at = map.tiles[o.tileIndex];
+    const r = unitSight(o, state);
+    const through = unitSeesThrough(o);
+    for (const p of plots) {
+      if (out.has(p)) continue;
+      const t = map.tiles[p];
+      if (hexDistance(map, at.col, at.row, t.col, t.row) <= r && canSee(map, at, t, through)) out.add(p);
+    }
+  }
+  return out;
+}
+
 export function barbScoutLook(state: GameState, unit: Unit): void {
   const tribe = tribesOf(state).find((tr) => tr.alive && tr.scouts.includes(unit.id));
   if (!tribe) return;
   const { map } = state;
   const from = map.tiles[unit.tileIndex];
   const through = unitSeesThrough(unit);
+  const sight = unitSight(unit, state);
   const now: number[] = [];
-  for (const t of tilesWithin(map, from.col, from.row, unitSight(unit, state))) {
+  for (const t of tilesWithin(map, from.col, from.row, sight)) {
     if (isTerritorial(tileSeat(t)) && canSee(map, from, t, through)) now.push(t.index);
   }
   now.sort((x, y) => x - y);
   const saw = new Set((tribe.saw ??= {})[unit.id] ?? []);
   tribe.saw[unit.id] = now;
+  const others = othersSee(state, unit, now.filter((p) => !saw.has(p)));
   const next = (state.barbSpotNext ??= {});
   for (const p of now) {
-    if (saw.has(p)) continue;
+    if (saw.has(p) || others.has(p)) continue;
     const t = map.tiles[p];
     const seat = tileSeat(t);
     if (state.turn < (next[seat] ?? 0)) continue;
-    // a major's city alone sends the scout home (0x484a10: a full civ)
+    // a plot of an improvement (+0x44) or a district (a city's centre among
+    // them) alone; a major's city sends the scout home (0x484a10: a full civ)
+    if (t.improvement === null && t.district === null) continue;
     if (!tribe.homing && seat >= 0 && seat < state.seats.length) barbScoutTreeStart(state, tribe, unit.id, { seat, plot: cityCentreOf(state, t) });
     next[seat] = state.turn + Math.max(0, BARB_SPOT_THROTTLE - BARB_SPOT_THROTTLE_PER_LEVEL * handicapOf(state, seat));
   }

@@ -60,48 +60,60 @@ def main() -> None:
               if bool(sim.city_alive[0, s, c]) and int(area[int(sim.city_center[0, s, c])]) == int(area[int(sim.tribe_plot[0, k])])
               and int(sim.pair_dist[int(sim.tribe_plot[0, k]), int(sim.city_center[0, s, c])]) >= 6]
     assert scenes, "no major's city on a camp's landmass"
-    _, k, seat, target = min(scenes)
-    camp = int(sim.tribe_plot[0, k])
     units = [s for s in sim.barb_unit_alive[0].nonzero(as_tuple=True)[0].tolist()
              if int(sim.barb_unit_seat[0, s]) == BARB_SEAT and not bool(sim.barb_unit_scout[0, s])
              and int(sim._type_combat[int(sim.barb_unit_type[0, s])]) > 0
              and not bool(sim.unit_naval[int(sim.barb_unit_type[0, s])])]
     assert units, "no barbarian fighter on land"
     u = units[0]
-    sim.barb_unit_tribe[0, u] = k
-    sim.tribe_defender[0][sim.tribe_defender[0] == u] = -1
-    put(sim, u, open_plot(sim, camp, 1))
-    # the raid started on its target, its force taken: the root resumes at the march
-    one = torch.zeros(sim.B, dtype=torch.bool)
-    one[0] = True
-    sim.tribe_op[0] = 0
-    sim.tribe_home_slot[0] = -1
-    sim.barb_unit_op[0] = False
-    sim._barb_start_op(one, k, False, torch.full((sim.B,), seat, dtype=torch.long), torch.full((sim.B,), target, dtype=torch.long))
-    assert int(sim.tribe_rally[0, k]) == camp, "the raid's rally is its camp"
-    sim.barb_unit_op[0, u] = True
-    sim.barb_unit_join[0, u] = 0
-    sim.tribe_op_resume[0, k] = 9
-    sim.tribe_score[0, k] = 0
-    # the march's Attack Units takes a foe within its reach: none stands there
-    t0 = int(sim.barb_unit_tile[0, u])
-    for m in range(sim.UNIT_MAX):
-        t = int(sim.unit_tile[0, m])
-        if (bool(sim.unit_alive[0, m]) and int(sim.unit_seat[0, m]) != BARB_SEAT and t >= 0
-                and int(sim.pair_dist[t0, t]) <= 3):
-            sim._occ_clear(torch.tensor([0]), torch.tensor([t]), torch.tensor([m]))
-            sim.unit_alive[0, m] = False
 
     def tick():
         sim._barb_reset_mp()
         sim._barbarian_tactics(sim.barb_unit_alive & (sim.barb_unit_seat == BARB_SEAT))
 
-    # the march
-    d0 = int(sim.pair_dist[int(sim.barb_unit_tile[0, u]), target])
-    tick()
-    d1 = int(sim.pair_dist[int(sim.barb_unit_tile[0, u]), target])
-    assert int(sim.tribe_op_resume[0, k]) == 9 and d1 < d0, (
-        f"the march: resume {int(sim.tribe_op_resume[0, k])}, from {d0} to {d1} of the target")
+    def stage(k: int, seat: int, target: int) -> int:
+        """the raid of tribe `k` on `seat`'s city at `target` started, its
+        force taken (the fighter beside the camp), the root at the march; the
+        camp"""
+        camp = int(sim.tribe_plot[0, k])
+        sim.barb_unit_tribe[0, u] = k
+        sim.tribe_defender[0][sim.tribe_defender[0] == u] = -1
+        put(sim, u, open_plot(sim, camp, 1))
+        one = torch.zeros(sim.B, dtype=torch.bool)
+        one[0] = True
+        sim.tribe_op[0] = 0
+        sim.tribe_home_slot[0] = -1
+        sim.barb_unit_op[0] = False
+        sim._barb_start_op(one, k, False, torch.full((sim.B,), seat, dtype=torch.long), torch.full((sim.B,), target, dtype=torch.long))
+        assert int(sim.tribe_rally[0, k]) == camp, "the raid's rally is its camp"
+        sim.barb_unit_op[0, u] = True
+        sim.barb_unit_join[0, u] = 0
+        sim.tribe_op_resume[0, k] = 9
+        sim.tribe_score[0, k] = 0
+        # the march's Attack Units takes a foe within its reach: none stands there
+        t0 = int(sim.barb_unit_tile[0, u])
+        for m in range(sim.UNIT_MAX):
+            t = int(sim.unit_tile[0, m])
+            if (bool(sim.unit_alive[0, m]) and int(sim.unit_seat[0, m]) != BARB_SEAT and t >= 0
+                    and int(sim.pair_dist[t0, t]) <= 3):
+                sim._occ_clear(torch.tensor([0]), torch.tensor([t]), torch.tensor([m]))
+                sim.unit_alive[0, m] = False
+        return camp
+
+    # the march: the first scene (nearest first) whose march walks nearer
+    base = sim.snapshot()
+    found = None
+    for _, k, seat, target in sorted(scenes):
+        sim.restore(base)
+        camp = stage(k, seat, target)
+        d0 = int(sim.pair_dist[int(sim.barb_unit_tile[0, u]), target])
+        tick()
+        d1 = int(sim.pair_dist[int(sim.barb_unit_tile[0, u]), target])
+        if int(sim.tribe_op_resume[0, k]) == 9 and d1 < d0:
+            found = (k, seat, target, camp, d0, d1)
+            break
+    assert found, "no raid's march walked nearer its target"
+    k, seat, target, camp, d0, d1 = found
     print(f"  the raid marches on its target ({d0} -> {d1})")
     # within the march's range: the raid begins
     put(sim, u, open_plot(sim, target, 2))

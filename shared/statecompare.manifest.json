@@ -4409,6 +4409,10 @@
       {
         "plane": "cai_tr_bb",
         "why": "a city tree's tagged data (TS `CityTree.bb`, keyed by tag name; the GPU's one value per tag): compared through the trees' and contracts' effect."
+      },
+      {
+        "plane": "free_best_melee",
+        "why": "the Free Cities seat's best trained melee strength (TS `freeSeat.bestMeleeCS`, a seat the seat group does not enumerate), read by the operations' enemy strength: compared through its effect, the operations' readiness and moves."
       }
     ]
   }

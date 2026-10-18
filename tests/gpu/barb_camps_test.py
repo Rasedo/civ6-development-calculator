@@ -8,7 +8,7 @@ CIV6 (BarbarianTribes, the barbarian manager — tools/civ6lab/dll_readings.md
 cavalry tribe an unowned Horses plot within its ResourceRange, a melee tribe
 otherwise inland; a new camp raises its defender on the camp and its scout
 within three plots; a living tribe under its unit cap spawns a melee or ranged
-unit every TurnsToWarriorSpawn turns. A scout home with a major's plot in
+unit every TurnsToWarriorSpawn turns. A scout home with a major's farm in
 sight starts the tribe's raid, whose tree raises its force; a scout home hurt
 by a quarter of its health where another player's fighting unit can strike
 holds its report; the camp step's sight takes the barbarians' own units.
@@ -87,6 +87,16 @@ def horses_near(sim, tile: int, on: bool) -> None:
         sim.tile_seat[0, spot] = -1
 
 
+def farm_in_sight(sim, tile: int, st: int) -> None:
+    """a land plot three from the camp and two from its scout (the scout's
+    alone of the barbarians' sight) made a major's farm: the scout's report"""
+    n = [n for n in range(sim.T) if int(sim.pair_dist[tile, n]) == 3 and int(sim.pair_dist[st, n]) <= 2
+         and bool(sim.passable[0, n]) and not bool(sim.wpass[0, n])][0]
+    sim.tile_seat[0, n] = 0
+    sim.improvement[0, n] = sim.FARM
+    sim._tile_owner_ver += 1
+
+
 def camp(sim, tile: int) -> int:
     """Raise one camp on `tile`; its tribe's slot."""
     mask = torch.zeros(sim.B, dtype=torch.bool)
@@ -139,7 +149,7 @@ def main() -> None:
         sim._barbarian_tactics(acting & sim.barb_unit_alive & (sim.barb_unit_seat == BARB_SEAT))
 
     # THE RAID (the TS twin's "a barbarian raid"): a scout beside its camp
-    # sees a major's plot, its look starts its tree, whose tick finds it home:
+    # sees a major's farm, its look starts its tree, whose ticks walk it home:
     # at RaidingBoldness the raid starts and its own tree asks for its force,
     # melee first, raised one a turn, a unit raised in a turn not the raid's
     # until the next
@@ -150,15 +160,17 @@ def main() -> None:
     sc = [s for s in sim.barb_unit_alive[0].nonzero(as_tuple=True)[0].tolist()
           if int(sim.barb_unit_tribe[0, s]) == k and bool(sim.barb_unit_scout[0, s])][0]
     st = int(sim.barb_unit_tile[0, sc])
-    seen = [n for n in sim.neigh[st].tolist() if n >= 0 and n != tile and int(sim.pair_dist[tile, n]) >= 1
-            and not bool(sim.wpass[0, n])][0]
-    sim.tile_seat[0, seen] = 0
-    sim._tile_owner_ver += 1
+    farm_in_sight(sim, tile, st)
     sim.tribe_bold[0, k] = 10
     sim.barb_spot_next[0, :] = 0  # no earlier report throttles the major
     sim._barbarian_scouts()
     assert int(sim.tribe_home_slot[0, k]) == sc, "the scout's look started no tree"
-    tick(torch.ones_like(sim.barb_unit_alive))
+    # the tree walks the scout home (its first tick holds it, the next finds
+    # it at the camp) and reports
+    for _ in range(3):
+        if int(sim.tribe_op[0, k]):
+            break
+        tick(torch.ones_like(sim.barb_unit_alive))
     melee = int(sim._barb_unit_for()[0, int(tribes[2][6])])
     ranged = int(sim._barb_unit_for()[0, int(tribes[2][7])])
     assert int(sim.tribe_op[0, k]) == 1 and int(sim.tribe_home_slot[0, k]) == -1, "the scout's report started no raid"
@@ -192,9 +204,7 @@ def main() -> None:
     sc = [s for s in sim.barb_unit_alive[0].nonzero(as_tuple=True)[0].tolist()
           if int(sim.barb_unit_tribe[0, s]) == k and bool(sim.barb_unit_scout[0, s])][0]
     st = int(sim.barb_unit_tile[0, sc])
-    seen = [n for n in sim.neigh[st].tolist() if n >= 0 and n != tile and not bool(sim.wpass[0, n])][0]
-    sim.tile_seat[0, seen] = 0
-    sim._tile_owner_ver += 1
+    farm_in_sight(sim, tile, st)
     sim.tribe_bold[0, k] = 10
     sim.barb_spot_next[0, :] = 0
     sim.barb_unit_hp[0, sc] = 53

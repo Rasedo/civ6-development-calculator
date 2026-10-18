@@ -1015,9 +1015,10 @@ class SimTactics:
         if seat == BARB_SEAT:
             # HIGH within BARBARIAN_DEFENSE_ALL_UNITS of a camp of the list, or
             # a ranged one within its range + BARBARIAN_DEFENSE_RANGED_UNITS
-            lcamp = rest & camp
+            lcamp = okk == 4
             if bool(lcamp.count_nonzero()):
-                # the list's camps: each camp plot seen with no foe on it
+                # the list's camp entries: a camp seen with no foe on it, or one
+                # only revealed
                 cl = (cp >= 0) & lcamp.gather(1, cp.clamp(min=0))  # [B, K]
                 dk_ = self.pair_dist[cp.clamp(min=0)].to(torch.long)  # [B, K, T]
                 dmin = torch.where(cl.unsqueeze(2), dk_, torch.full_like(dk_, 1 << 20)).min(dim=1).values  # [B, T]

@@ -57,7 +57,7 @@ import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { barbarianTactics, dangerPlane, freeCityTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
-import { barbSlots, barbSlotsDying, barbarianScouts, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
+import { barbSlots, barbSlotsDying, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
@@ -183,6 +183,10 @@ interface Ctx {
    *  as they stood before its first blow: the barbarians' AI takes its turn
    *  from there (`barbarianAi`) */
   barbBlows: Map<Unit, Unit>;
+  /** the barbarian units' plots of this pair the record's steps entered,
+   *  in their order, for their scouts' looks at the end of the barbarians'
+   *  turn (`barbarianTurn`) */
+  barbSteps: { u: Unit; plots: number[] }[];
   /** the other players' envoys this pair staged for the engine's turn (`stageEnvoys`) */
   envoys: EnvoyDecision[];
   /** the record's units (`owner:id`) a battle of this pair the engine fought */
@@ -542,8 +546,8 @@ function campsTaken(ctx: Ctx, b: TurnRecord, turn: number): void {
  * does not stands where the record holds it (`barb:move`, imposed). The AI
  * runs on a copy of the state, so a move it took that the game did not (a
  * blow, a pillage) leaves no trace: the record's battles and pillages are the
- * pair's. Their operations then take their turn (`barbarianScouts`: the scouts'
- * reports, the raids' recruits).
+ * pair's. Then their scouts look from the plots the record's steps entered
+ * (`barbScoutLook`), a tree a report starts ticking from the next turn.
  */
 function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   const { state } = ctx;
@@ -594,7 +598,18 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   }
   barbSlots(state);
   barbarianAi(ctx, b, closing, before, from);
-  barbarianScouts(state);
+  // the scouts look from each plot the record's steps of the turn entered (a
+  // scout reports the cities it comes to see, `barbScoutLook`), their trees
+  // ticking from the next turn
+  for (const { u, plots } of ctx.barbSteps.splice(0)) {
+    if (!state.units.includes(u)) continue;
+    const at = u.tileIndex;
+    for (const p of plots) {
+      u.tileIndex = p;
+      barbScoutLook(state, u);
+    }
+    u.tileIndex = at;
+  }
   traceBarbOps(null);
   const barbPlayer = ctx.playerOfSeat.get(BARB_SEAT);
   if (barbPlayer !== undefined) ctx.operationsAi.minorTurn(closing, barbPlayer, opLines, []);
@@ -675,7 +690,8 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     holdRng(held);
   }
   // the operations ran on the copy: the manager's state and the tribes'
-  // (the recruit's asks, the spawn interval, the cities a raid's end lists)
+  // (the recruit's asks, the spawn interval, the cities a raid's end and a
+  // scout's report list, the scouts' trees)
   state.barbSeat.ops = copy.barbSeat.ops;
   state.barbSeat.opsNext = copy.barbSeat.opsNext;
   (copy.barbTribes ?? []).forEach((c, i) => {
@@ -685,6 +701,8 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     tr.queue = c.queue;
     tr.every = c.every;
     tr.assaultTargets = c.assaultTargets;
+    tr.raidTargets = c.raidTargets;
+    tr.homing = c.homing;
   });
   // ...and the knowledge base's looks: its records name the units by id
   state.barbSeat.armyKnown = copy.barbSeat.armyKnown;
@@ -2625,14 +2643,10 @@ function syncUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
       // took 38 from China's... city-state Warrior at +10, unfortified)
       u.fortifyTurns = 0;
       // the unit sees from every plot the log's steps entered, and from where
-      // it stopped
-      // (a barbarian scout reports the cities it comes to see, `barbScoutLook`)
-      for (const p of [...(ctx.paths.get(`${r.owner}:${r.id}`) ?? []), at]) {
-        revealAround(ctx.state, u.seat, p, unitSight(u, ctx.state), { seeThrough: unitSeesThrough(u) });
-        if (!isBarbSeat(u.seat)) continue;
-        u.tileIndex = p;
-        barbScoutLook(ctx.state, u);
-      }
+      // it stopped (a barbarian's steps kept for its scout's looks)
+      const steps = [...(ctx.paths.get(`${r.owner}:${r.id}`) ?? []), at];
+      for (const p of steps) revealAround(ctx.state, u.seat, p, unitSight(u, ctx.state), { seeThrough: unitSeesThrough(u) });
+      if (isBarbSeat(u.seat)) ctx.barbSteps.push({ u, plots: steps });
     }
     u.tileIndex = at;
     u.movesLeft = num(r.moves) * MP_SCALE;
@@ -3429,7 +3443,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), barbSteps: [], envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),

@@ -18,7 +18,7 @@
  * Camp (its own start), Barb Camp Tech Boost (never started: its trigger is
  * unported), City Defense (the defence event).
  */
-import type { CityState, GameState, Unit } from './types';
+import type { ArmyRecord, CityState, GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { majorView } from './majorView';
@@ -60,9 +60,10 @@ function minorView(state: GameState, cs: CityState, pass: Pass | null): MajorVie
   return pass ? passView(state, cs.seat, pass, v) : v;
 }
 
-/** the minor's knowledge base's records of a player's units */
-function knownOf(cs: CityState, player: number): KnownUnit[] {
-  return (cs.armyKnown ?? []).filter((r) => r.owner === player).map((r) => {
+/** a seat's knowledge base's records of a player's units, as the
+ *  operations read them */
+export function knownOf(records: readonly ArmyRecord[] | undefined, player: number): KnownUnit[] {
+  return (records ?? []).filter((r) => r.owner === player).map((r) => {
     const d = UNITS[r.type];
     return { id: r.id, owner: r.owner, type: gameTypeOf('unit', r.type, 'UNIT_'), plot: r.plot, combat: d?.combat ?? 0,
       ranged: d?.ranged?.strength ?? 0, damage: r.damage, seen: r.seen };
@@ -91,7 +92,7 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
     turn: state.turn,
     view: fresh,
     defs: MINOR_OP_DEFS,
-    army: (p) => knownOf(cs, p),
+    army: (p) => knownOf(cs.armyKnown, p),
     camps: () => cs.campsKnown ?? [],
     known: () => fresh().knownCities(cs.seat),
     threat: (plot) => (plot === cs.centerIndex ? cs.threat ?? -1 : -1),

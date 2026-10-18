@@ -1820,9 +1820,11 @@ barbarians' raid" (its tree's Notify Owner lists the city for the assault).
   the plot's visibility count for the unit's OWNER went from 0 to more —
   newly visible to the barbarian player, not to the scout alone. A move
   (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the
-  old, so a plot both sights hold raises nothing. The engines take the
-  scout's own sight (LAB). The throttle write follows 0x1485c0 whether or
-  not a tree starts (the engines too).
+  old, so a plot both sights hold raises nothing. The engines: the scout's
+  plots in sight now, not at its last look, that no other unit of theirs
+  sees (`barbScoutLook` / `_barb_scout_look`). The throttle write follows
+  0x1485c0 whether or not a tree starts, on a plot of an improvement or a
+  district alone ("C-95: the scout's tree").
 - Protect Unit ("Barbarian Found City" node 3, a Concurrent with Move
   Unit; TreeData Damage Percentage .25): its check 0x7f07c0 counts the
   node's units whose damage (unit +0xcf0) is at least that share of their
@@ -5233,6 +5235,45 @@ cpu/core/operations/barbarian.ts); gpu/core/sim_barbops.py.
   1127 t36-t43). 1124 and 1128 regress: the scout's look starts trees the
   game does not (1128's raid on 15:10 at t12 against the game's 42:20).
 
+## C-95: an operation's enemy strength — READ (0x73eb60), ported
+
+`refreshStrengths` / `enemyStrengthAbout` (cpu/core/operations/nodes.ts);
+`_ops_enemy_str` (gpu/core/sim_minorops.py), read by the city-states' and the
+barbarians' operations alike.
+
+- 0x73eb60 over the player list (+0x4a0): the players it counts — the
+  operation's enemy (op +0x2a0), else (-1) each player the seat is at war
+  with (0x469cd0 -> IsAtWarWith; the barbarians at war with every player).
+  For each, the knowledge base's army strength within 3 of the target
+  (0x5eadb0, minimum 0: each record max(Combat, RangedCombat) less its
+  damage x 0.1), the enemy's own kept apart ([rbp+0x6f]); then of its known
+  cities (kb m_knownCities, 0xe0-byte entries) within 3 of the target, each
+  its defense (0x5eb2c0 without its byte: the strongest district's defense
+  - 10, or its walls; whole); the first with a defense above 0 — where the
+  enemy is none or a full civilization (0x484a10) — adds the owner's best
+  trained melee strength (PlayerStats +0xf0, 0x4d9320) less the enemy's
+  army there, where that is the smaller. The team's readiness (0x73fba0)
+  reads it: the barbarians' raid on a city Not Ready where a garrisoned
+  city stands (runs/h1_duelw1127 t36-t43: the members' 65 against 83 to 121;
+  h1_duelw1121 t16-t19).
+- The Free Cities' best trained melee strength is a plane of its own on the
+  GPU (`free_best_melee`).
+- The engines' tactical target list (both twins) holds a camp only revealed
+  among the camps whose ring makes a barbarian's target HIGH; the barbarians'
+  Attack Units takes a CIVILIAN target's planning entry (a Builder two plots
+  off: seed9001's opening, t13, where the twins parted).
+- MEASURED (the action replay, 5 seeds, the look, the readiness and the
+  replay's scout trees kept between turns): barb:move imposed 3,901 ->
+  3,698 (1117 335 -> 339, 1121 952 -> 1,008, 1124 1,047 -> 1,003, 1127 544
+  -> 590, 1128 1,023 -> 758); barb:unit 500 -> 483, barb:unitNew 156 ->
+  135. The logs' "Barbarian Attack" turns with every line equal 1117 5 -> 7,
+  1121 12 -> 10, 1124 207 -> 227, 1127 5 -> 5, 1128 0 -> 0. Raid starts on
+  the log's turn: 1117 t9, 1121 t6 and t55, 1124 t8 and t22, 1127 t30, 1128
+  one of t11's two (the other at t10); missed 1121 t33 / t78 / t119 and 1127
+  t59 (no tree). The city assault starts on 1128 at t33 against the log's
+  t32 (its raid's way home ends a turn late: the members' planning), none
+  on 1121 (its raids missing).
+
 ## C-95: Coastal Raid — READ, ported
 
 `coastalRaids` in cpu/core/tactical.ts (the raid `coastalRaid`,
@@ -5421,19 +5462,28 @@ gpu/core/sim_tactics.py.
   the held unit's turn ends; it goes for the plot at To Range its planning
   reaches this turn, else the location (a plot of danger only where Allow
   Danger), woken (0x53e20) and moved (0x972880 / 0x962030).
-- THE LOOK (0x153ef0): a scout (unit AI type +0x1c0 == 2, UNITAI_EXPLORE)
-  seeing a plot of a full civilization's (0x484a10) city or district, the
-  player's throttle passed (the throttle written whether or not a tree
-  starts), starts the tree where its tribe's scout walks none (0x1485c0).
+- THE LOOK (0x153ef0, per plot newly visible to the barbarian player): the
+  plot's owner (+0x1c) any player; for a scout (unit AI type +0x1c0 == 2,
+  UNITAI_EXPLORE), the owner's throttle passed (@f28c78 +0x110, the game
+  turn, at the player's +0x430 entry), a plot holding an improvement (+0x44,
+  the type, -1 none) or a district (0x810d0): the tree starts where its
+  tribe's scout walks none (0x1485c0; a full civilization's city, 0x484a10)
+  and the throttle is written (+0x3d8: the turn + BARBARIAN_MAX_THROTTLE_PER_RAID
+  less the level's, whether or not a tree started). Confirmed on the five
+  recordings' first trees: 1117 t6, 1121 t4, 1124 t6 and t20, 1128 t6 and
+  t8, 1127 t27 (the scouts' last tactical moves before their trees hold them), each
+  the engines' start turn in the action replay, which looks along the
+  record's steps once the barbarians' turn is done.
 - THE TREES' ORDER: the scout's tree is a tree of the barbarian player's
   list (0x7ffdd0, creation order), so it ticks in the tactical pass among
   the operations' by id; its Notify Owner starting the raid (0x149980) the
   raid's tree ticks in the same walk.
-- LAB: the look reads the plots the scout sees where it stands after its
-  moves, each plot newly seen against its last look (`BarbTribe.saw`); the
-  game's "newly visible to the barbarian player" (the visibility event) is
-  unread, and the engines' look starts some trees earlier than the game's
-  (runs/h1_duelw1124, h1_duelw1128).
+- LAB: the engines look where the scout stands after its moves (the replay
+  along the record's steps), a plot new against its last look and seen by
+  no other barbarian unit there; the game's event fires within a move.
+  runs/h1_duelw1121 t31 (the scout from 4:15 to 4:14, its tree from t32, the
+  raid t33) holds no plot new to it of an improvement or district by the
+  engines' sight — the miss unexplained.
 
 ## C-96 / C-97: the AI's weights and the modifier evaluator — READ (the parts below), the agendas' path and most analyzers unread
 

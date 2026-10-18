@@ -107,8 +107,16 @@ describe('the barbarians\' rules', () => {
   });
 });
 
+/** a plot three from the camp and two from its scout (the scout's alone of
+ *  the barbarians' sight) made a major's farm: the scout's report */
+function farmInSight(state: GameState, camp: number, scout: number, city?: number): void {
+  const t = state.map.tiles.find((x) => plotDistance(state, x.index, camp) === 3 && plotDistance(state, x.index, scout) <= 2)!;
+  setTileOwner(t, 0, city);
+  t.improvement = 'FARM';
+}
+
 // THE RAIDS (tools/civ6lab/dll_readings.md "H-1: the raids"): a scout that
-// sees a major's city walks it home; its tribe raids at its RaidingBoldness,
+// sees a major's improvement walks home with its city; its tribe raids at its RaidingBoldness,
 // the raid's force asked of the spawn clock one a turn, melee first, the units
 // raised in a turn not yet the raid's; the force whole, the clock its own.
 describe('a barbarian raid', () => {
@@ -118,9 +126,10 @@ describe('a barbarian raid', () => {
     const camp = tileAtCoords(state.map, 6, 6);
     raiseCamp(state, camp.index);
     state.barbCampsBegun = true;
-    settleAt(state, tileAtCoords(state.map, 9, 6).index, 0);
+    const city = settleAt(state, tileAtCoords(state.map, 9, 6).index, 0);
     const tribe = state.barbTribes![0];
     tribe.boldness = 10;
+    farmInSight(state, camp.index, state.units.find((u) => u.id === tribe.scouts[0])!.tileIndex, city.id);
     // the scout's look starts its tree; the tree's tick in the tactical pass
     // finds it home: the raid starts, its own tree ticking in the same walk
     // (its spawn change and the recruit's ask)
@@ -159,10 +168,10 @@ describe('a barbarian raid', () => {
     const camp = tileAtCoords(state.map, 6, 6);
     raiseCamp(state, camp.index);
     state.barbCampsBegun = true;
-    setTileOwner(tileAtCoords(state.map, 8, 6), 0);
     const tribe = state.barbTribes![0];
     tribe.boldness = 10;
     const scout = state.units.find((u) => u.id === tribe.scouts[0])!;
+    farmInSight(state, camp.index, scout.tileIndex);
     scout.hp = 53;
     // a Warrior two plots from the scout: its turn's reach takes the scout in
     const at = state.map.tiles[scout.tileIndex];

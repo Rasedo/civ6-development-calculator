@@ -427,6 +427,7 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     threat: env.threat,
     unitRows: env.unitRows,
     camps: env.camps,
+    army: env.army,
     barbarian: env.barbarian ?? null,
     log: env.log,
   };

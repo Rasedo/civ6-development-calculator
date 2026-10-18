@@ -141,7 +141,7 @@
   final: 0x3b4040
   kind: function
   status: PARTLY
-  impl: [cpu/harness/drawSites.ts:DRAW_SITES]
+  impl: [cpu/harness/drawSites.ts:DRAW_SITES, cpu/core/barbarians.ts:othersSee]
   readings: ["H-1: the raids — READ", "H-1: draws the AI takes, draws the engines lack", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:

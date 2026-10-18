@@ -654,29 +654,75 @@ class SimMinorOps:
         by = trunc2(avy + cy)
         g[:, G_LINE] = torch.where(eng, plot_at(bq + torch.div(by, 2, rounding_mode="floor"), by), g[:, G_LINE])
 
-    def _mops_hostile_str(self, s: int, target: torch.Tensor) -> torch.Tensor:
-        """[B] the enemy strength about the target (0x73eb60): the hostile
-        units minor `s` sees within 3 of it, each its larger of combat and
-        ranged strength (none for a bombard unit's ranged)"""
-        seat = 100 + s
-        dev = self.device
-        seen = self._barb_seen(seat)
-        tile = self.unit_tile
-        tc = tile.clamp(min=0)
-        vis = self.unit_alive & (tile >= 0) & seen.gather(1, tc) & self._seats_hostile(seat, self.unit_seat)
-        ut = self.unit_type.clamp(min=0, max=self.NU - 1)
-        if self._stealth_live:
-            stealthy = self._type_stealth.take(ut) | self._promo_flag(ut, self.unit_promos, "STEALTH")
-            vis = vis & ~(stealthy & self._stealth_hidden(seat).gather(1, tc) & (self.unit_seat != seat))
-        if self._spy_idx >= 0:
-            vis = vis & ~((self.unit_type == self._spy_idx) & (self.unit_seat != seat))
-        melee = self._type_combat.take(ut)
-        bomb = self._type_bombard.take(ut)
-        rng = torch.where(bomb > 0, torch.zeros_like(bomb), self._type_ranged_strength.take(ut))
-        vis &= (melee > 0) | (rng > 0) | (bomb > 0)
-        d = self.pair_dist[tc, target.clamp(min=0).unsqueeze(1)].to(torch.long)
-        m = vis & (d <= 3) & (target >= 0).unsqueeze(1)
-        return torch.where(m, torch.maximum(melee, rng), torch.zeros_like(melee)).sum(dim=1).to(dev)
+    def _ops_counted(self, seat: int, other: torch.Tensor, enemy: torch.Tensor) -> torch.Tensor:
+        """the players an operation of `seat` against `enemy` [B] (-1 none)
+        counts in its enemy strength (0x73eb60): its enemy, else every player
+        at war with it (the barbarians with everyone); `other` [B, N] seats"""
+        oc = other.clamp(min=0)
+        rows = self._seat_row.to(self.device)[oc.clamp(max=self._seat_row.numel() - 1)]
+        war = self.war[:, int(self._seat_row[seat])].gather(1, rows)
+        barb = (other == BARB_SEAT) | (seat == BARB_SEAT)
+        e = enemy.unsqueeze(1)
+        return (other >= 0) & (other != seat) & ((other == e) | ((e < 0) & (war | barb)))
+
+    def _ops_enemy_str(self, seat: int, r: int, target: torch.Tensor, enemy: torch.Tensor) -> torch.Tensor:
+        """[B] `enemyStrengthAbout` (0x73eb60) for an operation of `seat` (its
+        knowledge base row `r`) on `target` against `enemy` [B]: of the
+        players it counts the army records within 3 of the target (0x5eadb0),
+        then each known city within 3 its defense (0x5eb2c0 without its byte:
+        its centre's defense, less 10 without walls, 0 at least), the first of
+        them with a defense above 0, where the enemy is none or a major, the
+        shortfall of the enemy's records' strength there below its owner's best
+        combat strength (PlayerStats +0xf0)"""
+        B, dev = self.B, self.device
+        tc = target.clamp(min=0)
+        on = target >= 0
+        rec = self._mops_records(r)
+        rd = self.pair_dist[rec["plot"].clamp(min=0), tc.unsqueeze(1)].to(torch.long)
+        near = rec["live"] & (rec["plot"] >= 0) & (rd <= 3) & on.unsqueeze(1)
+        term = self._mops_army_term(rec["combat"], rec["ranged"], rec["dmg"])
+        counted = near & self._ops_counted(seat, rec["owner"], enemy)
+        strength = torch.where(counted, term, torch.zeros_like(term)).sum(dim=1)
+        theirs = near & (rec["owner"] == enemy.unsqueeze(1)) & (enemy >= 0).unsqueeze(1)
+        enemy_units = torch.where(theirs, term, torch.zeros_like(term)).sum(dim=1)
+        garrison = (enemy >= 0) & (enemy >= self.n_majors)
+        known = self._tac_known(seat)
+        bidx = self._bidx
+        order = list(range(self.n_majors)) + [self._CITY_MINOR0 + s for s in range(self.S)] + [self.FREE_ROW]
+        for row in order:
+            hseat = int(self._ROW_SEAT[row])
+            cnt = self._ops_counted(seat, torch.full((B, 1), hseat, dtype=torch.long, device=dev), enemy).squeeze(1) & on
+            if not bool(cnt.any()):
+                continue
+            minor = self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S
+            for c in range(1 if minor else self.city_alive.shape[2]):
+                ctr = self.city_center[:, row, c]
+                m = cnt & self.city_alive[:, row, c] & (ctr >= 0)
+                if not bool(m.any()):
+                    continue
+                cc = ctr.clamp(min=0)
+                if known is not None:
+                    m &= known.gather(1, cc.unsqueeze(1)).squeeze(1)
+                m &= self.pair_dist[cc, tc].to(torch.long) <= 3
+                if not bool(m.any()):
+                    continue
+                col = torch.full((B,), c, dtype=torch.long, device=dev)
+                rt = torch.full_like(col, row)
+                pool = torch.minimum(self.city_outer_hp[bidx, row, col].long(), self._walls_max_at(rt, col).long())
+                d = self._city_defense_cs(rt, col)[0].to(torch.float64)
+                cdef = torch.where(pool > 0, d, (d - 10).clamp(min=0)).trunc().long()
+                strength = strength + torch.where(m, cdef, torch.zeros_like(cdef))
+                g = m & (cdef > 0) & ~garrison
+                if bool(g.any()):
+                    if row < self.n_majors:
+                        best = self.civ_best_melee[:, row].long()
+                    elif minor:
+                        best = self.citystate_best_melee[:, row - self._CITY_MINOR0].long()
+                    else:
+                        best = self.free_best_melee.long()
+                    strength = strength + torch.where(g & (enemy_units < best), best - enemy_units, torch.zeros_like(best))
+                    garrison = garrison | g
+        return strength
 
     def _mops_refresh(self, s: int, k: int, live: torch.Tensor, u: dict, rows: dict, tg: dict) -> None:
         """`refreshStrengths` of slot `k` where `live`: the enemy strength
@@ -685,7 +731,7 @@ class SimMinorOps:
         if not bool(on.any()):
             return
         tgt = self.mops_target[:, s, k]
-        self.mops_estr[:, s, k] = torch.where(on, self._mops_hostile_str(s, tgt), self.mops_estr[:, s, k])
+        self.mops_estr[:, s, k] = torch.where(on, self._ops_enemy_str(100 + s, s, tgt, torch.full_like(tgt, -1)), self.mops_estr[:, s, k])
         for ti in range(N_TEAMS):
             self._mops_team_update(s, k, ti, on, u, rows)
             self._mops_update_team(s, k, ti, on, u, tg)

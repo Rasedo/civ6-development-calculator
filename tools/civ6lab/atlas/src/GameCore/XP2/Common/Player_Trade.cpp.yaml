@@ -34,6 +34,7 @@
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
   context:
     - "...derValue`): 0 once the player's MakeTradeRoute units (+0x1b9 bit 64) fill its capacity (0x4d9320, + the extra the caller adds); else the trade AI's route value K (its knowledge base +0..."
     - "...08, 0x79d2d0) is set, + fx(0.5 x (player +0x12f0 +0xc0)) where Combat (+0x48) exceeds 0x4d9320 (PlayerTrade +0xf0) — a city-state's logs read no such term (its count read 0); AIR + 3..."

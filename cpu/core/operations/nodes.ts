@@ -17,6 +17,9 @@ import { AI_UNITS } from '../../data/aiBuildTables';
 import { AI_UNIT_INDEX } from '../aiCityBuild';
 import { FX } from '../aiValue';
 import { desiredStrength, recruitOperation } from './recruit';
+import { cityDefense } from './cityValue';
+import { armyStrength } from './evaluate';
+import type { KnownUnit } from './knowledge';
 import { ASSAULT_NODES, attackUnitsExecute, operationAttackExecute, updateTeam } from './assault';
 import { BARBARIAN_NODES, type BarbarianHooks } from './barbarian';
 import type { MajorAttackView, MajorUnitView, MajorView } from '../../../ai/major/view';
@@ -83,6 +86,8 @@ export interface OpsContext {
   unitRows(): readonly UnitProductionRow[];
   /** the camps its knowledge base holds, in its order */
   camps(): readonly number[];
+  /** a player's army records in its knowledge base */
+  army(player: number): readonly KnownUnit[];
   /** the tribes the barbarians' operations run for (null for any other
    *  party) */
   barbarian: BarbarianHooks | null;
@@ -339,14 +344,19 @@ function tagOf(run: BtRun, node: BtNode, name: string): unknown {
 }
 
 /** the operation's strengths (0x73eb60, 0x73f7d0): the enemy's about the
- *  target (the hostile units the seat sees within 3 of it, each its larger
- *  of combat and ranged strength), each team's (teamUpdate) and their sum */
+ *  target, each team's (teamUpdate) and their sum. The enemy's: of the
+ *  players it counts — the operation's enemy, else every player at war with
+ *  the seat (the barbarians with everyone) — the army the knowledge base
+ *  records within 3 of the target (0x5eadb0), then each known city within 3
+ *  of the target its defense (0x5eb2c0, without
+ *  its byte: the strongest of its districts' defense - 10 and walls, whole), the
+ *  first of them with a defense above 0, where the enemy is none or a full
+ *  civilization, the shortfall of the enemy's units' strength there below
+ *  its owner's best combat strength (PlayerStats +0xf0) too */
 export function refreshStrengths(ctx: OpsContext): void {
   const { op } = ctx;
   const view = ctx.view();
-  op.enemyStrength = op.target === NO_PLOT ? 0 : view.hostileUnits(ctx.seat)
-    .filter((h) => view.plotDistance(h.plot, op.target) <= 3)
-    .reduce((s, h) => s + Math.max(h.melee, h.ranged), 0);
+  op.enemyStrength = op.target === NO_PLOT ? 0 : enemyStrengthAbout(ctx, view);
   let total = 0;
   const targets = view.attackTargets(ctx.seat);
   for (const t of op.teams) {
@@ -355,6 +365,30 @@ export function refreshStrengths(ctx: OpsContext): void {
     total += t.strength;
   }
   op.strength = total;
+}
+
+function enemyStrengthAbout(ctx: OpsContext, view: MajorView): number {
+  const { op } = ctx;
+  const barb = view.barbarianSeat();
+  const counts = (p: number): boolean => p !== ctx.seat && (p === op.enemy || (op.enemy < 0 && (view.atWar(ctx.seat, p) || p === barb || ctx.seat === barb)));
+  const players = view.players().filter(counts);
+  const units = new Map(players.map((p) => [p, armyStrength(view, ctx.army(p), op.target, 3, 0)] as const));
+  let strength = 0;
+  for (const p of players) strength += units.get(p)!;
+  const enemyUnits = op.enemy >= 0 ? units.get(op.enemy) ?? 0 : 0;
+  let garrison = op.enemy >= 0 && !view.majors().includes(op.enemy);
+  for (const p of players) {
+    for (const k of view.knownCities(ctx.seat)) {
+      if (k.owner !== p || view.plotDistance(k.plot, op.target) > 3) continue;
+      const def = Math.trunc(cityDefense(k, false));
+      strength += def;
+      if (def <= 0 || garrison) continue;
+      const best = view.bestCombatStrength(k.owner);
+      if (enemyUnits < best) strength += best - enemyUnits;
+      garrison = true;
+    }
+  }
+  return strength;
 }
 
 /** THE TEAM UPDATE (0x73fba0): per requirement the members carrying its AI

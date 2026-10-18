@@ -277,18 +277,25 @@
 - addr: 0x73eb60
   final: 0x4e1bf0
   kind: function
-  status: PARTLY
+  name: the operation's enemy strength
+  semantics: "of the players counted (the operation's enemy, else each at war with the seat): the knowledge base's army within 3 of the target (0x5eadb0), each known city within 3 its defense (0x5eb2c0), the first defended one its owner's best melee strength less the enemy's army there"
+  status: READ
+  cases:
+    - recording: h1_duelw1127
+      turn: 36
+      value: "Barbarian Attack Not Ready t36-t43: the members' 65 against 83 to 121 (a garrisoned city within 3)"
   impl:
     - cpu/core/operations/nodes.ts:refreshStrengths
-    - gpu/core/sim_minorops.py:_mops_hostile_str
-    - gpu/core/sim_barbops.py:_hostile_str_about
+    - cpu/core/operations/nodes.ts:enemyStrengthAbout
+    - gpu/core/sim_minorops.py:_ops_counted
+    - gpu/core/sim_minorops.py:_ops_enemy_str
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
   context:
     - "...; a type of none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120,..."
-  review: imported
+  review: reviewed
 - addr: 0x73f7d0
   final: 0x4e2670
   kind: function
@@ -324,5 +331,6 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

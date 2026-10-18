@@ -332,6 +332,7 @@
     - "H-1: the flood's river walk — READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   context:
     - "...330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) is the player, its district (0x810d0) is not InternalOnly (Districts +0xe1 bit 4 — the Wonder district), is complete (Dist..."
     - "...rovement (+0x44, read as none while pillaged, +0x4d bit 0) and, when the plot's district (0x810d0, the district at the plot's id) is complete (district +0xb08, Lua `District:IsComplete` 0..."
@@ -994,6 +995,7 @@
     - "H-1: the raids — READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...p, To Range 1, then Notify Owner) when none runs (+0x38) and the owner is a full civ (0x484a10 -> 0x469db0, hash 0x253718b0); the throttle becomes turn + max(0, BARBARIAN_MAX_THROTTL...

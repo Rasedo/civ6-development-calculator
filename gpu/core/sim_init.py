@@ -1526,6 +1526,9 @@ class SimInit:
         # the twins of `civ_next_city_id` and `civ_treasury` for a row that has
         # no civ block
         self.free_next_city_id = torch.zeros(B, dtype=torch.long, device=device)
+        # the strongest melee Combat Strength the Free Cities have trained
+        # (`freeSeat.bestMeleeCS`; their centres stand on a flat base of their own)
+        self.free_best_melee = torch.zeros(B, dtype=torch.long, device=device)
         self.free_treasury = torch.zeros(B, dtype=dtype, device=device)
         # every city row's holder's last turn SHORTFALL in whole Gold
         # (`Seat.goldShortfall`) — majors, minors and the Free Cities alike

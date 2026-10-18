@@ -204,17 +204,21 @@
 - addr: 0x153ef0
   final: 0xe5140
   kind: function
-  status: PARTLY
+  name: the barbarian scout's look
+  semantics: "per plot newly visible to the barbarian player (signal +0x10c8): an owned plot; for an EXPLORE unit, the owner's throttle passed, an improvement (+0x44) or a district (0x810d0): the scout's tree starts (0x1485c0) and the throttle is written"
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 6
+      value: "the scout's tree from its t6 move (the trees at t6 and t8, raids t11): the replay's starts on those turns"
   impl:
     - cpu/core/barbarians.ts:barbScoutLook
-    - cpu/core/types.ts:GameState
+    - cpu/core/barbarians.ts:othersSee
     - cpu/data/barbarians.ts:BARB_SPOT_THROTTLE
-  readings:
-    - "H-1: the raids — READ"
-    - "H-1: the raids — READ"
-    - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
-    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - gpu/core/sim_barb.py:_barb_scout_look
+    - gpu/core/sim_barb.py:_barb_others_see
+    - cpu/core/types.ts:GameState
+  readings: ["H-1: the raids — READ", "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
   context:
     - "- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout (unit +0x1c0 == 2) seeing an owne..."
     - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update..."

@@ -563,8 +563,9 @@ def main() -> None:
                 and not bool(ctr[n]) and int(sim.district[0, n]) < 0)
 
     found = None
-    # a COMBAT unit (a camp keeps its DEFENDER) with no HIGH target in its
-    # planning: Attack High runs before Attack Civilians
+    # a COMBAT unit (a camp keeps its DEFENDER) with no HIGH target within 8
+    # (its planning holds none, nor does its Rampage find one): Attack High
+    # runs before Attack Civilians
     tgh = sim._tac_targets(BARB_SEAT, sim.BK)
     high = (tgh["uk"][0] == 3).nonzero(as_tuple=True)[0].tolist()
     for s in barb_units(sim):
@@ -572,19 +573,14 @@ def main() -> None:
                 or int(sim._type_ranged_strength[int(sim.barb_unit_type[0, s])]) > 0):
             continue
         bt = int(sim.barb_unit_tile[0, s])
+        if any(int(sim.pair_dist[bt, h]) <= 8 for h in high):
+            continue
         spot = [n for n in sim.neigh[bt].tolist() if open_plot(n) and int(sim.tmove[0, n]) == 0]
         if spot:
             found = (s, spot[0])
             break
     assert found, "no barbarian fighter with an open plot beside it"
     s, ct = found
-    # its planning holds no HIGH target: those within 8 of it leave the map
-    bt = int(sim.barb_unit_tile[0, s])
-    for h in high:
-        u = int(tgh["uu"][0, h])
-        if int(sim.pair_dist[bt, h]) <= 8 and u >= 0 and u != c:
-            sim._occ_clear(torch.tensor([0]), torch.tensor([h]), torch.tensor([u]))
-            sim.unit_alive[0, u] = False
     sim._occ_clear(torch.tensor([0]), torch.tensor([int(sim.unit_tile[0, c])]), torch.tensor([c]))
     sim.unit_type[0, c] = sim._builder_idx
     sim.unit_tile[0, c] = ct
@@ -627,12 +623,17 @@ def main() -> None:
     ai, utribe = sim._tac_ai()
     land, _ = sim._tac_enter(BARB_SEAT)
     tac = sim._tac_tactical(ai, utribe)
+    # a fighter with no other HIGH target within 8 (one its Rampage or Attack
+    # High would take before this one)
+    high = (sim._tac_targets(BARB_SEAT, sim.BK)["uk"][0] == 3).nonzero(as_tuple=True)[0].tolist()
     found = None
     for s in barb_units(sim):
         if int(ai[0, s]) != 3 or not bool(tac[0, s]) or bool(sim.barb_unit_op[0, s]) or bool(
                 sim.unit_naval[int(sim.barb_unit_type[0, s])]) or int(sim._type_ranged_strength[int(sim.barb_unit_type[0, s])]) > 0:
             continue
         bt = int(sim.barb_unit_tile[0, s])
+        if any(int(sim.pair_dist[bt, h]) <= 8 for h in high):
+            continue
         spot = [n for n in sim.neigh[bt].tolist() if n >= 0 and bool(land[0, n]) and int(sim.military_at[0, n]) < 0
                 and int(sim.civilian_at[0, n]) < 0 and not bool(sim._centre_plane()[0, n])]
         if spot:

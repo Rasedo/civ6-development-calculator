@@ -18,6 +18,7 @@ import type { BarbHoming, BarbTarget, BarbTribe, GameState, Unit } from './types
 import { BARB_SEAT, isBarbSeat } from './seats';
 import { majorView } from './majorView';
 import { passOrders, passView } from './opsOrders';
+import { knownOf } from './minorOps';
 import { newOpsAi, operationsRefresh, opsOf, startOperationAt, tickOperation, type OpsAi, type OpsEnv } from './operations/manager';
 import { addMember, opUnits, type Operation } from './operations/operation';
 import type { BarbarianHooks } from './operations/barbarian';
@@ -141,7 +142,7 @@ function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
     turn: state.turn,
     view: fresh,
     defs: [],
-    army: () => [],
+    army: (p) => knownOf(state.barbSeat.armyKnown, p),
     camps: () => [],
     known: () => [],
     threat: () => -1,
