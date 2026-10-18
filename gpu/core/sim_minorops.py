@@ -629,8 +629,8 @@ class SimMinorOps:
         g[:, G_CENTRE] = torch.where(go, plot_at(cq + torch.div(cy, 2, rounding_mode="floor"), cy), g[:, G_CENTRE])
         g[:, G_MARCH] = torch.where(go, g[:, G_TARGET], g[:, G_MARCH])
         # the list's weighed entries: a plot's district entry (COMBAT or
-        # PASSIVE) and its unit entry each one
-        ent = (tg["dk"] > 0).long() + (tg["uk"] > 0).long()                         # [B, T]
+        # PASSIVE) and each of its unit entries one
+        ent = (tg["dk"] > 0).long() + (tg["uk"] > 0).view(B, -1, T).sum(dim=1)     # [B, T]
         reach = 2 * u["base_moves"]
         near = torch.zeros(B, T, dtype=torch.bool, device=dev)
         for j in memm.any(dim=0).nonzero(as_tuple=True)[0].tolist():
@@ -1327,9 +1327,10 @@ class SimMinorOps:
         others = torch.arange(own.shape[1], device=dev).unsqueeze(0) != jc.unsqueeze(1)
         beside = (own & others & (own_d == 1) & (self.major_unit_tile >= 0)).any(dim=1)
         here = danger.gather(1, plot.unsqueeze(1)).squeeze(1)
-        # the unit entries
+        # the unit entries, each at its plot
         uk, uu = tg["uk"], tg["uu"]
         uc = uu.clamp(min=0)
+        du = d.repeat(1, uk.shape[1] // self.T)  # [B, U]
         et = self.unit_type.gather(1, uc).clamp(min=0, max=self.NU - 1)
         ecb, erg, ebm = self._type_combat.take(et), self._type_ranged_strength.take(et), self._type_bombard.take(et)
         full_all = torch.cat((self._full_mp("major") - self.major_unit_aura_mp,
@@ -1340,8 +1341,8 @@ class SimMinorOps:
         r_major = self._tac_range(bi, uc.clamp(max=self.major_unit_type.shape[1] - 1), "major")
         r_barb = self._tac_range(bi, (uc - lo).clamp(min=0, max=self.barb_unit_type.shape[1] - 1), "barb")
         erng = torch.where(uc >= lo, r_barb, r_major)
-        ent = ((uk > 0) & (uu >= 0) & (d <= near.unsqueeze(1)) & ((ecb > 0) | (erg > 0) | (ebm > 0))
-               & ~beside.unsqueeze(1) & ((here > 0).unsqueeze(1) | (uk == 3)) & ((d <= emm) | (d <= erng)))
+        ent = ((uk > 0) & (uu >= 0) & (du <= near.unsqueeze(1)) & ((ecb > 0) | (erg > 0) | (ebm > 0))
+               & ~beside.unsqueeze(1) & ((here > 0).unsqueeze(1) | (uk == 3)) & ((du <= emm) | (du <= erng)))
         dmg = self._damage_expected((torch.maximum(ecb, erg) - mcb.unsqueeze(1)).to(torch.float64))
         total = torch.where(ent, dmg, torch.zeros_like(dmg)).sum(dim=1)
         # the combat districts' cities: each entry its city's strike
@@ -1621,10 +1622,12 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             dq = sim.pair_dist[u["tile"][:, j].clamp(min=0)].to(torch.long)
             near |= mj.unsqueeze(1) & (dq <= reach[:, j].unsqueeze(1))
         uk, uu, us_ = tg["uk"], tg["uu"], tg["us"]
+        L = uk.shape[1] // sim.T
         sl = uu.clamp(min=0)
-        standing = (uu >= 0) & sim.unit_alive.gather(1, sl) & (sim.unit_tile.gather(1, sl) == sim._arange_bt) \
+        # each unit entry's unit still on its plot
+        standing = (uu >= 0) & sim.unit_alive.gather(1, sl) & (sim.unit_tile.gather(1, sl) == sim._arange_bt.repeat(1, L)) \
             & (sim.unit_seat.gather(1, sl) == us_)
-        near &= (uk > 0) & (us_ != seat) & standing
+        near = near.repeat(1, L) & (uk > 0) & (us_ != seat) & standing
         cand = mem & (op["rowof"] >= 0)
         if not bool((cand.any(dim=1) & near.any(dim=1)).any()):
             continue

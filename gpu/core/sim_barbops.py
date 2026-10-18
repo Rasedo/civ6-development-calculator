@@ -718,9 +718,10 @@ class SimBarbOps:
         others = torch.arange(own.shape[1], device=dev).unsqueeze(0) != jc.unsqueeze(1)
         beside = (own & others & (own_d == 1)).any(dim=1)
         here = danger.gather(1, plot.unsqueeze(1)).squeeze(1)
-        # the unit entries
+        # the unit entries, each at its plot
         uk, uu = tg["uk"], tg["uu"]
         uc = uu.clamp(min=0)
+        du = d.repeat(1, uk.shape[1] // self.T)  # [B, U]
         et = self.unit_type.gather(1, uc).clamp(min=0, max=self.NU - 1)
         ecb, erg, ebm = self._type_combat.take(et), self._type_ranged_strength.take(et), self._type_bombard.take(et)
         full_all = torch.cat((self._full_mp("major") - self.major_unit_aura_mp,
@@ -731,8 +732,8 @@ class SimBarbOps:
         r_major = self._tac_range(bi, uc.clamp(max=self.major_unit_type.shape[1] - 1), "major")
         r_barb = self._tac_range(bi, (uc - lo).clamp(min=0, max=self.barb_unit_type.shape[1] - 1), "barb")
         erng = torch.where(uc >= lo, r_barb, r_major)
-        ent = ((uk > 0) & (uu >= 0) & (d <= near.unsqueeze(1)) & ((ecb > 0) | (erg > 0) | (ebm > 0))
-               & ~beside.unsqueeze(1) & ((here > 0).unsqueeze(1) | (uk == 3)) & ((d <= emm) | (d <= erng)))
+        ent = ((uk > 0) & (uu >= 0) & (du <= near.unsqueeze(1)) & ((ecb > 0) | (erg > 0) | (ebm > 0))
+               & ~beside.unsqueeze(1) & ((here > 0).unsqueeze(1) | (uk == 3)) & ((du <= emm) | (du <= erng)))
         dmg = self._damage_expected((torch.maximum(ecb, erg) - mcb.unsqueeze(1)).to(torch.float64))
         total = torch.where(ent, dmg, torch.zeros_like(dmg)).sum(dim=1)
         # the combat districts' cities: each entry its city's strike
@@ -995,8 +996,10 @@ class SimBarbOps:
         reach = torch.where(units, torch.div(self.barb_unit_mp, self._mp_scale, rounding_mode="floor").clamp(min=2),
                             torch.full_like(self.barb_unit_mp, -1))
         unit_pl, kinds, owner = tg["uu"], tg["uk"], tg["us"]
+        L = kinds.shape[1] // T
         s = unit_pl.clamp(min=0)
-        standing = ((unit_pl >= 0) & self.unit_alive.gather(1, s) & (self.unit_tile.gather(1, s) == self._arange_bt)
+        # each unit entry's unit still on its plot
+        standing = ((unit_pl >= 0) & self.unit_alive.gather(1, s) & (self.unit_tile.gather(1, s) == self._arange_bt.repeat(1, L))
                     & (self.unit_seat.gather(1, s) != BARB_SEAT))
         enemy = torch.where(self.tribe_op[:, k] == 2, self.tribe_op_seat[:, k], torch.full_like(tplot, -1))
         theirs = (enemy.unsqueeze(1) < 0) | (owner == enemy.unsqueeze(1)) | (kinds == 7)
@@ -1005,7 +1008,7 @@ class SimBarbOps:
             mj = units[:, j]
             dq = self.pair_dist[self.barb_unit_tile[:, j].clamp(min=0)].to(torch.long)
             near |= mj.unsqueeze(1) & (dq <= reach[:, j].unsqueeze(1))
-        near &= (kinds > 0) & standing & theirs & (owner != BARB_SEAT)
+        near = near.repeat(1, L) & (kinds > 0) & standing & theirs & (owner != BARB_SEAT)
         if not bool(near.count_nonzero()):
             return
         one = units.sum(dim=1) == 1
@@ -1116,7 +1119,7 @@ class SimBarbOps:
         if not bool((units.any(dim=1) & near.any(dim=1)).any()):
             return
         out = self._tac_assign(units, ctx["order"], ctx["ai"], near, res, rowof, tg["uu"], torch.zeros_like(on), True,
-                               torch.zeros_like(tg["uk"]), self._arange_bt, district=True)
+                               torch.zeros_like(tg["dk"]), self._arange_bt, district=True)
         self._tac_carry_out(out, done, rowof, res)
 
     def _bop_siege(self, on: torch.Tensor, k: int, ctx: dict) -> None:

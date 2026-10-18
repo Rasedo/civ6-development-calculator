@@ -772,7 +772,7 @@ class SimPhase:
         pillaged = (near2 & (self.improvement >= 0) & self.pillaged).any(dim=1)
         build = due & ~(mine & charged).any(dim=1) & pillaged
         if bool(build.count_nonzero()):
-            high = self._tac_targets(FREE_SEAT, -1)["uk"] == 3
+            high = (self._tac_targets(FREE_SEAT, -1)["uk"] == 3).view(B, -1, self.T).any(dim=1)
             threat = (high & (self.pair_dist[ctr].to(torch.long) <= self._free_builder_threat)).any(dim=1)
             build = build & ~threat
         jc = torch.full((B,), j, dtype=torch.long, device=dev)
