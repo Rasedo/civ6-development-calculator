@@ -58,6 +58,8 @@ export interface AiBuildingRow {
   placement: boolean;
   /** PurchaseYield YIELD_GOLD */
   goldPurchase: boolean;
+  /** PurchaseYield YIELD_FAITH */
+  faithPurchase: boolean;
   maxPlayerInstances: number;
   maxWorldInstances: number;
   trait: string | null;
@@ -497,6 +499,8 @@ export interface AiUnitRow {
   mustPurchase: boolean;
   /** PurchaseYield YIELD_GOLD */
   goldPurchase: boolean;
+  /** PurchaseYield YIELD_FAITH */
+  faithPurchase: boolean;
   combat: number;
   /** TypeTags CLASS_RECON */
   recon: boolean;

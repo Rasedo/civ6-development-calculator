@@ -7,9 +7,10 @@ the game's Control Manager runs a player's lists —
  - B: the military AI's turn (`_mops_evaluate`, from `_minor_military_turn`,
    before the turn's knowledge base look): the
    members gone leave their operations, the candidates — Attack Barb Camp
-   against each camp its knowledge base holds, the running operation's
-   naming its backup on the strengths the last run refreshed — and
-   the new one to start chosen under the trait's limits;
+   against each camp its knowledge base holds, Naval Superiority off its
+   coastal city, the running operations' naming their backups on the
+   strengths the last run refreshed — and the new one to start chosen under
+   the trait's limits;
  - A: the city's defence event starts City Defense (`_mops_start`, the
    minor world's `start_operation`);
  - C: in its tactical pass, once each unit's planning is taken
@@ -19,10 +20,11 @@ the game's Control Manager runs a player's lists —
    interpreter of sim_citytrees.py over the operation's
    nodes — and the operations' units' turns are theirs.
 
-A minor runs Attack Barb Camp, Barb Camp Tech Boost (never started) and
-City Defense (`MINOR_OP_DEFS`). A unit is its slot in the majors' pool; an
-operation's tree id is the minor's city AI's tree serial; its contracts are
-the city AI's book's (`cai_*`), held in the operation's tree.
+A minor runs Attack Barb Camp, Barb Camp Tech Boost (never started),
+Civilian Builder Capture (never started), City Defense and Naval Superiority
+(`MINOR_OP_DEFS`). A unit is its slot in the majors' pool; an operation's tree id is the minor's city AI's tree serial;
+its contracts are the city AI's book's (`cai_*`), held in the operation's
+tree.
 """
 
 from __future__ import annotations
@@ -65,9 +67,10 @@ def _f(x: torch.Tensor) -> torch.Tensor:
 
 class MinorOpsTables:
     """the static tables of the city-states' operations: the definitions
-    (by index: Attack Barb Camp, Barb Camp Tech Boost, City Defense), their
-    teams and requirements, the trees compiled, the unit AI types of each AI
-    unit row, the Priority types, the trait's limits"""
+    (by index: Attack Barb Camp, Barb Camp Tech Boost, Civilian Builder
+    Capture, City Defense, Naval Superiority), their teams and requirements,
+    the trees compiled, the unit AI types of each AI unit row, the Priority
+    types, the trait's limits"""
 
     def __init__(self, rules):
         ao = rules.ai_operations
@@ -76,6 +79,7 @@ class MinorOpsTables:
         self.names = [d["name"] for d in self.defs]
         self.d_abc = self.names.index("Attack Barb Camp")
         self.d_cd = self.names.index("City Defense")
+        self.d_nav = self.names.index("Naval Superiority")
         self.teams = {k: list(ao["teams"][d["name"]]) for k, d in enumerate(self.defs)}
         self.reqs = {t: list(r) for t, r in ao["reqs"].items()}
         self.trees = {k: _Tree(d["tree"], ao["trees"][d["tree"]]) for k, d in enumerate(self.defs) if d.get("tree")}
@@ -984,28 +988,73 @@ class SimMinorOps:
         Tm = self._mops_tables()
         u = self._mops_units(s)
         self._mops_drop_gone(s, alive, u)
+        sea = self._mops_naval_target(s)
         # the running operations' candidates name their backups, on the
         # strengths the last run refreshed (`operationsEvaluate`)
         for k in range(N_OPS):
-            m = alive & (self.mops_def[:, s, k] == Tm.d_abc)
-            if not bool(m.any()):
-                continue
-            v, t = self._mops_camp_eval(s, self.mops_target[:, s, k], self.mops_str[:, s, k], m, u)
-            ok = m & v
-            self.mops_bk_target[:, s, k] = torch.where(ok, t, self.mops_bk_target[:, s, k])
-            self.mops_bk_rally[:, s, k] = torch.where(ok, self.mops_target[:, s, k], self.mops_bk_rally[:, s, k])
-        # the new candidate that starts itself, under the trait's limits
+            for d in (Tm.d_abc, Tm.d_nav):
+                m = alive & (self.mops_def[:, s, k] == d)
+                if not bool(m.any()):
+                    continue
+                if d == Tm.d_abc:
+                    v, t = self._mops_camp_eval(s, self.mops_target[:, s, k], self.mops_str[:, s, k], m, u)
+                else:
+                    v, t = self._mops_naval_eval(self.mops_target[:, s, k], sea), sea
+                ok = m & v
+                self.mops_bk_target[:, s, k] = torch.where(ok, t, self.mops_bk_target[:, s, k])
+                self.mops_bk_rally[:, s, k] = torch.where(ok, self.mops_target[:, s, k], self.mops_bk_rally[:, s, k])
+        # of the new candidates that start themselves (Attack Barb Camp,
+        # priority 3, then Naval Superiority, priority 2) the first valid one
+        # under the trait's limits; a valid one at its limit leaves the next
+        # its place
         centre = self.citystate_center[:, s]
-        v, t = self._mops_camp_eval(s, centre, None, alive, u)
-        typ = Tm.defs[Tm.d_abc]["operationType"]
-        same = torch.zeros_like(alive, dtype=torch.long)
+        v_abc, t_abc = self._mops_camp_eval(s, centre, None, alive, u)
+        v_nav = self._mops_naval_eval(centre, sea)
+        ok_abc = alive & v_abc & self._mops_under_limit(s, Tm.d_abc)
+        ok_nav = alive & v_nav & self._mops_under_limit(s, Tm.d_nav) & ~ok_abc
+        ok = ok_abc | ok_nav
+        pick = torch.where(ok_abc, Tm.d_abc, torch.where(ok_nav, Tm.d_nav, -1))
+        self.mops_pick[:, s] = torch.where(alive, pick, self.mops_pick[:, s])
+        self.mops_pick_target[:, s] = torch.where(ok_abc, t_abc, torch.where(ok_nav, sea, self.mops_pick_target[:, s]))
+        self.mops_pick_rally[:, s] = torch.where(ok, centre, self.mops_pick_rally[:, s])
+
+    def _mops_under_limit(self, s: int, d: int) -> torch.Tensor:
+        """[B] minor `s` runs fewer operations of definition `d`'s
+        OperationType than its trait's limit"""
+        Tm = self._mops_tables()
+        typ = Tm.defs[d]["operationType"]
+        same = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for dd, dfn in enumerate(Tm.defs):
             if dfn["operationType"] == typ:
                 same += (self.mops_def[:, s] == dd).sum(dim=1)
-        ok = alive & v & (same < Tm.limits.get(typ, 0))
-        self.mops_pick[:, s] = torch.where(alive, torch.where(ok, Tm.d_abc, -1), self.mops_pick[:, s])
-        self.mops_pick_target[:, s] = torch.where(ok, t, self.mops_pick_target[:, s])
-        self.mops_pick_rally[:, s] = torch.where(ok, centre, self.mops_pick_rally[:, s])
+        return same < Tm.limits.get(typ, 0)
+
+    def _mops_naval_target(self, s: int) -> torch.Tensor:
+        """TARGET_NAVAL_SUPERIORITY of minor `s` (0x747230): where its city is
+        coastal land, the first sea plot (not a Lake) of the ring walk within
+        4 of it; [B] -1 none. Its value 100 and the enemy strength (the
+        majors' largest best combat strength) weigh no other target"""
+        ring = getattr(self, "_mops_ring4", None)
+        if ring is None:
+            ring = self._mops_ring4 = torch.tensor(simbase.barb_ring_table(self.W, self.H, self.wrap_x, 4),
+                                                   dtype=torch.long, device=self.device)
+        ctr = self.citystate_center[:, s]
+        cc = ctr.clamp(min=0)
+        pl = ring[cc]
+        pc = pl.clamp(min=0)
+        sea = (pl >= 0) & self.water.gather(1, pc) & (self.terrain.gather(1, pc) != self._terr_lake)
+        first = sea.long().argmax(dim=1, keepdim=True)
+        has = (sea.any(dim=1) & (ctr >= 0) & self.coastal_land.gather(1, cc.unsqueeze(1)).squeeze(1)
+               & (self.citystate_pop[:, s] > 0))
+        return torch.where(has, pl.gather(1, first).squeeze(1), torch.full_like(ctr, -1))
+
+    def _mops_naval_eval(self, rally: torch.Tensor, sea: torch.Tensor) -> torch.Tensor:
+        """`evaluate` of Naval Superiority from one rally [B]: valid where the
+        target stands and lies off the rally (no distance limit, no least
+        odds)"""
+        ok = (sea >= 0) & (rally >= 0)
+        d = self.pair_dist[rally.clamp(min=0), sea.clamp(min=0)].to(torch.long)
+        return ok & (d != 0)
 
     # -- the operations' run (C) ------------------------------------------------
 
@@ -1024,9 +1073,10 @@ class SimMinorOps:
         rows = view["rows"] = self._mops_unit_rows(s, u)
         for k in range(N_OPS):
             self._mops_refresh(s, k, on, u, rows, tg)
-        pick = on & (self.mops_pick[:, s] >= 0)
-        if bool(pick.any()):
-            self._mops_start(s, Tm.d_abc, self.mops_pick_target[:, s], self.mops_pick_rally[:, s], pick)
+        for d in (Tm.d_abc, Tm.d_nav):
+            pick = on & (self.mops_pick[:, s] == d)
+            if bool(pick.any()):
+                self._mops_start(s, d, self.mops_pick_target[:, s], self.mops_pick_rally[:, s], pick)
         self.mops_pick[:, s] = torch.where(on, -1, self.mops_pick[:, s])
         # the trees by priority, the highest first, of equals in slot order
         # (`operationsRun`: the tree manager's tick per priority)
@@ -1069,7 +1119,9 @@ class SimMinorOps:
                 v = h(self, c, i, run) if bool(run.any()) else torch.full_like(c.ref, BT_FRESH)
             v = torch.where(skipped, BT_SKIPPED, v)
             c.st[:, i] = torch.where(at, v, c.st[:, i])
-            if n["type"] in _NEXT_MEM:
+            if n["type"] == "Naval Choose Target":
+                own = torch.full_like(cur, n["end"])
+            elif n["type"] in _NEXT_MEM:
                 own = torch.where(c.ma[:, i] == NONE, n["first"], c.ma[:, i])
             elif n["type"] == "Sequence":
                 own = torch.maximum(torch.where(c.ma[:, i] == NONE, n["first"], c.ma[:, i]), torch.full_like(cur, i + 1))
@@ -2193,6 +2245,22 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             sim._mops_compact(s, k, ti, ~release, gt)
 
 
+def _u_naval_units(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """NAVAL PATROL, NAVAL PILLAGE (0x803880): RUNNING while the operation
+    holds units, else FAILURE"""
+    return torch.where(_n_units(sim, c) > 0, BT_RUNNING, BT_FAILURE)
+
+
+def _u_naval_choose(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """NAVAL CHOOSE TARGET (0x803590): of the targets of its domain the
+    tactical analysis lists, the nearest the operation's target becomes the
+    target and its children run; with none the walk skips them (the tick's
+    cursor to the node's end), FAILURE where the node says Fail for no
+    target. The minor's naval targets are not listed here: none is found."""
+    v = BT_FAILURE if c.tree.flag(i, "Fail for no target") else BT_SUCCESS
+    return torch.full_like(c.ref, v)
+
+
 _UPDATE = {
     "Decode Trigger": _u_decode,
     "Operation Defend Units": _u_defend,
@@ -2207,6 +2275,9 @@ _UPDATE = {
     "Can Alpha City": _u_can_alpha,
     "Garrison City": _u_running_units,
     "Operation Attack City": _u_running_units,
+    "Naval Choose Target": _u_naval_choose,
+    "Naval Pillage": _u_naval_units,
+    "Naval Patrol": _u_naval_units,
 }
 
 _EXECUTE = {

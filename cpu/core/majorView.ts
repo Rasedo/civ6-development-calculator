@@ -699,7 +699,8 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     barbarianCamps: (i) => [...campTiles(state)].filter((p) => isExplored(state, i, p)).sort((a, b) => a - b),
     barbarianSeat: () => BARB_SEAT,
     plotForeignUnits: (i, p) => state.units.filter((u) => u.tileIndex === p && u.seat !== i && !unitsHostile(state, { seat: i }, u)).length,
-    cityPopulation: (p) => cityHolders(state).flatMap((s) => s.cities).find((c) => c.centerIndex === p)?.population ?? 0,
+    cityPopulation: (p) => cityHolders(state).flatMap((s) => s.cities).find((c) => c.centerIndex === p)?.population
+      ?? state.cityStates.find((cs) => cs.centerIndex === p)?.population ?? 0,
     governors: (i): MajorGovernorView[] => governorsOf(seat(i)).map((g, k) => {
       const minor = g.minorId >= 0 ? state.cityStates.find((m) => m.id === g.minorId) : undefined;
       const promotions = new Set<string>();

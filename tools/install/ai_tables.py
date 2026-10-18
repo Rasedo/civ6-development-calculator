@@ -681,7 +681,7 @@ def build_city(rows, modifier) -> str:
             "outerDefenseStrength": num(c, "OuterDefenseStrength"), "defenseModifier": num(c, "DefenseModifier"),
             "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "district": c.get("PrereqDistrict"),
             "wonder": c.get("IsWonder", "").lower() == "true", "placement": c.get("RequiresPlacement", "").lower() == "true",
-            "goldPurchase": c.get("PurchaseYield") == "YIELD_GOLD",
+            "goldPurchase": c.get("PurchaseYield") == "YIELD_GOLD", "faithPurchase": c.get("PurchaseYield") == "YIELD_FAITH",
             "maxPlayerInstances": num(c, "MaxPlayerInstances", -1), "maxWorldInstances": num(c, "MaxWorldInstances", -1),
             "trait": c.get("TraitType"), "replaces": replaces.get(b),
             "capital": c.get("Capital", "").lower() == "true", "religion": c.get("EnabledByReligion", "").lower() == "true",
@@ -708,6 +708,7 @@ def build_city(rows, modifier) -> str:
         units.append({
             "type": u, "foundCity": c.get("FoundCity", "").lower() == "true", "buildCharges": num(c, "BuildCharges"),
             "mustPurchase": c.get("MustPurchase", "").lower() == "true", "goldPurchase": c.get("PurchaseYield") == "YIELD_GOLD",
+            "faithPurchase": c.get("PurchaseYield") == "YIELD_FAITH",
             "combat": num(c, "Combat"),
             "recon": any(t.get("Tag") == "CLASS_RECON" for t in tags[u]),
             "rangedCombat": num(c, "RangedCombat"), "bombard": num(c, "Bombard"), "antiAir": num(c, "AntiAirCombat"),

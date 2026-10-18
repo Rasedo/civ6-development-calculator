@@ -147,8 +147,10 @@ class CityTreeTables:
         self.u_must_purchase = torch.tensor([bool(r["mustPurchase"]) for r in u], dtype=torch.bool)
         self.u_recon = torch.tensor([bool(r["recon"]) for r in u], dtype=torch.bool)
         self.u_gold = torch.tensor([bool(r["goldPurchase"]) for r in u], dtype=torch.bool)
+        self.u_faith = torch.tensor([bool(r["faithPurchase"]) for r in u], dtype=torch.bool)
         b = self.building_rows
         self.b_gold = torch.tensor([bool(r["goldPurchase"]) and not r["wonder"] for r in b], dtype=torch.bool)
+        self.b_faith = torch.tensor([bool(r["faithPurchase"]) for r in b], dtype=torch.bool)
         self.b_defensive = torch.tensor([r["defenseModifier"] > 0 or r["outerDefenseStrength"] > 0 for r in b], dtype=torch.bool)
         self.b_must_purchase = torch.zeros(len(b), dtype=torch.bool)
         self.d_defensive = torch.zeros(len(self.district_rows), dtype=torch.bool)
@@ -322,6 +324,16 @@ def gold_purchasable(ai: CityAi, unit: torch.Tensor, building: torch.Tensor, dis
     return (district < 0) & torch.where(unit >= 0, u_ok, b_ok)
 
 
+def faith_purchasable(ai: CityAi, unit: torch.Tensor, building: torch.Tensor, district: torch.Tensor) -> torch.Tensor:
+    """`faithPurchasable`: a unit or a building whose PurchaseYield is
+    YIELD_FAITH, never a district (the religious AI's listener)"""
+    T = ai.T
+    dev = unit.device
+    u_ok = (unit >= 0) & T.u_faith.to(dev)[unit.clamp(min=0)]
+    b_ok = (building >= 0) & T.b_faith.to(dev)[building.clamp(min=0)]
+    return (district < 0) & torch.where(unit >= 0, u_ok, b_ok)
+
+
 def contract_eligible(ai: CityAi, s: int, j: torch.Tensor, w) -> torch.Tensor:
     """`contractEligible` of the contract in slot `j` ([B]) and the seat's
     city"""
@@ -376,10 +388,11 @@ def submit_contract(ai: CityAi, s: int, j: torch.Tensor, w, turn: int, mask: tor
     """`submitContract` where `mask`: SUBMITTED; the seat's city lists it
     where it may take it, clearing its production where the contract's value
     passes the item's in a city founded this turn or the one before; any taker (the
-    city, the economic AI's gold purchase) makes it ACCEPTED"""
+    city, the economic AI's gold purchase, the religious AI's faith purchase)
+    makes it ACCEPTED"""
     _cset(ai.c_progress, s, j, CP_SUBMITTED, mask)
     unit, bld, dist = _cget(ai.c_unit, s, j), _cget(ai.c_building, s, j), _cget(ai.c_district, s, j)
-    taken = gold_purchasable(ai, unit, bld, dist)
+    taken = gold_purchasable(ai, unit, bld, dist) | faith_purchasable(ai, unit, bld, dist)
     el = mask & contract_eligible(ai, s, j, w)
     _cset(ai.c_listed, s, j, True, el)
     clear = el & (_cget(ai.c_value, s, j) > _l(w.current_value(), j)) & (_l(w.founded_turn(), j) + 1 >= turn)

@@ -17,7 +17,9 @@
  *
  * A minor runs the definitions both twins carry the trees of: Attack Barb
  * Camp (its own start), Barb Camp Tech Boost (never started: its trigger is
- * unported), City Defense (the defence event).
+ * unported), Civilian Builder Capture (a candidate only: it starts itself
+ * not), City Defense (the defence event), Naval Superiority (its own start,
+ * off a coastal city) — the Default_List's order.
  */
 import type { ArmyRecord, CityState, GameState, Unit } from './types';
 import { UNITS } from '../data/units';
@@ -39,7 +41,8 @@ import type { UnitProductionRow } from './aiUnitProduction';
 import type { MajorUnitView, MajorView } from '../../ai/major/view';
 
 /** the definitions a city-state runs */
-export const MINOR_OP_DEFS: readonly string[] = ['Attack Barb Camp', 'Barb Camp Tech Boost', 'City Defense'];
+export const MINOR_OP_DEFS: readonly string[] = ['Attack Barb Camp', 'Barb Camp Tech Boost', 'Civilian Builder Capture', 'City Defense',
+  'Naval Superiority'];
 
 /** the replay's view of each minor's operation lines and candidate lines
  *  (null off) */

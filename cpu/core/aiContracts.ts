@@ -185,19 +185,36 @@ export function goldPurchasable(c: ContractItem): boolean {
   return !!b && !b.wonder && b.goldPurchase;
 }
 
+/** the religious AI's listener (0x751830, its test vt +0x78 0x5f6920; every
+ *  player holds a religious AI, the city-states and the barbarians too: each
+ *  logs AI_Religious.csv): it takes a contract for a unit or a building — no
+ *  district — whose PurchaseYield is YIELD_FAITH into its purchase list
+ *  (+0x3c8). A Warrior Monk contract no city may take is so ACCEPTED: the
+ *  Contract Manager holds it un-alive to its turn limit (runs/h1_duelv1128
+ *  city-state 4's Attack Barb Camp started t24 fails its contract at t30;
+ *  on 1128 / 1121 / 1124 most Attack Barb Camp runs end six turns from
+ *  their start, the last tick with no recruit line). */
+export function faithPurchasable(c: ContractItem): boolean {
+  if (c.district !== null) return false;
+  if (c.unit !== null) return AI_UNITS[AI_UNIT_INDEX.get(c.unit) ?? -1]?.faithPurchase ?? false;
+  if (c.building === null) return false;
+  return AI_BUILDINGS[AI_BUILDING_INDEX.get(c.building) ?? -1]?.faithPurchase ?? false;
+}
+
 /** the contract submitted (0x60bb50): SUBMITTED; the player's signal
  *  +0x270 runs every listener: each city's (0x5d6050), in city order — a
  *  city that may take it lists it and logs its line, and where its value
  *  passes the value of the item the city produces in a city founded this
  *  turn or the one before (city +0x2600, runs/h1_duelw1117 Caguana t34: its
- *  Warrior kept under the Harbor contract), clears the city's production — and the economic AI's
+ *  Warrior kept under the Harbor contract), clears the city's production; the economic AI's
  *  (goldPurchasable; a city-state's too: AI_CityBuild.csv's PURCHASE lines
- *  of players 2+); any taker makes it ACCEPTED */
+ *  of players 2+) and the religious AI's (faithPurchasable); any taker makes
+ *  it ACCEPTED */
 export function submitContract(book: ContractBook, c: AiContract, cities: readonly ContractCity[], turn: number,
   clearProduction: (city: ContractCity) => void, line: (city: ContractCity, c: AiContract) => void): void {
   c.progress = CP_SUBMITTED;
   book.contracts.push(c);
-  let taken = goldPurchasable(c);
+  let taken = goldPurchasable(c) || faithPurchasable(c);
   for (const city of cities) {
     if (!contractEligible(c, city)) continue;
     (book.city[city.id] ??= []).push(c.id);
