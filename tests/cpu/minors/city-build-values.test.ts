@@ -19,6 +19,7 @@ const facts: CityBuildFacts = {
   current: null, techTurns: () => 0, civicTurns: () => 0, buildTurns: () => 1,
   amenity: { balance: 0, yields: {} }, regionalAmenities: () => [], unitVersion: (u) => u, fullCiv: false, tribe: false, unitCount: 1,
   growth: { surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 },
+  forecast: growthForecast({ surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 }),
   unitProduction: new Map(), trainsDomain: () => true, combatCount: 0, extraCopies: () => 0, promotionWeight: () => 256,
   resourceAccess: () => true, handicap: 0,
 };

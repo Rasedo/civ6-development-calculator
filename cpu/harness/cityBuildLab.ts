@@ -30,11 +30,11 @@ import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory } from './import';
 import type { ArmyRecord, CityState, GameState } from '../core/types';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
-import { buildingPerTurn, buildingTable, buildingTurns, buildingValue, defaultSpecialization, growthForecast, housingValue, unitTable, unitTurns, unitValue } from '../core/aiCityBuild';
+import { buildingPerTurn, buildingTable, buildingTurns, buildingValue, defaultSpecialization, housingValue, unitTable, unitTurns, unitValue } from '../core/aiCityBuild';
 import { AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
 import { projectTable, projectValue } from '../core/aiProjectValue';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
-import { minorBuildFacts, minorProjectFacts, minorCombatDesire, minorKnowledge, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
+import { minorBuildFacts, minorCityGrowth, minorProjectFacts, minorCombatDesire, minorKnowledge, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
 import { minorStandingArmyShort, minorThreat } from '../core/minorCityAi';
 import { researchAnalysis } from '../core/aiResearch';
 import { civicAnalysis } from '../core/aiCivics';
@@ -268,6 +268,10 @@ for (let i = 0; i + 1 < recs.length; i++) {
     cs.research.aiEntries = researchAnalysis(state, cs.seat, stats.total.science);
     cs.research.civicAiEntries = civicAnalysis(state, cs.seat, stats.total.culture);
     const kb = knownUnits.get(`${turn + kbShift}:${player}`);
+    // the growth its city's update read before the turn's growth: the
+    // record before's citizens, store and surplus
+    const before = prevImp!.minorOfPlayer.get(player);
+    if (before) cs.aiGrowth = minorCityGrowth(prevImp!.state, before);
     const facts = minorBuildFacts(state, cs, args.includes('--enginekb') ? minorKnownUnits(cs) : (u) => kb?.get(u) ?? 0);
     // the inputs the port does not read, as the game's logs give them: the
     // trade AI's route value (AI_Knowledge.csv) and, under --zero, the
@@ -379,7 +383,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
         const parts = [facts.techTurns(brow.tech), facts.civicTurns(brow.civic), brow.district && !facts.hasDistrict(brow.district) ? facts.buildTurns(brow.district) : -1, facts.buildTurns(brow.type), facts.current];
         const rlog = brow.tech ? research.get(`${turn}:${player}:${brow.tech}`) ?? null : null;
         const cur = researching.get(`${turn}:${player}`) ?? null;
-        rows.push({ nu: state.units.filter((u) => u.seat === cs.seat).length, war: facts.atWar, t: turn, p: player, b: brow.type, log: g, ours: o, T, v, parts, rlog, cur, pop: cs.population, prod: stats.total.production, item: cs.prodItem ?? null, g: brow.housing > 0 ? { ...facts.growth, fc: growthForecast(facts.growth), hv: housingValue(facts.growth, growthForecast(facts.growth), brow.housing, T, 50) / 256 } : undefined });
+        rows.push({ nu: state.units.filter((u) => u.seat === cs.seat).length, war: facts.atWar, t: turn, p: player, b: brow.type, log: g, ours: o, T, v, parts, rlog, cur, pop: cs.population, prod: stats.total.production, item: cs.prodItem ?? null, g: brow.housing > 0 ? { ...facts.growth, fc: facts.forecast, hv: housingValue(facts.growth, facts.forecast, brow.housing, T, 50) / 256 } : undefined });
       });
     }
   }

@@ -2518,6 +2518,17 @@
           "note": "the minor city's threat (CityBuildAI +0x1b8), -1 for none"
         },
         {
+          "name": "minorAiGrowth",
+          "compare": "exact",
+          "covers": [
+            "CityState.aiGrowth"
+          ],
+          "planes": [
+            "citystate_ai_growth"
+          ],
+          "note": "the minor city's growth as its city AI's update read it between the turn's production and its growth (the growth forecast's inputs, CityBuildAI +0x6c8): surplus, housing, population, store, multiplier; zeros before its first"
+        },
+        {
           "name": "minorCombatDesire",
           "compare": "exact",
           "covers": [

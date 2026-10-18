@@ -36,7 +36,7 @@ import { minorCity } from '../core/cityStates';
 import { civicAnalysis } from '../core/aiCivics';
 import { borderCandidates, computeCityStats } from '../core/city';
 import { resourceValue } from '../core/aiResource';
-import { growthForecast, housingValue } from '../core/aiCityBuild';
+import { housingValue } from '../core/aiCityBuild';
 import { makeYieldCtx } from '../core/effects';
 import { improvementAdjacency } from '../core/yields';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
@@ -120,7 +120,7 @@ for (const rec of recs) {
     cs.research.civicAiEntries = civicAnalysis(state, cs.seat, computeCityStats(state, minorCity(cs)).total.culture);
     const facts = minorBuildFacts(state, cs, () => 0);
     const resFacts = minorResourceFacts(state, cs);
-    const forecast = growthForecast(facts.growth);
+    const forecast = facts.forecast;
     const yctx = makeYieldCtx(state, cs.seat);
     const r = cs.research;
     // the research AI's turns as the game's log gives them: the entry of the

@@ -4,6 +4,7 @@ import type { CivicEntry } from './aiCivics';
 import type { CityAi } from './aiCityTrees';
 import type { OpsAi } from './operations/manager';
 import type { EconomicMemory } from './aiEconomic';
+import type { CityGrowth } from './aiCityBuild';
 import type { GreatWork } from '../data/greatWorks';
 import type { QuestType } from '../data/quests';
 import type { DistrictId, GameMap, YieldKey } from '../../world/types';
@@ -1193,6 +1194,10 @@ export interface CityState extends Seat {
   resourceCounts?: Record<string, number>;
   economy?: EconomicMemory;
   threat?: number;
+  /** its city's growth as its city AI's full update read it, between the
+   *  turn's production and its growth (`minorPhase`): the growth forecast's
+   *  inputs (CityBuildAI +0x6c8) */
+  aiGrowth?: CityGrowth;
   /** the camps its knowledge base holds, in their order (m_barbarians
    *  +0x638) */
   campsKnown?: number[];

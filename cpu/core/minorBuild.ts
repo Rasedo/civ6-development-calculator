@@ -64,7 +64,7 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { TECH_IMPROVEMENT_RESOURCES, resourceValue, type ResourceFacts } from './aiResource';
 import { RESOURCES, extractsResource } from '../../world/resources';
 import { unitProductionTable } from './aiUnitProduction';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, unitTable, type AiUnitRow, type CityBuildFacts, type CityBuildTables, type PickFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, unitTable, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
@@ -96,6 +96,10 @@ export function minorPhase(state: GameState): void {
     minorPower(state, cityState);
     const gained = minorEconomy(state, cityState);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
+    // its city AI's full update reads its growth here, before the growth
+    // (runs/h1_duelv1121 Ayutthaya: the Granary's housing value from the
+    // forecast of the citizens and the store before each turn's growth, t18 - t24)
+    cityState.aiGrowth = minorCityGrowth(state, cityState);
     minorGrowth(state, cityState);
     // its military AI's turn: the Combat Desire on the records as its last
     // update aged them
@@ -1096,6 +1100,19 @@ export function minorKnownUnits(cityState: CityState): (unit: string) => number 
   return (unit) => n.get(unit) ?? 0;
 }
 
+/** A minor's city growth as the growth forecast reads it (`CityGrowth`) */
+export function minorCityGrowth(state: GameState, cityState: CityState): CityGrowth {
+  const city = minorCity(cityState);
+  const stats = computeCityStats(state, city);
+  return {
+    surplus: fxOf(stats.foodSurplus),
+    housing: stats.housing,
+    population: cityState.population,
+    stored: fxOf(city.foodBox),
+    multiplier: stats.foodSurplus > 0 ? Math.round((stats.effectiveFoodSurplus / stats.foodSurplus) * FX) : FX,
+  };
+}
+
 /** THE CITY BUILD AI'S VIEW OF A MINOR'S CITY (`aiCityBuild.ts`), its
  *  knowledge base's unit counts `known` */
 export function minorBuildFacts(state: GameState, cityState: CityState, known: (unit: string) => number): CityBuildFacts {
@@ -1171,13 +1188,10 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       return !!id && tilesWithin(state.map, centre.col, centre.row, 3).some((t) => t.resource === id);
     },
     handicap: 0,
-    growth: {
-      surplus: fxOf(stats.foodSurplus),
-      housing: stats.housing,
-      population: cityState.population,
-      stored: fxOf(city.foodBox),
-      multiplier: stats.foodSurplus > 0 ? Math.round((stats.effectiveFoodSurplus / stats.foodSurplus) * FX) : FX,
-    },
+    growth: minorCityGrowth(state, cityState),
+    // the forecast of its city's update between the turn's production and
+    // its growth (`CityState.aiGrowth`); a city founded this turn, its own
+    forecast: growthForecast(cityState.aiGrowth ?? minorCityGrowth(state, cityState)),
     current,
     techTurns: (t) => analysedTurns(techEntries, t && engineId('tech', t, 'TECH_', TECHS), r.techs, r.tech, techLeft),
     civicTurns: (c) => analysedTurns(civicEntries, c && engineId('civic', c, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft),

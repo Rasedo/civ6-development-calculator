@@ -315,6 +315,10 @@ class SimInit:
         self.citystate_prod_set_turn = torch.full((B, s_pad), -99, dtype=torch.long, device=device)
         self.citystate_prod_set_value = torch.full((B, s_pad), -9999 * 256, dtype=torch.long, device=device)
         self.citystate_threat = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        # its city's growth as its city AI's update read it between the
+        # turn's production and its growth: surplus, housing, population,
+        # store, multiplier (raw 24.8 but the housing and population)
+        self.citystate_ai_growth = torch.zeros(B, s_pad, 5, dtype=torch.long, device=device)
         # its military AI's Combat Desire (raw 24.8), its PSEUDOYIELD_UNIT_COMBAT weight
         self.citystate_combat_desire = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # the count its city's standing army lacks (CityBuildAI +0x2d8), set in its city's update

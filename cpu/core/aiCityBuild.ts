@@ -205,6 +205,9 @@ export interface CityBuildFacts {
   buildTurns(item: string): number;
   /** the city's growth as its forecast reads it */
   growth: CityGrowth;
+  /** the growth forecast (`growthForecast`, CityBuildAI +0x6c8) its city's
+   *  full update computed, which the housing values read */
+  forecast: readonly GrowthStep[];
   /** the player is CIVILIZATION_LEVEL_FULL_CIV (0x469db0) / _TRIBE (0x469ce0) */
   fullCiv: boolean;
   tribe: boolean;
@@ -472,7 +475,7 @@ export function buildingValue(f: CityBuildFacts, b: AiBuildingRow, t: number, h 
     if (u === 'UNIT_ARCHAEOLOGIST') continue;
     value += unitValue(f, AI_UNITS[AI_UNIT_INDEX.get(u)!], t, h) ?? unitValueExit(f, u, t, h) ?? 0;
   }
-  if (b.housing > 0) value += housingValue(f.growth, growthForecast(f.growth), b.housing, t, h);
+  if (b.housing > 0) value += housingValue(f.growth, f.forecast, b.housing, t, h);
   value += modifiersValue({ view: f.view, seat: f.seat, start: t, horizon: h, rate: AI_RATE, owner: { cityId: f.cityId, capital: f.capital } },
     b.modifiers);
   return value;

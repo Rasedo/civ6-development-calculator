@@ -30,6 +30,10 @@ class SimMinors:
             self._minor_power(s)
             gained = self._minor_economy(s)
             self._minor_build(s, self._minor_production(s))
+            # its city AI's full update reads its growth here, before the growth
+            g = self._cv_minor_facts(s).growth()
+            now = torch.stack([g["surplus"], g["housing"], g["population"], g["stored"], g["multiplier"]], -1)
+            self.citystate_ai_growth[:, s] = torch.where(alive.unsqueeze(-1), now, self.citystate_ai_growth[:, s])
             self._minor_growth(s)
             self._minor_combat_desire(s)
             self._minor_knowledge(s, True)

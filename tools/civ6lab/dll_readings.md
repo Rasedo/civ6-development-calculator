@@ -3700,7 +3700,12 @@ building tables).
   growth multiplier 0x1b62d0, rounded up; -1 with no surplus); then per next
   citizen while the turn is below 100 (+0x6c0): its factor, a step where it
   changes, the whole turns its threshold takes at g x S, S less 2.0 (at
-  least 0). The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+  least 0). The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's. A
+  city-state's forecast is of its citizens and store before the turn's
+  growth while the analysis reads the rest after it (runs/h1_duelv1121
+  Ayutthaya's Granary: t18, grown to 3, logs 14.11, no housing term — the
+  forecast of population 2; t20-t24 each the housing term of the forecast a
+  turn longer; LAB, the update's place in the turn not read).
 - THE ANALYZERS added (each its whole part): EFFECT_GRANT_ABILITY 0x6b5b30
   (per subject the ability's UnitAbilityModifiers analysed in a copy of the
   context, 0x142650, their sums added); COLLECTION_CITY_TRAINED_UNITS

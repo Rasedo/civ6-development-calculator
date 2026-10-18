@@ -21,7 +21,7 @@ import { engineId } from '../data/aliases';
 import { RESOURCES } from '../../world/resources';
 import { hasRiver } from '../../world/query';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, constructibleNow, type AmenityCity, type CityBuildFacts, type PickFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, constructibleNow, growthForecast, type AmenityCity, type CityBuildFacts, type PickFacts } from './aiCityBuild';
 import { FX, fxOf, turnsAt } from './aiValue';
 import { unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
@@ -152,6 +152,13 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
     return unique ? unique.type : u;
   };
   const mods = getModifiers(state, seat);
+  const growth = {
+    surplus: fxOf(stats.foodSurplus),
+    housing: stats.housing,
+    population: city.population,
+    stored: fxOf(city.foodBox),
+    multiplier: stats.foodSurplus > 0 ? Math.round((stats.effectiveFoodSurplus / stats.foodSurplus) * FX) : FX,
+  };
   return {
     view,
     seat,
@@ -211,13 +218,8 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
         .some((t) => t.resource === id));
     },
     handicap: handicapOf(state, seat),
-    growth: {
-      surplus: fxOf(stats.foodSurplus),
-      housing: stats.housing,
-      population: city.population,
-      stored: fxOf(city.foodBox),
-      multiplier: stats.foodSurplus > 0 ? Math.round((stats.effectiveFoodSurplus / stats.foodSurplus) * FX) : FX,
-    },
+    growth,
+    forecast: growthForecast(growth),
     current: majorItemType(city.queue[0]),
     techTurns: (t) => analysedTurns(techEntries, t && engineId('tech', t, 'TECH_', TECHS), r.techs, r.tech, techLeft),
     civicTurns: (c) => analysedTurns(civicEntries, c && engineId('civic', c, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft),

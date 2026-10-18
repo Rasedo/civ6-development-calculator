@@ -13,6 +13,8 @@ _FX_MIN = -9999 * _FX
 _BUILDER = "UNIT_BUILDER"
 _BASE_CHARGES = 3
 _FORECAST_TURNS = 100
+# the growth facts in `citystate_ai_growth`'s order
+_AI_GROWTH_KEYS = ("surplus", "housing", "population", "stored", "multiplier")
 _YIELDS = ["YIELD_FOOD", "YIELD_PRODUCTION", "YIELD_GOLD", "YIELD_SCIENCE", "YIELD_CULTURE", "YIELD_FAITH"]
 # CITY_POPULATION_AQUEDUCT_BOOST: the Housing an Aqueduct counts beyond its row's
 _AQUEDUCT_BOOST = 2
@@ -1610,9 +1612,17 @@ class _MinorFacts:
                     "multiplier": mult.long()}
         return self._get("growth", build)
 
+    def forecast_growth(self):
+        """the growth its city's update read between the turn's production
+        and its growth (`CityState.aiGrowth`, `citystate_ai_growth`): the
+        growth forecast's inputs"""
+        g = self.sim.citystate_ai_growth[:, self.s]
+        return {k: g[:, i] for i, k in enumerate(_AI_GROWTH_KEYS)}
+
     def housing_value(self, housing, t, h):
         g = self.growth()
-        return self.sim._cv_housing_value(g, self._get("fc", lambda: self.sim._cv_forecast(g)), housing, t, h)
+        fc = self._get("fc", lambda: self.sim._cv_forecast(self.forecast_growth()))
+        return self.sim._cv_housing_value(g, fc, housing, t, h)
 
     # the item in hand and the turns
     def _item_key(self, item: str) -> int:
@@ -1971,6 +1981,10 @@ class _FreeFacts(_MinorFacts):
         self.row = sim.FREE_ROW
         self.j = j
         self.seat = FREE_SEAT
+
+    def forecast_growth(self):
+        # a Free City's update reads its growth as it stands
+        return self.growth()
 
     # the value view: the Gold weight of a seat losing Gold (`yieldWeights`:
     # its gold per turn, the Free Cities' cities' Gold less their units'

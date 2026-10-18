@@ -40,7 +40,7 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import { axialToOffset, hexDistance, inBounds, neighbors, offsetToAxial, wrapCol } from '../../world/hex';
 import { isCoastalLand } from '../../world/query';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingTable, defaultSpecialization, growthForecast, housingValue, specializationBests, unitTable,
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingTable, defaultSpecialization, housingValue, specializationBests, unitTable,
   type CityBuildFacts, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable } from './aiProjectValue';
 import { improvementValue, type PlotValueFacts } from './aiPlotValue';
@@ -197,7 +197,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
   const r = cs.research;
   const yctx = makeYieldCtx(state, cs.seat);
   const resFacts = minorResourceFacts(state, cs);
-  const forecast = growthForecast(facts.growth);
+  const forecast = facts.forecast;
   const centre = map.tiles[cs.centerIndex];
   const candidates = new Set(borderCandidates(state, city));
   const specialty = (cs.districts ?? []).filter((x) => DISTRICTS[x.type]?.countsTowardLimit).length;
