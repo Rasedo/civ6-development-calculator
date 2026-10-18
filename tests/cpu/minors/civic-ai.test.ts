@@ -3,6 +3,7 @@ import { emptySeat, seatOfCityState } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { civicAnalysis, civicChoice, civicValue } from '../../../cpu/core/aiCivics';
 import { spawnUnit } from '../../../cpu/core/units';
+import { storeUnitStrength } from '../../../cpu/core/majorView';
 import type { CityState, GameState } from '../../../cpu/core/types';
 
 // THE CIVICS AI (tools/civ6lab/dll_readings.md "H-1: the civics AI"); the
@@ -57,10 +58,13 @@ describe('the civic value (0x7a9a10)', () => {
     // Corps' 100 and its spy
     expect(civicValue(state, seat, 'MOBILIZATION', 1, new Map())).toBe(56464);
     expect(civicValue(state, seat, 'NATIONALISM', 1, new Map())).toBe(159376);
-    // Military Tradition: the minor's strength a turn from landing — none
-    // with no unit, a Warrior's 20 402 (522.6 as minor 4 logs it from t25)
+    // Military Tradition: the minor's strength a turn from landing, as its
+    // turn start stored it — none with no unit, a Warrior's 20 402 (522.6 as
+    // minor 4 logs it from t25)
     expect(civicValue(state, seat, 'MILITARY_TRADITION', 1, new Map())).toBe(30864);
     spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, seat);
+    expect(civicValue(state, seat, 'MILITARY_TRADITION', 1, new Map())).toBe(30864);
+    storeUnitStrength(state, seat);
     expect(civicValue(state, seat, 'MILITARY_TRADITION', 1, new Map())).toBe(133776);
   });
 });

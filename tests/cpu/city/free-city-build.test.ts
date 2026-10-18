@@ -56,7 +56,9 @@ describe("the Free City's production", () => {
     const f = freeCityBuildFacts(state, city);
     const bt = buildingTable(f).filter((v) => v !== FX_MIN);
     const ut = unitTable(f).filter((v): v is number => v !== null && v !== FX_MIN);
-    expect([bt.length, bt.reduce((a, b) => a + b, 0), ut.length, ut.reduce((a, b) => a + b, 0)]).toEqual([1, 7728, 6, 25778]);
+    // the Warrior Monk, Warrior and Slinger each with half its one city over
+    // the strongest melee it has trained (none: the revolt's grants train nothing)
+    expect([bt.length, bt.reduce((a, b) => a + b, 0), ut.length, ut.reduce((a, b) => a + b, 0)]).toEqual([1, 7728, 6, 32712]);
     const seq: unknown[] = [];
     for (let k = 0; k < 8; k++) {
       freeCityBuild(state, city, 5);
@@ -64,7 +66,7 @@ describe("the Free City's production", () => {
       seq.push([q?.kind === 'building' ? q.building : q?.kind === 'unit' ? q.unit : '-', q?.progress ?? 0, city.productionBank ?? 0]);
     }
     expect(seq).toEqual([['MONUMENT', 0, 5], ['MONUMENT', 10, 0], ['MONUMENT', 15, 0], ['MONUMENT', 20, 0], ['MONUMENT', 25, 0],
-      ['SCOUT', 0, 0], ['SCOUT', 5, 0], ['SCOUT', 10, 0]]);
+      ['SLINGER', 0, 0], ['SLINGER', 5, 0], ['SLINGER', 10, 0]]);
   });
 
   it('banks its Production with nothing in hand, then its AI picks an item for the next step', () => {

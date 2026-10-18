@@ -59,16 +59,21 @@ def test_value(rules) -> None:
     assert value("DIPLOMATIC_SERVICE", 1) == 136348, "a spy, PSEUDOYIELD_UNIT_SPY from landing, and a building's share"
     assert value("MOBILIZATION", 1) == 56464, "the Armies' PSEUDOYIELD_UNIT_COMBAT 100"
     assert value("NATIONALISM", 1) == 159376, "the Corps' 100 and a spy"
-    # Military Tradition: the minor's strength a turn from landing
+    # Military Tradition: the minor's strength a turn from landing, as its
+    # turn start stored it
+    live = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
     mine = sim.major_unit_alive[0] & (sim.major_unit_seat[0] == 100)
     slots = mine.nonzero().flatten().tolist()
     sim.major_unit_alive[0, mine] = False
+    sim._store_unit_strength(0, live)
     assert value("MILITARY_TRADITION", 1) == 30864, "no unit, no strength"
     assert slots, "the fixture's minor 0 starts with a unit"
     u = slots[0]
     sim.major_unit_alive[0, u] = True
     sim.major_unit_type[0, u] = sim._warrior_idx
     sim.major_unit_hp[0, u] = int(rules.combat["unitHp"])
+    assert value("MILITARY_TRADITION", 1) == 30864, "a unit counts from the next turn start"
+    sim._store_unit_strength(0, live)
     assert value("MILITARY_TRADITION", 1) == 133776, "a Warrior's 20 a turn"
     print("  civic value OK")
 

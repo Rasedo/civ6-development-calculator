@@ -314,7 +314,9 @@ def test_free_city_pick(rules) -> None:
     fx_min = -9999 * 256
     bt = [int(v[0]) for v in sim._cv_building_table(f) if int(v[0]) != fx_min]
     ut = [int(v[0]) for v, read in sim._cv_unit_table(f) if bool(read[0]) and int(v[0]) != fx_min]
-    assert (len(bt), sum(bt), len(ut), sum(ut)) == (1, 7728, 6, 25778), (len(bt), sum(bt), len(ut), sum(ut))
+    # the Warrior Monk, Warrior and Slinger each with half its one city over
+    # the strongest melee it has trained (none: the revolt's grants train nothing)
+    assert (len(bt), sum(bt), len(ut), sum(ut)) == (1, 7728, 6, 32712), (len(bt), sum(bt), len(ut), sum(ut))
     act = torch.zeros(sim.B, dtype=torch.bool)
     act[B0] = True
     seq = []
@@ -324,7 +326,7 @@ def test_free_city_pick(rules) -> None:
         name = (BLD[code] if 0 <= code < sim.NB else UNI[code - sim.UNIT_BASE] if code >= sim.UNIT_BASE else "-")
         seq.append((name, float(sim.city_progress[B0, F, j, 0]), float(sim.city_prod_bank[B0, F, j])))
     want = [("MONUMENT", 0.0, 5.0), ("MONUMENT", 10.0, 0.0), ("MONUMENT", 15.0, 0.0), ("MONUMENT", 20.0, 0.0),
-            ("MONUMENT", 25.0, 0.0), ("SCOUT", 0.0, 0.0), ("SCOUT", 5.0, 0.0), ("SCOUT", 10.0, 0.0)]
+            ("MONUMENT", 25.0, 0.0), ("SLINGER", 0.0, 0.0), ("SLINGER", 5.0, 0.0), ("SLINGER", 10.0, 0.0)]
     assert seq == want, seq
     print("  6 Free City's pick OK — seed9001's revolt: the tables and eight steps as the TS twin pins")
 
