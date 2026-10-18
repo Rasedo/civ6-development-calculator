@@ -13,7 +13,8 @@
  *    (TriggeredBehaviorTrees TRIGGER_SETTLE_SPOT, through 0x800c60 ->
  *    0x7265b0) where the seat runs none; the candidates (evaluate.ts) on the
  *    knowledge base's records of the turn before, the valid ones' values
- *    logged; a running operation's candidate names its backup (0x73e610);
+ *    logged; a running operation's candidate names its backup (0x73e610)
+ *    on the strengths the last run refreshed;
  *    the best new candidate that starts itself — the highest Priority, then
  *    the best odds, the first of equals — where the seat runs fewer of its
  *    OperationType than its limits allow (0x726470) is the one to start;
@@ -297,11 +298,13 @@ export const opContracts = (ai: OpsAi): number[] => opsOf(ai).flatMap((o) => o.c
  *  the new one to start chosen */
 export function operationsEvaluate(ai: OpsAi, env: OpsEnv): void {
   const view = env.view();
-  // the seat's operations lose the units gone
+  // the seat's operations lose the units gone; their strengths stand as the
+  // last run's refresh left them — the running operations' candidates, and
+  // so their backups, read them before the run refreshes them (0x727510:
+  // the candidates 0x72763d, the enemy strength 0x727c74 after)
   const live = new Set(view.units(ai.seat).map((u) => u.id));
   for (const op of opsOf(ai)) {
     for (const t of op.teams) t.members = t.members.filter((id) => live.has(id));
-    refreshStrengths(context(ai, env, op));
   }
   const allowed = env.defs ? env.defs.map((n) => AI_OP_DEFS[n]) : allowedOps(view.leaderType(ai.seat));
   const staging = stagingPlots(view, ai.seat);

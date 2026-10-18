@@ -6,9 +6,9 @@ the game's Control Manager runs a player's lists —
 
  - B: the military AI's turn (`_mops_evaluate`, from `_minor_military_turn`,
    before the turn's knowledge base look): the
-   members gone leave their operations, each operation's strengths and
-   teams refreshed, the candidates — Attack Barb Camp against each camp its
-   knowledge base holds, the running operation's naming its backup — and
+   members gone leave their operations, the candidates — Attack Barb Camp
+   against each camp its knowledge base holds, the running operation's
+   naming its backup on the strengths the last run refreshed — and
    the new one to start chosen under the trait's limits;
  - A: the city's defence event starts City Defense (`_mops_start`, the
    minor world's `start_operation`);
@@ -968,13 +968,8 @@ class SimMinorOps:
         Tm = self._mops_tables()
         u = self._mops_units(s)
         self._mops_drop_gone(s, alive, u)
-        running = alive & (self.mops_def[:, s] >= 0).any(dim=1)
-        if bool(running.any()):
-            rows = self._mops_unit_rows(s, u)
-            tg = self._tac_targets(100 + s, -1)
-            for k in range(N_OPS):
-                self._mops_refresh(s, k, running, u, rows, tg)
-        # the running operations' candidates name their backups
+        # the running operations' candidates name their backups, on the
+        # strengths the last run refreshed (`operationsEvaluate`)
         for k in range(N_OPS):
             m = alive & (self.mops_def[:, s, k] == Tm.d_abc)
             if not bool(m.any()):

@@ -121,12 +121,15 @@ function targetsOf(view: MajorView, seat: number, c: Candidate, inputs: EvalInpu
       const str = view.majors().reduce((m, p) => Math.max(m, view.bestCombatStrength(p)), 0);
       return [{ plot: at, value: 100 << 8, enemyStr: str }];
     }
-    // each camp the seat knows, valued 50 a known camp; the enemy strength 6
-    // and the barbarians' units within 3 of it
+    // each camp the seat knows, valued 50 a known camp; the enemy strength 6,
+    // and for a seat not the barbarians' with no enemy named the barbarians'
+    // units within 3 of it (0x7476f9..0x747745)
     case 'TARGET_BARBARIAN_CAMP': {
       const camps = inputs.camps;
       const barb = view.barbarianSeat();
-      return camps.map((p) => ({ plot: p, value: (camps.length * 50) << 8, enemyStr: Math.trunc(6 + armyStrength(view, inputs.army(barb), p, 3)) }));
+      const army = seat !== barb && c.enemy < 0;
+      return camps.map((p) => ({ plot: p, value: (camps.length * 50) << 8,
+        enemyStr: Math.trunc(6 + (army ? armyStrength(view, inputs.army(barb), p, 3) : 0)) }));
     }
     // the seat's cities (TargetParameter 0), valued 0
     case 'TARGET_FRIENDLY_CITY':
