@@ -2833,7 +2833,8 @@ function minorBuilds(ctx: Ctx, b: TurnRecord, tally: MinorBuildTally): void {
         dis: (cs.districts ?? []).length, rdis: c?.districts.length,
         tech: cs.research.techs.length, rtech: bits(pl?.techs), civ: cs.research.civics.length, rciv: bits(pl?.civics),
         units: ctx.state.units.filter((u) => u.seat === cs.seat).length, runits: b.units.filter((u) => u.owner === pid).length,
-        threat: cs.threat ?? null, gold: Math.round(cs.treasury), desire: cs.combatDesire ?? 0 }));
+        threat: cs.threat ?? null, gold: Math.round(cs.treasury), desire: cs.combatDesire ?? 0,
+        trade: (cs.tradeValue ?? 0) / 256, tradeCities: cs.tradeCities ?? [] }));
     }
     const k = (tally.byKind[kind] ??= { turns: 0, same: 0 });
     tally.turns += 1;

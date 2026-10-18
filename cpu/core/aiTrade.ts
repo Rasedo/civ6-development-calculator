@@ -4,9 +4,11 @@
  * the trade AI's route value").
  *
  * THE CITY'S TRADE LIST (CityBuildAI +0x870, kept by 0x78f210 at the city's
- * analysis): per known city in the knowledge base's order not yet sorted, a
- * trade path from the city (the Trade_Movement pathfinder 0x559140,
- * `routeInRange`) lists it, else it goes on the rejected list. Once the list
+ * analysis): per known city in the knowledge base's order not yet sorted
+ * whose centre the minor has revealed (0x2d2220, `CityState.revealed`; an
+ * unrevealed one is not tried), a trade path from the city (the
+ * Trade_Movement pathfinder 0x559140, `routeInRange`) lists it, else it goes
+ * on the rejected list. Once the list
  * holds a city, at most two new cities are tried a turn; a turn that tries
  * none clears the rejected list. A known city gone leaves the list.
  *
@@ -22,7 +24,7 @@
  *
  * The known cities are the route scorer's (`minorRouteCandidate`): the other
  * city-states in id order, then every major's cities in seat and array
- * order — a minor has no fog.
+ * order.
  */
 import { fxOf, yieldValue } from './aiValue';
 import { majorView } from './majorView';
@@ -62,6 +64,7 @@ export function minorTradeList(state: GameState, cs: CityState): void {
   let tried = 0;
   for (const k of known) {
     if (listed.includes(k.centre) || rejected.includes(k.centre)) continue;
+    if (cs.revealed?.[k.centre] !== 1) continue;
     if (limited && ++tried > 2) continue;
     if (routeInRange(state, cs.seat, cs.centerIndex, k.centre)) listed.push(k.centre);
     else rejected.push(k.centre);

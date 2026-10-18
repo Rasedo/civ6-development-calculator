@@ -164,12 +164,19 @@ export function setMet(cityState: CityState, seat: number): void {
   if (!cityState.met.includes(seat)) cityState.met.push(seat);
 }
 
-/** A MAJOR MEETS A CITY-STATE: the first major to meet it sends it its
+/** A MAJOR MEETS A CITY-STATE: the major's first city revealed to the
+ *  minor; the first major to meet it sends it its
  *  INFLUENCE_TOKENS_FREE_FOR_FIRST_PLAYER_MEET envoys, free. */
 export function meetCityState(state: GameState, cityState: CityState, seat: number): void {
   if (hasMet(cityState, seat)) return;
   const first = !cityState.met.some((s) => isCiv(s));
   setMet(cityState, seat);
+  // the major's first city (its capital) is revealed to the minor, whose
+  // trade list tries only revealed cities (runs/h1_duelw1121: Antioch's
+  // route value K from t7, Hunza's from t29, each the turn it meets its
+  // first major)
+  const capital = state.seats.find((s) => s.seat === seat)?.cities[0];
+  if (capital) (cityState.revealed ??= new Array<number>(state.map.tiles.length).fill(0))[capital.centerIndex] = 1;
   // the meeting gives the pair its quest (0x93ae70) before the first
   // envoy's ground is drawn (runs/h1_duelw1117 t17: the quest's draws, then
   // Caguana's annex)

@@ -3303,6 +3303,12 @@ class SimMasks:
                 continue
             nr, nsr = rows[ns], sr[ns]
             self.seat_citystate_met[nr, nsr, s] = True
+            # the major's first city (its capital) is revealed to the minor
+            alive = self.city_alive[nr, nsr]
+            j = alive.long().argmax(dim=1)
+            cap = self.city_center[nr, nsr, j]
+            ok = alive.any(dim=1) & (cap >= 0)
+            self.mops_revealed[nr[ok], s, cap[ok]] = True
             for r in sorted(set(nsr.tolist())):
                 games = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                 games[nr[nsr == r]] = True

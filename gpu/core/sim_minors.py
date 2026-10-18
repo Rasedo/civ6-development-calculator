@@ -384,16 +384,19 @@ class SimMinors:
     def _minor_trade_list(self, s: int, mask: torch.Tensor) -> None:
         """`minorTradeList` where `mask` [B]: minor `s`'s city's trade list
         (CityBuildAI +0x870, 0x78f210) kept a turn on — each known city not
-        yet sorted that a trade path from the city reaches is listed
-        (`citystate_trade_ok`), any other rejected (`citystate_trade_no`);
-        once the list holds a city at most two are tried a turn; a turn that
+        yet sorted whose centre the minor has revealed (`mops_revealed`,
+        0x2d2220; an unrevealed one is not tried) that a trade path from the
+        city reaches is listed (`citystate_trade_ok`), any other tried
+        rejected (`citystate_trade_no`); once the list holds a city at most
+        two are tried a turn; a turn that
         tries none clears the rejected; a city gone leaves the list"""
         row = self._CITY_MINOR0 + s
         live, ctr = self._minor_trade_cands(s)
         ok_l = self.citystate_trade_ok[:, s] & live
         no_l = self.citystate_trade_no[:, s].clone()
         limited = ok_l.any(dim=1)
-        todo = mask.unsqueeze(1) & live & ~ok_l & ~no_l
+        seen = self.mops_revealed[:, s].gather(1, ctr.clamp(min=0))
+        todo = mask.unsqueeze(1) & live & ~ok_l & ~no_l & seen
         tried = torch.zeros(self.B, dtype=torch.long, device=self.device)
         games = todo.any(dim=1).nonzero(as_tuple=True)[0].tolist()
         if games:

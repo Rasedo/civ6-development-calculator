@@ -4426,7 +4426,9 @@ EFFECT_ADJUST_TRADE_ROUTE_CAPACITY term read the K it keeps.
   entry of the owner's knowledge base (0x786160, 0xe0 bytes an entry) in its
   order — one listed (0x78d630) or rejected passes; the city itself passes;
   a city no longer standing (0x57960 null) leaves the list (0x78d6d0 /
-  0x78f5d0); the destination's plot asked of the player (0x2d2220); with the
+  0x78f5d0); the destination's plot revealed to the player (0x2d2220 on its visibility
+  0x468320: the byte at visibility +0x2f0; unrevealed -> the next entry,
+  neither tried nor counted); with the
   list holding a city at the call's start, a counter allows two tries a
   turn (r13 > 2 skips); the try is the trade pathfinder (0x559140: the
   Trade_Movement finder 0xf2dc70 from the city's plot +0x158 to the
@@ -4450,8 +4452,15 @@ EFFECT_ADJUST_TRADE_ROUTE_CAPACITY term read the K it keeps.
   prints "TRADE, TO -1, VAL K" (0x5ed280). runs/h1_duelv1117: Valletta's K
   2.10 from t14 (0.00 before), the record training its Trader at t33.
 - Unread: the knowledge base's city entries' order (the engines take the
-  route scorer's: the other city-states by id, then the majors' cities) and
-  0x2d2220 (taken as true: a minor holds no fog); 0x54c630's term.
+  route scorer's: the other city-states by id, then the majors' cities);
+  0x54c630's term; what reveals a major's city to a minor beyond its looks:
+  the engines reveal the major's first city at the meeting (`meetCityState`)
+  — the records: a minor's K turns above 0 the turn it meets its first major
+  (runs/h1_duelw1121 Antioch t7, Hunza t29, Ayutthaya t33; 1117, 1124 each
+  minor the same), and a major meeting a city-state has its centre revealed
+  that turn (21 of 21 meetings, 1117 / 1121 / 1128). Measured K: the
+  engines' 1.50 against the log's 1.80 (1121 Antioch t7) and 2.10 (Hunza),
+  the route's origin yields short.
 
 ## C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)
 

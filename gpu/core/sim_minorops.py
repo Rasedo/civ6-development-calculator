@@ -234,7 +234,8 @@ class SimMinorOps:
         self.mops_pick_rally = torch.full((B, S), -1, dtype=L, device=device)
         # the camps the knowledge base holds, in its order (-1 padded)
         self.mops_camps = torch.full((B, S, N_CAMPS), -1, dtype=L, device=device)
-        # the plots its knowledge base's looks have seen (`CityState.revealed`)
+        # the plots its knowledge base's looks have seen or a meeting revealed
+        # (`CityState.revealed`)
         self.mops_revealed = torch.zeros(B, S, self.T, dtype=torch.bool, device=device)
 
     # -- the minor's units --------------------------------------------------

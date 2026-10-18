@@ -100,6 +100,15 @@
   context:
     - ...; UnlocksFromEffect (+0xe8 bit 2, or Projects_XP2's +0x60 bit 0) the player's unlock (0x468260); the civic (+0x120), tech (+0x150), district in the city (+0x128, 0x1aea60), RequiredB...
   review: imported
+- addr: 0x468320
+  final: 0x2f81f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+  context:
+    - "...0x78f5d0); the destination's plot revealed to the player (0x2d2220 on its visibility 0x468320: the byte at visibility +0x2f0; unrevealed -> the next entry, neither tried nor counted..."
+  review: imported
 - addr: 0x469cd0
   final: 0x2f9780
   kind: function
