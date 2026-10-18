@@ -4,6 +4,8 @@ from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the sha
 
 # the plots round a new camp the barbarians reveal (`CAMP_REVEAL`)
 _CAMP_REVEAL = 3
+# a camp's sight (`CAMP_SIGHT`): its owner sees its plot and the six beside it
+_CAMP_SIGHT = 1
 
 
 class SimBarb:
@@ -43,7 +45,8 @@ class SimBarb:
         every living player, the barbarians included ("all", `allSeers`), the
         barbarians alone ("barbarians") or one seat (`who` its absolute seat)
         see now — each unit's sight across the plots its line reaches, each
-        city centre two plots round, each owned plot with its ring."""
+        city centre two plots round, each owned plot with its ring, and the
+        barbarians' camps with theirs (`CAMP_SIGHT`)."""
         B, T = self.B, self.T
         seen = torch.zeros(B, T, dtype=torch.bool, device=self.device)
 
@@ -71,6 +74,15 @@ class SimBarb:
         nb = self.neigh  # [T, 6]
         ring = owned[:, nb.clamp(min=0)] & (nb >= 0)  # [B, T, 6]
         seen |= owned | ring.any(dim=2)
+        if who in (barbarians, all) or (isinstance(who, int) and who == BARB_SEAT):
+            # a camp's improvement: its owner sees its plot and the six beside it
+            cp = self.camp_tile
+            camp = torch.zeros(B, T, dtype=torch.bool, device=self.device)
+            ok = cp >= 0
+            if bool(ok.any()):
+                bi = torch.arange(B, device=self.device).unsqueeze(1).expand_as(cp)
+                camp[bi[ok], cp[ok]] = True
+                seen |= (camp.to(torch.float32) @ (self.pair_dist <= _CAMP_SIGHT).to(torch.float32)) > 0
         return seen
 
     # --------------------------------------------------------- the unit pick

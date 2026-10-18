@@ -5377,6 +5377,23 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   (`groundOf`'s known for a search without zones of control); a path (the
   move order's pathfinder) takes any plot. A plot only revealed gives the
   target list its districts, camp, goody hut, improvement.
+- THE WRITERS (READ): the reveal 0x50d390 is reached from the visibility
+  count change 0x508d50 alone for a barbarian (0x508330 is the diplomatic
+  sharing, 0x50ccc0 the war / peace one, 0x50d080 RevealAllPlots and the
+  Free Cities' start). 0x508d50's callers: a unit's sight update (0x58aa90
+  per plot of 0x58b1d0's line-of-sight list, from 0x58f3f0 on a move,
+  0x586d40), a plot's owner (0x84760, territory: none for the barbarians),
+  an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0:
+  the plot and the six beside it, no line of sight), the scripted
+  operations. A camp's placement (0x150a30) passes the barbarian player as
+  the improvement's owner, so a camp gives its plot and ring 1 to the
+  barbarians' sight as long as it stands (ported: `plotsSeenNow` /
+  `_barb_seen`, `CAMP_SIGHT`). Nothing in the camp's arrival reveals three
+  plots round it: the radius 3 the engines keep (`CAMP_REVEAL`) is the fit
+  — in the replay's planning classifier (1124 t1-60) radius 3 leaves 123
+  unrevealed plots the game lists against 299-303 at radius 1 or 2 — whose
+  writer is unread (the camp's units' looks from their record plots are
+  the candidate).
 - EXPLORE LAND (0x70ce90): up to three rounds over the homeland's units;
   each unit not done (+0x770) with Movement left (+0xdb0), of AI type
   EXPLORE (+0x1c0 == 2), its damage at most half its health (0x56e0d0 >>

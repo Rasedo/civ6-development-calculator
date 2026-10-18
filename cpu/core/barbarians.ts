@@ -24,7 +24,7 @@ import { neighbors, hexDistance, tilesWithin, tileAt, offsetToAxial, axialToOffs
 import { isWater, isImpassable } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
-import { BARB_SEAT, FREE_SEAT, NO_SEAT, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
 import { canSee, revealAround, unitSight, unitSeesThrough } from './fog';
 import { spawnUnit, tileFreeForUnit } from './units';
 import { UNITS } from '../data/units';
@@ -61,8 +61,9 @@ export function barbarianTechs(state: GameState): void {
 
 /**
  * THE PLOTS THESE SEATS SEE NOW: each unit's sight across the plots its
- * line reaches (`canSee`), each city's centre two plots round, and each
- * owned plot with its ring. A LAB reading: the camp step's exclusions fit it
+ * line reaches (`canSee`), each city's centre two plots round, each
+ * owned plot with its ring, and — the barbarians' — each camp with its ring
+ * (the improvement's owner, `CAMP_SIGHT`). A LAB reading: the camp step's exclusions fit it
  * (runs/h1_duelw1120-1124 camp draws' ranges), the game's sight rule unread.
  */
 export function plotsSeenNow(state: GameState, seats: ReadonlySet<number>): Uint8Array {
@@ -83,6 +84,10 @@ export function plotsSeenNow(state: GameState, seats: ReadonlySet<number>): Uint
   for (const c of centres) {
     const t = map.tiles[c];
     for (const n of tilesWithin(map, t.col, t.row, 2)) seen[n.index] = 1;
+  }
+  // a camp's improvement: its owner sees its plot and the six beside it
+  if ([...seats].some(isBarbSeat)) {
+    for (const c of campTiles(state)) for (const n of tilesWithin(map, map.tiles[c].col, map.tiles[c].row, CAMP_SIGHT)) seen[n.index] = 1;
   }
   for (const t of map.tiles) {
     if (!seats.has(tileSeat(t))) continue;
@@ -292,8 +297,14 @@ export function foundTribe(state: GameState, plot: number, name: number): BarbTr
   return tribe;
 }
 
+/** the plots round a camp its owner sees: the improvement's owner takes the
+ *  visibility of its plot and the six beside it (0x363080 -> 0x362ec0 ->
+ *  0x84340, a count each through 0x508d50, no line of sight) */
+export const CAMP_SIGHT = 1;
+
 /** the plots round a new camp its player reveals (runs/h1_duelv1124 t1: the
- *  camp at 40:21 lists 38:19, three off, and not 38:18, four off) */
+ *  camp at 40:21 lists 38:19, three off, and not 38:18, four off; the
+ *  replay's planning rows fit 3 best against 1 and 2) */
 const CAMP_REVEAL = 3;
 
 /**
