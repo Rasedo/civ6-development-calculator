@@ -132,10 +132,15 @@ interface Ground {
 function groundOf(state: GameState, unit: Unit, revealedOnly = true): Ground {
   const held = new Set<number>();
   const foes = new Set<number>();
+  // the plots a unit at war with it that fights holds, whatever its domain
+  const fighters = new Set<number>();
   for (const u of state.units) {
     if (u.seat === unit.seat || !onMap(u)) continue;
     held.add(u.tileIndex);
-    if (unitsHostile(state, unit, u)) foes.add(u.tileIndex);
+    if (!unitsHostile(state, unit, u)) continue;
+    foes.add(u.tileIndex);
+    const st = aiStrengths(u);
+    if (st.melee > 0 || st.ranged > 0 || st.bombard > 0) fighters.add(u.tileIndex);
   }
   const enters = new Map<number, boolean>();
   const zocs = new Map<number, boolean>();
@@ -164,7 +169,9 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true): Ground {
     },
     attack: (t) => {
       if (!melee || !known(t.index) || isImpassable(t)) return false;
-      if (foes.has(t.index) && isWater(t) === naval) return true;
+      // a unit at war that fights (0x26e570 -> 0x209dd0): a land mover's
+      // strike onto a ship's water as a ship's onto the shore
+      if (fighters.has(t.index) || (foes.has(t.index) && isWater(t) === naval)) return true;
       const owner = tileSeat(t);
       if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
       return !naval && encampmentBlocks(state, t, unit);

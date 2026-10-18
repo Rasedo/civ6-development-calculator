@@ -4924,7 +4924,14 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   Movement left, 0x1d0 += 0x1d4) and links nothing from it (a parent with
   node flag +0x51 & 0x40 is refused). AI_Planning.csv lists them (1124 t9:
   the barbarian Warrior at 40:22 holds 39:23 (1/0), China's Warrior there);
-  a Slinger's reach holds them too (combat > 0, the range aside). With them
+  a Slinger's reach holds them too (combat > 0, the range aside). The
+  wrapper's attack test: a district at war with hit points (DistrictInfo
+  +0x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any
+  unit on the plot (0x75c50) of a player at war that fights (0x209dd0:
+  combat, ranged or bombard above 0) — no domain test, so a land melee
+  unit's search strikes a ship on the water beside it and a ship's a land
+  unit ashore (runs/h1_duelw1117 t73 / t74: China's Spearman's 25 on the
+  barbarians' Quadrireme and Galley beside Longxi in the danger map). With them
   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->
   758 of 1,241, the game's plots within ours 862 -> 1,192.
 - The reach leaves out the plots the player never revealed (the game's

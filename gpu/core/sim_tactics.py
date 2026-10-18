@@ -263,14 +263,24 @@ class SimTactics:
     def _tac_attack_planes(self, seat: int, revealed_only: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat`
         attacks into (`groundOf`'s attack): a unit of a player at war with it
-        on ground of the mover's domain, a city centre of such a player, an
+        that fights, on any ground (0x26e570 -> 0x209dd0), any such unit on
+        ground of the mover's domain, a city centre of such a player, an
         Encampment that blocks a land mover — on plots it revealed."""
         foe = self._tac_hostile(seat)
+        fight = torch.zeros_like(foe)
+        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+            pc = pl.clamp(min=0)
+            ut = self.unit_type.gather(1, pc).clamp(min=0, max=self.NU - 1)
+            st = (self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0) | (self._type_bombard.take(ut) > 0)
+            s = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, -1))
+            fight |= (pl >= 0) & st & self._seats_hostile(seat, s)
+        fight &= self.passable | self.wpass
         ctr = self._centre_plane() & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
         land = self.passable & ((foe & ~self.water) | ctr)
         if self._encamp_didx >= 0:
             land = land | (self.passable & self._encamp_block_plane(seat))
-        naval = (self.wpass & foe) | (self.passable & ctr)
+        land = land | fight
+        naval = (self.wpass & foe) | (self.passable & ctr) | fight
         known = self._tac_known(seat) if revealed_only else None
         if known is not None:
             land, naval = land & known, naval & known
