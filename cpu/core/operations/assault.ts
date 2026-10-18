@@ -212,7 +212,8 @@ const garrisonCity: BtHandler<OpsContext> = {
   execute: garrisonExecute,
 };
 
-/** the garrison's pick (0x810d30) over the operation's units in order: the
+/** the garrison's pick (0x810d30) over the operation's units in the
+ *  player's unit order (0x6092c0): the
  *  one on the city its garrison (its ranged strength, or its Bombard less 5
  *  where higher, and its Combat); of those whose planning reaches the city
  *  this turn (0x791300, 1 turn) the candidate — a RangedCombat above the
@@ -236,8 +237,14 @@ function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], 
   let bestRanged = 0;
   let bestCombat = 0;
   let pick: MajorUnitView | null = null;
-  for (const id of opUnits(op)) {
-    const u = units.get(id);
+  // the operation's units as the unit evaluator lists them by job
+  // (0x6092c0): in the player's unit order, not the teams' (runs/h1_duelw1121
+  // Hunza t13: of City Defense's Warriors, recruited 196610 first, the older
+  // 131073 two plots off garrisons the city, not 196610 beside it)
+  const held = new Set(opUnits(op));
+  for (const v of view.units(ctx.seat)) {
+    if (!held.has(v.id)) continue;
+    const u = units.get(v.id);
     if (!u) continue;
     if (u.plot === city) {
       garrison = u;

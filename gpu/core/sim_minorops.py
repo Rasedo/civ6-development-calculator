@@ -1966,7 +1966,8 @@ def _u_running_units(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """GARRISON CITY's execution (0x810d30): over the operation's units in
-    order, the one on the city its garrison; of those whose planning reaches
+    the player's unit order, the one on the city its garrison; of those whose
+    planning reaches
     the city this turn the candidate (the ranged, the bombard, the combat
     strength above the best and the garrison's); with no garrison and no
     military unit of the minor on the city the candidate moves in; with a
@@ -1981,6 +1982,11 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     if not bool(g.any()):
         return
     mem = sim.mops_mem[:, s, k].reshape(B, -1)
+    # the operation's units in the player's unit order (0x6092c0: pool order,
+    # `garrisonExecute`), not the teams'
+    mc = mem.clamp(min=0)
+    key = torch.where(mem >= 0, sim.major_unit_pslot.gather(1, mc).clamp(min=0), torch.full_like(mem, 1 << 30))
+    mem = mem.gather(1, key.argsort(dim=1, stable=True))
     gar = torch.full((B,), -1, dtype=torch.long, device=dev)
     g_r = torch.zeros(B, dtype=torch.long, device=dev)
     g_c = torch.zeros(B, dtype=torch.long, device=dev)
