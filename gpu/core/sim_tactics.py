@@ -2337,6 +2337,12 @@ class SimTactics:
         region = self.tile_region.gather(1, goal.clamp(min=0).unsqueeze(1)).squeeze(1)
         hostile = self._tac_hostile(seat)
         foreign = self._tac_foreign(seat)
+        # the plots it would attack into (`attackPlot`): a unit at war, a
+        # hostile city centre, an Encampment that bars it — no ring plot
+        # (0x815d50 -> 0x586360)
+        atk = hostile | (self._centre_plane() & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat))
+        if self._encamp_didx >= 0:
+            atk = atk | self._encamp_block_plane(seat)
         ring = self._barb_ring[goal.clamp(min=0)]                                   # [B, 37]
         for j in range(int(nm.max()) if B else 0):
             us = order[:, j]
@@ -2386,7 +2392,7 @@ class SimTactics:
                     first = best_d < 0
                     beat = first | (((inr == best_in) & (dq < best_d)) | ((inr != best_in) & inr))
                     away = qc != here
-                    free = ~away | (~mine[ar, qc] & path[ar, qc])
+                    free = (~away | (~mine[ar, qc] & path[ar, qc])) & ~atk[rows, qc]
                     take = ok & beat & free
                     best = torch.where(take, qc, best)
                     best_d = torch.where(take, dq, best_d)

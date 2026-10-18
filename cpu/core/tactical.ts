@@ -2563,6 +2563,9 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
         }
         if (q !== u.tileIndex && state.units.some((x) => x !== u && x.tileIndex === q && x.seat === u.seat)) continue;
         if (q !== u.tileIndex && !paths.has(q)) continue;
+        // one it may move into (0x815d50 -> 0x586360): no plot it would
+        // attack into, the goal's own city centre among them
+        if (attackPlot(state, u, q)) continue;
         best = q;
         bestD = d;
         bestIn = inRegion;

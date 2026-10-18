@@ -5489,7 +5489,12 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   none of its own stacking there but its own plot) where that plot lies in
   the goal's region; else the ring walk 0x6aef0 (the test 0x815d50: one in
   the goal's region before one outside, then strictly nearer, its own plot
-  or one with none of its own and a path); none, the goal with flag 0x10.
+  or one with none of its own, and one it may move into (0x586360 with no
+  flags: no plot it would attack into, so not the goal's city centre — the
+  walk is the disc, the centre first); none, the goal with flag 0x10.
+  runs/h1_duelw1121 t11: Horseman 851980's march (range 2, radius 1) to
+  35:14 takes 36:14, the first in-region ring plot nearest it, not the
+  city's centre.
   The unit's turn ends (0x570b40) and its MoveTo (0x962030) runs at once
   ("Operation Move, %s, at, goal, after").
 - BARBARIAN RAID CHECK (0x7c7330): SUCCESS where the tribe's score
