@@ -3503,6 +3503,17 @@
           "note": "the civilian half of an escort formation; the escort is whoever holds the tile's military slot."
         },
         {
+          "name": "aiDefender",
+          "compare": "exact",
+          "covers": [
+            "Unit.aiDefender"
+          ],
+          "planes": [
+            "unit_defender"
+          ],
+          "note": "of AI type DEFENDER, homed on its city-state's city: that city's standing army; 1/0."
+        },
+        {
           "name": "patrol",
           "compare": "exact",
           "covers": [
