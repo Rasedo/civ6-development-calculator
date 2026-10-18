@@ -1011,9 +1011,13 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
     if (c.ops) cs.ops = c.ops;
     if (c.cityAi) cs.cityAi = c.cityAi;
     // its knowledge base's look after its units' turn (`minorPhase`'s last),
-    // before the barbarians' turn: its units on the plots record t+1 holds
-    // them on, the others where the turn found them with record t+1's
-    // damage (the turn's engine pass looked before its moves)
+    // in the pair's turn and before the barbarians' turn: its units on the
+    // plots record t+1 holds them on, the others where the turn found them
+    // with record t+1's damage (the turn's engine pass looked before its
+    // moves). What it sees is seen in the pair's turn, so the next turn's
+    // operations evaluation reads it aged one (runs/h1_duelv1128 city-state
+    // 4: the camp's Spearman, seen after its t13 moves and not again before
+    // t18, is past the age its t17 Attack Barb Camp odds read)
     if (c.centerIndex >= 0) {
       const held: [Unit, number, number][] = [];
       for (const [x, u] of twin) {
@@ -1022,7 +1026,10 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
         if (x.seat === c.seat) x.tileIndex = u.tileIndex;
         else x.hp = u.hp;
       }
+      const now = copy.turn;
+      copy.turn = turn;
       minorKnowledge(copy, c, false);
+      copy.turn = now;
       for (const [x, at, hp] of held) {
         x.tileIndex = at;
         x.hp = hp;
