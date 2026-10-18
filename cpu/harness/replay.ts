@@ -3582,16 +3582,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const key = `${r.owner}:${r.id}`;
       const u = unitOf(ctx, key);
       if (!u) continue;
-      // a city-state's or Free City's unit acts in the engine's turn, its own
-      // AI's: it starts that turn on its moves (runs/h1_duelw1121 t8: Hunza's
-      // Builder, its Farm laid at t7, walks to plot 275 on its moves)
-      if (minorAiSeat(u.seat)) {
-        u.movesLeft = grantedMoves(state, u);
-        continue;
-      }
       const stood = logged ? !walked.has(key) : was.get(key) === r.y * ctx.W + r.x;
       const rested = stood && !fought.has(key);
-      u.movesLeft = rested ? grantedMoves(state, u) : 0;
+      // a city-state's or Free City's unit acts in the engine's turn, its own
+      // AI's: it starts that turn on its moves (runs/h1_duelw1121 t8: Hunza's
+      // Builder, its Farm laid at t7, walks to plot 275 on its moves), its
+      // rest heal still the record's actions' (runs/h1_duelw1124 t10: city-
+      // state 2's Warrior attacked the Spearman at 8:14 and fought it again
+      // at t11 on 62 HP, unhealed)
+      u.movesLeft = rested || minorAiSeat(u.seat) ? grantedMoves(state, u) : 0;
       if (!rested) spent.set(u, u.hp);
       else if (struckOnly.has(key)) struckHp.set(u, u.hp);
       if (isBarbSeat(u.seat)) barbRest.set(u, stood && !struck.has(key) && num(r.fortify) > 0);
