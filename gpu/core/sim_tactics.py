@@ -434,12 +434,15 @@ class SimTactics:
         # the plots each unit attacks into (`groundOf`'s attack): an enemy
         # unit's of its own domain (the planning's: one that fights, on any
         # ground), a hostile city centre, an Encampment for a land unit — the
-        # path's end, the attack spending the Movement left
+        # path's end, the attack's step priced as any step and spending the
+        # Movement it leaves
         a_land, a_nav = self._tac_attack_planes(seat, not zoc, not zoc)
         fights = self._type_combat.take(utype) > 0
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows]) & fights.unsqueeze(1) & ~ent_n
         cost_b = self._tac_cost()  # [B, T, 6]
-        any_embark = bool(embarks.count_nonzero())
+        # the land/water steps priced (`stepCost`'s transition) where a unit
+        # embarks or strikes a plot across the shore
+        any_embark = bool(embarks.count_nonzero()) or bool((atk_n & water_n & ~naval.unsqueeze(1)).count_nonzero())
         if any_embark:
             entry_n = self._tac_entry()[rows]
             ctr_n = self._centre_plane()[rows]
@@ -529,7 +532,11 @@ class SimTactics:
                 tcost = torch.where(ctr_n.gather(1, nbc), tcost.clamp(max=self._mp_scale), tcost)
                 cst = torch.where(fw & tw, self._mp_scale, torch.where(tr, tcost, cst))
                 cliff6 = cliffs_b[rows, best][:, cols] & tr & ~waive_cliff.unsqueeze(1)
-            cst = torch.where(naval.unsqueeze(1), self._mp_scale, cst)
+            # a hull's step costs one Movement; its strike ashore the plot's
+            # own cost (`stepCost`: no transition for a hull)
+            a6 = atk_n.gather(1, nbc) & (nb >= 0)
+            ashore = a6 & ~water_n.gather(1, nbc)
+            cst = torch.where(naval.unsqueeze(1), torch.where(ashore, cost_b[rows, best][:, cols], self._mp_scale), cst)
             cst = torch.div(cst * _FIX, self._mp_scale, rounding_mode="floor")
             fresh = bm <= 0
             full_here = torch.where(fw.squeeze(1) & ~naval, full_s, full_l)
@@ -544,13 +551,13 @@ class SimTactics:
             turns = torch.where(short & ~at_start & same_turn, turns + 1, turns)
             cst = torch.where(short & ~at_start & ~same_turn, torch.where(pm > 0, pm, _FIX), cst)
             if zp is not None:
-                inz = zp.gather(1, nbc) & (moves > 0)
+                inz = zp.gather(1, nbc) & (moves > 0) & ~a6
                 cst = torch.where(inz, pm, cst)
                 moves = torch.where(inz, 0, moves)
-            a6 = atk_n.gather(1, nbc) & (nb >= 0)
-            cst = torch.where(a6, pm, cst)
+            # the attack's step priced as any step, then spending the
+            # Movement it leaves (`search`)
+            cst = torch.where(a6, cst + moves, cst)
             moves = torch.where(a6, 0, moves)
-            turns = torch.where(a6, (bt + fresh.long()).expand(-1, 6), turns)
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6) & (turns <= max_turns)
             if cliff6 is not None:
                 ok = ok & ~cliff6

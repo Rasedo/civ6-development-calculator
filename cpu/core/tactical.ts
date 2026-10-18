@@ -197,7 +197,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
  * unless it leaves the unit's own plot unmoved, where it spends everything; a
  * zone of control spends everything (`zoc`; the planning's breadth-first
  * search, flag 0x800, reads none, and strikes a unit at war on any ground,
- * a move order's path one on its own domain's). Its cost (0x270dd0): 1000 x the step's
+ * a move order's path one on its own domain's); a strike's step is priced
+ * so and then spends the Movement it leaves. Its cost (0x270dd0): 1000 x the step's
  * Movement +2, and where the step ends the turn's Movement +4, +3 more off
  * the unit's own territory. `onClose` sees each node as it closes; the
  * search stops where it answers true. `onLink` sees each link the search
@@ -265,25 +266,25 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
         turns += 1;
         pm = !naval && isWater(from) ? fullSea : fullLand;
       }
-      let cost: number;
-      let moves: number;
+      let cost = Math.floor(stepCostHeld(state, unit, from, to, di, held) * FIX / MP_SCALE);
+      let moves = pm - cost;
+      if (moves < 0) {
+        moves = 0;
+        if (best === start && unmoved) cost = pm;
+        else if (best.turns === turns) turns += 1;
+        else cost = pm > 0 ? pm : FIX;
+      }
       if (attack) {
-        // the attack spends the Movement left
+        // the attack's step priced as any step — a river's 2 above the
+        // Movement left waits for the next turn (runs/h1_duelv1121 t4: city-state
+        // 4's Warrior at 32:22 lists 32:23 (1/1) and the barbarian Scout's
+        // 33:23 across the river (2/0), AI_Planning.csv) — then spends the
+        // Movement it leaves (0x26e570: the cost adds it)
+        cost += moves;
+        moves = 0;
+      } else if (zoc && moves > 0 && ground.zoc(to)) {
         cost = pm;
         moves = 0;
-      } else {
-        cost = Math.floor(stepCostHeld(state, unit, from, to, di, held) * FIX / MP_SCALE);
-        moves = pm - cost;
-        if (moves < 0) {
-          moves = 0;
-          if (best === start && unmoved) cost = pm;
-          else if (best.turns === turns) turns += 1;
-          else cost = pm > 0 ? pm : FIX;
-        }
-        if (zoc && moves > 0 && ground.zoc(to)) {
-          cost = pm;
-          moves = 0;
-        }
       }
       if (turns > maxTurns) continue;
       onLink?.(to.index, best.tile, turns, moves, attack);

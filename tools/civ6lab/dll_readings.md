@@ -4933,9 +4933,13 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
 
 - The reach holds the plots the unit attacks into: the planning's
   breadth-first search links a plot a unit of a player at war holds (or a
-  hostile city centre, an Encampment) as a node whose step spends the
-  Movement left (the valid wrapper 0x26e570: the attack's cost adds the
-  Movement left, 0x1d0 += 0x1d4) and links nothing from it (a parent with
+  hostile city centre, an Encampment) as a node whose step is priced as any
+  step (0x26e920: a river's 2 above the Movement left waits for the next
+  turn — runs/h1_duelv1121 t4, city-state 4's Warrior at 32:22 lists 32:23
+  (1/1) and the barbarian Scout's 33:23 across the river from it (2/0),
+  AI_Planning.csv) and then spends the Movement it leaves (the valid
+  wrapper 0x26e570: the attack's cost adds the Movement left, 0x1d0 +=
+  0x1d4) and links nothing from it (a parent with
   node flag +0x51 & 0x40 is refused). AI_Planning.csv lists them (1124 t9:
   the barbarian Warrior at 40:22 holds 39:23 (1/0), China's Warrior there);
   a Slinger's reach holds them too (combat > 0, the range aside). The
