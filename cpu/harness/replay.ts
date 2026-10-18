@@ -77,7 +77,7 @@ import { missionOf, missionPayable } from '../core/deals';
 import { DEAL_MISSION, DELEGATION_COST, EMBASSY_COST } from '../data/seats';
 import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
-import { PROMOTE_HEAL, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
+import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
@@ -2376,6 +2376,12 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (!u || !name) { count(ctx, 'promote', 'refused', d.player); break; }
         const k = unitPromoRows(u).findIndex((p) => p.id === name);
         u.xp = Math.max(u.xp ?? 0, d.xp);
+        // a city-state's pick is its tactical AI's (`aiPromotionPick`, its
+        // Promotion move run on the copy beside the record): scored here
+        if (isCityStateSeat(u.seat)) {
+          const ours = aiPromotionPick(u);
+          count(ctx, 'minorAi:promote', ours === k ? 'applied' : 'fallback', d.player, `the AI's ${unitPromoRows(u)[ours]?.id ?? 'none'}, the game's ${name}`);
+        }
         if (k >= 0 && takePromotion(u, k)) { count(ctx, 'promote', 'applied', d.player); break; }
         if (k >= 0) {
           u.promos = (u.promos ?? 0) | (1 << k);

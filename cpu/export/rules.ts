@@ -2162,6 +2162,8 @@ export function buildRules() {
       mask: PROMO_CLASSES.map((c) => padTo(promoRows(c).map(
         (p) => slotsOf(p.effects.map((e) => e.mask ?? 0)),
       ), slotsOf([]))),
+      // each row's Level (`aiPromotionPick`)
+      tier: PROMO_CLASSES.map((c) => padTo(promoRows(c).map((p) => p.tier), 0)),
       unitClass: Object.values(UNITS).map((u) => PROMO_CLASSES.indexOf(UNIT_PROMO_CLASS[u.id] ?? ('' as never))),
       // CHOKE POINTS names "Woods, Jungle, Hills, or Marsh"; hills are their
       // own plane, so only the three FEATURES need naming here.

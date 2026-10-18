@@ -1490,7 +1490,7 @@ the two logs draw 12, its class's rows. Each of the three classes'
 rows share one Level in the engines' catalog, so the sort keeps the shuffle's
 order. The engines follow (`drawPromoOffer` / `_promo_offer_draw`).
 
-## C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported
+## C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)
 
 The tactical move Promotion (0x77ac30): each unit of the pool (+0x240)
 alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the
@@ -1506,7 +1506,15 @@ max(the modifiers' sum 0x7a4b20, 5 x the row's +0x24); the a term is the
 same for every row of a unit, so the pick is the first row with the
 greatest max(modifiers, 5 x +0x24). Operation Protect Units (0x80d790) and
 0x70fae0 take the same value. Unported: the promotion modifiers' analyzers
-(AUDIT C-96).
+(AUDIT C-96). The row's +0x24 read as its Level: every city-state pick of
+runs/h1_duelw1117-1128 is the first row of the highest Level it may take
+(melee Battlecry, then Commando; ranged Volley; siege Grape Shot; light
+cavalry Caparison; heavy cavalry Charge; naval ranged Line of Battle).
+Ported: `aiPromotionPick` and the city-states' tactical Promotion after
+Attack Medium Priority (Tactics.xml's "Minor Civ Tactical"; GPU
+`_tac_promotion`); the barbarians' lists hold no Promotion and the records
+log no barbarian promotion; the majors' and Operation Protect Units' use
+not ported.
 
 ## H-1: the World Congress slate (0x598270) — READ
 

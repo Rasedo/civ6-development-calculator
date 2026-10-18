@@ -5,6 +5,27 @@ from . import simbase
 
 
 class SimOrders:
+    def _take_promotion(self, pr: torch.Tensor, ps: torch.Tensor, pk: torch.Tensor, utp: torch.Tensor) -> None:
+        """`takePromotion`: games `pr`' units in global slots `ps` (types
+        `utp`) take column `pk` of their class list — its bit, a level, the
+        heal and the turn."""
+        self.unit_promos[pr, ps] |= torch.ones_like(ps) << pk
+        self.unit_level[pr, ps] += 1
+        self.unit_xp[pr, ps] = 0
+        # "Upon selecting a promotion, a unit recovers 50 HP and its turn ends."
+        _cap = int(self.rules.combat["unitHp"])
+        self.unit_hp[pr, ps] = (self.unit_hp[pr, ps] + PROMOTE_HEAL).clamp(max=_cap)
+        self.unit_mp[pr, ps] = 0
+        # CIV6 (Orator): "Can spread Religion 2 extra times" — the charges
+        # arrive with the CHOICE, which is where this roster's Apostle picks
+        # its promotion.
+        self.unit_charges[pr, ps] += self._promo_val(utp, self.unit_promos[pr, ps], "SPREAD_CHARGES")
+        # CIV6 (Patron Saint): the training city's banked promotion, spent by
+        # re-arming the unit.
+        _pb = self.unit_promo_bonus[pr, ps]
+        self.unit_promo_bonus[pr, ps] = (_pb - 1).clamp(min=0)
+        self.unit_xp[pr, ps] = torch.where(_pb > 0, self._xp_to_next(self.unit_level[pr, ps]), self.unit_xp[pr, ps])
+
     def _spend_build_charge(self, r: torch.Tensor, sc: torch.Tensor, hc: torch.Tensor) -> None:
         """A charge and the turn, and the unit vanishes on its last one — the
         tail every Builder and Military Engineer verb shares."""
@@ -277,27 +298,7 @@ class SimOrders:
                     ).squeeze(1).gather(1, pk_c.unsqueeze(1)).squeeze(1)
                     if bool(okp.count_nonzero()):
                         pr = okp.nonzero(as_tuple=True)[0]
-                        ps = sc[pr]
-                        self.unit_promos[pr, ps] |= torch.ones_like(ps) << pk_c[pr]
-                        self.unit_level[pr, ps] += 1
-                        self.unit_xp[pr, ps] = 0
-                        # "Upon selecting a promotion, a unit recovers 50 HP
-                        # and its turn ends."
-                        _cap = int(self.rules.combat["unitHp"])
-                        self.unit_hp[pr, ps] = (self.unit_hp[pr, ps] + PROMOTE_HEAL).clamp(max=_cap)
-                        self.unit_mp[pr, ps] = 0
-                        # CIV6 (Orator): "Can spread Religion 2 extra times" —
-                        # the charges arrive with the CHOICE, which is where
-                        # this roster's Apostle picks its promotion.
-                        self.unit_charges[pr, ps] += self._promo_val(
-                            utp[pr], self.unit_promos[pr, ps], "SPREAD_CHARGES")
-                        # CIV6 (Patron Saint): the training city's banked
-                        # promotion, spent by re-arming the unit.
-                        _pb = self.unit_promo_bonus[pr, ps]
-                        self.unit_promo_bonus[pr, ps] = (_pb - 1).clamp(min=0)
-                        self.unit_xp[pr, ps] = torch.where(
-                            _pb > 0, self._xp_to_next(self.unit_level[pr, ps]),
-                            self.unit_xp[pr, ps])
+                        self._take_promotion(pr, sc[pr], pk_c[pr], utp[pr])
 
             if _rk_escort[n] and _ecc >= 0:
                 # CIV6 (Formations): the rider joins the military unit already

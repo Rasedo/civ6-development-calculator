@@ -3246,7 +3246,8 @@ class SimTactics:
         before any moves, its tactical target list and danger map, its
         operations' run (`_mops_run`, their units theirs), then Attack
         High Priority, Move to Safety, Attack Medium and Low Priority, Heal,
-        Chase Target (no strike) and Wander Near City in pool order, the
+        Chase Target (no strike) and Wander Near City in pool order (Promotion
+        after Attack Medium Priority), the
         homeland's Move to Safety; the rest end their turn."""
         seat = 100 + s
         act = self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0)
@@ -3263,6 +3264,32 @@ class SimTactics:
             self._tac_cost_held = None
             self._tac_full_held = None
         self._seat_pool_dying(s, "major", seat, act)
+
+    def _tac_promotion(self, live, done: torch.Tensor, pre: str) -> None:
+        """PROMOTION (`promotion`, 0x77ac30): each unit left with a promotion
+        due takes the AI's pick (`aiPromotionPick`, 0x774970: of the rows it
+        may take, the first of the highest Level); the promotion ends its
+        turn"""
+        m = live()
+        if not bool(m.count_nonzero()):
+            return
+        rd = self.rules_dev
+        B, N = m.shape
+        P = rd.promo_cols
+        sc = (torch.arange(N, device=self.device) + self.POOL_LO[pre]).unsqueeze(0).expand(B, N)
+        utp = self.unit_type.gather(1, sc)
+        ok = self._promo_offer_mask(sc, utp) & m.unsqueeze(2)
+        has = ok.any(dim=2)
+        if not bool(has.count_nonzero()):
+            return
+        tier = rd.promo_tier[rd.u_promo_class.take(utp.clamp(min=0)).clamp(min=0)]
+        col = torch.arange(P, device=self.device).view(1, 1, -1)
+        key = torch.where(ok, tier * P + (P - 1 - col), torch.full_like(tier, -1))
+        pick = key.argmax(dim=2)
+        r, j = has.nonzero(as_tuple=True)
+        self._take_promotion(r, sc[r, j], pick[r, j], utp[r, j])
+        done |= has
+        self._gen_ver += 1
 
     def _minor_pass(self, s: int, act: torch.Tensor) -> None:
         """`_minor_tactics`' moves"""
@@ -3293,8 +3320,11 @@ class SimTactics:
             self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 3, pre, seat)
         self._tac_move_to_safety(live, done, order, npass, op["rowof"], op["res"], danger, pre, seat, False)
         if tg is not None:
-            for kind in (2, 1):
-                self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, kind, pre, seat)
+            self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 2, pre, seat)
+        # PROMOTION
+        self._tac_promotion(live, done, pre)
+        if tg is not None:
+            self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 1, pre, seat)
         # HEAL: a hurt unit not embarked on a plot of no danger holds its
         # plot; a hull outside its own waters heads for its city
         hp_max = int(self.rules.combat["unitHp"])

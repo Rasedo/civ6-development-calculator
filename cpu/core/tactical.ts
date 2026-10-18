@@ -35,7 +35,7 @@ import { barbarianScouts, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNo
 import { barbarianCaptures, barbarianTrees } from './barbarianOps';
 import { BT_RUNNING, BT_SUCCESS } from './behaviorTree';
 import { generalAuraMP } from './aura';
-import { attacksLeftOf, attacksPerTurn } from './promotions';
+import { aiPromotionPick, attacksLeftOf, attacksPerTurn, takePromotion } from './promotions';
 import type { BarbTribe, ImprovementId } from './types';
 
 /** the pathfinder's fixed point: one Movement is 256 */
@@ -1764,6 +1764,20 @@ function wanderNearCamp(state: GameState, pass: Pass, homeOf: (u: Unit) => numbe
 }
 
 /**
+ * PROMOTION (0x77ac30): each unit left, in pool order, with a promotion due
+ * (0x116f80) takes the AI's pick (`aiPromotionPick`, 0x774970); the
+ * promotion ends its turn ("Promote").
+ */
+function promotion(state: GameState, pass: Pass): void {
+  for (const u of pass.units) {
+    if (!live(state, pass, u)) continue;
+    const k = aiPromotionPick(u);
+    if (k < 0 || !takePromotion(u, k)) continue;
+    finish(pass, u, 'Promote');
+  }
+}
+
+/**
  * HEAL (0x779a70, its moves 0x7737c0): each unit left, in pool order, that
  * has taken damage (+0xcf0) is healed: a land unit holds its plot (it
  * fortifies, 0x95eae0, or sleeps, 0x9686d0); a naval one outside its own
@@ -2171,10 +2185,10 @@ export function militaryAiTypeOf(u: Unit): number {
  * (`operations`: their units the operations'); then the moves in the
  * list's order, each walking the units the moves before it left, in pool
  * order — Attack High Priority, Move to Safety, Attack Medium Priority,
- * Attack Low Priority, Heal, Chase Target (no strike), Wander Near City
- * (Support Formation, Attack Civilians, Promotion and Make Military
+ * Promotion, Attack Low Priority, Heal, Chase Target (no strike), Wander
+ * Near City (Support Formation, Attack Civilians and Make Military
  * Formation not ported); the homeland's Move to Safety, then its End Turn
- * takes the rest.
+ * takes the rest (its Promotion finds no unit the tactical one left due).
  */
 export function cityStateTactics(state: GameState, cityState: CityState, operations: (pass: Pass) => void): void {
   const pool = (cityState.unitPool ??= { size: 1, free: [], dying: [] });
@@ -2186,6 +2200,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
     attackUnits(state, pass, 'HIGH');
     moveToSafety(state, pass);
     attackUnits(state, pass, 'MEDIUM');
+    promotion(state, pass);
     attackUnits(state, pass, 'LOW');
     heal(state, pass);
     chaseTarget(state, pass);

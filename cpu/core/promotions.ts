@@ -361,6 +361,29 @@ export function holdTheLineCS(state: GameState, unit: Unit, tileIndex: number, f
   return n;
 }
 
+/** 0x774970, THE AI'S PROMOTION PICK: over the unit's class rows in database
+ *  order it may take now (0x55d750), the first valued strictly above the
+ *  best so far (from 0) — a row's value (0x7b5d70) the unit's own term, the
+ *  same for every row, plus the larger of its modifiers' value and 5 x its
+ *  Level. The modifiers' analyzers are not read: the first row of the
+ *  highest Level (runs/h1_duelw1117-1128: the city-states' melee units take
+ *  Battlecry, then Commando; ranged Volley, siege Grape Shot, light
+ *  cavalry Caparison, heavy cavalry Charge, naval ranged Line of Battle).
+ *  -1 with none due. */
+export function aiPromotionPick(unit: { level?: number; xp?: number; promos?: number; promoOffer?: number; type: string }): number {
+  if (!promoReady(unit)) return -1;
+  let best = -1;
+  let bv = 0;
+  unitPromoRows(unit).forEach((p, k) => {
+    if (!promoAvailable(unit, k)) return;
+    const v = 5 * p.tier;
+    if (best >= 0 && v <= bv) return;
+    best = k;
+    bv = v;
+  });
+  return best;
+}
+
 /** the promotion a unit takes at column k — its bit, its level and the heal.
  *  CIV6: "Upon selecting a promotion, a unit recovers 50 HP and its turn
  *  ends." */

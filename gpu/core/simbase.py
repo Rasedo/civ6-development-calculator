@@ -450,6 +450,7 @@ class Rules:
     promo_col_val: torch.Tensor  # long [NK, NPC, PCOL] — per-column sum of kind k's values
     promo_col_max: torch.Tensor  # long [NK, NPC, PCOL] — per-column max of kind k's values
     promo_rows: torch.Tensor  # long [NPC] — how many rows each class actually holds
+    promo_tier: torch.Tensor  # long [NPC, PCOL] — each row's Level (`aiPromotionPick`)
     u_promo_class: torch.Tensor  # long [NU] — the class each chassis promotes from, -1 = none
     promo_class_bit: torch.Tensor  # long [NPC] — the bit a class presents to a `CS_VS_*` mask, 0 = never a target
     choke_features: list  # the feature indices CHOKE POINTS defends in (hills are their own plane)
@@ -707,6 +708,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         promo_col_val=_pf_colv,
         promo_col_max=_pf_colm,
         promo_rows=torch.tensor([len(x) for x in _P["ids"]], dtype=torch.long),
+        promo_tier=torch.tensor(_P["tier"], dtype=torch.long),
         u_promo_class=torch.tensor(_P["unitClass"], dtype=torch.long),
         promo_class_bit=torch.tensor(_P["classBit"], dtype=torch.long),
         choke_features=list(_P["chokeFeatures"]),
