@@ -319,6 +319,10 @@ class SimInit:
         self.citystate_founded_turn = torch.full((B, s_pad), -99, dtype=torch.long, device=device)
         self.citystate_prod_set_value = torch.full((B, s_pad), -9999 * 256, dtype=torch.long, device=device)
         self.citystate_threat = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        # its city's Food favored by its city AI (`minorFoodFocus`, 0x5cdae0)
+        self.citystate_fav_food = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # the citizen manager's hexspace offsets in the DLL's order (`CITIZEN_HEXSPACE`)
+        self._hex37_off = torch.tensor(CITIZEN_HEXSPACE, dtype=torch.long, device=device)
         # its city's growth as its city AI's update read it between the
         # turn's production and its growth: surplus, housing, population,
         # store, multiplier (raw 24.8 but the housing and population)
@@ -2254,8 +2258,9 @@ class SimInit:
         self.fertility_sci = torch.zeros(B, T, dtype=torch.long, device=device)
         self.fertility_cul = torch.zeros(B, T, dtype=torch.long, device=device)
         # a CITIZEN is PINNED to this plot (Tile.locked): the work ranking takes
-        # every locked plot a city can reach before it ranks anything by score.
-        self.tile_locked = torch.zeros(B, T, dtype=torch.bool, device=device)
+        # every locked plot a city can reach before it ranks anything by score;
+        # the city-states' founding placed theirs (`lockedInit`)
+        self.tile_locked = torch.tensor([f["lockedInit"] for f in fixtures], dtype=torch.bool, device=device)
         # CIV6 (Marina Raskova): the permanent "+1 air unit slots" a retired
         # general leaves on a district tile (`Tile.airSlotBonus`)
         self.tile_air_bonus = torch.zeros(B, T, dtype=torch.long, device=device)

@@ -12,6 +12,7 @@ import { FEATURES } from '../../world/features';
 // the border-growth pick and its claim: a minor's envoy plots are taken by
 // the city rule's OWN next-tile choice, never a second one
 import { drawBorderPlot, acquireTile } from './city';
+import { placeCitizens, replaceAllCitizens, type YieldFlags } from './citizens';
 import { darkBuildings } from './yields';
 import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
@@ -61,7 +62,46 @@ export function placeCityStateAt(
   // the ROSTER width, which capture must not shrink — the war head's minor
   // columns and the observation's minor block are both sized off it.
   state.cityStateMax = Math.max(state.cityStateMax ?? 0, id + 1);
+  // the founding's annex re-places its citizen (AnnexPlots 0x1a8a30 ->
+  // 0x196320; runs/h1_duelw1127 Mexico City t2: the record's citizen on 492)
+  minorReplaceCitizens(state, cityState);
   return cityState;
+}
+
+/** A city-state's yield flags: Food favored where its city AI set it
+ *  (`minorFoodFocus`), else none */
+const minorFlags = (cs: CityState): YieldFlags => (cs.favoredFood ? 'F.....' : '');
+
+/** `n` citizens the minor's city gained placed beside the ones working
+ *  (0x197230; `minorCity` is a view, so the pins and the idle are written
+ *  back) */
+export function minorPlaceCitizens(state: GameState, cs: CityState, n: number): void {
+  if (n <= 0) return;
+  const city = minorCity(cs);
+  placeCitizens(state, city, n, minorFlags(cs));
+  cs.specialistPref = city.specialistPref;
+  cs.idleCitizens = city.idleCitizens;
+}
+
+/** every citizen of the minor's city re-placed (0x196320: an annex, a
+ *  citizen lost, an improvement laid, a yield flag set) */
+export function minorReplaceCitizens(state: GameState, cs: CityState): void {
+  const city = minorCity(cs);
+  replaceAllCitizens(state, city, minorFlags(cs));
+  cs.specialistPref = city.specialistPref;
+  cs.idleCitizens = city.idleCitizens;
+}
+
+/** THE CITY AI'S FOOD FOCUS (0x5cdae0, the city's update before its events):
+ *  a city whose Food surplus less its citizens' is below 1.0 with Housing
+ *  above its population favors Food, one that is not clears it, each change
+ *  a full re-place (the SET_FOCUS command; the city-states' CityFocusChanged
+ *  rows toggling Food a turn apart, runs/h1_duelw1129-1130) */
+export function minorFoodFocus(state: GameState, cs: CityState, surplus: number, housing: number): void {
+  const want = surplus < 1 && housing > cs.population;
+  if (want === !!cs.favoredFood) return;
+  cs.favoredFood = want;
+  minorReplaceCitizens(state, cs);
 }
 
 export function cityStateAt(state: GameState, tileIndex: number): CityState | undefined {
@@ -224,14 +264,19 @@ export function envoyTiles(state: GameState, cityState: CityState): void {
   if (!CIV_LEVELS.CITY_STATE.canAnnexTilesWithReceivedInfluence) return;
   const city = minorCity(cityState);
   let want = envoysReceived(cityState) - 1 - city.tilesAcquired;
+  let took = false;
   while (want > 0) {
     const next = drawBorderPlot(state, city);
     if (next === null) break; // the border rule's own refusal: nothing free is in reach
     acquireTile(state, city, next);
+    took = true;
     want -= 1;
   }
   // `minorCity` is a fresh VIEW every call, so the claim is written back
   cityState.tilesAcquired = city.tilesAcquired;
+  // each annex re-places every citizen (AnnexPlot 0x1a8b70 -> 0x196320;
+  // runs/h1_duelw1121 Hunza t41: a citizen moved onto the annexed 229)
+  if (took) minorReplaceCitizens(state, cityState);
 }
 
 /** Every minor, in roster order — one envoy write can raise the count at

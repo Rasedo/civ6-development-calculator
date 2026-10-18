@@ -706,8 +706,16 @@ class SimMinors:
         col = torch.zeros(self.B, dtype=torch.long, device=self.device)
         pop0 = self.city_pop[:, row, 0].clone()
         self._seat_city_growth(row, col, act, eff[:, 0], need[:, 0])
+        # a citizen grown is placed beside the rest, a starved city re-places
+        # them all (0x1b41e0 -> 0x194fb0)
+        pop1 = self.city_pop[:, row, 0].clone()
+        self._minor_place_citizens(s, act & (pop1 > pop0), pop1 - pop0)
+        self._minor_replace_citizens(s, act & (pop1 < pop0))
+        acq0 = self.city_acquired[:, row, 0].clone()
         self._seat_border_growth(row, col, act,
                                  self._culture_after_growth(row, 0, pop0, total[:, 0, 4], lux) * act.double())
+        # the border's annex re-places every citizen (AnnexPlot 0x1a8b70)
+        self._minor_replace_citizens(s, act & (self.city_acquired[:, row, 0] != acq0))
 
     def _minor_envoy_tiles(self, games: torch.Tensor) -> None:
         """A MINOR TAKES GROUND FROM THE INFLUENCE SPENT ON IT — `envoyTiles`,
@@ -756,6 +764,7 @@ class SimMinors:
             want = (env[:, s] - 1 - self.city_acquired[bidx, row, col]) * (self.citystate_alive[:, s] & games).long()
             if not bool((want > 0).count_nonzero()):
                 continue
+            took = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             center = self.city_center[bidx, row, col]
             cid = self.city_id[bidx, row, col]
             for _ in range(int(want.max())):  # the TS while-loop, one plot at a time
@@ -775,9 +784,12 @@ class SimMinors:
                 # A claim widens a LATER city's workable candidates.
                 self._claim_version += 1
                 self.city_acquired[rows, row, col[rows]] += 1
+                took = took | claim
                 want = want - claim.long()
                 # a game whose draw found nothing stops, as TS breaks
                 want = torch.where(ready & ~claim, torch.zeros_like(want), want)
+            # each annex re-places every citizen (AnnexPlot 0x1a8b70 -> 0x196320)
+            self._minor_replace_citizens(s, took)
 
     def _minor_research(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> torch.Tensor:
         """`minorResearch` for research row `s` — the Free Cities' (`FR`, every
@@ -1797,3 +1809,220 @@ class SimMinors:
         self._q_push(row, j, has_w, _b1 * code_w,
                      _b1.to(self.city_cost.dtype) * float(wrow["cost"]))
         self._eff_version += 1
+
+    # -- THE CITIZEN MANAGER (`citizens.ts`) for the city-states ------------
+
+    def _minor_plot_yields(self, s: int) -> torch.Tensor:
+        """[B, T, 6] f64 — each plot's yields as minor `s`'s worked plot pays
+        them: the city walk's tile planes (`tileYields`) and the plot bonuses
+        of the city's lit buildings (`cityPlotBonus`: the Water Mill's Farm
+        resources, the Coast rows, the coastal resources', the feature rows),
+        none under an impassable feature"""
+        row = self._CITY_MINOR0 + s
+        g = self._rcy_globals()
+        y = g["ty_oth"].double().clone()
+        y[:, :, 0] = self._rcy_food_plane(row, g).double()
+        y[:, :, 1] = g["p_plane"].double()
+        y = y + self._seat_tile_add(row).double()
+        hid = self._res_hidden_yields(row)
+        if hid is not None:
+            y = y - hid.double()
+        rd = self.rules_dev
+        sl = slice(0, 1)
+        lit = (self.city_bldg[:, row, sl] & ~self._bldg_dark(self.city_dist_tile[:, row, sl],
+                                                              self.city_bldg_pillaged[:, row, sl]))[:, 0]
+        bon = torch.zeros_like(y)
+        wm = lit[:, rd.b_farmbonus]
+        if wm.numel() and bool(wm.count_nonzero()):
+            wq = self._res_live() & (self.res_cat == 1) & (self.res_imp == self.FARM)
+            bon[:, :, 0] = bon[:, :, 0] + (wq & wm.any(dim=1, keepdim=True)).double()
+        if self._coast_plot_terr:
+            wet = torch.zeros_like(self.terrain, dtype=torch.bool)
+            for t in self._coast_plot_terr:
+                wet = wet | (self.terrain == t)
+            wet = wet & ~self.tile_submerged
+            for bi, y6, un in self._b_coast_plot:
+                has = lit[:, bi]
+                if not bool(has.count_nonzero()):
+                    continue
+                q = wet & has.unsqueeze(1)
+                if un:
+                    q = q & (self.improvement < 0)
+                bon = bon + q.double().unsqueeze(2) * y6.double().view(1, 1, 6)
+        for bi, civ, y6 in self._b_coast:
+            sv = lit[:, bi]
+            if civ is not None:
+                sv = sv & self._row_plays_idx(row, civ).reshape(-1)
+            if not bool(sv.count_nonzero()):
+                continue
+            rl = self._res_live() & ~self._res_hidden(row)
+            q = (self.terrain == self._coast_terr) & rl & sv.unsqueeze(1)
+            bon = bon + q.double().unsqueeze(2) * y6.double().view(1, 1, 6)
+        for bi, fid, y6, vcs in self._b_feat_plot:
+            sv = lit[:, bi]
+            for vc in vcs:
+                sv = sv & ~self._row_plays_idx(row, vc).reshape(-1)
+            if not bool(sv.count_nonzero()):
+                continue
+            q = (self.feat_id == fid) & ~self.feat_stripped & sv.unsqueeze(1)
+            bon = bon + q.double().unsqueeze(2) * y6.double().view(1, 1, 6)
+        fl = (self.feat_id >= 0) & ~self.feat_stripped
+        bar = fl & ~self._feat_passable[self.feat_id.clamp(min=0)]
+        return y + torch.where(bar.unsqueeze(2), torch.zeros_like(bon), bon)
+
+    def _minor_place_citizens(self, s: int, mask: torch.Tensor, n: torch.Tensor, full: bool = False) -> None:
+        """`minorPlaceCitizens` (with `full`, `minorReplaceCitizens`) for minor
+        `s` where `mask`: `placeCitizens` — the Food need with the assigned
+        citizens alone working, the entries of the DLL's hexspace (a free plot
+        once, a district's free specialist slots each), the table over
+        entries x count (an earlier entry keeps a tie), the plots of the
+        count's cell locked and its slots pinned, the rest idle"""
+        mask = mask & self.citystate_alive[:, s]
+        if not bool(mask.count_nonzero()):
+            return
+        B, dev = self.B, self.device
+        row = self._CITY_MINOR0 + s
+        seat = 100 + s
+        cid = self.city_id[:, row, 0]
+        ctr = self.city_center[:, row, 0].clamp(min=0)
+        mine = (self.tile_seat == seat) & (self.tile_city == cid.unsqueeze(1))
+        nD = self.city_spec_pin.shape[3]
+        if full:
+            self.tile_locked[mask.unsqueeze(1) & mine] = False
+            self.city_spec_pin[:, row, 0] = torch.where(mask.unsqueeze(1), 0, self.city_spec_pin[:, row, 0])
+            n = self.city_pop[:, row, 0]
+        n = torch.where(mask, n, torch.zeros_like(n)).clamp(min=0)
+        self.city_spec_pin[:, row, 0] = torch.where(mask.unsqueeze(1), self.city_spec_pin[:, row, 0].clamp(min=0),
+                                                    self.city_spec_pin[:, row, 0])
+        self.city_idle[:, row, 0] = torch.where(mask, n, self.city_idle[:, row, 0])
+        total = self._seat_city_stats(row, record=False)[0]
+        surplus = total[:, 0, 0] - self.city_pop[:, row, 0].double() * self.rules.food_per_citizen
+        need = (-torch.floor(surplus)).clamp(min=0)
+        y = self._minor_plot_yields(s)
+        win = tiles_from_offsets(ctr, self._hex37_off, self.W, self.H, self.wrap_x)  # [B, 37]
+        P = win.shape[1]
+        wc = win.clamp(min=0)
+
+        def at(plane):
+            return plane.gather(1, wc)
+
+        tile_ok = ((win >= 0) & (win != ctr.unsqueeze(1)) & at(mine) & (at(self.district) < 0)
+                   & (at(self.built_wonder) < 0) & ~at(self.tile_locked))
+        yt = torch.trunc(y.gather(1, wc.unsqueeze(2).expand(-1, -1, 6)))  # [B, P, 6]
+        tile_ok = tile_ok & (y.gather(1, wc.unsqueeze(2).expand(-1, -1, 6)) > 0).any(dim=2)
+        # a district of the city at a plot: its specialists' yields and free slots
+        dreg = self.city_dist_tile[:, row, 0]  # [B, nD]
+        slots = self._city_spec_slots(row, slice(0, 1))[:, 0]  # [B, nD]
+        free = (slots - self.city_spec_pin[:, row, 0].clamp(min=0)).clamp(min=0)
+        bldg = self.city_bldg[:, row, 0]
+        spec_y = torch.zeros(B, nD, 6, dtype=torch.float64, device=dev)
+        for di in range(min(nD, len(self.districts_cat))):
+            if not bool(self._spec_any[di]):
+                continue
+            has_t = torch.zeros(B, dtype=torch.bool, device=dev)
+            for t_b in self._spec_tb[di]:
+                if t_b == -2:
+                    has_t = has_t | (bldg & self._b_worship.reshape(1, -1)).any(dim=1)
+                elif t_b >= 0:
+                    has_t = has_t | bldg[:, t_b]
+            spec_y[:, di] = self._spec_y[di].reshape(1, 6) + has_t.double().unsqueeze(1) * self._spec_ta[di].reshape(1, 6)
+        spec_on = self._spec_any[:nD].reshape(1, nD) & (dreg >= 0)
+        K = max(int(free.max()) if free.numel() else 0, 1)
+        # the entries in hexspace order: per plot its tile entry, or the
+        # free slots of the district standing on it
+        flags = self.citystate_fav_food[:, s]
+        fav_k = torch.zeros(B, 6, dtype=torch.bool, device=dev)
+        fav_k[:, 0] = flags
+        wts = torch.tensor([2.0, 2.0, 1.0, 2.0, 2.0, 2.0], dtype=torch.float64, device=dev)
+
+        def score(y6):  # [B, ..., 6] -> food, favored, other
+            v = y6 * wts
+            f6 = fav_k.reshape(B, *([1] * (y6.dim() - 2)), 6)
+            return y6[..., 0], (v * f6).sum(-1), (v * ~f6).sum(-1)
+
+        e_food, e_fav, e_oth, e_ok, e_plot, e_dist = [], [], [], [], [], []
+        tf, tv, to = score(yt)
+        for p in range(P):
+            on_p = (dreg == win[:, p].unsqueeze(1)) & (win[:, p] >= 0).unsqueeze(1) & spec_on & at(mine)[:, p].unsqueeze(1)
+            di = torch.where(on_p.any(dim=1), on_p.long().argmax(dim=1), torch.full_like(win[:, p], -1))
+            has_d = di >= 0
+            dsy = torch.trunc(spec_y.gather(1, di.clamp(min=0).view(B, 1, 1).expand(-1, 1, 6)).squeeze(1))
+            df, dv, do = score(dsy)
+            dfree = free.gather(1, di.clamp(min=0).unsqueeze(1)).squeeze(1)
+            for k in range(K):
+                d_ok = has_d & (dfree > k)
+                if k == 0:
+                    ok = torch.where(has_d, d_ok, tile_ok[:, p])
+                    e_food.append(torch.where(has_d, df, tf[:, p]))
+                    e_fav.append(torch.where(has_d, dv, tv[:, p]))
+                    e_oth.append(torch.where(has_d, do, to[:, p]))
+                    e_plot.append(torch.where(has_d, torch.full_like(win[:, p], -1), win[:, p]))
+                else:
+                    ok = d_ok
+                    e_food.append(df)
+                    e_fav.append(dv)
+                    e_oth.append(do)
+                    e_plot.append(torch.full_like(win[:, p], -1))
+                e_ok.append(ok)
+                e_dist.append(torch.where(has_d, di, torch.full_like(di, -1)))
+        E = len(e_ok)
+        nmax = int(n.max())
+        if nmax <= 0:
+            self.city_idle[:, row, 0] = torch.where(mask, torch.zeros_like(n), self.city_idle[:, row, 0])
+            return
+        cf = torch.zeros(B, nmax + 1, dtype=torch.float64, device=dev)
+        cv = torch.zeros_like(cf)
+        co = torch.zeros_like(cf)
+        picks = torch.zeros(B, nmax + 1, E, dtype=torch.bool, device=dev)
+        need2 = need.unsqueeze(1)
+        for e in range(E):
+            ok = e_ok[e].unsqueeze(1)
+            pf, pv, po, pp = cf[:, :-1], cv[:, :-1], co[:, :-1], picks[:, :-1]
+            nf = pf + e_food[e].unsqueeze(1)
+            nv = pv + e_fav[e].unsqueeze(1)
+            no = po + e_oth[e].unsqueeze(1)
+            of, ov, oo = cf[:, 1:], cv[:, 1:], co[:, 1:]
+            better = ((of < need2) & (nf >= need2)) | ((nv != ov) & (nv > ov)) | ((nv == ov) & (no > oo))
+            take = ok & better
+            cf = torch.cat([cf[:, :1], torch.where(take, nf, of)], dim=1)
+            cv = torch.cat([cv[:, :1], torch.where(take, nv, ov)], dim=1)
+            co = torch.cat([co[:, :1], torch.where(take, no, oo)], dim=1)
+            np_ = pp.clone()
+            np_[:, :, e] = True
+            picks = torch.cat([picks[:, :1], torch.where(take.unsqueeze(2), np_, picks[:, 1:])], dim=1)
+        chosen = picks.gather(1, n.view(B, 1, 1).expand(-1, 1, E)).squeeze(1) & mask.unsqueeze(1)  # [B, E]
+        plot_e = torch.stack(e_plot, dim=1)
+        dist_e = torch.stack(e_dist, dim=1)
+        lay = chosen & (plot_e >= 0)
+        if bool(lay.count_nonzero()):
+            r, e = lay.nonzero(as_tuple=True)
+            self.tile_locked[r, plot_e[r, e]] = True
+        pin = chosen & (plot_e < 0) & (dist_e >= 0)
+        if bool(pin.count_nonzero()):
+            add = torch.zeros(B, nD, dtype=torch.long, device=dev)
+            add.scatter_add_(1, dist_e.clamp(min=0), pin.long())
+            self.city_spec_pin[:, row, 0] = self.city_spec_pin[:, row, 0] + add
+        placed = chosen.sum(dim=1)
+        self.city_idle[:, row, 0] = torch.where(mask, (n - placed).clamp(min=0), self.city_idle[:, row, 0])
+        self._eff_version += 1
+
+    def _minor_replace_citizens(self, s: int, mask: torch.Tensor) -> None:
+        """`minorReplaceCitizens`: every citizen of minor `s`'s city re-placed
+        where `mask` (0x196320)"""
+        self._minor_place_citizens(s, mask, self.city_pop[:, self._CITY_MINOR0 + s, 0], full=True)
+
+    def _minor_food_focus(self, s: int, mask: torch.Tensor) -> None:
+        """`minorFoodFocus` where `mask`: Food favored below a surplus of 1.0
+        with Housing above the population, cleared otherwise, each change a
+        full re-place (0x5cdae0)"""
+        row = self._CITY_MINOR0 + s
+        total = self._seat_city_stats(row, record=False)[0]
+        pop = self.city_pop[:, row, 0]
+        surplus = total[:, 0, 0] - pop.double() * self.rules.food_per_citizen
+        housing = self._seat_housing(row)[1][:, 0]
+        want = (surplus < 1) & (housing > pop.double())
+        change = mask & (want != self.citystate_fav_food[:, s])
+        if not bool(change.count_nonzero()):
+            return
+        self.citystate_fav_food[:, s] = torch.where(change, want, self.citystate_fav_food[:, s])
+        self._minor_replace_citizens(s, change)

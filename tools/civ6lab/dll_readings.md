@@ -2749,9 +2749,18 @@ the records hold none — 1117 Xiurong t199-240 (4 <-> 5 citizens: the
 growth pick Food-first, Plains 1/2 over a Great Wall 0/0/4/0/2, the
 re-placement Culture-first on the Great Walls; the border banks 25.5 and
 27.2 where an unfavored DP banks 27.5) and Guangzhou t173-249. The engines'
-own placement (`assignWorkedTiles` / the GPU walk: locked plots, then
-FOCUS_BASE 2/2/1/1/1/1) is not this reading (AUDIT C-94 BUILD). The H-1
-harness places by it (`cpu/harness/citizens.ts`, no favored yields): a
+own placement for a major (`assignWorkedTiles` / the GPU walk: locked plots,
+then FOCUS_BASE 2/2/1/1/1/1) is not this reading (AUDIT C-94 BUILD); the
+city-states place by it (`cpu/core/citizens.ts`, `minorPlaceCitizens` /
+`_minor_place_citizens`: their founding's annex, a grown citizen, a starved
+city, a border or envoy annex, an improvement laid, the Food focus below).
+THE CITY AI'S FOOD FOCUS (0x5cdae0, the city update's call before its
+events, an AI player's city only): the growth object's Food surplus
+(0x1b5620) below 1.0 with its Housing (0x1b5840) above the population
+(+0x588): Food not favored (0x1962a0 on +0x1ba8) is set favored; otherwise a
+favored Food is cleared — each through the SET_FOCUS command (0x975550),
+a full re-place. The H-1
+harness places by it (`cpu/core/citizens.ts`, no favored yields): a
 Settler's citizen lost re-places them all, a grown citizen goes beside the
 rest, a starved city re-places them all (1121 t21 Xi'an grows back on the
 Spices; t231 Shanghai's five specialists back on plots): over the 22

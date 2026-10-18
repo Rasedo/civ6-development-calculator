@@ -1183,6 +1183,9 @@ export interface CityState extends Seat {
   prodOverflow?: number;
   prodSite?: number;
   prodSetValue?: number;
+  /** its city's Food favored by its city AI (`minorFoodFocus`, 0x5cdae0):
+   *  the citizen manager's yield flag */
+  favoredFood?: boolean;
   /** the turn its city was founded (city +0x2600, m_iTurnFounded); absent
    *  for a city a record's import finds standing */
   foundedTurn?: number;

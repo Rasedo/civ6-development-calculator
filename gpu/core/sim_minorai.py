@@ -136,6 +136,8 @@ class SimMinorAi:
         ev = alive & ~fresh
         if bool(ev.count_nonzero()):
             lst = self.rules.ai_city_build["cityEventLists"].get("MINOR_CIV_DEFAULT_TRAIT", {})
+            # its Food focus (0x5cdae0), set before the events
+            self._minor_food_focus(s, ev)
             defense_event(ai, s, w, lst.get("CITY_UNDER_THREAT"), ev)
             building_event(ai, s, w, ev)
             district_event(ai, s, w, ev)
@@ -1721,6 +1723,9 @@ class _MinorWorld:
                 sim._eff_version += 1
                 sim._spend_build_charge(rr, uid, plot)
                 sim._gen_ver += 1
+                # an improvement laid re-places the citizens of the city it
+                # stands in (0xa4cee0 -> 0x196320)
+                sim._minor_replace_citizens(self.s, lay & (sim.tile_seat[sim._bidx, pc] == self.seat))
             return
         # the plot's improvement goes first, at no charge; then its feature,
         # else its resource

@@ -330,6 +330,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
 
   const ownerSeatInit = map.tiles.map((t) => tileSeat(t));
   const ownerInit = map.tiles.map((t) => tileCity(t));
+  // the citizens the city-states' founding placed (`minorReplaceCitizens`)
+  const lockedInit = map.tiles.map((t) => (t.locked ? 1 : 0));
 
   return {
     // 4: `du` admits floodplains (GS builds districts on them), a wider
@@ -371,6 +373,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     tiles,
     ownerSeatInit,
     ownerInit,
+    lockedInit,
     eraScoreInit: state.seats.map((s) => s.eraScore ?? 0),
     barsInit: state.seats.map((s) => [s.darkBar ?? 0, s.goldenBar ?? 0]),
     worldHash: world.worldHash,

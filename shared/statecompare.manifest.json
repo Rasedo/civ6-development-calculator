@@ -2516,6 +2516,21 @@
           "note": "the turn the minor's city was founded (city +0x2600, m_iTurnFounded); -99 for none"
         },
         {
+          "name": "minorCitizens",
+          "compare": "exact",
+          "covers": [
+            "CityState.favoredFood",
+            "CityState.idleCitizens",
+            "CityState.specialistPref"
+          ],
+          "planes": [
+            "citystate_fav_food",
+            "city_idle",
+            "city_spec_pin"
+          ],
+          "note": "the minor's citizen manager: Food favored (its city AI's focus, 0x5cdae0), its idle citizens, its specialists pinned per district (PLACEABLE_DISTRICTS order)"
+        },
+        {
           "name": "minorThreat",
           "compare": "exact",
           "covers": [

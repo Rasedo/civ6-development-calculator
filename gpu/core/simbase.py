@@ -1011,6 +1011,15 @@ def first_argmax(x: torch.Tensor) -> torch.Tensor:
 _OFFSETS_CACHE: dict[int, torch.Tensor] = {}
 
 
+# the DLL's hexspace order, axial (dq, dr) from the centre (City_Citizens 0x5cc00
+# over the tables 0xefedf0 / 0xefeef0: the centre, then rings 1, 2, 3)
+CITIZEN_HEXSPACE = (
+    (0, 0), (0, 1), (1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 2), (1, 1), (2, 0), (2, -1), (2, -2), (1, -2), (0, -2),
+    (-1, -1), (-2, 0), (-2, 1), (-2, 2), (-1, 2), (0, 3), (1, 2), (2, 1), (3, 0), (3, -1), (3, -2), (3, -3), (2, -3),
+    (1, -3), (0, -3), (-1, -2), (-2, -1), (-3, 0), (-3, 1), (-3, 2), (-3, 3), (-2, 3), (-1, 3),
+)
+
+
 def tiles_within_offsets(radius: int) -> torch.Tensor:
     """[M, 2] axial (dq, dr) offsets in EXACT tilesWithin iteration order —
     several TS scans break ties by that order (equal-sum tile picks, the
@@ -1204,7 +1213,7 @@ _MUTABLE = [
     "citystate_treasury", "citystate_faith",
     "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",
     # its city AI: the district's plot, the item's turn and value, the threat, its update's growth, the savings
-    "citystate_prod_site", "citystate_founded_turn", "citystate_prod_set_value", "citystate_threat", "citystate_ai_growth", "citystate_combat_desire", "citystate_standing_short",
+    "citystate_prod_site", "citystate_founded_turn", "citystate_prod_set_value", "citystate_threat", "citystate_fav_food", "citystate_ai_growth", "citystate_combat_desire", "citystate_standing_short",
     "citystate_savings", "citystate_balance", "citystate_ai_on", "citystate_unit_values", "citystate_unit_on", "citystate_res_counts", "citystate_trade_ok", "citystate_trade_no", "citystate_trade_value",
     # its events' slots, trees, contracts and reservations (`CityAi`)
     "cai_slots", "cai_tr_alive", "cai_tr_id", "cai_tr_status", "cai_tr_mem_a", "cai_tr_mem_b", "cai_tr_bb", "cai_tr_trigger",

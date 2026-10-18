@@ -60,11 +60,11 @@ import { majorView } from './majorView';
 import { minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
 import { ARMY_READ_AGE } from './operations/knowledge';
 import { joinBuilt } from './operations/manager';
-import { minorCity } from './cityStates';
+import { minorCity, minorFoodFocus } from './cityStates';
 import { campTiles, civOf, hiddenResourcesFor, seatOf, tileSeat } from './seats';
 import { cityAppealResolver } from './governors';
 import { canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
-import { borderCandidates } from './city';
+import { borderCandidates, computeCityStats } from './city';
 import { tilePurchaseCost } from './game';
 import { computeUnlocksIn, makeYieldCtx } from './effects';
 import { floodHazardTurns } from './disasters';
@@ -718,6 +718,9 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
   city.bestImprovement = pickImprovement(ai, w, evals);
   const list = AI_CITY_EVENTS[AI_CITY_EVENT_LISTS.MINOR_CIV_DEFAULT_TRAIT];
   if (!fresh) {
+    // its Food focus (0x5cdae0), set before the events
+    const st = computeCityStats(state, minorCity(cs));
+    minorFoodFocus(state, cs, st.foodSurplus, st.housing);
     defenseEvent(ai, w, city, list.CITY_UNDER_THREAT ?? null);
     buildingEvent(ai, w, city, list.CITY_EVENT_UNIT_OR_BUILDING);
     districtEvent(ai, w, city, list.CITY_EVENT_DISTRICT);

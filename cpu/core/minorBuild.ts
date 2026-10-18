@@ -44,7 +44,7 @@ import { researchCost, selectResearch } from './economy';
 import { CP_CLAIMED, CP_IN_PROGRESS } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw } from './aiCivics';
-import { minorCity, suzerainOf } from './cityStates';
+import { minorCity, minorPlaceCitizens, minorReplaceCitizens, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from './effects';
 import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
@@ -262,6 +262,14 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
   const stats = computeCityStats(state, city);
   const popBefore = city.population;
   seatGrowth(city, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
+  // a citizen grown is placed beside the rest, a starved city re-places them
+  // all (0x1b41e0 -> 0x194fb0)
+  cityState.population = city.population;
+  if (city.population > popBefore) minorPlaceCitizens(state, cityState, city.population - popBefore);
+  else if (city.population < popBefore) minorReplaceCitizens(state, cityState);
+  city.specialistPref = cityState.specialistPref;
+  city.idleCitizens = cityState.idleCitizens;
+  const acquired = city.tilesAcquired;
   cityBorderGrowth(state, city, cityState.seat, cultureAfterGrowth(state, city, popBefore, stats));
   cityState.population = city.population;
   cityState.unconvertedPressure = city.unconvertedPressure;
@@ -269,6 +277,8 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
   cityState.cultureBox = city.cultureBox;
   cityState.nextPlot = city.nextPlot;
   cityState.tilesAcquired = city.tilesAcquired;
+  // the border's annex re-places every citizen (AnnexPlot 0x1a8b70)
+  if (city.tilesAcquired !== acquired) minorReplaceCitizens(state, cityState);
 }
 
 /**
@@ -555,6 +565,10 @@ export function minorBuilderLays(state: GameState, u: Unit, plot: number, imp: s
   u.charges = (u.charges ?? 0) - 1;
   u.movesLeft = 0;
   if (u.charges <= 0) disbandUnit(state, u.id);
+  // an improvement laid re-places the citizens of the city it stands in
+  // (0xa4cee0 -> 0x196320)
+  const owner = state.cityStates.find((c) => c.seat === tileSeat(tile));
+  if (owner) minorReplaceCitizens(state, owner);
 }
 
 /** The land (or, with `naval`, the naval) military chassis a research
