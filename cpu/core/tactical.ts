@@ -2037,13 +2037,22 @@ function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number
   let v1Best = 0;
   let best2 = -1;
   let v2Best = 0;
+  // the first plot whose look holds a revealed route (plot +0x47, 0x70a6c0's
+  // second flag) and an unrevealed plot takes the lead once, whatever came
+  // before it
+  let routeLed = false;
   search(state, u, 1, false, (n, ground) => {
     const p = n.tile;
     if (!ground.stand(p) || pass.danger[p] > 0 || chosen.has(p) || !exploreOk(state, u, p, revealed)) return false;
     const seen = look(p);
     const v1 = seen.filter((q) => !revealed(q)).length;
     const v2 = seen.filter((q) => !seenNow[q]).length;
-    if (v1 > v1Best) {
+    const route = seen.some((q) => revealed(q) && (!!map.tiles[q].road || !!map.tiles[q].railroad));
+    if (!routeLed && route && v1 > 0) {
+      routeLed = true;
+      best1 = p;
+      v1Best = v1;
+    } else if (v1 > v1Best) {
       best1 = p;
       v1Best = v1;
     }

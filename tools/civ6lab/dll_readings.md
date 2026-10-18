@@ -5244,8 +5244,15 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   the "HL: Explore" rows of the 5-seed replay end on the game's plot 419 ->
   490 of 1,056; barb:move imposed 1117 418 -> 404, 1121 1,096 -> 1,070,
   1124 1,043 -> 1,018.
-- PARTLY READ: a revealed plot's +0x47 that makes a plot of positive count
-  win once ahead of a larger (0x70a6c0's second flag: not carried); the turn test on
+- THE ROUTE FLAG (0x70a6c0, READ): over the look, a plot not revealed
+  counts; a revealed one whose route byte (+0x47) is not -1 sets the second
+  flag (a goody hut on the revealed plot itself sets the first and counts
+  nothing; the first wins at once for a full civilization alone). In HL
+  Explore (0x70abe6..0x70ac15) the first plot in closing order with the
+  route flag and a count above 0 takes the lead once, whatever led before;
+  after it, as before it, a plot leads only with a strictly larger count.
+  Ported (`exploreTarget`, `_tac_explore`).
+- PARTLY READ: the turn test on
   a plot of a player at war (0x70bd40: the game turn below the regions
   record's +0x128; taken as passing); a goody hut's plot taken at once by a
   full civilization (0x82d90: no barbarian).

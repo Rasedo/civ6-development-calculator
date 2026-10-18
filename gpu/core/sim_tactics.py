@@ -2668,12 +2668,16 @@ class SimTactics:
             n_i, t_i = reach.nonzero(as_tuple=True)
             v1 = torch.full((rows.numel(), T), NEG, dtype=torch.long, device=dev)
             v2 = torch.full((rows.numel(), T), NEG, dtype=torch.long, device=dev)
+            # a revealed route in the look (plot +0x47, 0x70a6c0's second flag)
+            rt = torch.zeros(rows.numel(), T, dtype=torch.bool, device=dev)
             if n_i.numel():
                 ut_n = getattr(self, f"{pre}_unit_type")[rows[n_i], slots[n_i]]
                 sight = self._unit_sight(ut_n, getattr(self, f"{pre}_unit_promos")[rows[n_i], slots[n_i]])
                 disk = self._los_disk(rows[n_i], t_i, sight, torch.zeros_like(n_i, dtype=torch.bool))
                 v1[n_i, t_i] = (disk & ~revealed[rows[n_i]]).sum(dim=1)
                 v2[n_i, t_i] = (disk & ~seen_now[rows[n_i]]).sum(dim=1)
+                route = self.road | self.railroad
+                rt[n_i, t_i] = (disk & revealed[rows[n_i]] & route[rows[n_i]]).any(dim=1)
             dest = torch.full((B, P), -1, dtype=torch.long, device=dev)
             kind = torch.zeros(B, P, dtype=torch.long, device=dev)
             for j in range(int(npass.max()) if B else 0):
@@ -2694,6 +2698,22 @@ class SimTactics:
                     kmin, p = k.min(dim=1)
                     return torch.where(kmin < (1 << 40), p, torch.full_like(p, -1))
                 best1 = first_max(v1[r], 0)
+                # the first in closing order with a route in its look and a
+                # count above 0 leads once, whatever came before; a later one
+                # replaces it only with a larger count
+                big = 1 << 40
+                lead_k = torch.where(cand & rt[r] & (v1[r] > 0), key, torch.full_like(key, big))
+                lk, lp = lead_k.min(dim=1)
+                has_lead = lk < big
+                if bool(has_lead.any()):
+                    after = cand & (key > lk.unsqueeze(1))
+                    va = torch.where(after, v1[r], torch.full_like(v1[r], NEG))
+                    ma = va.max(dim=1).values
+                    ka = torch.where(after & (va == ma.unsqueeze(1)), key, torch.full_like(key, big))
+                    kmin, ap = ka.min(dim=1)
+                    lv = v1[r].gather(1, lp.unsqueeze(1)).squeeze(1)
+                    led = torch.where((kmin < big) & (ma > lv), ap, lp)
+                    best1 = torch.where(has_lead, led, best1)
                 best2 = first_max(v2[r], NEG)
                 chosen[bidx[go], here[go]] = True
                 pick = torch.where(go, best1, torch.full_like(best1, -1))
