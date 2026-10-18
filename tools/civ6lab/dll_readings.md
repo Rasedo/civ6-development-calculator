@@ -5519,7 +5519,13 @@ the event in `seizeCivilian` (cpu/core/combat.ts, `GameState.barbCaptures`);
   civilian (UNITTYPE_CIVILIAN 1..1), a UNITAI_COMBAT unit at least, no
   naval one; InitialStrengthAdvantage 0, Ongoing 0.5.
 - LAB: the barbarians' knowledge base's camps (+0x638) taken as every camp
-  in plot order; Operation Defend Units' moves (0x80d790) none.
+  in plot order.
+- OPERATION DEFEND UNITS (0x80ee70 / 0x80d790) runs the
+  city-states' reading ("Operation Defend Units, both twins") on the
+  barbarians' pool: the raid's node 20, the assault's 1, the capture's 5;
+  a hurt member not dug in is released (no plot is the barbarians' own
+  ground) and the barbarians hold no war rows (a hurt member flees danger
+  alone).
 - ASK (the operation manager's files): `targetValid` (nodes.ts) holds a
   camp target valid; the tree's INVALID swap needs the camp branch of
   0x73abf0 there ("no camp the seat knows on the target": `targetGone`),

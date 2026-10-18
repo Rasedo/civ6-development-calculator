@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from . import simbase
+from .sim_tactics import _CITY_STRIKE_RANGE
 
 # the interpreter's statuses
 _S, _R, _F = 1, 2, 3
@@ -86,6 +87,13 @@ class _Trees:
             return (_num(_node_data(n, "Move To (enum)"), 1), _num(_node_data(n, "Range to goal")),
                     _num(_node_data(n, "Unit distance"), 1))
 
+        def defend(n: dict) -> tuple[int, int]:
+            # (AutoProtect Percentage, Protect Outside Range)
+            return (_num(_node_data(n, "AutoProtect Percentage"), 33), _num(_node_data(n, "Protect Outside Range"), -1))
+
+        self.raid_defend = defend(raid[20])
+        self.ass_defend = defend(ass[1])
+        self.cap_defend = defend(cap[5])
         self.raid_recruit = _num(_node_data(raid[5], "Turns to Run"))
         self.raid_moves = [move(raid[11]), move(raid[21]), move(raid[24])]
         self.cap_moves = [move(cap[6]), move(cap[8])]
@@ -407,6 +415,10 @@ class SimBarbOps:
         tr = self._bop_trees()
         _, rg6, sp6 = tr.cap_moves[0]
         _, rg8, sp8 = tr.cap_moves[1]
+        # Operation Defend Units 5 over the team, the captive then its captor
+        cteam = [torch.where(civ_ok, cs, -1), torch.where(esc_ok, es, -1)]
+        pct5, rng5 = tr.cap_defend
+        mk5 = self._bop_defend_update(mv_on, cteam, pct5, ctx)
         st6, ar6 = self._bcap_move_update(mv_on & ~no_goal, c, 0, mem, goal, rg6, sp6, ctx)
         c6 = torch.where(no_goal, 3, st6)
         c3 = torch.where(rdy_fail, 3, torch.maximum(torch.ones_like(c6), c6))
@@ -427,6 +439,12 @@ class SimBarbOps:
             self._tac_move_to(move, esc_, civ_plot.clamp(min=0), strike=False)
             meet = ex1 & (self.barb_unit_tile[bidx, esc_] == self.barb_unit_tile[bidx, csc])
             self.bcap_form[:, c] |= meet
+        # Defend Units 5: a member released leaves the capture's team
+        rel = self._bop_defend_exec(mv_on & mk5, cteam, goal, pct5, rng5, ctx)
+        for us, r, plane in zip(cteam, rel, (self.bcap_civ, self.bcap_esc)):
+            if bool(r.any()):
+                plane[:, c] = torch.where(r, torch.full_like(us, -1), plane[:, c])
+                mem[bidx[r], us[r].clamp(min=0)] = False
         zero = torch.zeros_like(self.barb_unit_alive)
         formed = self.bcap_form[:, c]
         zero[bidx[formed & civ_ok], csc[formed & civ_ok]] = True
@@ -530,8 +548,8 @@ class SimBarbOps:
         """"Raid City"'s tick (the root Sequence from the child it resumes at:
         the recruit 2, the march 9, the raid 12, the way home 22): the walk's
         statuses, then the executions in node order — Attack Units 10, Move
-        11, Attack Units 16, Pillage 17, Attack City 19, Move 21, Attack Units
-        23, Move 24, Notify Owner 25"""
+        11, Attack Units 16, Pillage 17, Attack City 19, Defend Units 20, Move
+        21, Attack Units 23, Move 24, Notify Owner 25"""
         tr = self._bop_trees()
         turn = int(self.turn)
         resume = self.tribe_op_resume[:, k]
@@ -559,6 +577,9 @@ class SimBarbOps:
         living = self._bop_members(k).any(dim=1)
         pil_ok = gone | living
         cont = r14 & pil_ok
+        team = self._bop_team(k)
+        pct20, rng20 = tr.raid_defend
+        mk20 = self._bop_defend_update(cont, team, pct20, ctx)
         inside = bool(self._bb["attackCityHandicap"])
         ac = torch.where(gone, _S, _R)
         sl, rg, sp = tr.raid_moves[1]
@@ -585,6 +606,7 @@ class SimBarbOps:
         self._bop_pillage(cont, k, ctx)
         if inside:
             self._bop_attack_city(cont, k, ctx)
+        self._bop_defend(cont, mk20, k, team, pct20, rng20, ctx)
         self._bop_move_exec(cont, k, target, tr.raid_moves[1][1], ar21, ready, ctx)
         self._bop_attack_units(home, k, ctx)
         self._bop_move_exec(home, k, rally, tr.raid_moves[2][1], ar24, ready, ctx)
@@ -599,7 +621,8 @@ class SimBarbOps:
         """"Barbarian City Attack"'s tick (the root Concurrent over Defend
         Units and the Sequence 2 from the child it resumes at: the recruit 4,
         the gathering 11, the march 14, the assault 18): the walk's statuses,
-        then the executions in node order — Move 13, Attack Units 15, Move 17,
+        then the executions in node order — Defend Units 1, Move 13, Attack
+        Units 15, Move 17,
         Siege City 19, Attack City 20, Attack Units 21, Pillage 23, Move 24
         (Make Formation forms no pair: its formations take a civilian)"""
         tr = self._bop_trees()
@@ -607,6 +630,10 @@ class SimBarbOps:
         target = self.tribe_op_plot[:, k]
         rally = self.tribe_rally[:, k]
         end = torch.zeros_like(m)
+        # Operation Defend Units 1, the root Concurrent's first child
+        team = self._bop_team(k)
+        pct1, rng1 = tr.ass_defend
+        mk1 = self._bop_defend_update(m, team, pct1, ctx)
         rec = m & (resume <= 4)
         ok4 = self._bop_recruit_seq(rec, k, False, tr.ass_recruit)
         self.tribe_op_resume[:, k] = torch.where(rec & ~ok4, 4, self.tribe_op_resume[:, k])
@@ -647,6 +674,7 @@ class SimBarbOps:
         end |= ass & (c18 != _R)
         # the executions in node order
         ready = self.tribe_op_ready[:, k]
+        self._bop_defend(m, mk1, k, team, pct1, rng1, ctx)
         self._bop_move_exec(gather & ~no0, k, goal0, tr.ass_moves[0][1], ar13, ready, ctx)
         self._bop_attack_units(march, k, ctx)
         self._bop_move_exec(march & ~no1, k, goal1, tr.ass_moves[1][1], ar17, ready, ctx)
@@ -657,6 +685,204 @@ class SimBarbOps:
         self._bop_move_exec(on23 & (goal2 >= 0), k, goal2, tr.ass_moves[2][1], ar24, ready, ctx)
         # the assault's Notify Owner: no city to a list (a bribed tribe's alone)
         self.tribe_op_done[:, k] |= end
+
+    # -- Operation Defend Units ----------------------------------------------
+
+    def _bop_endangered(self, j: torch.Tensor, on: torch.Tensor, ctx: dict) -> torch.Tensor:
+        """[B] bool — the team update's endangered (`endangered`, 0x738f20)
+        for the barbarians' unit at pool slot `j` [B] where `on`: the pass's
+        targets within twice its base Movement — a unit of an entry that
+        fights, where no barbarian unit stands beside the member and its plot
+        holds danger or the entry is HIGH, within the unit's Movement or its
+        range, adds its blow on the member (`damageExpected` on their
+        strengths); a combat district's city that strikes, the member within
+        its range of the centre, its strike — and the member the sum leaves
+        with no hit points (one that does not fight, any blow at all on land)
+        is endangered"""
+        B, dev = self.B, self.device
+        b = self._bidx
+        jc = j.clamp(min=0)
+        tg, danger = ctx["tg"], ctx["danger"]
+        ut = self.barb_unit_type[b, jc].clamp(min=0, max=self.NU - 1)
+        mcb = self._type_combat.take(ut)
+        fights = (mcb > 0) | (self._type_ranged_strength.take(ut) > 0) | (self._type_bombard.take(ut) > 0)
+        plot = self.barb_unit_tile[b, jc].clamp(min=0)
+        near = 2 * self._type_moves.take(ut)
+        d = self.pair_dist[plot].to(torch.long)  # [B, T]
+        own = self.barb_unit_alive & (self.barb_unit_tile >= 0)
+        own_d = self.pair_dist[plot.unsqueeze(1), self.barb_unit_tile.clamp(min=0)].to(torch.long)
+        others = torch.arange(own.shape[1], device=dev).unsqueeze(0) != jc.unsqueeze(1)
+        beside = (own & others & (own_d == 1)).any(dim=1)
+        here = danger.gather(1, plot.unsqueeze(1)).squeeze(1)
+        # the unit entries
+        uk, uu = tg["uk"], tg["uu"]
+        uc = uu.clamp(min=0)
+        et = self.unit_type.gather(1, uc).clamp(min=0, max=self.NU - 1)
+        ecb, erg, ebm = self._type_combat.take(et), self._type_ranged_strength.take(et), self._type_bombard.take(et)
+        full_all = torch.cat((self._full_mp("major") - self.major_unit_aura_mp,
+                              self._full_mp("barb") - self.barb_unit_aura_mp), dim=1)
+        emm = torch.div(full_all.gather(1, uc), self._mp_scale, rounding_mode="floor")
+        lo = self.POOL_LO["barb"]
+        bi = b.unsqueeze(1).expand_as(uc)
+        r_major = self._tac_range(bi, uc.clamp(max=self.major_unit_type.shape[1] - 1), "major")
+        r_barb = self._tac_range(bi, (uc - lo).clamp(min=0, max=self.barb_unit_type.shape[1] - 1), "barb")
+        erng = torch.where(uc >= lo, r_barb, r_major)
+        ent = ((uk > 0) & (uu >= 0) & (d <= near.unsqueeze(1)) & ((ecb > 0) | (erg > 0) | (ebm > 0))
+               & ~beside.unsqueeze(1) & ((here > 0).unsqueeze(1) | (uk == 3)) & ((d <= emm) | (d <= erng)))
+        dmg = self._damage_expected((torch.maximum(ecb, erg) - mcb.unsqueeze(1)).to(torch.float64))
+        total = torch.where(ent, dmg, torch.zeros_like(dmg)).sum(dim=1)
+        # the combat districts' cities: each entry its city's strike
+        ent_d = (tg["dk"] == 1) & (d <= near.unsqueeze(1))
+        if bool((ent_d & on.unsqueeze(1)).any()):
+            for row in range(self.city_alive.shape[1]):
+                rs = int(self._ROW_SEAT[row])
+                for col in range(self.city_alive.shape[2]):
+                    alive = self.city_alive[:, row, col]
+                    if not bool((alive & on).any()):
+                        continue
+                    mine = ent_d & (self.tile_seat == rs) & (self.tile_city == self.city_id[:, row, col].unsqueeze(1))
+                    n = mine.sum(dim=1)
+                    if not bool((n > 0).any()):
+                        continue
+                    ctr = self.city_center[:, row, col].clamp(min=0)
+                    str_ = self._strike_strength(row, torch.full_like(ctr, col))
+                    if row < self.n_majors:
+                        str_ = str_ + self._gov_mods(row)[12]["crng"].to(str_.dtype)
+                    ok = alive & (n > 0) & (str_ > 0) & (self.pair_dist[plot, ctr].to(torch.long) <= _CITY_STRIKE_RANGE)
+                    hit = self._damage_expected(str_ - mcb.to(torch.float64))
+                    total = total + torch.where(ok, n * hit, torch.zeros_like(hit))
+        hp_max = int(self.rules.combat["unitHp"])
+        dmg_now = hp_max - self.barb_unit_hp[b, jc].long()
+        weak = (total > 0) & ~fights
+        land = ~self.water[b, plot]
+        return on & ((weak & land) | (~weak & (dmg_now + total > hp_max)))
+
+    def _bop_hurt(self, j: torch.Tensor, pct: int) -> torch.Tensor:
+        """[B] bool — the barbarians' unit at pool slot `j` hurt to `pct`
+        percent of its hit points (single precision)"""
+        hp_max = int(self.rules.combat["unitHp"])
+        f32 = torch.float32
+        bar = float(torch.tensor(hp_max, dtype=f32) * torch.tensor(float(torch.tensor(pct, dtype=f32) * torch.tensor(0.01, dtype=f32)), dtype=f32))
+        return (hp_max - self.barb_unit_hp[self._bidx, j.clamp(min=0)].long()).to(torch.float64) >= bar
+
+    def _bop_live(self, us: torch.Tensor) -> torch.Tensor:
+        uc = us.clamp(min=0)
+        return (us >= 0) & self.barb_unit_alive[self._bidx, uc] & (self.barb_unit_tile[self._bidx, uc] >= 0)
+
+    def _bop_defend_update(self, on: torch.Tensor, team: list, pct: int, ctx: dict) -> torch.Tensor:
+        """OPERATION DEFEND UNITS' update (`flagged`, 0x80ee70) for a team of
+        the barbarians' pool slots `team` (each [B], -1 none) in the games
+        `on`: [B] the node marked — a member endangered, hurt to `pct`
+        percent, or fortified on a plot of danger (the node SUCCEEDS)"""
+        b = self._bidx
+        danger = ctx["danger"]
+        marked = torch.zeros_like(on)
+        for us in team:
+            ok = on & self._bop_live(us)
+            if not bool(ok.any()):
+                continue
+            uc = us.clamp(min=0)
+            plot = self.barb_unit_tile[b, uc].clamp(min=0)
+            fort = self.barb_unit_fortify[b, uc] >= 2
+            marked |= ok & (self._bop_endangered(us, ok, ctx) | self._bop_hurt(us, pct)
+                            | (fort & (danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0)))
+        return marked
+
+    def _bop_defend_exec(self, g: torch.Tensor, team: list, target: torch.Tensor, pct: int, rng: int,
+                         ctx: dict) -> list:
+        """OPERATION DEFEND UNITS' execution (`DefendOrders.execute`, 0x80d790)
+        where `g` (marked) over the team's slots `team` in its order, the
+        members outside `rng` of `target` (-1: all): the endangered — not
+        bombard, with Movement, out of a city centre — to their safe plots
+        (0x716b90); then the hurt (or fortified afloat in danger), not
+        bombard: one not dug in released from the team (no plot is the
+        barbarians' own ground); one fortified afloat to its safe plot; one
+        with Movement on a plot of danger to its safe plot (the barbarians
+        hold no war rows); each fortified, its turn ended. [B] per member,
+        released"""
+        B, dev = self.B, self.device
+        b = self._bidx
+        danger, done = ctx["danger"], ctx["done"]
+        rowof, res = ctx["rowof"], ctx["res"]
+        none_taken = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+        tc = target.clamp(min=0)
+        released = [torch.zeros_like(g) for _ in team]
+        if not bool(g.any()):
+            return released
+
+        def off(us: torch.Tensor) -> torch.Tensor:
+            if rng < 0:
+                return torch.ones(B, dtype=torch.bool, device=dev)
+            return self.pair_dist[self.barb_unit_tile[b, us.clamp(min=0)].clamp(min=0), tc].to(torch.long) >= rng
+
+        def to_safe(us: torch.Tensor, m: torch.Tensor, stay_ok: bool) -> None:
+            if not bool(m.any()):
+                return
+            uc = us.clamp(min=0)
+            dest = self._tac_safe_plot(m, uc, "barb", BARB_SEAT, danger, rowof, res, none_taken)
+            done[b, uc] = torch.where(m, True, done[b, uc])
+            here = self.barb_unit_tile[b, uc]
+            go = m & (dest >= 0) & (stay_ok | (dest != here)) & (here != dest) & (self.barb_unit_mp[b, uc] > 0)
+            if bool(go.any()):
+                self._tac_move_to(go, uc, dest.clamp(min=0), strike=False)
+
+        # the endangered, listed as the execution opens, in the team's order
+        listed = [self._bop_endangered(us, g & self._bop_live(us), ctx) for us in team]
+        for us, ok in zip(team, listed):
+            ok = ok & self._bop_live(us)
+            if not bool(ok.any()):
+                continue
+            uc = us.clamp(min=0)
+            ut = self.barb_unit_type[b, uc].clamp(min=0, max=self.NU - 1)
+            ok &= (off(us) & (self._type_bombard.take(ut) <= 0) & (self.barb_unit_mp[b, uc] > 0)
+                   & ~self._centre_plane()[b, self.barb_unit_tile[b, uc].clamp(min=0)])
+            to_safe(us, ok, True)
+        # the hurt
+        for i, us in enumerate(team):
+            ok = g & self._bop_live(us)
+            if not bool(ok.any()):
+                continue
+            uc = us.clamp(min=0)
+            ok &= (self.barb_unit_mp[b, uc] > 0) & off(us)
+            plot = self.barb_unit_tile[b, uc].clamp(min=0)
+            fort = self.barb_unit_fortify[b, uc]
+            wat = self.water[b, plot]
+            dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
+            ok &= self._bop_hurt(us, pct) | ((fort >= 2) & wat & dang)
+            ut = self.barb_unit_type[b, uc].clamp(min=0, max=self.NU - 1)
+            ok &= self._type_bombard.take(ut) <= 0
+            if not bool(ok.any()):
+                continue
+            rel = ok & (fort == 0)
+            released[i] = rel
+            # a member released still ends its turn in the walk that held it
+            done[b, uc] = torch.where(rel, True, done[b, uc])
+            ok &= ~rel
+            to_safe(us, ok & (fort >= 2) & wat, True)
+            ok &= self._bop_live(us)
+            plot = self.barb_unit_tile[b, uc].clamp(min=0)
+            dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
+            to_safe(us, ok & (self.barb_unit_mp[b, uc] > 0) & dang, False)
+            ok &= self._bop_live(us)
+            done[b, uc] = torch.where(ok, True, done[b, uc])
+        return released
+
+    def _bop_team(self, k: int) -> list:
+        """tribe `k`'s operation's living members as a team in pool slot
+        order: one [B] slot tensor (-1 none) per slot any game fills"""
+        mem = self._bop_members(k)
+        cols = mem.any(dim=0).nonzero(as_tuple=True)[0].tolist()
+        return [torch.where(mem[:, j], j, -1) for j in cols]
+
+    def _bop_defend(self, upd: torch.Tensor, marked: torch.Tensor, k: int, team: list, pct: int, rng: int,
+                    ctx: dict) -> None:
+        """tribe `k`'s Defend Units executed where walked (`upd`) and marked,
+        a member released leaving the operation"""
+        rel = self._bop_defend_exec(upd & marked, team, self.tribe_op_plot[:, k], pct, rng, ctx)
+        b = self._bidx
+        for us, r in zip(team, rel):
+            if bool(r.any()):
+                self.barb_unit_op[b[r], us[r]] = False
 
     # -- the nodes -----------------------------------------------------------
 
