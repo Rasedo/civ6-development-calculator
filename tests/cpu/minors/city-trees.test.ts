@@ -11,7 +11,8 @@
  * The GPU twin is tests/gpu/city_trees_test.py, every variant a game of one
  * batch, against the same pins.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
+import { matchPins } from './pins';
 import { readFileSync } from 'node:fs';
 import {
   buildingEvent, districtEvent, freeSlots, goalsReached, improvementEvent, newCityAi, pickImprovement, tickCityTrees,
@@ -192,7 +193,6 @@ function runScenario(sc: Scenario, variant: { ties: number[] }): unknown[] {
 
 describe('the city events, trees and contracts over turns', () => {
   it('runs each variant of the scenario to its pinned turns', () => {
-    const pins = JSON.parse(readFileSync(new URL('./city-trees-pins.json', import.meta.url), 'utf-8')) as unknown[];
-    expect(SC.variants.map((v) => runScenario({ ...SC, ...v }, v))).toEqual(pins);
+    matchPins('city-trees-pins.json', SC.variants.map((v) => runScenario({ ...SC, ...v }, v)));
   });
 });

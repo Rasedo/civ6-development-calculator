@@ -11,7 +11,8 @@
  * minor-ai-pins.json; the GPU twin is tests/gpu/minor_ai_test.py, against the
  * same pins.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
+import { matchPins } from './pins';
 import { readFileSync } from 'node:fs';
 import { loadWorld } from '../../../cpu/world/load';
 import { endTurn, foundCity } from '../../../cpu/core/game';
@@ -40,7 +41,6 @@ function run(): unknown[] {
 
 describe("the city-states' city AI on a world", () => {
   it('plays the opening as pinned', () => {
-    const pins = JSON.parse(readFileSync(new URL('./minor-ai-pins.json', import.meta.url), 'utf-8')) as unknown[];
-    expect(JSON.parse(JSON.stringify(run()))).toEqual(pins);
+    matchPins('minor-ai-pins.json', run());
   }, 60000);
 });

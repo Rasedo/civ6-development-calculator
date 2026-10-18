@@ -8,7 +8,8 @@
  * slots, its threat, and its units' plots. Pinned in minor-ops-pins.json; the
  * GPU twin is tests/gpu/minor_ops_test.py, against the same pins.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
+import { matchPins } from './pins';
 import { readFileSync } from 'node:fs';
 import { loadWorld } from '../../../cpu/world/load';
 import { endTurn, foundCity } from '../../../cpu/core/game';
@@ -45,7 +46,6 @@ function minorOpsRun(): unknown[] {
 
 describe("the city-states' operations on a world", () => {
   it('play the opening as pinned', () => {
-    const pins = JSON.parse(readFileSync(new URL('./minor-ops-pins.json', import.meta.url), 'utf-8')) as unknown[];
-    expect(JSON.parse(JSON.stringify(minorOpsRun()))).toEqual(pins);
+    matchPins('minor-ops-pins.json', minorOpsRun());
   }, 60000);
 });

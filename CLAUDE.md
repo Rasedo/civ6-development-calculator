@@ -56,6 +56,10 @@ by one scripted decision server (`policy/`), verified against each other by
   second. Launch in the background and end the turn; never poll, never sleep.
 - Green = the pass row at the head sha in `stats/battery.jsonl`, never an
   exit code.
+- GPU tests are banned (owner 2026-10-18): nothing under `tests/gpu` runs,
+  for agents or the lead; the GPU twin is still written and checked by
+  `seat_symmetry_check.py`. The replay / sweep measures run once per wave
+  of agents, never per slice.
 
 ## Housekeeping
 
