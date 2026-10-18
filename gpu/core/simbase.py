@@ -1088,17 +1088,18 @@ _MUTABLE = [
     # their units was raised by (`cpu/core/barbarians.ts`)
     "tribe_plot", "tribe_alive", "tribe_kind", "tribe_name", "tribe_spawn", "tribe_scoutc", "n_tribes",
     "barb_camps_begun", "barb_techs", "barb_civics", "barb_unit_tribe", "barb_unit_scout",
-    # their raids and city assaults (`tribeTurn`, `opTurn`, `raidTick`, `barbarianScouts`)
+    # their raids, city assaults and scouts' trees (`tribeTurn`, `barbarianOps.ts`, `barbarianScouts`)
     "tribe_bold", "tribe_every", "tribe_queue", "tribe_raidq", "tribe_assq", "tribe_home_slot", "tribe_home_seat",
-    "tribe_saw", "tribe_op", "tribe_op_seat", "tribe_op_turns", "tribe_op_rec", "barb_unit_op", "barb_unit_fresh",
-    "barb_spot_next",
+    "tribe_home_id", "tribe_home_resume", "tribe_home_mu",
+    "tribe_saw", "tribe_op", "tribe_op_seat", "tribe_op_id", "tribe_op_rstart", "tribe_op_ready", "barb_unit_op",
+    "barb_unit_join", "barb_unit_fresh", "barb_spot_next", "barb_tree_next",
     # their unit pool and each tribe's camp defender (`barbSlots`, `cpu/core/tactical.ts`)
     "barb_unit_slotno", "barb_pool_size", "barb_pool_free", "barb_pool_nfree", "barb_pool_dying", "tribe_defender",
     # each city-state's unit pool, then the Free Cities' (`poolSlots`, `cpu/core/tactical.ts`)
     "seat_pool_size", "seat_pool_free", "seat_pool_nfree", "seat_pool_dying",
     # the player each dead tribe rampages against, the cities its raids wait for (`BarbTribe.rampage`, `raidTargets`)
     "tribe_ramp", "tribe_raidp", "tribe_home_plot",
-    # the raid's tree (`raidTick`)
+    # the operation's tree (`barbarianOps.ts`)
     "tribe_assp", "tribe_score", "tribe_op_plot", "tribe_rally", "tribe_op_resume", "tribe_raid_from", "tribe_op_done",
     "tribe_op_dead", "tribe_store", "tribe_store_goal",
     "victory_type", "victory_row", "project_done",  # one-time project ledger
@@ -1208,7 +1209,7 @@ _MUTABLE = [
     # its operations (`OpsAi`, sim_minorops.py): the pool, the trees, the teams, the stores, the pick, the camps known
     "mops_def", "mops_id", "mops_target", "mops_rally", "mops_bk_target", "mops_bk_rally", "mops_started", "mops_estr",
     "mops_str", "mops_st", "mops_ma", "mops_mb", "mops_bb", "mops_tm", "mops_mem", "mops_cnt", "mops_goal", "mops_eng",
-    "mops_mins", "mops_ready", "mops_ong", "mops_unit", "mops_tstr", "mops_mvs", "mops_mvg", "mops_free", "mops_nfree",
+    "mops_mins", "mops_ready", "mops_ong", "mops_unit", "mops_tstr", "mops_join", "mops_mvs", "mops_mvg", "mops_free", "mops_nfree",
     "mops_size", "mops_pick", "mops_pick_target", "mops_pick_rally", "mops_camps",
     "citystate_kb_seq", "citystate_kb_next",  # the records' order
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid

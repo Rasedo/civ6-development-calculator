@@ -2060,7 +2060,7 @@ export function cleanFallout(state: GameState, unit: Unit): RuleResult {
 
 /* The PILLAGE verb has ONE body, and it is `applySeatUnitOrders`' PILLAGE arm
  * in phase.ts — the same improvement-then-district order, the same +25 heal,
- * gated on `combat > 0` the way `hostileUnitAct` and the GPU's apply both are.
+ * gated on `combat > 0` as the GPU's apply is.
  * A charge test here instead of that combat test is what lets a Great General
  * pillage on one engine and not the other. */
 

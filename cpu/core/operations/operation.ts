@@ -42,6 +42,9 @@ export interface OpTeam {
   /** the members' strength (0x73fba0): each its larger of combat and ranged
    *  strength, less a tenth of its damage */
   strength: number;
+  /** the units the team has taken in (the join's second list, team +0x48,
+   *  its count +0x58): a member killed counted still */
+  joined: number;
 }
 
 export interface Operation {
@@ -99,7 +102,7 @@ export function newTeams(def: AiOpDef, view: MajorView, target: number): OpTeam[
   return (AI_OP_TEAMS[def.name] ?? []).filter((t) => teamApplies(t, view, target)).map((t) => {
     const reqs = AI_TEAM_REQS[t.team] ?? [];
     return { team: t.team, members: [], counts: reqs.map(() => 0), goals: [NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT], engaged: false,
-      minsMet: false, ready: false, ongoing: false, unit: null, strength: 0 };
+      minsMet: false, ready: false, ongoing: false, unit: null, strength: 0, joined: 0 };
   });
 }
 
@@ -125,6 +128,7 @@ export const unitStrength = (u: MajorUnitView): number => Math.max(u.combat, u.r
 export function addMember(team: OpTeam, u: Pick<MajorUnitView, 'id' | 'type'>): void {
   if (team.members.includes(u.id)) return;
   team.members.push(u.id);
+  team.joined++;
   teamReqs(team).forEach((r, i) => {
     if (hasAiType(u.type, r.aiType)) team.counts[i]++;
   });
@@ -137,6 +141,12 @@ export const opUnit = (op: Operation): string | null => op.teams.find((t) => t.u
 /** the units the operation holds, every team's, in team then join order */
 export function opUnits(op: Operation): number[] {
   return op.teams.flatMap((t) => t.members);
+}
+
+/** the operation holds a living unit (a member killed stays in its team) */
+export function holdsUnits(ctx: OpsContext, op: Operation): boolean {
+  const live = new Set(ctx.view().units(ctx.seat).map((u) => u.id));
+  return opUnits(op).some((id) => live.has(id));
 }
 
 /** the operation's target gone (0x73a8e0): a camp target no camp the seat

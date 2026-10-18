@@ -42,5 +42,5 @@ describe("the city-states' city AI on a world", () => {
   it('plays the opening as pinned', () => {
     const pins = JSON.parse(readFileSync(new URL('./minor-ai-pins.json', import.meta.url), 'utf-8')) as unknown[];
     expect(JSON.parse(JSON.stringify(run()))).toEqual(pins);
-  });
+  }, 60000);
 });

@@ -13,7 +13,7 @@ import { foundCity } from '../../../cpu/core/game';
 import { computeCityStats, cityMaintenance } from '../../../cpu/core/city';
 import { districtAdjacency } from '../../../cpu/core/yields';
 import { spawnUnit } from '../../../cpu/core/units';
-import { hostileUnitAct } from '../../../cpu/core/combat';
+import { hostilePillage } from '../../../cpu/core/combat';
 
 function cityWithCampus(campusCol = 9) {
   const state = makeState(makeMap(16, 16));
@@ -66,8 +66,6 @@ describe('district pillage', () => {
   });
 
   it('a hostile unit standing on a completed enemy district pillages it; a builder repairs it', () => {
-    // Campus at (11,8) — distance 3 from the (8,8) center, out of melee range so
-    // the raider cannot attack the city and falls through to the pillage branch.
     const { state, city, campus } = cityWithCampus(11);
     state.unitsMode = true;
     expect(tileCity(campus)).toBe(city.id); // the district tile is owned
@@ -75,7 +73,7 @@ describe('district pillage', () => {
     barb.tileIndex = campus.index;
     barb.movesLeft = 2 * MP_SCALE;
     expect(campus.districtPillaged).toBeFalsy();
-    hostileUnitAct(state, barb);
+    expect(hostilePillage(state, barb)).toBe(true);
     expect(campus.districtPillaged).toBe(true);
     expect(barb.movesLeft).toBe(0); // pillage ends the turn, no heal
 

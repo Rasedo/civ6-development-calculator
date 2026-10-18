@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { disbandUnit, raiseBestTrained, reseatUnit, spawnUnit } from '../../../cpu/core/units';
 import { outerPool } from '../../../cpu/core/rules';
-import { applyTrainingGrants, districtHit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack, hostileUnitAct, centreStrength } from '../../../cpu/core/combat';
+import { applyTrainingGrants, districtHit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack, hostilePillage, centreStrength } from '../../../cpu/core/combat';
 import { endTurn } from '../../../cpu/core/game';
 import { commitProduction } from '../../../cpu/core/seatTurn';
 import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
@@ -220,22 +220,22 @@ describe('an Encampment under attack', () => {
   it('a raider never pillages an Encampment, even with its pool beaten to 0', () => {
     const { state, enc, shelter, atk, arch } = scene();
     enc.encampHp = 0; // the block has lifted, so the tile is enterable
-    // nothing to attack, so the raider reaches its pillage step
+    // the scene's units gone: the raider alone on the Encampment
     state.units = state.units.filter(
       (u) => u.id !== shelter.id && u.id !== atk.id && u.id !== arch.id,
     );
     const raider = spawnUnit(state, 'WARRIOR', enc.index, BARB_SEAT)!;
-    hostileUnitAct(state, raider);
+    expect(hostilePillage(state, raider)).toBe(false);
     expect(enc.districtPillaged).toBe(false);
 
-    // control: any OTHER district on the same tile is pillaged by that step
+    // control: any OTHER district on the same tile is pillaged by the raider on it
     const ctl = scene();
     ctl.enc.district = 'CAMPUS';
     ctl.enc.encampHp = 0;
     ctl.state.units = ctl.state.units.filter(
       (u) => u.id !== ctl.shelter.id && u.id !== ctl.atk.id && u.id !== ctl.arch.id,
     );
-    hostileUnitAct(ctl.state, spawnUnit(ctl.state, 'WARRIOR', ctl.enc.index, BARB_SEAT)!);
+    expect(hostilePillage(ctl.state, spawnUnit(ctl.state, 'WARRIOR', ctl.enc.index, BARB_SEAT)!)).toBe(true);
     expect(ctl.enc.districtPillaged).toBe(true);
   });
 });

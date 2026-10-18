@@ -107,6 +107,7 @@
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The pass (TacticalAI 0x771530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a..."
@@ -138,7 +139,7 @@
     - cpu/core/operations/assault.ts:attackUnitsExecute
     - cpu/core/tactical.ts:passAttack
     - cpu/core/tactical.ts:carryOut
-    - cpu/core/tactical.ts:opAttackExec
+    - cpu/core/operations/assault.ts:attackUnitsExecute
     - gpu/core/sim_tactics.py:_tac_carry_out
     - cpu/core/operations/manager.ts:OpsEnv
     - cpu/core/operations/nodes.ts:OpsContext
@@ -147,6 +148,7 @@
     - "C-95: Attack Units — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE EXECUTION (0x771f80): the moves (retried where not blocked), the bombard strikes, the ranged strikes (unles..."
@@ -354,7 +356,7 @@
     - cpu/core/tactical.ts:ATTACK_TARGETS_RANGE
     - cpu/core/tactical.ts:assignTo
     - cpu/core/tactical.ts:districtHealth
-    - cpu/core/tactical.ts:opAttackExec
+    - cpu/core/operations/assault.ts:attackUnitsExecute
     - gpu/core/sim_tactics.py:_ATTACK_TARGETS_RANGE
     - gpu/core/sim_tactics.py:_tac_assign
   readings:
@@ -362,6 +364,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."

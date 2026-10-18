@@ -257,7 +257,11 @@
             "GameState.barbCampsBegun",
             "GameState.barbSpotNext",
             "GameState.barbPool",
-            "Unit.slot"
+            "Unit.slot",
+            "BarbTribe.homing",
+            "BarbTribe.op",
+            "Seat.ops",
+            "Seat.opsNext"
           ],
           "planes": [
             "tribe_plot",
@@ -282,8 +286,12 @@
             "tribe_saw",
             "tribe_op",
             "tribe_op_seat",
-            "tribe_op_turns",
-            "tribe_op_rec",
+            "tribe_op_id",
+            "tribe_op_rstart",
+            "tribe_home_id",
+            "tribe_home_resume",
+            "tribe_home_mu",
+            "barb_tree_next",
             "barb_unit_op",
             "barb_unit_fresh",
             "barb_spot_next",
@@ -305,7 +313,7 @@
             "tribe_op_done",
             "tribe_op_dead"
           ],
-          "note": "the barbarians' turn (cpu/core/barbarians.ts): one row — whether the camp step has added once, the tribes in their order (plot, alive, kind, name, the two clocks, the living units and scouts each raised), then the barbarians' techs and civics, each list behind its length; per tribe also its raid and city assault (Boldness, the interval its operation set, the units asked for, the owners of the cities waited for, the homing scout's city owner, the operation's kind, owner, turns, force taken and living units), and per major the turn a scout may report it again. A scout's sight memory (tribe_saw) and the fresh marks show through the homing and the recruit. Then the barbarians' unit pool (its size, its free slots in push order, the slots waiting to go free, each barbarian unit's slot in unit order) and per tribe whether its camp defender lives."
+          "note": "the barbarians' turn (cpu/core/barbarians.ts): one row — whether the camp step has added once, the tribes in their order (plot, alive, kind, name, the two clocks, the living units and scouts each raised), then the barbarians' techs and civics, each list behind its length; per tribe also its raid and city assault (Boldness, the interval its operation set, the units asked for, the owners of the cities waited for, the scout's tree (`barbHomingRecord`: the city, the tree's id, its resume, Move Unit's held scout), the raid score, the operation on the manager (`barbOpRecord`: kind, owner, target, rally, enemy, tree id, the resume, its Turn Limiters' first turns, its members living and killed)), per major the turn a scout may report it again, and the player's next tree id. A scout's sight memory (tribe_saw) and the fresh marks show through the homing and the recruit. Then the barbarians' unit pool (its size, its free slots in push order, the slots waiting to go free, each barbarian unit's slot in unit order) and per tribe whether its camp defender lives."
         },
         {
           "name": "unitPools",
@@ -2180,7 +2188,7 @@
           "name": "minorOps",
           "compare": "exact",
           "covers": [
-            "CityState.ops"
+            "Seat.ops"
           ],
           "planes": [
             "mops_def",
@@ -4138,6 +4146,18 @@
       }
     ],
     "gpu": [
+      {
+        "plane": "mops_join",
+        "why": "the units each minor operation's team has taken in (`OpTeam.joined`, team +0x58), which gates its Attack Units' execution: compared through its effect, the members' attacks."
+      },
+      {
+        "plane": "tribe_op_ready",
+        "why": "the readiness the military AI's turn gave a tribe's operation's team (`Operation.teams[0].ready`), which its Operation Move's executions read: compared through their effect, the members' moves."
+      },
+      {
+        "plane": "barb_unit_join",
+        "why": "a member's place in its tribe's operation's join order (`OpTeam.members`' order), which the pillage and the siege break ties by: compared through their effect, the members' moves."
+      },
       {
         "plane": "citystate_kb_seq",
         "why": "the order the knowledge base's records were added in (`armyKnown`'s array order on TS), which the target list's entries follow: compared through their effect, the tactical moves; the records themselves are compared as a sorted multiset."

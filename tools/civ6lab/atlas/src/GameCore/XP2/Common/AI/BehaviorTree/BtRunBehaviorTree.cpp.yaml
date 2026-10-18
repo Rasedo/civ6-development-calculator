@@ -17,6 +17,7 @@
     - cpu/core/operations/nodes.ts:decodeTrigger
     - gpu/core/sim_citytrees.py:_u_decode
     - gpu/core/sim_minorops.py:_u_decode
+    - cpu/core/barbarianOps.ts:SCOUT_NODES
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

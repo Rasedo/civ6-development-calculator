@@ -14317,6 +14317,144 @@ class SimSeats:
             out = out + torch.where(same, val, torch.zeros_like(val)).sum(dim=1)
         return torch.where(cav, out, torch.zeros_like(out))
 
+    def _city_assault_atk_cs(self, atk_kind: str, u: int, tgt: torch.Tensor) -> torch.Tensor:
+        """[B] `assaultAtkCS`: the melee attack strength on the city centre at
+        `tgt` of the unit at column `u` of pool `atk_kind` — the type's
+        Combat, its formation's, convoy's, fuel's and chassis' terms, its
+        wound, its promotions and penalties, the religion's and the chassis
+        ability's adders, the general's aura (none for a barbarian), the beam,
+        Congress and government terms and the roster's"""
+        a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
+        at0 = a_type[:, u].clamp(min=0, max=self.NU - 1)
+        ttc = tgt.clamp(min=0)
+        a_promos = self._promo_pool(atk_kind)[0][:, u]
+        atk_e = (self._type_combat[at0]
+                 + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
+                 - self._wound(a_hp[:, u], a_type[:, u])
+                 + self._assault_promo_cs(at0, a_promos, a_tile[:, u])
+                 - self._atk_pens(at0, a_promos, a_tile[:, u], tgt, a_emb[:, u]))
+        atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
+        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True).to(atk_e.dtype)
+        aura_civ = torch.where(a_seat[:, u] == BARB_SEAT, torch.full_like(a_seat[:, u], -1), a_seat[:, u])
+        atk_naval = self.unit_naval[at0] | a_emb[:, u]
+        atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
+        atk_e = atk_e + (self._gdr_beam_cs(at0, a_seat[:, u])
+                         + self._congress_unit_cs(at0, a_seat[:, u])
+                         + self._gov_unit_cs(at0, a_seat[:, u])).to(atk_e.dtype)
+        atk_e = atk_e + self._roster_cs(a_seat[:, u], at0, a_tile[:, u],
+                                        self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1), None, True,
+                                        getattr(self, f"{atk_kind}_unit_formation")[:, u],
+                                        getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_e.dtype)
+        return atk_e
+
+    def _city_ranged_atk_cs(self, atk_kind: str, u: int, tgt: torch.Tensor, outer: torch.Tensor,
+                            ctr: torch.Tensor) -> torch.Tensor:
+        """[B] `rangedCityAtkCS`: the ranged attack strength on the city at
+        `tgt` (its outer defense `outer`, its holder `ctr`) of the unit at
+        column `u` of pool `atk_kind` — the city ranged strength, the
+        formation's, convoy's, fuel's and chassis' terms, its wound, its
+        promotions; a major's religion adder and aura inside the ranged
+        strength's parentheses; Congress, government and the roster's"""
+        _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
+        barb = POOL_CLASS[atk_kind] == "hostile"
+        ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
+        a_hp, a_tile, a_seat = _hp_p[:, u], _tile_p[:, u], _seat_p[:, u]
+        a_promos = self._promo_pool(atk_kind)[0][:, u]
+        a_naval = self.unit_naval.take(ut0) | _emb_p[:, u]
+        atk_e = (self._city_ranged_strength(ut0, a_seat, outer)
+                 + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
+                 - self._wound(a_hp, ut0)
+                 + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
+        if not barb:
+            # aura inside hostileRangedStrike's ranged-strength parentheses,
+            # after the promotion adder; the enhancer ATTACKER adders apply
+            # to city assaults too — Crusade/Just War key on where the UNIT
+            # stands — before the aura add, as the TS assembly orders them
+            atk_e = atk_e + self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype)
+            atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
+        atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
+                         + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
+        atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True,
+                                        getattr(self, f"{atk_kind}_unit_formation")[:, u],
+                                        getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_e.dtype)
+        return atk_e
+
+    def _predict_city_blow(self, pre: str, us: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
+        """[B] `predictCityBlow`: the predicted damage the unit at local slot
+        `us` [B] of pool `pre` deals the city centre at `tgt` [B] — nothing
+        where no city of a holder at war with it stands there; a ranged
+        unit's by its ranged attack strength, any other's by its assault's
+        (its siege assist with it); the law at half the extra draw, less the
+        share the standing outer defense turns (none past a Siege Tower),
+        in [COMBAT_MINIMUM_DAMAGE, the city's hit points]"""
+        B, dev = self.B, self.device
+        out = torch.zeros(B, dtype=torch.long, device=dev)
+        bidx = torch.arange(B, device=dev)
+        ttc = tgt.clamp(min=0)
+        ctr = self._centre_seat_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
+        _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(pre)
+        for u in torch.unique(us[(us >= 0) & (tgt >= 0)]).tolist():
+            m = (us == u) & (tgt >= 0)
+            a_seat = _seat_p[:, u]
+            ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
+            ranged = self._type_ranged_strength.take(ut0) > 0
+            major = m & self._seats_hostile(a_seat.unsqueeze(1), self._centre_target_seat(ctr).unsqueeze(1)).squeeze(1)
+            minor = torch.zeros_like(m)
+            if self.S > 0:
+                _cst = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+                _cst.scatter_(1, self.citystate_center[:, :self.S].clamp(min=0), self.citystate_alive[:, :self.S])
+                minor = (m & ~major & _cst.gather(1, ttc.unsqueeze(1)).squeeze(1) & (ctr >= 100)
+                         & self._seats_hostile(a_seat.unsqueeze(1), ctr.unsqueeze(1)).squeeze(1))
+            on = major | minor
+            if not bool(on.any()):
+                continue
+            hrow = self._holder_row(ctr)
+            hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
+            def_m, tier_m = self._city_defense_cs(hrow, hcol)
+            outer_m = self.city_outer_hp[bidx, hrow, hcol]
+            csx = self.citystate_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0) if self.S > 0 else torch.zeros_like(tgt)
+            cs_mrow = self._CITY_MINOR0 + csx.clamp(min=0, max=max(self.S - 1, 0))
+            tier_c = self._minor_walls_tier_at(csx) if self.S > 0 else torch.zeros_like(tgt)
+            outer_c = torch.minimum(self.city_outer_hp[bidx, cs_mrow, 0], self._walls_tier_hp[tier_c])
+            def_c = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
+            def_cs = torch.where(major, def_m, def_c)
+            tier = torch.where(major, tier_m, tier_c)
+            outer = torch.where(major, outer_m, outer_c)
+            wmax = self._walls_tier_hp.take(tier)
+            hp_max = torch.where(major, torch.full_like(tgt, self._city_max_hp), torch.full_like(tgt, self._cs_max_hp))
+            atk = torch.where(ranged, self._city_ranged_atk_cs(pre, u, tgt, outer, ctr).to(torch.float64),
+                              self._city_assault_atk_cs(pre, u, tgt).to(torch.float64))
+            assist = torch.where(ranged, torch.zeros_like(tier), self._siege_assist(a_seat, ut0, tgt, tier))
+            left = outer.clamp(min=0).to(torch.long)
+            wm = wmax.clamp(min=0).to(torch.long)
+            share = torch.where((left > 0) & (wm > 0) & ((assist & ASSIST_TOWER) == 0),
+                                torch.div(left * 256, wm.clamp(min=1), rounding_mode="floor"), torch.zeros_like(left))
+            roll = torch.full((B,), self._dmg_max_extra // 2, dtype=torch.long, device=dev)
+            raw = self._damage_raw(roll, atk - def_cs.to(torch.float64))
+            blow = torch.minimum(hp_max, (raw - torch.div(raw * share, 256, rounding_mode="floor")).clamp(min=self._dmg_min))
+            out = torch.where(on, blow, out)
+        return out
+
+    def _centre_health(self, tk: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """`districtHealth` for the plots `tk` [B, K]: a city's centre its
+        hit points and their most (a major's or a Free City's, a
+        city-state's), its holder; elsewhere 0s and -1"""
+        B, K = tk.shape
+        bidx = torch.arange(B, device=self.device).unsqueeze(1).expand(B, K)
+        ctr = self._centre_seat_plane().gather(1, tk)
+        tgt_seat = self._centre_target_seat(ctr)
+        city = tgt_seat >= 0
+        hrow = self._holder_row(ctr)
+        hcol = self.centre_slot_at.gather(1, tk).clamp(min=0)
+        hp = torch.where(city, self.city_hp[bidx, hrow, hcol].to(torch.long), torch.zeros_like(tk))
+        mx = torch.where(city, torch.full_like(tk, self._city_max_hp), torch.zeros_like(tk))
+        if self.S > 0:
+            csx = self.citystate_at.gather(1, tk)
+            minor = ~city & (ctr >= 100) & (csx >= 0)
+            hp = torch.where(minor, self.citystate_hp.gather(1, csx.clamp(min=0)).to(torch.long), hp)
+            mx = torch.where(minor, torch.full_like(tk, self._cs_max_hp), mx)
+        return mx, hp, torch.where(mx > 0, ctr, torch.full_like(ctr, -1))
+
     def _assault_city(self, att: torch.Tensor, tgt: torch.Tensor,
                       atk_kind: str, u: int):
         """`attackCity` — ONE melee assault on a MAJOR seat's city, whoever
@@ -14349,26 +14487,7 @@ class SimSeats:
         hrow = self._holder_row(hseat)
         slot = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
         def_cs, _wtier = self._city_defense_cs(hrow, slot)
-        a_promos = self._promo_pool(atk_kind)[0][:, u]
-        atk_e = (self._type_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
-                 + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
-                 - self._wound(a_hp[:, u], a_type[:, u])
-                 + self._assault_promo_cs(a_type[:, u], a_promos, a_tile[:, u])
-                 - self._atk_pens(a_type[:, u], a_promos, a_tile[:, u], tgt, a_emb[:, u]))
-        atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
-        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True).to(atk_e.dtype)
-        aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
-                               torch.full_like(hrow, -1), a_seat[:, u])
-        atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
-        atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
-        atk_e = atk_e + (self._gdr_beam_cs(a_type[:, u], a_seat[:, u])
-                             + self._congress_unit_cs(a_type[:, u], a_seat[:, u])
-                             + self._gov_unit_cs(a_type[:, u], a_seat[:, u])).to(atk_e.dtype)
-        atk_e = atk_e + self._roster_cs(
-            a_seat[:, u], a_type[:, u].clamp(min=0, max=self.NU - 1), a_tile[:, u],
-            self.tile_seat.gather(1, ttc.unsqueeze(1)).squeeze(1), None, True,
-            getattr(self, f"{atk_kind}_unit_formation")[:, u],
-                                            getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_e.dtype)
+        atk_e = self._city_assault_atk_cs(atk_kind, u, tgt)
         if getattr(self, "_battle_probe", False) and bool(att.count_nonzero()):
             for _b in att.nonzero(as_tuple=True)[0].tolist():
                 print(f"GPU-BATTLE b={_b} t={self.turn} tgt={int(tgt[_b])} "
@@ -14558,25 +14677,7 @@ class SimSeats:
         cs_mrow = self._CITY_MINOR0 + citystate_sc.clamp(min=0, max=max(self.S - 1, 0))
         cs_outer = torch.minimum(self.city_outer_hp[_bax, cs_mrow, 0], self._walls_tier_hp[cs_tier])
         def_cs = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
-        a_promos = self._promo_pool(atk_kind)[0][:, u]
-        atk_e = (self._type_combat[at0] + self._form_cs_pool(atk_kind, u)
-                 + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
-                 - self._wound(a_hp[:, u], a_type[:, u])
-                 + self._assault_promo_cs(at0, a_promos, here)
-                 - self._atk_pens(at0, a_promos, here, tgt, a_emb[:, u]))
-        atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
-        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True).to(atk_e.dtype)
-        aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
-                               torch.full_like(a_seat[:, u], -1), a_seat[:, u])
-        atk_naval = self.unit_naval[at0] | a_emb[:, u]
-        atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
-        atk_e = atk_e + (self._gdr_beam_cs(at0, a_seat[:, u])
-                         + self._congress_unit_cs(at0, a_seat[:, u])
-                         + self._gov_unit_cs(at0, a_seat[:, u])).to(atk_e.dtype)
-        atk_e = atk_e + self._roster_cs(a_seat[:, u], at0, a_tile[:, u],
-                                        self.tile_seat.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1), None, True,
-                                        getattr(self, f"{atk_kind}_unit_formation")[:, u],
-                                            getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_e.dtype)
+        atk_e = self._city_assault_atk_cs(atk_kind, u, tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
         cs_assist = self._siege_assist(a_seat[:, u], at0, tgt, cs_tier)
         cs_wall, cs_centre = self._district_hit(
@@ -14869,11 +14970,8 @@ class SimSeats:
         _hp_p, _tile_p, _type_p, _xp_p, _emb_p, _alive_p, _seat_p = self._pool_of(atk_kind)
         barb = POOL_CLASS[atk_kind] == "hostile"
         ut0 = _type_p[:, u].clamp(min=0, max=self.NU - 1)
-        a_hp, a_tile, a_seat = _hp_p[:, u], _tile_p[:, u], _seat_p[:, u]
-        a_form = getattr(self, f"{atk_kind}_unit_formation")[:, u]
-        a_lev = getattr(self, f"{atk_kind}_unit_levied")[:, u]
+        a_seat = _seat_p[:, u]
         a_promos = self._promo_pool(atk_kind)[0][:, u]
-        a_naval = self.unit_naval.take(ut0) | _emb_p[:, u]
         # `cityAtIndex` finds ANY major's centre; `unitsHostile` decides who
         # may be hit, exactly as the
         # melee scan's `seatTarget` does — a barbarian is hostile to every
@@ -14889,21 +14987,7 @@ class SimSeats:
             hcol = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
             def_cs, _wtier = self._city_defense_cs(hrow, hcol)
             outer_all = self.city_outer_hp[_bidx, hrow, hcol]
-            atk_e = (self._city_ranged_strength(ut0, a_seat, outer_all)
-                     + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
-                     - self._wound(a_hp, ut0)
-                     + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
-            if not barb:
-                # aura inside hostileRangedStrike's ranged-strength
-                # parentheses, after the promotion adder.
-                # the enhancer ATTACKER adders apply to city assaults too —
-                # Crusade/Just War key on where the UNIT stands, not on what it hits.
-                # Inserted BEFORE the aura add so term order matches the TS assembly.
-                atk_e = atk_e + self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype)
-                atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
-            atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
-                             + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
-            atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True, a_form, a_lev).to(atk_e.dtype)
+            atk_e = self._city_ranged_atk_cs(atk_kind, u, tgt, outer_all, ctr)
             _wmax = self._walls_tier_hp.take(_wtier)
             wall, centre = self._district_hit(city_att, atk_e - def_cs, outer_all, _wmax, self._city_max_hp,
                                               _klass, None, "vrngc", tgt)
@@ -14953,16 +15037,7 @@ class SimSeats:
             cs_mrow = self._CITY_MINOR0 + csx.clamp(min=0, max=max(self.S - 1, 0))
             cs_outer = torch.minimum(self.city_outer_hp[_bidx, cs_mrow, 0], self._walls_tier_hp[cs_tier])
             def_cs = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
-            atk_cs = (self._city_ranged_strength(ut0, a_seat, cs_outer)
-                      + self._form_cs_pool(atk_kind, u) + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
-                      - self._wound(a_hp, ut0)
-                      + self._assault_promo_cs(ut0, a_promos, a_tile, ranged=True))
-            if not barb:
-                atk_cs = atk_cs + self._rel_atk_cs(a_seat, tgt).to(atk_cs.dtype)
-                atk_cs = atk_cs + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_cs.dtype)
-            atk_cs = atk_cs + (self._congress_unit_cs(ut0, a_seat)
-                               + self._gov_unit_cs(ut0, a_seat)).to(atk_cs.dtype)
-            atk_cs = atk_cs + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True, a_form, a_lev).to(atk_cs.dtype)
+            atk_cs = self._city_ranged_atk_cs(atk_kind, u, tgt, cs_outer, ctr)
             cs_wall, cs_centre = self._district_hit(cs_att, atk_cs - def_cs, cs_outer, self._walls_tier_hp[cs_tier],
                                                     self._cs_max_hp, _klass, None, "vrngcs", tgt)
             self._ww_battle(cs_att, self._row_of(self._atk_seat(atk_kind, u)),

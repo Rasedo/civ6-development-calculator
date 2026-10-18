@@ -10,7 +10,7 @@
 import type { ArmyRecord, City, CityState, GameState, Tile, Unit } from './types';
 import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isImpassable, isWater } from '../../world/query';
-import { COMBAT_BOMBARD_VS_UNIT, COST_MULTIPLIER_PCT, MP_SCALE } from '../data/constants';
+import { COMBAT_BOMBARD_VS_UNIT, MP_SCALE } from '../data/constants';
 import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { CITY_STATE_MAX_HP } from '../data/cityStates';
 import { DISTRICTS } from '../data/districts';
@@ -23,17 +23,18 @@ import {
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { cityDefenseStrength, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, hostileUnitAct, meleeAttack, meleeUnitStrengths, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { cityDefenseStrength, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { outerPool } from './rules';
 import { cityStateAt, minorCity } from './cityStates';
 import { irradiated } from './nuclear';
 import { canSee, unitSight } from './fog';
-import { barbarianScouts, barbarianRules, barbSlots, barbSlotsDying, opTurn, plotsSeenNow, poolDying, poolSlots, ringPlots, tribeOf } from './barbarians';
-import { RAID_HOME_RANGE, RAID_HOME_SPREAD, RAID_MARCH_RANGE, RAID_MARCH_SPREAD, RAID_RANGE, RAID_SCORE, RAID_TURNS } from '../data/barbarians';
+import { barbarianScouts, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, ringPlots, tribeOf } from './barbarians';
+import { barbarianTrees } from './barbarianOps';
+import { BT_RUNNING, BT_SUCCESS } from './behaviorTree';
 import { generalAuraMP } from './aura';
 import { attacksLeftOf, attacksPerTurn } from './promotions';
-import type { BarbOp, BarbTribe, ImprovementId } from './types';
+import type { BarbTribe, ImprovementId } from './types';
 
 /** the pathfinder's fixed point: one Movement is 256 */
 const FIX = 256;
@@ -994,6 +995,24 @@ export function passFinish(pass: Pass, u: Unit, move: string, plot: number): voi
   if (!pass.done.has(u.id)) finish(pass, u, move, plot);
 }
 
+/** a plot of the unit's planning in the pass (0x791300; `reachAt`), -1 none */
+export const passReachAt = (state: GameState, pass: Pass, u: Unit, goal: number, turns: number, moves: boolean, range: number): number =>
+  reachAt(state, pass, u, goal, turns, moves, range);
+
+/** the unit's safe plot in the pass (0x716b90; `safePlot`), -1 none */
+export const passSafePlot = (state: GameState, pass: Pass, u: Unit): number => safePlot(state, pass, u, new Set());
+
+/** a unit's turn in the pass ended by a tree's order, with no move logged */
+export function passEnd(pass: Pass, u: Unit): void {
+  pass.done.add(u.id);
+}
+
+/** an operation unit's pillage where it stands (0x963190), its turn done */
+export function passPillage(state: GameState, pass: Pass, u: Unit): void {
+  if (hostilePillage(state, u)) dropHeldCosts();
+  finish(pass, u, 'Operation', u.tileIndex);
+}
+
 const live = (state: GameState, pass: Pass, u: Unit) => !pass.done.has(u.id) && state.units.includes(u) && u.seat === pass.seat;
 
 /**
@@ -1542,9 +1561,13 @@ function mergeSort<T>(a: T[], before: (x: T, y: T) => boolean): T[] {
  * its own stands there); a siege unit strikes its attack; a ranged unit
  * strikes it unless its melee is the stronger and it can reach the plot this
  * turn; then every unit moves onto its attack (the attack flag) — a
- * civilian taken, a fighter struck in melee; each one's turn done.
+ * civilian taken, a fighter struck in melee; each one's turn done. The
+ * assignments in the order their turns ended (the order an operation's
+ * attack logs them: runs/h1_duelw1124 t16, the raid's Slinger before its
+ * Warriors).
  */
-function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack Units'): void {
+function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack Units'): Assigned[] {
+  const ended: Assigned[] = [];
   for (const a of out) {
     const u = a.unit;
     if (!state.units.includes(u) || u.tileIndex === a.move) continue;
@@ -1562,6 +1585,7 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
     strikeAt(u, a.attack);
     u.movesLeft = 0;
     finish(pass, u, move, a.move, a.attack);
+    ended.push(a);
   }
   for (const a of out) {
     const u = a.unit;
@@ -1572,28 +1596,32 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
     strikeAt(u, a.attack);
     u.movesLeft = 0;
     finish(pass, u, move, a.move, a.attack);
+    ended.push(a);
   }
   for (const a of out) {
     const u = a.unit;
     if (!state.units.includes(u)) continue;
     if (a.attack >= 0 && canAct(state, pass, u)) moveTo(state, u, a.attack);
     if (state.units.includes(u)) u.movesLeft = 0;
-    if (!pass.done.has(u.id)) finish(pass, u, move, a.move, a.attack);
+    if (!pass.done.has(u.id)) {
+      finish(pass, u, move, a.move, a.attack);
+      ended.push(a);
+    }
   }
+  return ended;
 }
 
 /** an operation's attack in the pass: the assignment of the units (in pool
  *  order, as the pass walks them) over the pass's targets `keep` picks (their
  *  units still on the map), `exchange` and `survive` its filters, carried
- *  out (0x771f80) */
+ *  out (0x771f80): the assignments in the order their turns ended */
 export function passAttack(state: GameState, pass: Pass, ids: readonly number[], keep: (k: number) => boolean, exchange: boolean,
   survive: boolean, move: string): Assigned[] {
   const units = ids.map((id) => state.units.find((u) => u.id === id)).filter((u): u is Unit => !!u && pass.plan.has(u.id))
     .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
   const targets = pass.targets.filter((t, k) => keep(k) && (!t.unit || state.units.includes(t.unit)));
   const out = assignTo(state, pass, units, targets, exchange, survive);
-  carryOut(state, pass, out, move);
-  return out;
+  return carryOut(state, pass, out, move);
 }
 
 /**
@@ -2175,34 +2203,9 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
   return { seat, strike: false, units, reach, done: new Set(), ai, targets, plan, danger: dangerPlane(state, seat), regions: seenRegions(state, seat) };
 }
 
-// THE BARBARIANS' RAID ("Raid City", BehaviorTrees.xml; the reading is
-// tools/civ6lab/dll_readings.md "C-95: the barbarians' raid"): the tree's
-// tick (0x7d3a00) as its nodes answer — each node's update in the walk, the
-// root Sequence resuming at the child that ran, then every node that
-// SUCCEEDED or RUNS executed in node order (0x7cb3d0).
-
-/** a node's status in the walk */
-const BT_OK = 1;
-const BT_RUN = 2;
-const BT_FAIL = 3;
-
-/** the root Sequence's children */
-const RAID_RECRUIT = 2;
-const RAID_MARCH = 9;
-const RAID_RAID = 12;
-const RAID_HOME = 22;
-const RAID_NOTIFY = 25;
-
 /** an operation's member of the player, null for one killed */
 function memberAtOf(state: GameState, seat: number, id: number): Unit | null {
   return state.units.find((u) => u.id === id && u.seat === seat) ?? null;
-}
-
-/** the operation's living members in pool order (the engines take the pool
- *  slot for the team's order) */
-function opMembers(state: GameState, op: BarbOp): Unit[] {
-  return op.units.map((id) => memberAtOf(state, BARB_SEAT, id)).filter((u): u is Unit => !!u)
-    .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
 }
 
 /** nearest the goal first, then by pool slot; a member killed last */
@@ -2225,14 +2228,6 @@ function goalDistance(state: GameState, u: Unit | null, goal: number): number {
   return u ? plotDistance(state, u.tileIndex, goal) : Infinity;
 }
 
-/** the operation's target is gone (0x73a8e0): no city centre stands on it */
-function raidTargetGone(state: GameState, op: BarbOp): boolean {
-  const t = state.map.tiles[op.target.plot];
-  if (t.district === 'CITY_CENTER') return false;
-  const cs = cityStateAt(state, t.index);
-  return !(cs && cs.centerIndex === t.index);
-}
-
 /** a plot of the unit's planning (0x791300) within `turns`: with `range` 0
  *  the goal itself, else a plot exactly `range` from it with none of its own
  *  stacking there but its own plot (0x78fa10); `moves` asks Movement left */
@@ -2246,32 +2241,22 @@ function reachAt(state: GameState, pass: Pass, u: Unit, goal: number, turns: num
   return -1;
 }
 
-/**
- * OPERATION MOVE'S UPDATE (0x81a130) for the operation's team: its members
- * not stored at the node (the node's list, kept while its goal holds)
- * nearest the goal first (a member killed last); the nearest within the
- * range — or its planning reaching a plot at the range this turn with
- * Movement left — has the team arrived, a stored member within the range
- * too. A goal of the target: arrived is SUCCESS. Else the members within
- * the unit distance of the goal, and of those in turn, are the team; more
- * than half outside it and it has not arrived. The list keeps the stored
- * members out of the unit distance of the others.
- */
-function moveUpdate(state: GameState, pass: Pass, op: BarbOp, node: number, goal: number, target: boolean,
-  range: number, spread: number): { status: number; arrived: boolean } {
-  const stores = (op.store ??= {});
-  const r = passMoveUpdate(state, pass, op.units, stores[node], goal, target, range, spread);
-  if (r.store) stores[node] = r.store;
-  return r;
-}
-
 /** a team's store at an Operation Move node: the members it holds out and
  *  the goal it holds them for */
 export interface MoveStore { list: number[]; goal: number }
 
-/** OPERATION MOVE'S UPDATE (0x81a130, above) for a team of the pass's
- *  player — its members, the node's store — the status (BT_OK, BT_RUN), the
- *  team arrived, the store kept */
+/**
+ * OPERATION MOVE'S UPDATE (0x81a130) for a team of the pass's player — its
+ * members, the node's store — the status (SUCCESS, RUNNING), the team
+ * arrived, the store kept: its members not stored at the node (the node's
+ * list, kept while its goal holds) nearest the goal first (a member killed
+ * last); the nearest within the range — or its planning reaching a plot at
+ * the range this turn with Movement left — has the team arrived, a stored
+ * member within the range too. A goal of the target: arrived is SUCCESS.
+ * Else the members within the unit distance of the goal, and of those in
+ * turn, are the team; more than half outside it and it has not arrived. The
+ * list keeps the stored members out of the unit distance of the others.
+ */
 export function passMoveUpdate(state: GameState, pass: Pass, members: readonly number[], store: MoveStore | undefined, goal: number,
   target: boolean, range: number, spread: number): { status: number; arrived: boolean; store: MoveStore | undefined } {
   const memberAt = (id: number) => memberAtOf(state, pass.seat, id);
@@ -2317,7 +2302,7 @@ export function passMoveUpdate(state: GameState, pass: Pass, members: readonly n
     }
   }
   // the store kept as it stood
-  if ((arrived || reach) && target) return { status: BT_OK, arrived: true, store };
+  if ((arrived || reach) && target) return { status: BT_SUCCESS, arrived: true, store };
   if (spread !== 0) {
     let end = others.findIndex((o) => o.d > spread);
     if (end < 0) end = others.length;
@@ -2343,7 +2328,7 @@ export function passMoveUpdate(state: GameState, pass: Pass, members: readonly n
     }
     list = keep;
   }
-  return { status: arrived ? BT_OK : BT_RUN, arrived, store: { list, goal } };
+  return { status: arrived ? BT_SUCCESS : BT_RUNNING, arrived, store: { list, goal } };
 }
 
 /** the goal barred to the unit (0x586360, 0x5862e0, 0x585eb0): no path to
@@ -2355,28 +2340,25 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
 }
 
 /**
- * OPERATION MOVE'S EXECUTION (0x816cb0): nothing where the operation is ready
- * (0x73aa60: its units may be built, or every team ready; a raid's is), the
- * update found the team arrived and the node names no Leader Tag (+0x7c,
- * its UnitAiType; a raid's none); else each member left with Movement, nearest the goal
- * first, takes a move order (0x962030): its radius the smaller of the
- * node's range and its attack range (0 for a ship), at least 1 where the
- * goal is barred to it (`moveBarred`); the first plot of its planning of two
- * turns at the radius (0x791300) where it lies in the goal's region, else of
- * the plots within the radius of the goal (the ring walk 0x6aef0, the test
- * 0x815d50) one in the goal's region before one outside, then the nearest
- * it, its own plot or one with none of its own and a path to it; none, the
- * goal with the attack flag.
+ * OPERATION MOVE'S EXECUTION (0x816cb0) for a team of the pass's player —
+ * zero: a unit whose radius is 0 (in a formation, or of the node's Leader
+ * Tag), leaderNamed: the node names a Leader Tag, which takes the others'
+ * radius to 1 at least: each mover, the plot it was on and the plot it went
+ * for, in the order they moved. Nothing where the operation is ready
+ * (0x73aa60: its units may be built, or every team ready), the update found
+ * the team arrived and the node names no Leader Tag (+0x7c, its UnitAiType);
+ * else each member left with Movement, nearest the goal first, takes a move
+ * order (0x962030): its radius the smaller of the node's range and its
+ * attack range (1 for a melee unit, 0 for a ship; runs/h1_duelw1124 t13-t15:
+ * the raid's Warriors go for 35:20 and 35:19 beside its target 34:19), at
+ * least 1 where the goal is barred to it
+ * (`moveBarred`); the first plot of its planning of two turns at the radius
+ * (0x791300) where it lies in the goal's region, else of the plots within
+ * the radius of the goal (the ring walk 0x6aef0, the test 0x815d50) one in
+ * the goal's region before one outside, then the nearest it, its own plot or
+ * one with none of its own and a path to it; none, the goal with the attack
+ * flag.
  */
-function moveExec(state: GameState, pass: Pass, op: BarbOp, goal: number, range: number, arrived: boolean): void {
-  passMoveExec(state, pass, op.units, goal, range, arrived, true);
-}
-
-/** OPERATION MOVE'S EXECUTION (0x816cb0, above) for a team of the pass's
- *  player — zero: a unit whose radius is 0 (in a formation, or of the
- *  node's Leader Tag), leaderNamed: the node names a Leader Tag, which
- *  takes the others' radius to 1 at least: each mover, the plot it was on and
- *  the plot it went for, in the order they moved */
 export function passMoveExec(state: GameState, pass: Pass, members: readonly number[], goal: number, range: number,
   arrived: boolean, ready: boolean, zero: (u: Unit) => boolean = () => false, leaderNamed = false): { unit: Unit; from: number; dest: number }[] {
   const out: { unit: Unit; from: number; dest: number }[] = [];
@@ -2389,7 +2371,7 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
   for (const u of movers) {
     if (!canAct(state, pass, u)) continue;
     const z = zero(u);
-    let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, rangeOf(u));
+    let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, unitAttackRange(u));
     const paths = pathPlots(state, u);
     if (u.tileIndex !== goal && moveBarred(state, u, goal, paths)) r = Math.max(1, r);
     else if (range > 0 && leaderNamed && !z) r = Math.max(1, r);
@@ -2424,173 +2406,6 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
   return out;
 }
 
-/** OPERATION ATTACK UNITS' "nearby" targets (0x80bd20 -> 0x80c080): the unit
- *  targets of the list (a civilian through a HIGH unit) not the player's own
- *  within max(2, its Movement left) of a member */
-function opNearbyTargets(state: GameState, pass: Pass, units: readonly Unit[]): Target[] {
-  return pass.targets.filter((e) => {
-    if (!['CIVILIAN', 'RELIGIOUS', 'TRADER', 'LOW', 'MEDIUM', 'HIGH'].includes(e.type)) return false;
-    const v = targetUnit(state, e);
-    if (!v || v.seat === pass.seat) return false;
-    return units.some((u) => plotDistance(state, u.tileIndex, v.tileIndex) <= Math.max(2, Math.floor(u.movesLeft / MP_SCALE)));
-  });
-}
-
-/**
- * OPERATION ATTACK UNITS' EXECUTION (0x80ceb0): the team's members left with
- * Movement on land (a bombard unit only against a city of another player,
- * or a DEFENDER), the list's unit targets near them (`opNearbyTargets`),
- * the assignment (0x776140) dropping a spot that would kill the unit — and
- * one of a losing exchange for a team of one — carried out (0x771f80).
- */
-function opAttackExec(state: GameState, pass: Pass, op: BarbOp): void {
-  const cityTarget = !raidTargetGone(state, op) && tileSeat(state.map.tiles[op.target.plot]) !== pass.seat;
-  const units = opMembers(state, op).filter((u) => canAct(state, pass, u)
-    && !UNITS[u.type]?.naval && (UNITS[u.type]?.bombard === undefined || cityTarget || pass.ai.get(u.id) === AI_DEFENDER));
-  if (!units.length) return;
-  const targets = opNearbyTargets(state, pass, units);
-  if (!targets.length) return;
-  carryOut(state, pass, assignTo(state, pass, units, targets, units.length === 1, true), 'Operation');
-}
-
-/**
- * OPERATION PILLAGE'S EXECUTION (0x811390): each IMPROVEMENT, then each
- * PASSIVE_DISTRICT target of the list in its order, on the ground of the
- * target's city, unpillaged: the first member standing on it with Movement
- * left, on land and with no bombard strength, pillages it (0x963190).
- */
-function opPillageExec(state: GameState, pass: Pass, op: BarbOp): void {
-  const tt = state.map.tiles[op.target.plot];
-  for (const e of pass.targets) {
-    if (e.type !== 'IMPROVEMENT' && e.type !== 'PASSIVE_DISTRICT') continue;
-    const t = state.map.tiles[e.tile];
-    if (tileSeat(t) !== tileSeat(tt) || tileCity(t) !== tileCity(tt)) continue;
-    if (e.type === 'IMPROVEMENT' ? (!t.improvement || t.pillaged) : (!t.districtComplete || t.districtPillaged)) continue;
-    const u = opMembers(state, op).find((x) => canAct(state, pass, x)
-      && x.tileIndex === e.tile && !UNITS[x.type]?.naval && UNITS[x.type]?.bombard === undefined);
-    if (!u) continue;
-    if (hostilePillage(state, u)) dropHeldCosts();
-    finish(pass, u, 'Operation', e.tile);
-  }
-}
-
-/**
- * A RAID'S TICK ("Raid City"): the recruit (nodes 2-8, `opTurn`) until its
- * force is whole or its limiter ends it; the march (Concurrent 9: Operation
- * Attack Units 10, Operation Move 11 to the target, range 2); the raid
- * (Priority 12: Barbarian Raid Check 13 — the tribe's score at 10 ends it —
- * else the Turn Limiter 14, at least 10 turns, over Concurrent 15: Attack
- * Units 16, Operation Pillage 17, In Difficulty Range 18 over Operation
- * Attack City 19, Operation Defend Units 20, Operation Move 21 about the
- * target, range 3); the way home (Concurrent 22: Attack Units 23, Operation
- * Move 24 to the rally, range 1, unit distance 4); Notify Owner 25. A child
- * that RUNS ends the walk, the root resuming there next turn; a FAILURE
- * ends the tree. Operation Attack Units' update SUCCEEDS; Operation Pillage's
- * FAILS once the operation holds no living unit. The tick runs no
- * Operation Attack City (In Difficulty Range admits it against a target owner
- * at Immortal or above) and moves no unit under Operation Defend Units.
- */
-function raidTick(state: GameState, pass: Pass, tr: BarbTribe, op: BarbOp): void {
-  const exec: (() => void)[] = [];
-  let root = op.resume ?? RAID_RECRUIT;
-  const end = (status: number) => {
-    if (status === BT_RUN) op.resume = root;
-    else {
-      op.done = true;
-      delete op.resume;
-    }
-  };
-  if (root === RAID_RECRUIT) {
-    if (!op.recruited) opTurn(state, tr, op);
-    if (!op.recruited) return end(BT_RUN);
-    root = RAID_MARCH;
-  }
-  const target = op.target.plot;
-  if (root === RAID_MARCH) {
-    exec.push(() => opAttackExec(state, pass, op));
-    const mv = moveUpdate(state, pass, op, 11, target, true, RAID_MARCH_RANGE, RAID_MARCH_SPREAD);
-    exec.push(() => moveExec(state, pass, op, target, RAID_MARCH_RANGE, mv.arrived));
-    if (mv.status !== BT_OK) {
-      exec.forEach((f) => f());
-      return end(mv.status);
-    }
-    root = RAID_RAID;
-  }
-  if (root === RAID_RAID) {
-    let status = BT_OK;
-    if ((tr.score ?? 0) < RAID_SCORE) {
-      op.raidFrom ??= state.turn;
-      exec.push(() => opAttackExec(state, pass, op));
-      const alive = op.units.some((id) => memberAtOf(state, BARB_SEAT, id));
-      let conc = BT_OK;
-      if (!raidTargetGone(state, op) && !alive) conc = BT_FAIL;
-      else {
-        exec.push(() => opPillageExec(state, pass, op));
-        const mv = moveUpdate(state, pass, op, 21, target, true, RAID_RANGE, 1);
-        exec.push(() => moveExec(state, pass, op, target, RAID_RANGE, mv.arrived));
-        conc = Math.max(conc, mv.status);
-      }
-      const elapsed = state.turn - op.raidFrom;
-      if (elapsed <= RAID_TURNS && conc !== BT_FAIL) status = BT_RUN;
-      else if (conc === BT_RUN && elapsed >= Math.trunc(RAID_TURNS * COST_MULTIPLIER_PCT / 100)) status = BT_OK;
-      else status = conc;
-    }
-    if (status !== BT_OK) {
-      exec.forEach((f) => f());
-      return end(status);
-    }
-    root = RAID_HOME;
-  }
-  if (root === RAID_HOME) {
-    const rally = op.rally ?? tr.plot;
-    exec.push(() => opAttackExec(state, pass, op));
-    const mv = moveUpdate(state, pass, op, 24, rally, false, RAID_HOME_RANGE, RAID_HOME_SPREAD);
-    exec.push(() => moveExec(state, pass, op, rally, RAID_HOME_RANGE, mv.arrived));
-    if (mv.status !== BT_OK) {
-      exec.forEach((f) => f());
-      return end(mv.status);
-    }
-    root = RAID_NOTIFY;
-  }
-  exec.forEach((f) => f());
-  // NOTIFY OWNER (0x7c6fa0 -> the tribe's 0x148270): the raid's city goes to
-  // the tribe's city assault list — the assault (0x1497d0) refuses while the
-  // raid stands
-  (tr.assaultTargets ??= []).push(op.target);
-  end(BT_OK);
-}
-
-/**
- * THE BARBARIANS' OPERATIONS' TREES (the operation manager 0x727510, in
- * the player's turn before its tactical pass): each tribe's operation in
- * the tribes' order: a raid's tick (`raidTick`), a city assault's
- * recruit.
- */
-function barbarianOpTrees(state: GameState, pass: Pass): void {
-  for (const tr of state.barbTribes ?? []) {
-    const op = tr.op;
-    if (!op || op.done) continue;
-    if (!op.assault) raidTick(state, pass, tr, op);
-    else if (!op.recruited) opTurn(state, tr, op);
-  }
-}
-
-/** the units a stand-in still moves, at the game's moves not yet ported: a
- *  city assault's */
-function standIn(state: GameState, pass: Pass, move: string, pick: (u: Unit, tr: BarbTribe | undefined) => boolean): void {
-  // the stand-in walks the units in the order the engine made them
-  const mine = new Set(pass.units);
-  for (const u of state.units.filter((x) => mine.has(x))) {
-    if (!live(state, pass, u) || u.movesLeft <= 0) continue;
-    if (!pick(u, tribeOf(state, u.id))) continue;
-    const here = state.map.tiles[u.tileIndex];
-    const was = `${here.pillaged}:${here.districtPillaged}`;
-    hostileUnitAct(state, u);
-    if (`${here.pillaged}:${here.districtPillaged}` !== was) dropHeldCosts();
-    finish(pass, u, move);
-  }
-}
-
 /**
  * THE BARBARIANS' TACTICAL PASS (TacticalAI 0x771530 over Tactics.xml's
  * "Default Barbarian" and "Default Barbarian HL" lists) for the units that
@@ -2598,7 +2413,7 @@ function standIn(state: GameState, pass: Pass, move: string, pick: (u: Unit, tr:
  * from the next): the knowledge base's ageing and look (`knowledgeLook`),
  * the units in their pool's order (`slot`), each one's
  * planning reach taken before any moves (0x792c90), the operations' trees
- * (`barbarianOpTrees`), then the moves in the
+ * (`barbarianTrees`), then the moves in the
  * list's order, each walking the units the moves before it left; at the
  * turn's end the knowledge base looks again.
  */
@@ -2633,19 +2448,9 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   }
   const pass: Pass = { seat: BARB_SEAT, strike: true, units: all, reach, done: new Set(), ai, targets, plan,
     danger: dangerPlane(state, BARB_SEAT), regions: seenRegions(state, BARB_SEAT) };
-  // the operations' trees first (their manager's job opens the player's
-  // turn); then an operation's units are the operation's
-  barbarianOpTrees(state, pass);
-  const opUnits = new Set<number>();
-  const assaults = new Set<number>();
-  for (const tr of state.barbTribes ?? []) {
-    for (const id of tr.op?.units ?? []) {
-      opUnits.add(id);
-      if (tr.op?.assault) assaults.add(id);
-    }
-  }
-  standIn(state, pass, 'Operation', (u) => assaults.has(u.id));
-  for (const id of opUnits) pass.done.add(id);
+  // the operations first (their manager's job opens the player's turn);
+  // then an operation's units are the operation's
+  const opUnits = barbarianTrees(state, pass);
   pass.units = all.filter((u) => !opUnits.has(u.id) && tacticalUnit(state, u, ai.get(u.id)!));
   rampage(state, pass);
   attackUnits(state, pass, 'HIGH');

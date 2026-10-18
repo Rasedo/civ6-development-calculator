@@ -1,0 +1,450 @@
+/**
+ * THE BARBARIANS' OPERATIONS AND TREES on the one operation manager
+ * (cpu/core/operations; the readings are tools/civ6lab/dll_readings.md
+ * "C-95: the barbarians' raid" and "C-95: the scout's tree"). The barbarian
+ * player's manager state is `barbSeat.ops`; a tribe starts its raid
+ * ("Barbarian Attack", the tree "Raid City") or its city assault
+ * ("Barbarian City Assault", "Barbarian City Attack") through the manager's
+ * start by name (0x149980 / 0x1497d0), the tree's Tribe tag its index, the
+ * assault against the target's owner; a scout that saw a city walks home
+ * under the tree "Barbarian Found City" (`homing`). The player's turn: the
+ * military AI's part logs and refreshes the operations
+ * (`barbarianOpsTurn`, before the tribes' turn); in the tactical pass, once
+ * each unit's planning is taken, every tree ticks in the order it was made
+ * (`barbarianTrees`), and the trees' units are theirs. The barbarians weigh
+ * no candidate, and a member killed stays in its team.
+ */
+import type { BarbHoming, BarbTarget, BarbTribe, GameState, Unit } from './types';
+import { BARB_SEAT, isBarbSeat } from './seats';
+import { majorView } from './majorView';
+import { passOrders, passView } from './opsOrders';
+import { newOpsAi, operationsRefresh, opsOf, startOperationAt, tickOperation, type OpsAi, type OpsEnv } from './operations/manager';
+import { addMember, opUnits, type Operation } from './operations/operation';
+import type { BarbarianHooks } from './operations/barbarian';
+import { BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataFloat, dataInt, dataTag, tick, type BtHandler, type BtNode, type BtRun } from './behaviorTree';
+import { AI_OP_DEFS, AI_TREES } from '../data/aiOperations';
+import { moveTo, passEnd, passPillage, passReachAt, passSafePlot, pathTo, type Pass } from './tactical';
+import { barbUnitFor, handicapOf, raidBoldness } from './barbarians';
+import { BARB_TAG_UNITS, barbForce } from '../data/barbarians';
+import { gameTypeOf } from '../data/aliases';
+import { UNIT_HP } from '../data/units';
+import type { MajorUnitView, MajorView } from '../../ai/major/view';
+
+/** the definitions the tribes start */
+export const BARB_RAID_DEF = 'Barbarian Attack';
+export const BARB_ASSAULT_DEF = 'Barbarian City Assault';
+
+/** the replay's view of the barbarians' operation lines (null off) */
+let tracer: ((line: string) => void) | null = null;
+export function traceBarbOps(fn: ((line: string) => void) | null): void {
+  tracer = fn;
+}
+
+const opsOfBarbs = (state: GameState): OpsAi => (state.barbSeat.ops ??= newOpsAi(BARB_SEAT));
+
+/** the operation of the id, null where none runs */
+export function barbOp(state: GameState, id: number): Operation | null {
+  return state.barbSeat.ops ? opsOf(state.barbSeat.ops).find((o) => o.id === id) ?? null : null;
+}
+
+/** the barbarians' view: their units in their pool's order; in their
+ *  tactical pass, the pass's target list, planning reaches, spots, blows */
+function barbView(state: GameState, pass: Pass | null): MajorView {
+  const base = majorView(state);
+  const own = (): MajorUnitView[] => {
+    const ids = state.units.filter((u) => isBarbSeat(u.seat)).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0)).map((u) => u.id);
+    const byId = new Map(base.units(BARB_SEAT).map((u) => [u.id, u]));
+    return ids.map((id) => byId.get(id)!).filter(Boolean);
+  };
+  const v: MajorView = { ...base, units: (i) => (i === BARB_SEAT ? own() : base.units(i)) };
+  return pass ? passView(state, BARB_SEAT, pass, v) : v;
+}
+
+const tribeAt = (state: GameState, k: number): BarbTribe | undefined => state.barbTribes?.[k];
+
+const unitOf = (state: GameState, id: number): Unit | undefined => state.units.find((u) => u.id === id && isBarbSeat(u.seat));
+
+/** what the barbarians' nodes ask of a tribe */
+function hooksOf(state: GameState): BarbarianHooks {
+  return {
+    spawnChange(k, rate, raiding) {
+      const tr = tribeAt(state, k);
+      if (!tr) return;
+      const force = rate && tr.op ? barbForce(tr.kind, raiding, handicapOf(state, tr.op.target.seat)) : undefined;
+      if (force) tr.every = force.rate;
+      else if (!rate) delete tr.every;
+    },
+    // the force (0x7c7580: the BarbarianAttackForces row by the target
+    // owner's handicap, each class the barbarians cannot raise dropped,
+    // 0x144610) from the tribe's units of each class, those raised this turn
+    // not yet among them; whole, it joins the operation's team; else the
+    // rest is asked for, melee first
+    recruit(k, op, raiding) {
+      const tr = tribeAt(state, k);
+      if (!tr || !tr.op) return false;
+      const force = barbForce(tr.kind, raiding, handicapOf(state, tr.op.target.seat));
+      const fresh = new Set(tr.fresh ?? []);
+      const free = tr.units.filter((id) => unitOf(state, id) && !fresh.has(id));
+      const taken: number[] = [];
+      const missing: string[] = [];
+      for (const [tag, n] of force?.units ?? []) {
+        const type = barbUnitFor(state, tag);
+        if (!type) continue;
+        let have = 0;
+        for (const id of free) {
+          if (have >= n) break;
+          const u = unitOf(state, id)!;
+          if (taken.includes(id) || !BARB_TAG_UNITS[tag].includes(u.type)) continue;
+          taken.push(id);
+          have++;
+        }
+        for (let j = have; j < n; j++) missing.push(type);
+      }
+      if (missing.length) {
+        tr.queue = missing;
+        return false;
+      }
+      for (const id of taken) addMember(op.teams[0], { id, type: gameTypeOf('unit', unitOf(state, id)!.type, 'UNIT_') });
+      return true;
+    },
+    score: (k) => tribeAt(state, k)?.score ?? 0,
+    // NOTIFY OWNER (0x148270): the raid's tree offers its city to the city
+    // assault, which refuses while the raid stands — the city to the
+    // tribe's assault list; the assault's own tree adds nothing (a city goes
+    // to the raid list only from a bribed tribe)
+    notify(k, op) {
+      const tr = tribeAt(state, k);
+      if (!tr?.op || tr.op.id !== op.id || tr.op.assault) return;
+      (tr.assaultTargets ??= []).push(tr.op.target);
+    },
+  };
+}
+
+/** the orders of a turn part outside the barbarians' pass: none is given */
+const refuse = (): never => {
+  throw new Error('the barbarians\' operations order their units in their tactical pass alone');
+};
+const outsidePass: Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec'> = {
+  move: refuse, strike: refuse, attack: refuse, moveUpdate: refuse, moveExec: refuse,
+};
+
+function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
+  let view: MajorView | null = null;
+  const fresh = () => (view ??= barbView(state, pass));
+  const changed = () => {
+    view = null;
+  };
+  const none = (): never => {
+    throw new Error('the barbarians\' operations hold no contracts');
+  };
+  return {
+    turn: state.turn,
+    view: fresh,
+    defs: [],
+    army: () => [],
+    camps: () => [],
+    known: () => [],
+    threat: () => -1,
+    book: none,
+    newContractId: none,
+    contractCities: () => [],
+    clearProduction: none,
+    newOpId: () => {
+      const id = state.barbSeat.opsNext ?? 0;
+      state.barbSeat.opsNext = id + 1;
+      return id;
+    },
+    settle: null,
+    unitRows: () => [],
+    // a unit action row of theirs: a pillage where the unit stands
+    act: (rows) => {
+      if (!pass) refuse();
+      const v = fresh();
+      const units = v.units(BARB_SEAT);
+      const pillage = v.unitActionColumn('PILLAGE');
+      for (const row of rows) {
+        row.forEach((a, col) => {
+          if (a < 0) return;
+          if (a !== pillage) throw new Error(`the barbarians' operations give no action ${a}`);
+          const u = unitOf(state, units[col].id);
+          if (u) passPillage(state, pass!, u);
+        });
+      }
+      changed();
+    },
+    ...(pass ? passOrders(state, BARB_SEAT, pass, changed) : outsidePass),
+    barbarian: hooksOf(state),
+    log: (l) => tracer?.(l),
+    logEval: () => undefined,
+  };
+}
+
+/**
+ * A TRIBE STARTS ITS RAID OR ITS CITY ASSAULT (0x149980 / 0x1497d0): never
+ * beside another; the manager's start by name with the city's plot, the
+ * target set (0x73e7d0) — the rally the tribe's camp —, the assault against
+ * the city's owner (op +0x2a0), the tree's Tribe tag the tribe.
+ * Whether it started; its tree ticks in the trees' walk.
+ */
+export function barbOpStart(state: GameState, tribe: BarbTribe, target: BarbTarget, assault: boolean): boolean {
+  if (tribe.op) return false;
+  const ai = opsOfBarbs(state);
+  const env = barbEnv(state, null);
+  const op = startOperationAt(ai, env, assault ? BARB_ASSAULT_DEF : BARB_RAID_DEF, assault ? target.seat : -1, target.plot, tribe.plot);
+  op.triggerValue = (state.barbTribes ?? []).indexOf(tribe);
+  tribe.op = { id: op.id, assault, target };
+  return true;
+}
+
+/** the tribe's operation still runs */
+export const barbOpLive = (state: GameState, tribe: BarbTribe): boolean => !!tribe.op && !!barbOp(state, tribe.op.id);
+
+/** the nodes of a definition's tree the twins compare: the Sequence the
+ *  trigger opens (its resume), the Turn Limiter over Barbarian Recruit and
+ *  the raid's Turn Limiter (Limit Is Min) — their first turns; -1 none */
+function treeMarks(def: string): { seq: number; recruit: number; raid: number } {
+  const nodes = compileTree(def, AI_TREES[AI_OP_DEFS[def].tree ?? ''] ?? []);
+  const decode = nodes.findIndex((n) => n.type === 'Decode Trigger');
+  const rec = nodes.findIndex((n) => n.type === 'Barbarian Recruit');
+  return {
+    seq: decode >= 0 ? nodes[decode].parent : -1,
+    recruit: rec >= 0 ? nodes[rec].parent : -1,
+    raid: nodes.findIndex((n) => n.type === 'Turn Limiter' && n.data['Limit Is Min']?.value === 'true'),
+  };
+}
+
+/** the tribe's operation as the twins compare it: its kind (0 none, 1 a
+ *  raid, 2 an assault), the target's owner and plot, the rally, the player
+ *  it is against, its tree's id, the child its trigger's Sequence resumes
+ *  at, the first turns of its recruit's and its raid's Turn Limiters, its
+ *  members living and killed */
+export function barbOpRecord(state: GameState, tribe: BarbTribe): number[] {
+  const op = tribe.op ? barbOp(state, tribe.op.id) : null;
+  if (!tribe.op || !op) return [0, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0];
+  const m = treeMarks(op.def);
+  const at = (i: number, k: string): number => (i >= 0 && typeof op.mem[i][k] === 'number' ? (op.mem[i][k] as number) : -1);
+  const members = opUnits(op);
+  const living = members.filter((id) => unitOf(state, id)).length;
+  return [tribe.op.assault ? 2 : 1, tribe.op.target.seat, op.target, op.rally, op.enemy, op.id,
+    at(m.seq, 'resume'), at(m.recruit, 'start'), at(m.raid, 'start'), living, members.length - living];
+}
+
+/**
+ * THE BARBARIANS' OPERATIONS' RUN in their tactical pass (the operation
+ * manager 0x727510, opening the player's turn): each running operation's
+ * target and teams logged and refreshed, its tree ticked, in slot order;
+ * their units' turns are the operations'. The ids of the operations' units.
+ */
+export function barbarianOpsTurn(state: GameState): void {
+  const ai = state.barbSeat.ops;
+  if (ai && opsOf(ai).length) operationsRefresh(ai, barbEnv(state, null));
+}
+
+/**
+ * THE BARBARIANS' TREES' TICK in their tactical pass (the tree manager's
+ * tick 0x7ffdd0, list C of the player's turn, once each unit's planning is
+ * taken): every tree of the player — its operations' and its scouts' — in
+ * the order they were made (their ids), a tree a tree's order starts (a
+ * scout's report raids at once) ticking in the same walk after them; a tree
+ * that ends goes. The operations' units' turns are their operations'; a
+ * scout its tree moved has its turn ended. The ids of the units the trees
+ * held.
+ */
+export function barbarianTrees(state: GameState, pass: Pass): Set<number> {
+  const held = new Set<number>();
+  const ai = opsOfBarbs(state);
+  for (let last = -1; ;) {
+    const ops = opsOf(ai).filter((o) => o.id > last);
+    const scouts = (state.barbTribes ?? []).filter((t) => t.homing && t.homing.id > last);
+    const op = ops.reduce<Operation | null>((a, o) => (!a || o.id < a.id ? o : a), null);
+    const tr = scouts.reduce<BarbTribe | null>((a, t) => (!a || t.homing!.id < a.homing!.id ? t : a), null);
+    if (!op && !tr) break;
+    if (op && (!tr || op.id < tr.homing!.id)) {
+      last = op.id;
+      for (const id of opUnits(op)) held.add(id);
+      tickOperation(ai, barbEnv(state, pass), op);
+      for (const id of opUnits(op)) held.add(id);
+    } else {
+      last = tr!.homing!.id;
+      tickScout(state, pass, tr!);
+    }
+  }
+  for (const id of held) pass.done.add(id);
+  return held;
+}
+
+// THE SCOUT'S TREE ("Barbarian Found City", the tribes' ScoutingBehaviorTree;
+// the reading is tools/civ6lab/dll_readings.md "C-95: the scout's tree"):
+// Sequence 0 over Decode Trigger 1 (its Location the camp, "Home Camp"; its
+// Value the tribe, "Tribe Index"), Concurrent 2 over Protect Unit 3 and Move
+// Unit 4, then Notify Owner 5.
+
+export const BARB_SCOUT_TREE = 'Barbarian Found City';
+
+let scoutNodes: BtNode[] | null = null;
+const scoutTreeNodes = (): BtNode[] => (scoutNodes ??= compileTree(BARB_SCOUT_TREE, AI_TREES[BARB_SCOUT_TREE] ?? []));
+
+interface ScoutCtx {
+  state: GameState;
+  pass: Pass;
+  tribe: BarbTribe;
+  home: BarbHoming;
+}
+
+/** the tree's units: its scout while it lives */
+const scoutUnits = (c: ScoutCtx): Unit[] => {
+  const u = unitOf(c.state, c.home.scout);
+  return u ? [u] : [];
+};
+
+const tagged = (run: BtRun, node: BtNode, name: string): unknown => {
+  const t = dataTag(node, name);
+  return t ? run.blackboard.get(t) : undefined;
+};
+
+/** Protect Unit's share of the health in 8.8 (0x7f07c0) */
+function protectShare(node: BtNode): number {
+  const pct = dataFloat(node, 'Damage Percentage') ?? 0;
+  const whole = Math.floor(pct);
+  return whole + Math.trunc((pct - whole) * 256) / 256;
+}
+
+/** a unit hurt by the share or more on a plot the danger map rates above 0 */
+const endangered = (c: ScoutCtx, node: BtNode, u: Unit): boolean =>
+  UNIT_HP - u.hp >= protectShare(node) * UNIT_HP && c.pass.danger[u.tileIndex] > 0;
+
+const SCOUT_NODES: Readonly<Record<string, BtHandler<ScoutCtx>>> = {
+  // DECODE TRIGGER (0x7f2970): the trigger's location (the camp) and value
+  // (the tribe) to their tags
+  'Decode Trigger': {
+    update(node, run, c) {
+      const loc = dataTag(node, 'Trigger Location');
+      if (loc) run.blackboard.set(loc, c.tribe.plot);
+      const val = dataTag(node, 'Trigger Value');
+      if (val) run.blackboard.set(val, (c.state.barbTribes ?? []).indexOf(c.tribe));
+      return BT_SUCCESS;
+    },
+  },
+  // PROTECT UNIT (0x7f07c0 update, 0x7ef0e0 execution): none of its units
+  // FAILS; one endangered RUNS, else SUCCESS. The execution: each endangered
+  // unit to its safe plot (0x716b90) where that is another, its turn ended
+  'Protect Unit': {
+    update(node, run, c) {
+      const us = scoutUnits(c);
+      if (!us.length) return BT_FAILURE;
+      const n = us.filter((u) => endangered(c, node, u)).length;
+      run.mem[node.index].count = n;
+      return n ? BT_RUNNING : BT_SUCCESS;
+    },
+    execute(node, run, c) {
+      if (!((run.mem[node.index].count as number) > 0)) return;
+      for (const u of scoutUnits(c)) {
+        if (!endangered(c, node, u)) continue;
+        const p = passSafePlot(c.state, c.pass, u);
+        if (p >= 0 && p !== u.tileIndex) moveTo(c.state, u, p, false);
+        passEnd(c.pass, u);
+      }
+    },
+  },
+  // MOVE UNIT (0x7f0020 update, 0x7eeba0 execution). The update: no
+  // Location SUCCESS; no unit SUCCESS. The unit it holds (its memory): its
+  // planning reaching a plot at To Range of the location this turn
+  // (0x791300) SUCCESS, else RUNNING; none held, the unit whose planning
+  // reaches the location itself this turn, with Movement left there first,
+  // else one with a path to it (0x272a60), is held — SUCCESS where it
+  // reaches it with Movement left, else RUNNING; none FAILS. The execution:
+  // the held unit's turn ends; it goes for the plot at To Range its planning
+  // reaches this turn, else the location (a plot of danger only where Allow
+  // Danger)
+  'Move Unit': {
+    update(node, run, c) {
+      const m = run.mem[node.index];
+      const loc = tagged(run, node, 'Location');
+      if (typeof loc !== 'number' || loc < 0) return BT_SUCCESS;
+      const us = scoutUnits(c);
+      if (!us.length) {
+        m.unit = -1;
+        return BT_SUCCESS;
+      }
+      const range = dataInt(node, 'To Range') ?? 0;
+      const held = typeof m.unit === 'number' ? us.find((u) => u.id === m.unit) : undefined;
+      if (held) {
+        if (!c.pass.plan.has(held.id)) return BT_FAILURE;
+        return passReachAt(c.state, c.pass, held, loc, 1, false, range) >= 0 ? BT_SUCCESS : BT_RUNNING;
+      }
+      m.unit = -1;
+      let pick: Unit | null = null;
+      let moves = false;
+      for (const u of us) {
+        if (c.pass.plan.has(u.id) && passReachAt(c.state, c.pass, u, loc, 1, false, 0) >= 0) {
+          if (!moves && passReachAt(c.state, c.pass, u, loc, 1, true, 0) >= 0) {
+            moves = true;
+            pick = u;
+          } else pick ??= u;
+          continue;
+        }
+        if (!pick && (u.tileIndex === loc || pathTo(c.state, u, loc).length > 0)) pick = u;
+      }
+      if (!pick) return BT_FAILURE;
+      m.unit = pick.id;
+      return moves ? BT_SUCCESS : BT_RUNNING;
+    },
+    execute(node, run, c) {
+      const m = run.mem[node.index];
+      const loc = tagged(run, node, 'Location');
+      const u = typeof m.unit === 'number' ? scoutUnits(c).find((x) => x.id === m.unit) : undefined;
+      if (!u || typeof loc !== 'number' || loc < 0) return;
+      const range = dataInt(node, 'To Range') ?? 0;
+      const reach = c.pass.plan.has(u.id) ? passReachAt(c.state, c.pass, u, loc, 1, false, range) : -1;
+      const plot = reach >= 0 ? reach : loc;
+      passEnd(c.pass, u);
+      if (!(dataBool(node, 'Allow Danger') ?? true) && c.pass.danger[plot] > 0) return;
+      if (u.tileIndex !== plot) moveTo(c.state, u, plot, false);
+    },
+  },
+  // NOTIFY OWNER (0x7c6fa0 -> 0x148270, the scout's tree): the tribe raids
+  // the city at once where its Boldness reaches its RaidingBoldness and no
+  // raid of it stands (0x149980), else the city to its raid list
+  'Notify Owner': {
+    update: () => BT_SUCCESS,
+    execute(_node, _run, c) {
+      const tr = c.tribe;
+      const target = c.home.target;
+      const can = !(tr.op && !tr.op.assault);
+      if (can && (tr.boldness ?? 0) >= raidBoldness(tr) && barbOpStart(c.state, tr, target, false)) return;
+      (tr.raidTargets ??= []).push(target);
+    },
+  },
+};
+
+/** the tribe's scout's tree as the twins compare it: the city's owner and
+ *  centre, the tree's id, the child its Sequence resumes at, whether its
+ *  Move Unit holds the scout; none, -1s */
+export function barbHomingRecord(tribe: BarbTribe): number[] {
+  const h = tribe.homing;
+  if (!h) return [-1, -1, -1, -1, -1];
+  const resume = typeof h.mem[0]?.resume === 'number' ? (h.mem[0].resume as number) : -1;
+  const held = typeof h.mem[4]?.unit === 'number' && (h.mem[4].unit as number) >= 0 ? 1 : 0;
+  return [h.target.seat, h.target.plot, h.id, resume, held];
+}
+
+/** the scout's tree's tick; a tree that ends leaves its tribe */
+function tickScout(state: GameState, pass: Pass, tribe: BarbTribe): void {
+  const home = tribe.homing!;
+  const nodes = scoutTreeNodes();
+  const run: BtRun = { name: BARB_SCOUT_TREE, nodes, status: home.status, mem: home.mem,
+    blackboard: new Map(Object.entries(home.bb)), done: false };
+  tick(run, SCOUT_NODES, { state, pass, tribe, home });
+  home.bb = Object.fromEntries(run.blackboard);
+  if (run.done && tribe.homing === home) delete tribe.homing;
+}
+
+/** THE SCOUT'S TREE'S START (0x1485c0, from the scout's look): on the scout
+ *  alone, its trigger the camp and the tribe, the city it saw; its id the
+ *  player's next tree's */
+export function barbScoutTreeStart(state: GameState, tribe: BarbTribe, scout: number, target: BarbTarget): void {
+  const nodes = scoutTreeNodes();
+  const id = state.barbSeat.opsNext ?? 0;
+  state.barbSeat.opsNext = id + 1;
+  tribe.homing = { id, scout, target, status: nodes.map(() => BT_FRESH), mem: nodes.map(() => ({})), bb: {} };
+}

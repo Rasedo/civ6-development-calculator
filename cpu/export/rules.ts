@@ -338,9 +338,10 @@ import { BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CA
   BARB_SCOUT_WAIT, BARB_ISLAND_PLOTS, BARB_COAST_WATER, BARB_MAX_UNITS, BARB_MAX_SCOUTS, BARB_NAMES_PER_KIND, BARB_CAMP_TERRAINS,
   BARB_CAMP_FEATURES, BARB_FREE_TECHS, BARB_TAG_UNITS, BARB_TRIBES, barbNameRangedPct, type BarbTag,
   BARB_BOLD_TURN, BARB_BOLD_KILL, BARB_BOLD_UNIT_LOST, BARB_BOLD_SCOUT_LOST, BARB_RAID_BOLDNESS, BARB_ASSAULT_BOLDNESS,
-  BARB_SPOT_THROTTLE, BARB_SPOT_THROTTLE_PER_LEVEL, BARB_HOME_RANGE, BARB_PROTECT_DAMAGE, BARB_RAID_RECRUIT_TURNS, BARB_ASSAULT_RECRUIT_TURNS,
-  BARB_PILLAGE_SCORE, RAID_MARCH_RANGE, RAID_MARCH_SPREAD, RAID_RANGE, RAID_HOME_RANGE, RAID_HOME_SPREAD, RAID_SCORE, RAID_TURNS,
-  DEFAULT_HANDICAP, barbForce, barbNameRaidBoldness } from '../data/barbarians';
+  BARB_SPOT_THROTTLE, BARB_SPOT_THROTTLE_PER_LEVEL,
+  BARB_PILLAGE_SCORE,
+  DEFAULT_HANDICAP, DIFFICULTIES, barbForce, barbNameRaidBoldness } from '../data/barbarians';
+import { BARB_ASSAULT_DEF, BARB_RAID_DEF, BARB_SCOUT_TREE } from '../core/barbarianOps';
 const BARB_TAGS = Object.keys(BARB_TAG_UNITS) as BarbTag[];
 import { CHOP_ROWS, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, LUXURY_IDS, wonderBit } from './catalog';
 import { TERRAINS } from '../../world/terrains';
@@ -2062,7 +2063,7 @@ export function buildRules() {
         tribes: BARB_TRIBES.map((d) => [d.coastal ? 1 : 0, d.resource ? RESOURCE_IDS.indexOf(d.resource) : -1, d.resourceRange,
           d.rangedPct, d.spawnEvery, BARB_TAGS.indexOf(d.scoutTag), BARB_TAGS.indexOf(d.meleeTag), BARB_TAGS.indexOf(d.rangedTag),
           BARB_TAGS.indexOf(d.defenderTag)]),
-        // the raids and the city assaults (`opTurn`, `raidTick`): per tribe kind,
+        // the raids and the city assaults (Barbarian Recruit, `hooksOf`): per tribe kind,
         // raid then assault, the force a city of the AI's handicap draws —
         // [SpawnRate at the speed, [tag, count] ...] (the engines' seats
         // carry no handicap of their own)
@@ -2080,22 +2081,18 @@ export function buildRules() {
         nameRaidBoldness: [[0, 2, barbNameRaidBoldness('NAVAL', 2) ?? -1]],
         // the throttle on a player's reports at the AI's handicap
         spotThrottle: Math.max(0, BARB_SPOT_THROTTLE - BARB_SPOT_THROTTLE_PER_LEVEL * DEFAULT_HANDICAP),
-        homeRange: BARB_HOME_RANGE,
-        protectDamage: BARB_PROTECT_DAMAGE,
-        raidRecruitTurns: BARB_RAID_RECRUIT_TURNS,
-        assaultRecruitTurns: BARB_ASSAULT_RECRUIT_TURNS,
-        // "Raid City"'s data (`raidTick`): the march's, the raid's and the way
-        // home's Operation Move range and unit distance, the raid's score and
-        // its turns, the score a pillage adds, the speed's percent
-        raidMarchRange: RAID_MARCH_RANGE,
-        raidMarchSpread: RAID_MARCH_SPREAD,
-        raidRange: RAID_RANGE,
-        raidHomeRange: RAID_HOME_RANGE,
-        raidHomeSpread: RAID_HOME_SPREAD,
-        raidScore: RAID_SCORE,
-        raidTurns: RAID_TURNS,
+        // the score a pillage adds, the speed's percent
         pillageScore: BARB_PILLAGE_SCORE,
         costPct: COST_MULTIPLIER_PCT,
+        // THE BARBARIANS' TREES (`barbarianOps.ts`): the raid's, the city
+        // assault's and the scout's, their nodes as the interpreter reads them;
+        // per unit (in `units` order) whether it carries UNITAI_COMBAT (the
+        // raid team's requirement); whether the AI's handicap lies in the
+        // raid's In Difficulty Range (its Operation Attack City runs)
+        trees: Object.fromEntries([AI_OP_DEFS[BARB_RAID_DEF].tree!, AI_OP_DEFS[BARB_ASSAULT_DEF].tree!, BARB_SCOUT_TREE]
+          .map((t) => [t, AI_TREES[t]])),
+        unitCombatAi: Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes('UNITAI_COMBAT')),
+        attackCityHandicap: DEFAULT_HANDICAP >= DIFFICULTIES.indexOf('IMMORTAL'),
       },
       // the civic a camp's clear inspires (BOOST_TRIGGER_CLEAR_CAMP)
       // COMBAT: the single-precision factor e^(x/256) per exponent x in

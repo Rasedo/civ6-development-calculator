@@ -18,6 +18,7 @@ import { AI_UNIT_INDEX } from '../aiCityBuild';
 import { FX } from '../aiValue';
 import { desiredStrength, recruitOperation } from './recruit';
 import { ASSAULT_NODES, attackUnitsExecute, operationAttackExecute, updateTeam } from './assault';
+import { BARBARIAN_NODES, type BarbarianHooks } from './barbarian';
 import type { MajorAttackView, MajorUnitView, MajorView } from '../../../ai/major/view';
 import type { MoveStore } from '../tactical';
 import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, buildUnitNode, contractManagerNode, submitContract,
@@ -82,6 +83,9 @@ export interface OpsContext {
   unitRows(): readonly UnitProductionRow[];
   /** the camps its knowledge base holds, in its order */
   camps(): readonly number[];
+  /** the tribes the barbarians' operations run for (null for any other
+   *  party) */
+  barbarian: BarbarianHooks | null;
   log(line: string): void;
 }
 
@@ -625,7 +629,9 @@ const turnLimiter: BtHandler<OpsContext> = {
     if (!m.start) m.start = ctx.turn;
     return BT_FRESH;
   },
-  child(node, run, _own, s, _child, ctx) {
+  child(node, run, own, s, _child, ctx) {
+    // the child begun: it runs on
+    if (s === BT_FRESH) return { own, finished: false };
     const m = run.mem[node.index];
     const limit = dataInt(node, 'Turns to Run') ?? 0;
     const elapsed = ctx.turn - (m.start as number);
@@ -635,7 +641,7 @@ const turnLimiter: BtHandler<OpsContext> = {
       const fail = dataBool(node, 'Fail at Limit');
       return { own: fail === false ? BT_SUCCESS : BT_FAILURE, finished: true };
     }
-    return { own: s, finished: s !== BT_FRESH };
+    return { own: s, finished: true };
   },
 };
 
@@ -652,7 +658,8 @@ export const OP_NODES: Readonly<Record<string, BtHandler<OpsContext>>> = {
   'Make Formation': makeFormation,
   'Operation Attack Units': { ...operationAttackUnits, execute: attackUnitsExecute },
   ...ASSAULT_NODES,
-  'Operation Attack': { ...operationAttack, execute: operationAttackExecute },
+  ...BARBARIAN_NODES,
+  'Operation Attack':{ ...operationAttack, execute: operationAttackExecute },
   'Naval Patrol': navalUnitsRunning,
   'Naval Pillage': navalUnitsRunning,
   'Naval Choose Target': navalChooseTarget,

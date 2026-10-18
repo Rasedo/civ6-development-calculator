@@ -1757,8 +1757,10 @@ plots or on an area (m_area, looked up at the game's time) of more than 10
 
 ## H-1: the raids — READ
 
-`barbarianScouts` / `opTurn` / `barbScoutLook` / `barbBattleBoldness` in
-cpu/core/barbarians.ts; `_barbarian_ops` & co in gpu/core/sim_barb.py.
+`barbarianScouts` / `barbScoutLook` / `barbBattleBoldness` in
+cpu/core/barbarians.ts, the operations and the scout's tree in
+cpu/core/barbarianOps.ts; `_barbarian_scouts` & co in gpu/core/sim_barb.py,
+the operations and the scout's tree in gpu/core/sim_barbops.py.
 
 - Boldness (tribe +0x20): +BARBARIAN_BOLDNESS_PER_TURN (2) each tribe turn
   (0x148ca3); a battle's dead (0x1540b0 -> 0x148e90: the defender dead, else
@@ -1831,8 +1833,9 @@ barbarians' raid" (its tree's Notify Owner lists the city for the assault).
   Warrior at t24, stands home at t25 three plots from it and raises no
   raid (none at boldness 10 on t26 either); home again at t33 with no
   enemy within four, the raid starts at once (Warriors t34, t35, t36, its
-  t28 Archer counted). The engines read the danger as an enemy fighting
-  unit within its moves plus its reach (LAB, `threatened`).
+  t28 Archer counted). The engines read the danger as the tactical pass's
+  danger map on the scout's plot (`dangerPlane` / `_danger_plane`; "C-95:
+  the scout's tree").
 
 ## H-1: the sight rule and a city's look — LAB (records; the walk 0x58b1d0 unread)
 
@@ -3296,7 +3299,7 @@ its steps landing on the game's log.
   engines: `seizeCivilian` / `seizable` (the order onto a plot holding no
   fighter is a move that seizes, and so is a victor's advance),
   `_seize_civilians` / `_seize_open`; a barbarian's captive holds where it
-  stands and guards no camp (`hostileUnitAct`, the GPU's barbarian walk).
+  stands and guards no camp.
 
 ## H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED
 Measured 2026-10-08: duel seed 1117 recorded twice under `game.py patch apply` + `profile apply`, the second beside a full harness sweep, draws identical over all 22,590 (unpatched recordings parted at t169).
@@ -4948,13 +4951,17 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   end on the game's plot 407 of 1,056 (128 with the stand-in); barb:move
   applied 13,702 against 12,592 on the base engine.
 
-## C-95: the barbarians' raid — READ ("Raid City"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)
+## C-95: the barbarians' raid — READ ("Raid City"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)
 
-`raidTick`, `moveUpdate`, `moveExec`, `opAttackExec`, `opPillageExec`,
-`barbarianOpTrees` in cpu/core/tactical.ts; `_barb_op_trees`,
-`_barb_move_update`, `_barb_move_exec`, `_barb_op_attack`, `_barb_op_pillage`
-in gpu/core/sim_tactics.py; the score `barbPillageScore` (cpu/core/barbarians.ts)
-/ `_barb_pillage_score` (gpu/core/sim_orders.py).
+The trees on the one operation manager (cpu/core/operations: `startOperationAt`,
+`operationsRefresh`, `tickOperation`; the barbarians' nodes
+cpu/core/operations/barbarian.ts) through cpu/core/barbarianOps.ts
+(`barbOpStart`, `barbarianOpsTurn`, `barbarianTrees`, the hooks `hooksOf`);
+Operation Move `passMoveUpdate` / `passMoveExec` (cpu/core/tactical.ts). The
+GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
+`_barb_trees`, `_bop_raid_tick`, `_bop_move_update`, `_bop_move_exec`,
+`_bop_attack_units`, `_bop_pillage`); the score `barbPillageScore`
+(cpu/core/barbarians.ts) / `_barb_pillage_score` (gpu/core/sim_orders.py).
 
 - THE TURN (0x6096c0, the player AI's jobs): a first list — the unit
   evaluator 0x5c2650, the barbarian manager's turn 0x1514a0 (barbarians
@@ -4963,9 +4970,14 @@ in gpu/core/sim_tactics.py; the score `barbPillageScore` (cpu/core/barbarians.ts
   — 0x785ec0, the tactical pass 0x771530 — then the homeland 0x70a370. The
   operations' trees tick after the tribes' turn and before the tactical
   pass, on the plannings and the target list the pass then reads; an
-  operation's units leave the pass. The engines keep a scout's report (its
-  tree "Barbarian Found City") after the pass (`scoutReports`), the new
-  raid's first recruit at once.
+  operation's units leave the pass. The engines: the military AI's part
+  (each running operation's team refreshed, its readiness) before the
+  tribes' turn (`barbarianOpsTurn` / `_barb_ops_refresh`); every tree of the
+  barbarian player — its operations' and its scouts' — ticks in id order in
+  the tactical pass (`barbarianTrees` / `_barb_trees`: the manager's tree
+  list, 0x7ffdd0), a tree started in the walk (a scout's report starting a
+  raid) ticking in it after the others; the trees' units leave the pass's
+  later moves.
 - THE NODES' HANDLERS (the dispatcher 0x7cbca0 storing each type's
   functions under the id the registration 0x7db850 gives it, the k-th id
   stored the k-th name, @d5b198 one unnamed): Operation Move update 0x81a130
@@ -4996,7 +5008,10 @@ in gpu/core/sim_tactics.py; the score `barbPillageScore` (cpu/core/barbarians.ts
   plot) SUCCESS, else SUCCESS (RUNNING under Always Running); FAILURE where
   a team is in battle (+0x90, the team update's battle points 0x738f20) and
   the operation holds no unit — a team in battle has a member, so never in
-  a turn. Execution (0x80ceb0): per team its members alive, not done, able
+  a turn. Execution (0x80ceb0): none for a team neither in battle nor
+  joined by a unit (+0x58: the count of the units added to the team, 0x737f90
+  pushing each to the members +0x18 and to the list +0x48; the engines'
+  `OpTeam.joined` / the members a tribe's operation holds); per team its members alive, not done, able
   to act (0x56c690), on land (+0x738 == 1), a bombard unit only against a
   city of another player or as a DEFENDER (+0x1c0 == 4); the targets: the
   list's unit entries (0x80b9b0: CIVILIAN through HIGH) narrowed to those
@@ -5089,15 +5104,49 @@ in gpu/core/sim_tactics.py; the score `barbPillageScore` (cpu/core/barbarians.ts
   the execution's gathering test is the update's arrival (the team's
   readiness +0x11, 0x73fba0's strength advantage, unread); the team's +0x48
   units are none; ties go by the pool slot.
-- MEASURED (the action replay, 5 seeds, the operations' units on the tree):
-  barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096, 1124 1,061 ->
-  1,043, 1128 856 -> 778, 1127 537 -> 536; the "Operation" rows end on the
-  game's plot 416 of 1,265 (400 on the stand-in) — the rest the Builder
-  Capture's escorts, the city assaults and the scouts' trees still off it.
-  barb:unit rises in 1117 (78 -> 94) and 1128 (117 -> 138); 1117's: a scout's report the game
-  never makes (the camp at plot 687, t34; the scout's tree unported)
-  starts a raid whose Notify Owner lists the city, an assault recruiting
-  from t65.
+- THE TURN LIMITER over a child the walk has not reached yet (FRESH) has
+  not finished it: the limiter RUNS (the raid's Concurrent 15 under it
+  ticks the turn it is reached).
+- THE MOVE'S RADIUS for a melee unit is its attack range 1 (runs/h1_duelv1124
+  t35: a Warrior's "Operation Move" goal 35:20 one plot short of the plot it
+  marched on); a ranged unit's its range, both capped by Range to goal.
+- MEASURED: below, "C-95: the barbarians' operations on the manager".
+
+## C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported
+
+cpu/core/barbarianOps.ts over cpu/core/operations (the barbarians' nodes
+cpu/core/operations/barbarian.ts); gpu/core/sim_barbops.py.
+
+- THE STARTS: the raid (0x149980) names no enemy (-1); the city assault
+  (0x1497d0) sets op +0x2a0 to the city's owner — the assault's enemy, so
+  its Attack Units takes that player's units (and any civilian), and Siege
+  City's update ERRORS with +0x2a0 at -1. Both set the target with 0x73e7d0
+  (the target, the rally — the tribe's camp —, each team's goals); the tree's
+  trigger value is the tribe's index. A tribe holds one at a time.
+- NOTIFY OWNER (0x148270, by the tree that sends it): the scout's tree
+  starts the raid at RaidingBoldness or lists the city for it; the raid's
+  tree lists the city for the assault (+0x60); the assault's tree lists
+  nothing but where the tribe was bribed (0x147c20's turns).
+- "BARBARIAN CITY ATTACK" under the interpreter: the root Concurrent over
+  Operation Defend Units and the Sequence — Decode Trigger, the recruit
+  (Spawn Change, the Turn Limiter over Barbarian Recruit and Spawn Change,
+  Spawn Change), the gathering (Make Formation, Operation Move to the
+  rally), the march (Attack Units, Make Formation, Operation Move to the
+  target), the assault (Siege City, Attack City, Attack Units, Make
+  Formation, Pillage, Operation Move onto the target), Notify Owner. Its
+  Make Formation nodes take a civilian, so a barbarian assault forms no pair.
+- MEASURED (the action replay, 5 seeds, main c3253523 -> the trees on the
+  manager): barb:move imposed 1117 400 -> 335, 1121 1,055 -> 952, 1124
+  1,007 -> 1,047, 1127 590 -> 544, 1128 791 -> 1,023 (3,843 -> 3,901);
+  barb:unit 511 -> 500, barb:unitNew 125 -> 156. The logs' "Barbarian
+  Attack" lines: turns with every line equal 1117 5 of 15, 1121 12 of 171,
+  1124 207 of 242, 1127 5 of 220, 1128 0 of 193; "Barbarian City Assault"
+  0 of 146 (1121, 1128: the replay's assault never starts). Every raid
+  starts a turn after the game's ("Started" at t, ours at t+1: the scout's
+  report lands in the tactical pass, the game's before it), and the
+  team's readiness reads Ready where the game's Not Ready (1121 t16-t19,
+  1127 t36-t43). 1124 and 1128 regress: the scout's look starts trees the
+  game does not (1128's raid on 15:10 at t12 against the game's 42:20).
 
 ## C-95: Coastal Raid — READ, ported
 
@@ -5248,7 +5297,12 @@ gpu/core/sim_tactics.py.
   72 -> 102 of 157, Barbarian Rampage 2,552 -> 2,575; Pillage Improvement
   59 -> 49 of 198. The city-states' moves unchanged.
 
-## C-95: the scout's tree "Barbarian Found City" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported
+## C-95: the scout's tree "Barbarian Found City" — READ, ported
+
+`barbScoutTreeStart`, `SCOUT_NODES`, `tickScout` in cpu/core/barbarianOps.ts
+(the look `barbScoutLook`, cpu/core/barbarians.ts); `_bop_scout_tick`
+(gpu/core/sim_barbops.py), the look in `_barbarian_scouts`
+(gpu/core/sim_barb.py).
 
 - THE START (0x1485c0, from the scout's look 0x153ef0 once the player's
   throttle allows, the tribe's scout walking none yet): the tree "Barbarian
@@ -5269,21 +5323,32 @@ gpu/core/sim_tactics.py.
   (+0xcf0) is at least Damage Percentage of its health (0x56e0d0; the
   percentage in 8.8) on a plot the influence map rates dangerous (player
   +0x12d8, 0x716a90 above 0) counts; any counted RUNNING, else SUCCESS.
-  Execution (0x7ef0e0, PARTLY READ): each such unit to its safe plot
-  (0x716b90) and the move (0x962030, its turn ended 0x570b40), else its
-  rest (0x56ef30, 0x95eae0) and its turn done (0x56d6f0).
-- MOVE UNIT. Update (0x7f0020, PARTLY READ): its units, the location, the
-  planning's reach of it at To Range (0x791300) and the danger (0x716a60).
-  Execution (0x7eeba0, PARTLY READ): each unit not +0x770 — its planning's
-  plot at To Range of the location this turn (0x791300), else the
-  location; a plot of danger only where Allow Danger; woken (0x53e20) and
-  moved (0x972880 / 0x962030).
-- The engines report a scout's city without the tree (`scoutReports` /
-  `_barb_scout_report`, after the tactical pass): within BARB_HOME_RANGE of
-  its camp, held while hurt by a quarter and threatened (`threatened`); the
-  scout itself walks the tactical pass's moves. Porting it on the
-  operation manager wants Move Unit's update and both executions read in
-  full (AUDIT C-95).
+  Execution (0x7ef0e0): where the update counted one, each such unit to
+  its safe plot (0x716b90; the engines' `passSafePlot` / `_tac_safe_plot`)
+  and the move (0x962030), its turn ended (0x570b40) either way.
+- MOVE UNIT. Update (0x7f0020): no Location SUCCESS, no unit SUCCESS; the
+  unit it holds (the node's memory): its planning reaching a plot at To
+  Range of the location this turn (0x791300) SUCCESS, else RUNNING, a held
+  unit with no planning FAILURE; none held, the unit whose planning reaches
+  the location itself this turn — one with Movement left there first —,
+  else one with a path to it (0x272a60), is held: SUCCESS where it reaches
+  it with Movement left, else RUNNING; none FAILURE. Execution (0x7eeba0):
+  the held unit's turn ends; it goes for the plot at To Range its planning
+  reaches this turn, else the location (a plot of danger only where Allow
+  Danger), woken (0x53e20) and moved (0x972880 / 0x962030).
+- THE LOOK (0x153ef0): a scout (unit AI type +0x1c0 == 2, UNITAI_EXPLORE)
+  seeing a plot of a full civilization's (0x484a10) city or district, the
+  player's throttle passed (the throttle written whether or not a tree
+  starts), starts the tree where its tribe's scout walks none (0x1485c0).
+- THE TREES' ORDER: the scout's tree is a tree of the barbarian player's
+  list (0x7ffdd0, creation order), so it ticks in the tactical pass among
+  the operations' by id; its Notify Owner starting the raid (0x149980) the
+  raid's tree ticks in the same walk.
+- LAB: the look reads the plots the scout sees where it stands after its
+  moves, each plot newly seen against its last look (`BarbTribe.saw`); the
+  game's "newly visible to the barbarian player" (the visibility event) is
+  unread, and the engines' look starts some trees earlier than the game's
+  (runs/h1_duelw1124, h1_duelw1128).
 
 ## C-96 / C-97: the AI's weights and the modifier evaluator — READ (the parts below), the agendas' path and most analyzers unread
 

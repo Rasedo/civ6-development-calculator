@@ -38,6 +38,7 @@ import type { ContractBook, ContractCity, ContractNodeWorld } from '../aiContrac
 import { evaluate, type ArmyUnit, type Candidate } from './evaluate';
 import type { KnownUnit } from './knowledge';
 import type { AiOpDef, OpsSettle } from './types';
+import type { BarbarianHooks } from './barbarian';
 import type { UnitProductionRow } from '../aiUnitProduction';
 import type { MajorAttackView, MajorKnownCityView, MajorUnitView, MajorView } from '../../../ai/major/view';
 
@@ -94,6 +95,9 @@ export interface OpsEnv {
   /** Operation Move's update and execution for a team (`OpsContext`) */
   moveUpdate: OpsContext['moveUpdate'];
   moveExec: OpsContext['moveExec'];
+  /** the tribes the barbarians' operations run for (none for another
+   *  party) */
+  barbarian?: BarbarianHooks;
   /** the operation lines (AI_Operation.csv without its turn and player) and
    *  the candidate lines (AI_Operation_Eval.csv) */
   log(line: string): void;
@@ -232,6 +236,33 @@ export function startOperationNamed(ai: OpsAi, env: OpsEnv, name: string, plot: 
   return startOperation(ai, env, AI_OP_DEFS[name], -1, plot, plot).id;
 }
 
+/** the start by name (0x7265b0) with the target set after it (0x73e7d0:
+ *  the target, the rally, each team's goals) and the player it is against
+ *  (op +0x2a0, -1 none); the operation */
+export function startOperationAt(ai: OpsAi, env: OpsEnv, name: string, enemy: number, target: number, rally: number): Operation {
+  return startOperation(ai, env, AI_OP_DEFS[name], enemy, target, rally);
+}
+
+/** one tick of a running operation's tree outside the operations' run (a
+ *  tree started in the player's turn takes its first at once); a tree that
+ *  ends ends its operation */
+export function tickOperation(ai: OpsAi, env: OpsEnv, op: Operation): void {
+  if (!opsOf(ai).includes(op)) return;
+  tickTree(ai, env, op);
+}
+
+function tickTree(ai: OpsAi, env: OpsEnv, op: Operation): void {
+  const run: BtRun = { name: op.def, nodes: treeOf(opDef(op).tree ?? ''), status: op.status, mem: op.mem,
+    blackboard: new Map(Object.entries(op.bb)), done: op.done };
+  tick(run, OP_NODES, context(ai, env, op));
+  op.bb = Object.fromEntries(run.blackboard);
+  op.done = run.done;
+  if (op.done) {
+    env.log(`${op.def}, Operation complete`);
+    endOperation(ai, op);
+  }
+}
+
 function endOperation(ai: OpsAi, op: Operation): void {
   const k = ai.slots.indexOf(op);
   if (k < 0) return;
@@ -334,6 +365,13 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv): void {
  *  target and teams logged; the chosen candidate started; the trees, in
  *  slot order */
 export function operationsRun(ai: OpsAi, env: OpsEnv): void {
+  operationsRefresh(ai, env);
+  for (const op of opsOf(ai)) tickTree(ai, env, op);
+}
+
+/** the operations' run before the trees tick: each operation's target and
+ *  teams logged and refreshed, the chosen candidate started */
+export function operationsRefresh(ai: OpsAi, env: OpsEnv): void {
   for (const op of opsOf(ai)) {
     const view = env.view();
     env.log(`${op.def} running, TARGET ${xy(view, op.target)}`);
@@ -347,17 +385,6 @@ export function operationsRun(ai: OpsAi, env: OpsEnv): void {
   const pick = ai.pick;
   ai.pick = null;
   if (pick) startOperation(ai, env, AI_OP_DEFS[pick.def], pick.enemy, pick.target, pick.rally);
-  for (const op of opsOf(ai)) {
-    const run: BtRun = { name: op.def, nodes: treeOf(opDef(op).tree ?? ''), status: op.status, mem: op.mem,
-      blackboard: new Map(Object.entries(op.bb)), done: op.done };
-    tick(run, OP_NODES, context(ai, env, op));
-    op.bb = Object.fromEntries(run.blackboard);
-    op.done = run.done;
-    if (op.done) {
-      env.log(`${op.def}, Operation complete`);
-      endOperation(ai, op);
-    }
-  }
 }
 
 /** what the shared contract nodes read of an operation's tree: the seat's
@@ -400,6 +427,7 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     threat: env.threat,
     unitRows: env.unitRows,
     camps: env.camps,
+    barbarian: env.barbarian ?? null,
     log: env.log,
   };
 }

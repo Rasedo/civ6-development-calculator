@@ -3,7 +3,7 @@ import { emptySeat, isCiv, seatOf, seatOfCityState, setTileOwner, setWar, tileCi
 import { stepThrough, makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { moveCostInto, unitPassable, canEmbark, stepUnit, waterEnterable, ownerHasTech, inEnemyZoc, spawnUnit, tileFreeForUnit, cityNavalCapable, trainableUnits, unitFullMoves, unitVisibleTo, visibleHostilesAt } from '../../../cpu/core/units';
-import { hostileUnitAct, meleeAttack, rangedAttack, attackTargets, defenderCS, embarkedDefenseCS, supportCount, encircled, stackDefender, AMPHIBIOUS_ATTACK_CS, SUPPORT_CS, FLANK_SUPPORT_CIVIC } from '../../../cpu/core/combat';
+import { meleeAttack, rangedAttack, attackTargets, defenderCS, embarkedDefenseCS, supportCount, encircled, stackDefender, AMPHIBIOUS_ATTACK_CS, SUPPORT_CS, FLANK_SUPPORT_CIVIC } from '../../../cpu/core/combat';
 import { neighbors, hexDistance } from '../../../world/hex';
 import { unitSight, SIGHT_RANGE } from '../../../cpu/core/fog';
 import { UNITS } from '../../../cpu/data/units';
@@ -124,54 +124,23 @@ describe('spawn stays ashore', () => {
   });
 });
 
-describe('war-march water steps', () => {
-  function marchScenario(techs: string[]): { state: GameState; unit: Unit } {
-    // Almost-all-water map: unit start + seat-0 city are the only land, so the
-    // strictly-closer march step is always a water tile (forces an embark).
+describe('a land unit beside the water', () => {
+  function coastScenario(techs: string[]): { state: GameState; unit: Unit } {
+    // Almost-all-water map: the unit's start and seat 0's city the only land
     const state = makeState(makeMap(14, 12, 'COAST'));
     state.unitsMode = true;
     const start = tileAtCoords(state.map, 3, 5);
     start.terrain = 'GRASSLAND';
     const cityTile = tileAtCoords(state.map, 10, 5);
     cityTile.terrain = 'GRASSLAND';
-    settleAt(state, cityTile.index); // the march target; founding consumes the spawned settler
+    settleAt(state, cityTile.index);
     addCivAtWar(state, 3, 5, techs);
     const unit = state.units.find((u) => u.seat === 1)!;
     return { state, unit };
   }
 
-  it('SHIPBUILDING: the war-march embarks (all MP spent, now on water)', () => {
-    const { state, unit } = marchScenario(['SAILING', 'SHIPBUILDING']);
-    expect(isWater(state.map.tiles[unit.tileIndex])).toBe(false); // starts ashore
-    hostileUnitAct(state, unit);
-    expect(unit.embarked).toBe(true);
-    expect(isWater(state.map.tiles[unit.tileIndex])).toBe(true);
-    expect(unit.movesLeft).toBe(0); // embark consumed all MP
-  });
-
-  // A CLIFF closes the embark edge for the WAR-MARCH, not just for the
-  // ordinary walker. Both engines must mask it out of the march's step set, or
-  // one embarks over a cliff where the other holds.
-  it('SHIPBUILDING but CLIFFED: the war-march stays ashore', () => {
-    const { state, unit } = marchScenario(['SAILING', 'SHIPBUILDING']);
-    const start = state.map.tiles[unit.tileIndex];
-    start.cliffMask = 0b111111; // wall every land/water edge of the start tile
-    hostileUnitAct(state, unit);
-    expect(unit.embarked).toBeFalsy();
-    expect(isWater(state.map.tiles[unit.tileIndex])).toBe(false);
-    expect(unit.tileIndex).toBe(start.index); // no legal step remained
-  });
-
-  it('NO SHIPBUILDING: the unit cannot embark and stays ashore', () => {
-    const { state, unit } = marchScenario(['SAILING']); // civilian tech only
-    const before = unit.tileIndex;
-    hostileUnitAct(state, unit);
-    expect(!!unit.embarked).toBe(false);
-    expect(unit.tileIndex).toBe(before); // no land-or-water step available
-  });
-
   it('tileFreeForUnit gates embark on allowEmbark + owner tech', () => {
-    const { state, unit } = marchScenario(['SAILING', 'SHIPBUILDING']);
+    const { state, unit } = coastScenario(['SAILING', 'SHIPBUILDING']);
     const water = tileAtCoords(state.map, 4, 5); // COAST, adjacent, free
     expect(tileFreeForUnit(state, water.index, 0, unit, false)).toBe(false); // land-only by default
     expect(tileFreeForUnit(state, water.index, 0, unit, true)).toBe(true); // embark allowed

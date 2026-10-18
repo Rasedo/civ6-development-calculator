@@ -3,7 +3,7 @@ import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOf, seatOfCityState, s
 import { seededGame, makeMap, makeState, tileAtCoords } from '../helpers';
 import { neighbors } from '../../../world/hex';
 import { spawnUnit } from '../../../cpu/core/units';
-import { hostileUnitAct } from '../../../cpu/core/combat';
+import { hostilePillage, meleeAttack } from '../../../cpu/core/combat';
 import { BARB_SEAT } from '../../../cpu/core/seats';
 import { foundCity, endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { CITY_STATE_START_DIST } from '../../../seeder/place';
@@ -364,7 +364,7 @@ describe("the suzerain's own rule (Geneva's science percent)", () => {
   });
 });
 
-describe('a hostile walker marches on a minor', () => {
+describe('a barbarian against a minor', () => {
   function board(): { state: GameState; cs: CityState } {
     const state = makeState(makeMap(24, 24));
     state.unitsMode = true;
@@ -375,41 +375,13 @@ describe('a hostile walker marches on a minor', () => {
   it('pillages a city-state improvement it stands on', () => {
     const { state, cs } = board();
     const t = state.map.tiles[cs.centerIndex];
-    // hand the minor a distance-2 tile: an ADJACENT raider attacks the city
-    // first (the majors' own precedence), so the pillage needs open ground
     const ground = state.map.tiles.find((n) =>
       hexDistance(state.map, n.col, n.row, t.col, t.row) === 2)!;
     setTileOwner(ground, cs.seat);
     ground.improvement = 'FARM';
     const barb = spawnUnit(state, 'WARRIOR', ground.index, BARB_SEAT)!;
-    hostileUnitAct(state, barb);
+    expect(hostilePillage(state, barb)).toBe(true);
     expect(ground.pillaged).toBe(true);
-  });
-
-  it('walks toward a city-state IMPROVEMENT within reach', () => {
-    const { state, cs } = board();
-    const t = state.map.tiles[cs.centerIndex];
-    const job = neighbors(state.map, t).find((n) => tileSeat(n) === cs.seat)!;
-    job.improvement = 'FARM';
-    const start = tileAtCoords(state.map, 12, 12);
-    const barb = spawnUnit(state, 'WARRIOR', start.index, BARB_SEAT)!;
-    const d = (a: { col: number; row: number }) => hexDistance(state.map, a.col, a.row, job.col, job.row);
-    expect(d(start)).toBeLessThan(13);
-    hostileUnitAct(state, barb);
-    expect(d(state.map.tiles[barb.tileIndex])).toBeLessThan(d(start));
-  });
-
-  it('beelines to the minor CITY — barbarians raid anyone', () => {
-    // Real Civ 6 barbarians raid whoever is near the camp: a city-state's
-    // CITY is a march target like any major's, and the walker stops adjacent.
-    const { state, cs } = board();
-    const start = tileAtCoords(state.map, 6, 12);
-    const barb = spawnUnit(state, 'WARRIOR', start.index, BARB_SEAT)!;
-    const ct = state.map.tiles[cs.centerIndex];
-    const d = (a: { col: number; row: number }) => hexDistance(state.map, a.col, a.row, ct.col, ct.row);
-    const d0 = d(start);
-    hostileUnitAct(state, barb);
-    expect(d(state.map.tiles[barb.tileIndex])).toBeLessThan(d0);
   });
 
   it('assaults an adjacent minor and floors it at 1 HP — never a capture', () => {
@@ -418,7 +390,7 @@ describe('a hostile walker marches on a minor', () => {
     const ring = neighbors(state.map, ct).find((n) => tileSeat(n) === cs.seat)!;
     const barb = spawnUnit(state, 'WARRIOR', ring.index, BARB_SEAT)!;
     cs.hp = 5;
-    hostileUnitAct(state, barb);
+    meleeAttack(state, barb.id, cs.centerIndex, BARB_SEAT);
     expect(cs.hp).toBe(1);
     expect(state.cityStates.some((c) => c.id === cs.id)).toBe(true);
   });

@@ -215,6 +215,8 @@ class SimMinorOps:
         self.mops_ong = torch.zeros(B, S, NO, NTM, dtype=torch.bool, device=device)
         self.mops_unit = torch.full((B, S, NO, NTM), -1, dtype=L, device=device)
         self.mops_tstr = torch.zeros(B, S, NO, NTM, dtype=L, device=device)
+        # the units each team has taken in (its join's second list, team +0x58)
+        self.mops_join = torch.zeros(B, S, NO, NTM, dtype=L, device=device)
         # Operation Move's stores: per move node per team the members held out
         # and the goal they are held for (-1 none: no store yet)
         self.mops_mvs = torch.zeros(B, S, NO, N_MOVES, NTM, P, dtype=torch.bool, device=device)
@@ -490,6 +492,7 @@ class SimMinorOps:
         j = free.long().argmax(dim=1)
         rows = m.nonzero(as_tuple=True)[0]
         mem[rows, j[rows]] = uid[rows]
+        self.mops_join[rows, s, k, ti] += 1
         Tm = self._mops_tables()
         d = self.mops_def[:, s, k]
         tm = self.mops_tm[:, s, k, ti]
@@ -742,6 +745,7 @@ class SimMinorOps:
             self.mops_ong[rows, s, kk] = False
             self.mops_unit[rows, s, kk] = -1
             self.mops_tstr[rows, s, kk] = 0
+            self.mops_join[rows, s, kk] = 0
             self.mops_mvs[rows, s, kk] = False
             self.mops_mvg[rows, s, kk] = -1
             # the definition's teams, those whose Condition holds, in order
@@ -1453,7 +1457,8 @@ def _u_attack_units(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 
 def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
-    """OPERATION ATTACK UNITS' EXECUTION (0x80ceb0): per team its members alive
+    """OPERATION ATTACK UNITS' EXECUTION (0x80ceb0): per team engaged or with a unit
+    taken in (team +0x90, +0x58) its members alive
     with Movement left (a bombard unit only against an enemy city), the list's
     unit targets not its own within max(2, a member's Movement left) of one,
     the assignment (the exchange filter where unequal attacks are not allowed
@@ -1472,7 +1477,7 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     enemy_city = city & (sim.tile_seat.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) != seat)
     for ti in range(N_TEAMS):
         tm = sim.mops_tm[:, s, k, ti]
-        g = on & (tm >= 0) & (sim.mops_eng[:, s, k, ti] | (sim.mops_tstr[:, s, k, ti] > 0))
+        g = on & (tm >= 0) & (sim.mops_eng[:, s, k, ti] | (sim.mops_join[:, s, k, ti] > 0))
         if not bool(g.any()):
             continue
         u = sim._mops_units(s)

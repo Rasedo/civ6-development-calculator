@@ -193,6 +193,9 @@ class SimBarb:
         self.tribe_raidq[rows, k[rows]] = -1
         self.tribe_assq[rows, k[rows]] = -1
         self.tribe_home_slot[rows, k[rows]] = -1
+        self.tribe_home_id[rows, k[rows]] = -1
+        self.tribe_home_resume[rows, k[rows]] = -1
+        self.tribe_home_mu[rows, k[rows]] = False
         self.tribe_defender[rows, k[rows]] = -1
         self.tribe_home_seat[rows, k[rows]] = -1
         self.tribe_home_plot[rows, k[rows]] = -1
@@ -201,8 +204,7 @@ class SimBarb:
         self.tribe_saw[rows, k[rows]] = False
         self.tribe_op[rows, k[rows]] = 0
         self.tribe_op_seat[rows, k[rows]] = -1
-        self.tribe_op_turns[rows, k[rows]] = 0
-        self.tribe_op_rec[rows, k[rows]] = False
+        self.tribe_op_id[rows, k[rows]] = -1
         self.n_tribes[rows] += 1
         has = (self.camp_tile[rows] == plot[rows].unsqueeze(1)).any(dim=1)
         put = rows[~has]
@@ -400,39 +402,6 @@ class SimBarb:
         ok = at < L
         q[rows[ok], k, at[ok]] = val[rows[ok]]
 
-    def _barb_start_op(self, mask: torch.Tensor, k: int, assault: bool, seat: torch.Tensor, plot: torch.Tensor) -> None:
-        """`startOp`: tribe `k` takes on a raid or a city assault on `seat`'s
-        city at `plot` in the games `mask`, its force yet to recruit, its
-        rally the camp, its tree at its recruit."""
-        rows = mask.nonzero(as_tuple=True)[0]
-        if not rows.numel():
-            return
-        self.tribe_op[rows, k] = 2 if assault else 1
-        self.tribe_op_seat[rows, k] = seat[rows]
-        self.tribe_op_plot[rows, k] = plot[rows]
-        self.tribe_rally[rows, k] = self.tribe_plot[rows, k]
-        self.tribe_op_turns[rows, k] = 0
-        self.tribe_op_rec[rows, k] = False
-        self.tribe_op_resume[rows, k] = 2
-        self.tribe_raid_from[rows, k] = -1
-        self.tribe_op_done[rows, k] = False
-        self.tribe_op_dead[rows, k] = 0
-        self.tribe_store[rows, k] = False
-        self.tribe_store_goal[rows, k] = -1
-        self.barb_unit_op[rows] &= self.barb_unit_tribe[rows] != k
-
-    def _barb_op_bury(self) -> None:
-        """an operation's members killed are counted to it (they stay its
-        members, off the map) and their slots let go"""
-        dead = self.barb_unit_op & ~self.barb_unit_alive & (self.barb_unit_tribe >= 0)
-        if not bool(dead.count_nonzero()):
-            return
-        tr = self.barb_unit_tribe.clamp(min=0)
-        add = torch.zeros_like(self.tribe_op_dead)
-        add.scatter_add_(1, tr, dead.long())
-        self.tribe_op_dead += add
-        self.barb_unit_op &= ~dead
-
     def _barb_tribe_turn(self, k: int) -> None:
         """`tribeTurn` for the tribes in slot `k` that live: the spawn clock at
         its interval (the operation's while it recruits) raising the unit the
@@ -471,11 +440,8 @@ class SimBarb:
         self._barb_raise(due, kk, self._barb_kind_col(5, kind), 2, 1, scout=True)
         self.tribe_scoutc[:, k] = torch.where(due, torch.zeros_like(self.tribe_scoutc[:, k]), self.tribe_scoutc[:, k])
         self.tribe_bold[:, k] += on.long() * int(bb["boldTurn"])
-        # a raid stands until its tree ends; a city assault that took its force
-        # while one of its units lives
-        held = (self.barb_unit_alive & self.barb_unit_op & (self.barb_unit_tribe == k)).any(dim=1)
-        gone = on & (((self.tribe_op[:, k] == 1) & self.tribe_op_done[:, k])
-                     | ((self.tribe_op[:, k] == 2) & self.tribe_op_rec[:, k] & ~held))
+        # an operation stands until its tree ends
+        gone = on & (self.tribe_op[:, k] > 0) & self.tribe_op_done[:, k]
         self.tribe_op[:, k] = torch.where(gone, torch.zeros_like(self.tribe_op[:, k]), self.tribe_op[:, k])
         # the operation forgotten, its members are their tribe's again
         self.barb_unit_op &= ~(gone.unsqueeze(1) & (self.barb_unit_tribe == k))
@@ -531,6 +497,13 @@ class SimBarb:
             best_g = torch.where(take, torch.full_like(best_g, g), best_g)
         go = (best_g >= 0) & (self.tribe_home_slot[rows, k] == -1)
         r2 = rows[go]
+        # the scout's tree starts (0x1485c0): its id the player's next
+        start = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        start[r2] = True
+        nid = self._bop_next_id(start)
+        self.tribe_home_id[r2, k] = nid[r2]
+        self.tribe_home_resume[r2, k] = -1
+        self.tribe_home_mu[r2, k] = False
         self.tribe_home_slot[r2, k] = slot[go]
         self.tribe_home_seat[r2, k] = best_g[go]
         # the city the plot seen belongs to (`cityCentreOf`)
@@ -541,106 +514,13 @@ class SimBarb:
         cen = torch.where(hit, self.city_center[r2, g2], torch.full_like(self.city_center[r2, g2], self.T)).min(dim=1).values
         self.tribe_home_plot[r2, k] = torch.where(cen < self.T, cen, torch.full_like(cen, -1))
 
-    def _barb_scout_report(self, on: torch.Tensor, k: int) -> None:
-        """`scoutReports`: tribe `k`'s homing scout within its home range of
-        the camp reports its city — a raid at once where the Boldness reaches
-        the raid's and no raid runs, else a city the raid waits for; a scout
-        lost reports nothing; one damaged by `protectDamage` of its health or
-        more where another player's fighting unit can strike (within its moves
-        plus its reach) holds its report."""
-        hs = self.tribe_home_slot[:, k]
-        bidx = torch.arange(self.B, device=self.device)
-        live = (hs >= 0) & self.barb_unit_alive[bidx, hs.clamp(min=0)]
-        lost = on & (hs != -1) & ~live
-        at = self.barb_unit_tile[bidx, hs.clamp(min=0)].clamp(min=0)
-        d = self.pair_dist[at, self.tribe_plot[:, k].clamp(min=0)].to(torch.long)
-        rep = on & live & (d <= int(self._bb["homeRange"]))
-        full = int(self.rules.combat["unitHp"])
-        hurt = rep & ((full - self.barb_unit_hp[bidx, hs.clamp(min=0)]).to(torch.float64)
-                      >= float(self._bb["protectDamage"]) * full)
-        if bool(hurt.any()):
-            ut = self.unit_type.clamp(min=0, max=self.NU - 1)
-            reach = self._type_moves[ut] + self._type_ranged_range[ut].clamp(min=1)
-            foe = self.unit_alive & (self.unit_seat != BARB_SEAT) & ~self._type_noncombat[ut]
-            near = self.pair_dist[self.unit_tile.clamp(min=0), at.unsqueeze(1)].to(torch.long) <= reach
-            rep = rep & ~(hurt & (foe & near).any(dim=1))
-        seat = self.tribe_home_seat[:, k].clone()
-        plot = self.tribe_home_plot[:, k].clone()
-        done = lost | rep
-        self.tribe_home_slot[:, k] = torch.where(done, torch.full_like(hs, -1), hs)
-        op = self.tribe_op[:, k]
-        start = rep & (op == 0) & (self.tribe_bold[:, k] >= self._barb_raid_boldness(k))
-        self._barb_start_op(start, k, False, seat, plot)
-        # the raid's tree takes its first turn at once: its spawn change and
-        # the recruit's first ask
-        self._barb_op_turn(start, k)
-        self._barb_push(self.tribe_raidq, rep & ~start, k, seat)
-        self._barb_push(self.tribe_raidp, rep & ~start, k, plot)
-
-    def _barb_op_turn(self, act: torch.Tensor, k: int) -> None:
-        """`opTurn` for tribe `k`'s operation recruiting: its first turn sets
-        the force's SpawnRate; past its Turn Limiter it gives up; else it takes
-        its force from the tribe's units of each class not raised this turn,
-        in raise order, and asks for the rest, melee first."""
-        if not bool(act.count_nonzero()):
-            return
-        bb = self._bb
-        dev = self.device
-        kind = self.tribe_kind[:, k]
-        assault = self.tribe_op[:, k] == 2
-        forces = bb["forces"]  # [kind][raid 0 / assault 1] = [rate, [[tag, n] ...]]
-        rate = torch.tensor([[f[0] for f in fk] for fk in forces], dtype=torch.long, device=dev)[kind, assault.long()]
-        turns = self.tribe_op_turns[:, k]
-        self.tribe_every[:, k] = torch.where(act & (turns == 0), rate, self.tribe_every[:, k])
-        self.tribe_op_turns[:, k] = turns + act.long()
-        limit = torch.where(assault, int(bb["assaultRecruitTurns"]), int(bb["raidRecruitTurns"]))
-        give = act & (self.tribe_op_turns[:, k] > limit)
-        self.tribe_op_rec[:, k] |= give
-        self.tribe_every[:, k] = torch.where(give, torch.full_like(rate, -1), self.tribe_every[:, k])
-        go = act & ~give
-        if not bool(go.count_nonzero()):
-            return
-        unit_for = self._barb_unit_for()  # [B, n_tags]
-        free = (self.barb_unit_alive & (self.barb_unit_tribe == k) & ~self.barb_unit_scout & ~self.barb_unit_fresh
-                & go.unsqueeze(1))
-        taken = torch.zeros_like(free)
-        queue = torch.full((self.B, self.TQ), -1, dtype=torch.long, device=dev)
-        off = torch.zeros(self.B, dtype=torch.long, device=dev)
-        n_e = max(len(f[1]) for fk in forces for f in fk)
-        ptype = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
-        for e in range(n_e):
-            tag_t = torch.tensor([[f[1][e][0] if e < len(f[1]) else -1 for f in fk] for fk in forces],
-                                 dtype=torch.long, device=dev)[kind, assault.long()]
-            n_t = torch.tensor([[f[1][e][1] if e < len(f[1]) else 0 for f in fk] for fk in forces],
-                               dtype=torch.long, device=dev)[kind, assault.long()]
-            utype = unit_for.gather(1, tag_t.clamp(min=0).unsqueeze(1)).squeeze(1)
-            valid = go & (tag_t >= 0) & (utype >= 0) & (n_t > 0)
-            member = self._barb_tag_member[tag_t.clamp(min=0).unsqueeze(1), ptype]  # [B, P]
-            elig = free & ~taken & member & valid.unsqueeze(1)
-            take = elig & (elig.long().cumsum(dim=1) <= n_t.unsqueeze(1))
-            taken |= take
-            miss = torch.where(valid, n_t - take.long().sum(dim=1), torch.zeros_like(n_t))
-            for j in range(int(n_t.max()) if n_t.numel() else 0):
-                put = valid & (j < miss) & (off + j < self.TQ)
-                rows = put.nonzero(as_tuple=True)[0]
-                queue[rows, (off + j)[rows]] = utype[rows]
-            off = off + miss
-        need = go & (off > 0)
-        self.tribe_queue[need, k] = queue[need]
-        done = go & (off == 0)
-        self.tribe_op_rec[:, k] |= done
-        self.tribe_every[:, k] = torch.where(done, torch.full_like(rate, -1), self.tribe_every[:, k])
-        self.barb_unit_op |= taken & done.unsqueeze(1)
-
     def _barbarian_scouts(self) -> None:
-        """`barbarianScouts`: each living tribe's scout looks where it stands and
-        a scout home reports."""
+        """`barbarianScouts`: each living tribe's scout looks where it stands."""
         for k in range(int(self.n_tribes.max())):
             on = self.tribe_alive[:, k] & (k < self.n_tribes)
             if not bool(on.count_nonzero()):
                 continue
             self._barb_scout_look(on, k)
-            self._barb_scout_report(on, k)
 
     def _barb_battle_boldness(self, live: torch.Tensor, a_kind: str, u: int, a_seat: torch.Tensor,
                               d_slot: torch.Tensor, d_is_barb: torch.Tensor,
@@ -678,8 +558,10 @@ class SimBarb:
                 self.tribe_bold[rows, tr[rows]] += delta[rows]
 
     def _barbarian_rules(self) -> None:
-        """`barbarianRules`: the techs, the camp step, each living tribe's
-        turn in the tribes' order."""
+        """`barbarianRules`: the military AI's part of the turn (its operations
+        refreshed, `_barb_ops_refresh`), the techs, the camp step, each living
+        tribe's turn in the tribes' order."""
+        self._barb_ops_refresh()
         self._barb_tech_step()
         self._barb_camp_step()
         for k in range(int(self.n_tribes.max())):

@@ -1733,6 +1733,107 @@ export const AI_TREES: Readonly<Record<string, readonly AiTreeNode[]>> = {
    }
   }
  ],
+ "Barbarian Found City": [
+  {
+   "id": 0,
+   "type": "Sequence",
+   "shape": 0,
+   "jumpTo": 6,
+   "data": {}
+  },
+  {
+   "id": 1,
+   "type": "Decode Trigger",
+   "shape": 2,
+   "jumpTo": 0,
+   "data": {
+    "Trigger Units": {
+     "defn": 0
+    },
+    "Trigger Buildings": {
+     "defn": 1
+    },
+    "Trigger Improvements": {
+     "defn": 2
+    },
+    "Trigger District": {
+     "defn": 3
+    },
+    "Trigger City": {
+     "defn": 4
+    },
+    "Trigger Location": {
+     "defn": 5,
+     "tag": "Home Camp"
+    },
+    "Trigger Tech": {
+     "defn": 6
+    },
+    "Trigger Civic": {
+     "defn": 7
+    },
+    "Trigger Value": {
+     "defn": 8,
+     "tag": "Tribe Index"
+    }
+   }
+  },
+  {
+   "id": 2,
+   "type": "Concurrent",
+   "shape": 0,
+   "jumpTo": 5,
+   "data": {}
+  },
+  {
+   "id": 3,
+   "type": "Protect Unit",
+   "shape": 1,
+   "jumpTo": 0,
+   "data": {
+    "Damage Percentage": {
+     "defn": 1,
+     "value": ".25"
+    }
+   }
+  },
+  {
+   "id": 4,
+   "type": "Move Unit",
+   "shape": 1,
+   "jumpTo": 0,
+   "data": {
+    "Location": {
+     "defn": 1,
+     "tag": "Home Camp"
+    },
+    "Release when done": {
+     "defn": 2,
+     "value": "1"
+    },
+    "Allow Danger": {
+     "defn": 3,
+     "value": "true"
+    },
+    "To Range": {
+     "defn": 4,
+     "value": "1"
+    }
+   }
+  },
+  {
+   "id": 5,
+   "type": "Notify Owner",
+   "shape": 1,
+   "jumpTo": 0,
+   "data": {
+    "Data Payload": {
+     "defn": 0,
+     "tag": "Tribe Index"
+    }
+   }
+  }
+ ],
  "Early City Assault": [
   {
    "id": 0,

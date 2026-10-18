@@ -1,6 +1,6 @@
-"""THE RAID'S TREE on the GPU twin (`_barb_op_trees`, the twin of
-`raidTick` in cpu/core/tactical.ts; tools/civ6lab/dll_readings.md "C-95: the
-barbarians' raid").
+"""THE RAID'S TREE on the GPU twin (`_bop_raid_tick` in gpu/core/sim_barbops.py,
+the twin of "Raid City" on cpu/core/operations through cpu/core/barbarianOps.ts;
+tools/civ6lab/dll_readings.md "C-95: the barbarians' raid").
 
     python tests/gpu/barb_raid_test.py
 
@@ -52,12 +52,16 @@ def main() -> None:
     path = fixture_paths()[0]
     sim = fresh(rules, path)
     sim._barb_slots()
-    k = next(k for k in range(int(sim.n_tribes[0])) if bool(sim.tribe_alive[0, k]))
+    # a camp and a major's city on its landmass, six plots or more from it
+    area = sim.tile_area[0]
+    scenes = [(int(sim.pair_dist[int(sim.tribe_plot[0, k]), int(sim.city_center[0, s, c])]), k, s, int(sim.city_center[0, s, c]))
+              for k in range(int(sim.n_tribes[0])) if bool(sim.tribe_alive[0, k])
+              for s in range(sim.city_center.shape[1]) for c in range(sim.city_center.shape[2])
+              if bool(sim.city_alive[0, s, c]) and int(area[int(sim.city_center[0, s, c])]) == int(area[int(sim.tribe_plot[0, k])])
+              and int(sim.pair_dist[int(sim.tribe_plot[0, k]), int(sim.city_center[0, s, c])]) >= 6]
+    assert scenes, "no major's city on a camp's landmass"
+    _, k, seat, target = min(scenes)
     camp = int(sim.tribe_plot[0, k])
-    cs = [(int(sim.city_center[0, 0, c])) for c in range(sim.city_center.shape[2])
-          if bool(sim.city_alive[0, 0, c])]
-    assert cs, "the first major holds no city"
-    target = max(cs, key=lambda c: int(sim.pair_dist[camp, c]))
     units = [s for s in sim.barb_unit_alive[0].nonzero(as_tuple=True)[0].tolist()
              if int(sim.barb_unit_seat[0, s]) == BARB_SEAT and not bool(sim.barb_unit_scout[0, s])
              and int(sim._type_combat[int(sim.barb_unit_type[0, s])]) > 0
@@ -67,15 +71,17 @@ def main() -> None:
     sim.barb_unit_tribe[0, u] = k
     sim.tribe_defender[0][sim.tribe_defender[0] == u] = -1
     put(sim, u, open_plot(sim, camp, 1))
+    # the raid started on its target, its force taken: the root resumes at the march
+    one = torch.zeros(sim.B, dtype=torch.bool)
+    one[0] = True
+    sim.tribe_op[0] = 0
+    sim.tribe_home_slot[0] = -1
     sim.barb_unit_op[0] = False
+    sim._barb_start_op(one, k, False, torch.full((sim.B,), seat, dtype=torch.long), torch.full((sim.B,), target, dtype=torch.long))
+    assert int(sim.tribe_rally[0, k]) == camp, "the raid's rally is its camp"
     sim.barb_unit_op[0, u] = True
-    sim.tribe_op[0, k] = 1
-    sim.tribe_op_seat[0, k] = 0
-    sim.tribe_op_plot[0, k] = target
-    sim.tribe_rally[0, k] = camp
-    sim.tribe_op_rec[0, k] = True
+    sim.barb_unit_join[0, u] = 0
     sim.tribe_op_resume[0, k] = 9
-    sim.tribe_op_done[0, k] = False
     sim.tribe_score[0, k] = 0
     # the march's Attack Units takes a foe within its reach: none stands there
     t0 = int(sim.barb_unit_tile[0, u])
@@ -104,7 +110,7 @@ def main() -> None:
         f"the raid: resume {int(sim.tribe_op_resume[0, k])}, began {int(sim.tribe_raid_from[0, k])}")
     print("  within the march's range the raid begins")
     # the score reached: home
-    sim.tribe_score[0, k] = int(sim._bb["raidScore"])
+    sim.tribe_score[0, k] = sim._bop_trees().raid_score
     tick()
     assert int(sim.tribe_op_resume[0, k]) == 22, f"the raid check: resume {int(sim.tribe_op_resume[0, k])}"
     print("  the tribe's score sends it home")
@@ -113,7 +119,7 @@ def main() -> None:
     tick()
     assert bool(sim.tribe_op_done[0, k]), "home at its rally, the raid's tree goes on"
     q = [(int(s), int(p)) for s, p in zip(sim.tribe_assq[0, k].tolist(), sim.tribe_assp[0, k].tolist()) if s >= 0]
-    assert q == [(0, target)], f"the assault list {q}"
+    assert q == [(seat, target)], f"the assault list {q}"
     print("  home, Notify Owner lists the city for the assault and the tree ends")
     # a raid with no unit living through its raid ends
     sim.tribe_op_done[0, k] = False

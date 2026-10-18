@@ -50,7 +50,8 @@ import { gameTypeOf } from '../data/aliases';
 import type { Catalog, TurnRecord } from './record';
 
 /** the families measured: the operations the port starts, then all */
-const FAMILIES = ['Settle New City', 'Naval Superiority', 'Attack Barb Camp', 'City Defense', 'Attack Enemy City', 'Attack Walled City', 'all'] as const;
+const FAMILIES = ['Settle New City', 'Naval Superiority', 'Attack Barb Camp', 'City Defense', 'Attack Enemy City', 'Attack Walled City',
+  'Barbarian Attack', 'Barbarian City Assault', 'all'] as const;
 const TRACE = (process.env.REPLAY_TRACE ?? '').split(',').includes('operations');
 
 /** a line's operation name */

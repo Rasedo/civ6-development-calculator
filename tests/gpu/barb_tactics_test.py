@@ -190,20 +190,18 @@ def scalar_spots(sim, b, slot, tg):
 
 
 def has_target(sim, s) -> bool:
-    """the barbarian at local slot `s` has something to attack (the stand-in's
-    target scan, asked without acting)"""
-    seen = []
-    one = torch.zeros_like(sim.barb_unit_alive)
-    one[0, s] = True
-
-    def pick(u, tgt):
-        if tgt is None:
-            return None
-        seen.append(int(tgt[0]))
-        return torch.zeros_like(tgt, dtype=torch.bool)
-
-    sim._barb_stand_in(lambda: one & sim.barb_unit_alive, pick)
-    return bool(seen) and seen[0] < sim.T
+    """the barbarian at local slot `s` has something to attack: another
+    player's unit within its reach (a ranged unit's range, else 1), or a city
+    centre beside it"""
+    here = int(sim.barb_unit_tile[0, s])
+    ut = int(sim.barb_unit_type[0, s])
+    reach = max(1, int(sim._type_ranged_range[ut])) if int(sim._type_ranged_strength[ut]) > 0 else 1
+    for m in sim.unit_alive[0].nonzero(as_tuple=True)[0].tolist():
+        t = int(sim.unit_tile[0, m])
+        if t >= 0 and int(sim.unit_seat[0, m]) != BARB_SEAT and int(sim.pair_dist[here, t]) <= reach:
+            return True
+    ctr = sim._centre_plane()[0]
+    return any(n >= 0 and bool(ctr[n]) for n in sim.neigh[here].tolist())
 
 
 def scalar_danger(sim, viewer, b=0):

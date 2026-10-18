@@ -9,6 +9,7 @@
   status: PARTLY
   readings:
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   context:
     - ...is turn (0x791300), else the location; a plot of danger only where Allow Danger; woken (0x53e20) and moved (0x972880 / 0x962030).
   review: imported

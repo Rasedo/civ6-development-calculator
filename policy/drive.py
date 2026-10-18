@@ -214,7 +214,7 @@ def _obs_war(st, nobs: list) -> dict:
 def _march_targets(st, war: dict, hcs: torch.Tensor) -> tuple:
     """The war-march DESTINATION for units standing at `hcs` [B, N]: the
     nearest of `war`'s improvement tiles within 13 (tile index breaking the
-    tie), else the nearest of its cities on `hostileUnitAct`'s key —
+    tie), else the nearest of its cities on the march key (`_march_seatkey`) —
     distance, then the owner's seat id, then the centre tile — else the
     stand itself. Distances are the STATIC `pair_dist`. Returns (tgt,
     has_imp, has_city), each [B, N]."""

@@ -29,7 +29,7 @@ import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, raiseBestTrained, unitReligious, unitStackSlot } from './units';
 import { randRange } from './rand';
-import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
+import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
@@ -3052,88 +3052,6 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
   state.eventLog.push(`${cityState.name} has been conquered by ${actor.name}!`);
 }
 
-export function hostileUnitAct(state: GameState, unit: Unit): void {
-  // a civilian the barbarians took holds where it stands
-  if (unitDomain(unit.type) !== 'military') return;
-  const seat = unit.seat;
-  const map = state.map;
-  const tile = () => map.tiles[unit.tileIndex];
-  const targets = attackTargets(state, unit);
-  if (targets.length > 0) {
-    if (UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, targets[0]);
-    else meleeAttack(state, unit.id, targets[0], seat);
-    return;
-  }
-
-  // 2. Pillage what stands underfoot (`hostilePillage`)
-  if (hostilePillage(state, unit)) return;
-  const here = tile();
-
-  let target: Tile | null = null;
-  let bestDist = 13;
-  for (const t of map.tiles) {
-    const tOwned = isTerritorial(tileSeat(t))
-      && unitsHostile(state, unit, { seat: tileSeat(t) });
-    if (!tOwned) continue;
-    const impJob = t.improvement !== null && !t.pillaged;
-    const distJob =
-      t.district !== null &&
-      t.district !== 'CITY_CENTER' &&
-      t.district !== 'ENCAMPMENT' &&
-      t.districtComplete &&
-      !t.districtPillaged;
-    if (!impJob && !distJob) continue;
-    const d = hexDistance(state.map, here.col, here.row, t.col, t.row);
-    if (d < bestDist) {
-      bestDist = d;
-      target = t;
-    }
-  }
-  // An improvement is walked ONTO (pillage reads the tile underfoot);
-  // a CITY target stops the march adjacent — enemy centers can't be entered
-  // (real Civ 6), and a unit standing on one could never attack it (d>=1).
-  const marchOnto = target !== null;
-  if (!target) {
-    let best: Tile | null = null;
-    let bestKey = Infinity;
-    // The city scan is ANY hostile owner's, majors, city-states and the
-    // Free Cities alike — real Civ 6 barbarians raid whoever is near the
-    // camp, and an adjacent minor centre IS a melee target (`attackTargets`'s
-    // cityStateTarget arm), so a parked raider fights rather than stands.
-    // The key packs distance, then the seat id (wide enough for a 100+ minor
-    // and for FREE_SEAT 300), then the centre tile — the GPU's `_march_seatkey`.
-    const owners = state.freeSeat ? [...state.seats, state.freeSeat] : state.seats;
-    for (const other of owners) {
-      if (other.seat === unit.seat) continue;
-      if (!unitsHostile(state, unit, other)) continue;
-      for (const oc of other.cities) {
-        const t = map.tiles[oc.centerIndex];
-        const key = hexDistance(state.map, here.col, here.row, t.col, t.row) * (2048 * 512)
-          + other.seat * 2048
-          + oc.centerIndex;
-        if (key < bestKey) {
-          bestKey = key;
-          best = t;
-        }
-      }
-    }
-    for (const csx of state.cityStates) {
-      if (!cityStateAttackable(state, csx, unitSeat(unit))) continue;
-      const t = map.tiles[csx.centerIndex];
-      const key = hexDistance(state.map, here.col, here.row, t.col, t.row) * (2048 * 512)
-        + seatOfCityState(csx.id) * 2048
-        + csx.centerIndex;
-      if (key < bestKey) {
-        bestKey = key;
-        best = t;
-      }
-    }
-    target = best;
-  }
-  if (!target) return;
-  marchOn(state, unit, target, marchOnto);
-}
-
 /**
  * A HOSTILE WALKER'S PILLAGE of its own plot: the improvement, else the
  * complete non-centre district, paying the target's own plunder row — a
@@ -3208,45 +3126,4 @@ export function coastalRaid(state: GameState, unit: Unit, plot: number): boolean
     return true;
   }
   return false;
-}
-
-/** a hostile unit's march toward a plot, a step nearer each time while its
- *  moves last: onto it (an improvement to wreck) or to its side (a city, a
- *  camp) */
-function marchOn(state: GameState, unit: Unit, target: Tile, marchOnto: boolean): void {
-  const map = state.map;
-  const tile = () => map.tiles[unit.tileIndex];
-  for (;;) {
-    const at = tile();
-    const step = neighbors(map, at)
-      .filter(
-        (n) =>
-          // a barbarian raider keeps to its own domain: the AI never embarks
-          // one, though the barbarians hold Shipbuilding from the start
-          tileFreeForUnit(state, n.index, 0, unit, !isBarbSeat(unit.seat)) &&
-          // A CLIFF closes the embark/disembark edge for the
-          // war-march too — the GPU's _apply_seat_unit_actions war-march scan
-          // masks it out of its step candidates, and TS did not, so a seat
-          // musketman walked over a cliff onto water in the off-script gate, t198).
-          // Filtered as a CANDIDATE (not a halt) so the march routes around it.
-          !cliffBlocksStep(state, at, n, unit),
-      )
-      .sort(
-        (a, b) =>
-          hexDistance(state.map, a.col, a.row, target!.col, target!.row) -
-          hexDistance(state.map, b.col, b.row, target!.col, target!.row),
-      )[0];
-    const stepD = hexDistance(state.map, step?.col ?? 0, step?.row ?? 0, target.col, target.row);
-    if (!step || stepD >= hexDistance(state.map, at.col, at.row, target.col, target.row) || (!marchOnto && stepD < 1)) {
-      return;
-    }
-    // The shared MP contract pays for the step (embark/disembark costs all
-    // remaining MP; water steps never pay river) and applies the camp clear.
-    // ZOC: a march step ending adjacent to a hostile MILITARY unit halts.
-    // Barbarians OBEY ZOC exactly as seat movers
-    // do — unitsHostile makes a barb halt at any adjacent non-barb military
-    // (barbarians are at war with every seat); other barbs exert nothing. The GPU barb walk mirrors this via
-    // _in_enemy_zoc_barb, so both engines stay symmetric. No new draws.
-    if (stepUnit(state, unit, step) !== 'moved') return;
-  }
 }

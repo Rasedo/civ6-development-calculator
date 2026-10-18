@@ -15,7 +15,7 @@
 import { BT_ERROR, BT_FAILURE, BT_RUNNING, BT_SUCCESS, dataBool, dataInt, dataTag, type BtHandler } from '../behaviorTree';
 import { NO_PLOT, type OpTeam, type Operation } from './operation';
 import { generalizedAssignment } from '../aiAssignment';
-import { moveTo, opUnits, targetGone, unitsById, xy } from './operation';
+import { holdsUnits, moveTo, opUnits, targetGone, unitsById, xy } from './operation';
 import type { OpsContext } from './nodes';
 import type { MajorAttackTargetView, MajorUnitView, MajorView } from '../../../ai/major/view';
 
@@ -312,15 +312,15 @@ const operationDiplomacy: BtHandler<OpsContext> = {
 };
 
 // OPERATION ATTACK CITY (0x813250): SUCCESS once the target is gone; a target
-// that is no city nor a district FAILS; RUNNING while the operation holds
-// units, else FAILURE
+// that is no city nor a district FAILS; RUNNING while the operation holds a
+// living unit, else FAILURE
 const operationAttackCity: BtHandler<OpsContext> = {
   update(_node, _run, ctx) {
     const view = ctx.view();
     if (targetGone(ctx, ctx.op)) return BT_SUCCESS;
     const p = view.plots()[ctx.op.target];
     if (!p.city && !p.district) return BT_FAILURE;
-    return opUnits(ctx.op).length > 0 ? BT_RUNNING : BT_FAILURE;
+    return holdsUnits(ctx, ctx.op) ? BT_RUNNING : BT_FAILURE;
   },
 };
 
@@ -336,23 +336,23 @@ const operationAirAssault: BtHandler<OpsContext> = {
 };
 
 // OPERATION PILLAGE (0x8134a0): ERROR where its three data are all present
-// and false; SUCCESS once the target is gone or while the operation holds
-// units, else FAILURE
+// and false; SUCCESS once the target is gone or while the operation holds a
+// living unit, else FAILURE
 const operationPillage: BtHandler<OpsContext> = {
   update(node, _run, ctx) {
     if (!flag(node, 'Pillage Districts', true) && !flag(node, 'Pillage Improvements', true) && !flag(node, 'Get Goody Huts', true)) return BT_ERROR;
     if (targetGone(ctx, ctx.op)) return BT_SUCCESS;
-    return opUnits(ctx.op).length > 0 ? BT_SUCCESS : BT_FAILURE;
+    return holdsUnits(ctx, ctx.op) ? BT_SUCCESS : BT_FAILURE;
   },
 };
 
 // OPERATION SIEGE CITY (0x8136a0): SUCCESS once the target is gone; ERROR
-// with no enemy; SUCCESS while the operation holds units, else FAILURE
+// with no enemy; SUCCESS while the operation holds a living unit, else FAILURE
 const operationSiegeCity: BtHandler<OpsContext> = {
   update(_node, _run, ctx) {
     if (targetGone(ctx, ctx.op)) return BT_SUCCESS;
     if (ctx.op.enemy < 0) return BT_ERROR;
-    return opUnits(ctx.op).length > 0 ? BT_SUCCESS : BT_FAILURE;
+    return holdsUnits(ctx, ctx.op) ? BT_SUCCESS : BT_FAILURE;
   },
 };
 
@@ -448,7 +448,8 @@ function pickTargets(node: Parameters<BtHandler<OpsContext>['update']>[0], view:
   return () => true;
 }
 
-/** per team: its members with Movement left and in no formation (a siege
+/** per team engaged or with a unit taken in (0x80ceb0: team +0x90, +0x58):
+ *  its members with Movement left and in no formation (a siege
  *  unit only against an enemy city), the targets the node picks logged, the
  *  attack assignment over them (`even` where unequal attacks are not allowed
  *  and one unit goes; `survive` always) carried out (the seat's `attack`)
@@ -460,7 +461,7 @@ function attackUnitsExecute(node: Parameters<BtHandler<OpsContext>['update']>[0]
   const enemyCity = op.target >= 0 && P[op.target].city && P[op.target].owner !== ctx.seat;
   const allowUnequal = flag(node, 'Allow Unequal Attacks', false);
   for (const t of op.teams) {
-    if (!t.engaged && t.strength <= 0) continue;
+    if (!t.engaged && t.joined === 0) continue;
     const v = ctx.view();
     const units = unitsById(v, ctx.seat);
     const paired = new Set(op.formations.flat());
@@ -607,7 +608,8 @@ function pillageHere(ctx: OpsContext, id: number): void {
  *  target's owner:
  *  of the teams' members on land or at sea off it, with no bombard
  *  strength, in no formation, with Movement left, that may pillage (a goody
- *  hut any): one on it pillages there; else of those within twice their
+ *  hut any): one on it pillages there ("Operation Pillage City", its plot
+ *  the three; runs/h1_duelw11xx: every such line of the barbarians'); else of those within twice their
  *  Movement of it (any for a goody hut) whose planning reaches it within two
  *  turns with Movement left there (0x791300 at range 0), the nearest goes
  *  ("Operation Pillage City, From, Goal, Move") and pillages on arrival */
@@ -634,6 +636,7 @@ function pillageExecute(node: Parameters<BtHandler<OpsContext>['update']>[0], _r
         if (!goody && u.combat <= 0) continue;
         if (u.plot === g.plot) {
           pillageHere(ctx, id);
+          ctx.log(`${op.def}, Operation Pillage City, ${u.type}, From ${xy(v0, u.plot)}, Goal: ${xy(v0, g.plot)}, Move ${xy(v0, u.plot)}`);
           continue;
         }
         const v = ctx.view();

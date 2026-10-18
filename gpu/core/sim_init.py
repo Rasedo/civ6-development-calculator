@@ -4003,12 +4003,15 @@ class SimInit:
         # THE RAIDS AND CITY ASSAULTS (`barbarianScouts`): each tribe's Boldness,
         # the spawn interval its operation set (-1 its own), the unit types it
         # asked for (-1 empty), the owners of the cities its raid and its
-        # assault wait for, its homing scout's slot and city owner, the owned
-        # plots its scout saw at its last look; its operation (0 none, 1 a
-        # raid, 2 an assault), the owner it goes after, its turns recruiting,
-        # whether it took its force; per unit, taken by its tribe's operation,
-        # raised in its tribe's last turn; per major, the turn a scout may
-        # report it again
+        # assault wait for, its scout's tree (its scout's slot, the city's
+        # owner, the tree's id, its Sequence's resume, Move Unit's held
+        # scout), the owned plots its scout saw at its last look; its
+        # operation (0 none, 1 a raid, 2 an assault; `sim_barbops.py`), the
+        # owner it goes after, its tree's id, its recruit's Turn Limiter's
+        # first turn, its team's readiness of the military AI's turn; per
+        # unit, taken by its tribe's operation (its place in the team's join
+        # order), raised in its tribe's last turn; per major, the turn a scout
+        # may report it again; the barbarian player's next tree's id
         self.tribe_bold = torch.zeros(B, self.KT, dtype=torch.long, device=device)
         self.tribe_every = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.TQ = 10
@@ -4021,12 +4024,18 @@ class SimInit:
         self.tribe_assq = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
         self.tribe_home_slot = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_home_seat = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_home_id = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_home_resume = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_home_mu = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
         self.tribe_saw = torch.zeros(B, self.KT, self.T, dtype=torch.bool, device=device)
         self.tribe_op = torch.zeros(B, self.KT, dtype=torch.long, device=device)
         self.tribe_op_seat = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
-        self.tribe_op_turns = torch.zeros(B, self.KT, dtype=torch.long, device=device)
-        self.tribe_op_rec = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
+        self.tribe_op_id = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_op_rstart = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_op_ready = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
         self.barb_unit_op = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
+        self.barb_unit_join = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=device)
+        self.barb_tree_next = torch.zeros(B, dtype=torch.long, device=device)
         self.barb_unit_fresh = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
         # THE BARBARIANS' UNIT POOL (`BarbPool`, `barbSlots`): each unit's
         # place in the player's unit list (-1 none yet), the slots ever used,
@@ -4056,17 +4065,20 @@ class SimInit:
         self.tribe_ramp = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_raidp = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
         self.tribe_home_plot = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
-        # THE RAID'S TREE (`raidTick`): the cities the assault waits for by
-        # their centres; each tribe's raid score (its units' pillages); its
-        # operation's target plot and rally, the root's child it resumes at
-        # (2 the recruit, 9 the march, 12 the raid, 22 the way home), the turn
-        # its raid began (-1 not yet), its tree ended, its members killed;
-        # each Operation Move node's (11, 21, 24) stored members and goal
+        # THE OPERATION'S TREE (`sim_barbops.py`): the cities the assault
+        # waits for by their centres; each tribe's raid score (its units'
+        # pillages); its operation's target plot and rally, its trigger
+        # Sequence's child it resumes at (-1 its first; a raid's root 2 the
+        # recruit, 9 the march, 12 the raid, 22 the way home; an assault's
+        # Sequence 4 the recruit, 11 the gathering, 14 the march, 18 the
+        # assault), the turn its raid's Turn Limiter first ran (-1 not yet),
+        # its tree ended, its members killed; each Operation Move node's
+        # stored members and goal (in node order)
         self.tribe_assp = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
         self.tribe_score = torch.zeros(B, self.KT, dtype=torch.long, device=device)
         self.tribe_op_plot = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_rally = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
-        self.tribe_op_resume = torch.full((B, self.KT), 2, dtype=torch.long, device=device)
+        self.tribe_op_resume = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_raid_from = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_op_done = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
         self.tribe_op_dead = torch.zeros(B, self.KT, dtype=torch.long, device=device)
@@ -4123,6 +4135,8 @@ class SimInit:
         self.NU = len(ru)
         # [n_tags, NU] bool: the roster types each barbarian class tag holds
         # (a raid's recruit counts a unit to its class by them)
+        # per unit type, UNITAI_COMBAT (the raid team's requirement)
+        self._bop_combat_ai = torch.tensor([bool(x) for x in self._bb["unitCombatAi"]] or [False], dtype=torch.bool, device=device)
         self._barb_tag_member = torch.zeros(len(self._bb["tagUnits"]), self.NU, dtype=torch.bool, device=device)
         for _ti, _rows in enumerate(self._bb["tagUnits"]):
             for _r in _rows:
@@ -4801,7 +4815,7 @@ class SimInit:
         # `city_center.reshape(B, -1)` order (row-major, so the column index
         # runs fastest). A CITY-STATE row carries its 100+ seat id and the
         # FREE CITIES row FREE_SEAT (300), which is why the distance term is
-        # scaled by 2048 * 512 — the same key `hostileUnitAct` packs.
+        # scaled by 2048 * 512 — the driver's war-march key (`_march_targets`).
         _cell_row = torch.arange(self.city_center.shape[1] * self.RC, device=device) // self.RC
         self._march_seatkey = torch.where(
             _cell_row == self.FREE_ROW, torch.full_like(_cell_row, FREE_SEAT),

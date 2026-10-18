@@ -85,6 +85,7 @@ import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './rec
 import { num, bool } from './record';
 import { minorAiTurn, traceMinorAi } from '../core/minorCityAi';
 import { cityStateMilitary, traceMinorOps } from '../core/minorOps';
+import { traceBarbOps } from '../core/barbarianOps';
 import { opsOf } from '../core/operations/manager';
 import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
@@ -567,6 +568,10 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
     pool.size = Math.max(pool.size, u.slot + 1);
   }
   barbSlots(state);
+  // the barbarians' operation lines of the turn: their tribes' starts, their
+  // run in the tactical pass, a scout's report's start
+  const opLines: string[] = [];
+  traceBarbOps((l) => opLines.push(l));
   barbarianRules(state, closing);
   // where the pair's first record holds each unit its moves took off
   const from = new Map([...moved.keys()].map((u) => [u, u.tileIndex] as const));
@@ -590,6 +595,9 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   barbSlots(state);
   barbarianAi(ctx, b, closing, before, from);
   barbarianScouts(state);
+  traceBarbOps(null);
+  const barbPlayer = ctx.playerOfSeat.get(BARB_SEAT);
+  if (barbPlayer !== undefined) ctx.operationsAi.minorTurn(closing, barbPlayer, opLines, []);
   barbSlotsDying(state);
   // the barbarians' units look round where the record holds them (their
   // moves are the record's, set without a step)
@@ -666,8 +674,10 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     traceTactics(null);
     holdRng(held);
   }
-  // the operations' trees ran on the copy: their state (the recruit's asks,
-  // the raids' progress, the cities a raid's end lists) is the tribes'
+  // the operations ran on the copy: the manager's state and the tribes'
+  // (the recruit's asks, the spawn interval, the cities a raid's end lists)
+  state.barbSeat.ops = copy.barbSeat.ops;
+  state.barbSeat.opsNext = copy.barbSeat.opsNext;
   (copy.barbTribes ?? []).forEach((c, i) => {
     const tr = state.barbTribes?.[i];
     if (!tr) return;

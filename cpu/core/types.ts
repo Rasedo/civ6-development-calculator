@@ -623,9 +623,9 @@ export interface BarbTribe {
   /** the cities its raid and its assault wait to go after */
   raidTargets?: BarbTarget[];
   assaultTargets?: BarbTarget[];
-  /** a scout that saw a city walks home to report it ("Barbarian Found
-   *  City") */
-  homing?: { scout: number; target: BarbTarget };
+  /** a scout that saw a city walks home to report it: its tree "Barbarian
+   *  Found City" (`barbarianOps.ts`) */
+  homing?: BarbHoming;
   /** per scout, the city plots it saw at its last look */
   saw?: Record<number, number[]>;
   /** its raid or city assault (the AI operation it runs) */
@@ -642,29 +642,25 @@ export interface BarbTarget {
   plot: number;
 }
 
-/** A BARBARIAN OPERATION: a raid ("Raid City") or a city assault
- *  ("Barbarian City Attack") on a target, recruiting its force, then on
- *  its way with the units it took */
+/** A SCOUT'S TREE ("Barbarian Found City"): its id among the barbarian
+ *  player's trees, its scout, the city it saw, its run between ticks (each
+ *  node's status and memory, the tagged data) */
+export interface BarbHoming {
+  id: number;
+  scout: number;
+  target: BarbTarget;
+  status: number[];
+  mem: Record<string, unknown>[];
+  bb: Record<string, unknown>;
+}
+
+/** A TRIBE'S OPERATION: a raid ("Raid City") or a city assault
+ *  ("Barbarian City Attack") on a city, its id in the barbarians'
+ *  operation manager (`barbarianOps.ts`) */
 export interface BarbOp {
+  id: number;
   assault: boolean;
   target: BarbTarget;
-  /** the turns it has recruited; done once it took its force */
-  turns: number;
-  recruited: boolean;
-  /** its team's members in the order they joined; a member killed keeps
-   *  its place, off the map */
-  units: number[];
-  /** the plot its way home goes to (the rally) */
-  rally?: number;
-  /** its tree's root Sequence: the child it resumes at */
-  resume?: number;
-  /** the turn its raid's Turn Limiter first ran */
-  raidFrom?: number;
-  /** each Operation Move node's stored units and the goal they were
-   *  stored for */
-  store?: Record<number, { list: number[]; goal: number }>;
-  /** its tree ended: the tribe forgets it at its next turn */
-  done?: boolean;
 }
 
 export interface Unit {
@@ -813,6 +809,11 @@ export interface Seat {
    *  unit type, the turn and plot last seen; a record drops 22 turns after.
    *  Absent = none. */
   armyKnown?: ArmyRecord[];
+  /** the operation manager of a city-state (`minorOps.ts`) or the
+   *  barbarians (`barbarianOps.ts`), and the id the barbarians' next
+   *  operation's tree takes */
+  ops?: OpsAi;
+  opsNext?: number;
   /**
    * THIS SEAT'S CITIES — one field on one interface, so a rule that touches
    * a seat's cities cannot be written twice and drift.
@@ -1174,9 +1175,8 @@ export interface CityState extends Seat {
   cityAi?: CityAi;
   economy?: EconomicMemory;
   threat?: number;
-  /** its operation manager (`minorOps.ts`, `OpsAi`) and the camps its
-   *  knowledge base holds, in their order (m_barbarians +0x638) */
-  ops?: OpsAi;
+  /** the camps its knowledge base holds, in their order (m_barbarians
+   *  +0x638) */
   campsKnown?: number[];
   /** its military AI's Combat Desire (`minorCombatDesire`), raw 24.8: its
    *  PSEUDOYIELD_UNIT_COMBAT weight */

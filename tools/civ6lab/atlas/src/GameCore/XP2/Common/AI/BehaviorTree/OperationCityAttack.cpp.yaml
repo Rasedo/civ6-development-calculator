@@ -27,10 +27,12 @@
     - cpu/core/operations/assault.ts:CITY_ATTACK_RANGE
     - cpu/core/operations/assault.ts:attackCityExecute
     - gpu/core/sim_minorops.py:_x_attack_city
+    - gpu/core/sim_barbops.py:_bop_attack_city
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...0x811390; Operation Siege City 0x8136a0 / 0x811e80; Operation Attack City 0x813250 / 0x8109e0; Barbarian Raid Check 0x7c7330; Barbarian Recruit 0x7c7580; Barbarian Spawn Change 0x7c...
@@ -63,12 +65,13 @@
   impl:
     - cpu/core/operations/assault.ts:pillageExecute
     - cpu/core/operations/assault.ts:pillageHere
-    - cpu/core/tactical.ts:opPillageExec
-    - gpu/core/sim_tactics.py:_barb_op_pillage
+    - cpu/core/operations/assault.ts:pillageExecute
+    - gpu/core/sim_barbops.py:_bop_pillage
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - .../ 0x80ceb0; Operation Defend Units 0x80ee70 / 0x80d790; Operation Pillage 0x8134a0 / 0x811390; Operation Siege City 0x8136a0 / 0x811e80; Operation Attack City 0x813250 / 0x8109e0; B...
@@ -78,11 +81,16 @@
   kind: function
   name: Operation Siege City (execution)
   status: PARTLY
-  impl: [cpu/core/operations/assault.ts:SiegeSlot, cpu/core/operations/assault.ts:siegeCityExecute]
+  impl:
+    - cpu/core/operations/assault.ts:SiegeSlot
+    - cpu/core/operations/assault.ts:siegeCityExecute
+    - gpu/core/sim_barbops.py:_bop_siege
+    - gpu/core/sim_barbops.py:_op_siege
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ee70 / 0x80d790; Operation Pillage 0x8134a0 / 0x811390; Operation Siege City 0x8136a0 / 0x811e80; Operation Attack City 0x813250 / 0x8109e0; Barbarian Raid Check 0x7c7330; Barbarian Re...
@@ -153,6 +161,7 @@
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...0x8134a0 / 0x811390; Operation Siege City 0x8136a0 / 0x811e80; Operation Attack City 0x813250 / 0x8109e0; Barbarian Raid Check 0x7c7330; Barbarian Recruit 0x7c7580; Barbarian Spawn...
@@ -183,11 +192,12 @@
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES
     - cpu/core/operations/assault.ts:operationPillage
-    - cpu/core/tactical.ts:raidTick
-    - gpu/core/sim_tactics.py:_barb_op_trees
+    - cpu/core/barbarianOps.ts:barbarianTrees
+    - gpu/core/sim_barbops.py:_barb_trees
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...nits 0x80ecf0 / 0x80ceb0; Operation Defend Units 0x80ee70 / 0x80d790; Operation Pillage 0x8134a0 / 0x811390; Operation Siege City 0x8136a0 / 0x811e80; Operation Attack City 0x813250...
     - "- OPERATION PILLAGE. Update (0x8134a0): the target gone SUCCESS; the operation holding a unit SUCCESS, else FAILURE (no flag..."
@@ -203,6 +213,7 @@
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...Units 0x80ee70 / 0x80d790; Operation Pillage 0x8134a0 / 0x811390; Operation Siege City 0x8136a0 / 0x811e80; Operation Attack City 0x813250 / 0x8109e0; Barbarian Raid Check 0x7c7330; B...

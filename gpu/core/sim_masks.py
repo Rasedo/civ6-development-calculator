@@ -2800,8 +2800,8 @@ class SimMasks:
         self.barb_unit_tribe[rows, slot] = -1
         self.barb_unit_scout[rows, slot] = False
         # a reclaimed slot is no operation's, raised in no tribe's turn, and
-        # the scout a tribe waited on there is lost (-2: its report falls at
-        # the tribe's next look, `scoutReports`)
+        # the scout a tribe's tree held there is lost (-2: the tree's Protect
+        # Unit finds no unit and the tree ends)
         self.barb_unit_op[rows, slot] = False
         self.barb_unit_fresh[rows, slot] = False
         _hs = self.tribe_home_slot[rows]

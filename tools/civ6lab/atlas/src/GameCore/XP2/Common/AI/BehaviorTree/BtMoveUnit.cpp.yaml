@@ -10,6 +10,7 @@
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...the lower-priority unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0...
   review: imported
@@ -19,9 +20,12 @@
   name: moveUnitExec
   semantics: "Move Unit's execution: the unit's planning plot at To Range this turn, else the location; no move into danger unless allowed; MoveTo"
   status: PARTLY
+  impl: [cpu/core/barbarianOps.ts:SCOUT_NODES]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
@@ -30,9 +34,12 @@
   final: 0x557180
   kind: function
   status: PARTLY
+  impl: [cpu/core/barbarianOps.ts:SCOUT_NODES]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...Difficulty Range 0x7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation...
@@ -54,6 +61,7 @@
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...e units of the lower-priority unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7...
   review: imported
@@ -61,11 +69,16 @@
   final: 0x5580a0
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:moveUnit, gpu/core/sim_citytrees.py:_u_move]
+  impl:
+    - cpu/core/aiCityTrees.ts:moveUnit
+    - gpu/core/sim_citytrees.py:_u_move
+    - cpu/core/barbarianOps.ts:SCOUT_NODES
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
@@ -81,15 +94,18 @@
       turn: 23
       value: "Case:   1121 camp (3,19): its Scout reports at t23, takes 47 from China's   Warrior at t24, stands home at t25 three plots from it and raises no   raid (none at boldness 10 on t26 either);"
   impl:
-    - cpu/core/barbarians.ts:threatened
-    - cpu/data/barbarians.ts:BARB_PROTECT_DAMAGE
+    - cpu/core/barbarianOps.ts:SCOUT_NODES
+    - gpu/core/sim_barbops.py:_bop_scout_tick
     - cpu/core/aiCityTrees.ts:protectUnit
+    - cpu/core/barbarianOps.ts:protectShare
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   context:
     - "...d City\" node 3, a Concurrent with Move Unit; TreeData Damage Percentage .25): its check 0x7f07c0 counts the node's units whose damage (unit +0xcf0) is at least that share of their he..."
   review: reviewed

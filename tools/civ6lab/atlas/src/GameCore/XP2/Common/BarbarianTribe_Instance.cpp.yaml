@@ -14,7 +14,7 @@
   final: 0xd9c80
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:opTurn]
+  impl: [cpu/core/barbarianOps.ts:hooksOf, cpu/core/barbarianOps.ts:recruit]
   readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
@@ -60,6 +60,15 @@
   context:
     - "...stacking; else MOVE_TO the target's plot with the attack flag 0x10). With no target (0x1479e0): of the cities its raid (+0x48) then its assault (+0x60) wait for that the player hold..."
   review: imported
+- addr: 0x147c20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...r the assault (+0x60); the assault's tree lists nothing but where the tribe was bribed (0x147c20's turns).
+  review: imported
 - addr: 0x147e70
   final: 0xdbd50
   kind: function
@@ -93,12 +102,19 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/barbarians.ts:scoutReports, cpu/core/tactical.ts:raidTick]
+  impl:
+    - cpu/core/barbarianOps.ts:SCOUT_NODES
+    - cpu/core/barbarianOps.ts:barbarianTrees
+    - cpu/core/barbarianOps.ts:hooksOf
+    - cpu/core/operations/barbarian.ts:BarbarianHooks
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The scout home (Notify Owner 0x7c6fa0 -> 0x153ea0 -> 0x148270): for the scout's tree, threshold RaidingBoldness (BarbarianTribes +0x24, a name's +0..."
@@ -108,11 +124,15 @@
   name: barbFoundCityStart
   semantics: "the scout's tree started: \"Barbarian Found City\" on the scout, the camp its Home Camp and the tribe its index"
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:barbScoutLook]
+  impl:
+    - cpu/core/barbarians.ts:barbScoutLook
+    - cpu/core/barbarianOps.ts:barbScoutTreeStart
+    - gpu/core/sim_barb.py:_barb_scout_look
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ing an owned plot of a city, its owner's throttle (manager +0x3d8, data +0x430) passed: 0x1485c0 starts the tribe's ScoutingBehaviorTree (\"Barbarian Found City\": Move Unit to the camp,..."

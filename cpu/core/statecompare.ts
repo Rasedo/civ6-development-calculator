@@ -83,6 +83,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { MINOR_OP_DEFS } from './minorOps';
+import { barbHomingRecord, barbOpRecord } from './barbarianOps';
 import { opsOf } from './operations/manager';
 import { AI_OP_TEAMS } from '../data/aiOperations';
 import { AI_DISTRICTS, AI_IMPROVEMENTS } from '../data/aiBuildTables';
@@ -560,21 +561,17 @@ const GAME: Record<string, Extractor> = {
       BARB_TRIBES.findIndex((d) => d.kind === t.kind), t.name, t.spawnTurns, t.scoutTurns,
       t.units.filter((id) => live.has(id)).length, t.scouts.filter((id) => live.has(id)).length,
       // the raid and the city assault: Boldness, the interval set, the units
-      // asked for, the cities waited for (their owners), the homing scout's
-      // city owner, the operation (kind, owner, turns, force taken, its units)
+      // asked for, the cities waited for (their owners), the scout's tree
+      // (`barbHomingRecord`)
       t.boldness ?? 0, t.every ?? -1, (t.queue ?? []).length, ...(t.queue ?? []).map(uidx),
       (t.raidTargets ?? []).length, ...(t.raidTargets ?? []).map((x) => x.seat), ...(t.raidTargets ?? []).map((x) => x.plot),
       (t.assaultTargets ?? []).length, ...(t.assaultTargets ?? []).map((x) => x.seat), ...(t.assaultTargets ?? []).map((x) => x.plot),
-      t.homing ? t.homing.target.seat : -1,
-      t.op ? (t.op.assault ? 2 : 1) : 0, t.op?.target.seat ?? -1, t.op?.turns ?? 0, t.op?.recruited ? 1 : 0,
-      t.op ? t.op.units.filter((id) => live.has(id)).length : 0,
-      // the raid's score and its tree: its target and rally, the child it
-      // resumes at, the turn its raid began, ended, its members killed
-      t.score ?? 0, t.op?.target.plot ?? -1, t.op?.rally ?? -1, t.op ? (t.op.resume ?? 2) : 0, t.op?.raidFrom ?? -1,
-      t.op?.done ? 1 : 0, t.op ? t.op.units.filter((id) => !live.has(id)).length : 0,
+      ...barbHomingRecord(t),
+      // the raid's score, the operation on the manager (`barbOpRecord`)
+      t.score ?? 0, ...barbOpRecord(s, t),
       // the player its units rampage against, its camp taken
       t.rampage ?? -1]),
-    ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0),
+    ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0), s.barbSeat.opsNext ?? 0,
     techs.length, ...techs, civics.length, ...civics,
     // the unit pool (`barbSlots`): its size, its free slots, those waiting to
     // go free, each unit's slot in unit order; each tribe's camp defender alive

@@ -7,11 +7,16 @@
   final: 0x53d6b0
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:opTurn]
+  impl:
+    - cpu/core/barbarianOps.ts:hooksOf
+    - cpu/core/operations/barbarian.ts:BarbarianHooks
+    - cpu/core/operations/barbarian.ts:barbarianRecruit
+    - gpu/core/sim_barbops.py:_bop_recruit
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the speed (0x14fc30 -> 0x149760, +0x88; 0 or less: the tribe's own). Barbarian Recruit (0x7c7580) under a Turn Limiter (10 / 15): the force's counts (0x144610, each class the barbarian..."

@@ -225,13 +225,14 @@
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
-  impl: [cpu/core/tactical.ts:passMoveExec, cpu/core/tactical.ts:moveExec]
+  impl: [cpu/core/tactical.ts:passMoveExec]
   readings:
     - "H-1: the citizen pressure term — PARTLY READ"
     - "H-1: the city-states' quests — READ"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...ns a city's own and foreign citizen pressure (24.8 fixed point, gathered by the plot walk 0x6aef0 over CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF, gp +0xf0 = 10, with the per-plot functor 0x...
     - "...barian Camp (0x849a70): a camp within 5 of the minor's capital (the plots in range 5, 0x6aef0); no target; done when the actor clears a camp within 5 (0x849c00: distance <= 5); a..."
@@ -526,13 +527,15 @@
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
   impl:
-    - cpu/core/barbarians.ts:startOp
-    - gpu/core/sim_barb.py:_barb_start_op
-    - cpu/core/tactical.ts:raidTick
+    - cpu/core/barbarianOps.ts:barbOpStart
+    - gpu/core/sim_barbops.py:_barb_start_op
+    - cpu/core/barbarianOps.ts:barbarianTrees
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...or a raid's own tree ending: threshold CityAttackBoldness (+0x1c) and the city assault (0x1497d0) or its list (+0x60)."
@@ -542,8 +545,12 @@
   final: 0xdd3d0
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:startOp]
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
+  impl: [cpu/core/barbarianOps.ts:barbOpStart, cpu/core/barbarianOps.ts:SCOUT_NODES]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...100); boldness at it, no raid running (+0x3c) and no bribe -> the raid starts at once (0x149980), else the city goes on the raid list (+0x48). For a raid's own tree ending: threshold..."
@@ -683,8 +690,10 @@
   final: 0x1aa7e0
   kind: function
   status: PARTLY
+  impl: [cpu/core/barbarianOps.ts:SCOUT_NODES]
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with a path to it (0x272a60), not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area..."
@@ -979,6 +988,7 @@
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...p, To Range 1, then Notify Owner) when none runs (+0x38) and the owner is a full civ (0x484a10 -> 0x469db0, hash 0x253718b0); the throttle becomes turn + max(0, BARBARIAN_MAX_THROTTL...
@@ -1444,6 +1454,8 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -2425,6 +2437,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om the behaviour tree — \"HL: Rock Band Move\" (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a unit's name for its log (the band template over 118 and 155): the AI'..."
@@ -2510,6 +2523,7 @@
     - cpu/core/minorOps.ts:minorOpsStart
     - cpu/core/operations/manager.ts:startOperationNamed
     - cpu/core/operations/manager.ts:operationsEvaluate
+    - cpu/core/operations/manager.ts:startOperationAt
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -2536,6 +2550,7 @@
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ds the operation's tree gone and the manager ends it (\"Operation complete\", 0x725000 -> 0x7353d0)."
@@ -2698,6 +2713,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...x775340; for MEDIUM / LOW a ranged unit's spot at exactly its range with Movement left, 0x78fa10), the targets of that type within 5 of it (0x76eb50), each unit's spots per target from...
@@ -2931,11 +2947,15 @@
   final: 0x53d060
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:opTurn]
+  impl:
+    - cpu/core/barbarianOps.ts:hooksOf
+    - cpu/core/operations/barbarian.ts:BarbarianHooks
+    - cpu/core/operations/barbarian.ts:spawnChange
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- \"Raid City\" / \"Barbarian City Attack\" (BehaviorTrees.xml): Barbarian Spawn Change (0x7c6e50): the force (0x147640: the name's then the tribe's BarbarianTribeForces rows, RaidingFo..."
@@ -2950,12 +2970,19 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:raidTick, gpu/core/sim_tactics.py:_barb_op_trees]
+  impl:
+    - cpu/core/barbarianOps.ts:barbarianTrees
+    - gpu/core/sim_barbops.py:_barb_trees
+    - cpu/core/barbarianOps.ts:SCOUT_NODES
+    - cpu/core/operations/barbarian.ts:BarbarianHooks
+    - cpu/core/operations/barbarian.ts:notifyOwner
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The scout home (Notify Owner 0x7c6fa0 -> 0x153ea0 -> 0x148270): for the scout's tree, threshold RaidingBoldness (BarbarianTri..."
@@ -2970,9 +2997,13 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:raidTick, gpu/core/sim_tactics.py:_barb_op_trees]
+  impl:
+    - cpu/core/barbarianOps.ts:barbarianTrees
+    - gpu/core/sim_barbops.py:_barb_trees
+    - cpu/core/operations/barbarian.ts:raidCheck
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ty 0x8136a0 / 0x811e80; Operation Attack City 0x813250 / 0x8109e0; Barbarian Raid Check 0x7c7330; Barbarian Recruit 0x7c7580; Barbarian Spawn Change 0x7c7b70 / 0x7c6e50; Notify Owner...
@@ -2981,8 +3012,10 @@
 - addr: 0x7c7b70
   kind: function
   status: PARTLY
+  impl: [cpu/core/operations/barbarian.ts:spawnChange]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...09e0; Barbarian Raid Check 0x7c7330; Barbarian Recruit 0x7c7580; Barbarian Spawn Change 0x7c7b70 / 0x7c6e50; Notify Owner 0x7c6fa0; In Difficulty Range 0x7f1d70; Make Formation 0x7efd7...
@@ -3006,6 +3039,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...RS (the dispatcher 0x7cbca0 storing each type's functions under the id the registration 0x7db850 gives it, the k-th id stored the k-th name, @d5b198 one unnamed): Operation Move update..."
@@ -3148,9 +3182,10 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:raidTick]
+  impl: [cpu/core/barbarianOps.ts:barbarianTrees, cpu/core/operations/barbarian.ts:inDifficultyRange]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...Barbarian Spawn Change 0x7c7b70 / 0x7c6e50; Notify Owner 0x7c6fa0; In Difficulty Range 0x7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f00...
@@ -3283,9 +3318,11 @@
     - recording: 1121
       turn: 9
       value: "A tree one of whose units its own orders   spent ends that tick (1121 t9 Hunza's last charge on a Rainforest: the   next Builder contract t10;"
-  impl: [cpu/core/aiCityTrees.ts:tickCityTrees]
+  impl: [cpu/core/aiCityTrees.ts:tickCityTrees, cpu/core/barbarianOps.ts:barbarianTrees]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   context:
     - "...is empty, then TryPurchaseUnits 0x68be60 over the city's units; the tree manager's tick 0x7ffdd0; tactical). A city founded during the turn exists for C only: the Default Specializatio..."
     - "- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a loop destroys a tree whose +0x368 is set or who..."
@@ -3370,10 +3407,11 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:opNearbyTargets]
+  impl: [cpu/core/operations/assault.ts:pickTargets]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...of another player or as a DEFENDER (+0x1c0 == 4); the targets: the list's unit entries (0x80b9b0: CIVILIAN through HIGH) narrowed to those near (0x80bd20 -> 0x80c080: not the player's..."
@@ -3389,6 +3427,7 @@
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...ry barbarian node asks Attack Nearby Units, so the march's 0x80be90 and the near-target 0x80bb50 never run. The assignment 0x776140 with its fifth argument (the exchange filter) where...
@@ -3406,11 +3445,12 @@
   impl:
     - cpu/core/operations/assault.ts:attackUnitsExecute
     - cpu/core/operations/assault.ts:pickTargets
-    - cpu/core/tactical.ts:opNearbyTargets
-    - gpu/core/sim_tactics.py:_barb_op_attack
+    - cpu/core/operations/assault.ts:pickTargets
+    - gpu/core/sim_barbops.py:_bop_attack_units
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...ts: the list's unit entries (0x80b9b0: CIVILIAN through HIGH) narrowed to those near (0x80bd20 -> 0x80c080: not the player's own, of a player at war or the operation's enemy — a civi..."
   review: reviewed
@@ -3425,6 +3465,7 @@
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...ent left) of a member); every barbarian node asks Attack Nearby Units, so the march's 0x80be90 and the near-target 0x80bb50 never run. The assignment 0x776140 with its fifth argument...
@@ -3441,12 +3482,13 @@
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
   impl:
     - cpu/core/operations/assault.ts:attackUnitsExecute
-    - cpu/core/tactical.ts:opNearbyTargets
-    - gpu/core/sim_tactics.py:_barb_op_attack
+    - cpu/core/operations/assault.ts:pickTargets
+    - gpu/core/sim_barbops.py:_bop_attack_units
     - cpu/core/operations/assault.ts:UNIT_TARGETS
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...st's unit entries (0x80b9b0: CIVILIAN through HIGH) narrowed to those near (0x80bd20 -> 0x80c080: not the player's own, of a player at war or the operation's enemy — a civilian of anyo..."
   review: reviewed
@@ -3491,9 +3533,10 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:moveUpdate, gpu/core/sim_tactics.py:_barb_move_update]
+  impl: [cpu/core/tactical.ts:passMoveUpdate, gpu/core/sim_barbops.py:_bop_move_update]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...hin it of the goal, then each next one within it of one of those (0x814930, 0x815a10, 0x814840 grow the run in the sorted order), the rest strays — two strays or more for each member..."
@@ -3508,9 +3551,10 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:moveUpdate, gpu/core/sim_tactics.py:_barb_move_update]
+  impl: [cpu/core/tactical.ts:passMoveUpdate, gpu/core/sim_barbops.py:_bop_move_update]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ove 0: the members within it of the goal, then each next one within it of one of those (0x814930, 0x815a10, 0x814840 grow the run in the sorted order), the rest strays — two strays o..."
@@ -3525,9 +3569,10 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:moveUpdate, gpu/core/sim_tactics.py:_barb_move_update]
+  impl: [cpu/core/tactical.ts:passMoveUpdate, gpu/core/sim_barbops.py:_bop_move_update]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ess Validate new units. The members not listed, nearest the goal first (the stable sort 0x814d10): the nearest within Range to goal has the team arrived (+0x70); else its planning reac..."
@@ -3538,6 +3583,7 @@
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...members within it of the goal, then each next one within it of one of those (0x814930, 0x815a10, 0x814840 grow the run in the sorted order), the rest strays — two strays or more for..."
@@ -3557,11 +3603,12 @@
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
   impl:
     - cpu/core/tactical.ts:passMoveExec
-    - cpu/core/tactical.ts:moveExec
-    - gpu/core/sim_tactics.py:_barb_move_exec
+    - cpu/core/tactical.ts:passMoveExec
+    - gpu/core/sim_barbops.py:_bop_move_exec
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...0. With a radius the ring walk 0x6aef0 (0x69010's order) around the goal with the test 0x815d50: a plot in the goal's region (plot +0x18) before one outside, then the nearest the unit..."
   review: reviewed
@@ -3575,9 +3622,10 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:moveUpdate, gpu/core/sim_tactics.py:_barb_move_update]
+  impl: [cpu/core/tactical.ts:passMoveUpdate, gpu/core/sim_barbops.py:_bop_move_update]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...nted and arrived is cleared; the listed members within the unit distance of the others (0x8160a0) leave the list, one within the range arriving; the list stored with the goal. The stat...
