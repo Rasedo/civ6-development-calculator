@@ -979,6 +979,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorProdSet: overCityStates((cityState) => [cityState.prodSetTurn ?? -99, cityState.prodSetValue ?? FX_MIN_RAW]),
   minorThreat: overCityStates((cityState) => cityState.threat ?? -1),
   minorCombatDesire: overCityStates((cityState) => cityState.combatDesire ?? 0),
+  minorStandingArmyShort: overCityStates((cityState) => cityState.standingArmyShort ?? 0),
   minorSavings: overCityStates((cityState) => [...(cityState.economy?.savings ?? [0, 0, 0, 0]), cityState.economy?.balance ?? 0]),
   minorAiSlots: overCityStates((cityState) => cityAiSlots(cityState)),
   minorAiTrees: overCityStates((cityState, state) => cityAiTrees(cityState, state)),

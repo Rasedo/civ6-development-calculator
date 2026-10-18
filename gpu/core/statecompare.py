@@ -986,6 +986,7 @@ CITY_STATE = {
     "minorProdSet": lambda sim, b, rows: [[int(sim.citystate_prod_set_turn[b, s]), int(sim.citystate_prod_set_value[b, s])] for s in rows],
     "minorThreat": lambda sim, b, rows: [int(sim.citystate_threat[b, s]) for s in rows],
     "minorCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, s]) for s in rows],
+    "minorStandingArmyShort": lambda sim, b, rows: [int(sim.citystate_standing_short[b, s]) for s in rows],
     "minorSavings": lambda sim, b, rows: [[int(x) for x in sim.citystate_savings[b, s].tolist()] + [int(sim.citystate_balance[b, s])]
                                           for s in rows],
     "minorAiSlots": lambda sim, b, rows: [[int(x) for x in sim.cai_slots[b, s].tolist()] for s in rows],

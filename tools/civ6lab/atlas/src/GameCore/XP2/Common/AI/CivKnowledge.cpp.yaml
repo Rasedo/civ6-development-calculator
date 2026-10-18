@@ -20,6 +20,7 @@
     - gpu/core/sim_minors.py:_knowledge_look
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...age, +0x10 its plot (x, y), +0x18 / +0x1c the plot's two map ids (the second its area). 0x5e9530 (from 0x5f0440) finds the unit's id in its type's list: found, age 0 and the plot rewri..."
   review: reviewed
@@ -77,6 +78,7 @@
   impl: [ai/major/warValue.ts:regionalStrength]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - ...0) the strength summed over the military AI's area list (+0x1290 +0x2f0) of the records 0x5eb430 returns (the record's +0x1c the area's id, age at most 2), each unit's max(Combat, Ra...
   review: reviewed
@@ -109,6 +111,7 @@
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "..., over the player list (0x483b50 +0x4a0) the knowledge base's count of it (CivKnowledge 0x5eb650: the player's army records, AI_Knowledge.csv's ARMY lines \"UNIT_X count age\"), N thei..."
   review: imported
@@ -172,6 +175,7 @@
     - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "- The update (0x5ebb30): every entry ages; one whose plot the player sees with no city of its owner there is d..."
   review: imported
@@ -187,6 +191,7 @@
       value: minor 3's dead Warrior 131073 stays on its ARMY line from t17 to t38, gone at t39
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...s list: found, age 0 and the plot rewritten; else a record appended. The ARMY log line (0x5eceb0, \"%s %d %d,\") prints per type the list's size and its oldest age; the counts 0x5eb650 r..."
   review: reviewed
@@ -289,6 +294,7 @@
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - ...440 into its owner's list; a barbarian camp improvement (plot +0x44 the barbarians') -> 0x5f0110. Player signal +0xc0 (0x7874a0) and game signal +0x2e8 (0x7838a0 -> 0x783570) refresh...
   review: reviewed
@@ -298,6 +304,7 @@
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...plot the player's visibility count (+0x290) holds above 0 — a city -> the known cities (0x5f0280), a district -> 0x5f0490 — each unit on it (0x75ce0's list), one hidden (+0x15f0, not +..."
   review: reviewed
@@ -313,6 +320,7 @@
       value: minor 3's dead Warrior 131073 stays on its ARMY line from t17 to t38, gone at t39
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...plot (x, y), +0x18 / +0x1c the plot's two map ids (the second its area). 0x5e9530 (from 0x5f0440) finds the unit's id in its type's list: found, age 0 and the plot rewritten; else a..."
     - ..., one hidden (+0x15f0, not +0x1650) only where 0x5033a0 lets the player see it, through 0x5f0440 into its owner's list; a barbarian camp improvement (plot +0x44 the barbarians') -> 0x5...
@@ -323,6 +331,7 @@
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...ity count (+0x290) holds above 0 — a city -> the known cities (0x5f0280), a district -> 0x5f0490 — each unit on it (0x75ce0's list), one hidden (+0x15f0, not +0x1650) only where 0x50..."
   review: reviewed
@@ -338,6 +347,7 @@
       value: "one whose age before the   step was above 0x14 is erased (0x5f09b0) — a record lives through age 21   (runs/h1_duelv1124 minor 3's dead Warrior 131073: on its ARMY line from   t17 to t38, gone at t39)"
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...0x1f8): every record's age + 1; one whose age before the step was above 0x14 is erased (0x5f09b0) — a record lives through age 21 (runs/h1_duelv1124 minor 3's dead Warrior 131073: on i..."
   review: reviewed

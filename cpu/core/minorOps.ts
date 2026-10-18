@@ -148,6 +148,9 @@ export const minorOpLive = (cs: CityState, id: number): boolean => !!cs.ops && o
 /** the contracts the minor's running operations hold */
 export const minorOpContracts = (cs: CityState): number[] => (cs.ops ? opContracts(cs.ops) : []);
 
+/** the units the minor's running operations hold */
+export const minorOpUnits = (cs: CityState): number[] => (cs.ops ? opsOf(cs.ops).flatMap(opUnits) : []);
+
 /**
  * C: A CITY-STATE'S UNITS' TURN — its tactical pass (`cityStateTactics`),
  * its operations run once the pass has its units' planning: each operation

@@ -24,6 +24,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 on PrereqTech/Civic turns), maintenance as plain Gold..."
   context:
@@ -56,8 +57,20 @@
   impl: [cpu/data/aiBuildTables.ts:AI_UNIT_EFFICIENCY]
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   context:
     - "- THE EFFICIENCIES (0x79d040 allocates, the job 0x79a440 fills, \"Could not find a neutral player\"): per pair of Units rows both without strength..."
+  review: imported
+- addr: 0x79b9c0
+  final: 0x5242d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ng army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "...of AI type COMBAT (3) — or EXPLORE (2) whose type's highest AI flag up to 3 is COMBAT (0x79b9c0) while the player's units exceed twice its cities — with no operation (+0x7d0 == -1), o..."
   review: imported
 - addr: 0x79ba50
   kind: function
@@ -103,6 +116,7 @@
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x promo-class weight 0x723bb0,  p..."
     - ".claude/scratchpad/cb/notes.txt: ...en PV diff. trade -> 0x7a7110; religious etc. CONCLUSION so far: full value port needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons..."

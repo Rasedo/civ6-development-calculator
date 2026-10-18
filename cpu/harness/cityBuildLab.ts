@@ -35,6 +35,7 @@ import { AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
 import { projectTable, projectValue } from '../core/aiProjectValue';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { minorBuildFacts, minorProjectFacts, minorCombatDesire, minorKnowledge, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
+import { minorStandingArmyShort, minorThreat } from '../core/minorCityAi';
 import { researchAnalysis } from '../core/aiResearch';
 import { civicAnalysis } from '../core/aiCivics';
 import { computeCityStats } from '../core/city';
@@ -243,6 +244,9 @@ for (let i = 0; i + 1 < recs.length; i++) {
     if (onlyPlayer !== null && player !== onlyPlayer) continue;
     // the military AI's turn: its strengths and Combat Desire against
     // AI_Military.csv's (the records as its last update aged them)
+    // its last city update's threat and standing army, on the record as it stands
+    cs.threat = minorThreat(state, cs);
+    cs.standingArmyShort = minorStandingArmyShort(state, cs);
     const ourDesire = minorCombatDesire(state, cs, turn - 1);
     const wantS = strengths.get(`${turn}:${player}`);
     if (wantS) {

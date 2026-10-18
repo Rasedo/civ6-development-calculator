@@ -3860,7 +3860,7 @@ rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
   Siege Tower, Military Engineer: Combat 0, the 0.01 / 100 rows), the
   religious, Archaeologist, Rock Band and air units (unported).
 
-## C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)
+## C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)
 
 `minorKnowledge` / `minorKnownUnits` / `minorCombatDesire` in
 `cpu/core/minorBuild.ts`, `cityStateSight` in `cpu/core/fog.ts`,
@@ -3932,6 +3932,54 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   +0x280; no writer found through its offsets — taken as 0), the +0xd18 /
   +0xc58 flags, the city's threat +0x1b8 (taken as none), and what the
   signals +0xc0 / +0x2e8 refresh outside the turn's two looks.
+
+## C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ
+
+`minorStandingArmyShort` (cpu/core/minorCityAi.ts) / `_minor_standing_short`
+(gpu/core/sim_minorai.py), read by `minorCombatDesire` / `_minor_combat_desire`.
+
+- 0x5ca7e0, a step of the city's full update (after the threat 0x5cbd10):
+  the QUOTA, CityBuildAI +0x220's watched value (+0x278, the setter
+  0x731d10 writes +0x58 of the variable), is pseudoYieldValue(
+  PSEUDOYIELD_STANDING_ARMY_NUMBER, 1.0, the owner) times fx(sqrtf(the
+  city's population +0x588)) (the IAT slot @0xcf47b0 is sqrtf), whole
+  (sar 8). Then over the owner's units (player +0x12e8 +0xd8): a unit of AI
+  type DEFENDER (+0x1c0 == 4) homed on the city (+0x11d0 == the city's id
+  +0xf8) stays in the list unless +0xf30 > 0 with player +0x1278 holding it
+  (then it is released: COMBAT 3, home -1); the list sorted (0x5c4910); each
+  unit of AI type COMBAT (3) — or EXPLORE (2) whose type's highest AI flag
+  up to 3 is COMBAT (0x79b9c0) while the player's units exceed twice its
+  cities — with no operation (+0x7d0 == -1), of the land domain (+0x650 ==
+  2) or the sea (0) beside a coastal city (0x82a10), joins (DEFENDER, homed)
+  while the list is below the quota, else replaces the weakest member of
+  lower Combat (0x56dc90). The SHORTFALL, CityBuildAI +0x280's watched
+  value (+0x2d8), is the quota less the list's length.
+- The military AI's turn (0x7218a5) sums +0x2d8 over the player's cities
+  (city +0x31d0 the CityBuildAI) and adds pseudoYieldValue(
+  PSEUDOYIELD_STANDING_ARMY_VALUE, 1.0) times that sum (0.1 at DefaultValue,
+  raw 25 each) to the desire. The cap of 2.0 lifts with the war footing or a
+  city's threat +0x1b8 at or above 0 (`threatened`, the threat of its last
+  update).
+- The engines: the minor's units with no running operation's membership
+  (`minorOpUnits` / `_mops_busy`), not civilian, not recon, of strength
+  above 0, land or (coastal) sea, count toward the quota; the shortfall at
+  0 or above — the unit AI types are not kept, so a list longer than the
+  quota (AI_Military.csv's -0.1 desires, runs/h1_duelv1127 Muscat t23–t24,
+  four Warriors at population 4) is not reproduced.
+- MEASURED (`cityBuildLab.ts`, the five verbose duels): the Combat Desire as
+  logged 1,778 -> 2,897 of 3,600 minor-turns (within 0.05); the action
+  replay's own desire (REPLAY_TRACE=minorRows against AI_Military.csv)
+  1,714 -> 2,089 of 3,602.
+- The unit production table's value (0x7989e0): each opposing type's count
+  times the efficiency at data[width x opposing + entry] (0x7992b9: the
+  matrix +0x28 width, +0x30 data, the opposing type the loop's index
+  [rbp+0xc00], the entry's unit +0 of its 0x168-byte record); the log
+  (0x79b8a0) prints row r, column c as data[width x r + c], so the value
+  reads AI_UnitEfficiency.csv's row the opposing unit, column the entry
+  (`AI_UNIT_EFFICIENCY[i][k]`). The other way round the lab's units within
+  0.005 fall 7,815 -> 6,099 on runs/h1_duelv1117. The entry's value is its
+  +0x160 (0x79ca90), N over the summed products (+0x30), 1.0 where nothing
+  opposes.
 
 ## C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)
 

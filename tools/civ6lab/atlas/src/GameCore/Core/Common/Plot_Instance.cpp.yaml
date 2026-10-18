@@ -44,6 +44,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: Coastal Raid — READ, ported"
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...promise's plot   (PROMISE_DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30),   coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence..."
   context:

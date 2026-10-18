@@ -67,7 +67,7 @@ import { unitProductionTable } from './aiUnitProduction';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, unitTable, type AiUnitRow, type CityBuildFacts, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { upgradeGoldCost } from './stockpile';
-import { FX, FX_MIN, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
+import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { majorView } from './majorView';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
@@ -876,9 +876,9 @@ export function minorKnowledge(state: GameState, cityState: CityState, age: bool
  *  `turn` the one its knowledge base's records were last aged to: the
  *  area of its city, its unit in training, the players in the game's order —
  *  the majors, the city-states, the Free Cities, the barbarians (a tribe,
- *  always at war) — at war where its seat is. Unread: the player
- *  flags (+0xc58), a city's threat (CityBuildAI +0x1b8) and its
- *  standing-army count (+0x2d8), taken as none. */
+ *  always at war) — at war where its seat is; its city's threat and its
+ *  standing army's shortfall as its last city update left them. Unread: the
+ *  player flags (+0xc58 / +0xd18), taken as none. */
 export function minorCombatDesire(state: GameState, cityState: CityState, turn: number): CombatDesire {
   const centre = state.map.tiles[cityState.centerIndex];
   const areas = new Set<number>();
@@ -907,8 +907,12 @@ export function minorCombatDesire(state: GameState, cityState: CityState, turn: 
     turn,
     queuedUnits: cityState.prodItem?.startsWith('unit:') ? [cityState.prodItem.slice(5)] : [],
     warFooting: false,
-    threatened: false,
-    standingArmy: 0,
+    // its city threatened at its last update (CityBuildAI +0x1b8 at or
+    // above 0), and what its standing army lacked then (+0x2d8) at
+    // PSEUDOYIELD_STANDING_ARMY_VALUE each
+    threatened: (cityState.threat ?? -1) >= 0,
+    standingArmy: fmul(pseudoYieldValue(majorView(state), cityState.seat, FX, 'PSEUDOYIELD_STANDING_ARMY_VALUE'),
+      (cityState.standingArmyShort ?? 0) * FX),
   });
 }
 

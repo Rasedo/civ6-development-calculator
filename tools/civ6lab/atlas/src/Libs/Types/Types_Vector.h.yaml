@@ -420,6 +420,8 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhatta..."
   context:

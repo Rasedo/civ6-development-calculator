@@ -1105,6 +1105,7 @@
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   notes:
     - ".claude/scratchpad/st1/reading.md: ....cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x7164..."
   context:
@@ -1518,6 +1519,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...unter through 0xcc6080) feed the scoped profiler (0x8c05a0 / 0x8c0640) and timing totals (0x5bce20, Player::Processor::EndTurn 0x7ed0a); none is compared to a limit.
+  review: imported
+- addr: 0x5c4910
+  final: 0x3dae20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...th player +0x1278 holding it (then it is released: COMBAT 3, home -1); the list sorted (0x5c4910); each unit of AI type COMBAT (3) — or EXPLORE (2) whose type's highest AI flag up to..."
   review: imported
 - addr: 0x5c9a00
   final: 0x3dec40
@@ -2514,6 +2525,7 @@
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ct Manager's check 0x7f2220 sets FAILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8...

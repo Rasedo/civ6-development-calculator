@@ -3,6 +3,15 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0xcf47b0
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...MY_NUMBER, 1.0, the owner) times fx(sqrtf(the city's population +0x588)) (the IAT slot @0xcf47b0 is sqrtf), whole (sar 8). Then over the owner's units (player +0x12e8 +0xd8): a unit of..."
+  review: imported
 - addr: 0xd02108
   kind: global
   status: PARTLY
@@ -35,6 +44,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...the knowledge base's update 0x783980 from a per-plot visibility word > 0) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, els..."
   review: imported
@@ -66,6 +76,7 @@
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - ...h twice the cost in hand; then the heroes) gets a contract, and the boost takes -0.25 (@0xd2f324) once the balance passes its cost, -0.25 more once the Faith per turn (0x496fd0) passes...
   review: imported
@@ -90,6 +101,7 @@
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "..._Military.csv's Regional / Enemy / Other Strength) — below the enemy's (enemy - own) x @0xd55ff0, below a target (target - own) / +0xd8, 20 past the enemy a negative term toward the ot..."
   review: imported
@@ -134,6 +146,7 @@
       value: minor 3 Regional 20 / Enemy 30 -> desire 0.5 + 0.2 standing army = 0.7 (AI_Military.csv)
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - ...ives Enemy (+0x3f8) its max and, not a tribe (0x469ce0), raises the floor M (from -0.5, 0xd5fed0) by 0.5 (0xd20458); any other gives Other (+0x458) its max and, flagged at +0xc58, rais...
   review: reviewed
@@ -167,6 +180,7 @@
       value: minor 3 Regional 20 / Enemy 30 -> desire 0.5 + 0.2 standing army = 0.7 (AI_Military.csv)
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...- 20 above Enemy: where Regional + 60 is below Other, (Other - Regional - 60) x 0.025 (0xd6ced0) capped at 2.0, else (Enemy - max(Other - 60, Regional)) x 0.025 capped at 3.0. W below..."
   review: reviewed
@@ -1249,6 +1263,7 @@
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
   review: imported
 - addr: 0xf2e2b8

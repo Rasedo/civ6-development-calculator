@@ -40,13 +40,14 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import { RESOURCES } from '../../world/resources';
 import { axialToOffset, hexDistance, inBounds, neighbors, offsetToAxial, wrapCol } from '../../world/hex';
+import { isCoastalLand } from '../../world/query';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingTable, defaultSpecialization, growthForecast, housingValue, specializationBests, unitTable,
   type CityBuildFacts, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable } from './aiProjectValue';
 import { improvementValue, type PlotValueFacts } from './aiPlotValue';
 import { districtValue, type DistrictValueFacts } from './aiDistrictValue';
 import { resourceValue } from './aiResource';
-import { FX, FX_MIN } from './aiValue';
+import { FX, FX_MIN, fmul, pseudoYieldValue } from './aiValue';
 import {
   buildingEvent, defenseEvent, districtEvent, freeSlots, goalsReached, improvementEvent, newCityAi, pickImprovement, tickCityTrees,
   type CityAi, type CityTreeCity, type CityTreeWorld, type PlotEval, type TreeUnit,
@@ -56,7 +57,7 @@ import { newEconomicMemory, purchaseTurn, purchasePick, savingsTurn, type Purcha
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat } from './operations/cityThreat';
 import { majorView } from './majorView';
-import { minorOpContracts, minorOpLive, minorOpsEvaluate, minorOpsStart } from './minorOps';
+import { minorOpContracts, minorOpLive, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
 import { joinBuilt } from './operations/manager';
 import { minorCity } from './cityStates';
 import { campTiles, civOf, seatOf, tileSeat } from './seats';
@@ -484,6 +485,34 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
   return order.map(([x]) => ({ unit: x.unit, valid: true, rank: x.all, subRank: x.atWar }));
 }
 
+/**
+ * THE STANDING ARMY (0x5ca7e0, the city's full update): its quota, the whole
+ * part of PSEUDOYIELD_STANDING_ARMY_NUMBER (1.0 at a minor's weight) times
+ * the square root of its population (float32, as the game's fixed point);
+ * the minor's combat units outside every running operation fill it (a land
+ * unit, a sea one where the city is coastal; a recon unit not). The count it
+ * lacks (CityBuildAI +0x2d8), which the military AI adds to its Combat
+ * Desire as PSEUDOYIELD_STANDING_ARMY_VALUE each.
+ */
+export function minorStandingArmyShort(state: GameState, cs: CityState): number {
+  if (cs.centerIndex < 0) return 0;
+  const root = Math.fround(Math.sqrt(cs.population));
+  const fl = Math.floor(root);
+  const quota = fmul(pseudoYieldValue(majorView(state), cs.seat, FX, 'PSEUDOYIELD_STANDING_ARMY_NUMBER'),
+    fl * FX + Math.trunc(Math.fround(Math.fround(root - fl) * 256))) >> 8;
+  const busy = new Set(minorOpUnits(cs));
+  const coastal = isCoastalLand(state.map, state.map.tiles[cs.centerIndex]);
+  let held = 0;
+  for (const u of state.units) {
+    if (u.seat !== cs.seat || busy.has(u.id)) continue;
+    const row = AI_UNITS[AI_UNIT_INDEX.get(installType('unit', u.type, 'UNIT_', UNITS)) ?? -1];
+    if (!row || row.civilian || row.recon || Math.max(row.combat, row.rangedCombat, row.bombard) <= 0) continue;
+    if (row.domain !== 'DOMAIN_LAND' && !(row.domain === 'DOMAIN_SEA' && coastal)) continue;
+    held += 1;
+  }
+  return Math.max(0, quota - held);
+}
+
 /** the minor's city threat (0x5cbd10) on its knowledge base's records, with
  *  no operation of its own */
 export function minorThreat(state: GameState, cs: CityState): number {
@@ -529,6 +558,7 @@ export function minorAiTurn(state: GameState, cs: CityState): void {
   const pf = minorPickFacts(state, cs, facts);
   const threat = minorThreat(state, cs);
   cs.threat = threat;
+  cs.standingArmyShort = minorStandingArmyShort(state, cs);
   const evals = minorPlotEvals(state, cs, facts);
   const city = minorTreeCity(state, cs, facts, tables, pf, evals, threat);
   const w = minorTreeWorld(state, cs, ai, city);

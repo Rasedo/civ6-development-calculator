@@ -123,6 +123,7 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...he player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the..."
   context:

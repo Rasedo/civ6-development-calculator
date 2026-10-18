@@ -10,6 +10,7 @@
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - ...ans') -> 0x5f0110. Player signal +0xc0 (0x7874a0) and game signal +0x2e8 (0x7838a0 -> 0x783570) refresh one unit outside the look.
   review: reviewed
@@ -20,6 +21,7 @@
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - ...44 the barbarians') -> 0x5f0110. Player signal +0xc0 (0x7874a0) and game signal +0x2e8 (0x7838a0 -> 0x783570) refresh one unit outside the look.
   review: reviewed
@@ -89,6 +91,7 @@
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "- THE AGEING (0x5ebb30, the first step of the tactical AI's turn 0x785f30 on player signal +0x1f8): every record's age + 1; one whose age before the step was a..."
     - "...877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785f30 and again on player signal +0x228): over every plot the player's visibility count (+0x2..."
@@ -173,6 +176,7 @@
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - ...rbarian camp improvement (plot +0x44 the barbarians') -> 0x5f0110. Player signal +0xc0 (0x7874a0) and game signal +0x2e8 (0x7838a0 -> 0x783570) refresh one unit outside the look.
   review: reviewed
@@ -197,6 +201,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "- THE LOOK (0x7877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785..."
   review: reviewed

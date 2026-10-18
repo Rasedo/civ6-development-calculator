@@ -9,6 +9,7 @@
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...0 — a city -> the known cities (0x5f0280), a district -> 0x5f0490 — each unit on it (0x75ce0's list), one hidden (+0x15f0, not +0x1650) only where 0x5033a0 lets the player see it,..."
   review: reviewed

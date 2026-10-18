@@ -105,6 +105,8 @@ class SimMinorAi:
         b_tab, u_tab, p_tab = self._cv_minor_tables(s, f)
         threat = torch.where(alive, self._minor_threat(s), torch.full_like(self.citystate_threat[:, s], -1))
         self.citystate_threat[:, s] = torch.where(alive, threat, self.citystate_threat[:, s])
+        self.citystate_standing_short[:, s] = torch.where(alive, self._minor_standing_short(s),
+                                                         self.citystate_standing_short[:, s])
         evals = self._minor_plot_evals(s, f)
         w = _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), evals, threat)
         goals_reached(ai, s, w, alive)
@@ -348,8 +350,10 @@ class SimMinorAi:
         training, the players in the game's order — the majors, the
         city-states, the Free Cities, the barbarians (a tribe, always at war)
         — at war where its seat is; on turn 1 it holds no city (the game's
-        city-states found theirs after their military AI's turn). The player
-        flags, a city's threat and its standing-army count read none."""
+        city-states found theirs after their military AI's turn); its city's
+        threat and its standing army's shortfall as its last city update left
+        them (`citystate_threat`, `citystate_standing_short`). The player
+        flags read none."""
         B, dev = self.B, self.device
         alive = self.citystate_alive[:, s]
         if not bool(alive.count_nonzero()):
@@ -391,9 +395,45 @@ class SimMinorAi:
             else:
                 players.append((p, self.war[:, row, int(self._seat_row[p])], False, False))
         zero = torch.zeros(B, dtype=torch.bool, device=dev)
+        threatened = self.citystate_threat[:, s] >= 0
+        each = self._cv_pseudo(torch.full((B,), _FX, dtype=torch.long, device=dev), "PSEUDOYIELD_STANDING_ARMY_VALUE")
+        standing = _fmul(each, self.citystate_standing_short[:, s] * _FX)
         _r, _e, _o, w = self._cv_combat_desire(owner, strength, counted, best, cities, players, 100 + s, queued,
-                                              zero, zero, 0)
+                                              zero, threatened, standing)
         self.citystate_combat_desire[:, s] = torch.where(alive, w, self.citystate_combat_desire[:, s])
+
+    def _minor_standing_short(self, s: int) -> torch.Tensor:
+        """[B] `minorStandingArmyShort` — THE STANDING ARMY of minor `s`'s city
+        (0x5ca7e0, its full update): its quota, the whole part of
+        PSEUDOYIELD_STANDING_ARMY_NUMBER (1.0 at a minor's weight) times the
+        square root of its population (float32, as the game's fixed point);
+        its combat units outside every running operation fill it (a land
+        unit, a sea one where the city is coastal; a recon unit not); the
+        count it lacks (CityBuildAI +0x2d8)"""
+        B, dev = self.B, self.device
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        er = T["engine_row"].to(dev)
+        centre = self.citystate_center[:, s]
+        pop = self.city_pop[:, self._CITY_MINOR0 + s, 0].float()
+        root = torch.sqrt(pop)
+        fl = torch.floor(root)
+        rfx = fl.long() * _FX + torch.trunc((root - fl) * 256).long()
+        one = self._cv_pseudo(torch.full((B,), _FX, dtype=torch.long, device=dev), "PSEUDOYIELD_STANDING_ARMY_NUMBER")
+        quota = torch.div(_fmul(one, rfx), _FX, rounding_mode="floor")
+        coastal = self.coastal_land.gather(1, centre.clamp(min=0).unsqueeze(1)).squeeze(1)
+        land = torch.tensor([r["domain"] == "DOMAIN_LAND" for r in rows] + [False], dtype=torch.bool, device=dev)
+        sea = torch.tensor([r["domain"] == "DOMAIN_SEA" for r in rows] + [False], dtype=torch.bool, device=dev)
+        fights = torch.tensor([not r["civilian"] and not r["recon"]
+                               and max(int(r["combat"]), int(r["rangedCombat"]), int(r["bombard"])) > 0 for r in rows] + [False],
+                              dtype=torch.bool, device=dev)
+        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        ar = er.take(ut)
+        ar = torch.where(ar >= 0, ar, torch.full_like(ar, len(rows)))
+        own = self.major_unit_alive & (self.major_unit_seat == 100 + s) & ~self._mops_busy(s)
+        ok = own & fights.take(ar) & (land.take(ar) | (sea.take(ar) & coastal.unsqueeze(1)))
+        short = (quota - ok.sum(dim=1)).clamp(min=0)
+        return torch.where(centre >= 0, short, torch.zeros_like(short))
 
     def _minor_flood_turns(self) -> torch.Tensor:
         """[B, T] `floodHazardTurns` — THE TURNS THE AI EXPECTS TO A FLOOD of

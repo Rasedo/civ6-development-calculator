@@ -377,6 +377,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   notes: ["label: pseudoYieldValue(out,&amt,pseudo,playerAI,..)"]
   context:
     - ...ds' +0x638, +0x7a8, the +0x6b0 list or +0x6c8); per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 fo...

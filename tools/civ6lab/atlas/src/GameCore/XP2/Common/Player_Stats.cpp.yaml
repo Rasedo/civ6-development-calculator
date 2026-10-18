@@ -64,6 +64,7 @@
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...ke strength (0x207080 → 0x249ee0): max(PlayerStats +0x150, m_iMaxRangedStrengthTrained (0x4bd030), COMBAT_MINIMUM_CITY_STRIKE_STRENGTH 3) plus the city's district attack bonus (+0x1890..."
   review: imported

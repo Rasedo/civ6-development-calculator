@@ -317,6 +317,8 @@ class SimInit:
         self.citystate_threat = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # its military AI's Combat Desire (raw 24.8), its PSEUDOYIELD_UNIT_COMBAT weight
         self.citystate_combat_desire = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # the count its city's standing army lacks (CityBuildAI +0x2d8), set in its city's update
+        self.citystate_standing_short = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         self.citystate_savings = torch.zeros(B, s_pad, len(rules.ai_city_build["savings"]), dtype=torch.long, device=device)
         self.citystate_balance = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # its city AI has run (`CityState.cityAi` made): a city its AI first

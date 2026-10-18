@@ -2521,6 +2521,17 @@
           "note": "the minor's military AI's Combat Desire, its PSEUDOYIELD_UNIT_COMBAT weight, raw 24.8"
         },
         {
+          "name": "minorStandingArmyShort",
+          "compare": "exact",
+          "covers": [
+            "CityState.standingArmyShort"
+          ],
+          "planes": [
+            "citystate_standing_short"
+          ],
+          "note": "the count the minor city's standing army lacks (CityBuildAI +0x2d8)"
+        },
+        {
           "name": "minorSavings",
           "compare": "exact",
           "covers": [

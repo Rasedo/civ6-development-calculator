@@ -5,7 +5,8 @@ city-state its AI's state as the census reads it (the item in hand, its
 progress, plot and kept progress, the overflow store, the turn and value it
 was set, the threat, the savings, the event slots, the trees, the
 contracts, the reservations, the hand and the serials, the treasury, the
-Builders trained, the best melee strength, the Combat Desire), against the
+Builders trained, the best melee strength, the Combat Desire, the standing
+army's shortfall), against the
 pins the TS twin tests/cpu/minors/minor-ai.test.ts holds (minor-ai-pins.json).
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
