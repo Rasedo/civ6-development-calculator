@@ -356,17 +356,22 @@ describe('the danger map and Move to Safety', () => {
 
 // tools/civ6lab/dll_readings.md "C-95: Explore Land and the barbarians' revealed plots"
 describe("the barbarians' revealed plots and Explore Land", () => {
-  it('a camp reveals the plots three round it, and the planning keeps to the revealed', () => {
+  it("a new camp's units' looks reveal round it; the planning enters a plot never revealed and steps on from none", () => {
     const state = land();
     state.fogOfWar = true;
     const camp = tileAtCoords(state.map, 10, 10);
     raiseCamp(state, camp.index);
     const ex = state.barbSeat.explored;
-    expect(ex[tileAtCoords(state.map, 13, 10).index]).toBe(1);
-    expect(ex[tileAtCoords(state.map, 15, 10).index]).toBe(0);
+    for (const t of tilesWithin(state.map, 10, 10, 2)) expect(ex[t.index]).toBe(1);
     const u = state.units.find((x) => x.id === state.barbTribes![0].defender)!;
     turnStart(state);
-    expect(reachPlots(state, u, 2).every((e) => ex[e.tile] === 1)).toBe(true);
+    // the barbarians have revealed the camp's plot and the six beside it alone
+    ex.fill(0);
+    for (const t of tilesWithin(state.map, 10, 10, 1)) ex[t.index] = 1;
+    const reach = reachPlots(state, u, 2);
+    const dist = (p: number) => plotDistance(state, camp.index, p);
+    expect(reach.some((e) => dist(e.tile) === 2)).toBe(true);
+    expect(reach.every((e) => dist(e.tile) <= 2)).toBe(true);
   });
 
   it("an explorer goes to the plot of its reach whose sight takes in the most it never revealed", () => {

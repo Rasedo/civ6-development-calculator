@@ -25,7 +25,7 @@ import { isWater, isImpassable } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
-import { canSee, revealAround, unitSight, unitSeesThrough } from './fog';
+import { canSee, unitSight, unitSeesThrough } from './fog';
 import { spawnUnit, tileFreeForUnit } from './units';
 import { UNITS } from '../data/units';
 import { TECHS } from '../data/techs';
@@ -302,22 +302,17 @@ export function foundTribe(state: GameState, plot: number, name: number): BarbTr
  *  0x84340, a count each through 0x508d50, no line of sight) */
 export const CAMP_SIGHT = 1;
 
-/** the plots round a new camp its player reveals (runs/h1_duelv1124 t1: the
- *  camp at 40:21 lists 38:19, three off, and not 38:18, four off; the
- *  replay's planning rows fit 3 best against 1 and 2) */
-const CAMP_REVEAL = 3;
-
 /**
  * A CAMP RISES (the improvement's arrival, 0x150a30): its tribe, named by
  * "Barb Tribe Roll", raises its defender on the camp and its scouts within
- * three plots (0x147fc0); the barbarians reveal the plots three round it.
+ * three plots (0x147fc0); what the barbarians reveal round it is those
+ * units' looks.
  */
 export function raiseCamp(state: GameState, plot: number): void {
   const def = tribeKindAt(state, plot);
   const names = freeNames(state, def);
   const name = names.length ? names[randRange(state, names.length, 'Barb Tribe Roll')] : 0;
   const tribe = foundTribe(state, plot, name);
-  revealAround(state, BARB_SEAT, plot, CAMP_REVEAL);
   tribe.defender = raise(state, tribe, def.defenderTag, 0, 1)[0];
   tribe.scouts.push(...raise(state, tribe, def.scoutTag, 3, BARB_MAX_SCOUTS));
 }

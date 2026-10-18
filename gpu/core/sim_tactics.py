@@ -427,7 +427,12 @@ class SimTactics:
         full_l = torch.div(f_land[rows, slots] * _FIX, self._mp_scale, rounding_mode="floor")
         full_s = torch.div(f_sea[rows, slots] * _FIX, self._mp_scale, rounding_mode="floor")
         unmoved = mp >= granted
-        land, wat = self._tac_enter(seat, not zoc)
+        land, wat = self._tac_enter(seat, False)
+        # the plots the player revealed (`groundOf`'s known; a path reads
+        # every plot as revealed): one it never revealed is entered, and no
+        # step leaves it but the unit's own
+        known = self._tac_known(seat) if not zoc else None
+        kn_n = known[rows] if known is not None else torch.ones(N, T, dtype=torch.bool, device=dev)
         embarks = self._tac_embarks(rows, utype, seat)
         ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & embarks.unsqueeze(1)))  # [N, T]
         water_n = self.water[rows]
@@ -520,8 +525,9 @@ class SimTactics:
                 found |= hit
                 act &= ~hit
             run &= act
-            # an attack's plot is the path's end: no step leaves it
-            act = act & ~atk_n.gather(1, b1).squeeze(1)
+            # an attack's plot is the path's end: no step leaves it; nor one
+            # the player never revealed but the unit's own
+            act = act & ~atk_n.gather(1, b1).squeeze(1) & (kn_n.gather(1, b1).squeeze(1) | (best == start))
             if not bool(act.count_nonzero()):
                 continue
             bg, bm, bt = g.gather(1, b1), mv.gather(1, b1), tn.gather(1, b1)  # [N, 1]
@@ -579,8 +585,12 @@ class SimTactics:
                 ok = ok & ~cliff6
             if link is not None:
                 link(nbc, best, turns, moves, ok)
-            ends = torch.where(moves <= 0, (tseat[rows.unsqueeze(1), nbc] != seat).long() * 3 + 4, 0)
-            gn = bg + cst * 1000 + (ends + 2) * _FIX
+            # +4 where the step leaves no Movement, +3 more off the unit's
+            # territory on a revealed plot; +2 a revealed plot, +3 an
+            # unrevealed one
+            seen6 = kn_n.gather(1, nbc)
+            ends = torch.where(moves <= 0, ((tseat[rows.unsqueeze(1), nbc] != seat) & seen6).long() * 3 + 4, 0)
+            gn = bg + cst * 1000 + (ends + 3 - seen6.long()) * _FIX
             s0 = st.gather(1, nbc)
             g0 = g.gather(1, nbc)
             t0 = tie.gather(1, nbc)

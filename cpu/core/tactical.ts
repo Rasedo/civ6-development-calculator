@@ -152,8 +152,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const enters = new Map<number, boolean>();
   const zocs = new Map<number, boolean>();
   const ex = seatOf(state, unit.seat)?.explored;
-  // the breadth-first lists keep only the plots the player revealed; a path
-  // (`revealedOnly` false) takes any
+  // the plots the player revealed (node +0x51 bit 0, 0x154c0); a path
+  // (`revealedOnly` false) reads every plot as revealed
   const known = (i: number) => !revealedOnly || !ex || ex.length === 0 || ex[i] === 1;
   const def = UNITS[unit.type];
   const melee = !!def && def.combat > 0;
@@ -170,7 +170,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     enter: (t) => {
       let v = enters.get(t.index);
       if (v === undefined) {
-        enters.set(t.index, (v = known(t.index) && enterable(state, unit, t, foes, embarks)
+        enters.set(t.index, (v = enterable(state, unit, t, foes, embarks)
           && !(minor && majorClosedToMinor(state, unit.seat, t))));
       }
       return v;
@@ -258,8 +258,10 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     }
     best.closed = true;
     if (onClose(best, ground)) break;
-    // an attack's plot is the path's end: no step leaves it
-    if (best.attack) continue;
+    // an attack's plot is the path's end: no step leaves it; nor one the
+    // player never revealed but the unit's own (0x2720a0 under the search's
+    // flag 1: the parent unrevealed)
+    if (best.attack || (best !== start && !ground.known(best.tile))) continue;
     const from = map.tiles[best.tile];
     for (let di = 0; di < DIRECTION_TYPES.length; di++) {
       const d = DIRECTION_TYPES[di];
@@ -299,8 +301,12 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // against the stacking limit)
       if (zoc && turns > best.turns && ground.full(best.tile)) continue;
       onLink?.(to.index, best.tile, turns, moves, attack);
-      const ends = moves <= 0 ? 4 + (tileSeat(to) !== unit.seat ? 3 : 0) : 0;
-      const g = best.g + cost * 1000 + (ends + 2) * FIX;
+      // the cost (0x270dd0): +4 where the step leaves no Movement, +3 more
+      // off the unit's territory on a revealed plot; +2 a revealed plot, +3
+      // an unrevealed one
+      const seen = ground.known(to.index);
+      const ends = moves <= 0 ? 4 + (seen && tileSeat(to) !== unit.seat ? 3 : 0) : 0;
+      const g = best.g + cost * 1000 + (ends + (seen ? 2 : 3)) * FIX;
       const c = nodes.get(to.index);
       if (!c) {
         const n: PNode = { tile: to.index, g, tie: 0, moves, turns, closed: false, parent: best, attack };
@@ -2193,7 +2199,7 @@ function alternateLocation(state: GameState, unit: Unit, plot: number, range: nu
       if (n > range) continue;
       const [c, r] = axialToOffset(q0 + dx, r0 + dy);
       const t = tileAt(map, c, r);
-      if (!t || !ground.enter(t)) continue;
+      if (!t || !ground.known(t.index) || !ground.enter(t)) continue;
       if (state.units.some((o) => o !== unit && o.tileIndex === t.index && onMap(o)
         && (o.seat !== unit.seat || unitDomain(o.type) === dom))) continue;
       let score = plotDistance(state, plot, t.index);

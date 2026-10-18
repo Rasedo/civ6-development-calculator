@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 
-# the plots round a new camp the barbarians reveal (`CAMP_REVEAL`)
-_CAMP_REVEAL = 3
 # a camp's sight (`CAMP_SIGHT`): its owner sees its plot and the six beside it
 _CAMP_SIGHT = 1
 
@@ -227,11 +225,11 @@ class SimBarb:
         return k
 
     def _barb_raise_camp(self, mask: torch.Tensor, plot: torch.Tensor) -> None:
-        """`raiseCamp`: the barbarians reveal the plots three round the camp;
-        the camp's tribe, named by "Barb Tribe Roll" over the
+        """`raiseCamp`: the camp's tribe, named by "Barb Tribe Roll" over the
         kind's names no tribe took (else those only dead tribes took), raises
         its defender on the camp (`tribe_defender`) and its scouts within
-        three plots."""
+        three plots; what the barbarians reveal round it is those units'
+        looks."""
         if not bool(mask.count_nonzero()):
             return
         kind = self._barb_tribe_kind(plot)
@@ -250,9 +248,6 @@ class SimBarb:
         pick = (pool.long().cumsum(dim=1) == (roll + 1).unsqueeze(1)) & pool
         name = torch.where(cnt > 0, pick.long().argmax(dim=1), torch.zeros_like(cnt))
         k = self._barb_found_tribe(mask, plot, kind, name)
-        # the barbarians reveal the plots three round the camp
-        rows = mask.nonzero(as_tuple=True)[0]
-        self._barb_reveal(rows, plot[rows], _CAMP_REVEAL)
         tr = self._bb["tribes"]
         dtag = torch.tensor([r[8] for r in tr], dtype=torch.long, device=self.device).take(kind)
         stag = torch.tensor([r[5] for r in tr], dtype=torch.long, device=self.device).take(kind)

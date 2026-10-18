@@ -5100,10 +5100,12 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   barbarians' Quadrireme and Galley beside Longxi in the danger map). With them
   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->
   758 of 1,241, the game's plots within ours 862 -> 1,192.
-- The reach leaves out the plots the player never revealed (the game's
-  lists drop them; a camp reveals three plots round it: 1124 t1, the camp at
-  40:21 lists 38:19 at distance 3 and not 38:18 at 4): "C-95: Explore Land
-  and the barbarians' revealed plots".
+- A plot the player never revealed is the reach's leaf (READ): the
+  validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose
+  parent is not revealed (node +0x51 bit 0) unless the parent is the unit's
+  own plot (0x272618..0x272635), so such a plot is entered and listed but
+  nothing leaves it: "C-95: Explore Land and the barbarians' revealed
+  plots".
 - THE TARGET LIST (0x783980): the plots in index order, a plot the player
   sees (the word plane +0x290 > 0) giving, by its district (0x810d0): the
   player's own a FRIENDLY_CITY; a player's at war (0x469cd0) a COMBAT_DISTRICT
@@ -5372,11 +5374,15 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
 `exploreLand`, `exploreTarget`, `exploreOk` in cpu/core/tactical.ts; `_tac_explore`, `_tac_explore_ok`, `_tac_explore_region` in gpu/core/sim_tactics.py; the revealed plots in cpu/core/fog.ts `revealAround` / gpu `_barb_reveal` (`barb_explored`).
 
 - THE REVEALED PLOTS (the player's +0x2f0, read by 0x154c0): the
-  barbarians' units' looks (each step's, a new unit's) and a new camp's
-  three plots round it. The planning's breadth-first lists keep to them
-  (`groundOf`'s known for a search without zones of control); a path (the
-  move order's pathfinder) takes any plot. A plot only revealed gives the
-  target list its districts, camp, goody hut, improvement.
+  barbarians' units' looks (each step's, a new unit's: a new camp's defender
+  and scouts look from their plots). In the planning's breadth-first lists
+  (`groundOf`'s known for a search without zones of control) a plot not
+  revealed is entered and never left (0x2720a0, flag 1: the parent
+  unrevealed and not the unit's plot refuses the step), its step costing +3
+  where a revealed plot's costs +2 and no +3 off the territory (0x270dd0);
+  a path (the move order's pathfinder) reads every plot as revealed. A plot
+  only revealed gives the target list its districts, camp, goody hut,
+  improvement.
 - THE WRITERS (READ): the reveal 0x50d390 is reached from the visibility
   count change 0x508d50 alone for a barbarian (0x508330 is the diplomatic
   sharing, 0x50ccc0 the war / peace one, 0x50d080 RevealAllPlots and the
@@ -5388,12 +5394,14 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   operations. A camp's placement (0x150a30) passes the barbarian player as
   the improvement's owner, so a camp gives its plot and ring 1 to the
   barbarians' sight as long as it stands (ported: `plotsSeenNow` /
-  `_barb_seen`, `CAMP_SIGHT`). Nothing in the camp's arrival reveals three
-  plots round it: the radius 3 the engines keep (`CAMP_REVEAL`) is the fit
-  — in the replay's planning classifier (1124 t1-60) radius 3 leaves 123
-  unrevealed plots the game lists against 299-303 at radius 1 or 2 — whose
-  writer is unread (the camp's units' looks from their record plots are
-  the candidate).
+  `_barb_seen`, `CAMP_SIGHT`). Nothing in the camp's arrival reveals more:
+  the plots the game lists three round a new camp are the unrevealed
+  leaves past its units' looks. Case (runs/h1_duelw1124, planning rows
+  t1-60, inside the replay): of the 123 plots the game listed that the
+  barbarians had not revealed, every one lies beside a revealed plot and
+  none within two of a recorded barbarian look (plot or step) on 9 of the
+  10 traced; with the leaf rule and no camp reveal 23 remain, the rows
+  reproduced exactly 792 -> 822 of 1,276 (radius 1, 2 or none the same).
 - EXPLORE LAND (0x70ce90): up to three rounds over the homeland's units;
   each unit not done (+0x770) with Movement left (+0xdb0), of AI type
   EXPLORE (+0x1c0 == 2), its damage at most half its health (0x56e0d0 >>
