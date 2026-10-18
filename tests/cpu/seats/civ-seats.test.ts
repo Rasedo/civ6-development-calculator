@@ -415,7 +415,8 @@ describe('determinism', () => {
       endTurn(a);
       endTurn(b);
     }
-    expect(serialize(a)).toBe(serialize(b));
+    // the saved games' content, not their key order (a key cleared and set again lands last)
+    expect(JSON.parse(serialize(a))).toEqual(JSON.parse(serialize(b)));
   }, 60000);
 });
 
