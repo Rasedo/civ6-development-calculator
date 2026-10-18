@@ -637,7 +637,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const trainable = new Set(trainableUnits(state, i, c).map((d) => gameTypeOf('unit', d.id, 'UNIT_')));
       const prod = Math.max(1, computeCityStats(state, c).total.production);
       return {
-        id: c.id, underThreat: false, current, productionTurn: -1, currentValue: 0,
+        id: c.id, underThreat: false, current, foundedTurn: c.foundedTurn, currentValue: 0,
         buildingBlocked: () => false, districtBlocked: () => false,
         canTrain: (u) => trainable.has(u),
         trainsSea: [...trainable].some((u) => !!UNITS[engineId('unit', u, 'UNIT_', UNITS) ?? '']?.naval),

@@ -85,6 +85,8 @@ let contractSerial = 1;
 let treeSerial = 1;
 /** the turn the city's current item was set and its value (from the lines) */
 const setTurn = new Map<number, { turn: number; value: number }>();
+// each city-state's founding turn: the first turn its city stands in the walk
+const founded = new Map<number, number>();
 
 interface Tally { log: number; ours: number; both: number; miss: string[] }
 const tally = new Map<string, Tally>();
@@ -237,6 +239,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     const pfAi: PickFacts = { ...pf, buildingHeld: (bt) => current?.building === bt || heldTypes.includes(bt) };
     for (const l of log) if (l.kind === 'pick' || l.kind === 'queued') setTurn.set(player, { turn, value: Math.round((l.value ?? 0) * FX) });
     const set = setTurn.get(player) ?? { turn: -99, value: FX_MIN };
+    if (!founded.has(player)) founded.set(player, turn);
     // the research as the AI acts: the record before the turn's, and the tech
     // or civic it was researching where the record after holds it (the
     // player's turn start completes it before the AI acts; one a boost
@@ -251,7 +254,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
       tech: rb.tech === null ? null : techOf(rb.tech), civic: rb.civic === null ? null : civicOf(rb.civic),
     };
     const cityFacts: CityTreeCity = {
-      id: cityId, underThreat: false, current, productionTurn: set.turn, currentValue: set.value,
+      id: cityId, underThreat: false, current, foundedTurn: founded.get(player)!, currentValue: set.value,
       // CanConstruct refuses for good a building the city holds and a
       // district it had completed as the turn began
       buildingBlocked: (bt) => heldTypes.includes(bt),

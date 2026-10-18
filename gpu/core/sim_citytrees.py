@@ -354,14 +354,14 @@ def contract_evaluate(ai: CityAi, s: int, j: torch.Tensor, w, mask: torch.Tensor
 def submit_contract(ai: CityAi, s: int, j: torch.Tensor, w, turn: int, mask: torch.Tensor) -> None:
     """`submitContract` where `mask`: SUBMITTED; the seat's city lists it
     where it may take it, clearing its production where the contract's value
-    passes the item's it set this turn or the one before; any taker (the
+    passes the item's in a city founded this turn or the one before; any taker (the
     city, the economic AI's gold purchase) makes it ACCEPTED"""
     _cset(ai.c_progress, s, j, CP_SUBMITTED, mask)
     unit, bld, dist = _cget(ai.c_unit, s, j), _cget(ai.c_building, s, j), _cget(ai.c_district, s, j)
     taken = gold_purchasable(ai, unit, bld, dist)
     el = mask & contract_eligible(ai, s, j, w)
     _cset(ai.c_listed, s, j, True, el)
-    clear = el & (_cget(ai.c_value, s, j) > _l(w.current_value(), j)) & (_l(w.production_turn(), j) + 1 >= turn)
+    clear = el & (_cget(ai.c_value, s, j) > _l(w.current_value(), j)) & (_l(w.founded_turn(), j) + 1 >= turn)
     if bool(clear.any()):
         w.clear_production(clear)
     taken = mask & (taken | el)

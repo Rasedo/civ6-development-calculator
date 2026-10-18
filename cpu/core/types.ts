@@ -1168,15 +1168,17 @@ export interface CityState extends Seat {
   /** the item in hand (`minorItemKey`), its progress, the progress kept on
    *  each item it switched away from, and the overflow store a completion or
    *  an idle step leaves for the next step (`minorBuild`); a district's plot
-   *  (`prodSite`); the turn its AI set the item and the item's value then
-   *  (city +0x2600, CityBuildAI +0xa48, `minorAiTurn`). */
+   *  (`prodSite`); the item's value as its AI set it (CityBuildAI +0xa48,
+   *  `minorAiTurn`). */
   prodItem?: string;
   prodProgress?: number;
   prodRetained?: Record<string, number>;
   prodOverflow?: number;
   prodSite?: number;
-  prodSetTurn?: number;
   prodSetValue?: number;
+  /** the turn its city was founded (city +0x2600, m_iTurnFounded); absent
+   *  for a city a record's import finds standing */
+  foundedTurn?: number;
   /** its city AI (`minorAiTurn`): the events' slots, the trees, the
    *  contracts and reservations (`CityAi`), the Economic AI's savings
    *  (`EconomicMemory`), the city's threat (CityBuildAI +0x1b8, -1 none) */

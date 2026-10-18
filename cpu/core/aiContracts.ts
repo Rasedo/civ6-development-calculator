@@ -70,8 +70,8 @@ export interface ContractCity {
   underThreat: boolean;
   /** the item the city produces (its queue head, city +0x2170), null none */
   current: ContractItem | null;
-  /** the turn the city last set its production (city +0x2600) */
-  productionTurn: number;
+  /** the turn the city was founded (city +0x2600, m_iTurnFounded) */
+  foundedTurn: number;
   /** the value of the item the city produces (CityBuildAI +0xa48), raw */
   currentValue: number;
   /** CanConstruct (0x170450) of a building refuses it for good: its
@@ -188,8 +188,9 @@ export function goldPurchasable(c: ContractItem): boolean {
 /** the contract submitted (0x60bb50): SUBMITTED; the player's signal
  *  +0x270 runs every listener: each city's (0x5d6050), in city order — a
  *  city that may take it lists it and logs its line, and where its value
- *  passes the value of the item the city produces, an item set this turn or
- *  the one before, clears the city's production — and the economic AI's
+ *  passes the value of the item the city produces in a city founded this
+ *  turn or the one before (city +0x2600, runs/h1_duelw1117 Caguana t34: its
+ *  Warrior kept under the Harbor contract), clears the city's production — and the economic AI's
  *  (goldPurchasable; a city-state's too: AI_CityBuild.csv's PURCHASE lines
  *  of players 2+); any taker makes it ACCEPTED */
 export function submitContract(book: ContractBook, c: AiContract, cities: readonly ContractCity[], turn: number,
@@ -201,7 +202,7 @@ export function submitContract(book: ContractBook, c: AiContract, cities: readon
     if (!contractEligible(c, city)) continue;
     (book.city[city.id] ??= []).push(c.id);
     line(city, c);
-    if (c.value > city.currentValue && city.productionTurn + 1 >= turn) clearProduction(city);
+    if (c.value > city.currentValue && city.foundedTurn + 1 >= turn) clearProduction(city);
     taken = true;
   }
   if (taken) c.progress = CP_ACCEPTED;

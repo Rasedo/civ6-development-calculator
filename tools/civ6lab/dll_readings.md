@@ -4325,7 +4325,13 @@ operations' contracts, the improvement values below, the purchases).
   runs each city's listener 0x5d6050 in city order: a city that may take
   it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and
   clears its production (0x175d10) where the value passes CityBuildAI
-  +0xa48 and the production was set this turn or the last (city +0x2600);
+  +0xa48 and the city was founded this turn or the last (city +0x2600 + 1
+  >= the game turn; +0x2600 is m_iTurnFounded, the field 0x8ea750's
+  CitiesFounded / TurnFounded reads: runs/h1_duelw1117 Caguana t34 keeps
+  the Warrior its Default Specialization set at t33 under the Harbor
+  contract at 40.0, the Warrior done at t35; Valletta's Monument of its
+  founding turn t1 cleared by the Builder contract at t2; Bologna's of t1
+  kept at t3);
   the economic AI's listener 0x68ab40 takes a unit or building contract
   it may buy with gold; any taker makes it ACCEPTED (SUBMITTED lines 259
   exact before the economic AI's listener, 283 with it; queue lines 133,

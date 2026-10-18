@@ -1644,12 +1644,13 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     // which runs no events and picks the Default Specialization. A minor's founding lands after the
     // engine's turn (its player is never the active one), the clock already
     // on the record's next turn: that turn stamps the founding turn's, the
-    // item's set turn first among them (runs/h1_duelw1124 Bologna:
+    // city's founding turn first among them (runs/h1_duelw1124 Bologna:
     // AI_CityBuild.csv's Default Specialization Monument at t1, the Builder
     // contract at t3 clearing none of it). The city's boosts land on the
     // founding turn too (runs/h1_duelv1117: a coastal minor's Sailing
     // BOOSTED at 7 turns in AI_Research.csv from t2)
     state.turn -= 1;
+    placed.foundedTurn = state.turn;
     try {
       minorResearch(state, placed.research, placed.seat, 0, 0, () => undefined, () => undefined, []);
       placed.combatDesire = minorCombatDesire(state, placed, state.turn - 1).desire;
@@ -2827,7 +2828,7 @@ function minorBuilds(ctx: Ctx, b: TurnRecord, tally: MinorBuildTally): void {
       const pid = ctx.playerOfSeat.get(cs.seat) ?? -1;
       const pl = b.players.find((q) => q.id === pid);
       const bits = (s: string | undefined) => [...(s ?? '')].filter((x) => x === '1').length;
-      console.error('ROW ' + JSON.stringify({ t: b.turn, p: pid, name: cs.name, ours, record, set: cs.prodSetTurn ?? -1, val: cs.prodSetValue ?? null,
+      console.error('ROW ' + JSON.stringify({ t: b.turn, p: pid, name: cs.name, ours, record, val: cs.prodSetValue ?? null,
         prog: Math.round(cs.prodProgress ?? 0), rprog: Math.round(Number(c?.queueProgress?.[0] ?? 0)),
         pop: cs.population, rpop: c?.pop, bld: (cs.buildings ?? []).length, rbld: c?.buildings.length,
         dis: (cs.districts ?? []).length, rdis: c?.districts.length,

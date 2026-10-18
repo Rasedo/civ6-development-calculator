@@ -308,11 +308,12 @@ class SimInit:
         self.citystate_prod = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_builders_trained = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # its city AI (`minorAiTurn`): the plot of its district in hand (-1),
-        # the turn its AI set the item (-99 never) and the item's value then
+        # the item's value as its AI set it
         # (raw 24.8), its city's threat (-1 none), the Economic AI's savings
         # slots and last balance (raw 24.8)
         self.citystate_prod_site = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
-        self.citystate_prod_set_turn = torch.full((B, s_pad), -99, dtype=torch.long, device=device)
+        # the turn its city was founded (city +0x2600), -99 none
+        self.citystate_founded_turn = torch.full((B, s_pad), -99, dtype=torch.long, device=device)
         self.citystate_prod_set_value = torch.full((B, s_pad), -9999 * 256, dtype=torch.long, device=device)
         self.citystate_threat = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # its city's growth as its city AI's update read it between the
@@ -404,6 +405,7 @@ class SimInit:
                 self.citystate_pop[b, s] = cs["pop"]
                 self.citystate_suz_code[b, s] = cs.get("suzCode", -1)
                 self.citystate_suz_imp[b, s] = cs.get("suzImp", -1)
+                self.citystate_founded_turn[b, s] = cs["foundedTurn"]
         # A city-state's tile ownership lives in `tile_seat` (seeded below off
         # the wire's `ownerSeatInit` plane); `citystate_at` is a derived view.
         # The (seat, city-state) relations live on `seat_citystate_*`

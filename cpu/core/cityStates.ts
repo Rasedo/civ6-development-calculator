@@ -38,6 +38,7 @@ export function placeCityStateAt(
     name,
     type,
     centerIndex,
+    foundedTurn: state.turn,
     population: 1,
     unconvertedPressure: ATHEISM_PRESSURE_PER_POP,
     envoys: {},

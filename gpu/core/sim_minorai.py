@@ -150,7 +150,6 @@ class SimMinorAi:
             q = queue_contract(ai, s, hand, w, ok, take)
             if bool(q.count_nonzero()):
                 self._minor_set_item(s, q, key, site)
-                self.citystate_prod_set_turn[:, s] = torch.where(q, int(self.turn), self.citystate_prod_set_turn[:, s])
                 self.citystate_prod_set_value[:, s] = torch.where(q, _cget(ai.c_value, s, hand), self.citystate_prod_set_value[:, s])
             rest = idle & ~take
             ai.in_hand[:, s] = torch.where(rest, -1, ai.in_hand[:, s])
@@ -160,7 +159,6 @@ class SimMinorAi:
                 ok2 = rest & (pkey >= 0) & self._minor_queue_ok(s, pkey, torch.full_like(pkey, -1))
                 if bool(ok2.count_nonzero()):
                     self._minor_set_item(s, ok2, pkey, torch.full_like(pkey, -1))
-                    self.citystate_prod_set_turn[:, s] = torch.where(ok2, int(self.turn), self.citystate_prod_set_turn[:, s])
                     self.citystate_prod_set_value[:, s] = torch.where(ok2, val, self.citystate_prod_set_value[:, s])
         # the purchases: a threatened city buys its list's first unit while it may
         buy = alive & (threat > -1)
@@ -1392,8 +1390,8 @@ class _MinorWorld:
     def cur_district(self):
         return self._current_rows()[2]
 
-    def production_turn(self):
-        return self.sim.citystate_prod_set_turn[:, self.s]
+    def founded_turn(self):
+        return self.sim.citystate_founded_turn[:, self.s]
 
     def current_value(self):
         return self.sim.citystate_prod_set_value[:, self.s]

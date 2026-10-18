@@ -53,6 +53,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     center: cityState.centerIndex,
     pop: cityState.population,
     suzCode: suzCodeOf(cityState.name),
+    foundedTurn: cityState.foundedTurn ?? -99,
     // the IMPROVEMENT this minor's suzerain may build, by roster index. The
     // catalog names the minor and the seeder draws which minors a map holds,
     // so the pairing can only be resolved here, per game.

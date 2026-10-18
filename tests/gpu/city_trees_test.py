@@ -66,7 +66,7 @@ class Game:
         self.current = None  # (unit, building, district, plot)
         self.left = 0
         self.cleared = 0
-        self.production_turn = -99
+        self.founded_turn = -99
         self.current_value = FX_MIN
         self.researching = None
         self.spent: set[int] = set()
@@ -135,8 +135,8 @@ class World:
     def cur_district(self):
         return self._cur(2)
 
-    def production_turn(self):
-        return torch.tensor([g.production_turn for g in self.g], dtype=L)
+    def founded_turn(self):
+        return torch.tensor([g.founded_turn for g in self.g], dtype=L)
 
     def current_value(self):
         return torch.tensor([g.current_value for g in self.g], dtype=L)
@@ -369,7 +369,6 @@ def run(rules) -> list:
             if bool(q[b]):
                 g.current = (int(cu[b]), int(cb[b]), int(cd[b]), int(cp[b]))
                 g.left = SC["buildTurns"]
-                g.production_turn = t
                 g.current_value = int(ai.c_value[b, s, int(hand[b])])
         w = World(T, games, t)
         tick_city_trees(ai, s, w, t, allm)

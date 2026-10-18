@@ -98,6 +98,8 @@ let contractSerial = 1;
 let treeSerial = 1;
 /** the turn each city's current item was set and its value (from the lines) */
 const setTurn = new Map<string, { turn: number; value: number }>();
+// each city's founding turn: the first turn it stands in the walk
+const founded = new Map<string, number>();
 
 interface Tally { log: number; ours: number; both: number; miss: string[] }
 const tally = new Map<string, Tally>();
@@ -273,8 +275,9 @@ for (let i = 0; i + 1 < recs.length; i++) {
       const pfAi: PickFacts = { ...pf, buildingHeld: (bt) => current?.building === bt || heldTypes.includes(bt) };
       for (const l of cityLog) if (l.kind === 'pick' || l.kind === 'queued') setTurn.set(`${p.id}:${name}`, { turn, value: Math.round((l.value ?? 0) * FX) });
       const set = setTurn.get(`${p.id}:${name}`) ?? { turn: -99, value: FX_MIN };
+      if (!founded.has(`${p.id}:${name}`)) founded.set(`${p.id}:${name}`, turn);
       const cf: CityTreeCity = {
-        id: city.id, underThreat: false, current, productionTurn: set.turn, currentValue: set.value,
+        id: city.id, underThreat: false, current, foundedTurn: founded.get(`${p.id}:${name}`)!, currentValue: set.value,
         buildingBlocked: (bt) => heldTypes.includes(bt),
         districtBlocked: (d) => (prior?.districts ?? []).some((x) => typeOf('district', x.type) === d && before.state.map.tiles[x.tileIndex].districtComplete),
         canTrain: (u) => pf.canTrain(u) && !AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some((x) => research.techs.includes(x) || research.civics.includes(x)),

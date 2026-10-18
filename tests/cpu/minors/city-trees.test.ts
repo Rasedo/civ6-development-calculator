@@ -64,7 +64,7 @@ function runScenario(sc: Scenario, variant: { ties: number[] }): unknown[] {
   let cleared = 0;
   const out: unknown[] = [];
   const city: CityTreeCity = {
-    id: sc.city, name: 'X', underThreat: false, current: null, productionTurn: -99, currentValue: FX_MIN,
+    id: sc.city, name: 'X', underThreat: false, current: null, foundedTurn: -99, currentValue: FX_MIN,
     buildingBlocked: (b) => held.includes(b),
     districtBlocked: (d) => placed.some((x) => x.district === d),
     canTrain: () => true, trainsSea: false,
@@ -171,7 +171,6 @@ function runScenario(sc: Scenario, variant: { ties: number[] }): unknown[] {
           current = { unit: hand.unit, building: hand.building, district: hand.district, plot: hand.plot };
           left = sc.buildTurns;
           city.current = { unit: hand.unit, building: hand.building, district: hand.district };
-          city.productionTurn = t;
           city.currentValue = hand.value;
         }
       } else ai.inHand[sc.city] = -1;

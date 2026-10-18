@@ -530,7 +530,6 @@ def test_the_city_ai(rules, path) -> None:
     sim._minor_ai_turn(s)
     got = int(sim.citystate_item[B0, s])
     assert got == want, f"the AI queued item {got}, its pick is {want}"
-    assert int(sim.citystate_prod_set_turn[B0, s]) == int(sim.turn)
     assert int(sim.citystate_prod_set_value[B0, s]) == int(val[B0])
     # a city its AI first sees this turn runs no events
     sim = build(rules, path)

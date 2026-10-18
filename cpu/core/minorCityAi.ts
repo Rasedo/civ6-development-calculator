@@ -366,7 +366,7 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
   return {
     id: city.id, name: cs.name, underThreat: threat > -1,
     current: currentItem(cs),
-    productionTurn: cs.prodSetTurn ?? -99,
+    foundedTurn: cs.foundedTurn ?? -99,
     currentValue: cs.prodSetValue ?? FX_MIN,
     // CanConstruct refuses for good a building the city holds, a district it
     // holds complete
@@ -715,7 +715,6 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
       const queued = queueContract(hand, city, () => !!item && minorQueueOk(state, cs, item), () => undefined);
       if (queued && item) {
         minorSetItem(state, cs, item);
-        cs.prodSetTurn = state.turn;
         cs.prodSetValue = hand.value;
       }
     } else {
@@ -724,12 +723,10 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
       const item = pick ? minorItemOfType(pick.type) : null;
       if (pick && item && minorQueueOk(state, cs, item)) {
         minorSetItem(state, cs, item);
-        cs.prodSetTurn = state.turn;
         cs.prodSetValue = pick.value;
       }
     }
     city.current = currentItem(cs);
-    city.productionTurn = cs.prodSetTurn ?? -99;
     city.currentValue = cs.prodSetValue ?? FX_MIN;
   }
   // the purchases: a threatened city buys its list's first unit while it may

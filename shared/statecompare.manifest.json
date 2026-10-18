@@ -2497,14 +2497,23 @@
           "name": "minorProdSet",
           "compare": "exact",
           "covers": [
-            "CityState.prodSetTurn",
             "CityState.prodSetValue"
           ],
           "planes": [
-            "citystate_prod_set_turn",
             "citystate_prod_set_value"
           ],
-          "note": "the turn the minor's AI set its item and the item's value then, raw 24.8 (city +0x2600, CityBuildAI +0xa48); -99 and FX(-9999) before its first"
+          "note": "the item's value as the minor's AI set it, raw 24.8 (CityBuildAI +0xa48); FX(-9999) before its first"
+        },
+        {
+          "name": "minorFounded",
+          "compare": "exact",
+          "covers": [
+            "CityState.foundedTurn"
+          ],
+          "planes": [
+            "citystate_founded_turn"
+          ],
+          "note": "the turn the minor's city was founded (city +0x2600, m_iTurnFounded); -99 for none"
         },
         {
           "name": "minorThreat",

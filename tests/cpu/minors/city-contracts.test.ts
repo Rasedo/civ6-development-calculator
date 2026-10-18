@@ -13,7 +13,7 @@ import { AI_IMPROVEMENTS } from '../../../cpu/data/aiBuildTables';
 import { FX, FX_MIN } from '../../../cpu/core/aiValue';
 
 const city = (over: Partial<ContractCity> = {}): ContractCity => ({
-  id: 7, underThreat: false, current: null, productionTurn: -99, currentValue: FX_MIN,
+  id: 7, underThreat: false, current: null, foundedTurn: -99, currentValue: FX_MIN,
   buildingBlocked: () => false, districtBlocked: () => false, canTrain: () => true, trainsSea: false,
   buildTurns: () => 5, itemValue: () => FX_MIN,
   unitRow: (u) => ({ combat: u === 'UNIT_BUILDER' ? 0 : 20, buildCharges: u === 'UNIT_BUILDER' ? 3 : 0, sea: false, mustPurchase: false, recon: false }),
@@ -41,18 +41,18 @@ describe('the contracts (Contracts.cpp)', () => {
     expect(contractEligible(c, city({ current: { unit: null, building: 'BUILDING_GRANARY', district: null } }))).toBe(false);
   });
 
-  it('submission: each city that may take it lists it, logs it, and clears a production set this turn or the last one', () => {
+  it('submission: each city that may take it lists it, logs it, and clears the production of a city founded this turn or the last one', () => {
     const book = newContractBook();
     const c = contract();
     const cleared: number[] = [];
     const lines: string[] = [];
-    submitContract(book, c, [city({ productionTurn: 9, currentValue: 10 * FX })], 10, (x) => cleared.push(x.id), (x) => lines.push(String(x.id)));
+    submitContract(book, c, [city({ foundedTurn: 9, currentValue: 10 * FX })], 10, (x) => cleared.push(x.id), (x) => lines.push(String(x.id)));
     expect(c.progress).toBe(CP_ACCEPTED);
     expect(book.city[7]).toEqual([1]);
     expect(lines).toEqual(['7']);
     expect(cleared).toEqual([7]);
     const d = contract({ id: 2 });
-    submitContract(book, d, [city({ productionTurn: 8, currentValue: 10 * FX })], 10, (x) => cleared.push(x.id), () => undefined);
+    submitContract(book, d, [city({ foundedTurn: 8, currentValue: 10 * FX })], 10, (x) => cleared.push(x.id), () => undefined);
     expect(cleared).toEqual([7]);
   });
 
