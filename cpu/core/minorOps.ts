@@ -22,16 +22,16 @@ import type { ArmyRecord, CityState, GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { majorView } from './majorView';
-import { cityStateTactics, passFinish, type Pass } from './tactical';
+import { cityStateTactics, passFinish, plotDistance, type Pass } from './tactical';
 import { passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { lookCamps, type KnownUnit } from './operations/knowledge';
-import { opUnits } from './operations/operation';
+import { NO_PLOT, opDef, opUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
 import { installType, minorSetItem } from './minorBuild';
 import { minorContractCity } from './minorCityAi';
-import { campTiles } from './seats';
+import { BARB_SEAT, campTiles } from './seats';
 import { cityStateSight } from './fog';
 import type { ContractCity } from './aiContracts';
 import type { UnitProductionRow } from './aiUnitProduction';
@@ -148,6 +148,17 @@ export const minorOpLive = (cs: CityState, id: number): boolean => !!cs.ops && o
 
 /** the contracts the minor's running operations hold */
 export const minorOpContracts = (cs: CityState): number[] => (cs.ops ? opContracts(cs.ops) : []);
+
+/** a running operation of the minor against `player` whose target lies
+ *  within `dist` of `plot` (0x723cf0, not asked ready: its enemy op +0x2a0
+ *  the player) — a camp's operation against the barbarians, whose city
+ *  threat the game holds back while it runs (runs/h1_duelw1117-1128: of the
+ *  28 Attack Barb Camp completions 10 the turn City Defense starts) */
+export function minorOpNear(state: GameState, cs: CityState, player: number, plot: number, dist: number): boolean {
+  if (!cs.ops) return false;
+  return opsOf(cs.ops).some((o) => (o.enemy === player || (player === BARB_SEAT && opDef(o).targetType === 'TARGET_BARBARIAN_CAMP'))
+    && o.target !== NO_PLOT && plotDistance(state, o.target, plot) <= dist);
+}
 
 /** the units the minor's running operations hold */
 export const minorOpUnits = (cs: CityState): number[] => (cs.ops ? opsOf(cs.ops).flatMap(opUnits) : []);

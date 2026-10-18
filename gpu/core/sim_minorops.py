@@ -70,6 +70,7 @@ class MinorOpsTables:
         self.defs = list(ao["defs"])
         self.names = [d["name"] for d in self.defs]
         self.d_abc = self.names.index("Attack Barb Camp")
+        self.d_boost = self.names.index("Barb Camp Tech Boost")
         self.d_cd = self.names.index("City Defense")
         self.teams = {k: list(ao["teams"][d["name"]]) for k, d in enumerate(self.defs)}
         self.reqs = {t: list(r) for t, r in ao["reqs"].items()}

@@ -213,8 +213,10 @@ class SimMinorAi:
         Bombard unit counts, a ranged one above the defense less 15, any above
         the defense less 5; never an explorer); at the city's defense plus
         the margin (5.0 hostile, else 20.0 or the city's strength) the city
-        is threatened: 2 hostile, 1 not. The first such player decides; -1
-        none."""
+        is threatened at its level (`threatLevel`: 2, 3 above two districts
+        the centre included; +2 its capital, the city-state's one city
+        holding the Palace; no wonder; + its citizens / 5), at most 1 not
+        hostile. The first such player decides; -1 none."""
         B, dev = self.B, self.device
         row = self._CITY_MINOR0 + s
         T = self._cv_tables()
@@ -244,6 +246,21 @@ class SimMinorAi:
         centre = self.citystate_center[:, s].clamp(min=0)
         dist = self.pair_dist[centre.unsqueeze(1), plot.clamp(min=0)].long()
         out = torch.full((B,), -1, dtype=torch.long, device=dev)
+        # an undamaged city with a running camp operation of the minor whose
+        # target lies within 5 holds the barbarians back (0x723cf0,
+        # `minorOpNear`)
+        Tm = self._mops_tables()
+        camp_ops = torch.zeros(B, dtype=torch.bool, device=dev)
+        for k in range(self.mops_def.shape[2]):
+            dk = self.mops_def[:, s, k]
+            tk = self.mops_target[:, s, k]
+            camp = (dk == Tm.d_abc) | (dk == Tm.d_boost)
+            near = self.pair_dist[centre, tk.clamp(min=0)].long() <= 5
+            camp_ops |= camp & (tk >= 0) & near
+        undamaged = self.citystate_hp[:, s].long() >= self._cs_max_hp
+        nd = (self.city_dist_tile[:, row, 0] >= 0).sum(dim=1) + 1
+        level = (torch.where(nd > 2, 3, 2) + 2
+                 + torch.div(self.citystate_pop[:, s].long(), 5, rounding_mode="trunc"))
         seats = list(range(self.n_majors)) + [100 + k for k in range(self.S) if k != s] + [FREE_SEAT, BARB_SEAT]
         for p in seats:
             full = p < self.n_majors
@@ -257,12 +274,14 @@ class SimMinorAi:
             margin = torch.where(hostile, torch.full_like(d, _MARGIN_HOSTILE),
                                  torch.maximum(torch.full_like(d, _MARGIN_OTHER), dcs * _FX))
             mine = rec & (owner == p) & (dist <= (_RANGE_CIV if full else _RANGE_OTHER))
+            if barb:
+                mine = mine & ~(undamaged & camp_ops).unsqueeze(1)
             anyu = mine.any(dim=1)
             tot = torch.where(mine, strength, torch.zeros_like(strength)).sum(dim=1)
             hit = (out < 0) & anyu & (tot.double() >= d + margin)
             if not full and not barb:
                 hit = hit & war
-            out = torch.where(hit, torch.where(hostile, 2, 1), out)
+            out = torch.where(hit, torch.where(hostile, level, level.clamp(max=1)), out)
         return out
 
     # -- the plot analysis ---------------------------------------------------

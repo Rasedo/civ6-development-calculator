@@ -760,7 +760,11 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const city = held ? held.city : cs && cs.centerIndex === p ? minorCity(cs) : null;
       if (!city) return null;
       const hp = districtHealth(state, p);
-      return { defense: cityDefenseStrength(state, city), strength: centreStrength(state, city), damaged: !!hp && hp.hp < hp.max };
+      return {
+        defense: cityDefenseStrength(state, city), strength: centreStrength(state, city), damaged: !!hp && hp.hp < hp.max,
+        districts: city.districts.length, capital: held ? city.isCapital : true,
+        wonder: city.wonders.some((w) => state.map.tiles[w.tileIndex].builtWonderComplete), population: city.population,
+      };
     },
     cityBlowFrom: (id, p) => {
       const u = state.units.find((x) => x.id === id);

@@ -58,9 +58,8 @@ function threatStrength(type: string, d: number): number | null {
  * operation of the owner against the player within 5 is left alone; else
  * the player's known units within 5 (a full civ's) or 3 of the city summed
  * by their threat strengths; at the city's defense plus the margin or more,
- * the city is threatened: its level 2 (the population, capital, wonders and
- * +0x588 terms unread, none), at most 1 for a player not hostile. The
- * first such player decides; none, -1.
+ * the city is threatened at its level (`threatLevel`), at most 1 for a
+ * player not hostile. The first such player decides; none, -1.
  */
 export function cityThreat(view: MajorView, seat: number, city: number, inp: ThreatInputs): number {
   const c = view.cityDefense(city);
@@ -87,7 +86,15 @@ export function cityThreat(view: MajorView, seat: number, city: number, inp: Thr
     }
     if (!any) continue;
     if (sum < d + margin) continue;
-    return hostile ? 2 : 1;
+    const level = threatLevel(c);
+    return hostile ? level : Math.min(level, 1);
   }
   return -1;
+}
+
+/** the threatened city's level (0x5cbd10 from 0x5cc475): 2, 3 for a city
+ *  of more than two districts the centre included; +2 a capital; +1 with a
+ *  wonder built; + its citizens / 5 (cut toward 0) */
+function threatLevel(c: { districts: number; capital: boolean; wonder: boolean; population: number }): number {
+  return (c.districts > 2 ? 3 : 2) + (c.capital ? 2 : 0) + (c.wonder ? 1 : 0) + Math.trunc(c.population / 5);
 }

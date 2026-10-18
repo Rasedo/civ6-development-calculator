@@ -56,7 +56,7 @@ import { newEconomicMemory, purchaseTurn, purchasePick, savingsTurn, type Purcha
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat } from './operations/cityThreat';
 import { majorView } from './majorView';
-import { minorOpContracts, minorOpLive, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
+import { minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
 import { joinBuilt } from './operations/manager';
 import { minorCity } from './cityStates';
 import { campTiles, civOf, hiddenResourcesFor, seatOf, tileSeat } from './seats';
@@ -584,8 +584,8 @@ export function minorStandingArmyShort(state: GameState, cs: CityState): number 
   return Math.max(0, quota - held);
 }
 
-/** the minor's city threat (0x5cbd10) on its knowledge base's records, with
- *  no operation of its own */
+/** the minor's city threat (0x5cbd10) on its knowledge base's records and
+ *  its running operations (`minorOpNear`) */
 export function minorThreat(state: GameState, cs: CityState): number {
   const view = majorView(state);
   const records = cs.armyKnown ?? [];
@@ -593,7 +593,7 @@ export function minorThreat(state: GameState, cs: CityState): number {
     army: (p) => records.filter((x) => x.owner === p).map((x) => ({
       id: x.id, owner: x.owner, type: installType('unit', x.type, 'UNIT_'), plot: x.plot, combat: 0, ranged: 0, damage: 0, seen: x.seen,
     })),
-    operationNear: () => false,
+    operationNear: (p, plot, dist) => minorOpNear(state, cs, p, plot, dist),
   });
 }
 
