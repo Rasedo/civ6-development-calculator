@@ -36,7 +36,8 @@ import { NO_SEAT, type Governor } from '../core/types';
 import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
-  serialize, deserialize } from '../core/game';
+  serialize, deserialize, itemCost } from '../core/game';
+import { completeQueueItem } from '../core/production';
 import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
@@ -2236,9 +2237,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       }
       case 'unitNew': {
         // a major's trained unit is its city's production, the engine's to
-        // make; a city-state's or a Free City's is their scripts' decision,
-        // which the engine does not replay; the barbarians' are their rules',
-        // which close the pair (`barbarianTurn`)
+        // make, and where the engine's city did not complete it the record's
+        // completion is imposed (`completeTrained`); a city-state's or a Free
+        // City's is their scripts' decision, which the engine does not
+        // replay; the barbarians' are their rules', which close the pair
+        // (`barbarianTurn`)
         const major = seatOfP(ctx, d.player) >= 0 && seatOfP(ctx, d.player) < state.seats.length;
         if (isBarbSeat(seatOfP(ctx, d.player))) {
           ctx.barbNew.push(d.unit);
@@ -2248,7 +2251,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // completed grants its Great Person, a minor's harvest completes its
         // item) is the record's
         matchNewUnits(ctx, b);
-        if (d.why === 'trained' && major) break;
+        if (d.why === 'trained' && major) {
+          if (unitOf(ctx, d.unit)) count(ctx, 'unitNew:trained', 'applied', d.player);
+          else completeTrained(ctx, b, d);
+          break;
+        }
         if (unitOf(ctx, d.unit)) {
           if (!major) count(ctx, 'minorAi:unitNew', 'applied', d.player);
           break;
@@ -2600,6 +2607,51 @@ function matchNewUnits(ctx: Ctx, b: TurnRecord): void {
       free.splice(free.indexOf(best), 1);
     }
   }
+}
+
+/** A MAJOR'S TRAINED UNIT the engine's production did not make (its city short
+ *  of the cost, or on another item): the record's completion, imposed. The
+ *  item comes out of the seat's nearest city within three plots of the unit
+ *  that holds it (in its queue, or banked behind the record's next item) and
+ *  completes there by the engine's own completion (`completeQueueItem`: the
+ *  unit at the centre, its grants, a Builder's or Settler's price climb, a
+ *  Settler's citizen), its unit the record's (`matchNewUnits`); with no such
+ *  city, or no unit the completion placed, the record's unit stands as it
+ *  is. Counted as `unitNew:trained`. */
+function completeTrained(ctx: Ctx, b: TurnRecord, d: Extract<Decision, { kind: 'unitNew' }>): void {
+  const { state } = ctx;
+  const seat = seatOfP(ctx, d.player);
+  const name = ctx.cat.units[d.type];
+  const rec = b.units.find((x) => `${x.owner}:${x.id}` === d.unit);
+  const at = state.map.tiles[d.plot];
+  let city: City | undefined;
+  let item: QueueItem | null = null;
+  let bd = 4;
+  for (const c of seatOf(state, seat)?.cities ?? []) {
+    const ct = state.map.tiles[c.centerIndex];
+    const dd = hexDistance(state.map, ct.col, ct.row, at.col, at.row);
+    if (dd >= bd) continue;
+    const q = queueItem(ctx, seat, c, { kind: 'unit', row: d.type, plot: -1, ...(num(rec?.formation) > 0 ? { formation: num(rec?.formation) } : {}) });
+    if (!q) continue;
+    const k = itemKey(q);
+    if (!c.queue.some((x) => itemKey(x) === k) && !ctx.retained.has(`${c.centerIndex}|${k}`)) continue;
+    [bd, city, item] = [dd, c, q];
+  }
+  if (!city || !item) {
+    spawnRecorded(ctx, b, d.unit);
+    return void count(ctx, 'unitNew:trained', 'fallback', d.player, `${d.unit} ${name}: no engine city near holds it`);
+  }
+  const k = itemKey(item);
+  const held = city.queue.findIndex((x) => itemKey(x) === k);
+  const progress = held >= 0 ? city.queue[held].progress : ctx.retained.get(`${city.centerIndex}|${k}`) ?? 0;
+  if (held >= 0) city.queue.splice(held, 1);
+  ctx.retained.delete(`${city.centerIndex}|${k}`);
+  const cost = itemCost(item, state, city);
+  completeQueueItem(state, city, item, cost);
+  matchNewUnits(ctx, b);
+  if (!unitOf(ctx, d.unit)) spawnRecorded(ctx, b, d.unit);
+  count(ctx, 'unitNew:trained', 'fallback', d.player,
+    `${d.unit} ${name}: ${recordCityName(ctx, seat, city.id)} ${held >= 0 ? 'held' : 'banked'} it at ${r3(progress)} of ${r3(cost)}`);
 }
 
 /** the record's name of an engine city (LOC_CITY_NAME_ dropped): the city
@@ -3143,6 +3195,9 @@ const IMPOSES_ON: Record<string, readonly string[]> = {
   'draw:camps': ['plots.improvement', 'barb.camps'],
   'barb:unit': UNITS_SUBS, 'barb:unitNew': UNITS_SUBS, 'barb:move': UNITS_SUBS,
   'draw:floodRiver': [...UNITS_SUBS, 'plots.feature', 'read.plot.yields'],
+  // a major's trained unit completed as the record completed it: the unit,
+  // its city's item, a Settler's citizen, the unit's upkeep and price climb
+  'unitNew:trained': [...UNITS_SUBS, 'city.production', 'city.pop', 'read.seat.maintUnits', 'read.buy.unitCost', 'read.buy.unitGold', 'read.buy.unitFaith'],
   // a village paid as the record paid it: its Gold, Faith, boosts, citizen,
   // the unit's price climb, its moment and the hut's plot
   village: ['seat.gold', 'seat.faith', 'seat.boosts', 'seat.science', 'seat.culture', 'seat.techs', 'seat.civics',
