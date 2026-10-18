@@ -172,6 +172,7 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - DLL rules the engines contradict
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "- 0x522630, the Combat a wounded unit loses, 24.8: m = COMBAT_WOUNDED_DAMAGE_ MULTIPLIER (gp +0x23..."
     - "...56dc90 with the formation's) is strictly greater, and only then takes its wounds off (0x522630). Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75, 16 HP) over an Ironclad (70..."

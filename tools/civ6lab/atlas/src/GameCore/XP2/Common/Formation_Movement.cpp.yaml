@@ -39,7 +39,10 @@
     - recording: 1124
       turn: 1
       value: With them   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->   758 of 1,241, the game's plots within ours 862 -> 1,192.
-  impl: [cpu/core/tactical.ts:minor, gpu/core/sim_tactics.py:_tac_attack_planes]
+  impl:
+    - cpu/core/tactical.ts:minor
+    - gpu/core/sim_tactics.py:_tac_attack_planes
+    - cpu/core/tactical.ts:moves
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -62,6 +65,7 @@
     - "C-95: a river crossing's Movement — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...out); a land unit whose   player may embark it takes water (a turn starting on the domain's pool:   0x26e920's [r9 + 0x180 + domain*4]); the barbarians' land units take none   (0 of 6,269 of their AI_Planning..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...1121 and 1124 hold a   water plot; the majors' and the minors' do from t62-69). The step's cost   (0x26e920's rules 0x531660..0x530240): into a city at most   CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x..."

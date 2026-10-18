@@ -69,8 +69,10 @@
     - recording: h1_duelv1117
       value: the Combat Desire as logged 264 -> 602 of 747 minor-turns with the shortfall at PSEUDOYIELD_STANDING_ARMY_VALUE each
   impl:
-    - cpu/core/minorCityAi.ts:minorStandingArmyShort
-    - gpu/core/sim_minorai.py:_minor_standing_short
+    - cpu/core/minorCityAi.ts:minorStandingArmy
+    - gpu/core/sim_minorai.py:_minor_standing_army
+    - cpu/core/minorCityAi.ts:minorStandingArmy
+    - gpu/core/sim_minorai.py:_minor_standing_army
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"

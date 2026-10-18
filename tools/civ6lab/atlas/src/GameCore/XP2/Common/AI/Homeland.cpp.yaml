@@ -49,7 +49,10 @@
   cases:
     - recording: h1_duelv1124
       value: "- PARTLY READ: the region lists' writer (the engines carry none: 36 of the   barbarians' 223 Explore rows of runs/h1_duelv1124 are \"tertiary regions\");"
-  impl: [cpu/core/tactical.ts:exploreTarget]
+  impl:
+    - cpu/core/tactical.ts:exploreTarget
+    - cpu/core/tactical.ts:v2Best
+    - gpu/core/sim_tactics.py:_tac_explore
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   context:

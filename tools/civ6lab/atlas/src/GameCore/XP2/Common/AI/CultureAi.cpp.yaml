@@ -125,6 +125,18 @@
   context:
     - ...Value, within MinDifficulty / MaxDifficulty of the player's handicap; the leader query 0x622e90).
   review: imported
+- addr: 0x623910
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 4
+      value: "A DEFENDER   takes its own plot alone as an Attack Units spot (0x776140) and goes in   only before another unit among the strikers (0x775340): runs/h1_duelv1121   t4, city-state 4's Warrior 131073 (it"
+  readings:
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+  context:
+    - "...city (+0x11d0 == city +0xf8) — one with +0xf30 above 0 that the player's +0x1278 holds (0x623910 >= 0) released (COMBAT 3, home -1); the weakest (0x5c4910: the first of the lowest Co..."
+  review: imported
 - addr: 0x623b30
   final: 0x4165a0
   kind: function

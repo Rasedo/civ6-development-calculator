@@ -14,6 +14,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "H-1: the raids — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...able slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list..."
@@ -74,7 +75,11 @@
     - recording: 1124
       turn: 22
       value: "1124 camp (41,7): home at t22, t23 W, t24 W, t25 W, t26 S, t27 S, the clock at t34."
-  impl: [cpu/core/operations/nodes.ts:before, cpu/core/operations/nodes.ts:recruitUnits]
+  impl:
+    - cpu/core/operations/nodes.ts:before
+    - cpu/core/operations/nodes.ts:recruitUnits
+    - cpu/core/barbarianOps.ts:recruit
+    - gpu/core/sim_barbops.py:_bop_recruit
   readings:
     - "H-1: the raids — READ"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"

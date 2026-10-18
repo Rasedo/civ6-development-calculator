@@ -39,6 +39,7 @@
     - cpu/core/aiDistrictValue.ts:rowsValue
     - cpu/core/aiDistrictValue.ts:ROWS
     - gpu/core/sim_seats.py:_imp_adj_at
+    - cpu/core/aiPlotValue.ts:improvementYieldsValue
   readings:
     - "H-1: the district adjacency — READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"

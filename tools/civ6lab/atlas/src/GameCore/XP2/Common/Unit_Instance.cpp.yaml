@@ -120,7 +120,11 @@
     - recording: 1121
       turn: 191
       value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
-  impl: [cpu/core/tactical.ts:canFight, cpu/core/tactical.ts:aiStrengths]
+  impl:
+    - cpu/core/tactical.ts:canFight
+    - cpu/core/tactical.ts:aiStrengths
+    - cpu/core/tactical.ts:within
+    - gpu/core/sim_tactics.py:_danger_plane
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-94: the wounded law and the garrison — READ"

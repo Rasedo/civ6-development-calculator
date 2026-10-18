@@ -98,11 +98,16 @@
     - cpu/core/combat.ts:garrisonCS
     - cpu/harness/checks.ts:luxAtRebuild
     - ai/major/view.ts:cityDefense
+    - cpu/core/combat.ts:districtGarrisonedStrength
+    - cpu/core/tactical.ts:dangerDistricts
+    - gpu/core/sim_seats.py:_garrison_cs
+    - gpu/core/sim_tactics.py:_danger_districts
   readings:
     - "C-94: the wounded law and the garrison — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "- The centre's garrison term (0x24a180): FP(Combat incl. formation, 0x56dc90) less the wounded loss, less the base, where posi..."
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units i..."
@@ -137,6 +142,8 @@
     - cpu/core/tactical.ts:dangerPlane
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/tactical.ts:dangerDistricts
+    - cpu/core/combat.ts:districtGarrisonedStrength
+    - gpu/core/sim_tactics.py:_danger_districts
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"

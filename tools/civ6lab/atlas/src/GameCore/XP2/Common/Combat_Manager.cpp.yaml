@@ -177,11 +177,13 @@
     - cpu/core/tactical.ts:defenderAt
     - cpu/harness/checks.ts:fresh
     - cpu/core/tactical.ts:ARMY_RECORD_AGE
+    - cpu/core/combat.ts:districtGarrisonedStrength
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: the garrison requirement — READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units in its own order the comparator 0x523d60 keeps the..."
     - "...s with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a Mili..."
