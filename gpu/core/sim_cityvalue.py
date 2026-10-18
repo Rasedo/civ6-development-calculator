@@ -1371,6 +1371,9 @@ class _MinorFacts:
         self.T = sim._cv_tables()
         self.E = self.T["engine"]
         self._memo = {}
+        # [B] games whose unit production table counts no known unit (a
+        # founding turn's first look), None none
+        self.no_known = None
 
     def _get(self, key, fn):
         if key not in self._memo:
@@ -1528,6 +1531,8 @@ class _MinorFacts:
                 if ei >= 0:
                     owned[:, k] = (mine & (sim.major_unit_type == ei)).sum(dim=1)
             known = sim._cv_known(s)
+            if self.no_known is not None:
+                known = torch.where(self.no_known.unsqueeze(1), torch.zeros_like(known), known)
             return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, owned, known)
         return self._get("uprod", build)
 

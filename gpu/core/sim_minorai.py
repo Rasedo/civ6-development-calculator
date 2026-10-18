@@ -103,6 +103,9 @@ class SimMinorAi:
         # A: the city's update; its trade list, kept at the city's analysis
         self._minor_trade_list(s, alive & ~fresh)
         f = self._cv_minor_facts(s)
+        # a founding turn's first look: the unit production table with no
+        # known unit (`minorAiTurn`)
+        f.no_known = fresh
         b_tab, u_tab, p_tab = self._cv_minor_tables(s, f)
         # the tables the research and civics values' city terms read next turn
         self.citystate_unit_values[:, s] = torch.where(alive.unsqueeze(1), torch.stack(u_tab, dim=1),

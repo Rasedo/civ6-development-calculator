@@ -598,7 +598,11 @@ export function minorAiTurn(state: GameState, cs: CityState): void {
   // A: the city's update
   // its trade list, kept at the city's analysis (none the turn it is founded)
   if (!fresh) minorTradeList(state, cs);
-  const known = minorKnownUnits(cs);
+  // a founding turn's first look reads the military AI's unit production
+  // table as it stood before the city: no known unit, every entry 1.0
+  // (runs/h1_duelv1117 t1: every city-state's Warrior, Slinger and Builder
+  // on the one curve of 1.0 at their own turns)
+  const known = fresh ? () => 0 : minorKnownUnits(cs);
   const facts = minorBuildFacts(state, cs, known);
   const tables: CityBuildTables = {
     buildings: buildingTable(facts),

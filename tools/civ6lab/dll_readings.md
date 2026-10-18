@@ -3832,6 +3832,23 @@ rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
   value 0x799b9d computes from the player's counts (+0x510, +0x4a0) feeds
   asserts only. The city hook 0x79a320 copies the table per city, the
   +0x2c / +0x30 times the extra copies.
+- A FOUNDING TURN'S TABLE (the city's first look, C only): the unit
+  production table counts no known unit — N 0, every entry 1.0. The five
+  verbose duels' t1 UNITS rows: every city-state's Warrior, Slinger and
+  Builder (pseudo-yield none: the combat path; no Maintenance; their
+  promotion weights 1.0) land on the one value curve of an entry of 1.0, each
+  at its own T — runs/h1_duelv1117 Valletta Builder 17.38 / Slinger 15.19 /
+  Warrior 14.11 at T 4 / 7 / 8, Antananarivo 13.04 / 8.25 / 6.20 at T 10 /
+  19 / 23; 1121 Hunza 18.29 / 16.53 / 15.61 at T 3 / 5 / 6 — and the
+  Default Specialization takes the Slinger (no BuildCharges unit). From t2
+  the table counts the knowledge base's records (1117 Antananarivo t2
+  Warrior 9.95 at T 15 as ours). LAB the founding T: on the record of t2
+  our Warrior / Slinger turns are about a third of the game's while our
+  Builder's agree (Valletta 3 / 3 / 4 against 8 / 7 / 4) — the
+  MINOR_CIV_PRODUCTION_MILITARY +200% not yet on the founding city fits
+  Valletta and Caguana; Hunza's (6 / 5 against 7 / 6 without it) and
+  Antananarivo's (23 / 19 / 10 against 14 / 12 / 6) production at founding
+  differs from the record's of t2 (its citizens' first placement unread).
 - THE EFFICIENCIES (0x79d040 allocates, the job 0x79a440 fills, "Could not
   find a neutral player"): per pair of Units rows both without strength
   (max(Combat, RangedCombat, Bombard) 0 and AntiAirCombat 0) 1.0; one
