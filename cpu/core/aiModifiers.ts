@@ -699,6 +699,26 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const v = fmul(yieldValue(t.view, t.seat, fmul(pctOf(args), culture), 'YIELD_CULTURE'), fxConst(0.5));
     return whole(span(t, v));
   },
+  // 0x6b2350 (UnitType +8, Amount +0x10 as its parser 0x6b1d00 stores it,
+  // fx(Amount x 0.01f)): per city of the player (the context's city alone
+  // where it has one), the Amount x its Production (CityBuildAI +0x1008) x
+  // its expected count of the unit (0x5d4750), bare Production, from the
+  // start to the start plus its train turns at the Production times 1 + the
+  // Amount (0x17bb40), at most the horizon
+  EFFECT_ADJUST_UNIT_PRODUCTION: (t, args) => {
+    const unit = args.UnitType;
+    if (!unit) return 0;
+    const a = pctOf(args);
+    const cities = t.owner ? [{ seat: t.owner.seat ?? t.seat, id: t.owner.cityId }] : t.view.cities(t.seat).map((c) => ({ seat: t.seat, id: c.id }));
+    let sum = 0;
+    for (const c of cities) {
+      const end = Math.min(t.start + t.view.cityUnitTurns(c.seat, c.id, unit, a), t.horizon);
+      const per = Math.floor((fxOf(t.view.cityYield(c.seat, c.id, 'YIELD_PRODUCTION')) * t.view.cityUnitExpected(c.seat, c.id, unit)) / FX);
+      const v = Math.floor((a * per) / FX);
+      sum += whole(yieldValue(null, null, presentValue(v, t.rate, end) - presentValue(v, t.rate, t.start), 'YIELD_PRODUCTION'));
+    }
+    return sum;
+  },
   // 0x6c4650: a city subject whose centre's outer defence stands (its
   // damage below its maximum, 0x24ae50 / 0x24b290 on 0x6da56a3d): Amount, raw
   EFFECT_ADJUST_CITY_OUTER_DEFENSE: (t, args, s) =>

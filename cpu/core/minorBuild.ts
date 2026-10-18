@@ -41,7 +41,7 @@ import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost, selectResearch } from './economy';
-import { CP_CLAIMED, CP_IN_PROGRESS } from './aiContracts';
+import { CP_CLAIMED, CP_IN_PROGRESS, contractById } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw } from './aiCivics';
 import { minorCity, minorPlaceCitizens, minorReplaceCitizens, suzerainOf } from './cityStates';
@@ -888,6 +888,40 @@ export function minorCanTrain(state: GameState, cityState: CityState, id: string
   if (d.trader && minorTraders(state, cityState) >= tradeCapacity(state, cityState.seat)) return false;
   if (id === 'ARCHAEOLOGIST' && !held.includes('MUSEUM_ARTIFACT')) return false;
   return true;
+}
+
+/** the turns a minor's city trains the unit in (0x17bb40) at its Production
+ *  times 1 + its percent toward the unit + `extra` raw (24.8), the extra added
+ *  to the percent: its cost less the progress kept on it and the city's
+ *  store, as `buildTurns` reads them */
+export function minorUnitTurns(state: GameState, cityState: CityState, unit: string, extra: number): number {
+  const item = minorItemOfType(unit);
+  if (!item || !('unit' in item)) return 500;
+  const k = minorItemKey(item);
+  const progress = (cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0) + (cityState.prodOverflow ?? 0);
+  const stats = computeCityStats(state, minorCity(cityState));
+  const rate = fxOf(stats.total.production * (1 + minorItemPct(state, cityState, item) / 100 + extra / FX));
+  return turnsAt(minorItemCost(state, cityState, item) * FX - fxOf(progress), rate);
+}
+
+/** CityBuildAI's expected count of the unit (0x5d4750), raw: 1.0 with
+ *  progress kept on it (City_BuildQueue's unit progress, 0x17d1a0); 0 where
+ *  the city cannot train it (a unit not the minor's version, a Settler among
+ *  them, or not `minorCanTrain`); else 0.5 plus 0.2 x the most its contract
+ *  list's (+0x3a8, its data +0x400) contracts of the unit (+0x408) hold at
+ *  +0x160 — read as 1 for a listed one (LAB: the base contract's constructor
+ *  writes 0 and its writer is unread; runs/h1_duelw1117 Valletta's Ilkum 1
+ *  while its Builder contract 47 stays listed, t16-24) */
+export function minorUnitExpected(state: GameState, cityState: CityState, unit: string): number {
+  const item = minorItemOfType(unit);
+  if (!item || !('unit' in item)) return 0;
+  const k = minorItemKey(item);
+  const kept = cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0;
+  if (kept > 0) return FX;
+  if (!minorUnitVersion(unit) || !minorCanTrain(state, cityState, item.unit)) return 0;
+  const book = cityState.cityAi;
+  const listed = !!book && (book.city[-1] ?? []).some((id) => contractById(book, id)?.unit === unit);
+  return fxConst(0.5) + (listed ? fxConst(0.2) : 0);
 }
 
 /** An install item type as the minor's item in hand: BUILDING_X, DISTRICT_X

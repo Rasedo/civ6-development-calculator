@@ -6375,10 +6375,7 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   PSEUDOYIELD_GOVERNOR @0xf2e214, discounted from the start);
   EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 PARTLY (the Trader's value
   0x7a7110 of Amount, start to horizon).
-- PARTLY (their inputs unported): EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (per
-  city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's
-  expected count 0x5d4750 x its Production [+0x1008], bare, from the start to
-  start + the train turns), EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER
+- PARTLY (their inputs unported): EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER
   0x6b8930 (per resource, or the named one, the player's count of it 0x4aa790
   x Amount through the resource value 0x7a21e0),
   EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY 0x6adb20 (the player's
@@ -6386,6 +6383,30 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   parser's scaling unread), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work
   type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURISM,
   between).
+- READ, Ilkum's EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (@f040d0, vtable
+  0xd63100; its parser 0x6b1d00 stores UnitType +8 and fx(Amount x 0.01f)
+  +0x10): with a player, per city of its list (+0x12f0 +0xd8; the context's
+  city alone where it has one), v = the Amount x (CityBuildAI's Production
+  +0x1008 x its expected count of the unit 0x5d4750), bare Production,
+  PV(min(start + the train turns, horizon)) - PV(start) (PV(0) the turn's
+  v), its whole part added. The train turns 0x17bb40(unit, 0, &extra): the
+  city's Production (0x1cb9f0) x (the unit's production multiplier 0x17c1c0
+  + extra), the cost (0x17bfa0) less the unit's progress (+0x230). The
+  expected count 0x5d4750: 1.0 where the unit holds progress (0x17d1a0); 0
+  where CanTrain (0x172820) refuses; else 0.2 x the most +0x160 of the
+  city's listed contracts of the unit (CityBuildAI +0x3a8's data +0x400,
+  contract +0x408 the unit, the vector of weak handles) + 0.5 (@d5aff0,
+  @d20458). The base contract's constructor (0x5ff390) writes +0x160 0; its
+  other writer is unread — LAB: read as 1 for a listed contract
+  (runs/h1_duelw1117 Valletta's Ilkum 1 while its Builder contract 47 stays
+  listed, t16-24, 0 with the list read empty). Port: `aiModifiers.ts`
+  (`cityUnitTurns`, `cityUnitExpected`: `minorUnitTurns` /
+  `minorUnitExpected`, `majorItemTurns` / `majorUnitExpected` — a major's
+  and the Free Cities' contracts not read), `sim_cityvalue.py`
+  (`_cv_unit_prod_value`), `sim_policy.py`. Measured (minor turns the game
+  lists Ilkum): 1121 24 of 32, 1124 19 of 34, 1117 25 of 61 equal; the rest
+  our contracts' or queues' divergence (1124 Cardiff t40-48 a Builder's
+  kept 24 of 25 where the game built a Granary).
 - READ, Bastions' two analyzers: EFFECT_ADJUST_CITY_OUTER_DEFENSE 0x6c4650
   (the registry's object @f03cf0, vtable 0xd63a18 slot 1): with arguments
   and the context's city, its centre's outer damage (0x24ae50 on 0x6da56a3d:

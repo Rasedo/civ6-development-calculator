@@ -150,7 +150,6 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
       && engineId('unit', x.type, 'UNIT_', UNITS) !== null && UNITS[engineId('unit', x.type, 'UNIT_', UNITS)!]?.replaces === engineId('unit', u, 'UNIT_', UNITS));
     return unique ? unique.type : u;
   };
-  const mods = getModifiers(state, seat);
   const growth = cityGrowth(state, city);
   return {
     view,
@@ -216,16 +215,38 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
     current: majorItemType(city.queue[0]),
     techTurns: (t) => analysedTurns(techEntries, t && engineId('tech', t, 'TECH_', TECHS), r.techs, r.tech, techLeft),
     civicTurns: (c) => analysedTurns(civicEntries, c && engineId('civic', c, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft),
-    buildTurns: (type) => {
-      const q = majorQueueItem(state, seat, city, type);
-      if (!q) return 500;
-      const k = keyOf(q);
-      const inQueue = city.queue.find((x) => keyOf(x) === k);
-      const progress = (inQueue?.progress ?? 0) + (city.productionBank ?? 0);
-      const rate = fxOf(stats.total.production * (1 + prodBoostPct(mods, q, s.gpPerm)));
-      return turnsAt(itemPrice(state, city, q) * FX - fxOf(progress), rate);
-    },
+    buildTurns: (type) => majorItemTurns(state, city, type, 0),
   };
+}
+
+/** the turns a major's or a Free City's city builds an install type in
+ *  (0x17bb40 for a unit) at its Production times 1 + its percent toward the
+ *  item + `extra` raw (24.8), the extra added to the percent: its price less the progress the queue holds on it and the bank;
+ *  500 for an item the city has no row for */
+export function majorItemTurns(state: GameState, city: City, type: string, extra: number): number {
+  const s = seatOf(state, city.seat)!;
+  const q = majorQueueItem(state, city.seat, city, type);
+  if (!q) return 500;
+  const k = keyOf(q);
+  const inQueue = city.queue.find((x) => keyOf(x) === k);
+  const progress = (inQueue?.progress ?? 0) + (city.productionBank ?? 0);
+  const rate = fxOf(computeCityStats(state, city).total.production * (1 + prodBoostPct(getModifiers(state, city.seat), q, s.gpPerm) + extra / FX));
+  return turnsAt(itemPrice(state, city, q) * FX - fxOf(progress), rate);
+}
+
+/** CityBuildAI's expected count of a unit in a major's or a Free City's
+ *  city (0x5d4750), raw: 1.0 with progress the queue holds on it; 0 where
+ *  the city cannot train it (its production column closed); else 0.5 — the
+ *  +0x400 list's entries (0.2 x their +0x160 more) not read */
+export function majorUnitExpected(state: GameState, city: City, type: string): number {
+  const q = majorQueueItem(state, city.seat, city, type);
+  if (!q) return 0;
+  const k = keyOf(q);
+  if ((city.queue.find((x) => keyOf(x) === k)?.progress ?? 0) > 0) return FX;
+  const s = seatOf(state, city.seat)!;
+  const col = queueItemColumn(q);
+  const open = productionObs(state, s, { ...city, queue: [] }, unitGates(state, city.seat)).prodOpen;
+  return col >= 0 && open.includes(col) ? FX / 2 : 0;
 }
 
 /** What the Default Specialization pick reads of a major's city: the

@@ -141,6 +141,24 @@
     - "...x(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption 0x5276c0 of the new population. One entry per free slot of e..."
     - ...- PV(start), 0x7a2140); EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90 (min(City::GetYield 0x1cb8b0, 100) x the percent x 0.01f, weighted, the same span); EFFECT_ADJUST_PLAYER_YIELD_CHA...
   review: imported
+- addr: 0x1cb9f0
+  final: 0x1334c0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 16
+      value: "its   other writer is unread — LAB: read as 1 for a listed contract   (runs/h1_duelw1117 Valletta's Ilkum 1 while its Builder contract 47 stays   listed, t16-24, 0 with the list read empty)."
+    - recording: 1121
+      value: "Measured (minor turns the game   lists Ilkum): 1121 24 of 32, 1124 19 of 34, 1117 25 of 61 equal;"
+    - recording: 1124
+      turn: 40
+      value: the rest   our contracts' or queues' divergence (1124 Cardiff t40-48 a Builder's   kept 24 of 25 where the game built a Granary).
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...its whole part added. The train turns 0x17bb40(unit, 0, &extra): the city's Production (0x1cb9f0) x (the unit's production multiplier 0x17c1c0 + extra), the cost (0x17bfa0) less the un..."
+  review: imported
 - addr: 0x1cbd10
   kind: function
   status: READ

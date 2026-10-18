@@ -180,6 +180,23 @@
   context:
     - "...0x198310) adds Amount raw. EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 (@f03d20, vtable 0xd62ad0): the centre's strike 0x249ee0, its whole part above 0, x Amount / 100 truncated (0x51e..."
   review: imported
+- addr: 0xd63100
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 16
+      value: "its   other writer is unread — LAB: read as 1 for a listed contract   (runs/h1_duelw1117 Valletta's Ilkum 1 while its Builder contract 47 stays   listed, t16-24, 0 with the list read empty)."
+    - recording: 1121
+      value: "Measured (minor turns the game   lists Ilkum): 1121 24 of 32, 1124 19 of 34, 1117 25 of 61 equal;"
+    - recording: 1124
+      turn: 40
+      value: the rest   our contracts' or queues' divergence (1124 Cardiff t40-48 a Builder's   kept 24 of 25 where the game built a Granary).
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "- READ, Ilkum's EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (@f040d0, vtable 0xd63100; its parser 0x6b1d00 stores UnitType +8 and fx(Amount x 0.01f) +0x10): with a player, p..."
+  review: imported
 - addr: 0xd63400
   kind: global
   status: PARTLY

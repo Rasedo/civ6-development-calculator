@@ -241,6 +241,11 @@ export interface AiValueView {
   cityOuterStands(seat: number, cityId: number): boolean;
   /** a city centre's strike strength (0x249ee0), its whole part */
   cityStrike(seat: number, cityId: number): number;
+  /** the turns a city trains a UnitType in (0x17bb40) at its Production
+   *  toward it times 1 + `extra` raw (24.8) */
+  cityUnitTurns(seat: number, cityId: number, unit: string, extra: number): number;
+  /** the city's CityBuildAI's expected count of a UnitType (0x5d4750), raw */
+  cityUnitExpected(seat: number, cityId: number, unit: string): number;
   /** the times the seat completed a ProjectType (player +0x1330, 0x4be7b0) */
   projectCompletions(seat: number, project: string): number;
   /** the turns a city builds a ProjectType in (0x17b890): its cost less the

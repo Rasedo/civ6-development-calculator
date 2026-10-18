@@ -27,7 +27,7 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_TRADE_ROUTE_YIELD", "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL",
     "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC", "EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT", "EFFECT_ADJUST_PROJECT_PRODUCTION",
     "EFFECT_ADJUST_GREAT_PERSON_POINTS", "EFFECT_ADJUST_POLICY_AMENITY", "EFFECT_ADJUST_POLICY_HOUSING",
-    "EFFECT_ADJUST_CITY_OUTER_DEFENSE", "EFFECT_ADJUST_CITY_RANGED_STRIKE",
+    "EFFECT_ADJUST_CITY_OUTER_DEFENSE", "EFFECT_ADJUST_CITY_RANGED_STRIKE", "EFFECT_ADJUST_UNIT_PRODUCTION",
 }
 # worth 0 in a minor's policy context: the context's own city (none), the
 # Influence a minor may not give, its tributaries and placed envoys (none)
@@ -340,6 +340,17 @@ class SimPolicy:
             if not p:
                 return zero
             return _present_value(self._cv_pseudo(full(amount * _FX), p, f0.pseudo_w(p)), r, hh) >> 8
+        if eff == "EFFECT_ADJUST_UNIT_PRODUCTION":
+            # per city of the minor (0x6b2350, `_cv_unit_prod_value`)
+            unit = a.get("UnitType")
+            if not unit:
+                return zero
+            pct = _fx_const(_f32(amount * _f32(0.01)))
+            acc = zero
+            for f, alive, _cap in ctx["cities"]:
+                v = self._cv_unit_prod_value(f, unit, pct, t0, hh)
+                acc = acc + torch.where(alive, v, zero)
+            return acc
         if eff == "EFFECT_ADJUST_CITY_OUTER_DEFENSE":
             # the centre's outer defence standing: a city-state's always
             # (`cityOuterStands`), a Free City's walls' pool above 0

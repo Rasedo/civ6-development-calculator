@@ -567,11 +567,34 @@
   context:
     - ..._AMENITY 0x6a1170 (CityBuildAI's 0x7a3d70 / 0x79f7c0), EFFECT_ADJUST_PROJECT_PRODUCTION 0x6b10b0, and the knowledge base's city value 0x7a0ac0 behind EFFECT_ADJUST_CITY_COMBAT_BONUS 0x...
   review: reviewed
+- addr: 0x6b1d00
+  final: 0x463fb0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 16
+      value: "its   other writer is unread — LAB: read as 1 for a listed contract   (runs/h1_duelw1117 Valletta's Ilkum 1 while its Builder contract 47 stays   listed, t16-24, 0 with the list read empty)."
+    - recording: 1121
+      value: "Measured (minor turns the game   lists Ilkum): 1121 24 of 32, 1124 19 of 34, 1117 25 of 61 equal;"
+    - recording: 1124
+      turn: 40
+      value: the rest   our contracts' or queues' divergence (1124 Cardiff t40-48 a Builder's   kept 24 of 25 where the game built a Granary).
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...D, Ilkum's EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (@f040d0, vtable 0xd63100; its parser 0x6b1d00 stores UnitType +8 and fx(Amount x 0.01f) +0x10): with a player, per city of its list (..."
+  review: imported
 - addr: 0x6b2350
   final: 0x464600
   kind: function
   name: EFFECT_ADJUST_UNIT_PRODUCTION
   status: PARTLY
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - gpu/core/sim_cityvalue.py:_cv_unit_prod_value
+    - gpu/core/sim_policy.py:_pol_analyze
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]

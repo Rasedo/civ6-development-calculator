@@ -49,6 +49,8 @@ import { computeUnlocks } from './effects';
 import type { ContractCity } from './aiContracts';
 import { civicAnalysis } from './aiCivics';
 import { growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
+import { minorUnitExpected, minorUnitTurns } from './minorBuild';
+import { majorItemTurns, majorUnitExpected } from './majorCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, hasMet, minorCity, minorWarGate, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
@@ -763,6 +765,24 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     cityStrike: (i, id) => {
       const city = cityOf(i, id);
       return city ? Math.trunc(cityStrikeStrength(state, city)) : 0;
+    },
+    // a city-state's train turns and expected count as its city's update
+    // reads them (`minorUnitTurns`), any other city's its queue's
+    cityUnitTurns: (i, id, type, extra) => {
+      if (isCityStateSeat(i)) {
+        const cs = seatOf(state, i) as CityState | undefined;
+        return cs && cs.centerIndex >= 0 ? minorUnitTurns(state, cs, type, extra) : -1;
+      }
+      const city = cityOf(i, id);
+      return city ? majorItemTurns(state, city, type, extra) : -1;
+    },
+    cityUnitExpected: (i, id, type) => {
+      if (isCityStateSeat(i)) {
+        const cs = seatOf(state, i) as CityState | undefined;
+        return cs && cs.centerIndex >= 0 ? minorUnitExpected(state, cs, type) : 0;
+      }
+      const city = cityOf(i, id);
+      return city ? majorUnitExpected(state, city, type) : 0;
     },
     projectCompletions: (i, type) => {
       const id = engineId('project', type, 'PROJECT_', PROJECTS);

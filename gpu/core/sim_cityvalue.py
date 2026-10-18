@@ -1137,7 +1137,8 @@ class SimCityValue:
                      "EFFECT_ADJUST_CITY_INNER_DEFENSE", "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY",
                      "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN",
                      "EFFECT_GRANT_UNIT_IN_CITY", "EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER",
-                     "EFFECT_GRANT_INFLUENCE_TOKEN", "EFFECT_GRANT_SPY", "EFFECT_GRANT_COMBAT_ADJACENCY")
+                     "EFFECT_GRANT_INFLUENCE_TOKEN", "EFFECT_GRANT_SPY", "EFFECT_GRANT_COMBAT_ADJACENCY",
+                     "EFFECT_ADJUST_UNIT_PRODUCTION")
 
     def _cv_check_read(self, m: dict, reads: dict, depth: int = 1) -> None:
         """refuse a modifier whose analysis the TS evaluator reads through an
@@ -1286,6 +1287,12 @@ class SimCityValue:
         if eff in ("EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN"):
             p = "PSEUDOYIELD_DIPLOMATIC_FAVOR" if eff == "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN" else "PSEUDOYIELD_INFLUENCE"
             return span(self._cv_pseudo(torch.full_like(like, amount * _FX), p, f.pseudo_w(p))) >> 8
+        if eff == "EFFECT_ADJUST_UNIT_PRODUCTION":
+            # the evaluation's city alone (`EFFECT_ADJUST_UNIT_PRODUCTION`)
+            if not a.get("UnitType"):
+                return zero
+            pct = _fx_const(_f32(amount * _f32(0.01)))
+            return _t(self._cv_unit_prod_value(f, a["UnitType"], pct, t, h), like)
         if eff == "EFFECT_GRANT_UNIT_IN_CITY":
             if not city:
                 return zero
@@ -1304,6 +1311,18 @@ class SimCityValue:
                 return zero
             return between(self._cai_strength(f.s) * _FX) >> 8
         raise NotImplementedError(eff)
+
+    def _cv_unit_prod_value(self, f, unit: str, pct: int, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
+        """0x6b2350 on one city, its whole part: `pct` (fx(Amount x 0.01f)) x the
+        city's Production x its expected count of the unit (0x5d4750), bare
+        Production, PV(min(t + its train turns at the Production lifted by the
+        Amount, h)) - PV(t)"""
+        r = self._cv_tables()["rate"]
+        end = torch.minimum(t + _t(f.unit_turns(unit, pct), t), h)
+        prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64, device=t.device) * _FX + 0.5).long()
+        per = torch.div(prod.expand_as(t) * _t(f.unit_expected(unit), t), _FX, rounding_mode="floor")
+        v = torch.div(per * pct, _FX, rounding_mode="floor")
+        return self._cv_yield(_present_value(v, r, end) - _present_value(v, r, t), "YIELD_PRODUCTION") >> 8
 
     def _cv_analysis(self, f, m: dict, t: torch.Tensor, h: torch.Tensor, depth: int):
         """0x6cede0: the whole number the modifier's subjects leave; None
@@ -1797,6 +1816,38 @@ class _MinorFacts:
         rate = torch.floor(self._total(1) * (1 + self._item_pct(item) / 100) * _FX + 0.5).long()
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
+    def unit_turns(self, u, extra):
+        """`minorUnitTurns`: the turns the unit takes (0x17bb40) at the
+        Production times 1 + its percent + `extra` raw"""
+        sim, s = self.sim, self.s
+        k = self._item_key(u)
+        if k < 0:
+            return 500
+        cur = sim.citystate_item[:, s]
+        progress = torch.where(cur == k, sim.citystate_prod[:, s], sim.citystate_kept[:, s, k]) + sim.citystate_ovf[:, s]
+        rate = torch.floor(self._total(1) * (1 + self._item_pct(u) / 100 + extra / _FX) * _FX + 0.5).long()
+        return _turns_at(torch.floor(self._item_cost(u) * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
+
+    def unit_expected(self, u):
+        """`minorUnitExpected` (0x5d4750), raw: 1.0 with progress kept on
+        the unit, 0 where the city cannot train it, else 0.5 and 0.2 more
+        with a contract of it listed"""
+        sim, s = self.sim, self.s
+        k = self._item_key(u)
+        like = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
+        if k < 0:
+            return like
+        kept = torch.where(sim.citystate_item[:, s] == k, sim.citystate_prod[:, s], sim.citystate_kept[:, s, k])
+        if self.unit_version(u) is None:
+            return torch.where(kept > 0, like + _FX, like)
+        can = _t(self.can_train(u), like).bool()
+        # 0.2 more where its city lists a contract of the unit (its +0x160
+        # read as 1, LAB)
+        row = next((i for i, r in enumerate(self.T["unit_rows"]) if r["type"] == u), -1)
+        listed = (sim.cai_c_listed[:, s] & (sim.cai_c_id[:, s] >= 0) & (sim.cai_c_unit[:, s] == row)).any(dim=1)
+        open_ = like + _FX // 2 + torch.where(listed, _fx_const(0.2), 0)
+        return torch.where(kept > 0, like + _FX, torch.where(can, open_, like))
+
     # the projects table's facts: a minor completes no once-only project
     def advanced(self, p):
         return 0
@@ -2245,6 +2296,32 @@ class _FreeFacts(_MinorFacts):
         cost = self._item_cost(item)
         rate = torch.floor(self._total(1) * _FX + 0.5).long()
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
+
+    def unit_turns(self, u, extra):
+        """`majorItemTurns` of a unit at the Production times 1 + `extra`
+        raw"""
+        sim = self.sim
+        k = self._item_key(u)
+        if k < 0:
+            return 500
+        head = sim.city_current[:, self.row, self.j, 0]
+        progress = torch.where(head == k, sim.city_progress[:, self.row, self.j, 0].double(), torch.zeros(sim.B, dtype=torch.float64, device=sim.device))
+        progress = progress + sim.city_prod_bank[:, self.row, self.j].double()
+        rate = torch.floor(self._total(1) * (1 + extra / _FX) * _FX + 0.5).long()
+        return _turns_at(torch.floor(self._item_cost(u) * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
+
+    def unit_expected(self, u):
+        """`majorUnitExpected` (0x5d4750), raw: 1.0 with progress the queue
+        holds on the unit, 0 where the city cannot train it, else 0.5"""
+        sim = self.sim
+        k = self._item_key(u)
+        like = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
+        if k < 0:
+            return like
+        head = sim.city_current[:, self.row, self.j, 0]
+        kept = (head == k) & (sim.city_progress[:, self.row, self.j, 0] > 0)
+        can = _t(self.can_train(u), like).bool()
+        return torch.where(kept, like + _FX, torch.where(can, like + _FX // 2, like))
 
     def player_cities(self):
         sim = self.sim

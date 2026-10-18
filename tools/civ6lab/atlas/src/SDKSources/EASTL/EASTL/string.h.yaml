@@ -36,6 +36,23 @@
   context:
     - "- The research and civic overflows (`m_xResearchOverflow`, serializer 0x4c6dc2; `m_xCulturalOverflow`, 0x38a93a): only the members are read; the records fit the produ..."
   review: imported
+- addr: 0x5ff390
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 16
+      value: "its   other writer is unread — LAB: read as 1 for a listed contract   (runs/h1_duelw1117 Valletta's Ilkum 1 while its Builder contract 47 stays   listed, t16-24, 0 with the list read empty)."
+    - recording: 1121
+      value: "Measured (minor turns the game   lists Ilkum): 1121 24 of 32, 1124 19 of 34, 1117 25 of 61 equal;"
+    - recording: 1124
+      turn: 40
+      value: the rest   our contracts' or queues' divergence (1124 Cardiff t40-48 a Builder's   kept 24 of 25 where the game built a Granary).
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...the vector of weak handles) + 0.5 (@d5aff0, @d20458). The base contract's constructor (0x5ff390) writes +0x160 0; its other writer is unread — LAB: read as 1 for a listed contract (..."
+  review: imported
 - addr: 0x6419c0
   final: 0x4271a0
   kind: function

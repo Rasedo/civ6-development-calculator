@@ -636,6 +636,13 @@
   final: 0x3e7c80
   kind: function
   status: PARTLY
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/majorCityBuild.ts:majorUnitExpected
+    - cpu/core/minorBuild.ts:minorUnitExpected
+    - gpu/core/sim_cityvalue.py:_cv_unit_prod_value
+    - gpu/core/sim_cityvalue.py:unit_expected
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
