@@ -362,6 +362,10 @@ class SimCityValue:
         if row["appealYield"]:
             amt = _fmul(_t(f.appeal(), like) * _FX, torch.full_like(like, _fx_const(row["appealPct"] * 0.01)))
             v = v + self._cv_yield(amt, row["appealYield"], f.yield_w(row["appealYield"]))
+        # the defence: min(max(n, 1), DefenseModifier) + min(n,
+        # GrantFortification), n 0 (LAB, `improvementYieldsValue`)
+        n = 0
+        v = v + (min(max(n, 1), row["defenseModifier"]) + min(n, row["grantFortification"])) * _FX
         if any(not c for _, c in row["buildUnits"]):
             v = v * 3
         value = _between(v, t, h, T["rate"])

@@ -1609,6 +1609,17 @@ class _MinorWorld:
         flat = plot.reshape(sim.B, -1)
         return sim.tile_seat.gather(1, flat.clamp(min=0)).reshape(plot.shape)
 
+    def plot_ground(self, plot):
+        """`plotGround` at [B] plots: the engine feature and the engine
+        resource the minor sees there, -1 none"""
+        sim = self.sim
+        p = plot.clamp(min=0)
+        b = sim._bidx
+        fid = sim.feat_id[b, p]
+        live_f = (fid >= 0) & ~sim.feat_stripped[b, p]
+        seen = sim._res_live()[b, p] & ~sim._res_hidden(sim._CITY_MINOR0 + self.s)[b, p]
+        return torch.where(live_f, fid, -1), torch.where(seen, sim.res_id[b, p], -1)
+
     def units(self):
         """the minor's units in the pool's order: id (its global slot), AI
         row, plot, charges, valid ([B, U] each)"""

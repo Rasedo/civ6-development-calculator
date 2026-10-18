@@ -152,6 +152,27 @@ class CityTreeTables:
         self.b_defensive = torch.tensor([r["defenseModifier"] > 0 or r["outerDefenseStrength"] > 0 for r in b], dtype=torch.bool)
         self.b_must_purchase = torch.zeros(len(b), dtype=torch.bool)
         self.d_defensive = torch.zeros(len(self.district_rows), dtype=torch.bool)
+        # ADD GOAL TECH's Goal Plot to work: per engine feature and resource
+        # its AI row (-1 none); per improvement row the features it stands
+        # on, the resources it works and those whose feature it keeps; per
+        # feature row whether it may be removed and the removal's technology;
+        # per resource row its harvests' technologies (-1 none)
+        feats, ress = cb["features"], cb["resources"]
+        names = cb["plotNames"]
+        f_of = {r["type"]: i for i, r in enumerate(feats)}
+        r_of = {r["type"]: i for i, r in enumerate(ress)}
+        self.feat_row = torch.tensor([f_of.get(n, -1) for n in names["feature"]] or [-1], dtype=torch.long)
+        self.res_row = torch.tensor([r_of.get(n, -1) for n in names["resourceType"]] or [-1], dtype=torch.long)
+        imps = self.improvement_rows
+        self.i_feat_ok = torch.tensor([[f["type"] in r["features"] for f in feats] for r in imps], dtype=torch.bool)
+        self.i_res_ok = torch.tensor([[x["type"] in r["resources"] for x in ress] for r in imps], dtype=torch.bool)
+        self.i_keeps = torch.tensor([[x["type"] in r["keepsFeature"] for x in ress] for r in imps], dtype=torch.bool)
+        self.f_removable = torch.tensor([bool(f["removable"]) for f in feats], dtype=torch.bool)
+        self.f_remove_tech = torch.tensor([self.tech_code.get(f["removeTech"], -2) if f["removeTech"] else -1 for f in feats],
+                                          dtype=torch.long)
+        k = max([len(x["harvestTechs"]) for x in ress] + [1])
+        self.r_harvest_tech = torch.tensor([[self.tech_code.get(t, -2) if t else -1 for t in x["harvestTechs"]]
+                                            + [-1] * (k - len(x["harvestTechs"])) for x in ress], dtype=torch.long)
         self.event_types = list(cb["cityEventTypes"])
         self.event_lists = cb["cityEventLists"]
         self.trees = {name: _Tree(name, rows) for name, rows in cb["cityTrees"].items()}
@@ -816,31 +837,64 @@ def _u_decode(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 def _goal_of(c: _Ctx, i: int):
     """ADD GOAL TECH's first technology and civic the desired items need that
-    the seat lacks (NONE none)"""
-    w = c.w
+    the seat lacks (NONE none) — an improvement's own, then on its Goal Plot
+    to work the harvest's of a resource the seat sees there that it does not
+    work and the removal's of a feature it neither keeps nor stands on — and
+    where that feature may not be removed (FAILURE)"""
+    w, T = c.w, c.ai.T
     tech = torch.full_like(c.ref, NONE)
     civic = torch.full_like(c.ref, NONE)
+    fail = torch.zeros_like(c.ref, dtype=torch.bool)
+
+    def want_tech(t, need):
+        nonlocal tech
+        lack = need & (t != -1) & ~_b(w.tech_held(t), t)
+        tech = torch.where((tech == NONE) & lack, t, tech)
+
     for name, kind in (("Desired Units", "unit"), ("Desired Buildings", "building"), ("Desired Improvements", "improvement")):
         row = c.tag(i, name)
         row = torch.where(row == NONE, -1, row)
         t, cv = _lacking(w, *_prereqs(c.ai, kind, row))
         tech = torch.where((tech == NONE) & (t >= 0), t, tech)
         civic = torch.where((civic == NONE) & (cv >= 0), cv, civic)
+        if kind != "improvement":
+            continue
+        gp = c.tag(i, "Goal Plot to work")
+        on = (row >= 0) & (gp != NONE) & (gp >= 0)
+        if not bool(on.any()):
+            continue
+        dev = row.device
+        fe, re = w.plot_ground(torch.where(on, gp, 0))
+        fi = torch.where(fe >= 0, T.feat_row.to(dev)[fe.clamp(min=0)], -1)
+        ri = torch.where(re >= 0, T.res_row.to(dev)[re.clamp(min=0)], -1)
+        r = row.clamp(min=0)
+        rc = ri.clamp(min=0)
+        has_r = on & (ri >= 0)
+        listed = has_r & T.i_res_ok.to(dev)[r, rc]
+        keeps = listed & T.i_keeps.to(dev)[r, rc]
+        ht = T.r_harvest_tech.to(dev)[rc]
+        for k in range(ht.shape[1]):
+            want_tech(ht[:, k], has_r & ~listed)
+        fc = fi.clamp(min=0)
+        clear = on & (fi >= 0) & ~keeps & ~T.i_feat_ok.to(dev)[r, fc]
+        fail = fail | (clear & ~T.f_removable.to(dev)[fc])
+        want_tech(T.f_remove_tech.to(dev)[fc], clear & T.f_removable.to(dev)[fc])
     t = c.tag(i, "Desired Techs")
     t_l = (t != NONE) & ~_b(w.tech_held(torch.where(t == NONE, -1, t)), t)
     tech = torch.where((tech == NONE) & t_l, t, tech)
     cv = c.tag(i, "Desired Civics")
     c_l = (cv != NONE) & ~_b(w.civic_held(torch.where(cv == NONE, -1, cv)), cv)
     civic = torch.where((civic == NONE) & c_l, cv, civic)
-    return tech, civic
+    return tech, civic, fail
 
 
 def _u_add_goal_tech(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     """ADD GOAL TECH (0x7e7d20)"""
-    tech, civic = _goal_of(c, i)
-    c.ma[:, i] = torch.where(at, tech, c.ma[:, i])
-    c.mb[:, i] = torch.where(at, civic, c.mb[:, i])
-    return torch.where((tech == NONE) & (civic == NONE), BT_SUCCESS, BT_RUNNING)
+    tech, civic, fail = _goal_of(c, i)
+    put = at & ~fail
+    c.ma[:, i] = torch.where(put, tech, c.ma[:, i])
+    c.mb[:, i] = torch.where(put, civic, c.mb[:, i])
+    return torch.where(fail, BT_FAILURE, torch.where((tech == NONE) & (civic == NONE), BT_SUCCESS, BT_RUNNING))
 
 
 def _x_add_goal_tech(c: _Ctx, i: int, at: torch.Tensor) -> None:

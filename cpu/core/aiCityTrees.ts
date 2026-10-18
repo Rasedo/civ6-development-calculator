@@ -17,7 +17,7 @@
  * from turn to turn; the world it reads is the caller's `CityTreeWorld`.
  */
 import { AI_CITY_TREES } from '../data/aiCityTrees';
-import { AI_BUILDINGS, AI_DISTRICTS, AI_IMPROVEMENTS, AI_UNITS } from '../data/aiBuildTables';
+import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX } from './aiCityBuild';
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataTag, tick,
   type BtHandler, type BtNode, type BtRun } from './behaviorTree';
@@ -184,6 +184,9 @@ export interface CityTreeWorld {
   canPlaceDistrict(plot: number, district: string): boolean;
   /** the plot's owner, -1 none */
   plotOwner(plot: number): number;
+  /** the plot's feature and the resource the player sees on it (0x4ab4b0),
+   *  install types, null none */
+  plotGround(plot: number): { feature: string | null; resource: string | null };
   /** the player's builders make districts / wonders (player +0x308 /
    *  +0x3c8) */
   buildersMakeDistricts: boolean;
@@ -495,9 +498,18 @@ function contractWorld(ctx: Ctx): ContractNodeWorld {
 /** the tree's contract by the id a tag holds (0x7cb8b0: the tree's own) */
 const treeContract = (ctx: Ctx, id: unknown): AiContract | undefined => treeContractOf(ctx.ai, ctx.tree, id);
 
+const IMPROVEMENT_ROW = new Map(AI_IMPROVEMENTS.map((r) => [r.type, r] as const));
+const FEATURE_ROW = new Map(AI_FEATURES.map((r) => [r.type, r] as const));
+const RESOURCE_ROW = new Map(AI_RESOURCES.map((r) => [r.type, r] as const));
+
 // ADD GOAL TECH (0x7e7d20; its execution 0x7e7200): the technologies and
-// civics the desired items need that the player lacks; none SUCCEEDS; else
-// RUNNING, its execution claiming a contract on the first of them
+// civics the desired items need that the player lacks — an improvement's
+// own, and on its Goal Plot to work the harvest's of a resource the player
+// sees there that the improvement does not work and the removal's of a
+// feature it neither keeps nor stands on (a feature that may not be removed
+// FAILS); none SUCCEEDS; else RUNNING, its execution claiming a contract on
+// the first of them (runs/h1_duelw1124 Granada t2: the Alcazar tree on plot
+// 570's Rainforest, Bronze Working Tech Contract 7 at 104.0)
 const addGoalTech: BtHandler<Ctx> = {
   update(node, run, ctx) {
     const m = run.mem[node.index];
@@ -508,9 +520,25 @@ const addGoalTech: BtHandler<Ctx> = {
       if (p.tech && !w.techHeld(p.tech) && !techs.includes(p.tech)) techs.push(p.tech);
       if (p.civic && !w.civicHeld(p.civic) && !civics.includes(p.civic)) civics.push(p.civic);
     };
+    const goal = tagOf(run, node, 'Goal Plot to work');
     for (const u of list(tagOf(run, node, 'Desired Units'))) want(prereqsOf({ unit: String(u) }));
     for (const b of list(tagOf(run, node, 'Desired Buildings'))) want(prereqsOf({ building: String(b) }));
-    for (const i of list(tagOf(run, node, 'Desired Improvements'))) want(prereqsOf({ improvement: String(i) }));
+    for (const i of list(tagOf(run, node, 'Desired Improvements'))) {
+      want(prereqsOf({ improvement: String(i) }));
+      const imp = IMPROVEMENT_ROW.get(String(i));
+      if (!imp || typeof goal !== 'number' || goal < 0) continue;
+      const g = w.plotGround(goal);
+      let keeps = false;
+      if (g.resource) {
+        if (imp.resources.includes(g.resource)) keeps = imp.keepsFeature.includes(g.resource);
+        else for (const t of RESOURCE_ROW.get(g.resource)?.harvestTechs ?? []) if (t) want({ tech: t, civic: null });
+      }
+      if (g.feature && !keeps && !imp.features.includes(g.feature)) {
+        const f = FEATURE_ROW.get(g.feature);
+        if (!f?.removable) return BT_FAILURE;
+        if (f.removeTech) want({ tech: f.removeTech, civic: null });
+      }
+    }
     for (const t of list(tagOf(run, node, 'Desired Techs'))) if (!w.techHeld(String(t)) && !techs.includes(String(t))) techs.push(String(t));
     for (const c of list(tagOf(run, node, 'Desired Civics'))) if (!w.civicHeld(String(c)) && !civics.includes(String(c))) civics.push(String(c));
     m.tech = techs[0] ?? null;

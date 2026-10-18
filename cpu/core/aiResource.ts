@@ -39,6 +39,8 @@ export interface AiResourceRow {
   units: readonly string[];
   /** Resource_Harvests and Resource_YieldChanges: [YieldType, amount] */
   harvests: readonly (readonly [string, number])[];
+  /** each Resource_Harvests row's PrereqTech, null none */
+  harvestTechs: readonly (string | null)[];
   yields: readonly (readonly [string, number])[];
 }
 

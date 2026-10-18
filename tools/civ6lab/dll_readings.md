@@ -4460,6 +4460,24 @@ operations' contracts, the improvement values below, the purchases).
   (0x7a0ac0), its threat CityBuildAI +0x1b8. The city-states run it (1124
   player 3 t19 "City Defense, Started"); the threat, the one manager and
   the tree's nodes: "City Defense and the assault target's validity".
+- ADD GOAL TECH, READ (0x7e7d20; its execution 0x7e7200). Its kept
+  contracts first (+0x94 tech, +0x9c civic: SUBMITTED / FAILED / COMPLETED /
+  0 released, IN PROGRESS RUNNING); no list in its data ERROR. The lists:
+  Desired Techs and Civics the player lacks, each desired unit's, building's
+  and improvement's PrereqTech / PrereqCivic it lacks; per improvement, on
+  the Goal Plot to work, the resource the player sees there (0x4ab4b0):
+  one it works (Improvement_ValidResources) keeps the feature where
+  MustRemoveFeature is false, one it does not adds its Resource_Harvests'
+  PrereqTech; then a feature it neither keeps nor lists
+  (Improvement_ValidFeatures): not Removable FAILURE, else its RemoveTech.
+  "Add Techs For All" clear: an item lacking its own SUCCEEDS at once (no
+  city tree sets it so). After the lists the Goal Plot alone: each
+  improvement working the seen resource (its +0xd8 / +0xe0 tests unread)
+  adds its PrereqTech, and where the last clears the feature, a removable
+  feature's RemoveTech (not ported). The tech list sorted (0x7e7080, its
+  key unread), the first the goal; none SUCCESS, else RUNNING
+  (runs/h1_duelw1124 Granada t2: the Alcazar tree on plot 570's Rainforest
+  posts Bronze Working, Tech Contract 7 at the tree's 104.0).
 - A tech contract (Add Goal Tech) is IN PROGRESS while the tech is the
   research (AI_Research.csv prints it alive while RESEARCHING), ACCEPTED
   off it (the research AI's check 0x5f5940; the engines' trees hold it
@@ -4615,7 +4633,9 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   Appeal x the percent, each at the player's value (0x7a6690, 0x7a60d0);
   Improvement_Tourism at PSEUDOYIELD_TOURISM x the era factor;
   min(max(n, 1), DefenseModifier) + min(n, GrantFortification), n by
-  0x3dfae0 (unread); the Barbarian Clans traps' properties
+  0x3dfae0 (partly read: a count over the game's players; ported at n 0, a
+  LAB fit — runs/h1_duelv1124 Granada's Alcazar, DefenseModifier 4, every
+  row 1.0 a turn above the value without it, 104.61 at its t2 plot); the Barbarian Clans traps' properties
   (PLOT_DAMAGE_TO_WALKING_INTO / _ADJACENT, hashes 0x7d27db83 /
   0x8634aa0f); x3 where a build unit spends no charge. PV(H) - PV(T); the
   Housing over TilesRequired at the housing value 0x7a3d70; where the
@@ -4624,7 +4644,7 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T,
   0x79f0c0); its modifiers 0x7a4b20; at the top level its neighbours'
   improvements and districts revalued with it (0x79ed40). Unported: the
-  tourism, defence, claims, modifiers and neighbours terms. LAB: the
+  tourism, claims, modifiers and neighbours terms. LAB: the
   Housing counted a second time at its whole value (the housing value's
   whole part, as an analyzer's): runs/h1_duelv1117 Caguana's Farm rows
   each the value without it plus exactly that whole part (18.00 at t6, 30.00

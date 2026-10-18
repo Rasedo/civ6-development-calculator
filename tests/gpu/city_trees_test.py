@@ -249,6 +249,10 @@ class World:
     def plot_owner(self, plot):
         return self._per(lambda b, p: self.seat if p in SC["owned"] else -1 if p in SC["unowned"] else 5, plot)
 
+    def plot_ground(self, plot):
+        none = torch.full_like(plot, -1)
+        return none, none
+
     def units(self):
         U = max([len(g.units) for g in self.g] + [1])
         out = {k: torch.full((self.B, U), -1, dtype=L) for k in ("id", "type", "plot", "charges")}

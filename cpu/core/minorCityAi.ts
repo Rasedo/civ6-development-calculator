@@ -144,6 +144,17 @@ function seenGround(state: GameState, cs: CityState, tile: Tile): Tile {
   return tile.resource && hiddenResourcesFor(state, cs.seat).has(tile.resource) ? { ...tile, resource: null } : tile;
 }
 
+/** a plot's feature and the resource the seat sees on it, install types
+ *  (the trees' `plotGround`) */
+export function plotGroundOf(state: GameState, seat: number, plot: number): { feature: string | null; resource: string | null } {
+  const tile = state.map.tiles[plot];
+  const seen = tile.resource && !hiddenResourcesFor(state, seat).has(tile.resource) ? tile.resource : null;
+  return {
+    feature: tile.feature ? installFeature(tile.feature) : null,
+    resource: seen ? gameTypeOf('resource', seen, 'RESOURCE_') : null,
+  };
+}
+
 /** the improvements the ground of a plot takes for the minor, the
  *  improvements' own research waived (CanHaveImprovement, 0x35fd60) — a
  *  ground row's civic (the Farm on Hills, a feature row) held: those of the
@@ -453,6 +464,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
       return !!id && canPlaceDistrictIn(state, minorCity(cs), id, plot, { unlocks: null, ownsTile: (t) => tileSeat(t) === cs.seat }).ok;
     },
     plotOwner: (plot) => tileSeat(state.map.tiles[plot]),
+    plotGround: (plot) => plotGroundOf(state, cs.seat, plot),
     buildersMakeDistricts: false,
     buildersMakeWonders: false,
     districtTie: () => randRange(state, 2, 'City Build District Choice'),

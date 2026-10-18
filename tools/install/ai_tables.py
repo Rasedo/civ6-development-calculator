@@ -765,6 +765,7 @@ def build_city(rows, modifier) -> str:
                   "peakEra": c.get("PeakEra") if c.get("PeakEra") not in (None, "", "NO_ERA") else None,
                   "units": strat_units[r],
                   "harvests": [[h["YieldType"], num(h, "Amount")] for h in harvests[r]],
+                  "harvestTechs": [h.get("PrereqTech") or None for h in harvests[r]],
                   "yields": [[y["YieldType"], num(y, "YieldChange")] for y in res_yields[r]]}
                  for r, c in in_game_order("Resources", "ResourceType", keyed(rows("Resources"), "ResourceType"))]
     valid = multi("Improvement_ValidResources", "ImprovementType")
