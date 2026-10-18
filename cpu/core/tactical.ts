@@ -30,7 +30,7 @@ import { cityStateAt, minorCity } from './cityStates';
 import { irradiated } from './nuclear';
 import { canSee, unitSight } from './fog';
 import { barbarianScouts, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, ringPlots, tribeOf } from './barbarians';
-import { barbarianTrees } from './barbarianOps';
+import { barbarianCaptures, barbarianTrees } from './barbarianOps';
 import { BT_RUNNING, BT_SUCCESS } from './behaviorTree';
 import { generalAuraMP } from './aura';
 import { attacksLeftOf, attacksPerTurn } from './promotions';
@@ -2439,8 +2439,10 @@ export function barbarianTactics(state: GameState, acting: ReadonlySet<number>):
   } finally {
     costsHeld = null;
   }
-  // the turn's end: the knowledge base looks again (player signal +0x228)
+  // the turn's end: the knowledge base looks again (player signal +0x228);
+  // the turn's captures start their operations
   knowledgeLook(state, state.barbSeat, BARB_SEAT, plotsSeenNow(state, new Set([BARB_SEAT])), false);
+  barbarianCaptures(state);
 }
 
 function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {

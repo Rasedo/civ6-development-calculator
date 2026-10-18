@@ -4102,6 +4102,31 @@ class SimInit:
         self.tribe_op_done = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
         self.tribe_op_dead = torch.zeros(B, self.KT, dtype=torch.long, device=device)
         self.tribe_store = torch.zeros(B, self.KT, 3, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
+        # the barbarians' Builder Capture operations (`BARB_CAPTURE_DEF`, the
+        # tree "Escort Worker To Camp"), a slot each: its tree's id (-1 a free
+        # slot), its captive's and its captor's local slots (-1 gone from
+        # it), its target and rally and its backup's, its root Sequence's
+        # resume, its pair formed, its team ready, its team's and the enemy's
+        # strengths, its two Operation Moves' stores and their goals, its
+        # members killed; the turn's captures (captive, captor) awaiting
+        # their operations
+        _nc = simbase.BARB_CAP_MAX
+        self.bcap_id = torch.full((B, _nc), -1, dtype=torch.long, device=device)
+        self.bcap_civ = torch.full((B, _nc), -1, dtype=torch.long, device=device)
+        self.bcap_esc = torch.full((B, _nc), -1, dtype=torch.long, device=device)
+        self.bcap_target = torch.full((B, _nc), -1, dtype=torch.long, device=device)
+        self.bcap_rally = torch.full((B, _nc), -1, dtype=torch.long, device=device)
+        self.bcap_bk_target = torch.full((B, _nc), -1, dtype=torch.long, device=device)
+        self.bcap_bk_rally = torch.full((B, _nc), -1, dtype=torch.long, device=device)
+        self.bcap_resume = torch.full((B, _nc), -1, dtype=torch.long, device=device)
+        self.bcap_form = torch.zeros(B, _nc, dtype=torch.bool, device=device)
+        self.bcap_ready = torch.zeros(B, _nc, dtype=torch.bool, device=device)
+        self.bcap_str = torch.zeros(B, _nc, dtype=torch.long, device=device)
+        self.bcap_estr = torch.zeros(B, _nc, dtype=torch.long, device=device)
+        self.bcap_store = torch.zeros(B, _nc, 2, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
+        self.bcap_store_goal = torch.full((B, _nc, 2), -1, dtype=torch.long, device=device)
+        self.bcap_dead = torch.zeros(B, _nc, dtype=torch.long, device=device)
+        self.barb_capq = torch.full((B, simbase.BARB_CAP_MAX, 2), -1, dtype=torch.long, device=device)
         self.tribe_store_goal = torch.full((B, self.KT, 3), -1, dtype=torch.long, device=device)
         self.barb_spot_next = torch.zeros(B, max(self.n_majors, 1), dtype=torch.long, device=device)
         # the plots three rings round each plot in the game's ring order
@@ -4156,6 +4181,8 @@ class SimInit:
         # (a raid's recruit counts a unit to its class by them)
         # per unit type, UNITAI_COMBAT (the raid team's requirement)
         self._bop_combat_ai = torch.tensor([bool(x) for x in self._bb["unitCombatAi"]] or [False], dtype=torch.bool, device=device)
+        self._bop_land_ai = torch.tensor([bool(x) for x in self._bb["unitLandCombatAi"]] or [False], dtype=torch.bool, device=device)
+        self._bop_civ_ai = torch.tensor([bool(x) for x in self._bb["unitCivilianAi"]] or [False], dtype=torch.bool, device=device)
         self._barb_tag_member = torch.zeros(len(self._bb["tagUnits"]), self.NU, dtype=torch.bool, device=device)
         for _ti, _rows in enumerate(self._bb["tagUnits"]):
             for _r in _rows:

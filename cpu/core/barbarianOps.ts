@@ -15,12 +15,13 @@
  * no candidate, and a member killed stays in its team.
  */
 import type { BarbHoming, BarbTarget, BarbTribe, GameState, Unit } from './types';
-import { BARB_SEAT, isBarbSeat } from './seats';
+import { BARB_SEAT, campTiles, isBarbSeat } from './seats';
 import { majorView } from './majorView';
 import { passOrders, passView } from './opsOrders';
 import { knownOf } from './minorOps';
 import { newOpsAi, operationsRefresh, opsOf, startOperationAt, tickOperation, type OpsAi, type OpsEnv } from './operations/manager';
-import { addMember, opUnits, type Operation } from './operations/operation';
+import { evaluate, type Candidate, type EvalInputs } from './operations/evaluate';
+import { NO_PLOT, addMember, opDef, opUnits, type Operation } from './operations/operation';
 import type { BarbarianHooks } from './operations/barbarian';
 import { BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataFloat, dataInt, dataTag, tick, type BtHandler, type BtNode, type BtRun } from './behaviorTree';
 import { AI_OP_DEFS, AI_TREES } from '../data/aiOperations';
@@ -34,6 +35,9 @@ import type { MajorUnitView, MajorView } from '../../ai/major/view';
 /** the definitions the tribes start */
 export const BARB_RAID_DEF = 'Barbarian Attack';
 export const BARB_ASSAULT_DEF = 'Barbarian City Assault';
+/** the definition a capture starts (BarbarianTriggeredTrees:
+ *  TRIGGER_CAPTURE_BARBARIAN, the tree "Escort Worker To Camp") */
+export const BARB_CAPTURE_DEF = 'Barbarian Builder Capture';
 
 /** the replay's view of the barbarians' operation lines (null off) */
 let tracer: ((line: string) => void) | null = null;
@@ -62,6 +66,10 @@ function barbView(state: GameState, pass: Pass | null): MajorView {
 }
 
 const tribeAt = (state: GameState, k: number): BarbTribe | undefined => state.barbTribes?.[k];
+
+/** the camps the barbarians' knowledge base holds: every camp, in plot
+ *  order (their own camps, each seen by its defender) */
+const campsKnown = (state: GameState): number[] => [...campTiles(state)].sort((a, b) => a - b);
 
 const unitOf = (state: GameState, id: number): Unit | undefined => state.units.find((u) => u.id === id && isBarbSeat(u.seat));
 
@@ -143,7 +151,7 @@ function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
     view: fresh,
     defs: [],
     army: (p) => knownOf(state.barbSeat.armyKnown, p),
-    camps: () => [],
+    camps: () => campsKnown(state),
     known: () => [],
     threat: () => -1,
     book: none,
@@ -238,7 +246,46 @@ export function barbOpRecord(state: GameState, tribe: BarbTribe): number[] {
  */
 export function barbarianOpsTurn(state: GameState): void {
   const ai = state.barbSeat.ops;
-  if (ai && opsOf(ai).length) operationsRefresh(ai, barbEnv(state, null));
+  if (!ai || !opsOf(ai).length) return;
+  const env = barbEnv(state, null);
+  operationsRefresh(ai, env);
+  // a running operation's candidate names its backup (0x7271d0 ->
+  // 0x73e610): its target from its own, at its strength
+  const view = env.view();
+  const inputs: EvalInputs = {
+    settle: null, camps: campsKnown(state), taken: new Set(opsOf(ai).map((o) => o.target)), known: () => view.knownCities(BARB_SEAT),
+    army: (p) => (p === BARB_SEAT ? view.units(BARB_SEAT) : env.army(p)),
+  };
+  for (const op of opsOf(ai)) {
+    const c: Candidate = { def: opDef(op), enemy: op.enemy, presetRally: op.target, presetStrength: op.strength, op,
+      valid: false, odds: 0, value: 0, target: NO_PLOT, rally: NO_PLOT };
+    evaluate(view, BARB_SEAT, c, [], inputs);
+    if (c.valid) op.backup = { target: c.target, rally: c.rally, enemy: c.enemy };
+  }
+}
+
+/**
+ * THE CAPTURES' OPERATIONS at the barbarians' turn's end (AI_EVENT_UNIT_CAPTURED
+ * from the capture 0x212500, the triggered tree 0x800c60): each capture
+ * starts "Barbarian Builder Capture" by name (0x7265b0) on the captive's
+ * plot, its rally the plot, the event's units — the captive, then its
+ * captor — joining its team (0x737e80), the captor leaving the operation it
+ * held; the tree first ticks in the next turn's walk.
+ */
+export function barbarianCaptures(state: GameState): void {
+  const caps = state.barbCaptures ?? [];
+  delete state.barbCaptures;
+  if (!caps.length) return;
+  const ai = opsOfBarbs(state);
+  for (const { captive, captor } of caps) {
+    const cu = unitOf(state, captive);
+    if (!cu) continue;
+    const units = [cu, unitOf(state, captor)].filter((u): u is Unit => !!u);
+    for (const o of opsOf(ai)) for (const t of o.teams) t.members = t.members.filter((id) => !units.some((u) => u.id === id));
+    const op = startOperationAt(ai, barbEnv(state, null), BARB_CAPTURE_DEF, -1, cu.tileIndex, cu.tileIndex);
+    op.triggerUnits = units.map((u) => u.id);
+    for (const u of units) addMember(op.teams[0], { id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_') });
+  }
 }
 
 /**

@@ -12457,7 +12457,7 @@ class SimSeats:
             # (`seizable`)
             _won = def_dead & ~atk_dead
             if bool(_won.count_nonzero()):
-                self._seize_civilians(self._seize_open(_won, ttc, a_type[:, u], a_seat[:, u]), ttc, a_seat[:, u], atk_kind)
+                self._seize_civilians(self._seize_open(_won, ttc, a_type[:, u], a_seat[:, u]), ttc, a_seat[:, u], atk_kind, u)
             adv_terr = self._advance_terrain(a_type[:, u], a_seat[:, u], tgt)
             _anav = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)]
             adv = (def_dead & ~atk_dead & adv_terr
@@ -12486,7 +12486,7 @@ class SimSeats:
             civ_att = self._seize_open(civ_att, ttc, a_type[:, u], a_seat[:, u])
             rows = civ_att.nonzero(as_tuple=True)[0]
             if rows.numel():
-                self._seize_civilians(civ_att, ttc, a_seat[:, u], atk_kind)
+                self._seize_civilians(civ_att, ttc, a_seat[:, u], atk_kind, u)
                 for s in torch.unique(a_seat[rows, u]).tolist():
                     self._melee_coloc(civ_att & (a_seat[:, u] == s), ttc, atk_kind, u, int(s))
         # A FALLEN attacker's turn ends outright; a surviving one pays through
@@ -13950,7 +13950,8 @@ class SimSeats:
             ok = ok & ~((o >= 0) & (o_seat != captor) & ~self._seize_victim(o, captor))
         return ok
 
-    def _seize_civilians(self, mask: torch.Tensor, tile: torch.Tensor, captor: torch.Tensor, pool: str) -> None:
+    def _seize_civilians(self, mask: torch.Tensor, tile: torch.Tensor, captor: torch.Tensor, pool: str,
+                         by: int = -1) -> None:
         """`seizeCivilian` over every hostile civilian on `tile` [B] (clamped)
         of the games in `mask`, `captor` [B] the mover's seat, `pool` its
         pool: a chassis with a UnitCaptures row becomes it under the captor
@@ -13959,7 +13960,9 @@ class SimSeats:
         free, and any other is destroyed. A religious unit is never seized
         (onto its plot the order is a move, `_melee_coloc`). A plot holds
         at most one civilian a UnitCaptures row names, so the planes' order
-        appends no two captives against each other."""
+        appends no two captives against each other. A barbarian's capture
+        (`by` the mover's local slot) is the Builder Capture's event: the
+        captive and its captor to `barb_capq`."""
         for plane in (self.embarked_at, self.support_at, self.civilian_at):
             slot = plane.gather(1, tile.unsqueeze(1)).squeeze(1)
             hit = mask & self._seize_victim(slot, captor)
@@ -13974,6 +13977,8 @@ class SimSeats:
             take = cap >= 0
             if bool(take.count_nonzero()):
                 self.unit_type[hr[take], hs[take]] = cap[take]
+                if pool == "barb" and by >= 0:
+                    self._barb_capture_event(hr[take], self.next_slot[hr[take]].clone(), by)
                 self._capture_unit(hr[take], hs[take], pool, hc[take], ht[take])
             back = ~take & self._type_retreats[hu]
             to = torch.full_like(hs, -1)

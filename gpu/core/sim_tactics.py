@@ -1256,8 +1256,8 @@ class SimTactics:
         moves of Tactics.xml's "Default Barbarian" and "Default Barbarian HL"
         lists in order, each walking the units the moves before it left — in
         their pool's slot order (`barb_unit_slotno`); at the turn's end the
-        knowledge base looks again
-        (`_knowledge_look` on the row `BK`)."""
+        knowledge base looks again (`_knowledge_look` on the row `BK`) and the
+        turn's captures start their operations (`_barb_captures`)."""
         self._tac_in_pass = True
         self._tac_cost_held = None
         self._tac_full_held = None
@@ -1269,6 +1269,8 @@ class SimTactics:
             self._tac_full_held = None
         ones = torch.ones(self.B, dtype=torch.bool, device=self.device)
         self._knowledge_look(self.BK, BARB_SEAT, self._barb_seen("barbarians"), ones, False)
+        # the turn's captures start their operations
+        self._barb_captures()
 
     def _tac_range(self, b: torch.Tensor, s: torch.Tensor, pre: str = "barb") -> torch.Tensor:
         """`rangeOf` for the units at local slots `s` of pool `pre` in the
@@ -2439,7 +2441,7 @@ class SimTactics:
         # the trees first (the tree manager's tick, list C); then an
         # operation's units are the operation's
         self._barb_trees(done, ai, order, rowof, res, tg, danger)
-        done |= self.barb_unit_op & acting
+        done |= (self.barb_unit_op | self._bcap_members()) & acting
         # the tactical list (`tacticalUnit`); the homeland takes the rest
         tac = self._tac_tactical(ai, utribe)
         live_all = live

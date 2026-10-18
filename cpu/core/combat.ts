@@ -1844,14 +1844,18 @@ const MOVED_ONTO: RuleResult = { ok: true, reason: 'Moved onto the plot.' };
  *     district plot it may stand on — a city centre alone for a sea-domain
  *     unit (0x530650) — and is destroyed where none is free;
  *   - any other is destroyed.
+ * `by` the mover (its player; its id, -1 for a seizure with no mover).
  */
-export function seizeCivilian(state: GameState, victim: Unit, captor: number): void {
+export function seizeCivilian(state: GameState, victim: Unit, by: { seat: number; id: number }): void {
   const def = UNITS[victim.type];
   // a seized or withdrawn civilian rides in no formation
   victim.escorted = false;
   if (def?.capturedAs) {
     victim.type = def.capturedAs;
-    reseatUnit(state, victim, captor);
+    reseatUnit(state, victim, by.seat);
+    // the capture's event (AI_EVENT_UNIT_CAPTURED, 0x212500): the captive,
+    // then its captor
+    if (isBarbSeat(by.seat) && by.id >= 0) (state.barbCaptures ??= []).push({ captive: victim.id, captor: by.id });
     return;
   }
   const to = def?.retreatsWhenCaptured ? retreatPlot(state, victim) : -1;
@@ -2036,7 +2040,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     // every hostile civilian on it (`seizable`), and the mover then steps in
     const taken = seizable(state, attacker, targetIndex);
     if (!taken) return no('Cannot move there.');
-    for (const u of taken) seizeCivilian(state, u, attacker.seat);
+    for (const u of taken) seizeCivilian(state, u, attacker);
     stepUnit(state, attacker, target);
     return MOVED_ONTO;
   } else {
@@ -2084,7 +2088,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // China's Warrior killed the barbarians' escort and took the Settler)
   const taken = state.units.includes(attacker) ? seizable(state, attacker, targetIndex) : null;
   if (taken) {
-    for (const u of taken) seizeCivilian(state, u, attacker.seat);
+    for (const u of taken) seizeCivilian(state, u, attacker);
     attacker.tileIndex = targetIndex;
     // an amphibious victor comes ashore: `stepUnit`'s own transition rule
     if (!def.naval && !waterWalks(attacker.type)) {

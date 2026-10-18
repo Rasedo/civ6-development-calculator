@@ -217,12 +217,14 @@ function assaultTargetValid(ctx: OpsContext, op: Operation): boolean {
 
 /** the target still one the operation can act on (0x73abf0): a city
  *  assault's (assaultTargetValid); for a settle target, a plot the seat may
- *  found on that still scores */
+ *  found on that still scores; for a camp target, a camp the seat knows
+ *  still standing on it */
 export function targetValid(ctx: OpsContext, op: Operation): boolean {
   if (op.target === NO_PLOT) return false;
   const type = opDef(op).targetType;
   if (type === 'TARGET_ENEMY_COMBAT_DISTRICT') return assaultTargetValid(ctx, op);
   if (type === 'TARGET_SETTLE_LOCATION') return ctx.settle?.canFoundAt(op.target) ?? false;
+  if (type === 'TARGET_BARBARIAN_CAMP') return !targetGone(ctx, op);
   return true;
 }
 

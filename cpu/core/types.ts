@@ -577,6 +577,10 @@ export interface GameState {
   barbTribes?: BarbTribe[];
   /** the barbarians' unit pool (`barbSlots`) */
   barbPool?: UnitPool;
+  /** the civilians the barbarians captured this turn, each with its captor
+   *  (AI_EVENT_UNIT_CAPTURED's payload, 0x212500): the Builder Capture's
+   *  trigger, read at their turn's end */
+  barbCaptures?: { captive: number; captor: number }[];
   /** the camp step has added camps once: every later step adds one */
   barbCampsBegun?: boolean;
   /** per player (seat), the first turn a barbarian scout may report one of

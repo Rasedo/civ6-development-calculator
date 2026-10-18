@@ -2,7 +2,9 @@
 over the one operation manager cpu/core/operations; tools/civ6lab/dll_readings.md
 "C-95: the barbarians' raid", "C-95: the scout's tree"): a tribe's raid
 ("Raid City") or city assault ("Barbarian City Attack") and its scout's
-walk home ("Barbarian Found City"), each tree ticked as the interpreter
+walk home ("Barbarian Found City"), and a capture's escort of its captive
+to a camp ("Escort Worker To Camp", the operation "Barbarian Builder
+Capture"), each tree ticked as the interpreter
 walks it (cpu/core/behaviorTree.ts) — the walk's statuses, then the
 executions in node order — the trees' data read off the install's rows
 (`rules`' barbarians.trees).
@@ -67,6 +69,15 @@ class _Trees:
             "Make Formation", "Operation Pillage", "Operation Move", "Notify Owner"], "Barbarian City Attack's walk"
         assert [n["type"] for n in sc] == ["Sequence", "Decode Trigger", "Concurrent", "Protect Unit", "Move Unit",
                                            "Notify Owner"], "Barbarian Found City's walk"
+        cap = trees["Escort Worker To Camp"]
+        assert [n["type"] for n in cap] == [
+            "Sequence", "Make Formation", "Operation Change Target", "Concurrent", "Operation Is Ready",
+            "Operation Defend Units", "Operation Move", "Make Formation", "Operation Move"], "Escort Worker To Camp's walk"
+        assert _node_data(cap[1], "Combat Unit") == "UNITTYPE_LAND_COMBAT" and _node_data(cap[1], "Civilian Unit") == "UNITTYPE_CIVILIAN"
+        assert _flag(_node_data(cap[7], "Destroy Formations")), "the capture's second Make Formation forms"
+        assert _num(_node_data(cap[2], "Backup Amount")) == 0 and _num(_node_data(cap[2], "Failure Amount")) == -1
+        for n in (cap[6], cap[8]):
+            assert _num(_node_data(n, "Move To (enum)"), 1) == 1, "the capture's Operation Move to its target"
         for n in (ass[12], ass[16], ass[22]):
             # a formation of a civilian alone: none of the assault's pairs
             assert _node_data(n, "Civilian Unit") is None, "Make Formation with a civilian"
@@ -77,6 +88,7 @@ class _Trees:
 
         self.raid_recruit = _num(_node_data(raid[5], "Turns to Run"))
         self.raid_moves = [move(raid[11]), move(raid[21]), move(raid[24])]
+        self.cap_moves = [move(cap[6]), move(cap[8])]
         self.raid_score = _num(_node_data(raid[13], "Score"))
         assert _flag(_node_data(raid[14], "Limit Is Min")) and _flag(_node_data(raid[14], "Fail at Limit")) is False
         self.raid_turns = _num(_node_data(raid[14], "Turns to Run"))
@@ -171,14 +183,289 @@ class SimBarbOps:
             against = torch.where(self.tribe_op[:, k] == 2, self.tribe_op_seat[:, k], torch.full_like(self.tribe_op_seat[:, k], -1))
             enemy = self._ops_enemy_str(BARB_SEAT, self.BK, self.tribe_op_plot[:, k], against)
             self.tribe_op_ready[:, k] = torch.where(on, mins & (strength >= enemy), self.tribe_op_ready[:, k])
+        self._bcap_refresh(st, combat_ai)
+
+    # -- the Builder Capture ("Escort Worker To Camp") ------------------------
+
+    def _barb_capture_event(self, rows: torch.Tensor, captive: torch.Tensor, by: int) -> None:
+        """AI_EVENT_UNIT_CAPTURED (0x212500) of a barbarian capture in games
+        `rows`: the captive's local slot `captive` [n] and its captor's `by`
+        to the turn's queue"""
+        q = self.barb_capq[rows, :, 0]
+        free = (q < 0).long().argmax(dim=1)
+        assert bool((q < 0).any(dim=1).all()), "the barbarians' captures: raise BARB_CAP_MAX"
+        self.barb_capq[rows, free, 0] = captive
+        self.barb_capq[rows, free, 1] = by
+
+    def _bcap_members(self) -> torch.Tensor:
+        """[B, P] the units the captures' operations hold"""
+        out = torch.zeros_like(self.barb_unit_alive)
+        bidx = self._bidx
+        for c in range(self.bcap_id.shape[1]):
+            on = self.bcap_id[:, c] >= 0
+            for pl in (self.bcap_civ, self.bcap_esc):
+                sl = pl[:, c]
+                m = on & (sl >= 0)
+                out[bidx[m], sl[m]] = True
+        return out & self.barb_unit_alive
+
+    def _barb_captures(self) -> None:
+        """`barbarianCaptures`: each of the turn's captures starts "Barbarian
+        Builder Capture" by name (0x7265b0) on the captive's plot, its rally
+        the plot, its tree the player's next; the captive, then its captor,
+        join its team (0x737e80), the captor leaving the operation it held"""
+        for j in range(self.barb_capq.shape[1]):
+            civ = self.barb_capq[:, j, 0]
+            esc = self.barb_capq[:, j, 1]
+            go = (civ >= 0) & self.barb_unit_alive.gather(1, civ.clamp(min=0).unsqueeze(1)).squeeze(1)
+            if not bool(go.any()):
+                continue
+            cs = civ.clamp(min=0)
+            es = esc.clamp(min=0)
+            esc_ok = go & (esc >= 0) & self.barb_unit_alive.gather(1, es.unsqueeze(1)).squeeze(1)
+            rows = esc_ok.nonzero(as_tuple=True)[0]
+            if rows.numel():
+                # the captor leaves its tribe's operation and any capture's
+                self.barb_unit_op[rows, es[rows]] = False
+                for c in range(self.bcap_id.shape[1]):
+                    for pl in (self.bcap_civ, self.bcap_esc):
+                        hit = esc_ok & (pl[:, c] == esc)
+                        pl[:, c] = torch.where(hit, torch.full_like(esc, -1), pl[:, c])
+            free = (self.bcap_id < 0)
+            assert bool((free.any(dim=1) | ~go).all()), "the barbarians' captures' operations: raise BARB_CAP_MAX"
+            c_ix = free.long().argmax(dim=1)
+            nid = self._bop_next_id(go)
+            r = go.nonzero(as_tuple=True)[0]
+            ci = c_ix[r]
+            plot = self.barb_unit_tile[r, cs[r]]
+            self.bcap_id[r, ci] = nid[r]
+            self.bcap_civ[r, ci] = cs[r]
+            self.bcap_esc[r, ci] = torch.where(esc_ok[r], es[r], torch.full_like(es[r], -1))
+            self.bcap_target[r, ci] = plot
+            self.bcap_rally[r, ci] = plot
+            self.bcap_bk_target[r, ci] = -1
+            self.bcap_bk_rally[r, ci] = -1
+            self.bcap_resume[r, ci] = -1
+            self.bcap_form[r, ci] = False
+            self.bcap_ready[r, ci] = False
+            self.bcap_str[r, ci] = 0
+            self.bcap_estr[r, ci] = 0
+            self.bcap_store[r, ci] = False
+            self.bcap_store_goal[r, ci] = -1
+            self.bcap_dead[r, ci] = 0
+        self.barb_capq.fill_(-1)
+
+    def _bcap_bury(self) -> None:
+        """a capture's member killed is counted to it and its slot let go"""
+        bidx = self._bidx
+        for c in range(self.bcap_id.shape[1]):
+            on = self.bcap_id[:, c] >= 0
+            for pl in (self.bcap_civ, self.bcap_esc):
+                sl = pl[:, c]
+                gone = on & (sl >= 0) & ~self.barb_unit_alive[bidx, sl.clamp(min=0)]
+                self.bcap_dead[:, c] += gone.long()
+                pl[:, c] = torch.where(gone, torch.full_like(sl, -1), sl)
+
+    def _bcap_refresh(self, st: torch.Tensor, combat_ai: torch.Tensor) -> None:
+        """the captures' part of `barbarianOpsTurn`: each team's update
+        (0x73fba0: a civilian and a UNITAI_COMBAT member — the
+        InitialStrengthAdvantage 0 asks no strength — the members' strength),
+        the enemy's about the target (`_ops_enemy_str`), and the running
+        operation's candidate as its backup (0x73e610, `evaluate`: of the
+        camps, in plot order, the one of the best odds from the target at the
+        team's strength, the enemy's 6 and the barbarians' own units within 3
+        of it; a camp on the target, or off its area, none)"""
+        self._bcap_bury()
+        B, dev = self.B, self.device
+        bidx = self._bidx
+        ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
+        civ_ai = self._bop_civ_ai.take(ut)
+        cp = self.camp_tile
+        n_camps = (cp >= 0).sum(dim=1)
+        # each camp's enemy strength: 6 and the barbarians' units within 3
+        full = int(self.rules.combat["unitHp"])
+        own = self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT) & (self.barb_unit_tile >= 0)
+        dmg = (full - self.barb_unit_hp).clamp(min=0)
+        term = self._mops_army_term(self._type_combat.take(ut), self._type_ranged_strength.take(ut), dmg)
+        best = 1  # the barbarians' best trained strength none: max(1, 0)
+        for c in range(self.bcap_id.shape[1]):
+            on = self.bcap_id[:, c] >= 0
+            if not bool(on.any()):
+                continue
+            cs, es = self.bcap_civ[:, c], self.bcap_esc[:, c]
+            civ_in = on & (cs >= 0) & civ_ai[bidx, cs.clamp(min=0)]
+            esc_in = on & (es >= 0) & combat_ai[bidx, es.clamp(min=0)]
+            self.bcap_ready[:, c] = torch.where(on, civ_in & esc_in, self.bcap_ready[:, c])
+            stc = torch.where(cs >= 0, st[bidx, cs.clamp(min=0)], torch.zeros_like(cs))
+            ste = torch.where(es >= 0, st[bidx, es.clamp(min=0)], torch.zeros_like(es))
+            self.bcap_str[:, c] = torch.where(on, stc + ste, self.bcap_str[:, c])
+            tgt = self.bcap_target[:, c]
+            self.bcap_estr[:, c] = torch.where(on, self._ops_enemy_str(BARB_SEAT, self.BK, tgt, torch.full_like(tgt, -1)),
+                                               self.bcap_estr[:, c])
+            # the backup: the camps in plot order, the last of the best
+            rally = tgt
+            rc = rally.clamp(min=0)
+            ours = self.bcap_str[:, c]
+            value = n_camps * 50 * 256
+            order = torch.where(cp >= 0, cp, torch.full_like(cp, 1 << 30)).argsort(dim=1)
+            got_t = torch.full_like(tgt, -1)
+            got_v = torch.zeros_like(tgt)
+            got_o = torch.zeros(B, dtype=torch.float64, device=dev)
+            for j in range(cp.shape[1]):
+                camp = cp.gather(1, order[:, j:j + 1]).squeeze(1)
+                ok = on & (rally >= 0) & (camp >= 0)
+                if not bool(ok.any()):
+                    continue
+                cc = camp.clamp(min=0)
+                d = self.pair_dist[rc, cc].to(torch.long)
+                same_area = self.tile_area[bidx, rc] == self.tile_area[bidx, cc]
+                ok &= (d > 0) & same_area
+                near = own & (self.pair_dist[self.barb_unit_tile.clamp(min=0), cc.unsqueeze(1)].to(torch.long) <= 3)
+                enemy = 6 + torch.where(near, term, torch.zeros_like(term)).sum(dim=1)
+                odds = self._mops_odds(ours, enemy, d, torch.full_like(ours, best))
+                prod = torch.div(self._mops_fixed(odds) * value, 256, rounding_mode="trunc")
+                held = torch.div(got_v * self._mops_fixed(got_o), 256, rounding_mode="trunc")
+                take = ok & ((got_t < 0) | ~(prod < held))
+                got_t = torch.where(take, camp, got_t)
+                got_v = torch.where(take, value, got_v)
+                got_o = torch.where(take, odds, got_o)
+            has = on & (got_t >= 0)
+            self.bcap_bk_target[:, c] = torch.where(has, got_t, self.bcap_bk_target[:, c])
+            self.bcap_bk_rally[:, c] = torch.where(has, rally, self.bcap_bk_rally[:, c])
+
+    def _bop_capture_tick(self, m: torch.Tensor, c: int, ctx: dict) -> None:
+        """"Escort Worker To Camp"'s tick for capture `c` in the games `m`:
+        the root Sequence from the child it resumes at — Make Formation 1
+        (the captive and its escort: SUCCESS where the escort's planning
+        reaches the captive's plot within a turn, or none can within two;
+        else RUNNING), Operation Change Target 2 (the target no camp: the
+        backup, else FAILURE; weaker than the enemy, the backup (WEAK), else
+        FAILURE), Concurrent 3 (Operation Is Ready 4: FAILURE where the team
+        is not ready; Operation Defend Units 5; Operation Move 6 to the
+        target, range 1, unit distance 2), Make Formation 7 (the formation
+        undone), Operation Move 8 onto the target; then the executions in
+        node order; a tree that ends frees its slot"""
+        bidx = self._bidx
+        rowof, res, done = ctx["rowof"], ctx["res"], ctx["done"]
+        cs, es = self.bcap_civ[:, c].clone(), self.bcap_esc[:, c].clone()
+        civ_ok = m & (cs >= 0)
+        esc_ok = m & (es >= 0)
+        csc, esc_ = cs.clamp(min=0), es.clamp(min=0)
+        resume = self.bcap_resume[:, c]
+        start1 = m & (resume <= 1)
+        start3 = m & (resume == 3)
+        start8 = m & (resume == 8)
+        # Make Formation 1
+        ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
+        land = self._bop_land_ai.take(ut)
+        civ_ai = self._bop_civ_ai.take(ut)
+        pair = (start1 & civ_ok & esc_ok & ~self.bcap_form[:, c]
+                & land[bidx, esc_] & (self._type_combat.take(ut)[bidx, esc_] > 0)
+                & civ_ai[bidx, csc] & ~(self._type_combat.take(ut)[bidx, csc] > 0))
+        civ_plot = self.barb_unit_tile[bidx, csc]
+        r1 = torch.full_like(cs, -1)
+        r2 = torch.full_like(cs, -1)
+        rows = (pair & (rowof[bidx, esc_] >= 0)).nonzero(as_tuple=True)[0]
+        if rows.numel():
+            r1[rows] = self._op_reach_at(rows, esc_[rows], civ_plot[rows], 1, False, torch.zeros_like(rows), rowof, res)
+            r2[rows] = self._op_reach_at(rows, esc_[rows], civ_plot[rows], 2, False, torch.zeros_like(rows), rowof, res)
+        pair &= r2 >= 0
+        mf1 = torch.where(pair & (r1 < 0), 2, 1)
+        run_mf = start1 & (mf1 == 2)
+        # Operation Change Target 2
+        ct_on = start1 & (mf1 == 1)
+        tgt = self.bcap_target[:, c]
+        cp = self.camp_tile
+        is_camp = ((cp == tgt.unsqueeze(1)) & (cp >= 0)).any(dim=1) & (tgt >= 0)
+        bk_ok = self.bcap_bk_target[:, c] >= 0
+        swap_inv = ct_on & ~is_camp & bk_ok
+        fail_inv = ct_on & ~is_camp & ~bk_ok
+        estr = self.bcap_estr[:, c]
+        stren = self.bcap_str[:, c]
+        valid = ct_on & is_camp
+        weak = valid & (estr > 0) & (stren < estr)
+        swap_weak = weak & bk_ok
+        fail_weak = weak & ~bk_ok
+        swap = swap_inv | swap_weak
+        if bool(swap.any()):
+            self.bcap_target[:, c] = torch.where(swap, self.bcap_bk_target[:, c], self.bcap_target[:, c])
+            self.bcap_rally[:, c] = torch.where(swap, self.bcap_bk_rally[:, c], self.bcap_rally[:, c])
+            self.bcap_bk_target[:, c] = torch.where(swap, torch.full_like(tgt, -1), self.bcap_bk_target[:, c])
+            self.bcap_bk_rally[:, c] = torch.where(swap, torch.full_like(tgt, -1), self.bcap_bk_rally[:, c])
+        ct_fail = fail_inv | fail_weak
+        # Concurrent 3
+        c3_on = (ct_on & ~ct_fail) | start3
+        ready = self.bcap_ready[:, c]
+        rdy_fail = c3_on & ~ready
+        mv_on = c3_on & ready
+        goal = self.bcap_target[:, c]
+        mem = torch.zeros_like(self.barb_unit_alive)
+        mem[bidx[civ_ok], csc[civ_ok]] = True
+        mem[bidx[esc_ok], esc_[esc_ok]] = True
+        mem &= self.barb_unit_alive
+        no_goal = goal < 0
+        tr = self._bop_trees()
+        _, rg6, sp6 = tr.cap_moves[0]
+        _, rg8, sp8 = tr.cap_moves[1]
+        st6, ar6 = self._bcap_move_update(mv_on & ~no_goal, c, 0, mem, goal, rg6, sp6, ctx)
+        c6 = torch.where(no_goal, 3, st6)
+        c3 = torch.where(rdy_fail, 3, torch.maximum(torch.ones_like(c6), c6))
+        c3 = torch.where(c3_on, c3, torch.zeros_like(c3))
+        # Make Formation 7 and Operation Move 8
+        seq7 = c3_on & (c3 == 1)
+        on8 = seq7 | start8
+        st8, ar8 = self._bcap_move_update(on8 & ~no_goal, c, 1, mem, goal, rg8, sp8, ctx)
+        c8 = torch.where(no_goal, 3, st8)
+        root_fail = ct_fail | (c3_on & (c3 == 3)) | (on8 & (c8 == 3))
+        root_ok = on8 & (c8 == 1)
+        self.bcap_resume[:, c] = torch.where(run_mf, 1, torch.where(c3_on & (c3 == 2), 3,
+                                             torch.where(on8 & (c8 == 2), 8, torch.where(m, -1, self.bcap_resume[:, c]))))
+        # the executions in node order
+        ex1 = start1 & pair
+        if bool(ex1.any()):
+            move = ex1 & (self.barb_unit_tile[bidx, esc_] != civ_plot)
+            self._tac_move_to(move, esc_, civ_plot.clamp(min=0), strike=False)
+            meet = ex1 & (self.barb_unit_tile[bidx, esc_] == self.barb_unit_tile[bidx, csc])
+            self.bcap_form[:, c] |= meet
+        zero = torch.zeros_like(self.barb_unit_alive)
+        formed = self.bcap_form[:, c]
+        zero[bidx[formed & civ_ok], csc[formed & civ_ok]] = True
+        zero[bidx[formed & esc_ok], esc_[formed & esc_ok]] = True
+        ex6 = mv_on & ~no_goal & ((c6 == 1) | (c6 == 2))
+        if bool(ex6.any()):
+            self._op_move_exec(ex6, mem, goal, rg6, ar6, self.bcap_ready[:, c], done, rowof, res, zero=zero)
+        self.bcap_form[:, c] &= ~seq7
+        ex8 = on8 & ~no_goal & ((c8 == 1) | (c8 == 2))
+        if bool(ex8.any()):
+            self._op_move_exec(ex8, mem, goal, rg8, ar8, self.bcap_ready[:, c], done, rowof, res)
+        end = root_ok | root_fail
+        self.bcap_id[:, c] = torch.where(end, torch.full_like(self.bcap_id[:, c], -1), self.bcap_id[:, c])
+        self.bcap_civ[:, c] = torch.where(end, torch.full_like(cs, -1), self.bcap_civ[:, c])
+        self.bcap_esc[:, c] = torch.where(end, torch.full_like(es, -1), self.bcap_esc[:, c])
+
+    def _bcap_move_update(self, on: torch.Tensor, c: int, node: int, mem: torch.Tensor, goal: torch.Tensor, rng: int,
+                          spread: int, ctx: dict) -> tuple[torch.Tensor, torch.Tensor]:
+        """OPERATION MOVE's update (`passMoveUpdate`) for capture `c`'s team
+        at its store `node`, its goal the target: its status and whether the
+        team arrived"""
+        store = self.bcap_store[:, c, node].clone()
+        sg = self.bcap_store_goal[:, c, node].clone()
+        status, arrived, rest = self._op_move_update(on, mem, self.bcap_dead[:, c], store, sg, goal, True, rng, spread,
+                                                     ctx["rowof"], ctx["res"])
+        st = rest.nonzero(as_tuple=True)[0]
+        if st.numel():
+            self.bcap_store[st, c, node] = store[st]
+            self.bcap_store_goal[st, c, node] = sg[st]
+        return status, arrived
 
     # -- the trees' walk -----------------------------------------------------
 
     def _barb_trees(self, done: torch.Tensor, ai: torch.Tensor, order: torch.Tensor, rowof: torch.Tensor,
                     res: dict, tg: dict, danger: torch.Tensor) -> None:
-        """`barbarianTrees`: every tree of the barbarians — their operations'
-        and their scouts' — in id order, a tree started in the walk ticking in
-        it after the others; the operations' members' turns are theirs"""
+        """`barbarianTrees`: every tree of the barbarians — their tribes'
+        operations', their captures' and their scouts' — in id order, a tree
+        started in the walk ticking in it after the others; the operations'
+        members' turns are theirs"""
         B = self.B
         dev = self.device
         if not B:
@@ -189,15 +476,19 @@ class SimBarbOps:
         big = 1 << 40
         while True:
             K = int(self.n_tribes.max())
-            if not K:
-                break
             op_on = (self.tribe_op[:, :K] > 0) & ~self.tribe_op_done[:, :K] & (self.tribe_op_id[:, :K] > last.unsqueeze(1))
             hm_on = (self.tribe_home_slot[:, :K] != -1) & (self.tribe_home_id[:, :K] > last.unsqueeze(1))
-            ids = torch.cat((torch.where(op_on, self.tribe_op_id[:, :K], big), torch.where(hm_on, self.tribe_home_id[:, :K], big)), dim=1)
+            cp_on = (self.bcap_id >= 0) & (self.bcap_id > last.unsqueeze(1))
+            ids = torch.cat((torch.where(op_on, self.tribe_op_id[:, :K], big), torch.where(hm_on, self.tribe_home_id[:, :K], big),
+                             torch.where(cp_on, self.bcap_id, big)), dim=1)
             nxt = ids.min(dim=1).values
             go = nxt < big
             if not bool(go.any()):
                 break
+            for c in range(self.bcap_id.shape[1]):
+                m = go & cp_on[:, c] & (self.bcap_id[:, c] == nxt)
+                if bool(m.any()):
+                    self._bop_capture_tick(m, c, ctx)
             for k in range(K):
                 m = go & op_on[:, k] & (self.tribe_op_id[:, k] == nxt)
                 if bool(m.any()):

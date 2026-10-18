@@ -2421,7 +2421,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           // the record's seizure, on the engine's own rule for the civilian,
           // where the engine's battles left no mover
           vic.tileIndex = d.plot;
-          seizeCivilian(state, vic, seatOfP(ctx, d.player));
+          seizeCivilian(state, vic, { seat: seatOfP(ctx, d.player), id: -1 });
           ctx.units.delete(d.victim);
           if (d.into && state.units.includes(vic)) ctx.units.set(d.into, vic);
           count(ctx, 'seize', 'fallback', d.player, 'a mover the replay does not hold');
@@ -2435,7 +2435,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const took = d.into ? vic.seat === by.seat && state.units.includes(vic) : !state.units.includes(vic);
         if (!took) {
           // the record's seizure, on the engine's own rule for the civilian
-          if (state.units.includes(vic) && vic.seat !== by.seat) seizeCivilian(state, vic, by.seat);
+          if (state.units.includes(vic) && vic.seat !== by.seat) seizeCivilian(state, vic, by);
           by.tileIndex = d.plot;
         }
         ctx.units.delete(d.victim);

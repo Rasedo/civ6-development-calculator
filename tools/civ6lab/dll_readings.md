@@ -5388,6 +5388,45 @@ barbarians' operations alike.
   t32 (its raid's way home ends a turn late: the members' planning), none
   on 1121 (its raids missing).
 
+## C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported
+
+`barbarianCaptures`, `barbarianOpsTurn`'s backups (cpu/core/barbarianOps.ts),
+the event in `seizeCivilian` (cpu/core/combat.ts, `GameState.barbCaptures`);
+`_barb_capture_event`, `_barb_captures`, `_bcap_refresh`, `_bop_capture_tick`
+(gpu/core/sim_barbops.py), the event in `_seize_civilians` (gpu/core/sim_seats.py).
+
+- THE EVENT (Combat_Manager 0x212500, a civilian captured): the payload's
+  units — the captive (r14 +0x100), then the captor (rsi +0x100; where its
+  +0x7d0 is -1 or 0x56ee80 answers, both unread: the engines take it
+  always) — raised as AI_EVENT_UNIT_CAPTURED (@f2e088) on the player's
+  signals (+0x2b8, 0x200e10). The barbarians' triggered trees
+  (BarbarianTriggeredTrees: TRIGGER_CAPTURE_BARBARIAN, the tree "Escort
+  Worker To Camp", the operation "Barbarian Builder Capture") run it.
+- THE START (0x800c60): the named definition by 0x7265b0 with its flag,
+  the target the first payload unit's plot (+0x220), the candidate's rally
+  (the engines: the plot); each payload unit to its team (addMember
+  0x737e80, the unit leaving the team it held: runs/h1_duelw1128 t25-26, the
+  raid's Slinger to the capture, the raid's team two Warriors).
+- THE BACKUP: the military AI's turn names a running operation's candidate
+  its backup (0x73e610): of the camps, at the team's strength from the
+  target, the enemy's 6 and the barbarians' units within 3 (0x746920);
+  the tree's Change Target finds the capture's plot no camp (INVALID) and
+  switches to it (1128 t26: "INVALID Changing to backup", the target 30:6).
+- THE TREE ("Escort Worker To Camp"): Sequence 0 over Make Formation 1
+  (Combat Unit UNITTYPE_LAND_COMBAT, Civilian Unit UNITTYPE_CIVILIAN),
+  Operation Change Target 2 (Backup Amount 0, Failure Amount -1),
+  Concurrent 3 (Operation Is Ready 4, Operation Defend Units 5, Operation
+  Move 6: the target, range 1, unit distance 2), Make Formation 7 (Destroy
+  Formations), Operation Move 8 (the target, range 0). The team: one
+  civilian (UNITTYPE_CIVILIAN 1..1), a UNITAI_COMBAT unit at least, no
+  naval one; InitialStrengthAdvantage 0, Ongoing 0.5.
+- LAB: the barbarians' knowledge base's camps (+0x638) taken as every camp
+  in plot order; Operation Defend Units' moves (0x80d790) none.
+- ASK (the operation manager's files): `targetValid` (nodes.ts) holds a
+  camp target valid; the tree's INVALID swap needs the camp branch of
+  0x73abf0 there ("no camp the seat knows on the target": `targetGone`),
+  which the GPU twin reads.
+
 ## C-95: Coastal Raid — READ, ported
 
 `coastalRaids` in cpu/core/tactical.ts (the raid `coastalRaid`,

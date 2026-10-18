@@ -342,7 +342,7 @@ import { BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CA
   BARB_SPOT_THROTTLE, BARB_SPOT_THROTTLE_PER_LEVEL,
   BARB_PILLAGE_SCORE,
   DEFAULT_HANDICAP, DIFFICULTIES, barbForce, barbNameRaidBoldness } from '../data/barbarians';
-import { BARB_ASSAULT_DEF, BARB_RAID_DEF, BARB_SCOUT_TREE } from '../core/barbarianOps';
+import { BARB_ASSAULT_DEF, BARB_CAPTURE_DEF, BARB_RAID_DEF, BARB_SCOUT_TREE } from '../core/barbarianOps';
 const BARB_TAGS = Object.keys(BARB_TAG_UNITS) as BarbTag[];
 import { CHOP_ROWS, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, LUXURY_IDS, wonderBit } from './catalog';
 import { TERRAINS } from '../../world/terrains';
@@ -2092,9 +2092,12 @@ export function buildRules() {
         // per unit (in `units` order) whether it carries UNITAI_COMBAT (the
         // raid team's requirement); whether the AI's handicap lies in the
         // raid's In Difficulty Range (its Operation Attack City runs)
-        trees: Object.fromEntries([AI_OP_DEFS[BARB_RAID_DEF].tree!, AI_OP_DEFS[BARB_ASSAULT_DEF].tree!, BARB_SCOUT_TREE]
-          .map((t) => [t, AI_TREES[t]])),
+        trees: Object.fromEntries([AI_OP_DEFS[BARB_RAID_DEF].tree!, AI_OP_DEFS[BARB_ASSAULT_DEF].tree!, BARB_SCOUT_TREE,
+          AI_OP_DEFS[BARB_CAPTURE_DEF].tree!].map((t) => [t, AI_TREES[t]])),
         unitCombatAi: Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes('UNITAI_COMBAT')),
+        // the AI types the capture's formation pairs (UnitAiInfos)
+        unitLandCombatAi: Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes('UNITTYPE_LAND_COMBAT')),
+        unitCivilianAi: Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes('UNITTYPE_CIVILIAN')),
         attackCityHandicap: DEFAULT_HANDICAP >= DIFFICULTIES.indexOf('IMMORTAL'),
       },
       // the civic a camp's clear inspires (BOOST_TRIGGER_CLEAR_CAMP)

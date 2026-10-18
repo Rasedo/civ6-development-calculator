@@ -858,6 +858,8 @@ MAJOR_POOL_MAX = 512
 #: them, at most two apiece, so the row can never fill in a real game.
 GP_LUX_MAX = 8
 BARB_POOL_MAX = 256
+# the barbarians' Builder Capture operations a game holds at once
+BARB_CAP_MAX = 4
 #: the slots a city-state's or the Free Cities' unit pool may number
 SEAT_POOL_MAX = 64
 #: the knowledge base's army records a city-state may hold (`armyKnown`):
@@ -1093,6 +1095,8 @@ _MUTABLE = [
     "tribe_home_id", "tribe_home_resume", "tribe_home_mu",
     "tribe_saw", "tribe_op", "tribe_op_seat", "tribe_op_id", "tribe_op_rstart", "tribe_op_ready", "barb_unit_op",
     "barb_unit_join", "barb_unit_fresh", "barb_spot_next", "barb_tree_next",
+    "bcap_id", "bcap_civ", "bcap_esc", "bcap_target", "bcap_rally", "bcap_bk_target", "bcap_bk_rally", "bcap_resume",
+    "bcap_form", "bcap_ready", "bcap_str", "bcap_estr", "bcap_store", "bcap_store_goal", "bcap_dead", "barb_capq",
     # their unit pool and each tribe's camp defender (`barbSlots`, `cpu/core/tactical.ts`)
     "barb_unit_slotno", "barb_pool_size", "barb_pool_free", "barb_pool_nfree", "barb_pool_dying", "tribe_defender",
     # each city-state's unit pool, then the Free Cities' (`poolSlots`, `cpu/core/tactical.ts`)

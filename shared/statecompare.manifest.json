@@ -4166,6 +4166,10 @@
       {
         "path": "Tile.region",
         "why": "a MAP fact, not state, static like `area`: `deriveRegions` stamps the map's regions (or its passable land areas) once at map creation and the exporter ships the ids per tile (the region plane)."
+      },
+      {
+        "path": "GameState.barbCaptures",
+        "why": "the turn's captures awaiting their operations, read and cleared at the barbarians' turn's end: never live at a compare point."
       }
     ],
     "gpu": [
@@ -4436,6 +4440,70 @@
       {
         "plane": "free_best_melee",
         "why": "the Free Cities seat's best trained melee strength (TS `freeSeat.bestMeleeCS`, a seat the seat group does not enumerate), read by the operations' enemy strength: compared through its effect, the operations' readiness and moves."
+      },
+      {
+        "plane": "bcap_id",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_civ",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_esc",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_target",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_rally",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_bk_target",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_bk_rally",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_resume",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_form",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_ready",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_str",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_estr",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_store",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_store_goal",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "bcap_dead",
+        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
+      },
+      {
+        "plane": "barb_capq",
+        "why": "the turn's captures awaiting their operations (TS `GameState.barbCaptures`), empty at every turn boundary."
       }
     ]
   }
