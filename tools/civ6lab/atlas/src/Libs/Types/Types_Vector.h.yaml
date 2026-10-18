@@ -76,6 +76,7 @@
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the   move 0x962030 to the plot drawn..."
   context:
@@ -539,6 +540,14 @@
     - "...es: a city-state whose research or civic completed picks the next (\"BT Research Choice\" 0x763020: the AI plan's tech, no draw, else ONE uniform draw over every researchable tech; \"Rand..."
     - "...t (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research in hand; the analysis reads the value b..."
     - "- THE CHOICE, 0x763020 (key): the comparator 0x75d530 over the entries — the same next step: the larger turns..."
+  review: imported
+- addr: 0x78f5d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+  context:
+    - ...y itself passes; a city no longer standing (0x57960 null) leaves the list (0x78d6d0 / 0x78f5d0); the destination's plot asked of the player (0x2d2220); with the list holding a city a...
   review: imported
 - addr: 0x7e7d20
   kind: function

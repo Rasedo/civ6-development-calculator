@@ -1173,6 +1173,13 @@ export interface CityState extends Seat {
    *  contracts and reservations (`CityAi`), the Economic AI's savings
    *  (`EconomicMemory`), the city's threat (CityBuildAI +0x1b8, -1 none) */
   cityAi?: CityAi;
+  /** its city's trade list (CityBuildAI +0x870, `minorTradeList`): the
+   *  destination centres a trade path reaches, and the ones it did not */
+  tradeCities?: number[];
+  tradeRejected?: number[];
+  /** its trade AI's route value K (raw, knowledge base +0x6d8,
+   *  `minorTradeValue`) */
+  tradeValue?: number;
   /** its city's UNITS table (raw, `AI_UNITS`' order) as its city AI's last
    *  turn left it, and its unimproved resources' counts (CityBuildAI +0x978)
    *  as its last update counted them — the research and civics values'

@@ -38,6 +38,8 @@ class SimMinors:
             self._minor_trade(s)
             self._city_strikes(self._CITY_MINOR0 + s, col0, alive)
             self._minor_tactics(s)
+            # its knowledge base's trade record at its tactical turn
+            self._minor_trade_value(s, alive)
             self._minor_knowledge(s, False)
             # the boosts its turn earned
             self._detect_minor_boosts(s, alive)
@@ -355,6 +357,107 @@ class SimMinors:
                 dcity = torch.where(take, cid, dcity)
                 dct = torch.where(take, ctr, dct)
         return found, code, dseat, dcity, dct
+
+    def _minor_trade_cands(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """the known cities of minor `s`'s trade AI (`knownTradeCities`):
+        ([B, ND] standing, [B, ND] centre) over the other city-states by
+        index, then every major's cities in row and slot order"""
+        S = self.S
+        live, ctr = [], []
+        for s2 in range(S):
+            c = self.citystate_center[:, s2]
+            live.append(self.citystate_alive[:, s2] & (c >= 0) & (s2 != s))
+            ctr.append(c)
+        for r2 in range(self.n_majors):
+            for j in range(self.RC):
+                live.append(self.city_alive[:, r2, j])
+                ctr.append(self.city_center[:, r2, j])
+        return torch.stack(live, dim=1), torch.stack(ctr, dim=1)
+
+    def _minor_trade_list(self, s: int, mask: torch.Tensor) -> None:
+        """`minorTradeList` where `mask` [B]: minor `s`'s city's trade list
+        (CityBuildAI +0x870, 0x78f210) kept a turn on — each known city not
+        yet sorted that a trade path from the city reaches is listed
+        (`citystate_trade_ok`), any other rejected (`citystate_trade_no`);
+        once the list holds a city at most two are tried a turn; a turn that
+        tries none clears the rejected; a city gone leaves the list"""
+        row = self._CITY_MINOR0 + s
+        live, ctr = self._minor_trade_cands(s)
+        ok_l = self.citystate_trade_ok[:, s] & live
+        no_l = self.citystate_trade_no[:, s].clone()
+        limited = ok_l.any(dim=1)
+        todo = mask.unsqueeze(1) & live & ~ok_l & ~no_l
+        tried = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        games = todo.any(dim=1).nonzero(as_tuple=True)[0].tolist()
+        if games:
+            reach = self._trade_reach_rows(row, games, self.citystate_center[:, s:s + 1])[:, 0]   # [B, T]
+            for d in range(todo.shape[1]):
+                t = todo[:, d]
+                if not bool(t.count_nonzero()):
+                    continue
+                tried = tried + (t & limited).long()
+                go = t & (~limited | (tried <= 2))
+                inr = reach.gather(1, ctr[:, d].clamp(min=0).unsqueeze(1)).squeeze(1)
+                ok_l[:, d] = ok_l[:, d] | (go & inr)
+                no_l[:, d] = no_l[:, d] | (go & ~inr)
+        no_l = no_l & ~(tried == 0).unsqueeze(1)
+        m = mask.unsqueeze(1)
+        self.citystate_trade_ok[:, s] = torch.where(m, ok_l, self.citystate_trade_ok[:, s])
+        self.citystate_trade_no[:, s] = torch.where(m, no_l, self.citystate_trade_no[:, s])
+
+    def _minor_trade_value(self, s: int, mask: torch.Tensor) -> None:
+        """`minorTradeValue` where `mask` [B]: minor `s`'s route value K
+        (0x5e9b20, `citystate_trade_value` raw) — over its listed cities whose
+        holder it is not at war with, the most a route there pays it, its
+        origin yields with no path term (`minorRouteOriginYields` on a route
+        with no course: the destination's rows, the Trading Post there, a
+        major city's foreign-route Gold and its wonders' sender yields) each
+        valued (`yieldValue`) and summed; never below 0"""
+        from .sim_cityvalue import _YIELDS
+        B, S, dev = self.B, self.S, self.device
+        row = self._CITY_MINOR0 + s
+        live, ctr = self._minor_trade_cands(s)
+        ok_l = self.citystate_trade_ok[:, s] & live
+        best = torch.zeros(B, dtype=torch.long, device=dev)
+        if not bool((ok_l & mask.unsqueeze(1)).count_nonzero()):
+            self.citystate_trade_value[:, s] = torch.where(mask, best, self.citystate_trade_value[:, s])
+            return
+        f = self._cv_minor_facts(s)
+        y6 = []
+        free = []
+        cs6 = self._cs_route_y6() if S > 0 else None
+        for s2 in range(S):
+            y6.append(cs6[:, s2])
+            free.append(~self.war[:, row, self._CITY_MINOR0 + s2])
+        reg = self.city_dist_tile
+        comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
+        fgk = self._gp_city_perm_names.index("foreignRouteGold")
+        wond = getattr(self, "_wond_sender_gold", None) is not None
+        for r2 in range(self.n_majors):
+            for j in range(self.RC):
+                y = self._route_centre_intl.reshape(1, 6).double() + comp[:, r2, j].double() @ self._route_intl_y
+                y = y.clone()
+                y[:, 2] += self.city_gp_perm[:, r2, j, fgk].double()
+                if wond:
+                    wr = self.city_wonder[:, r2, j]
+                    wc = (wr >= 0) & self.built_wonder_complete.gather(1, wr.clamp(min=0))
+                    y[:, 2] += wc.double() @ self._wond_sender_gold
+                    y[:, 3] += wc.double() @ self._wond_sender_sci
+                y6.append(y)
+                free.append(~self.war[:, row, r2])
+        post = self._route_post_gold(row, ctr).double()                     # [B, ND]
+        for d in range(len(y6)):
+            on = ok_l[:, d] & free[d] & mask
+            if not bool(on.count_nonzero()):
+                continue
+            y = y6[d].clone()
+            y[:, 2] += post[:, d]
+            v = torch.zeros(B, dtype=torch.long, device=dev)
+            for k, name in enumerate(_YIELDS):
+                amt = torch.floor(y[:, k] * 256 + 0.5).long()
+                v = v + self._cv_yield(amt, name, f.yield_w(name))
+            best = torch.where(on & (v > best), v, best)
+        self.citystate_trade_value[:, s] = torch.where(mask, best, self.citystate_trade_value[:, s])
 
     def _minor_trade(self, s: int) -> None:
         """`minorTrade` — minor `s`'s routes walk and meet their raiders

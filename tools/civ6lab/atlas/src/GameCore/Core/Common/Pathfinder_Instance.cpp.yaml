@@ -22,6 +22,7 @@
     - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...f no region, not impassable (byte +0x3a bit 3) and not water seeds a region, and a flood (0x77d10, the visitor 0x886dd0 counting and stamping each plot it closes, m_area its area) takes e...

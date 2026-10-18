@@ -100,7 +100,8 @@ class SimMinorAi:
         self.citystate_balance[:, s] = torch.where(alive, bal, self.citystate_balance[:, s])
         # B: the military AI's turn
         self._mops_evaluate(s)
-        # A: the city's update
+        # A: the city's update; its trade list, kept at the city's analysis
+        self._minor_trade_list(s, alive & ~fresh)
         f = self._cv_minor_facts(s)
         b_tab, u_tab, p_tab = self._cv_minor_tables(s, f)
         # the tables the research and civics values' city terms read next turn

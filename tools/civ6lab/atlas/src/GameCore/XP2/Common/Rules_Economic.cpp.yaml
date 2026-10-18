@@ -157,7 +157,9 @@
       value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
     - recording: 1124
       value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   context:
     - "...e0a0 (per known city of the knowledge base +0xe0 entries, the routes' yields 0x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the unit table: that is 0x7989e0 (the sect..."
   review: imported
@@ -172,7 +174,9 @@
       value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
     - recording: 1124
       value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   context:
     - "...T). 0x78e0a0 (per known city of the knowledge base +0xe0 entries, the routes' yields 0x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the unit table: that is 0x7989e..."
   review: imported

@@ -4353,6 +4353,46 @@ operations' contracts, the improvement values below, the purchases).
   civic, the buildings built, the units trained and bought); the districts
   placed as the record of T has them, refused for good only complete.
 
+## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)
+
+Ported in `cpu/core/aiTrade.ts` (`minorTradeList`, `minorTradeValue`; the
+GPU twin `_minor_trade_list` / `_minor_trade_value` in gpu/core/sim_minors.py);
+the city build AI's Trader value (`traderValue`, 0x7a7110) and the
+EFFECT_ADJUST_TRADE_ROUTE_CAPACITY term read the K it keeps.
+
+- THE CITY'S TRADE LIST (CityBuildAI +0x870, 0x10 an entry at +0x10 / count
+  +0x20, a rejected list of 8-byte entries at +0x28 / +0x38), kept by
+  0x78f210 from the city's analysis (0x5ce3f0 "City Analysis"): per city
+  entry of the owner's knowledge base (0x786160, 0xe0 bytes an entry) in its
+  order — one listed (0x78d630) or rejected passes; the city itself passes;
+  a city no longer standing (0x57960 null) leaves the list (0x78d6d0 /
+  0x78f5d0); the destination's plot asked of the player (0x2d2220); with the
+  list holding a city at the call's start, a counter allows two tries a
+  turn (r13 > 2 skips); the try is the trade pathfinder (0x559140: the
+  Trade_Movement finder 0xf2dc70 from the city's plot +0x158 to the
+  destination's, GeneratePath 0x77d10) — reached: appended listed (byte +8
+  and dword +0xc 0), else rejected; a turn that tried none (r13 0) clears
+  the rejected list. A listed city of the owner's own (a domestic route)
+  rates its destination (0x54ad70 >= 5: +8 set) — a city-state holds one
+  city. 0x78e010 is the list's lookup.
+- THE ROUTE VALUE K (0x5e9b20, this = the knowledge base +0x680; called at
+  the tail of the knowledge base's ageing 0x5ebb30): the best record reset
+  (0x5ea780), then per city of the player (its +0x12f0 list) and per city
+  entry of its knowledge base in the city's trade list (0x78e010): an
+  international destination (owner not the player) not at war (0x469cd0)
+  takes the origin's yields of a route there (0x526330(origin, dest, out,
+  -1, 1): CalculateOriginYieldsFromPotentialRoute 0x54eb90, 0x54c630, the
+  path term CalculateOriginYieldsFromPath 0x54e160 skipped on the last
+  argument 1, Trade_Manager 0x54c6c0); a domestic one adds the
+  destination's (0x525b90). Each yield's amount valued (0x7a6690, the
+  player's weights) and summed; a sum above the best (+0x58 = +0x6d8) is
+  kept with its route. TO (+0x688) is the reset's -1: AI_Knowledge.csv
+  prints "TRADE, TO -1, VAL K" (0x5ed280). runs/h1_duelv1117: Valletta's K
+  2.10 from t14 (0.00 before), the record training its Trader at t33.
+- Unread: the knowledge base's city entries' order (the engines take the
+  route scorer's: the other city-states by id, then the majors' cities) and
+  0x2d2220 (taken as true: a minor holds no fog); 0x54c630's term.
+
 ## C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired
 
 Ported in `cpu/core/aiPlotValue.ts`; measured by

@@ -394,8 +394,9 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     },
     tradeRouteCapacity: (i) => tradeCapacity(state, i),
     traders: (i) => unitsOf(state, i).filter((u) => UNITS[u.type]?.trader).length,
-    // the trade AI's knowledge base (its route evaluation) is not read
-    tradeKnowledge: () => null,
+    // a city-state's trade AI's route value (`minorTradeValue`); a major's
+    // is not read
+    tradeKnowledge: (i) => (isCityStateSeat(i) ? state.cityStates.find((c) => c.seat === i)?.tradeValue ?? 0 : null),
     influenceTokensUsed: (i) => state.cityStates.reduce((n, cs) => n + envoysOf(cs, i), 0),
     tributaries: (i) => state.cityStates.filter((cs) => suzerainOf(cs) === i).length,
     unitMaintenances: (i) => state.units.filter((u) => u.seat === i).map((u) => UNITS[u.type]?.maintenance ?? 0),

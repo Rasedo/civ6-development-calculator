@@ -72,6 +72,7 @@ import { tileAppeal } from './appeal';
 import { builderHarvest, builderRemoveFeature, tileFreeForUnit } from './units';
 import { moveTo, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
+import { minorTradeList } from './aiTrade';
 import {
   installType, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts,
   minorProjectFacts, minorResourceCounts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
@@ -587,6 +588,8 @@ export function minorAiTurn(state: GameState, cs: CityState): void {
   savingsTurn(eco, Math.trunc(cs.treasury * FX), false);
   minorOpsEvaluate(state, cs);
   // A: the city's update
+  // its trade list, kept at the city's analysis (none the turn it is founded)
+  if (!fresh) minorTradeList(state, cs);
   const known = minorKnownUnits(cs);
   const facts = minorBuildFacts(state, cs, known);
   const tables: CityBuildTables = {

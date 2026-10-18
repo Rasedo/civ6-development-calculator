@@ -1,0 +1,14 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x57960
+  final: 0x132c90
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+  context:
+    - ...isted (0x78d630) or rejected passes; the city itself passes; a city no longer standing (0x57960 null) leaves the list (0x78d6d0 / 0x78f5d0); the destination's plot asked of the player...
+  review: imported

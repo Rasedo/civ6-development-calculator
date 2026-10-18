@@ -116,6 +116,7 @@
   status: PARTLY
   readings:
     - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "....+0x4a8) and, for each its player is at war with (0x469cd0), asks its knowledge base (0x786160) for that player's units (0x5eb8b0, age 1, distance 2): per unit type in DB order, each..."

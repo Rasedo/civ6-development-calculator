@@ -329,6 +329,13 @@ class SimInit:
         # resources' counts as its last update counted them (CityBuildAI
         # +0x978; none on a founding turn's first look) — the research and
         # civics values' city terms (`CityState.unitValues`, `.resourceCounts`)
+        # its city's trade list (CityBuildAI +0x870, `_minor_trade_list`) over
+        # the known cities (the other city-states, then the majors' slots):
+        # listed, rejected; its trade AI's route value K (raw)
+        _nd = max(self.S + self.n_majors * self.RC, 1)
+        self.citystate_trade_ok = torch.zeros(B, s_pad, _nd, dtype=torch.bool, device=device)
+        self.citystate_trade_no = torch.zeros(B, s_pad, _nd, dtype=torch.bool, device=device)
+        self.citystate_trade_value = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         self.citystate_unit_values = torch.full((B, s_pad, len(rules.ai_city_build["units"])), -9999 * 256,
                                                 dtype=torch.long, device=device)
         self.citystate_unit_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)

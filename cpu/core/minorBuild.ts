@@ -71,6 +71,7 @@ import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetwee
 import { majorView } from './majorView';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
+import { minorTradeValue } from './aiTrade';
 
 /** One minor at a time — a district one minor lands may lend a neighbour's
  *  district adjacency across the border, so the next minor's yields read it.
@@ -106,6 +107,8 @@ export function minorPhase(state: GameState): void {
     const city = minorCity(cityState);
     cityStrikes(state, city, cityStrikeStrength(state, city));
     if (!ordersHeld) cityStateMilitary(state, cityState);
+    // its knowledge base's trade record at its tactical turn, after its city's update
+    minorTradeValue(state, cityState);
     minorKnowledge(state, cityState, false);
     // the boosts its turn earned (runs/h1_duelw1117 t1: every city-state
     // takes Pottery before its coastal city's Sailing eureka lands)

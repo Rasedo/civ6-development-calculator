@@ -3,6 +3,15 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x54ad70
+  final: 0x38a860
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+  context:
+    - "...jected list. A listed city of the owner's own (a domestic route) rates its destination (0x54ad70 >= 5: +8 set) — a city-state holds one city. 0x78e010 is the list's lookup."
+  review: imported
 - addr: 0x54ae60
   final: 0x38a950
   kind: function
@@ -34,6 +43,22 @@
   context:
     - "Trade_Manager 0x54bdb0 (a route's yield of one type): the route's path from the trade manager's cache (0x541ae0;..."
   review: imported
+- addr: 0x54c630
+  final: 0x38b0a0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "TO (+0x688) is the reset's -1: AI_Knowledge.csv   prints \"TRADE, TO -1, VAL K\" (0x5ed280)."
+    - recording: h1_duelv1117
+      turn: 14
+      value: "runs/h1_duelv1117: Valletta's K   2.10 from t14 (0.00 before), the record training its Trader at t33."
+  readings:
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+  context:
+    - "...(0x526330(origin, dest, out, -1, 1): CalculateOriginYieldsFromPotentialRoute 0x54eb90, 0x54c630, the path term CalculateOriginYieldsFromPath 0x54e160 skipped on the last argument 1,..."
+    - "...tes by id, then the majors' cities) and 0x2d2220 (taken as true: a minor holds no fog); 0x54c630's term."
+  review: imported
 - addr: 0x54c6c0
   final: 0x38b870
   kind: function
@@ -55,10 +80,45 @@
     - cpu/data/cityStates.ts:CITY_STATE_ROUTE_TO_OTHERS
     - cpu/data/seats.ts:TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE
     - gpu/core/sim_seats.py:_rk_add
-  readings: ["C-94: trade posts and cultural dominance — READ", "C-94: Sovereignty's route yield — READ"]
+  readings:
+    - "C-94: trade posts and cultural dominance — READ"
+    - "C-94: Sovereignty's route yield — READ"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   context:
     - "...yer: visiting > the other's domestic sets the pair's flag, < clears it, equal keeps it. 0x54c6c0 adds TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE (gp +0x6ec, 4) to a route whose origin's own..."
     - "- Trade_Manager 0x54c6c0, per yield of a route: X = the DESTINATION city's route-to-others row of that yield (ci..."
+  review: imported
+- addr: 0x54e160
+  final: 0x38c900
+  kind: function
+  name: CalculateOriginYieldsFromPath
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "TO (+0x688) is the reset's -1: AI_Knowledge.csv   prints \"TRADE, TO -1, VAL K\" (0x5ed280)."
+    - recording: h1_duelv1117
+      turn: 14
+      value: "runs/h1_duelv1117: Valletta's K   2.10 from t14 (0.00 before), the record training its Trader at t33."
+  readings:
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+  context:
+    - ...ieldsFromPotentialRoute 0x54eb90, 0x54c630, the path term CalculateOriginYieldsFromPath 0x54e160 skipped on the last argument 1, Trade_Manager 0x54c6c0); a domestic one adds the dest...
+  review: imported
+- addr: 0x54eb90
+  final: 0x38ccf0
+  kind: function
+  name: CalculateOriginYieldsFromPotentialRoute
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "TO (+0x688) is the reset's -1: AI_Knowledge.csv   prints \"TRADE, TO -1, VAL K\" (0x5ed280)."
+    - recording: h1_duelv1117
+      turn: 14
+      value: "runs/h1_duelv1117: Valletta's K   2.10 from t14 (0.00 before), the record training its Trader at t33."
+  readings:
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+  context:
+    - "...oute there (0x526330(origin, dest, out, -1, 1): CalculateOriginYieldsFromPotentialRoute 0x54eb90, 0x54c630, the path term CalculateOriginYieldsFromPath 0x54e160 skipped on the last a..."
   review: imported
 - addr: 0x54eeb0
   kind: function

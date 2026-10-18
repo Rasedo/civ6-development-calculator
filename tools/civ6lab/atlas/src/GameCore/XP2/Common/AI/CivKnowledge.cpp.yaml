@@ -24,6 +24,38 @@
   context:
     - "...age, +0x10 its plot (x, y), +0x18 / +0x1c the plot's two map ids (the second its area). 0x5e9530 (from 0x5f0440) finds the unit's id in its type's list: found, age 0 and the plot rewri..."
   review: reviewed
+- addr: 0x5e9b20
+  final: 0x3f15c0
+  kind: function
+  name: tradeRouteValue
+  semantics: "the knowledge base's route value K (+0x680 + 0x58): the best summed yield value of a route from the player's cities to a listed, not-at-war known city"
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 14
+      value: Valletta's TRADE, TO -1, VAL 2.10 (0.00 before t14)
+  impl: [cpu/core/aiTrade.ts:minorTradeValue, gpu/core/sim_minors.py:_minor_trade_value]
+  readings:
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+  context:
+    - "## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's..."
+    - "- THE ROUTE VALUE K (0x5e9b20, this = the knowledge base +0x680; called at the tail of the knowledge base's ageing 0x..."
+  review: reviewed
+- addr: 0x5ea780
+  final: 0x3f1d40
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "TO (+0x688) is the reset's -1: AI_Knowledge.csv   prints \"TRADE, TO -1, VAL K\" (0x5ed280)."
+    - recording: h1_duelv1117
+      turn: 14
+      value: "runs/h1_duelv1117: Valletta's K   2.10 from t14 (0.00 before), the record training its Trader at t33."
+  readings:
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+  context:
+    - "...; called at the tail of the knowledge base's ageing 0x5ebb30): the best record reset (0x5ea780), then per city of the player (its +0x12f0 list) and per city entry of its knowledge ba..."
+  review: imported
 - addr: 0x5eadb0
   kind: function
   status: PARTLY
@@ -185,6 +217,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   context:
     - "- The update (0x5ebb30): every entry ages; one whose plot the player sees with no city of its owner there is d..."
   review: imported
@@ -229,7 +262,9 @@
       value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
     - recording: 1124
       value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...cd0), whole; needs unit table. - Trade knowledge K logged in AI_Knowledge.csv \"TRADE, TO x, VAL v\" (0x5ed280); writer unread. - Unit value 0x7b62c0 branches by pseudo; religious branch adds tourism terms (min..."
   context:

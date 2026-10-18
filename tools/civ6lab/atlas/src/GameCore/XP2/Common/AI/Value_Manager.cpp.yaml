@@ -403,6 +403,7 @@
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - "label: yieldValue(out,&amt,yield,playerAI): amt*Yields.col1c*(1+min(w[yield],9))"
@@ -446,6 +447,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...pseudoYieldValue(UNIT_COMBAT...), minus maintenance gold if [r15+0x908]<3, then PV diff. trade -> 0x7a7110; religious etc. CONCLUSION so far: full value port needs military AI (0x79ca90), yield-weight parts..."
     - ".claude/scratchpad/cb4/NOTES.md: ...ANY_IMPROVEMENT. - aiValue.ts: AiPlotView, view.cityOwnedPlots/traders/tradeKnowledge; traderValue (0x7a7110). - majorView.ts: cityYield for a city-state (minorCity), cityOwnedPlots, traders, tradeKnowledge n..."

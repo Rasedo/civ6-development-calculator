@@ -399,6 +399,14 @@
   context:
     - "...0x691f0 is the ring walk: from the plot's cube coordinates, the six steps of the table at 0xf0bf40 — (0, 1), (-1, 0), (1, -1), (0, -1), (1, 0), (-1, 1) in (x - y // 2, y) — this grid's SOU..."
   review: imported
+- addr: 0xf2dc70
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+  context:
+    - "...n (r13 > 2 skips); the try is the trade pathfinder (0x559140: the Trade_Movement finder 0xf2dc70 from the city's plot +0x158 to the destination's, GeneratePath 0x77d10) — reached: appe..."
+  review: imported
 - addr: 0xf2e080
   kind: global
   name: AI_EVENT_GAIN_TECH

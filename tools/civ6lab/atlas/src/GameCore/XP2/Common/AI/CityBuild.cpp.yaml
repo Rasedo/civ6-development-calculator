@@ -274,6 +274,7 @@
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Jobs pushed: \"City Analysis\" (0x5ce3f0 — pushed and SPAWNED with no wait in the function: AI::CityBuild's analysis runs beside..."

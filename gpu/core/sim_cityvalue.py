@@ -1874,7 +1874,8 @@ class _MinorFacts:
         return self.sim._trade_capacity(self.row)
 
     def trade_knowledge(self):
-        return None
+        # its trade AI's route value K (`_minor_trade_value`)
+        return self.sim.citystate_trade_value[:, self.s]
 
     def unit_cost(self, u):
         ui = self._uidx(u)
@@ -1951,6 +1952,10 @@ class _FreeFacts(_MinorFacts):
     its trade, TRAIT_LEADER_FREE_CITIES' promotion lists, the majors' default
     trait alone for its versions, the default handicap; its units in the
     hostile pool; no knowledge base's units known; its queue the city's"""
+
+    def trade_knowledge(self):
+        # the Free Cities' trade AI is not read
+        return None
 
     def __init__(self, sim, j: int):
         super().__init__(sim, sim.FR)
