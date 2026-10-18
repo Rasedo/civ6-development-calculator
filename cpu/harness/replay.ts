@@ -187,8 +187,9 @@ interface Ctx {
   /** the units a city-state's, a Free City's or a barbarian's battle of this
    *  pair struck or fought with, as they stood before its first blow: the
    *  minors' AI takes its turn from there (`minorAi`), its own operations
-   *  fighting those battles in its pass */
-  minorBlows: Map<Unit, Unit>;
+   *  fighting those battles in its pass; each with its record key, which a
+   *  unit the pair killed has left the replay's map by */
+  minorBlows: Map<Unit, { snap: Unit; key: string }>;
   /** the barbarian units' plots of this pair the record's steps entered,
    *  in their order, for their scouts' looks at the end of the barbarians'
    *  turn (`barbarianTurn`) */
@@ -822,11 +823,20 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
   // city-state 2's Warrior, whole at its turn's start, strikes the camp's
   // Spearman in its Attack Barb Camp operation)
   const back = new Map([...twin].map(([c, u]) => [u, c] as const));
-  for (const [u, snap] of ctx.minorBlows) {
+  // — a unit the pair killed with its record key, in its place among its
+  // player's units, which stand in the order they were made (runs/h1_duelw1121
+  // t13: Hunza's Warrior at 11:4 stands its turn and is City Defense's first
+  // recruit before the barbarian Quadrireme's strike kills it)
+  for (const [u, { snap, key }] of ctx.minorBlows) {
+    if (!keyOf.has(u)) keyOf.set(u, key);
     let c = back.get(u);
     if (!c) {
       c = structuredClone(snap);
-      copy.units.push(c);
+      const seat = c.seat;
+      const id = c.id;
+      const mine = copy.units.flatMap((x, i) => (x.seat === seat ? [i] : []));
+      const before = mine.filter((i) => copy.units[i].id < id);
+      copy.units.splice(before.length ? before[before.length - 1] + 1 : mine.length ? mine[0] : copy.units.length, 0, c);
       twin.set(c, u);
     }
     c.hp = snap.hp;
@@ -2523,14 +2533,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const atk = unitOf(ctx, d.attacker);
         const def = unitOf(ctx, d.defender);
         if (!atk || !def) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); if (TRACE.has('battle')) console.error(`   ${d.attacker} ${!!atk} ${d.defender} ${!!def}`); break; }
-        for (const blows of [isBarbSeat(atk.seat) && ctx.barbBlows, (isBarbSeat(atk.seat) || minorAiSeat(atk.seat)) && ctx.minorBlows]) {
-          if (!blows) continue;
-          for (const [u, at] of [[atk, d.from], [def, d.at]] as const) {
-            if (blows.has(u)) continue;
-            const snap = structuredClone(u);
-            snap.tileIndex = at;
-            blows.set(u, snap);
-          }
+        const minorBattle = isBarbSeat(atk.seat) || minorAiSeat(atk.seat);
+        for (const [u, at, key] of [[atk, d.from, d.attacker], [def, d.at, d.defender]] as const) {
+          const snap = () => Object.assign(structuredClone(u), { tileIndex: at });
+          if (isBarbSeat(atk.seat) && !ctx.barbBlows.has(u)) ctx.barbBlows.set(u, snap());
+          if (minorBattle && !ctx.minorBlows.has(u)) ctx.minorBlows.set(u, { snap: snap(), key });
         }
         const s0 = battleDraw(ctx, wit, b, d);
         if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); if (TRACE.has('battle')) console.error(`   ${d.attacker || 'city@' + d.from} vs ${d.defender || 'city@' + d.at} seq${d.seq}`); break; }
