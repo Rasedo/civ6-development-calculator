@@ -12,7 +12,7 @@ import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { attacksLeftOf } from './promotions';
 import { cityStrikeStrength, damageExpected, hostileRangedStrike, unitAttackRange } from './combat';
-import { aiStrengths, maxMoves, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passSafePlot, plotDistance, rangeOf,
+import { aiStrengths, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passSafePlot, plotDistance, rangeOf,
   type Pass } from './tactical';
 import type { OpsEnv } from './operations/manager';
 import type { DefendOrders } from './operations/nodes';
@@ -204,6 +204,20 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
       }
       return { lines, released };
     },
+  };
+}
+
+/** `seat`'s units of the ids take their type's own AI type (0x79b9c0): a
+ *  standing army's DEFENDER turns COMBAT, the pass (where one is open)
+ *  reading the type it now holds */
+export function ownAiType(state: GameState, seat: number, pass: Pass | null): OpsEnv['ownAiType'] {
+  return (ids) => {
+    for (const id of ids) {
+      const u = state.units.find((x) => x.id === id && x.seat === seat);
+      if (!u?.aiDefender) continue;
+      delete u.aiDefender;
+      if (pass?.ai.has(id)) pass.ai.set(id, militaryAiTypeOf(u));
+    }
   };
 }
 

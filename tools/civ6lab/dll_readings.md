@@ -4066,11 +4066,25 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   only before another unit among the strikers (0x775340): runs/h1_duelv1121
   t4, city-state 4's Warrior 131073 (its first unit, the quota 1) wanders
   while 196610 strikes the barbarian Scout it could reach too.
+- An operation's recruit clears the DEFENDER: Recruit Units' update
+  (0x81c820), after the recruit (0x60a8c0, whose offer does not exclude a
+  DEFENDER), lists the operation's units (0x6092c0: the player's units
+  +0xd8 with +0x7d0 the operation's id and +0x770 clear) and sets each one's
+  AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0: the highest
+  UnitAiInfos flag of the type up to COMBAT 3, -1 none), at 0x81cb90..0x81cbd3,
+  before the strengths (0x73f7d0). The standing army then counts it no more
+  (a unit in a job never rejoins it): runs/h1_duelw1121 Hunza (player 2) t9,
+  Attack Barb Camp's "Recruiting strength ... UNIT_WARRIOR" takes its
+  standing DEFENDER, the Combat Desire 0.0 at t10 (the city's update before
+  the recruit), 0.1 from t11 (AI_Military.csv), the shortfall 1.
 - The engines (`minorStandingArmy` / `_minor_standing_army`): the units' AI
   type kept as `Unit.aiDefender` / `unit_defender`, the units' order taken
   as pool order, COMBAT read as not civilian, not recon, of strength above
   0; the EXPLORE clause and the +0xf30 release not ported; the pass's AI type
-  (`militaryAiTypeOf`) DEFENDER where it holds.
+  (`militaryAiTypeOf`) DEFENDER where it holds; Recruit Units' reset
+  (`ownAiType` in cpu/core/opsOrders.ts through the operations' context,
+  `_u_recruit` in gpu/core/sim_minorops.py) clears `aiDefender` /
+  `unit_defender` on every unit of the operation.
 - MEASURED (`cityBuildLab.ts`, the five verbose duels): the Combat Desire as
   logged 1,778 -> 2,897 of 3,600 minor-turns (within 0.05); the action
   replay's own desire (REPLAY_TRACE=minorRows against AI_Military.csv)

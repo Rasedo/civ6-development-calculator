@@ -19,7 +19,11 @@
   final: 0x401ba0
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarianOps.ts:recruit, gpu/core/sim_barbops.py:_bop_recruit]
+  impl:
+    - cpu/core/barbarianOps.ts:recruit
+    - gpu/core/sim_barbops.py:_bop_recruit
+    - cpu/core/operations/nodes.ts:update
+    - gpu/core/sim_minorops.py:_u_recruit
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -29,6 +33,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "H-1: the raids — READ"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...able slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list..."
@@ -103,6 +108,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   context:
     - "...is not yet recruitable (W at t7 recruited at t8, the t9 W not at t9): LAB — the evaluator 0x60a8c0 is unread. The raid operation's own end (its tree's last Notify Owner, which opens the ci..."
     - "...71530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tact..."

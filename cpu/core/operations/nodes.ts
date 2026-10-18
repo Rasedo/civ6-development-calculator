@@ -83,6 +83,9 @@ export interface OpsContext {
   /** Operation Defend Units' orders, where the seat's units' turn gives
    *  them; none, the node moves no unit */
   defend?: DefendOrders;
+  /** the units take their type's own AI type (0x79b9c0: COMBAT for a
+   *  fighting unit), a standing army's DEFENDER among them leaving it */
+  ownAiType(ids: readonly number[]): void;
   op: Operation;
   /** the units in any operation (none recruitable elsewhere) */
   assigned(): ReadonlySet<number>;
@@ -296,6 +299,9 @@ const recruitUnits: BtHandler<OpsContext> = {
         for (const o of lower) for (const t of o.teams) t.members = t.members.filter((id) => id !== u.id);
       }
     }
+    // the operation's units (the player's walk 0x6092c0) each take their
+    // type's own AI type (unit +0x168, 0x79b9c0)
+    ctx.ownAiType(opUnits(op));
     refreshStrengths(ctx);
     const after = opUnits(op).length;
     const unit = opUnit(op);

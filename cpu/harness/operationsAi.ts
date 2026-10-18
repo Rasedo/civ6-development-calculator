@@ -38,7 +38,7 @@ import { opsSettle } from '../../ai/major/settle';
 import { seatUnitRows } from '../core/operations/unitRows';
 import type { MajorKnownCityView, MajorView } from '../../ai/major/view';
 import { militaryAiTypeOf, openPass } from '../core/tactical';
-import { passOrders, passView } from '../core/opsOrders';
+import { ownAiType, passOrders, passView } from '../core/opsOrders';
 import type { WarHooks } from './diploSender';
 import { NO_PLOT, opUnits } from '../core/operations/operation';
 import {
@@ -342,6 +342,7 @@ export class OperationsProbe {
         ...passOrders(copy, seat, pass, () => {
           view = look();
         }),
+        ownAiType: ownAiType(copy, seat, pass),
         log: (l) => lines.push(l),
         logEval: (l) => evals.push(l),
       };

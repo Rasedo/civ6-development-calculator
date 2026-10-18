@@ -617,6 +617,22 @@
   context:
     - "...bour within 3 of the city another owns, without a wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T, 0x79f0c0); its modifiers 0x7a4b20; at the top level its neighb..."
   review: reviewed
+- addr: 0x1e60f0
+  final: 0x2ca0f0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 9
+      value: "The standing army then counts it no more   (a unit in a job never rejoins it): runs/h1_duelw1121 Hunza (player 2) t9,   Attack Barb Camp's \"Recruiting strength ..."
+    - recording: AI_Military.csv
+      turn: 10
+      value: "UNIT_WARRIOR\" takes its   standing DEFENDER, the Combat Desire 0.0 at t10 (the city's update before   the recruit), 0.1 from t11 (AI_Military.csv), the shortfall 1."
+  readings:
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+  context:
+    - "...+0x7d0 the operation's id and +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0: the highest UnitAiInfos flag of the type up to COMBAT 3,..."
+  review: imported
 - addr: 0x1eaa30
   final: 0x144810
   kind: function
@@ -3976,6 +3992,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   context:
     - "...up, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority..."
   review: reviewed

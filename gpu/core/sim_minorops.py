@@ -1692,6 +1692,11 @@ def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
                     mem = sim.mops_mem[:, s, kk, ti]
                     keep = ~((mem >= 0) & got.gather(1, mem.clamp(min=0)))
                     sim._mops_compact(s, kk, ti, keep, at)
+    # the operation's units (the player's walk 0x6092c0) each take their
+    # type's own AI type (unit +0x168, 0x79b9c0): a DEFENDER turns COMBAT
+    for ti in range(N_TEAMS):
+        mine = sim._mops_member_mask(s, k, ti) & at.unsqueeze(1)
+        sim.major_unit_defender &= ~mine
     rows = view["rows"]
     sim._mops_refresh(s, k, at, sim._mops_units(s), rows, view["tg"])
     after = _n_units(sim, c)

@@ -101,6 +101,8 @@ export interface OpsEnv {
   barbarian?: BarbarianHooks;
   /** Operation Defend Units' orders (`OpsContext`), where the seat's units' turn gives them */
   defend?: OpsContext['defend'];
+  /** the units' AI type their type's own (`OpsContext`) */
+  ownAiType: OpsContext['ownAiType'];
   /** the operation lines (AI_Operation.csv without its turn and player) and
    *  the candidate lines (AI_Operation_Eval.csv) */
   log(line: string): void;
@@ -419,6 +421,7 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     moveUpdate: env.moveUpdate,
     moveExec: env.moveExec,
     defend: env.defend,
+    ownAiType: env.ownAiType,
     op,
     assigned: () => assigned(ai),
     others: () => opsOf(ai),

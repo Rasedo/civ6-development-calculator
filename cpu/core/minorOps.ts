@@ -24,7 +24,7 @@ import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { majorView } from './majorView';
 import { cityStateTactics, passFinish, plotDistance, type Pass } from './tactical';
-import { passOrders, passView } from './opsOrders';
+import { ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
 import { NO_PLOT, opDef, opUnits } from './operations/operation';
@@ -132,6 +132,7 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
       throw new Error('a city-state\'s operations give their units move and attack orders alone');
     },
     ...(pass ? passOrders(state, cs.seat, pass, changed) : outsidePass),
+    ownAiType: ownAiType(state, cs.seat, pass),
     log: (l) => tracer?.(cs.seat, l, false),
     logEval: (l) => tracer?.(cs.seat, l, true),
   };

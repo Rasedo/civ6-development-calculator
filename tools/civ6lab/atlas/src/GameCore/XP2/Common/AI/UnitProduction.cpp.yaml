@@ -65,6 +65,11 @@
   final: 0x5242d0
   kind: function
   status: PARTLY
+  impl:
+    - cpu/core/operations/nodes.ts:OpsContext
+    - cpu/core/operations/nodes.ts:update
+    - cpu/core/opsOrders.ts:ownAiType
+    - gpu/core/sim_minorops.py:_u_recruit
   readings:
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]

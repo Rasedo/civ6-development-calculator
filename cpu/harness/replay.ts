@@ -989,6 +989,12 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: Readonl
 function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, twin: ReadonlyMap<Unit, Unit>,
   keyOf: ReadonlyMap<Unit, string>): void {
   const { state } = ctx;
+  // their units' AI type as their operations' recruits left it
+  for (const [x, u] of twin) {
+    if (!minorAiSeat(x.seat) || !copy.units.includes(x) || !state.units.includes(u)) continue;
+    if (x.aiDefender) u.aiDefender = true;
+    else delete u.aiDefender;
+  }
   for (const c of copy.cityStates) {
     const cs = state.cityStates.find((x) => x.id === c.id);
     if (!cs) continue;

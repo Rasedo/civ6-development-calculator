@@ -200,6 +200,9 @@ function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
     },
     ...(pass ? passOrders(state, BARB_SEAT, pass, changed) : outsidePass),
     barbarian: hooksOf(state),
+    ownAiType: () => {
+      throw new Error('the barbarians\' operations recruit through Barbarian Recruit alone');
+    },
     log: (l) => tracer?.(l),
     logEval: () => undefined,
   };
