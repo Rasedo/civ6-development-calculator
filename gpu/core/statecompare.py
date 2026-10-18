@@ -429,6 +429,8 @@ GAME = {
             sim.citystate_kb_slot[b, sim.BK].tolist(), sim.citystate_kb_owner[b, sim.BK].tolist(),
             sim.citystate_kb_type[b, sim.BK].tolist(), sim.citystate_kb_seen[b, sim.BK].tolist(),
             sim.citystate_kb_plot[b, sim.BK].tolist(), sim.citystate_kb_damage[b, sim.BK].tolist()) if k != -2) for x in r]],
+    "barbArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.BK])],
+    "freeUnitStrength": lambda sim, b, rows: [int(sim.citystate_unit_strength[b, sim.FR])],
     "storms": lambda sim, b, rows: [_storm_table(sim, b)],
     "droughts": lambda sim, b, rows: [_drought_table(sim, b)],
 }
@@ -1000,6 +1002,8 @@ CITY_STATE = {
     "minorResourceCounts": lambda sim, b, rows: [[int(x) for x in sim.citystate_res_counts[b, s].tolist()] for s in rows],
     "minorTradeList": lambda sim, b, rows: [_trade_list(sim, b, s) for s in rows],
     "minorTradeValue": lambda sim, b, rows: [int(sim.citystate_trade_value[b, s]) for s in rows],
+    "minorUnitStrength": lambda sim, b, rows: [int(sim.citystate_unit_strength[b, s]) for s in rows],
+    "minorArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, s]) for s in rows],
     "minorRevealed": lambda sim, b, rows: [[int(p) for p in sim.mops_revealed[b, s].nonzero(as_tuple=True)[0].tolist()]
                                            for s in rows],
     "minorSavings": lambda sim, b, rows: [[int(x) for x in sim.citystate_savings[b, s].tolist()] + [int(sim.citystate_balance[b, s])]

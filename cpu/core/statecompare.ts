@@ -613,6 +613,8 @@ const GAME: Record<string, Extractor> = {
   barbArmyKnown: (s) => [(s.barbSeat.armyKnown ?? [])
     .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage])
     .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()],
+  barbArmyAged: (s) => [s.barbSeat.armyAged ?? -1],
+  freeUnitStrength: (s) => [s.freeSeat?.unitStrength ?? 0],
   // the live storms in the order they began: the last serial, then per
   // record its serial, row, centre, turns left, and its struck plots sorted
   // behind their count
@@ -991,6 +993,8 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorTradeList: overCityStates((cityState) => [...(cityState.tradeCities ?? [])].sort((a, b) => a - b)
     .concat(-1, [...(cityState.tradeRejected ?? [])].sort((a, b) => a - b))),
   minorTradeValue: overCityStates((cityState) => cityState.tradeValue ?? 0),
+  minorUnitStrength: overCityStates((cityState) => cityState.unitStrength ?? 0),
+  minorArmyAged: overCityStates((cityState) => cityState.armyAged ?? -1),
   minorRevealed: overCityStates((cityState) => (cityState.revealed ?? []).flatMap((v, p) => (v === 1 ? [p] : []))),
   minorSavings: overCityStates((cityState) => [...(cityState.economy?.savings ?? [0, 0, 0, 0]), cityState.economy?.balance ?? 0]),
   minorAiSlots: overCityStates((cityState) => cityAiSlots(cityState)),

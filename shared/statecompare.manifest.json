@@ -473,6 +473,28 @@
           ]
         },
         {
+          "name": "barbArmyAged",
+          "compare": "exact",
+          "note": "the turn the barbarians' knowledge base's records last aged (`knowledgeLook` on `barbSeat.armyAged`; the row `BK`); -1 never.",
+          "covers": [
+            "Seat.armyAged"
+          ],
+          "planes": [
+            "citystate_kb_aged"
+          ]
+        },
+        {
+          "name": "freeUnitStrength",
+          "compare": "exact",
+          "note": "the Free Cities' strength over every domain as their turn start stored it (`storeUnitStrength` on `freeSeat.unitStrength`; the row `FR`); 0 until the seat is made.",
+          "covers": [
+            "Seat.unitStrength"
+          ],
+          "planes": [
+            "citystate_unit_strength"
+          ]
+        },
+        {
           "name": "storms",
           "compare": "exact",
           "covers": [
@@ -2622,6 +2644,28 @@
           "note": "the minor's trade AI's route value K, raw 24.8 (knowledge base +0x680); 0 before its first"
         },
         {
+          "name": "minorUnitStrength",
+          "compare": "exact",
+          "covers": [
+            "Seat.unitStrength"
+          ],
+          "planes": [
+            "citystate_unit_strength"
+          ],
+          "note": "the minor's strength over every domain as its turn start stored it (`storeUnitStrength`), the civics AI's combat-adjacency term; 0 before its first. A major's is read only by the majors' AI, which runs on TS alone"
+        },
+        {
+          "name": "minorArmyAged",
+          "compare": "exact",
+          "covers": [
+            "Seat.armyAged"
+          ],
+          "planes": [
+            "citystate_kb_aged"
+          ],
+          "note": "the turn the minor's knowledge base's army records last aged (`knowledgeLook`); -1 never"
+        },
+        {
           "name": "minorRevealed",
           "compare": "exact",
           "covers": [
@@ -4215,14 +4259,6 @@
       {
         "path": "CityState.name",
         "why": "presentation."
-      },
-      {
-        "path": "CityState.specialistPref",
-        "why": "the H-1 importer's pins from a recorded game; no engine path writes a minor's."
-      },
-      {
-        "path": "CityState.idleCitizens",
-        "why": "the H-1 importer's idle citizens from a recorded game; no engine path writes a minor's."
       },
       {
         "path": "GameState.cityStateMax",
