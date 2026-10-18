@@ -26,7 +26,7 @@ import { majorView } from './majorView';
 import { cityStateTactics, passFinish, plotDistance, type Pass } from './tactical';
 import { passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
-import { lookCamps, type KnownUnit } from './operations/knowledge';
+import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
 import { NO_PLOT, opDef, opUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
@@ -63,7 +63,7 @@ function minorView(state: GameState, cs: CityState, pass: Pass | null): MajorVie
 
 /** a seat's knowledge base's records of a player's units, as the
  *  operations read them */
-export function knownOf(records: readonly ArmyRecord[] | undefined, player: number): KnownUnit[] {
+function knownOf(records: readonly ArmyRecord[] | undefined, player: number): KnownUnit[] {
   return (records ?? []).filter((r) => r.owner === player).map((r) => {
     const d = UNITS[r.type];
     return { id: r.id, owner: r.owner, type: gameTypeOf('unit', r.type, 'UNIT_'), plot: r.plot, combat: d?.combat ?? 0,
@@ -71,17 +71,13 @@ export function knownOf(records: readonly ArmyRecord[] | undefined, player: numb
   });
 }
 
-/** the age at most of a record the knowledge base's army strength reads
- *  (0x5eadb0 -> 0x5ef760 with 2, at every caller: the city's threat, the
- *  operations' targets and enemy strength, the city value) */
-export const ARMY_READ_AGE = 2;
 
-/** a minor's records of a player's units the army strength reads: those
- *  aged at most ARMY_READ_AGE (their age the last ageing's turn less the
- *  turn last seen; records never aged are of age 0) */
-export function minorRecentOf(cs: CityState, player: number): KnownUnit[] {
-  const aged = cs.armyAged;
-  return knownOf(aged === undefined ? cs.armyKnown : cs.armyKnown?.filter((r) => aged - r.seen <= ARMY_READ_AGE), player);
+/** a city-state's or the barbarians' records of a player's units the army
+ *  strength reads: those aged at most ARMY_READ_AGE (their age the last
+ *  ageing's turn less the turn last seen; records never aged are of age 0) */
+export function recentOf(holder: { armyKnown?: ArmyRecord[]; armyAged?: number }, player: number): KnownUnit[] {
+  const aged = holder.armyAged;
+  return knownOf(aged === undefined ? holder.armyKnown : holder.armyKnown?.filter((r) => aged - r.seen <= ARMY_READ_AGE), player);
 }
 
 /** the knowledge base's camps (its look, `lookCamps`) on the plots the
@@ -110,7 +106,7 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
     turn: state.turn,
     view: fresh,
     defs: MINOR_OP_DEFS,
-    army: (p) => minorRecentOf(cs, p),
+    army: (p) => recentOf(cs, p),
     camps: () => cs.campsKnown ?? [],
     known: () => fresh().knownCities(cs.seat),
     threat: (plot) => (plot === cs.centerIndex ? cs.threat ?? -1 : -1),

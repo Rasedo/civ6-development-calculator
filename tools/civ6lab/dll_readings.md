@@ -5709,10 +5709,10 @@ barbarians' operations alike.
   (0x7a0142), 0x654c9a, 0x7aed3b. runs/h1_duelv1117 Caguana t50: three
   Warrior records on 611 seen t33, t35, t50 — the last alone counts, 20
   against 23 + 23, no threat, and the game starts no City Defense. The
-  engines read the city-states' records so (`minorRecentOf` /
-  `_mops_records`' recent, `minorThreat`, the age the last ageing's turn
-  `armyAged` / `citystate_kb_aged` less the turn last seen); the
-  barbarians' and the majors' records are read whole.
+  engines read the city-states' and the barbarians' records so
+  (`recentOf` / `_mops_records`' recent, `minorThreat`; the age the last
+  ageing's turn `armyAged` / `citystate_kb_aged` less the turn last seen)
+  and the majors' (`recentArmy`, the probe's `armyAged` at its `lookArmy`).
 - 0x73eb60 over the player list (+0x4a0): the players it counts — the
   operation's enemy (op +0x2a0), else (-1) each player the seat is at war
   with (0x469cd0 -> IsAtWarWith; the barbarians at war with every player).
@@ -7571,8 +7571,26 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   Recruit Value (x 3 for a unit row +0x40 above 0), the Time Limit as its
   turn limit (autovariable +0x168, the contract's +0x1c0), the tree's,
   submitted (0x60bb50) and held under the tag. The levy (Allow Levying,
-  0x449b70, "LEVIED FROM") and the stealing signal's gate (player signal
-  +0x1c8, Allow Stealing) are unread.
+  0x449b70, "LEVIED FROM") is unread. THE SECOND OFFER (0x60a8c0): the
+  evaluator's satisfied test (vtable @0xd760f8 +8, 0xb3c380) answers false
+  always, so after the first offer (the units in no job, not done, alive)
+  player signal +0x1c8 is raised (0x6075b0) with the recruit's priority (the
+  tree's +0x5a8, else its operation's 0x723b90: the root tree's +0x548, its
+  definition's Priority, 0x73a120 -> 0x7cb230), its value, its job and the
+  node's Allow Stealing (TreeData +0x60, no default: false); each behaviour
+  tree listens (0x7cbb40 binds tree +0x628 to 0x7d1e40): a tree not the
+  requester's job, marked (+0x3c8, set by its reset 0x7d3670) or asked with
+  Allow Stealing, of a priority below the request's (or marked, of equal
+  priority and a value below), answers with its units (0x6092c0 by its job
+  +0x488) alive and alone (+0x1fb8 +0x738 1); those not done (+0x530) are
+  offered again — the evaluation logged a second time — and taken units
+  leave their job. A city event tree's priority is its list entry's Value
+  (+0x470, 0x5cc910 / 0x5ccc10 / 0x5cd150; the city-states' lists none: 0).
+  runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its "No
+  recruits" pair twice — the Builder made at t6 held by a city tree; t6 and
+  t8 once. Not ported: the engines keep no tree priorities, marks or turn-
+  done flags, and a city tree's Builder never fits a combat team — the
+  second pair is a log line, no unit moves on it.
 - THE KNOWLEDGE BASE'S CAMPS (CivKnowledge m_barbarians +0x638, 0x10 bytes:
   the plot, an age, the camp's unit): the look (0x7877e0) walks every plot —
   one the player sees (visibility +0x290 above 0) its units and camp, one it

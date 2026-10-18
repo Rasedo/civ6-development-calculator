@@ -30,7 +30,7 @@ import {
   joinBuilt, newOpsAi, notReadyHook, operationsEvaluate, operationsRun, opContracts, opsOf, peaceMade, remapUnits, startOperationNamed,
   surpriseWarReady, type OpsAi, type OpsEnv,
 } from '../core/operations/manager';
-import { knownArmy, lookArmy, lookCamps, type ArmyRecords } from '../core/operations/knowledge';
+import { knownArmy, lookArmy, recentArmy, lookCamps, type ArmyRecords } from '../core/operations/knowledge';
 import { cityThreat } from '../core/operations/cityThreat';
 import { cityValue } from '../core/operations/cityValue';
 import { warValue } from '../../ai/major/warValue';
@@ -159,6 +159,8 @@ interface MajorOps {
   nextContract: number;
   nextOp: number;
   army: ArmyRecords;
+  /** the turn its records last aged (`lookArmy`), null none yet */
+  armyAged: number | null;
   camps: number[];
   known: readonly MajorKnownCityView[] | null;
   threat: Map<number, number>;
@@ -198,7 +200,7 @@ export class OperationsProbe {
         const v = this.lastView.get(owner) ?? view;
         const records = (p: number) => (m ? knownArmy(m.army, p) : []);
         return warValue(v, owner, other, favoured, {
-          army: (p) => (p === owner ? v.units(owner) : records(p)), records, turn: v.turn,
+          army: (p) => (p === owner ? v.units(owner) : m ? recentArmy(m.army, p, m.armyAged) : []), records, turn: v.turn,
         });
       },
       // on the view the seat's operations' turn left: their units' ids
@@ -289,7 +291,7 @@ export class OperationsProbe {
       if (!seatOf(copy, seat)) continue;
       let m = this.majors.get(seat);
       if (!m) {
-        this.majors.set(seat, (m = { ai: newOpsAi(seat), book: newContractBook(), nextContract: 0, nextOp: 0, army: new Map(), camps: [], known: null,
+        this.majors.set(seat, (m = { ai: newOpsAi(seat), book: newContractBook(), nextContract: 0, nextOp: 0, army: new Map(), armyAged: null, camps: [], known: null,
           threat: new Map(), defense: new Map() }));
       }
       const mo = m;
@@ -321,7 +323,7 @@ export class OperationsProbe {
         turn,
         view: () => view,
         defs: null,
-        army: (p) => knownArmy(mo.army, p),
+        army: (p) => recentArmy(mo.army, p, mo.armyAged),
         camps: () => mo.camps,
         known: () => mo.known ?? view.knownCities(seat),
         threat: (plot) => mo.threat.get(plot) ?? -1,
@@ -350,9 +352,10 @@ export class OperationsProbe {
       // of another player
       const known = (mo.known = view.knownCities(seat));
       lookArmy(mo.army, view, seat, turn);
+      mo.armyAged = turn;
       const seen = view.plotsSeen(seat);
       mo.camps = lookCamps(mo.camps, (p) => seen.has(p), view.campPlots());
-      const army = (p: number) => (p === seat ? view.units(seat) : knownArmy(mo.army, p));
+      const army = (p: number) => (p === seat ? view.units(seat) : recentArmy(mo.army, p, mo.armyAged));
       const cityValues = known.filter((k) => k.owner !== seat).map((k) => ({ plot: k.plot, value: cityValue(view, seat, k, known, army) }));
       cityDefense(mo, env, view);
       operationsRun(ai, env);
@@ -563,7 +566,7 @@ function cityDefense(m: MajorOps, env: OpsEnv, view: MajorView): void {
   const { ai } = m;
   for (const city of view.cityPlots(ai.seat)) {
     const threat = cityThreat(view, ai.seat, city, {
-      army: (p) => knownArmy(m.army, p),
+      army: (p) => recentArmy(m.army, p, m.armyAged),
       operationNear: (p, plot, dist) => opsOf(ai).some((o) => o.enemy === p && o.target !== NO_PLOT && view.plotDistance(o.target, plot) <= dist),
     });
     m.threat.set(city, threat);

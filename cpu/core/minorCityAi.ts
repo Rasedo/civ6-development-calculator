@@ -57,7 +57,8 @@ import { newEconomicMemory, purchaseTurn, purchasePick, savingsTurn, type Purcha
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat } from './operations/cityThreat';
 import { majorView } from './majorView';
-import { ARMY_READ_AGE, minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
+import { minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
+import { ARMY_READ_AGE } from './operations/knowledge';
 import { joinBuilt } from './operations/manager';
 import { minorCity } from './cityStates';
 import { campTiles, civOf, hiddenResourcesFor, seatOf, tileSeat } from './seats';

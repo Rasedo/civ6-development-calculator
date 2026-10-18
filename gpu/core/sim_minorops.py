@@ -339,8 +339,9 @@ class SimMinorOps:
         self.mops_camps[:, s] = torch.where(alive.unsqueeze(1), new, known)
 
     def _mops_records(self, s: int) -> dict:
-        """minor `s`'s knowledge base's army records ([B, K]): live, those the
-        army strength reads (`minorRecentOf`: aged at most ARMY_READ_AGE, all
+        """the knowledge base's army records of row `s` (a minor, the barbarians'
+        `BK`) ([B, K]): live, those the
+        army strength reads (`recentOf`: aged at most ARMY_READ_AGE, all
         where the row never aged), owner, AI unit row, plot, combat and
         ranged strengths, damage"""
         T = self._cv_tables()
@@ -694,7 +695,7 @@ class SimMinorOps:
         on = target >= 0
         rec = self._mops_records(r)
         rd = self.pair_dist[rec["plot"].clamp(min=0), tc.unsqueeze(1)].to(torch.long)
-        near = rec["recent" if r != self.BK else "live"] & (rec["plot"] >= 0) & (rd <= 3) & on.unsqueeze(1)
+        near = rec["recent"] & (rec["plot"] >= 0) & (rd <= 3) & on.unsqueeze(1)
         term = self._mops_army_term(rec["combat"], rec["ranged"], rec["dmg"])
         counted = near & self._ops_counted(seat, rec["owner"], enemy)
         strength = torch.where(counted, term, torch.zeros_like(term)).sum(dim=1)

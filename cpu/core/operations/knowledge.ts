@@ -43,6 +43,17 @@ export function lookArmy(records: ArmyRecords, view: MajorView, seat: number, tu
 /** the units the knowledge base holds of a player, in record order */
 export const knownArmy = (records: ArmyRecords, player: number): KnownUnit[] => [...records.values()].filter((r) => r.owner === player);
 
+/** the age at most of a record the knowledge base's army strength reads
+ *  (0x5eadb0 -> 0x5ef760 with 2, at every caller: the city's threat, the
+ *  operations' targets and enemy strength, the city value) */
+export const ARMY_READ_AGE = 2;
+
+/** the units of a player the army strength reads: those of age at most
+ *  ARMY_READ_AGE, their age `aged` (the turn the records last aged) less
+ *  the turn last seen; with no ageing yet, all (of age 0) */
+export const recentArmy = (records: ArmyRecords, player: number, aged: number | null): KnownUnit[] =>
+  knownArmy(records, player).filter((r) => aged === null || aged - r.seen <= ARMY_READ_AGE);
+
 /** the knowledge base's camps (m_barbarians +0x638, in their order): its
  *  update drops a camp whose plot the seat sees or has revealed with none
  *  there (0x5ebb30), its look adds each camp on a plot it sees or has
