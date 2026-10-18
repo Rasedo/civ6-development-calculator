@@ -133,8 +133,9 @@ export function harvestValue(f: PlotValueFacts, resource: string, t: number, h: 
 }
 
 /** 0x7b1320: the improvement's yields on the plot from `t` to `h` — a turn's
- *  PSEUDOYIELD_IMPROVEMENT, its Improvement_YieldChanges, each adjacency
- *  row's yield (a row counts its yield's whole adjacency) and its
+ *  PSEUDOYIELD_IMPROVEMENT, its Improvement_YieldChanges, its adjacency
+ *  (0x365ae0 per row, the rows summed: each adjacency yield's whole
+ *  adjacency once) and its
  *  YieldFromAppeal at the plot's Appeal, each at the player's value; its Housing over its TilesRequired at the city's housing
  *  value; a flood or an eruption the AI expects before the horizon ends it
  *  there */
@@ -148,7 +149,7 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
   }
   let v = pseudoYieldValue(f.view, f.seat, FX, 'PSEUDOYIELD_IMPROVEMENT');
   for (const [y, a] of imp.yields) v += yieldValue(f.view, f.seat, a * FX, y);
-  for (const y of imp.adjacency) v += yieldValue(f.view, f.seat, f.adjacency(imp.type, y) * FX, y);
+  for (const y of new Set(imp.adjacency)) v += yieldValue(f.view, f.seat, f.adjacency(imp.type, y) * FX, y);
   if (imp.appealYield) v += yieldValue(f.view, f.seat, fmul(f.appeal * FX, fxConst(imp.appealPct * 0.01)), imp.appealYield);
   if (imp.buildUnits.some(([, consumes]) => !consumes)) v *= 3;
   let value = between(v, t, h);

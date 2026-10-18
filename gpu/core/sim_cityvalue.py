@@ -342,7 +342,7 @@ class SimCityValue:
         v = self._cv_pseudo(torch.full_like(like, _FX), "PSEUDOYIELD_IMPROVEMENT", f.pseudo_w("PSEUDOYIELD_IMPROVEMENT"))
         for y, a in row["yields"]:
             v = v + self._cv_yield(torch.full_like(like, a * _FX), y, f.yield_w(y))
-        for y in row["adjacency"]:
+        for y in dict.fromkeys(row["adjacency"]):
             v = v + self._cv_yield(_t(f.adjacency(imp, y), like) * _FX, y, f.yield_w(y))
         if row["appealYield"]:
             amt = _fmul(_t(f.appeal(), like) * _FX, torch.full_like(like, _fx_const(row["appealPct"] * 0.01)))

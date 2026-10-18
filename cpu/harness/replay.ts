@@ -84,7 +84,7 @@ import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, mi
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
-import { minorAiTurn, minorMilitaryTurn, traceMinorAi } from '../core/minorCityAi';
+import { holdMinorClears, minorAiTurn, minorMilitaryTurn, traceMinorAi } from '../core/minorCityAi';
 import { cityStateMilitary, traceMinorOps } from '../core/minorOps';
 import { traceBarbOps } from '../core/barbarianOps';
 import { opsOf } from '../core/operations/manager';
@@ -2915,10 +2915,8 @@ function scoreMinorResearch(ctx: Ctx, b: TurnRecord, tally: MinorResearchTally):
 
 /** the plots whose improvement the engine's own city-state, Free City or
  *  barbarian scripts changed in the turn take the record's: their builders'
- *  and raiders' decisions; a feature or resource their Builders cleared that
- *  record t+1 still holds is the record's again (`minorAi:clear`) */
-function undoMinorPlots(ctx: Ctx, before: (string | null)[], ground: [string | null, string | null][],
-  charges: Map<Unit, number>): void {
+ *  and raiders' decisions */
+function undoMinorPlots(ctx: Ctx, before: (string | null)[], charges: Map<Unit, number>): void {
   const { state, next } = ctx;
   // the Builder whose charge the undone order spent gets it back: one that
   // stood on the plot after it with fewer charges than it began the turn on,
@@ -2931,19 +2929,6 @@ function undoMinorPlots(ctx: Ctx, before: (string | null)[], ground: [string | n
       return;
     }
   };
-  for (const t of state.map.tiles) {
-    if (t.ownerSeat < state.seats.length) continue;
-    const r = next.state.map.tiles[t.index];
-    const [feature, resource] = ground[t.index];
-    for (const k of ['feature', 'resource'] as const) {
-      const was = k === 'feature' ? feature : resource;
-      if (!was || t[k] || !r[k]) continue;
-      if (k === 'feature') t.feature = r.feature;
-      else t.resource = r.resource;
-      count(ctx, 'minorAi:clear', 'fallback', ctx.playerOfSeat.get(t.ownerSeat), `plot ${t.index}: the engine cleared its ${k}, the game kept it`);
-      refund(t.index);
-    }
-  }
   for (const t of state.map.tiles) {
     if ((t.improvement ?? null) === before[t.index]) continue;
     if (t.ownerSeat >= 0 && t.ownerSeat < state.seats.length) continue;
@@ -3544,6 +3529,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (!e) ctx.minorOps.set(seat, (e = { lines: [], evals: [] }));
     (candidate ? e.evals : e.lines).push(line);
   });
+  // a feature or resource a city-state's Builder would clear that record t+1
+  // still holds stands: the game's Builder kept it (`minorAi:clear`)
+  holdMinorClears((plot, clears) => {
+    const r = ctx.next.state.map.tiles[plot];
+    if (!(clears === 'feature' ? r.feature : r.resource)) return false;
+    count(ctx, 'minorAi:clear', 'fallback', ctx.playerOfSeat.get(ctx.state.map.tiles[plot].ownerSeat),
+      `plot ${plot}: the engine cleared its ${clears}, the game kept it`);
+    return true;
+  });
   // the record's units in the importer's order
   let k = 0;
   for (const u of recs[0].units) {
@@ -3617,7 +3611,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const seed = turnSeed(b);
     const standing = new Set(state.units);
     const improvements = state.map.tiles.map((x) => x.improvement ?? null);
-    const ground = state.map.tiles.map((x): [string | null, string | null] => [x.feature ?? null, x.resource ?? null]);
     const charges = new Map(state.units.filter((u) => minorAiSeat(u.seat) && (u.charges ?? 0) > 0).map((u) => [u, u.charges ?? 0]));
     // what each unit did in its player's actions of the turn, which the
     // turn's heal and fortification read: one that stood on its plot and
@@ -3788,7 +3781,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat),
         `${u.type}${op ? ` for ${op}` : ''}`);
     }
-    undoMinorPlots(ctx, improvements, ground, charges);
+    undoMinorPlots(ctx, improvements, charges);
     minorBuilds(ctx, b, report.minorBuilds);
     scoreMinorResearch(ctx, b, report.minorResearch);
     // REPLAY_TRACE=minorProd: each city-state's item, purse, units and research after the engine's turn
@@ -3979,6 +3972,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   report.subsystems = Object.fromEntries(Object.entries(report.subsystems).sort(([x], [y]) => x.localeCompare(y)));
   holdRng(null);
   traceMinorAi(null);
+  holdMinorClears(null);
   traceMinorOps(null);
   holdMinorCatchUp(null);
   holdResearchEra(null);

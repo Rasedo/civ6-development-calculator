@@ -4571,8 +4571,12 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   Woods, Rainforest and Marsh at 54.34, on Cattle beside the Pasture; none on
   Sugar or Ivory) and a ground row's civic held (no Farm on Hills before
   Civil Engineering). A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges
-  and, per adjacency row, its yield's whole adjacency (0x365ae0; a Farm's
-  three Food rows count it three times), YieldFromAppeal at the plot's
+  and its adjacency: the loop over Improvement_Adjacencies (+0x110..+0x118)
+  hands 0x365ae0 each row on its own (r8 = the row, r9d its yield +0x108 ->
+  +0x14) and values that row's integer, so the rows sum, each counted once
+  — a yield's whole adjacency once, not once per row (runs/h1_duelv1117
+  Caguana's Batey, four Culture rows: 692 -> 1,279 of 2,525 rows exact,
+  the misses whole multiples of one Culture's 20.11 gone), YieldFromAppeal at the plot's
   Appeal x the percent, each at the player's value (0x7a6690, 0x7a60d0);
   Improvement_Tourism at PSEUDOYIELD_TOURISM x the era factor;
   min(max(n, 1), DefenseModifier) + min(n, GrantFortification), n by

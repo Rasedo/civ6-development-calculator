@@ -401,6 +401,14 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
   };
 }
 
+/** THE CLEARINGS HELD: the action replay names the plots whose feature or
+ *  resource the game's own city-state kept through the turn (record t+1's),
+ *  which a minor's Builder then leaves standing. Null outside a replay. */
+let clearHeld: ((plot: number, clears: 'feature' | 'resource') => boolean) | null = null;
+export function holdMinorClears(held: typeof clearHeld): void {
+  clearHeld = held;
+}
+
 /** the minor's world as its trees read it and act on it; `spent` the units
  *  whose last charge an order took */
 function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityTreeCity): CityTreeWorld {
@@ -490,8 +498,14 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
         return;
       }
       if ((unit.charges ?? 0) <= 1) spent.add(u);
-      if (tile.feature && canRemoveFeature(state, tile, cs.seat).ok) builderRemoveFeature(state, unit.id, cs.seat);
-      else if (tile.resource) builderHarvest(state, unit.id);
+      const clears = tile.feature && canRemoveFeature(state, tile, cs.seat).ok ? 'feature' : tile.resource ? 'resource' : null;
+      // a clearing held stands, the Builder's turn spent and its charge kept
+      if (clears && clearHeld?.(plot, clears)) {
+        unit.movesLeft = 0;
+        return;
+      }
+      if (clears === 'feature') builderRemoveFeature(state, unit.id, cs.seat);
+      else if (clears === 'resource') builderHarvest(state, unit.id);
     },
     unitAlive: (u) => !!unitOf(u) && !spent.has(u),
     startOperation: (name, plot) => minorOpsStart(state, cs, name, plot),
