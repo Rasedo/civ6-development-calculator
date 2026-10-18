@@ -576,7 +576,10 @@
     - recording: 1124
       turn: 28
       value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
-  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts, cpu/core/aiResearch.ts:researchAnalysis]
+  impl:
+    - cpu/core/aiCityBuild.ts:CityBuildFacts
+    - cpu/core/aiResearch.ts:researchAnalysis
+    - cpu/core/types.ts:CityState
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -634,6 +637,7 @@
     - cpu/core/aiContracts.ts:ContractCity
     - cpu/core/aiDistrictValue.ts:DistrictValueFacts
     - cpu/core/minorBuild.ts:minorUnitTerm
+    - cpu/core/types.ts:CityState
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
