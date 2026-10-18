@@ -15,7 +15,8 @@ the game's Control Manager runs a player's lists —
  - C: in its tactical pass, once each unit's planning is taken
    (`_mops_run`, from `_minor_pass`): each running operation's strengths
    refreshed, the chosen one started, then each operation's tree ticks in
-   slot order — the interpreter of sim_citytrees.py over the operation's
+   priority order (the highest first, of equals in slot order) — the
+   interpreter of sim_citytrees.py over the operation's
    nodes — and the operations' units' turns are theirs.
 
 A minor runs Attack Barb Camp, Barb Camp Tech Boost (never started) and
@@ -74,7 +75,6 @@ class MinorOpsTables:
         self.defs = list(ao["defs"])
         self.names = [d["name"] for d in self.defs]
         self.d_abc = self.names.index("Attack Barb Camp")
-        self.d_boost = self.names.index("Barb Camp Tech Boost")
         self.d_cd = self.names.index("City Defense")
         self.teams = {k: list(ao["teams"][d["name"]]) for k, d in enumerate(self.defs)}
         self.reqs = {t: list(r) for t, r in ao["reqs"].items()}
@@ -1004,7 +1004,8 @@ class SimMinorOps:
     def _mops_run(self, s: int, act: torch.Tensor, op: dict, done: torch.Tensor) -> None:
         """`operationsRun` for minor `s` in its pass (`op` the pass's opening,
         `done` its units' turns): each running operation refreshed, the pick
-        started, the trees in slot order; the operations' units' turns end"""
+        started, the trees by priority (the highest first, of equals in slot
+        order); the operations' units' turns end"""
         Tm = self._mops_tables()
         on = act & ((self.mops_def[:, s] >= 0).any(dim=1) | (self.mops_pick[:, s] >= 0))
         if not bool(on.any()):
@@ -1019,11 +1020,16 @@ class SimMinorOps:
         if bool(pick.any()):
             self._mops_start(s, Tm.d_abc, self.mops_pick_target[:, s], self.mops_pick_rally[:, s], pick)
         self.mops_pick[:, s] = torch.where(on, -1, self.mops_pick[:, s])
-        for k in range(N_OPS):
-            for d in Tm.trees:
-                m = on & (self.mops_def[:, s, k] == d)
-                if bool(m.any()):
-                    self._mops_tick(s, k, d, m, view)
+        # the trees by priority, the highest first, of equals in slot order
+        # (`operationsRun`: the tree manager's tick per priority)
+        for prio in sorted({int(Tm.defs[d]["priority"]) for d in Tm.trees}, reverse=True):
+            for k in range(N_OPS):
+                for d in Tm.trees:
+                    if int(Tm.defs[d]["priority"]) != prio:
+                        continue
+                    m = on & (self.mops_def[:, s, k] == d)
+                    if bool(m.any()):
+                        self._mops_tick(s, k, d, m, view)
         busy = self._mops_busy(s) & self.major_unit_alive & (self.major_unit_seat == 100 + s)
         done |= busy & on.unsqueeze(1) & (op["rowof"] >= 0)
 

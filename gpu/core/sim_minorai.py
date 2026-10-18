@@ -262,18 +262,8 @@ class SimMinorAi:
         centre = self.citystate_center[:, s].clamp(min=0)
         dist = self.pair_dist[centre.unsqueeze(1), plot.clamp(min=0)].long()
         out = torch.full((B,), -1, dtype=torch.long, device=dev)
-        # an undamaged city with a running camp operation of the minor whose
-        # target lies within 5 holds the barbarians back (0x723cf0,
-        # `minorOpNear`)
-        Tm = self._mops_tables()
-        camp_ops = torch.zeros(B, dtype=torch.bool, device=dev)
-        for k in range(self.mops_def.shape[2]):
-            dk = self.mops_def[:, s, k]
-            tk = self.mops_target[:, s, k]
-            camp = (dk == Tm.d_abc) | (dk == Tm.d_boost)
-            near = self.pair_dist[centre, tk.clamp(min=0)].long() <= 5
-            camp_ops |= camp & (tk >= 0) & near
-        undamaged = self.citystate_hp[:, s].long() >= self._cs_max_hp
+        # a minor's operations name no enemy (op +0x2a0), so none holds a
+        # player back (0x723cf0, `minorOpNear`)
         nd = (self.city_dist_tile[:, row, 0] >= 0).sum(dim=1) + 1
         level = (torch.where(nd > 2, 3, 2) + 2
                  + torch.div(self.citystate_pop[:, s].long(), 5, rounding_mode="trunc"))
@@ -290,8 +280,6 @@ class SimMinorAi:
             margin = torch.where(hostile, torch.full_like(d, _MARGIN_HOSTILE),
                                  torch.maximum(torch.full_like(d, _MARGIN_OTHER), dcs * _FX))
             mine = rec & (owner == p) & (dist <= (_RANGE_CIV if full else _RANGE_OTHER))
-            if barb:
-                mine = mine & ~(undamaged & camp_ops).unsqueeze(1)
             anyu = mine.any(dim=1)
             sums = mine & ~acav.take(a0) if barb else mine
             tot = torch.where(sums, strength, torch.zeros_like(strength)).sum(dim=1)

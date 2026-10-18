@@ -24,7 +24,8 @@
  *  - the operations' run (`operationsRun`, with the tree manager's tick):
  *    each running operation logs its target and refreshes its strengths and
  *    its teams' readiness (0x73eb60, 0x73f7d0, 0x73b360); the chosen
- *    candidate starts; then each operation's tree ticks, an operation whose
+ *    candidate starts; then each operation's tree ticks (by priority, the
+ *    highest first, of equals in slot order), an operation whose
  *    tree ends complete.
  *
  * The operations live in the manager's pool (+0x2e0, 0x71e370): an operation
@@ -369,11 +370,17 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv): void {
 }
 
 /** THE OPERATIONS' RUN (with the tree manager's tick): each operation's
- *  target and teams logged; the chosen candidate started; the trees, in
- *  slot order */
+ *  target and teams logged; the chosen candidate started; the trees by
+ *  priority, the highest first, of equals in slot order — the tree
+ *  manager's tick (0x7ffdd0) runs once per priority and ticks the trees of
+ *  that priority alone (0x7d3a00 / 0x7cb3d0: tree +0x548, its definition's
+ *  Priority) (runs/h1_duelw1121 Hunza t13: City Defense, priority 4, ticks
+ *  before the older Attack Barb Camp, priority 3, and recruits both its
+ *  Warriors; Attack Barb Camp then completes, empty) */
 export function operationsRun(ai: OpsAi, env: OpsEnv): void {
   operationsRefresh(ai, env);
-  for (const op of opsOf(ai)) tickTree(ai, env, op);
+  const order = opsOf(ai).map((op, k) => ({ op, k })).sort((a, b) => opDef(b.op).priority - opDef(a.op).priority || a.k - b.k);
+  for (const { op } of order) tickTree(ai, env, op);
 }
 
 /** the operations' run before the trees tick: each operation's target and

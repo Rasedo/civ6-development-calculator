@@ -7500,7 +7500,14 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   another full civ, margin 20.0 or the centre's strength with its garrison
   (0x24a180) where higher; a city-state the owner does not fight is
   skipped. An undamaged city with an operation of the owner against the
-  player whose target lies within 5 of it (0x723cf0) skips the player. The
+  player whose target lies within 5 of it (0x723cf0: each operation of the
+  owner's list +0x318 valid (0x73a840) whose enemy +0x2a0 is the player
+  itself — an operation against no enemy, a camp's, never; asked ready
+  where its third argument is set, here not) skips the player
+  (runs/h1_duelw1121 Hunza t13: its Attack Barb Camp's target 10:2 three
+  from the city, the barbarian Quadrireme at 11:2 starts City Defense,
+  which recruits the camp operation's Warriors; the camp operation
+  completes, empty, the same turn). The
   knowledge base's units of the player within 5 (a full civ's) or 3
   (0x5eadb0) each by its unit row: s = max(Combat +0x48, RangedCombat
   +0x6c, Bombard + 20 where +0x40 is above 0), counted where it bombards,
