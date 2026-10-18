@@ -184,6 +184,11 @@ interface Ctx {
    *  as they stood before its first blow: the barbarians' AI takes its turn
    *  from there (`barbarianAi`) */
   barbBlows: Map<Unit, Unit>;
+  /** the units a city-state's, a Free City's or a barbarian's battle of this
+   *  pair struck or fought with, as they stood before its first blow: the
+   *  minors' AI takes its turn from there (`minorAi`), its own operations
+   *  fighting those battles in its pass */
+  minorBlows: Map<Unit, Unit>;
   /** the barbarian units' plots of this pair the record's steps entered,
    *  in their order, for their scouts' looks at the end of the barbarians'
    *  turn (`barbarianTurn`) */
@@ -803,7 +808,7 @@ const minorAiSeat = (seat: number) => isCityStateSeat(seat) || seat === FREE_SEA
  * set beside the game's tactical log and record t+1 (`tallyMinorTactics`):
  * the record's moves and battles stay the pair's.
  */
-function minorAi(ctx: Ctx, b: TurnRecord, turn: number): void {
+function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
   const twin = new Map<Unit, Unit>();
@@ -811,18 +816,37 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number): void {
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
   const was = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
+  // the units the minors' and the barbarians' battles of the pair struck (or
+  // lost) stand as they were before the first blow: the game fought a
+  // minor's in its own pass, the barbarians' after it (runs/h1_duelw1121 t9:
+  // city-state 2's Warrior, whole at its turn's start, strikes the camp's
+  // Spearman in its Attack Barb Camp operation)
+  const back = new Map([...twin].map(([c, u]) => [u, c] as const));
+  for (const [u, snap] of ctx.minorBlows) {
+    let c = back.get(u);
+    if (!c) {
+      c = structuredClone(snap);
+      copy.units.push(c);
+      twin.set(c, u);
+    }
+    c.hp = snap.hp;
+    c.fortifyTurns = snap.fortifyTurns;
+  }
   const gone = new Set<Unit>();
   for (const [c, u] of twin) {
     if (!minorAiSeat(c.seat) && !isBarbSeat(c.seat)) continue;
     const key = keyOf.get(u);
     const at = key ? was.get(key) : undefined;
     // a unit the first record lacks was made after (a purchase at the
-    // player's next start, a barbarian camp's raise)
-    if (at === undefined) {
+    // player's next start, a barbarian camp's raise) — but one its city
+    // trained in the engine's turn stands where it was made: a city-state's
+    // production runs before its tactical pass (runs/h1_duelw1121 t16:
+    // Ayutthaya's new Warrior wanders)
+    if (at === undefined && !(key && made.has(u))) {
       gone.add(c);
       continue;
     }
-    c.tileIndex = at;
+    if (at !== undefined) c.tileIndex = at;
     if (!minorAiSeat(c.seat) || !key) continue;
     c.slot = Number(key.split(':')[1]) & 0xffff;
     c.movesLeft = grantedMoves(copy, c);
@@ -2493,12 +2517,13 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const atk = unitOf(ctx, d.attacker);
         const def = unitOf(ctx, d.defender);
         if (!atk || !def) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); if (TRACE.has('battle')) console.error(`   ${d.attacker} ${!!atk} ${d.defender} ${!!def}`); break; }
-        if (isBarbSeat(atk.seat)) {
+        for (const blows of [isBarbSeat(atk.seat) && ctx.barbBlows, (isBarbSeat(atk.seat) || minorAiSeat(atk.seat)) && ctx.minorBlows]) {
+          if (!blows) continue;
           for (const [u, at] of [[atk, d.from], [def, d.at]] as const) {
-            if (ctx.barbBlows.has(u)) continue;
+            if (blows.has(u)) continue;
             const snap = structuredClone(u);
             snap.tileIndex = at;
-            ctx.barbBlows.set(u, snap);
+            blows.set(u, snap);
           }
         }
         const s0 = battleDraw(ctx, wit, b, d);
@@ -3512,7 +3537,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), barbSteps: [], envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), minorBlows: new Map(), barbSteps: [], envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
@@ -3580,6 +3605,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.fortified = fortifiedIn(b);
     ctx.paths = new Map();
     ctx.barbBlows = new Map();
+    ctx.minorBlows = new Map();
     ctx.barbNew = [];
     ctx.lateEnvoys = [];
     traceTurn = b.turn;
@@ -3826,7 +3852,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // Rome at t61, DiplomacySummary.csv, the record of t62 the first to show it)
     inTurn(state, a.turn, () => syncUnits(ctx, b));
     campsTaken(ctx, b, a.turn);
-    minorAi(ctx, b, a.turn);
+    // the units the minors' cities trained in the engine's turn (a purchase
+    // the record shows is not one)
+    const bought = new Set(ds.flatMap((d) => (d.kind === 'buyUnit' ? [d.unit] : [])));
+    minorAi(ctx, b, a.turn, new Set([...ctx.units].filter(([k, u]) => minorAiSeat(u.seat) && !standing.has(u) && !bought.has(k)).map(([, u]) => u)));
     barbarianTurn(ctx, b, a.turn);
     // the units the barbarians raised stand where the record holds them
     inTurn(state, a.turn, () => syncUnits(ctx, b));
