@@ -2574,6 +2574,41 @@
           "note": "the minor city's unimproved resources' counts as its city AI's last update counted them (CityBuildAI +0x978), per resource in the resource rows' order; zeros before its first count"
         },
         {
+          "name": "minorTradeList",
+          "compare": "exact",
+          "covers": [
+            "CityState.tradeCities",
+            "CityState.tradeRejected"
+          ],
+          "planes": [
+            "citystate_trade_ok",
+            "citystate_trade_no"
+          ],
+          "note": "the minor city's trade list (CityBuildAI +0x870): the listed known cities' centre plots ascending, then -1, then the rejected ones' centre plots ascending (the GPU's known-city slots read through their centres)"
+        },
+        {
+          "name": "minorTradeValue",
+          "compare": "exact",
+          "covers": [
+            "CityState.tradeValue"
+          ],
+          "planes": [
+            "citystate_trade_value"
+          ],
+          "note": "the minor's trade AI's route value K, raw 24.8 (knowledge base +0x680); 0 before its first"
+        },
+        {
+          "name": "minorRevealed",
+          "compare": "exact",
+          "covers": [
+            "CityState.revealed"
+          ],
+          "planes": [
+            "mops_revealed"
+          ],
+          "note": "the plots the minor's knowledge base has revealed (visibility +0x2f0), ascending"
+        },
+        {
           "name": "minorSavings",
           "compare": "exact",
           "covers": [

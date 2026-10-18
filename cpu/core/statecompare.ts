@@ -985,6 +985,10 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorUnitValues: overCityStates((cityState) => [...(cityState.unitValues ?? [])]),
   minorResourceCounts: overCityStates((cityState) =>
     Object.keys(RESOURCES).map((id) => cityState.resourceCounts?.[installType('resource', id, 'RESOURCE_')] ?? 0)),
+  minorTradeList: overCityStates((cityState) => [...(cityState.tradeCities ?? [])].sort((a, b) => a - b)
+    .concat(-1, [...(cityState.tradeRejected ?? [])].sort((a, b) => a - b))),
+  minorTradeValue: overCityStates((cityState) => cityState.tradeValue ?? 0),
+  minorRevealed: overCityStates((cityState) => (cityState.revealed ?? []).flatMap((v, p) => (v === 1 ? [p] : []))),
   minorSavings: overCityStates((cityState) => [...(cityState.economy?.savings ?? [0, 0, 0, 0]), cityState.economy?.balance ?? 0]),
   minorAiSlots: overCityStates((cityState) => cityAiSlots(cityState)),
   minorAiTrees: overCityStates((cityState, state) => cityAiTrees(cityState, state)),

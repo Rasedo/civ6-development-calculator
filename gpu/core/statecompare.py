@@ -995,6 +995,10 @@ CITY_STATE = {
     "minorUnitValues": lambda sim, b, rows: [[int(x) for x in sim.citystate_unit_values[b, s].tolist()]
                                              if bool(sim.citystate_unit_on[b, s]) else [] for s in rows],
     "minorResourceCounts": lambda sim, b, rows: [[int(x) for x in sim.citystate_res_counts[b, s].tolist()] for s in rows],
+    "minorTradeList": lambda sim, b, rows: [_trade_list(sim, b, s) for s in rows],
+    "minorTradeValue": lambda sim, b, rows: [int(sim.citystate_trade_value[b, s]) for s in rows],
+    "minorRevealed": lambda sim, b, rows: [[int(p) for p in sim.mops_revealed[b, s].nonzero(as_tuple=True)[0].tolist()]
+                                           for s in rows],
     "minorSavings": lambda sim, b, rows: [[int(x) for x in sim.citystate_savings[b, s].tolist()] + [int(sim.citystate_balance[b, s])]
                                           for s in rows],
     "minorAiSlots": lambda sim, b, rows: [[int(x) for x in sim.cai_slots[b, s].tolist()] for s in rows],
@@ -1012,6 +1016,16 @@ CITY_STATE = {
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],
     "treatyTurns": lambda sim, b, rows: [_treaty_clock_line(sim, b, 100 + s) for s in rows],
 }
+
+
+def _trade_list(sim, b: int, s: int) -> list[int]:
+    """minor `s`'s trade list, its known-city slots read through their
+    centres: the listed centres ascending, -1, the rejected ones ascending"""
+    ctr = sim._minor_trade_cands(s)[1][b].tolist()
+    ok = sim.citystate_trade_ok[b, s].tolist()
+    no = sim.citystate_trade_no[b, s].tolist()
+    return (sorted(int(c) for c, on in zip(ctr, ok) if on) + [-1]
+            + sorted(int(c) for c, on in zip(ctr, no) if on))
 
 
 def _ai_trees(sim, b: int, s: int) -> list[int]:
