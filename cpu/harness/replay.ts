@@ -1121,7 +1121,7 @@ function placeHead(ctx: Ctx, actor: Seat, city: City, q: QueueItem): boolean {
       const ok = canPlaceWonder(state, city, q.wonder, q.tileIndex, seat).ok;
       t.builtWonder = q.wonder;
       t.builtWonderComplete = false;
-      paveGround(t);
+      paveGround(t, BUILT_WONDERS[q.wonder]?.placement.onFeature);
       if (!city.wonders.some((w) => w.id === q.wonder)) city.wonders.push({ id: q.wonder, tileIndex: q.tileIndex });
       return ok;
     }

@@ -10,6 +10,7 @@ import { cityLook, fogActive, isExplored, meetMajors, revealAround, unitSight, u
 import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
 import { isFloodplains } from '../../world/features';
+import type { FeatureId } from '../../world/types';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { atRngPoint, randRange } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
@@ -1130,10 +1131,14 @@ export function districtSiteCost(
  * it paves every feature EXCEPT floodplains — the feature stays under the
  * district (GS floods damage districts built on them; the Dam exists for
  * exactly that), and the flood-target pick draws from it — and removes a
- * bonus resource (`canPlaceDistrictIn` already refused luxury/strategic). */
-export function paveGround(tile: Tile): void {
+ * bonus resource (`canPlaceDistrictIn` already refused luxury/strategic).
+ * A wonder keeps the feature its Building_RequiredFeatures row names (`keep`:
+ * its placement's `onFeature`) — runs/h1_duelw1117 t84: Chichen Itza placed
+ * at (35,12) stands on its Rainforest in every record after, where the Oracle
+ * (t61) and the Hanging Gardens (t75) took theirs off. */
+export function paveGround(tile: Tile, keep: readonly FeatureId[] = []): void {
   tile.improvement = null;
-  tile.feature = isFloodplains(tile.feature) ? tile.feature : null;
+  tile.feature = isFloodplains(tile.feature) || (tile.feature !== null && keep.includes(tile.feature)) ? tile.feature : null;
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
 }
 
@@ -1233,7 +1238,7 @@ export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, de
   if (!tile) return false;
   tile.builtWonder = def.id;
   tile.builtWonderComplete = false;
-  paveGround(tile);
+  paveGround(tile, def.placement.onFeature);
   civCity.wonders.push({ id: def.id, tileIndex: tile.index });
   commitProduction(state, civCity.seat, civCity, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
   return true;

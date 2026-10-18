@@ -5217,11 +5217,21 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   stands embarked (record t107 and t108), so its combat strength is its
   owner's era's embarked one (0x56dc90(unit, 0): IsEmbarked, a land combat
   unit, +0x18c3 clear, +0x21e0 -1 — Eras' value), 30 over its bombard less
-  17 (28); ported. t109 (+35): the danger map is built at the player's
-  DoTurn (0x46cdd0), its other players' units where they stood as the turn
-  began — China's Trebuchet at (34,12), record t109, two plots from the
-  Man-at-Arms — while the copy holds them where their turn left them (the
-  Trebuchet at (35,12)). New on 2a1caa0c: t58 the Quadrireme beside Longxi
+  17 (28); ported. The map is the last step of the player's DoTurn
+  (0x4e4560 -> 0x46cdd0 at 0x4e4aa4, a tail jump to 0x717460), and the
+  barbarians' DoTurn follows every other player's actions (the players one
+  at a time, tools/civ6lab/turn_order_civ6.md), so the other players' units
+  stand where their own turns left them: on 1117 the copy's map with them
+  there equals 34 of 35 rows, with them where record t (the turn's start)
+  holds them 16 of 35 (t12, t22, t23, t26 ... t108 all off). t109 (+35):
+  China's Trebuchet at (35,12), where its turn left it, on Chichen Itza's
+  plot (placed t84, in progress): the wonder keeps its Rainforest
+  (Building_RequiredFeatures; every record from t84 holds FEATURE_JUNGLE
+  there, where the Oracle t61 and the Hanging Gardens t75 took theirs off),
+  so the plot stands 2 high (Hills + Rainforest) and the Man-at-Arms at
+  (35,14) sees it over the 1-high plots between; the engines' `paveGround`
+  had taken the Rainforest off, the plot stood 1 high and hid the Trebuchet;
+  a wonder now keeps its required feature. New on 2a1caa0c: t58 the Quadrireme beside Longxi
   reads 46, the game 26 — China's Warrior fortified (record fortify 2) on
   the centre counts its 20 in the copy and nothing in the game (the unit
   walk skips +0x770; fortified as a skip is unread). End plots: "HL: Move To Safety" 183 of 371 (60 with

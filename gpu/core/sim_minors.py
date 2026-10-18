@@ -627,13 +627,16 @@ class SimMinors:
         holds = (self.city_bldg[:, self._CITY_MINOR0 + s, 0] & self._b_worship.unsqueeze(0)).any(dim=1)
         return torch.where((wi >= 0) & ~holds, wb, torch.full_like(wi, -1))
 
-    def _pave_plot(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+    def _pave_plot(self, rows: torch.Tensor, tiles: torch.Tensor, keep: tuple[int, ...] = ()) -> None:
         """`paveGround` — the ground a district or a wonder takes, for every
-        seat: the improvement goes, every feature but floodplains goes, a bonus
+        seat: the improvement goes, every feature but floodplains and those of
+        `keep` (a wonder's required features, its `onFeat`) goes, a bonus
         resource goes."""
         self.improvement[rows, tiles] = -1
         fid = self.feat_id[rows, tiles]
         nofp = (fid < 0) | ~self._fp_feat[fid.clamp(min=0)]
+        for f in keep:
+            nofp = nofp & (fid != int(f))
         if bool(nofp.count_nonzero()):
             self._strip_feature_at(rows[nofp], tiles[nofp])
         # the bonus resource goes as a harvest takes it: every baked plane to
@@ -1783,7 +1786,7 @@ class SimMinors:
         bwt = bw[rows_w]
         self.built_wonder[rows_w, bwt] = wi
         self.built_wonder_complete[rows_w, bwt] = False
-        self._pave_plot(rows_w, bwt)
+        self._pave_plot(rows_w, bwt, tuple(int(f) for f in wrow["onFeat"] if int(f) >= 0))
         self.city_wonder[rows_w, row, j, wi] = bwt
         code_w = self.WONDER_BASE + wi
         # the wonder's PLOT lives in the `city_wonder` registry, which is keyed
