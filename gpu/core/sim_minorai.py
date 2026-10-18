@@ -103,6 +103,14 @@ class SimMinorAi:
         # A: the city's update
         f = self._cv_minor_facts(s)
         b_tab, u_tab, p_tab = self._cv_minor_tables(s, f)
+        # the tables the research and civics values' city terms read next turn
+        self.citystate_unit_values[:, s] = torch.where(alive.unsqueeze(1), torch.stack(u_tab, dim=1),
+                                                       self.citystate_unit_values[:, s])
+        self.citystate_unit_on[:, s] |= alive
+        counted = alive & ~fresh
+        if bool(counted.count_nonzero()):
+            self.citystate_res_counts[:, s] = torch.where(counted.unsqueeze(1), self._minor_res_counts(s),
+                                                          self.citystate_res_counts[:, s])
         threat = torch.where(alive, self._minor_threat(s), torch.full_like(self.citystate_threat[:, s], -1))
         self.citystate_threat[:, s] = torch.where(alive, threat, self.citystate_threat[:, s])
         self.citystate_standing_short[:, s] = torch.where(alive, self._minor_standing_short(s),

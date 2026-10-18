@@ -244,10 +244,74 @@ class SimResearch:
         turns = torch.where(far | spent, torch.full_like(turns, -1), turns)
         nxt = torch.where(spent, col.expand(B, -1), nxt)
         # the value (`techValue`) and the resources term `researchAnalysis` adds
-        val = self._rai_value(s, turns) + self._rai_resources(s, turns)
+        val = self._rai_value(s, turns) + self._rai_resources(s, turns) + self._rai_unit_term(s, turns, False, False)
         base = torch.where(turns < 0, torch.zeros_like(val), val)
         score = base + self._rai_contracts(s, base, spent) + self._rai_upstream(have, base, turns)
         return turns, nxt, base, score, spent
+
+    def _rai_unit_term(self, s: int, turns: torch.Tensor, civic: bool, below: bool) -> torch.Tensor:
+        """[B, N] the research (or, `civic`, the civics) value's UNIT TERM of
+        minor `s` (`minorUnitTerm`), paid whole: per unit a row unlocks that
+        is the minor's version, its city's value in the UNITS table its city
+        AI last left (`citystate_unit_values`, none before its first) where
+        the city trains the unit's domain, at least 0 — a technology's at most
+        50.0 and taken 10 times, a civic's once; and per upgrade source of the
+        unit each of the minor's units of it adds that value less the
+        upgrade's Gold valued as a yield, at least 20.0. A row in reach only,
+        landing within the horizon (`below`: before it); the Free Cities'
+        row none"""
+        out = torch.zeros_like(turns)
+        if s >= self.citystate_unit_values.shape[1]:
+            return out
+        T = self._cv_tables()
+        E = T["engine"]
+        f = self._cv_minor_facts(s)
+        key = "civic" if civic else "tech"
+        rows = {}
+        for k, u in enumerate(T["unit_rows"]):
+            g = u.get(key)
+            if not g or f.unit_version(u["type"]) != u["type"]:
+                continue
+            i = E[key].get(g, -1)
+            if i >= 0:
+                rows.setdefault(i, []).append(k)
+        if not rows:
+            return out
+        tab = self.citystate_unit_values[:, s]
+        on = self.citystate_unit_on[:, s]
+        seat = 100 + s
+        row = self._CITY_MINOR0 + s
+        mine = self.major_unit_alive & (self.major_unit_seat == seat)
+        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        floor = 20 * _FX
+        cap = 50 * _FX
+        for i, ks in rows.items():
+            v = torch.zeros(self.B, dtype=torch.long, device=self.device)
+            for k in ks:
+                u = T["unit_rows"][k]
+                eng = int(E["unit"][k])
+                tr = f.trains_domain(u["domain"])
+                tr = tr.bool() if torch.is_tensor(tr) else torch.full_like(on, bool(tr))
+                raw = tab[:, k]
+                avg = torch.where(on & tr, (raw if civic else torch.minimum(raw, torch.full_like(raw, cap))).clamp(min=0),
+                                  torch.zeros_like(raw))
+                v = v + (avg if civic else avg * 10)
+                if eng < 0:
+                    continue
+                for src in (self._type_up_to == eng).nonzero(as_tuple=True)[0].tolist():
+                    n = (mine & (ut == src)).sum(dim=1)
+                    if not bool(n.count_nonzero()):
+                        continue
+                    gold = self._upgrade_gold_cost(row, torch.full((self.B,), src, dtype=torch.long, device=self.device),
+                                                   torch.full((self.B,), eng, dtype=torch.long, device=self.device),
+                                                   torch.zeros(self.B, dtype=torch.bool, device=self.device),
+                                                   torch.zeros(self.B, dtype=torch.long, device=self.device))
+                    gv = self._cv_yield(gold.long() * _FX, "YIELD_GOLD", f.yield_w("YIELD_GOLD"))
+                    v = v + n * torch.maximum(avg - gv, torch.full_like(avg, floor))
+            out[:, i] = v
+        h = int(self._rai_tables()["horizon"])
+        live = (turns >= 0) & ((turns < h) if below else (turns <= h))
+        return torch.where(live, out, torch.zeros_like(out))
 
     def _rai_contracts(self, s: int, base: torch.Tensor, spent: torch.Tensor) -> torch.Tensor:
         """the seat's Tech Contracts (its city AI's Add Goal Tech contracts):
@@ -353,13 +417,27 @@ class SimResearch:
         v = torch.where(pb != -100, v + add, v)
         return torch.where(before == after, same, torch.clamp(v, min=_FX))
 
+    def _minor_res_counts(self, s: int) -> torch.Tensor:
+        """[B, NR] `minorResourceCounts` of minor `s`: its plots within three
+        of the centre it owns, unimproved, by the resource it sees there"""
+        R = self._rai_res_tables()
+        B = self.B
+        row = self._CITY_MINOR0 + s
+        centre = self.citystate_center[:, s]
+        near = (self.pair_dist[centre.clamp(min=0)].to(torch.long) <= 3) & (centre >= 0).unsqueeze(1)
+        mine = self.tile_seat == 100 + s
+        cnt_tile = near & mine & (self.improvement < 0) & self._res_live() & ~self._res_hidden(row)
+        counts = torch.zeros(B, R["nr"], dtype=torch.long, device=self.device)
+        counts.scatter_add_(1, self.res_id.clamp(min=0), cnt_tile.long())
+        return counts
+
     def _rai_resources(self, s: int, turns: torch.Tensor) -> torch.Tensor:
         """[B, NT] the research value's resources term of minor `s`
-        (`minorResearchResources`): per resource a row's improvements work
-        that its city counts (its plots within three of the centre it owns,
-        unimproved, the resource one it sees), one copy more's value
-        (`resourceValue`) landing in the row's turns; the Free Cities' row
-        (`FR`) carries none"""
+        (`minorResearchTerms`): per resource a row's improvements work that
+        its city counted at its city AI's last update
+        (`citystate_res_counts`), one copy more's value (`resourceValue`)
+        landing in the row's turns; the Free Cities' row (`FR`) carries
+        none"""
         if s == self.FR:
             return torch.zeros_like(turns)
         R = self._rai_res_tables()
@@ -368,15 +446,11 @@ class SimResearch:
         dev = self.device
         row = self._CITY_MINOR0 + s
         seat = 100 + s
-        centre = self.citystate_center[:, s]
-        near = (self.pair_dist[centre.clamp(min=0)].to(torch.long) <= 3) & (centre >= 0).unsqueeze(1)
         live = self._res_live()
         mine = self.tile_seat == seat
-        cnt_tile = near & mine & (self.improvement < 0) & live & ~self._res_hidden(row)
         nr = R["nr"]
         rid = self.res_id.clamp(min=0)
-        counts = torch.zeros(B, nr, dtype=torch.long, device=dev)
-        counts.scatter_add_(1, rid, cnt_tile.long())
+        counts = self.citystate_res_counts[:, s]
         if not bool((counts > 0).count_nonzero()):
             return torch.zeros(B, NT, dtype=torch.long, device=dev)
         ext = torch.zeros(B, nr, dtype=torch.long, device=dev)

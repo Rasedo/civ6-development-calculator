@@ -135,6 +135,8 @@ def test_resources(rules) -> None:
     sim.tile_seat[b, tile] = 100 + s
     sim.citystate_techs[b, s].zero_()
     sim.citystate_techs[b, s, ti["BRONZE_WORKING"]] = True
+    # the counts its city AI's update keeps
+    sim.citystate_res_counts[:, s] = sim._minor_res_counts(s)
     nt = sim.citystate_techs.shape[2]
     turns = torch.zeros(sim.B, nt, dtype=torch.long, device=sim.device)
     turns[b, ti["MINING"]] = 10

@@ -74,7 +74,7 @@ import { moveTo, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import {
   installType, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts,
-  minorProjectFacts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
+  minorProjectFacts, minorResourceCounts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
 } from './minorBuild';
 
 /** the city's plots, the centre first, as axial offsets from it (the city's
@@ -594,6 +594,8 @@ export function minorAiTurn(state: GameState, cs: CityState): void {
     units: unitTable(facts).map((v) => v ?? FX_MIN),
     projects: projectTable(minorProjectFacts(cs, facts)),
   };
+  cs.unitValues = tables.units;
+  if (!fresh) cs.resourceCounts = Object.fromEntries(minorResourceCounts(state, cs));
   const pf = minorPickFacts(state, cs, facts);
   const threat = minorThreat(state, cs);
   cs.threat = threat;

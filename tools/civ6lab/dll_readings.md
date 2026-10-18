@@ -4521,6 +4521,20 @@ Contract %d").
   (1124 t6: minors 2 and 3 pass Writing, Currency and Irrigation over —
   their next step was Pottery — and take Celestial Navigation through
   Astrology and Bronze Working through Mining, as logged).
+- THE CITY TERMS' TIMING (list B before the cities A, "The turn" in the
+  city build AI's section): the unit term reads the city's UNITS table
+  (0x5d4cd0) as the city AI's last turn left it, the resources term the
+  counts the city's last update kept (CityBuildAI +0x978, 0x5d45c0). A
+  city-state's first turn: its research and civics AIs choose before its
+  city stands, at no Science, Culture or city term (runs/h1_duelv1124 t1:
+  every minor's Pottery 78.3 at 12 turns, RESEARCHING, Writing its GOAL); at
+  t2 the founding turn's Default Specialization table gives the unit term
+  (Iron Working 181.4 = 141.4 + two Warriors' upgrade floor 20.0 each,
+  minor 4) and no update has counted resources yet (Animal Husbandry 82.6,
+  107.5 from t3 with the Cattle counted); Pottery at 4 turns, the t1
+  choice's 2.5 Science banked on it (113.0). On the engines' own founding
+  table the Archer's 1.54 is the game's -0.2 (t2 Archery 157.7 against
+  142.3): the founding turn's tables' LAB.
 - MEASURED on the logs alone (29 duels, a goal change the comparator's best
   over the turn before's or the turn's logged scores): majors 1,654 of 1,805,
   minors 4,244 of 4,980 by one of the timings (1,017 minor changes with every

@@ -1173,6 +1173,13 @@ export interface CityState extends Seat {
    *  contracts and reservations (`CityAi`), the Economic AI's savings
    *  (`EconomicMemory`), the city's threat (CityBuildAI +0x1b8, -1 none) */
   cityAi?: CityAi;
+  /** its city's UNITS table (raw, `AI_UNITS`' order) as its city AI's last
+   *  turn left it, and its unimproved resources' counts (CityBuildAI +0x978)
+   *  as its last update counted them — the research and civics values'
+   *  city terms read them (0x5d4cd0, 0x5d45c0); a founding turn's first look
+   *  counts none */
+  unitValues?: readonly number[];
+  resourceCounts?: Record<string, number>;
   economy?: EconomicMemory;
   threat?: number;
   /** the camps its knowledge base holds, in their order (m_barbarians

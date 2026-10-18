@@ -24,7 +24,8 @@ import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { computeCityStats } from '../core/city';
 import { minorCity } from '../core/cityStates';
-import { minorResearchTerms } from '../core/minorBuild';
+import { minorBuildFacts, minorKnownUnits, minorResearchTerms, minorResourceCounts } from '../core/minorBuild';
+import { unitTable } from '../core/aiCityBuild';
 import { loadCityBuildCentre } from './cityBuildLog';
 import { AI_POLICIES } from '../../ai/major/tables';
 
@@ -174,7 +175,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     const loggedUnits = lu?.map((v) => Math.round(v * 256));
     if (only !== 'civic' && techLog.has(key)) {
       const logged = techLog.get(key)!;
-      const terms = minorResearchTerms(state, cs, loggedUnits);
+      const terms = minorResearchTerms(state, cs, loggedUnits ?? unitTable(minorBuildFacts(state, cs, minorKnownUnits(cs))), minorResourceCounts(state, cs));
       for (const e of researchAnalysis(state, cs.seat, y.science, {}, terms.tech)) {
         const l = logged.get(`TECH_${e.tech}`);
         if (l && !e.owned) tally('tech', `TECH_${e.tech}`, turn, player, l, e);
@@ -186,7 +187,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     }
     if (only !== 'tech' && civicLog.has(key)) {
       const logged = civicLog.get(key)!;
-      const terms = minorResearchTerms(state, cs, loggedUnits);
+      const terms = minorResearchTerms(state, cs, loggedUnits ?? unitTable(minorBuildFacts(state, cs, minorKnownUnits(cs))), minorResourceCounts(state, cs));
       for (const e of civicAnalysis(state, cs.seat, y.culture, {}, terms.civic)) {
         const l = logged.get(`CIVIC_${e.civic}`);
         if (l && !e.owned) tally('civic', `CIVIC_${e.civic}`, turn, player, l, e);

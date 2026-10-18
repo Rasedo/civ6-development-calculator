@@ -324,6 +324,15 @@ class SimInit:
         # its city AI has run (`CityState.cityAi` made): a city its AI first
         # sees runs no events
         self.citystate_ai_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # its city's UNITS table as its city AI's last turn left it (raw, the
+        # AI unit rows' order; FX(-9999) none yet) and its unimproved
+        # resources' counts as its last update counted them (CityBuildAI
+        # +0x978; none on a founding turn's first look) — the research and
+        # civics values' city terms (`CityState.unitValues`, `.resourceCounts`)
+        self.citystate_unit_values = torch.full((B, s_pad, len(rules.ai_city_build["units"])), -9999 * 256,
+                                                dtype=torch.long, device=device)
+        self.citystate_unit_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        self.citystate_res_counts = torch.zeros(B, s_pad, len(rules.res_ai), dtype=torch.long, device=device)
         # the events' slots, the trees, the contracts and the reservations of
         # each minor's city (`CityAi`, gpu/core/sim_citytrees.py): its planes
         # are the sim's `cai_*`

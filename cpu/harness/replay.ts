@@ -79,7 +79,7 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorOrders, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -1624,9 +1624,15 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     state.cityStates.sort((a, b) => a.id - b.id);
     if (settler) disbandUnit(state, settler.id);
     // the game's minor took its first turn the turn the city was founded:
-    // its knowledge base's look, which its military AI reads on its next
-    // turn, and its city AI's first look, which runs no events and picks
-    // the Default Specialization. A minor's founding lands after the
+    // its research and civics AIs' turns before the city stood, at no
+    // Science or Culture and no resources near a city (runs/h1_duelv1124 t1:
+    // every minor's Pottery at 12 turns, 78.3, Writing its goal), its
+    // military AI's Combat Desire, run before the founding on a player
+    // that holds no city (its PSEUDOYIELD_UNIT_COMBAT weight, which the
+    // first look's unit values read: runs/h1_duelw1117 Antananarivo's Default
+    // Specialization a Slinger at 8.3), its knowledge base's look, which its
+    // military AI reads on its next turn, and its city AI's first look,
+    // which runs no events and picks the Default Specialization. A minor's founding lands after the
     // engine's turn (its player is never the active one), the clock already
     // on the record's next turn: that turn stamps the founding turn's, the
     // item's set turn first among them (runs/h1_duelw1124 Bologna:
@@ -1634,6 +1640,8 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     // contract at t3 clearing none of it)
     state.turn -= 1;
     try {
+      minorResearch(state, placed.research, placed.seat, 0, 0, () => undefined, () => undefined, []);
+      placed.combatDesire = minorCombatDesire(state, placed, state.turn - 1).desire;
       minorKnowledge(state, placed, false);
       minorAiTurn(state, placed);
     } finally {
@@ -2772,7 +2780,7 @@ function minorBuilds(ctx: Ctx, b: TurnRecord, tally: MinorBuildTally): void {
 /** THE CITY-STATES' RESEARCH: each city-state's techs, civics, their
  *  yields, choices, progress and costs after its turn against record t+1's
  *  (`MinorResearchTally`); nothing imposed */
-function minorResearch(ctx: Ctx, b: TurnRecord, tally: MinorResearchTally): void {
+function scoreMinorResearch(ctx: Ctx, b: TurnRecord, tally: MinorResearchTally): void {
   const { state } = ctx;
   for (const cs of state.cityStates) {
     const rcs = ctx.next.state.cityStates.find((x) => x.centerIndex === cs.centerIndex);
@@ -3180,7 +3188,7 @@ export interface ReplayReport {
   /** the city-states' items in hand after their turn against record t+1's
    *  queue heads (`minorBuilds`) */
   minorBuilds: MinorBuildTally;
-  /** the city-states' research against the record's (`minorResearch`) */
+  /** the city-states' research against the record's (`scoreMinorResearch`) */
   minorResearch: MinorResearchTally;
   /** where the replay stopped short of the last record, and why */
   stopped?: string;
@@ -3708,7 +3716,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     }
     undoMinorPlots(ctx, improvements, ground, charges);
     minorBuilds(ctx, b, report.minorBuilds);
-    minorResearch(ctx, b, report.minorResearch);
+    scoreMinorResearch(ctx, b, report.minorResearch);
     // REPLAY_TRACE=minorProd: each city-state's item, purse, units and research after the engine's turn
     if (TRACE.has('minorProd')) {
       for (const cs of state.cityStates) {

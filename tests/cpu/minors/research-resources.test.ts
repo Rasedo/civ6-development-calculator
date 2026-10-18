@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { emptySeat, seatOfCityState } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { minorResearchResources, minorResourceCounts } from '../../../cpu/core/minorBuild';
+import { minorResearchTerms, minorResourceCounts } from '../../../cpu/core/minorBuild';
 import { amenityPerTurn } from '../../../cpu/core/aiCityBuild';
 import { luxuryAmenities } from '../../../cpu/core/aiResource';
 import { AI_RESOURCES } from '../../../cpu/data/aiBuildTables';
@@ -44,7 +44,7 @@ describe('the resource value in the research value', () => {
     const iron = tileAtCoords(state.map, 6, 5);
     iron.resource = 'IRON';
     iron.ownerSeat = cs.seat;
-    const term = minorResearchResources(state, cs);
+    const term = minorResearchTerms(state, cs, undefined, minorResourceCounts(state, cs)).tech;
     // Mining's Mine works Iron: the need 20 (the most of ResourceCost + 10 x
     // ResourceMaintenanceAmount over the table's Iron units), the Ancient
     // chronology 1: 25 / 20 x 2 = 2.5, discounted 10 turns
@@ -61,7 +61,7 @@ describe('the resource value in the research value', () => {
     const silver = tileAtCoords(state.map, 6, 5);
     silver.resource = 'SILVER';
     silver.ownerSeat = cs.seat;
-    expect(minorResearchResources(state, cs)('MINING', 10)).toBe(5016);
+    expect(minorResearchTerms(state, cs, undefined, minorResourceCounts(state, cs)).tech('MINING', 10)).toBe(5016);
   });
 
   it("values one Amenity more at the city's level (0x79f7c0)", () => {

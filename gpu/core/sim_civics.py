@@ -101,7 +101,7 @@ class SimCivics:
         far = lv[2][1].any(dim=2)
         turns = torch.where(far | spent, torch.full_like(turns, -1), turns)
         nxt = torch.where(spent, col.expand(B, -1), nxt)
-        val = self._cai_value(s, turns)
+        val = self._cai_value(s, turns) + self._rai_unit_term(s, turns, True, True)
         base = torch.where(turns < 0, torch.zeros_like(val), val)
         # the propagation (0x61ee30): a row in reach scores its lineage's own
         # values, a negative one counting nothing
