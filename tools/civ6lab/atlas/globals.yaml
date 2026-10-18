@@ -162,6 +162,24 @@
   context:
     - ...ives Enemy (+0x3f8) its max and, not a tribe (0x469ce0), raises the floor M (from -0.5, 0xd5fed0) by 0.5 (0xd20458); any other gives Other (+0x458) its max and, flagged at +0xc58, rais...
   review: reviewed
+- addr: 0xd62ad0
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 40
+      value: "LAB: a city-state's centre reads its outer defence standing with   or without walls — every minor's Bastions reads its +6 before any walls   (runs/h1_duelw1121 Ayutthaya t40-58, walls at t59;"
+    - recording: 1117
+      turn: 40
+      value: "Hunza t40, walls t41),   7 / 8 / 9 with the strike's term — while in combat a wall-less city-state's   centre has no outer pool (CombatLog: 1117 t13 a Warrior's 18 on Valletta,   1116 t8-9, 1127 t22-2"
+    - recording: 1121
+      turn: 40
+      value: every minor turn the game lists Bastions equal (1121 t40-75, 1117 t32-75).
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...0x198310) adds Amount raw. EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 (@f03d20, vtable 0xd62ad0): the centre's strike 0x249ee0, its whole part above 0, x Amount / 100 truncated (0x51e..."
+  review: imported
 - addr: 0xd63400
   kind: global
   status: PARTLY
@@ -180,6 +198,24 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...6cf3c0's evaluation of it unread). The other analyzers (EFFECT_ADJUST_CITY_YIELD_MODIFIER 0xd63490 ...) are unread.
+  review: imported
+- addr: 0xd63a18
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 40
+      value: "LAB: a city-state's centre reads its outer defence standing with   or without walls — every minor's Bastions reads its +6 before any walls   (runs/h1_duelw1121 Ayutthaya t40-58, walls at t59;"
+    - recording: 1117
+      turn: 40
+      value: "Hunza t40, walls t41),   7 / 8 / 9 with the strike's term — while in combat a wall-less city-state's   centre has no outer pool (CombatLog: 1117 t13 a Warrior's 18 on Valletta,   1116 t8-9, 1127 t22-2"
+    - recording: 1121
+      turn: 40
+      value: every minor turn the game lists Bastions equal (1121 t40-75, 1117 t32-75).
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...yzers: EFFECT_ADJUST_CITY_OUTER_DEFENSE 0x6c4650 (the registry's object @f03cf0, vtable 0xd63a18 slot 1): with arguments and the context's city, its centre's outer damage (0x24ae50 on..."
   review: imported
 - addr: 0xd6ced0
   kind: global

@@ -6386,6 +6386,25 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   parser's scaling unread), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work
   type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURISM,
   between).
+- READ, Bastions' two analyzers: EFFECT_ADJUST_CITY_OUTER_DEFENSE 0x6c4650
+  (the registry's object @f03cf0, vtable 0xd63a18 slot 1): with arguments
+  and the context's city, its centre's outer damage (0x24ae50 on 0x6da56a3d:
+  district +0x8d8) below its outer maximum (0x24b290 -> City +0x1880,
+  0x198310) adds Amount raw. EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0
+  (@f03d20, vtable 0xd62ad0): the centre's strike 0x249ee0, its whole part
+  above 0, x Amount / 100 truncated (0x51eb851f), raw. The outer maximum
+  0x198310: the Free Cities (0x469d40: civilization level 0x4e6b0a0,
+  CIVILIZATION_LEVEL_FREE_CITIES) a table's row (0x276310 / 0x276370, +0x1c);
+  any other player its +0x12f0 +0xf4 where above 0, else the sum of its
+  buildings' OuterDefenseHitPoints (+0x58 where +0x54); then + City +0x14, at
+  least 0. LAB: a city-state's centre reads its outer defence standing with
+  or without walls — every minor's Bastions reads its +6 before any walls
+  (runs/h1_duelw1121 Ayutthaya t40-58, walls at t59; Hunza t40, walls t41),
+  7 / 8 / 9 with the strike's term — while in combat a wall-less city-state's
+  centre has no outer pool (CombatLog: 1117 t13 a Warrior's 18 on Valletta,
+  1116 t8-9, 1127 t22-25 whole damage); ASK: player +0x12f0 +0xf4's writer.
+  Port: `aiModifiers.ts` (`cityOuterStands`, `cityStrike`), `sim_policy.py`;
+  every minor turn the game lists Bastions equal (1121 t40-75, 1117 t32-75).
 - READ, the policy Amenity and Housing (Civil Prestige, Retainers, Robber
   Barons, Monarchy's walls, Collectivism, Digital Democracy):
   EFFECT_ADJUST_POLICY_AMENITY 0x6b45a0: with arguments and the context's

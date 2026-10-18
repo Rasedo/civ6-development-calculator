@@ -235,6 +235,12 @@ export interface AiValueView {
   citySpecialtyDistricts(seat: number, cityId: number): number;
   /** a city's centre strikes (0x249ee0 above 0: its walls stand) */
   cityStrikes(seat: number, cityId: number): boolean;
+  /** a city centre's outer defence stands (0x24b290 on 0x6da56a3d above its
+   *  damage, district +0x8d8): its walls' pool above 0; a city-state's always
+   *  (LAB) */
+  cityOuterStands(seat: number, cityId: number): boolean;
+  /** a city centre's strike strength (0x249ee0), its whole part */
+  cityStrike(seat: number, cityId: number): number;
   /** the times the seat completed a ProjectType (player +0x1330, 0x4be7b0) */
   projectCompletions(seat: number, project: string): number;
   /** the turns a city builds a ProjectType in (0x17b890): its cost less the

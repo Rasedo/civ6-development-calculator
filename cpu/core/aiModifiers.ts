@@ -699,6 +699,17 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const v = fmul(yieldValue(t.view, t.seat, fmul(pctOf(args), culture), 'YIELD_CULTURE'), fxConst(0.5));
     return whole(span(t, v));
   },
+  // 0x6c4650: a city subject whose centre's outer defence stands (its
+  // damage below its maximum, 0x24ae50 / 0x24b290 on 0x6da56a3d): Amount, raw
+  EFFECT_ADJUST_CITY_OUTER_DEFENSE: (t, args, s) =>
+    s.kind === 'city' && t.view.cityOuterStands(s.seat, s.id) ? Number(args.Amount ?? 0) | 0 : 0,
+  // 0x6a69c0: a city subject whose centre's strike (0x249ee0) has a whole
+  // part above 0: that whole part x Amount / 100, truncated, raw
+  EFFECT_ADJUST_CITY_RANGED_STRIKE: (t, args, s) => {
+    if (s.kind !== 'city') return 0;
+    const strike = t.view.cityStrike(s.seat, s.id);
+    return strike > 0 ? Math.trunc((strike * (Number(args.Amount ?? 0) | 0)) / 100) : 0;
+  },
   // 0x6b45a0: a city subject (the context's city, +0x70, the walk sets it);
   // the Amount's Amenities more in it (0x79f7c0) from the start to the
   // horizon (0x7a2140)

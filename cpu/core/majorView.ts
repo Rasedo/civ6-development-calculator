@@ -751,6 +751,19 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const city = minor ? minorCity(minor) : citiesOf(state, i).find((c) => c.id === id);
       return !!city && outerPool(state, city) > 0;
     },
+    // a city-state's centre reads its outer defence standing with or
+    // without walls (LAB: 0x198310's player +0x12f0 +0xf4 term, its writer
+    // unread — every minor's Bastions reads its Outer Defense whole before any
+    // walls, runs/h1_duelw1121 Ayutthaya t40-58; in combat a wall-less
+    // city-state's centre has no outer pool, its CombatLog damage whole)
+    cityOuterStands: (i, id) => {
+      const city = cityOf(i, id);
+      return !!city && (isCityStateSeat(i) || outerPool(state, city) > 0);
+    },
+    cityStrike: (i, id) => {
+      const city = cityOf(i, id);
+      return city ? Math.trunc(cityStrikeStrength(state, city)) : 0;
+    },
     projectCompletions: (i, type) => {
       const id = engineId('project', type, 'PROJECT_', PROJECTS);
       return id ? seat(i).projectsDone.filter((x) => x === id).length : 0;

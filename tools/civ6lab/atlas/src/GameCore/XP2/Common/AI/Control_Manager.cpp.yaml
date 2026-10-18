@@ -24,6 +24,9 @@
     - gpu/core/sim_barbops.py:_bop_recruit
     - cpu/core/operations/nodes.ts:update
     - gpu/core/sim_minorops.py:_u_recruit
+    - cpu/core/operations/assault.ts:garrisonExecute
+    - cpu/core/operations/assault.ts:held
+    - gpu/core/sim_minorops.py:_x_garrison
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"

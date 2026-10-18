@@ -12,6 +12,26 @@
   context:
     - ...g 0x9876b0) reads the city-growth cache's +0x28, a 24.8 fixed-point value; the cache copy 0xa7b10 (its data 8 bytes into the cache) fills it from CityGrowth 0x1b62d0, beside housing 0x1b5...
   review: imported
+- addr: 0x198310
+  final: 0x111920
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 40
+      value: "LAB: a city-state's centre reads its outer defence standing with   or without walls — every minor's Bastions reads its +6 before any walls   (runs/h1_duelw1121 Ayutthaya t40-58, walls at t59;"
+    - recording: 1117
+      turn: 40
+      value: "Hunza t40, walls t41),   7 / 8 / 9 with the strike's term — while in combat a wall-less city-state's   centre has no outer pool (CombatLog: 1117 t13 a Warrior's 18 on Valletta,   1116 t8-9, 1127 t22-2"
+    - recording: 1121
+      turn: 40
+      value: every minor turn the game lists Bastions equal (1121 t40-75, 1117 t32-75).
+  impl: [cpu/core/majorView.ts:centres]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...50 on 0x6da56a3d: district +0x8d8) below its outer maximum (0x24b290 -> City +0x1880, 0x198310) adds Amount raw. EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 (@f03d20, vtable 0xd62ad0):..."
+  review: imported
 - addr: 0x1f6360
   final: 0x14b720
   kind: function

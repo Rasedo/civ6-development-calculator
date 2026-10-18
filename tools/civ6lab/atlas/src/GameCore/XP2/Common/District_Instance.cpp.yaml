@@ -49,12 +49,14 @@
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/tactical.ts:dangerDistricts
+    - gpu/core/sim_policy.py:_pol_analyze
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes:
     - ".claude/scratchpad/st1/reading.md: .... Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player'..."
   context:
@@ -126,6 +128,26 @@
   context:
     - "...t subject; its yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier) / 100; 0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural Philosophy 29 for..."
   review: imported
+- addr: 0x24ae50
+  final: 0x191650
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 40
+      value: "LAB: a city-state's centre reads its outer defence standing with   or without walls — every minor's Bastions reads its +6 before any walls   (runs/h1_duelw1121 Ayutthaya t40-58, walls at t59;"
+    - recording: 1117
+      turn: 40
+      value: "Hunza t40, walls t41),   7 / 8 / 9 with the strike's term — while in combat a wall-less city-state's   centre has no outer pool (CombatLog: 1117 t13 a Warrior's 18 on Valletta,   1116 t8-9, 1127 t22-2"
+    - recording: 1121
+      turn: 40
+      value: every minor turn the game lists Bastions equal (1121 t40-75, 1117 t32-75).
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...ble 0xd63a18 slot 1): with arguments and the context's city, its centre's outer damage (0x24ae50 on 0x6da56a3d: district +0x8d8) below its outer maximum (0x24b290 -> City +0x1880, 0x..."
+  review: imported
 - addr: 0x24ae80
   final: 0x191680
   kind: function
@@ -187,7 +209,10 @@
   final: 0x1919b0
   kind: function
   status: PARTLY
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...uilds the law's struct: +0 / +4 the two strengths, +8 the district's maximum hit points 0x24b290, +0xc / +0x10 the outer defense's damage and maximum, +0x14 the pool's hash, +0x1c CO..."
