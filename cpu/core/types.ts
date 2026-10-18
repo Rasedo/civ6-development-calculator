@@ -779,6 +779,9 @@ export interface Unit {
    * slot, so read it through `inEscort`, never inline.
    */
   escorted?: boolean;
+  /** of AI type DEFENDER (+0x1c0 4), homed on its city-state's city: its
+   *  city's standing army (`minorStandingArmy`) */
+  aiDefender?: boolean;
   /** A LAND unit currently on a water tile (embarked). Moves
    * at EMBARK_MOVES, cannot fortify/exert ZOC, and defends at a flat CS.
    * Naval units are never `embarked` — they belong on water natively. */

@@ -4013,12 +4013,27 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   raw 25 each) to the desire. The cap of 2.0 lifts with the war footing or a
   city's threat +0x1b8 at or above 0 (`threatened`, the threat of its last
   update).
-- The engines: the minor's units with no running operation's membership
-  (`minorOpUnits` / `_mops_busy`), not civilian, not recon, of strength
-  above 0, land or (coastal) sea, count toward the quota; the shortfall at
-  0 or above — the unit AI types are not kept, so a list longer than the
-  quota (AI_Military.csv's -0.1 desires, runs/h1_duelv1127 Muscat t23–t24,
-  four Warriors at population 4) is not reproduced.
+- The list in full (0x5ca7e0's tail): first the player's units (+0xd8) of
+  AI type DEFENDER (+0x1c0 4) homed on the city (+0x11d0 == city +0xf8) —
+  one with +0xf30 above 0 that the player's +0x1278 holds (0x623910 >= 0)
+  released (COMBAT 3, home -1); the weakest (0x5c4910: the first of the
+  lowest Combat 0x56dc90); then per unit of AI type COMBAT (or EXPLORE
+  whose type's highest AI flag up to 3 is COMBAT, 0x79b9c0, while the
+  player's units exceed twice its cities), in no job (+0x7d0 -1), of the
+  land (+0x650 2) or the sea (0) beside a coastal city, not so held: below
+  the quota (+0x278) it joins (DEFENDER, homed); else where its Combat tops
+  the weakest's it takes the weakest's place (the weakest COMBAT, home -1);
+  the weakest found again after each change. The shortfall is the quota
+  less the list, below 0 where the list outgrew a fallen quota. A DEFENDER
+  takes its own plot alone as an Attack Units spot (0x776140) and goes in
+  only before another unit among the strikers (0x775340): runs/h1_duelv1121
+  t4, city-state 4's Warrior 131073 (its first unit, the quota 1) wanders
+  while 196610 strikes the barbarian Scout it could reach too.
+- The engines (`minorStandingArmy` / `_minor_standing_army`): the units' AI
+  type kept as `Unit.aiDefender` / `unit_defender`, the units' order taken
+  as pool order, COMBAT read as not civilian, not recon, of strength above
+  0; the EXPLORE clause and the +0xf30 release not ported; the pass's AI type
+  (`militaryAiTypeOf`) DEFENDER where it holds.
 - MEASURED (`cityBuildLab.ts`, the five verbose duels): the Combat Desire as
   logged 1,778 -> 2,897 of 3,600 minor-turns (within 0.05); the action
   replay's own desire (REPLAY_TRACE=minorRows against AI_Military.csv)

@@ -34,7 +34,7 @@ from .sim_citytrees import (
     _propagate, _u_contract_manager, new_contract, submit_contract,
 )
 from .sim_research import _FX
-from .sim_tactics import _AI_COMBAT
+from .sim_tactics import _AI_COMBAT, _AI_DEFENDER
 
 # the pool's slots, the teams of an operation, a team's members, the camps
 # the knowledge base holds, the Operation Move nodes of a tree
@@ -1633,7 +1633,7 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         cand = mem & (op["rowof"] >= 0)
         if not bool((cand.any(dim=1) & near.any(dim=1)).any()):
             continue
-        ai = torch.where(op["units"], _AI_COMBAT, -1)
+        ai = torch.where(op["units"], torch.where(sim.major_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
         one = mem.sum(dim=1) == 1
         exch = (~torch.full((B,), unequal, dtype=torch.bool, device=dev)) & one
         out = sim._tac_assign(cand, op["order"], ai, near, op["res"], op["rowof"], uu, exch, True, uk, tg["uo"], "major", seat)

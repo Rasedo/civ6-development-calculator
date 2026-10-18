@@ -560,13 +560,20 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
 /**
  * THE STANDING ARMY (0x5ca7e0, the city's full update): its quota, the whole
  * part of PSEUDOYIELD_STANDING_ARMY_NUMBER (1.0 at a minor's weight) times
- * the square root of its population (float32, as the game's fixed point);
- * the minor's combat units outside every running operation fill it (a land
- * unit, a sea one where the city is coastal; a recon unit not). The count it
- * lacks (CityBuildAI +0x2d8), which the military AI adds to its Combat
- * Desire as PSEUDOYIELD_STANDING_ARMY_VALUE each.
+ * the square root of its population (float32, as the game's fixed point).
+ * Its list: the minor's units of AI type DEFENDER (`aiDefender`), in its
+ * units' order (taken as pool order); then each unit of AI type COMBAT (a
+ * fighting unit, not civilian, not recon) outside every running operation,
+ * of the land or — where the city is coastal — the sea, in that order, joins
+ * as a DEFENDER while the list is below the quota, else takes the place of
+ * the list's weakest (the first of the lowest Combat, 0x5c4910) where its
+ * Combat is higher, the weakest turned COMBAT. The count it lacks, the quota
+ * less the list (CityBuildAI +0x2d8, below 0 where the list outgrows a quota
+ * that fell), which the military AI adds to its Combat Desire as
+ * PSEUDOYIELD_STANDING_ARMY_VALUE each. The release of a DEFENDER with
+ * +0xf30 above 0 held by the player's +0x1278 is unread.
  */
-export function minorStandingArmyShort(state: GameState, cs: CityState): number {
+export function minorStandingArmy(state: GameState, cs: CityState): number {
   if (cs.centerIndex < 0) return 0;
   const root = Math.fround(Math.sqrt(cs.population));
   const fl = Math.floor(root);
@@ -574,15 +581,28 @@ export function minorStandingArmyShort(state: GameState, cs: CityState): number 
     fl * FX + Math.trunc(Math.fround(Math.fround(root - fl) * 256))) >> 8;
   const busy = new Set(minorOpUnits(cs));
   const coastal = isCoastalLand(state.map, state.map.tiles[cs.centerIndex]);
-  let held = 0;
-  for (const u of state.units) {
-    if (u.seat !== cs.seat || busy.has(u.id)) continue;
+  const own = state.units.filter((u) => u.seat === cs.seat).sort((a, b) => (a.slot ?? Infinity) - (b.slot ?? Infinity));
+  const list = own.filter((u) => u.aiDefender);
+  const combat = (u: Unit) => UNITS[u.type]?.combat ?? 0;
+  const weakest = (): Unit | null => list.reduce<Unit | null>((w, u) => (w === null || combat(u) < combat(w) ? u : w), null);
+  for (const u of own) {
+    if (u.aiDefender || busy.has(u.id)) continue;
     const row = AI_UNITS[AI_UNIT_INDEX.get(installType('unit', u.type, 'UNIT_')) ?? -1];
     if (!row || row.civilian || row.recon || Math.max(row.combat, row.rangedCombat, row.bombard) <= 0) continue;
     if (row.domain !== 'DOMAIN_LAND' && !(row.domain === 'DOMAIN_SEA' && coastal)) continue;
-    held += 1;
+    if (list.length < quota) {
+      u.aiDefender = true;
+      list.push(u);
+      continue;
+    }
+    const w = weakest();
+    if (!w || combat(w) >= combat(u)) continue;
+    delete w.aiDefender;
+    list.splice(list.indexOf(w), 1);
+    u.aiDefender = true;
+    list.push(u);
   }
-  return Math.max(0, quota - held);
+  return quota - list.length;
 }
 
 /** the minor's city threat (0x5cbd10) on its knowledge base's records and
@@ -651,7 +671,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
   const pf = minorPickFacts(state, cs, facts);
   const threat = minorThreat(state, cs);
   cs.threat = threat;
-  cs.standingArmyShort = minorStandingArmyShort(state, cs);
+  cs.standingArmyShort = minorStandingArmy(state, cs);
   const evals = minorPlotEvals(state, cs, facts);
   const city = minorTreeCity(state, cs, facts, tables, pf, evals, threat);
   const w = minorTreeWorld(state, cs, ai, city);

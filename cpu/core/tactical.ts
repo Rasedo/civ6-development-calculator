@@ -2258,9 +2258,11 @@ function supportFormation(state: GameState, pass: Pass): void {
 
 /** the units a pass walks of a player of no full AI (a city-state, the Free
  *  Cities) or of an operations probe: its military units, of AI type
+ *  DEFENDER where its city's standing army holds it (`aiDefender`), else
  *  COMBAT (a civilian, a support unit none) */
 export function militaryAiTypeOf(u: Unit): number {
-  return unitDomain(u.type) === 'military' ? AI_COMBAT : -1;
+  if (unitDomain(u.type) !== 'military') return -1;
+  return u.aiDefender ? AI_DEFENDER : AI_COMBAT;
 }
 
 /**

@@ -1416,6 +1416,9 @@ class SimInit:
             # IN AN ESCORT FORMATION with the military unit on its own tile —
             # the CIVILIAN half carries it, and the tile names the escort.
             ("escorted", torch.bool),
+            # of AI type DEFENDER, homed on its city-state's city: the city's
+            # standing army (`Unit.aiDefender`, `_minor_standing_army`)
+            ("defender", torch.bool),
             # CIV6 (The Raven King): this unit is a city-state's, held by LEVY
             # — the mark its clauses read (the 75% upgrade discount survives
             # an upgrade); `levy_src` is the minor's seat it returns to

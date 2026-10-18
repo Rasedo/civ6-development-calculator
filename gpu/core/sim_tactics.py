@@ -3441,7 +3441,8 @@ class SimTactics:
         npos = int(npass.max()) if B else 0
         home = self.citystate_center[:, s].clamp(min=0)
         danger = op["danger"]
-        ai = torch.where(units, _AI_COMBAT, -1)
+        # DEFENDER where its city's standing army holds it (`militaryAiTypeOf`)
+        ai = torch.where(units, torch.where(self.major_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
         # SUPPORT FORMATION
         self._tac_support_formation(live, done, op, pre, seat)
         # ATTACK HIGH PRIORITY, MOVE TO SAFETY, ATTACK MEDIUM and LOW PRIORITY
@@ -3533,7 +3534,7 @@ class SimTactics:
 
             # ATTACK HIGH and MEDIUM PRIORITY, MOVE TO SAFETY, ATTACK LOW
             # PRIORITY (the attacks where a foe stands near)
-            ai = torch.where(units, _AI_COMBAT, -1)
+            ai = torch.where(units, torch.where(self.barb_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
             if op["tg"] is not None:
                 for kind in (3, 2):
                     self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], op["tg"], kind, pre, seat)

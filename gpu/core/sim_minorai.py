@@ -124,7 +124,7 @@ class SimMinorAi:
                                                           self.citystate_res_counts[:, s])
         threat = torch.where(alive, self._minor_threat(s), torch.full_like(self.citystate_threat[:, s], -1))
         self.citystate_threat[:, s] = torch.where(alive, threat, self.citystate_threat[:, s])
-        self.citystate_standing_short[:, s] = torch.where(alive, self._minor_standing_short(s),
+        self.citystate_standing_short[:, s] = torch.where(alive, self._minor_standing_army(s, alive),
                                                          self.citystate_standing_short[:, s])
         evals = self._minor_plot_evals(s, f)
         w = _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), evals, threat)
@@ -450,14 +450,18 @@ class SimMinorAi:
                                               zero, threatened, standing)
         self.citystate_combat_desire[:, s] = torch.where(alive, w, self.citystate_combat_desire[:, s])
 
-    def _minor_standing_short(self, s: int) -> torch.Tensor:
-        """[B] `minorStandingArmyShort` — THE STANDING ARMY of minor `s`'s city
-        (0x5ca7e0, its full update): its quota, the whole part of
-        PSEUDOYIELD_STANDING_ARMY_NUMBER (1.0 at a minor's weight) times the
-        square root of its population (float32, as the game's fixed point);
-        its combat units outside every running operation fill it (a land
-        unit, a sea one where the city is coastal; a recon unit not); the
-        count it lacks (CityBuildAI +0x2d8)"""
+    def _minor_standing_army(self, s: int, act: torch.Tensor) -> torch.Tensor:
+        """[B] `minorStandingArmy` — THE STANDING ARMY of minor `s`'s city
+        (0x5ca7e0, its full update) in the games of `act`: its quota, the
+        whole part of PSEUDOYIELD_STANDING_ARMY_NUMBER (1.0 at a minor's
+        weight) times the square root of its population (float32, as the
+        game's fixed point); its list the units of AI type DEFENDER
+        (`unit_defender`) in pool order, then each COMBAT unit (not
+        civilian, not recon, a fighter) outside every running operation, of
+        the land or — the city coastal — the sea, in pool order, joining
+        while the list is below the quota, else replacing the list's weakest
+        (the first of the lowest Combat) where its Combat is higher; the
+        count it lacks, the quota less the list (CityBuildAI +0x2d8)"""
         B, dev = self.B, self.device
         T = self._cv_tables()
         rows = T["unit_rows"]
@@ -478,10 +482,44 @@ class SimMinorAi:
         ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
         ar = er.take(ut)
         ar = torch.where(ar >= 0, ar, torch.full_like(ar, len(rows)))
-        own = self.major_unit_alive & (self.major_unit_seat == 100 + s) & ~self._mops_busy(s)
-        ok = own & fights.take(ar) & (land.take(ar) | (sea.take(ar) & coastal.unsqueeze(1)))
-        short = (quota - ok.sum(dim=1)).clamp(min=0)
-        return torch.where(centre >= 0, short, torch.zeros_like(short))
+        act = act & (centre >= 0)
+        own = self.major_unit_alive & (self.major_unit_seat == 100 + s) & act.unsqueeze(1)
+        flag = self.major_unit_defender & own
+        ok = own & ~flag & ~self._mops_busy(s) & fights.take(ar) & (land.take(ar) | (sea.take(ar) & coastal.unsqueeze(1)))
+        P = own.shape[1]
+        BIG = 1 << 40
+        pslot = self.major_unit_pslot
+        order = torch.where(own, torch.where(pslot >= 0, pslot, torch.full_like(pslot, P)), torch.full_like(pslot, BIG))
+        order = order.argsort(dim=1, stable=True)
+        n_own = own.sum(dim=1)
+        comb = self._type_combat.take(ut)
+        # each member's place in the list: the DEFENDERs in pool order, a
+        # joiner after them all
+        place = torch.where(flag, order.argsort(dim=1), torch.full_like(pslot, BIG))
+        n = flag.sum(dim=1)
+        bidx = torch.arange(B, device=dev)
+        for j in range(int(n_own.max()) if B else 0):
+            u_b = order[:, j]
+            e = (j < n_own) & ok[bidx, u_b]
+            if not bool(e.count_nonzero()):
+                continue
+            join = e & (n < quota)
+            key = torch.where(flag, comb * (1 << 30) + place, torch.full_like(place, 1 << 62))
+            w = key.argmin(dim=1)
+            rep = e & ~join & flag.any(dim=1) & (comb[bidx, w] < comb[bidx, u_b])
+            if bool(rep.count_nonzero()):
+                r = rep.nonzero(as_tuple=True)[0]
+                flag[r, w[r]] = False
+                place[r, w[r]] = BIG
+            add = join | rep
+            if bool(add.count_nonzero()):
+                r = add.nonzero(as_tuple=True)[0]
+                flag[r, u_b[r]] = True
+                place[r, u_b[r]] = P + 1 + j
+            n = n + join.long()
+        mine = own
+        self.major_unit_defender[mine] = flag[mine]
+        return torch.where(act, quota - n, torch.zeros_like(n))
 
     def _minor_flood_turns(self) -> torch.Tensor:
         """[B, T] `floodHazardTurns` — THE TURNS THE AI EXPECTS TO A FLOOD of
