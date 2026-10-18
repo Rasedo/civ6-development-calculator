@@ -1114,10 +1114,10 @@ export function woundedLoss256(damagePct: number, reductionPct = 0): number {
  * Guangzhou t191: a Line Infantry Corps of 75 at 16 HP over an Ironclad
  * of 70 at 75 HP, 66.6015625). An aircraft and a passenger are no garrison.
  */
-function garrisonCS(state: GameState, city: City, base: number): number {
+function garrisonCS(state: GameState, city: City, base: number, plot = city.centerIndex): number {
   let pick: Unit | undefined;
   let top = -Infinity;
-  for (const u of unitsAt(state, city.centerIndex)) {
+  for (const u of unitsAt(state, plot)) {
     if (u.seat !== city.seat || unitDomain(u.type) !== 'military' || u.embarked) continue;
     const s = (UNITS[u.type]?.combat ?? 0) + formationCS(u);
     if (s > top) {
@@ -1173,6 +1173,14 @@ export function centreStrength(state: GameState, city: City, garrisoned = true):
     if (minor) n += envoysReceived(minor) * ENVOY_CITY_CS;
   }
   return n;
+}
+
+/** A DISTRICT WITH HIT POINTS' DEFENCE as the danger map reads it (0x24ae80
+ *  with the garrison flag 0): its city's standing strength without the
+ *  centre's garrison, and the garrison term (0x24a180) over the best
+ *  defender of its own plot (0x208b80) — an Encampment's */
+export function districtGarrisonedStrength(state: GameState, city: City, plot: number): number {
+  return centreStrength(state, city, false) + garrisonCS(state, city, holderStrength(state, cityBaseSeat(city)), plot);
 }
 
 /** What an attacker measures itself against — Bastions' "+6 City Defense

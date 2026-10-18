@@ -13028,15 +13028,16 @@ class SimSeats:
         return gar, form
 
     def _garrison_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
-                     seat: torch.Tensor, base: torch.Tensor) -> torch.Tensor:
+                     seat: torch.Tensor, base: torch.Tensor, plot: torch.Tensor | None = None) -> torch.Tensor:
         """[B] f64 — `garrisonCS`, THE GARRISON TERM: a military unit of the
         holder on the centre, a hull included, adds max(0, its Combat and its
         formation's strength less its wounded loss in 1/256 (`_wounded_loss`,
         none for a chassis with no wound penalty) - `base`), associated as TS
         writes it. An aircraft and a passenger are no garrison; the tile seats
-        one military unit."""
+        one military unit. `plot` [B] another of the city's districts to read
+        the garrison on (an Encampment's, 0x24a180), else the centre."""
         bidx = self._bidx
-        ctr = self.city_center[bidx, hrow, hcol.clamp(min=0)].clamp(min=0)
+        ctr = (self.city_center[bidx, hrow, hcol.clamp(min=0)] if plot is None else plot).clamp(min=0)
         gslot = self.military_at[bidx, ctr]
         gs0 = gslot.clamp(min=0)
         gty = self.unit_type[bidx, gs0].clamp(min=0, max=self.NU - 1)

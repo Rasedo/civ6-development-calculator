@@ -5127,8 +5127,15 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   Bermuda Triangle 10 (DLC GranColombia_Maya), no other. The map is built
   at the player's DoTurn (0x4e4560 -> 0x46cdd0 at 0x4e4aa4); the engines
   build it as each tactical pass opens, the hostile units' searches on their
-  full Movement; an Encampment's defence the engines' (its city's standing
-  strength without the garrison) and its strike its city's.
+  full Movement; an Encampment's strike its city's. A district's defence
+  with the garrison flag 0 (the danger map's call): the base (0x24a000) and
+  0x24a180's terms, its garrison first — the best defender on the
+  district's own plot (0x208b80, flags 0x10): its Combat (0x56dc90) << 8
+  less the wounded loss (0x522630 on its damage percent and its +0x1868
+  reduction), less the base, where positive — then the walls and the
+  rest the centre reads. The engines: an Encampment at its city's standing
+  strength without the centre's garrison plus its own plot's garrison term
+  (`districtGarrisonedStrength`, `_garrison_cs(plot=)`).
 - MOVE TO SAFETY (0x77a4b0): each unit left (+0x530, +0x770 clear) on a plot
   of danger above 0 is listed ("Move to safety ... Current Danger") when it
   has no strength, or is embarked (0x8be30, IsEmbarked); hurt (+0xcf0 > 0): a
@@ -5167,10 +5174,20 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
 - MEASURED: the replay's barbarian "Current Danger" rows (the map as the
   barbarians' turn opens on the copy), 1117: 30 of 35 equal with the
   districts (17 with the cities alone: the +1 misses were the rings of the
-  Harbor, Campus and other districts beside the plot). The five left: t73 /
-  t74 an Archer on a city centre the game's barbarians see and the copy's
-  do not (+25), t107 a Trebuchet's 35 against the game's 30, t108 / t109 +85
-  on a Man-at-Arms beside Longxi with no unit of the record within six. End plots: "HL: Move To Safety" 183 of 371 (60 with
+  Harbor, Campus and other districts beside the plot). Of the five left,
+  t73 / t74 were China's Spearman the replay had not made (its strike on the
+  ships beside it) and t108 its Trebuchet. t107: the city-state's Trebuchet
+  stands embarked (record t107 and t108), so its combat strength is its
+  owner's era's embarked one (0x56dc90(unit, 0): IsEmbarked, a land combat
+  unit, +0x18c3 clear, +0x21e0 -1 — Eras' value), 30 over its bombard less
+  17 (28); ported. t109 (+35): the danger map is built at the player's
+  DoTurn (0x46cdd0), its other players' units where they stood as the turn
+  began — China's Trebuchet at (34,12), record t109, two plots from the
+  Man-at-Arms — while the copy holds them where their turn left them (the
+  Trebuchet at (35,12)). New on 2a1caa0c: t58 the Quadrireme beside Longxi
+  reads 46, the game 26 — China's Warrior fortified (record fortify 2) on
+  the centre counts its 20 in the copy and nothing in the game (the unit
+  walk skips +0x770; fortified as a skip is unread). End plots: "HL: Move To Safety" 183 of 371 (60 with
   the stand-in), "Move to safety" 29 of 60 (0).
 
 ## C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)

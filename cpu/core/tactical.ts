@@ -25,7 +25,7 @@ import {
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { centreStrength, cityDefenseStrength, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { encampOuterPool, outerPool } from './rules';
 import { cityStateAt, minorCity } from './cityStates';
@@ -879,7 +879,11 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     if (unitReligious(u.type) || !unitsHostile(state, { seat }, u) || !seen[u.tileIndex] || !unitVisibleTo(state, u, seat)) continue;
     const st = aiStrengths(u);
     if (st.melee <= 0 && st.ranged <= 0 && st.bombard <= 0) continue;
-    const s = unitDanger(st.melee, st.ranged, st.bombard);
+    // an embarked unit's combat strength its owner's era's (0x56dc90 with 0:
+    // IsEmbarked, a land combat unit), its ranged and bombard its own
+    // (runs/h1_duelw1117 t107: a city-state's embarked Trebuchet reads 30)
+    const melee = u.embarked && unitDomain(u.type) === 'military' ? embarkedDefenseCS(state, u.seat) : st.melee;
+    const s = unitDanger(melee, st.ranged, st.bombard);
     const R = rangeOf(u);
     if (unitDomain(u.type) === 'air') {
       for (const p of within(u.tileIndex, R)) out[p] += s;
@@ -957,8 +961,9 @@ export function featureDanger(feature: string): number {
  * the City Center, the Encampment) has a defence, and it strikes only while
  * its own perimeter stands (0x24b960: its outer damage below its maximum):
  * the centre on its city's defence and strike, the Encampment on its city's
- * standing strength without the garrison and the city's strike; any other
- * district neither.
+ * standing strength with its own plot's garrison (0x24a180 over the best
+ * defender there, `districtGarrisonedStrength`) and the city's strike; any
+ * other district neither.
  */
 export function dangerDistricts(state: GameState, c: City): { plot: number; def: number; strike: number }[] {
   const strike = Math.floor(cityStrikeStrength(state, c));
@@ -968,7 +973,7 @@ export function dangerDistricts(state: GameState, c: City): { plot: number; def:
       out.push({ plot: d.tileIndex, def: Math.floor(cityDefenseStrength(state, c)), strike: outerPool(state, c) > 0 ? strike : 0 });
     } else if (d.type === 'ENCAMPMENT') {
       const t = state.map.tiles[d.tileIndex];
-      out.push({ plot: d.tileIndex, def: Math.floor(centreStrength(state, c, false)), strike: encampmentIntact(t) && encampOuterPool(state, c, t) > 0 ? strike : 0 });
+      out.push({ plot: d.tileIndex, def: Math.floor(districtGarrisonedStrength(state, c, d.tileIndex)), strike: encampmentIntact(t) && encampOuterPool(state, c, t) > 0 ? strike : 0 });
     } else {
       out.push({ plot: d.tileIndex, def: 0, strike: 0 });
     }

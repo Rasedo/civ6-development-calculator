@@ -2961,6 +2961,13 @@ class SimTactics:
             for pl in (self.military_at, self.embarked_at):
                 hid = self._stealth_hidden(seat, pl)
                 ok &= ~((pl.gather(1, tc) == me) & hid.gather(1, tc))
+        # an embarked unit's combat strength its owner's era's (0x56dc90 with
+        # 0: IsEmbarked, a land combat unit), its ranged and bombard its own
+        emb = ok & self.unit_emb & ~self._type_support.take(ut)
+        if bool(emb.any()):
+            for sv in torch.unique(self.unit_seat[emb]).tolist():
+                cs = self._embarked_def_cs(torch.full((B,), int(sv), dtype=torch.long, device=dev))
+                melee = torch.where(emb & (self.unit_seat == sv), cs.unsqueeze(1).to(melee.dtype), melee)
         vs = bomb - self._bombard_vs_unit
         s = torch.where(bomb > 0, torch.maximum(melee, vs), torch.maximum(melee, rng_s))
         promos = self.unit_promos
@@ -3058,8 +3065,8 @@ class SimTactics:
         per district placed (the centre, the registry's, the wonders' plots)
         (placed [B], plot [B], defence [B], strike [B]) in whole numbers — the
         centre on its city's defence and its strike while the walls stand,
-        the Encampment on the city's standing strength without the garrison
-        and its strike while it stands intact behind its own perimeter, any
+        the Encampment on the city's standing strength with its own plot's
+        garrison and its strike while it stands intact behind its own perimeter, any
         other neither"""
         dev = self.device
         B = self.B
@@ -3086,7 +3093,10 @@ class SimTactics:
                 intact = (self.district_complete[bidx, p0] & ~self.district_pillaged[bidx, p0]
                           & (self.encamp_hp[bidx, p0] > 0)
                           & (torch.minimum(self.encamp_outer_hp[bidx, p0].long(), wmax) > 0))
-                d = torch.floor(self._centre_strength(rt, col, garrisoned=False)).long()
+                # its city's standing strength and its own plot's garrison
+                # (0x24ae80 with the garrison flag 0, 0x24a180)
+                gar = self._garrison_cs(rt, col, self._ROW_SEAT.take(rt), self._holder_strength(rt, col), plot=p0)
+                d = torch.floor(self._centre_strength(rt, col, garrisoned=False) + gar).long()
                 out.append((placed, p0, d, torch.where(intact, raw, zero)))
             else:
                 out.append((placed, p0, zero, zero))
