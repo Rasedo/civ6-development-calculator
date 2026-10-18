@@ -513,6 +513,7 @@
     - cpu/core/operations/evaluate.ts:enemyCities
     - cpu/core/operations/evaluate.ts:targetsOf
     - cpu/core/barbarianOps.ts:view
+    - gpu/core/sim_minorops.py:_mops_naval_target
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"

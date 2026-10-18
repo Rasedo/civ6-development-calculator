@@ -50,6 +50,7 @@
     - cpu/core/quests.ts:giveEraQuests
     - gpu/core/sim_seats.py:_game_era_turn
     - gpu/core/sim_seats.py:_give_era_quests
+    - cpu/core/game.ts:eraOpening
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - "- When: the game era's change (0x93ac50, registered on GameEras' signal when the game has eras, the player era's 0x93ad80 other..."

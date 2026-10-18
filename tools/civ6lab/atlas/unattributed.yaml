@@ -1823,6 +1823,13 @@
   context:
     - "...ct for a unit or a building — no district — whose PurchaseYield is YIELD_GOLD (vt +0x80 0x5f6830; a building flagged +0x159 & 0x10 declines) it takes into its purchase list and makes..."
   review: reviewed
+- addr: 0x5f6920
+  final: 0x3fb1b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiContracts.ts:faithPurchasable]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x600b00
   final: 0x3fda30
   kind: function
@@ -2841,6 +2848,7 @@
   final: 0x4eefd0
   kind: function
   status: PARTLY
+  impl: [cpu/core/aiContracts.ts:faithPurchasable]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
@@ -3715,7 +3723,7 @@
   final: 0x566cd0
   kind: function
   status: PARTLY
-  impl: [cpu/core/operations/nodes.ts:navalUnitsRunning]
+  impl: [cpu/core/operations/nodes.ts:navalUnitsRunning, gpu/core/sim_minorops.py:_u_naval_units]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...CESS — the team flag +0x90 with no units FAILURE, unread); Naval Patrol / Naval Pillage 0x803880 (RUNNING with units, else FAILURE); Operation Defend Units' update 0x80ee70 (SUCCESS; m..."

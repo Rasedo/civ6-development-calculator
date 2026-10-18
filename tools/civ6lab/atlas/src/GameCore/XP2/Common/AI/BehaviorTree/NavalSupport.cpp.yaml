@@ -7,7 +7,7 @@
   final: 0x566a50
   kind: function
   status: PARTLY
-  impl: [cpu/core/operations/nodes.ts:navalChooseTarget]
+  impl: [cpu/core/operations/nodes.ts:navalChooseTarget, gpu/core/sim_minorops.py:_u_naval_choose]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "- PARTLY READ / unread: Naval Choose Target 0x803590 (the tactical analysis's target list by domain 0x802ea0 unread: the port finds none and..."

@@ -524,7 +524,10 @@
   kind: function
   name: City_BuildQueue
   status: PARTLY
-  impl: [cpu/harness/import.ts:reserved]
+  impl:
+    - cpu/harness/import.ts:reserved
+    - cpu/core/minorBuild.ts:cost
+    - gpu/core/sim_minors.py:_minor_finish
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - "- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070): a unit at the queue's front with a strategic cost and n..."
