@@ -144,7 +144,11 @@
   kind: function
   status: PARTLY
   impl: [cpu/harness/drawSites.ts:DRAW_SITES, cpu/core/barbarians.ts:othersSee]
-  readings: ["H-1: the raids — READ", "H-1: draws the AI takes, draws the engines lack", "H-1: the raids — READ"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: draws the AI takes, draws the engines lack"
+    - "H-1: the raids — READ"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2:...

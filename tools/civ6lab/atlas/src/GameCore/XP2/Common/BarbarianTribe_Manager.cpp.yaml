@@ -53,6 +53,8 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/barbarians.ts:raiseCamp]
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x1514a0

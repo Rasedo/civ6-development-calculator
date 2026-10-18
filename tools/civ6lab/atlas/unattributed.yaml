@@ -1581,7 +1581,10 @@
   final: 0x3b7100
   kind: function
   status: PARTLY
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights hold raises..."
@@ -2336,7 +2339,10 @@
   final: 0x48ef40
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:admits, gpu/core/sim_cityvalue.py:_cv_admits]
+  impl:
+    - cpu/core/aiModifiers.ts:admits
+    - gpu/core/sim_cityvalue.py:_cv_admits
+    - gpu/core/sim_policy.py:_pol_admits
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
@@ -3644,7 +3650,10 @@
     - recording: 1121
       turn: 9
       value: "A tree one of whose units its own orders   spent ends that tick (1121 t9 Hunza's last charge on a Rainforest: the   next Builder contract t10;"
-  impl: [cpu/core/aiCityTrees.ts:tickCityTrees, cpu/core/barbarianOps.ts:barbarianTrees]
+  impl:
+    - cpu/core/aiCityTrees.ts:tickCityTrees
+    - cpu/core/barbarianOps.ts:barbarianTrees
+    - cpu/core/operations/manager.ts:operationsRun
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"

@@ -3,12 +3,28 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x508330
+  final: 0x359f00
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1
+      value: "Case (runs/h1_duelw1124, planning rows   t1-60, inside the replay): of the 123 plots the game listed that the   barbarians had not revealed, every one lies beside a revealed plot and   none within two"
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+  context:
+    - ...al 0x50d390 is reached from the visibility count change 0x508d50 alone for a barbarian (0x508330 is the diplomatic sharing, 0x50ccc0 the war / peace one, 0x50d080 RevealAllPlots and th...
+  review: imported
 - addr: 0x508d50
   final: 0x35a7f0
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:othersSee]
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
+  impl: [cpu/core/barbarians.ts:othersSee, cpu/core/barbarians.ts:CAMP_SIGHT]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2: the plot's visibility count fo..."
@@ -47,6 +63,32 @@
   context:
     - "- Camp step 0x14fcc0: target = max camps (+0x110) x the land plots no major sees (0x50b2d0 on hash 0x253718b0) / all land plots, less the standing camps (+0x170); the first step..."
   review: imported
+- addr: 0x50ccc0
+  final: 0x35d8c0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1
+      value: "Case (runs/h1_duelw1124, planning rows   t1-60, inside the replay): of the 123 plots the game listed that the   barbarians had not revealed, every one lies beside a revealed plot and   none within two"
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+  context:
+    - ...lity count change 0x508d50 alone for a barbarian (0x508330 is the diplomatic sharing, 0x50ccc0 the war / peace one, 0x50d080 RevealAllPlots and the Free Cities' start). 0x508d50's ca...
+  review: imported
+- addr: 0x50d080
+  final: 0x35dca0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1
+      value: "Case (runs/h1_duelw1124, planning rows   t1-60, inside the replay): of the 123 plots the game listed that the   barbarians had not revealed, every one lies beside a revealed plot and   none within two"
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+  context:
+    - "...lone for a barbarian (0x508330 is the diplomatic sharing, 0x50ccc0 the war / peace one, 0x50d080 RevealAllPlots and the Free Cities' start). 0x508d50's callers: a unit's sight update (..."
+  review: imported
 - addr: 0x50d390
   kind: function
   status: READ
@@ -62,6 +104,7 @@
   readings:
     - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   context:
     - "...Kandy's MINOR_CIV_KANDY_GRANT_RELIC_BONUS, Amount 1): the visibility manager's reveal 0x50d390 (Player_Visibility_Manager.cpp, the natural-wonder discovery notification), for i below..."
     - "- WORLD_CIRCUMNAVIGATED: on a plot revealed (0x50d390, the visibility manager), a player without the flag (+0x8a8) whose team has revealed a..."

@@ -171,6 +171,7 @@
     - "H-1: the raids — READ"
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
     - "H-1: the raids — READ"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."

@@ -164,8 +164,10 @@
   final: 0x1a9060
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:search]
-  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:from]
+  readings:
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The cost (0x270dd0): 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no..."
@@ -211,6 +213,10 @@
     - cpu/core/tactical.ts:enterable
     - cpu/core/tactical.ts:from
     - gpu/core/sim_tactics.py:_tac_search
-  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+    - cpu/core/tactical.ts:before
+  readings:
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported

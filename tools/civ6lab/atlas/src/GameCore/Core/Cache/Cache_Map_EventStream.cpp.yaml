@@ -7,6 +7,7 @@
   final: 0xfce80
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:ex]
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"

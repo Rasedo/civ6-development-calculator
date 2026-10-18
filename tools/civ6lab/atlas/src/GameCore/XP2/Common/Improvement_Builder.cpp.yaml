@@ -66,3 +66,31 @@
   context:
     - ...4d0) and RING_COST when d > 3; an improvement adds RING_COST if it is the barbarian camp (0x362130), else IMPROVEMENT_COST; a natural wonder (0x82e90) NW_COST; YIELD_POINT_COST per yield p...
   review: imported
+- addr: 0x362ec0
+  final: 0x25d270
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1
+      value: "Case (runs/h1_duelw1124, planning rows   t1-60, inside the replay): of the 123 plots the game listed that the   barbarians had not revealed, every one lies beside a revealed plot and   none within two"
+  impl: [cpu/core/barbarians.ts:CAMP_SIGHT]
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+  context:
+    - "...one for the barbarians), an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0: the plot and the six beside it, no line of sight), the scripted operations. A camp's..."
+  review: imported
+- addr: 0x363080
+  final: 0x25d430
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1
+      value: "Case (runs/h1_duelw1124, planning rows   t1-60, inside the replay): of the 123 plots the game listed that the   barbarians had not revealed, every one lies beside a revealed plot and   none within two"
+  impl: [cpu/core/barbarians.ts:CAMP_SIGHT]
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+  context:
+    - "...territory: none for the barbarians), an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0: the plot and the six beside it, no line of sight), the scripted operatio..."
+  review: imported

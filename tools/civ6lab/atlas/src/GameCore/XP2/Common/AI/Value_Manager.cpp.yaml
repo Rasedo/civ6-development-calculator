@@ -530,6 +530,7 @@
     - cpu/core/minorBuild.ts:minorResearchTerms
     - cpu/core/minorBuild.ts:minorUnitTerm
     - cpu/data/aiCivics.ts:CIVIC_AI_FORMATION_UNITS
+    - gpu/core/sim_civics.py:_cai_gov_term
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
@@ -574,6 +575,8 @@
     - cpu/core/aiPolicyValue.ts:governmentValue
     - cpu/core/aiPolicyValue.ts:governmentValue
     - cpu/core/aiPolicyValue.ts:governmentValues
+    - gpu/core/sim_policy.py:_NO_SCORE
+    - gpu/core/sim_policy.py:_pol_gov_values
   readings:
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
@@ -651,7 +654,10 @@
   final: 0x5310d0
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiPolicyValue.ts:policyScore, cpu/core/aiPolicyValue.ts:policyScore]
+  impl:
+    - cpu/core/aiPolicyValue.ts:policyScore
+    - cpu/core/aiPolicyValue.ts:policyScore
+    - gpu/core/sim_policy.py:_NO_SCORE
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
