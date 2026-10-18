@@ -35,6 +35,7 @@ class SimMinors:
             now = torch.stack([g["surplus"], g["housing"], g["population"], g["stored"], g["multiplier"]], -1)
             self.citystate_ai_growth[:, s] = torch.where(alive.unsqueeze(-1), now, self.citystate_ai_growth[:, s])
             self._minor_growth(s)
+            self._minor_research_ai(s)
             self._minor_combat_desire(s)
             self._minor_knowledge(s, True)
             self._minor_upgrades(s, gained)
@@ -648,7 +649,7 @@ class SimMinors:
         (City-state): a city-state's city is an ordinary city — its Campus
         yields Science, its Commercial Hub Gold. Its Science and Culture as
         the turn opens feed the two research pots and the research completes
-        on them (`_minor_research`); then, off the city as that research left
+        on them (`_minor_research_bank`); then, off the city as that research left
         it, Gold banks into `citystate_treasury` and pays the minor's units'
         upkeep — each unit's own Maintenance, a minor carrying no card that
         cuts it — and meets the `_bankruptcy` every seat meets, and Faith
@@ -658,7 +659,7 @@ class SimMinors:
         alive = self.citystate_alive[:, s]
         keep = alive.double()
         tot = self._seat_city_stats(row, record=False)[0][:, 0]  # [B, 6], zero where the city is dead
-        gained = self._minor_research(s, tot[:, 3] * keep, tot[:, 4] * keep)
+        gained = self._minor_research_bank(s, tot[:, 3] * keep, tot[:, 4] * keep)
         if bool((gained > 0).count_nonzero()):
             fresh = self._seat_city_stats(row, record=False)[0][:, 0]
             tot = torch.where((gained > 0).unsqueeze(1), fresh, tot)
@@ -768,22 +769,45 @@ class SimMinors:
                 want = torch.where(ready & ~claim, torch.zeros_like(want), want)
 
     def _minor_research(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> torch.Tensor:
-        """`minorResearch` for research row `s` — a city-state's, or the Free
-        Cities' (`FR`, every game every turn) — the TECHNOLOGIES first: the CATCH-UP
-        (`minorCatchUp`, read inline), the turn's Science (`sci` [B]) and the
-        overflow bank, a completion at the cost leaving the rest, whose
-        choice reads the research AI's analysis of the turn before
-        (`_rai_completion`); then the AI's turn analyses the tree and makes
-        its turn's choice (`_rai_turn`). Then the CIVICS the same way: the
-        catch-up, the turn's Culture (`cul`) and the overflow bank and
-        complete the civic in hand at its cost, whose choice reads the civics
-        AI's analysis of the turn before (`_cai_completion`); then the AI's
-        turn analyses the tree and, with nothing in hand, chooses
-        (`_cai_turn`). CIV6 (Urban Defenses): the
-        tech "builds modern fortifications around the City Centers of all
-        current and future cities and their Encampment districts", so the
-        holder's perimeters arrive at the urban tier's full pool. Returns [B]
-        long, how many trees completed a row — the upgrade trigger's count."""
+        """`minorResearch` for research row `s` — the Free Cities' (`FR`, every
+        game every turn) — the bank (`_minor_research_bank`) and the AIs' turns
+        (`_minor_research_turn`) at once. Returns [B] long, how many trees
+        completed a row."""
+        gained = self._minor_research_bank(s, sci, cul)
+        self._minor_research_turn(s, sci, cul)
+        return gained
+
+    def _minor_research_turn(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> None:
+        """`minorResearchTurn` for research row `s`: the research AI analyses
+        the tree on the Science `sci` [B] and makes its turn's choice
+        (`_rai_turn`); the civics AI analyses its tree on the Culture `cul`
+        and, with nothing in hand, chooses (`_cai_turn`)"""
+        alive = (torch.ones(self.B, dtype=torch.bool, device=self.device) if s == self.FR
+                 else self.citystate_alive[:, s])
+        self._rai_turn(s, alive, sci)
+        self._cai_turn(s, alive, cul)
+
+    def _minor_research_ai(self, s: int) -> None:
+        """`minorResearchAi`: city-state `s`'s research and civics AIs' turns on
+        its city as its production and growth left it"""
+        keep = self.citystate_alive[:, s].double()
+        tot = self._seat_city_stats(self._CITY_MINOR0 + s, record=False)[0][:, 0]
+        self._minor_research_turn(s, tot[:, 3] * keep, tot[:, 4] * keep)
+
+    def _minor_research_bank(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> torch.Tensor:
+        """`minorResearchBank` for research row `s` — a city-state's, or the
+        Free Cities' — the TECHNOLOGIES first: the CATCH-UP (`minorCatchUp`,
+        read inline), the turn's Science (`sci` [B]) and the overflow bank, a
+        completion at the cost leaving the rest, whose choice reads the
+        research AI's analysis of the turn before (`_rai_completion`). Then
+        the CIVICS the same way: the catch-up, the turn's Culture (`cul`) and
+        the overflow bank and complete the civic in hand at its cost, whose
+        choice reads the civics AI's analysis of the turn before
+        (`_cai_completion`). CIV6 (Urban Defenses): the tech "builds modern
+        fortifications around the City Centers of all current and future
+        cities and their Encampment districts", so the holder's perimeters
+        arrive at the urban tier's full pool. Returns [B] long, how many trees
+        completed a row — the upgrade trigger's count."""
         free = s == self.FR
         alive = (torch.ones(self.B, dtype=torch.bool, device=self.device) if free
                  else self.citystate_alive[:, s])
@@ -836,7 +860,6 @@ class SimMinors:
                     self._urban_defenses_fit(self.FREE_ROW, hit)
                 else:
                     self._minor_urban_fit(s, hit)
-        self._rai_turn(s, alive, sci)
 
         # THE CIVICS
         have, prog, cur = self.citystate_civics, self.citystate_civic_prog, self.citystate_cur_civic
@@ -860,7 +883,6 @@ class SimMinors:
             cur[:, s] = torch.where(fire, torch.full_like(c, -1), c)
             self._eff_version += 1
             self._cai_completion(s, fire, torch.where(fire, c, torch.full_like(c, -1)), cul)
-        self._cai_turn(s, alive, cul)
         return gained
 
     def _minor_urban_fit(self, s: int, hit: torch.Tensor) -> None:

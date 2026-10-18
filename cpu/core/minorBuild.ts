@@ -81,7 +81,8 @@ import { minorTradeValue } from './aiTrade';
  *  research that completes on it, then its city — the Production its city
  *  makes now, then growth and borders on the city as it stands after that
  *  (`minorGrowth`) — its city presses a religion it follows on that
- *  religion's founder's turn (`spreadReligiousPressure`) — then its military
+ *  religion's founder's turn (`spreadReligiousPressure`) — then its research
+ *  and civics AIs' turns on the city so grown (`minorResearchAi`), its military
  *  AI's Combat Desire (`minorCombatDesire`), then its
  *  knowledge base's look (`minorKnowledge`), then its actions: a research
  *  completion's upgrades, its city AI's turn (`minorAiTurn`: its builds,
@@ -101,6 +102,7 @@ export function minorPhase(state: GameState): void {
     // forecast of the citizens and the store before each turn's growth, t18 - t24)
     cityState.aiGrowth = minorCityGrowth(state, cityState);
     minorGrowth(state, cityState);
+    minorResearchAi(state, cityState);
     // its military AI's turn: the Combat Desire on the records as its last
     // update aged them
     cityState.combatDesire = minorCombatDesire(state, cityState, state.turn - 1).desire;
@@ -203,11 +205,26 @@ function minorTechContracts(cityState: CityState): TechContract[] {
   return out;
 }
 
+/** a city-state's city terms of its research and civics values, off its
+ *  city AI's last table and counts */
+function minorCityTerms(state: GameState, cityState: CityState): ReturnType<typeof minorResearchTerms> {
+  return minorResearchTerms(state, cityState, cityState.unitValues,
+    cityState.resourceCounts && new Map(Object.entries(cityState.resourceCounts)));
+}
+
+/** the minor's research and civics AIs' turns (`minorResearchTurn`) on its
+ *  city as its production and growth left it */
+export function minorResearchAi(state: GameState, cityState: CityState): void {
+  const y = computeCityStats(state, minorCity(cityState)).total;
+  minorResearchTurn(state, cityState.research, cityState.seat, y.science, y.culture,
+    () => minorCityTerms(state, cityState), minorTechContracts(cityState));
+}
+
 /**
  * THE MINOR'S ECONOMY, in the order every player's start of turn runs
  * (tools/civ6lab/turn_order_civ6.md): its city's Science and Culture as the
  * turn opens feed the two research pots, and the research completes on them
- * (`minorResearch`); then, off the city as that research left it, its Gold
+ * (`minorResearchBank`); then, off the city as that research left it, its Gold
  * banks and pays its units' upkeep — each unit's own Maintenance, a minor
  * carrying no government or policy that cuts it — and meets the
  * `bankruptcy` every seat meets, and its Faith banks. Returns how many trees
@@ -215,10 +232,8 @@ function minorTechContracts(cityState: CityState): TechContract[] {
  */
 export function minorEconomy(state: GameState, cityState: CityState): number {
   let y = computeCityStats(state, minorCity(cityState)).total;
-  const gained = minorResearch(state, cityState.research, cityState.seat, y.science, y.culture,
-    () => minorResearchTerms(state, cityState, cityState.unitValues,
-      cityState.resourceCounts && new Map(Object.entries(cityState.resourceCounts))),
-    () => minorUrbanFit(state, cityState), minorTechContracts(cityState));
+  const gained = minorResearchBank(state, cityState.research, cityState.seat, y.science, y.culture,
+    () => minorCityTerms(state, cityState), () => minorUrbanFit(state, cityState), minorTechContracts(cityState));
   if (gained > 0) y = computeCityStats(state, minorCity(cityState)).total;
   let upkeep = 0;
   for (const u of state.units) if (u.seat === cityState.seat) upkeep += unitMaintenance(u);
@@ -257,24 +272,35 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
  * the turn's yield and the overflow a completion set aside, and completes at
  * its cost, leaving the rest. Its technologies are the research AI's
  * (`aiResearch.ts`) and its civics the civics AI's (`aiCivics.ts`): a
- * completion's choice, then the turn's; a pick resumes the progress kept on
- * it (`selectResearch`). First the CATCH-UP (`minorCatchUp`). Early Empire is
- * the row `borderClosedTo` reads. CIV6 (Urban Defenses): the tech "builds
- * modern fortifications around the City Centers of all current and future
- * cities and their Encampment districts" — `urban` fits the holder's cities
- * on its completion. `terms` gives the research and civics analyses their
- * city terms (`minorResearchTerms`), `contracts` the seat's Tech Contracts. Returns how many trees
- * completed a row this turn — the upgrade trigger's count.
+ * completion's choice at the bank (`minorResearchBank`), then the AIs' turns
+ * (`minorResearchTurn`); a pick resumes the progress kept on it
+ * (`selectResearch`). The Free Cities run both at once. Returns how many
+ * trees completed a row this turn — the upgrade trigger's count.
  */
 export function minorResearch(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
   terms: () => ReturnType<typeof minorResearchTerms> | undefined, urban: () => void,
   contracts: readonly TechContract[]): number {
+  const gained = minorResearchBank(state, r, seat, science, culture, terms, urban, contracts);
+  minorResearchTurn(state, r, seat, science, culture, terms, contracts);
+  return gained;
+}
+
+/**
+ * THE BANK, at the minor's start of turn: first the CATCH-UP
+ * (`minorCatchUp`); each tree banks the turn's yield; a completion takes the
+ * AI's completion choice on its analysis of the turn before (0x762d60, the
+ * civics' 0x6293e0, the completed row its key). Early Empire is the row
+ * `borderClosedTo` reads. CIV6 (Urban Defenses): the tech "builds modern
+ * fortifications around the City Centers of all current and future cities
+ * and their Encampment districts" — `urban` fits the holder's cities on its
+ * completion. `terms` gives the analyses their city terms
+ * (`minorResearchTerms`), `contracts` the seat's Tech Contracts. Returns how
+ * many trees completed a row.
+ */
+export function minorResearchBank(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
+  terms: () => ReturnType<typeof minorResearchTerms> | undefined, urban: () => void,
+  contracts: readonly TechContract[]): number {
   let gained = 0;
-  let held: ReturnType<typeof minorResearchTerms> | undefined | null = null;
-  const city = () => (held === null ? (held = terms()) : held);
-  // THE TECHNOLOGIES: the turn's Science banks; a completion's choice reads
-  // the research AI's analysis of the turn before (0x762d60); then the AI's
-  // turn analyses the tree and makes its turn's choice (0x760980)
   minorCatchUp(state, r, false, seat);
   r.techProgress += science + (r.techOverflow ?? 0);
   r.techOverflow = 0;
@@ -286,18 +312,10 @@ export function minorResearch(state: GameState, r: ResearchState, seat: number, 
     if (!r.techs.includes(cur)) r.techs.push(cur);
     delete r.techRetained[cur];
     r.tech = null;
-    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, city()?.tech, contracts), cur, researchDraw(state)));
+    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, terms()?.tech, contracts), cur, researchDraw(state)));
     r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
     if (cur === URBAN_DEFENSES_TECH) urban();
   }
-  r.aiEntries = researchAnalysis(state, seat, science, {}, city()?.tech, contracts);
-  r.aiLeftSeen = r.aiLeft ?? 0;
-  takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
-  r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
-  // THE CIVICS: the turn's Culture banks; a completion's choice reads the
-  // civics AI's analysis of the turn before, the completed civic its key
-  // (0x6293e0); then the AI's turn analyses the tree and, with nothing in
-  // hand, chooses (0x620110)
   minorCatchUp(state, r, true, seat);
   r.civicProgress += culture + (r.civicOverflow ?? 0);
   r.civicOverflow = 0;
@@ -309,11 +327,29 @@ export function minorResearch(state: GameState, r: ResearchState, seat: number, 
     if (!r.civics.includes(civ)) r.civics.push(civ);
     delete r.civicRetained[civ];
     r.civic = null;
-    takeCivic(r, civicChoice(state, seat, r.civicAiEntries ?? civicAnalysis(state, seat, culture, {}, city()?.civic), civ, civicDraw(state)));
+    takeCivic(r, civicChoice(state, seat, r.civicAiEntries ?? civicAnalysis(state, seat, culture, {}, terms()?.civic), civ, civicDraw(state)));
   }
+  return gained;
+}
+
+/**
+ * THE AIS' TURNS (list B, after the city's production and growth): the
+ * research AI analyses the tree on the Science the city now makes and makes
+ * its turn's choice (0x760980); the civics AI analyses its tree and, with
+ * nothing in hand, chooses (0x620110). runs/h1_duelw1124 t5 Granada: grown
+ * to two citizens that turn, every row at 3.0 Science (Animal Husbandry 4
+ * turns where 2.5 gives 5).
+ */
+export function minorResearchTurn(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
+  terms: () => ReturnType<typeof minorResearchTerms> | undefined, contracts: readonly TechContract[]): void {
+  let held: ReturnType<typeof minorResearchTerms> | undefined | null = null;
+  const city = () => (held === null ? (held = terms()) : held);
+  r.aiEntries = researchAnalysis(state, seat, science, {}, city()?.tech, contracts);
+  r.aiLeftSeen = r.aiLeft ?? 0;
+  takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
+  r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
   r.civicAiEntries = civicAnalysis(state, seat, culture, {}, city()?.civic);
   if (!r.civic) takeCivic(r, civicChoice(state, seat, r.civicAiEntries, null, civicDraw(state)));
-  return gained;
 }
 
 /** Urban Defenses on a city-state: its centre's perimeter and its

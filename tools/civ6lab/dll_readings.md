@@ -4615,6 +4615,13 @@ Contract %d").
   (1124 t6: minors 2 and 3 pass Writing, Currency and Irrigation over —
   their next step was Pottery — and take Celestial Navigation through
   Astrology and Bronze Working through Mining, as logged).
+- THE SCIENCE THE TURN READS: the research and civics AIs' turns (list B)
+  run after the player's own turn start banked the pots and grew its
+  cities, on the Science and Culture the grown city makes — runs/h1_duelw1124
+  t5 Granada, grown to two citizens that turn: every row at 3.0 Science
+  (Animal Husbandry and Mining 4 turns, Writing 10, Bronze Working 18), not
+  the 2.5 its pots banked (5 / 11 / 21). A completion's choice stays at the
+  bank, on the analysis of the turn before.
 - THE CITY TERMS' TIMING (list B before the cities A, "The turn" in the
   city build AI's section): the unit term reads the city's UNITS table
   (0x5d4cd0) as the city AI's last turn left it, the resources term the
