@@ -492,6 +492,14 @@ class SimMinorOps:
         out.scatter_(1, torch.where(m >= 0, m, P), True)
         return out[:, :P]
 
+    def _mops_held(self, s: int) -> torch.Tensor:
+        """[B, P] the units any of minor `s`'s operations' teams list"""
+        P = self.major_unit_alive.shape[1]
+        m = self.mops_mem[:, s].reshape(self.B, -1)
+        out = torch.zeros(self.B, P + 1, dtype=torch.bool, device=self.device)
+        out.scatter_(1, torch.where(m >= 0, m, P), True)
+        return out[:, :P]
+
     def _mops_add_member(self, s: int, k: int, ti: int, uid: torch.Tensor, mask: torch.Tensor) -> None:
         """`addMember` where `mask`: the unit [B] joins the team's members, each
         requirement it carries counting it"""
@@ -1649,7 +1657,12 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         ai = torch.where(op["units"], torch.where(sim.major_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
         one = mem.sum(dim=1) == 1
         exch = (~torch.full((B,), unequal, dtype=torch.bool, device=dev)) & one
-        out = sim._tac_assign(cand, op["order"], ai, near, op["res"], op["rowof"], uu, exch, True, uk, tg["uo"], "major", seat)
+        # the operation's units (its job), every team's
+        held = torch.zeros_like(memm)
+        for t in range(N_TEAMS):
+            held |= sim._mops_member_mask(s, k, t)
+        peers = sim._tac_peers(held & u["own"], "major")
+        out = sim._tac_assign(cand, op["order"], ai, near, op["res"], op["rowof"], uu, exch, True, uk, tg["uo"], peers, "major", seat)
         sim._tac_carry_out(out, done, op["rowof"], op["res"], "major", seat)
 
 

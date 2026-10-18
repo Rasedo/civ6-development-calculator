@@ -33,6 +33,8 @@ import { irradiated } from './nuclear';
 import { canSee, unitSight } from './fog';
 import { barbarianScouts, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, ringPlots, tribeOf } from './barbarians';
 import { barbarianCaptures, barbarianTrees } from './barbarianOps';
+import { opsOf } from './operations/manager';
+import { opUnits } from './operations/operation';
 import { BT_RUNNING, BT_SUCCESS } from './behaviorTree';
 import { generalAuraMP } from './aura';
 import { aiPromotionPick, attacksLeftOf, attacksPerTurn, takePromotion } from './promotions';
@@ -1461,6 +1463,18 @@ function strikers(state: GameState, pass: Pass, plot: number): Unit[] {
   return out;
 }
 
+/** the pass's own job in `jobOf` */
+const PASS_JOB = -2;
+
+/** the job a unit is in (unit +0x7d0): its operation's id in its player's
+ *  operation manager (the barbarians', a city-state's), else the pass's
+ *  where the pass holds it, else -1 (a unit raised this turn among them) */
+function jobOf(state: GameState, pass: Pass, u: Unit): number {
+  const ai = isBarbSeat(u.seat) ? state.barbSeat.ops : state.cityStates.find((c) => c.seat === u.seat)?.ops;
+  if (ai) for (const o of opsOf(ai)) if (opUnits(o).includes(u.id)) return o.id;
+  return pass.units.includes(u) ? PASS_JOB : -1;
+}
+
 /** one unit's claim on a spot in the assignment: the unit, the target, the
  *  damage it would deal, the turn of the blow, its worth as last weighed */
 interface Claim { unit: number; target: number; dealt: number; turns: number; value: number }
@@ -1480,7 +1494,8 @@ export interface Assigned { unit: Unit; move: number; attack: number; from: numb
  *    takes in the blow and the blow back passes the damage it deals in both,
  *    or would kill it; a DEFENDER's only on its own plot, a unit that has
  *    moved only its own plot this turn, and no spot another unit holds that
- *    stacks with it (its own unit with Movement left aside); each a claim on
+ *    stacks with it (its own unit of its job with Movement left aside,
+ *    `jobOf`); each a claim on
  *    the spot (the spots in the order first claimed);
  *  - the Generalized Assignment (MathAlgorithm_GeneralizedAssignmentProblem
  *    0x8b5bf0, one pass): spot by spot each unit's gain there (`gain`, less
@@ -1513,6 +1528,7 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
     const p = pass.plan.get(u.id);
     if (!p) return;
     const moved = u.movesLeft < (u.movesFull ?? unitFullMoves(state, u));
+    const job = jobOf(state, pass, u);
     tg.forEach((T, k) => {
       const E = p.entries.find((e) => e.target === T.target);
       if (!E) return;
@@ -1524,7 +1540,7 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
         if (s.turns === 1 && moved && s.tile !== u.tileIndex) continue;
         const dom = unitDomain(u.type);
         if (state.units.some((x) => x.tileIndex === s.tile && onMap(x) && x !== T.unit
-          && !(x.seat === u.seat && x.movesLeft > 0) && unitDomain(x.type) === dom)) continue;
+          && !(x.seat === u.seat && jobOf(state, pass, x) === job && x.movesLeft > 0) && unitDomain(x.type) === dom)) continue;
         let sp = spots.find((x) => x.tile === s.tile);
         if (!sp) spots.push((sp = { tile: s.tile, claims: [], holder: -1, holderTarget: -1 }));
         sp.claims.push({ unit: i, target: k, dealt, turns: s.turns, value: 0 });

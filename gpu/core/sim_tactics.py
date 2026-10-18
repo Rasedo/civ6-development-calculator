@@ -1342,6 +1342,15 @@ class SimTactics:
         rng = self._type_ranged_range.take(ut) + self._promo_val(ut, getattr(self, f"{pre}_unit_promos")[b, s], "RANGE")
         return torch.where(self._type_ranged_strength.take(ut) > 0, rng, torch.zeros_like(rng))
 
+    def _tac_peers(self, local: torch.Tensor, pre: str = "barb") -> torch.Tensor:
+        """[B, NG] bool — the units of pool `pre` in `local` [B, P] on the
+        units' index: the units of one job (`jobOf`: an operation's, the
+        pass's)"""
+        out = torch.zeros(self.B, self.unit_seat.shape[1], dtype=torch.bool, device=self.device)
+        lo = self.POOL_LO[pre]
+        out[:, lo:lo + local.shape[1]] = local
+        return out
+
     def _tac_stacked_other(self, us: torch.Tensor, pre: str = "barb", seat: int = BARB_SEAT) -> torch.Tensor:
         """[B, T] — a military unit of `seat` (ashore, afloat or embarked)
         other than the one at local slot `us` [B] of pool `pre` holds the
@@ -1752,13 +1761,14 @@ class SimTactics:
     # --------------------------------------------------------- attack units
 
     def _tac_attack_units(self, live, done: torch.Tensor, ai: torch.Tensor, order: torch.Tensor,
-                          rowof: torch.Tensor, res: dict, tg: dict, kind: int, pre: str = "barb",
+                          rowof: torch.Tensor, res: dict, tg: dict, kind: int, peers: torch.Tensor, pre: str = "barb",
                           seat: int = BARB_SEAT) -> None:
         """ATTACK HIGH / MEDIUM / LOW PRIORITY (`attackUnits`, `kind` the
         list's LOW 1, MEDIUM 2, HIGH 3): each target of the kind in the list's
         order, its unit still standing, the units that can strike its plot
         (`strikers`) assigned over the targets of the kind within 5 of it
-        (`_tac_assign`) and the assignment carried out (`_tac_carry_out`)."""
+        (`_tac_assign`, `peers` the pass's units) and the assignment carried
+        out (`_tac_carry_out`)."""
         dev = self.device
         B, T = self.B, self.T
         P = getattr(self, f"{pre}_unit_alive").shape[1]
@@ -1820,17 +1830,18 @@ class SimTactics:
             near = isk & standing(all_e) & (self.pair_dist[t].to(torch.long) <= _ATTACK_TARGETS_RANGE).repeat(1, L)
             near &= on.unsqueeze(1)
             plain = torch.full((B,), kind != 3, dtype=torch.bool, device=dev)
-            out = self._tac_assign(cand, order, ai, near, res, rowof, unit_pl, plain, kind != 3, tg["uk"], tg["uo"], pre, seat)
+            out = self._tac_assign(cand, order, ai, near, res, rowof, unit_pl, plain, kind != 3, tg["uk"], tg["uo"], peers, pre, seat)
             self._tac_carry_out(out, done, rowof, res, pre, seat)
 
     def _tac_assign(self, cand: torch.Tensor, order: torch.Tensor, ai: torch.Tensor, near: torch.Tensor,
                     res: dict, rowof: torch.Tensor, unit_pl: torch.Tensor, exchange: torch.Tensor,
-                    survive: bool, kinds: torch.Tensor, place: torch.Tensor, pre: str = "barb",
+                    survive: bool, kinds: torch.Tensor, place: torch.Tensor, peers: torch.Tensor, pre: str = "barb",
                     seat: int = BARB_SEAT, district: bool = False) -> dict:
         """`assignTo` for the units `cand` [B, P] (in pool order) over the
         targets `near` [B, U] (the list's unit entries of `_tac_targets`'
         layers, `unit_pl`, `kinds` and `place` [B, U] each one's unit, kind
-        and place in the list's order), `exchange` [B] dropping a spot
+        and place in the list's order), `peers` [B, NG] the units of the
+        units' job (`_tac_peers`), `exchange` [B] dropping a spot
         of a losing exchange, `survive` one that would kill the unit, neither
         against a HIGH target (`kinds` the list's entry, 3): each claim a unit has on a spot
         of a target's planning entry, the Generalized Assignment of the units
@@ -1914,14 +1925,14 @@ class SimTactics:
         h4 = here.view(B, U, 1, 1)
         ok &= ~(defender.view(B, U, 1, 1) & (spot != h4))
         ok &= ~((sturn == 1) & moved.view(B, U, 1, 1) & (spot != h4))
-        # no spot another unit holds that stacks with it, its own units with
-        # Movement left aside
+        # no spot another unit holds that stacks with it, its own units of
+        # its job with Movement left aside
         spc = spot.clamp(min=0).view(B, -1)
         for pl in (self.military_at, self.embarked_at):
             x = pl.gather(1, spc)
             xs = x.clamp(min=0)
             xt = self.unit_type.gather(1, xs).clamp(min=0, max=self.NU - 1)
-            mine = (self.unit_seat.gather(1, xs) == seat) & (self.unit_mp.gather(1, xs) > 0)
+            mine = (self.unit_seat.gather(1, xs) == seat) & peers.gather(1, xs) & (self.unit_mp.gather(1, xs) > 0)
             blk = (x >= 0) & self._type_dom_mil.take(xt) & ~mine
             blk = blk.view(B, U, K, 6) & (x.view(B, U, K, 6) != tslot.view(B, 1, K, 1))
             ok &= ~blk
@@ -2537,9 +2548,12 @@ class SimTactics:
         def live() -> torch.Tensor:
             return live_all() & tac
 
+        # the pass's own units (its job): the tactical list's, no operation's
+        peers = self._tac_peers(acting & self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT) & tac
+                                & ~(self.barb_unit_op | self._bcap_members()))
         if rows.numel():
             self._tac_rampage(live, done, utribe, rowof, res, tg, order, npass)
-            self._tac_attack_units(live, done, ai, order, rowof, res, tg, 3)
+            self._tac_attack_units(live, done, ai, order, rowof, res, tg, 3, peers)
 
         # DEFEND CAMPS: each camp in plot order, its first DEFENDER by slot
         # whose reach takes it within three turns
@@ -2611,10 +2625,10 @@ class SimTactics:
                     active = has & ~there
 
         if rows.numel():
-            self._tac_attack_units(live, done, ai, order, rowof, res, tg, 2)
+            self._tac_attack_units(live, done, ai, order, rowof, res, tg, 2, peers)
         self._tac_move_to_safety(live, done, order, npass, rowof, res, danger, "barb", BARB_SEAT, False)
         if rows.numel():
-            self._tac_attack_units(live, done, ai, order, rowof, res, tg, 1)
+            self._tac_attack_units(live, done, ai, order, rowof, res, tg, 1, peers)
             self._tac_chase(live, done, rowof, res, tg, order, npass)
 
         # WANDER NEAR CAMP: by slot, each unit above EXPLORE whose camp stands
@@ -3512,6 +3526,8 @@ class SimTactics:
         # its operations' run once the pass has its units' planning: their
         # units' turns are the operations'
         self._mops_run(s, act, op, done)
+        # the pass's own units (its job): no operation's
+        peers = self._tac_peers(units & ~self._mops_held(s), pre)
 
         def live() -> torch.Tensor:
             return units & ~done & alive & (self.major_unit_seat == seat)
@@ -3526,14 +3542,14 @@ class SimTactics:
         # ATTACK HIGH PRIORITY, MOVE TO SAFETY, ATTACK MEDIUM and LOW PRIORITY
         # (the attacks where a foe stands near)
         if tg is not None:
-            self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 3, pre, seat)
+            self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 3, peers, pre, seat)
         self._tac_move_to_safety(live, done, order, npass, op["rowof"], op["res"], danger, pre, seat, False)
         if tg is not None:
-            self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 2, pre, seat)
+            self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 2, peers, pre, seat)
         # PROMOTION
         self._tac_promotion(live, done, pre)
         if tg is not None:
-            self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 1, pre, seat)
+            self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 1, peers, pre, seat)
         # HEAL: a hurt unit not embarked on a plot of no danger holds its
         # plot; a hull outside its own waters heads for its city
         hp_max = int(self.rules.combat["unitHp"])
@@ -3606,6 +3622,8 @@ class SimTactics:
             units, order, npass = op["units"], op["order"], op["npass"]
             done = torch.zeros_like(units)
             homes = self._free_homes()
+            # the pass's own units (its job)
+            peers = self._tac_peers(units, pre)
 
             def live() -> torch.Tensor:
                 return units & ~done & self.barb_unit_alive & (self.barb_unit_seat == seat)
@@ -3615,10 +3633,10 @@ class SimTactics:
             ai = torch.where(units, torch.where(self.barb_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
             if op["tg"] is not None:
                 for kind in (3, 2):
-                    self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], op["tg"], kind, pre, seat)
+                    self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], op["tg"], kind, peers, pre, seat)
             self._tac_move_to_safety(live, done, order, npass, op["rowof"], op["res"], op["danger"], pre, seat, False)
             if op["tg"] is not None:
-                self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], op["tg"], 1, pre, seat)
+                self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], op["tg"], 1, peers, pre, seat)
             for j in range(int(npass.max()) if B else 0):
                 u_b = order[:, j]
                 home = homes[bidx, u_b]

@@ -5225,7 +5225,12 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   its damage (1.1 in 24.8); for MEDIUM / LOW a spot whose received (taken +
   back taken) tops the dealt (dealt + back dealt), or the unit's health, is
   dropped; a unit that moved with turns 1 only its own plot; the stacking
-  block; claims in unit, target, spot order. ONE pass of the Generalized
+  block (0x776890..0x776909: a unit on the spot not the target, of the
+  mover's formation class, blocks unless it is the player's, in the mover's
+  job — unit +0x7d0, the pass's, an operation's — with Movement left
+  +0xdb0: a unit raised this turn, in no job, blocks; runs/h1_duelw1124 t11,
+  the camp at 40:21's new Slinger on 41:22 keeps the Warrior at 41:21 off
+  its spot there); claims in unit, target, spot order. ONE pass of the Generalized
   Assignment (0x8b5bf0): the gain λ 0x7702b0 (dealt / turns, a kill +100,
   an overkill (health - damage) + 100, a barbarian target x 0.8, less what
   the unit holds assigned; early out where the unit already claims the
