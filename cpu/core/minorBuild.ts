@@ -815,8 +815,9 @@ export function minorSetItem(state: GameState, cityState: CityState, item: Exclu
 
 /** May the minor's queue take the item now (0x5c9ea0 / 0x5ca170 / 0x5ca5a0 /
  *  0x5ca450)? A building it may raise, a district its plot takes, a unit it
- *  may train, a project it may run. */
-export function minorQueueOk(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): boolean {
+ *  may train, a project it may run; with `placed` a district its plot
+ *  already holds, the plot's resources asking nothing. */
+export function minorQueueOk(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>, placed = false): boolean {
   const unlocks = computeUnlocksIn(cityState.research, []); // a MINOR carries no roster row
   if ('building' in item) {
     const worship = minorWorship(state, cityState);
@@ -825,7 +826,7 @@ export function minorQueueOk(state: GameState, cityState: CityState, item: Exclu
   if ('district' in item) {
     if (item.site < 0) return false;
     const owns = (t: Tile) => tileSeat(t) === cityState.seat;
-    return canPlaceDistrictIn(state, minorCity(cityState), item.district, item.site, { unlocks, ownsTile: owns }).ok;
+    return canPlaceDistrictIn(state, minorCity(cityState), item.district, item.site, { unlocks, ownsTile: owns, placed }).ok;
   }
   if ('unit' in item) return minorCanTrain(state, cityState, item.unit);
   if ('project' in item) {
@@ -1425,8 +1426,9 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
       }
     }
   } else if ('district' in item) {
-    // the plot no longer takes it: the item leaves the queue
-    if (!minorQueueOk(state, cityState, item)) {
+    // the plot no longer takes it: the item leaves the queue (a resource
+    // seen since it was placed does not refuse it)
+    if (!minorQueueOk(state, cityState, item, true)) {
       minorSetItem(state, cityState, null);
       return false;
     }

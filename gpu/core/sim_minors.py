@@ -1153,13 +1153,15 @@ class SimMinors:
             ok = ok & ((u0 != self._archaeologist_idx) | has)
         return ok
 
-    def _minor_district_plane(self, s: int, dv: int, own: bool, research: bool) -> torch.Tensor:
+    def _minor_district_plane(self, s: int, dv: int, own: bool, research: bool,
+                              placed: bool = False) -> torch.Tensor:
         """[B, T] — `canPlaceDistrictIn` of district `dv` in minor `s`'s city
         on each plot: with `own` the minor's own plots alone, else any; with
         `research` its research unlocks the district and clears the plot's
         feature, else neither is asked. Within three of the centre and not
         on it, no district, centre or wonder there, a bonus resource at most
-        (an unseen one plain ground), the district's surface and placement
+        (an unseen one plain ground; with `placed`, a district the plot
+        already holds, no resource asked), the district's surface and placement
         (`_district_elig`), one of a type to the city (a repeatable one
         aside), a specialty district under the population's limit."""
         row = self._CITY_MINOR0 + s
@@ -1170,8 +1172,9 @@ class SimMinors:
         ut, uc, plc = sc[dv]
         center = self.citystate_center[:, s].clamp(min=0)
         base = ((self.district < 0) & (self.built_wonder < 0) & ~self._centre_plane()
-                & ((self.res_priority <= 1) | self._res_hidden(row))
                 & (self.pair_dist[center] <= 3) & (self.citystate_center[:, s] >= 0).unsqueeze(1))
+        if not placed:
+            base = base & ((self.res_priority <= 1) | self._res_hidden(row))
         if own:
             base = base & (self.tile_seat == 100 + s)
         if research:
@@ -1191,11 +1194,13 @@ class SimMinors:
             ok = ok & (spec < torch.div(self.city_pop[:, row, 0].long() - 1, 3, rounding_mode="floor") + 1)
         return elig & ok.unsqueeze(1)
 
-    def _minor_queue_ok(self, s: int, key: torch.Tensor, site: torch.Tensor) -> torch.Tensor:
+    def _minor_queue_ok(self, s: int, key: torch.Tensor, site: torch.Tensor,
+                        placed: bool = False) -> torch.Tensor:
         """[B] — `minorQueueOk`: may the minor's queue take the item now? A
         building it may raise (a worship building only the one its religion
-        offers), a district its plot takes, a unit it may train, a project it
-        may run (the walls' repair while available)"""
+        offers), a district its plot takes (with `placed` one the plot
+        already holds, its resources asking nothing), a unit it may train, a
+        project it may run (the walls' repair while available)"""
         row = self._CITY_MINOR0 + s
         is_u, is_b, is_d, is_p, _is_r = self._mk_kinds(key)
         ok = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -1211,7 +1216,7 @@ class SimMinors:
             for dv in sorted({int(x) - self._mk_d0 for x in key[is_d].tolist()}):
                 m = is_d & (key == self._mk_d0 + dv) & (site >= 0)
                 if bool(m.any()):
-                    pl = self._minor_district_plane(s, dv, True, True)
+                    pl = self._minor_district_plane(s, dv, True, True, placed)
                     ok = ok | (m & pl.gather(1, site.clamp(min=0).unsqueeze(1)).squeeze(1))
         if bool(is_p.any()):
             P = self._mb_proj()
@@ -1470,7 +1475,7 @@ class SimMinors:
         m = done & is_d
         if bool(m.any()):
             site = self.citystate_prod_site[:, s]
-            ok = self._minor_queue_ok(s, item, site)
+            ok = self._minor_queue_ok(s, item, site, placed=True)
             gone = m & ~ok
             if bool(gone.any()):
                 self._minor_set_item(s, gone, -1)

@@ -542,7 +542,7 @@ export function canPlaceDistrictIn(
   city: City,
   type: DistrictId,
   tileIndex: number,
-  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean },
+  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean; placed?: boolean },
 ): RuleResult {
   const map = state.map;
   const def = DISTRICTS[type];
@@ -610,8 +610,11 @@ export function canPlaceDistrictIn(
   }
 
   // CIV6 (Resources.PrereqTech): a strategic the city's seat cannot see yet
-  // is plain ground — the district may stand on it (the resource is lost)
-  if (tile.resource && !hiddenResourcesFor(state, city.seat).has(tile.resource)) {
+  // is plain ground — the district may stand on it (the resource is lost);
+  // a district already placed is not refused by a resource its owner has
+  // seen since (`placed`: runs/h1_duelw1128 Nazca's Holy Site on 473, laid
+  // t14 on Horses unseen, completes t15 after Animal Husbandry)
+  if (!opts.placed && tile.resource && !hiddenResourcesFor(state, city.seat).has(tile.resource)) {
     const cat = RESOURCES[tile.resource].category;
     if (cat !== 'bonus') return no(`Cannot build over a ${cat} resource.`);
   }
