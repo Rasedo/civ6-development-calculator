@@ -2552,6 +2552,17 @@
           "note": "the turn the minor's city was founded (city +0x2600, m_iTurnFounded); -99 for none"
         },
         {
+          "name": "minorStockpile",
+          "compare": "exact",
+          "covers": [
+            "CityState.stockpile"
+          ],
+          "planes": [
+            "citystate_stockpile"
+          ],
+          "note": "the minor's strategic stockpiles, dense over STRATEGIC_IDS: its own improved sources' accrual, the turn end's cap, its units' costs where they are covered"
+        },
+        {
           "name": "minorCitizens",
           "compare": "exact",
           "covers": [

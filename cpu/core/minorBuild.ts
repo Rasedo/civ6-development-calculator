@@ -67,7 +67,7 @@ import { RESOURCES, extractsResource } from '../../world/resources';
 import { unitProductionTable } from './aiUnitProduction';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, unitTable, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
-import { upgradeGoldCost } from './stockpile';
+import { accrueStockpiles, canPayStockpile, capStockpiles, spendStockpile, unitResourceCost, upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { cityGrowth, majorView, storeUnitStrength } from './majorView';
 import { governmentValues } from './aiPolicyValue';
@@ -97,6 +97,11 @@ export function minorPhase(state: GameState): void {
   for (const cityState of state.cityStates) {
     atRngPoint(state, { kind: 'seat', seat: cityState.seat, turn: state.turn });
     minorLevyReturn(state, cityState);
+    // its strategic resources, before anything reads them: every improved
+    // source of its own pays into its stockpile, as a major's does
+    // (Player_Resources is every player's; runs/h1_duelw1121 Hunza's one
+    // Horses Pasture from t20)
+    accrueStockpiles(state, cityState.seat);
     minorPower(state, cityState);
     const gained = minorEconomy(state, cityState);
     storeUnitStrength(state, cityState.seat);
@@ -125,6 +130,8 @@ export function minorPhase(state: GameState): void {
     // the boosts its turn earned (runs/h1_duelw1117 t1: every city-state
     // takes Pottery before its coastal city's Sailing eureka lands)
     detectBoosts(state, cityState.seat);
+    // its turn's end holds each stockpile to its cap (0x4a8f10)
+    capStockpiles(state, cityState.seat);
   }
 }
 
@@ -187,9 +194,9 @@ function sendLevyHome(state: GameState, cityState: CityState): void {
 
 /**
  * THE MINOR'S GRID (`cityPower` over its one city). CIV6 (Power): the load is
- * met all at once or not at all. A city-state holds no stockpile, so no power
- * plant can run for it; its renewables (a Dam, the Solar and Wind Farms on its
- * plots) must carry the whole load — or a running `fullyPowered` project
+ * met all at once or not at all. No power plant runs for a city-state (its
+ * stockpile feeds none); its renewables (a Dam, the Solar and Wind Farms on
+ * its plots) must carry the whole load — or a running `fullyPowered` project
  * (Industrial Zone Logistics) meets it, as a major's does.
  */
 export function minorPower(state: GameState, cityState: CityState): void {
@@ -1421,6 +1428,11 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
     built = unit.id;
     applyTrainingGrants(state, minorCity(cityState), unit);
     if (item.unit === 'BUILDER') cityState.buildersTrained += 1;
+    // its strategic resource, where the stockpile covers it (the queue's
+    // reservation 0x17f3a0, charged at the completion; a city-state trains
+    // the unit without it)
+    const cost = unitResourceCost(item.unit);
+    if (cost && canPayStockpile(state, cityState.seat, cost.id, cost.n)) spendStockpile(state, cityState.seat, cost.id, cost.n, 'mu');
   } else if ('building' in item) {
     const b = BUILDINGS[item.building];
     cityState.buildings = [...(cityState.buildings ?? []), item.building];

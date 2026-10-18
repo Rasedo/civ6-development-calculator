@@ -991,6 +991,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorProdSite: overCityStates((cityState) => cityState.prodSite ?? -1),
   minorProdSet: overCityStates((cityState) => cityState.prodSetValue ?? FX_MIN_RAW),
   minorFounded: overCityStates((cityState) => cityState.foundedTurn ?? -99),
+  minorStockpile: overCityStates((cityState) => [...(cityState.stockpile ?? emptyStockpile())]),
   minorCitizens: overCityStates((cityState) => [cityState.favoredFood ? 1 : 0, cityState.idleCitizens ?? 0,
     ...PLACEABLE_DISTRICTS.map((_t, di) => Math.max(0, cityState.specialistPref?.[di] ?? 0))]),
   minorThreat: overCityStates((cityState) => cityState.threat ?? -1),

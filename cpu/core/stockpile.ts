@@ -16,8 +16,8 @@ import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor } from '../data/building
 import { GP_CITY_FREE_EXTRACTION, GP_FREE_EXTRACTION, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { governorSum, governorTileSum } from './governors';
 import { extractsResource, resourceImprovement } from '../../world/resources';
-import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
-import { regionalReach, suzerainEffectCount, suzerainMinorSeats } from './cityStates';
+import { citiesOf, civOf, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
+import { minorCity, regionalReach, suzerainEffectCount, suzerainMinorSeats } from './cityStates';
 import { HATTUSA_FREE_STRATEGIC } from '../data/cityStates';
 import { hexDistance } from '../../world/hex';
 import { getModifiers } from './effects';
@@ -28,6 +28,13 @@ import { cityHasLiveDistrict, cityImprovedResourceKinds, cityPower, darkBuilding
 import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
 import { ageReactors } from './disasters';
 import type { City, GameState, Seat, Tile, Unit } from './types';
+
+/** the cities whose buildings raise a seat's cap: a city-state's own one */
+function capCities(state: GameState, seat: number): City[] {
+  if (!isCityStateSeat(seat)) return citiesOf(state, seat);
+  const cs = state.cityStates.find((c) => c.seat === seat);
+  return cs ? [minorCity(cs)] : [];
+}
 
 export function strategicSlot(resourceId: string | undefined): number {
   return resourceId ? STRATEGIC_IDS.indexOf(resourceId) : -1;
@@ -48,11 +55,12 @@ export function stockOf(state: GameState, seat: number, resourceId: string): num
  * but constructing Encampment buildings in your empire (Barracks, Armory,
  * etc.) will increase your maximum stockpile by 10 per building for all
  * resources." A building in a pillaged district is dark here for every other
- * purpose, so it does not raise the ceiling either.
+ * purpose, so it does not raise the ceiling either. A city-state's one city
+ * counts as a major's do.
  */
 export function stockpileCap(state: GameState, seat: number): number {
   let n = 0;
-  for (const city of citiesOf(state, seat)) {
+  for (const city of capCities(state, seat)) {
     const dark = darkBuildings(state.map, city);
     for (const id of city.buildings) {
       if (BUILDINGS[id]?.district === 'ENCAMPMENT' && !dark.has(id)) n += 1;
@@ -61,7 +69,7 @@ export function stockpileCap(state: GameState, seat: number): number {
   // CIV6 (EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP): the roster's per-building rows
   let extra = 0;
   for (const r of getModifiers(state, seat).stockpileCap) {
-    for (const city of citiesOf(state, seat)) if (city.buildings.includes(r.building)) extra += r.amount;
+    for (const city of capCities(state, seat)) if (city.buildings.includes(r.building)) extra += r.amount;
   }
   return STOCKPILE_CAP_BASE + STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING * n + extra;
 }

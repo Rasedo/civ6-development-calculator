@@ -11,7 +11,9 @@ class SimMinors:
         # each minor in turn — the `minorPhase` order, one minor at a time
         # because a district one minor lands may lend a neighbour's district
         # adjacency across the border: its levied army home when due, its
-        # grid; its economy and the research it completes; its city — the
+        # strategic resources' income (`_seat_accrue_stockpile`, a major's
+        # body over its own bank), its grid; its economy and the research it
+        # completes; its city — the
         # step works the item in hand, then growth and borders on the city as
         # it stands after that (its city presses a religion it follows on the
         # founder's turn); its military AI's Combat Desire; its savings and
@@ -21,13 +23,15 @@ class SimMinors:
         # its builds, purchases and trees, the trees' Builders' work), its
         # trade routes, its city's ranged strikes (the majors' own body,
         # `cityStrikes`), its units' tactical turn; its look again; and the
-        # boosts the turn earned (`_detect_minor_boosts`)
+        # boosts the turn earned (`_detect_minor_boosts`); its turn's end
+        # holds each stockpile to its cap (`_seat_cap_stockpile`)
         col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for s in range(self.S):
             alive = self.citystate_alive[:, s]
             if not bool(alive.count_nonzero()):
                 continue
             self._minor_levy_return(s)
+            self._seat_accrue_stockpile(self._CITY_MINOR0 + s)
             self._minor_power(s)
             gained = self._minor_economy(s)
             self._store_unit_strength(s, alive)
@@ -51,6 +55,7 @@ class SimMinors:
             self._minor_knowledge(s, False)
             # the boosts its turn earned
             self._detect_minor_boosts(s, alive)
+            self._seat_cap_stockpile(self._CITY_MINOR0 + s)
 
     def _detect_minor_boosts(self, s: int, active: torch.Tensor) -> None:
         """`detectBoosts` for city-state `s`: every trigger read off the state
@@ -273,8 +278,8 @@ class SimMinors:
 
     def _minor_power(self, s: int) -> None:
         """`minorPower` — CIV6 (Power): the minor city's load is met all at
-        once or not at all. A city-state holds no stockpile, so no plant runs
-        for it: its renewables — a Dam's supply, the generators on its own
+        once or not at all. No plant runs for a city-state (its stockpile
+        feeds none): its renewables — a Dam's supply, the generators on its own
         plots — carry the whole load (`cityPower`'s fuel-free half, the
         governor, wonder and suzerain terms a city-state never holds aside),
         or a running `fullyPowered` project meets it."""
@@ -1486,6 +1491,18 @@ class SimMinors:
             uid = torch.where(landed, self.POOL_LO["major"] + slot0, uid)
             u_row = torch.where(landed, T["engine_row"].to(dev).take(ui), u_row)
             fin = fin | landed
+            # its strategic resource, where the stockpile covers it (the
+            # queue's reservation 0x17f3a0, charged at the completion; a
+            # city-state trains the unit without it)
+            if self._n_strategic:
+                slot = self._type_res_slot.take(ui)
+                cost = self._type_res_cost.take(ui)
+                bank = self.citystate_stockpile[:, s]
+                have = bank.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
+                pay = landed & (slot >= 0) & (cost > 0) & (have >= cost)
+                if bool(pay.count_nonzero()):
+                    bank.scatter_add_(1, slot.clamp(min=0).unsqueeze(1), -(pay.long() * cost).unsqueeze(1))
+                    self._log_stock(pay.nonzero(as_tuple=True)[0], row, slot[pay], "mu")
         m = done & is_b
         if bool(m.any()):
             bi = (item - self._mk_b0).clamp(min=0, max=int(rd.b_cost.shape[0]) - 1)

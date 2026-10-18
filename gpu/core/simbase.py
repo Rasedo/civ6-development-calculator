@@ -1121,7 +1121,7 @@ _MUTABLE = [
     "civ_citizen_names",  # the citizen names each major has given (its Spies, its Archaeologists, its storms)
     "civ_goody_kinds",  # the villages each major has had of each kind (the kind draw halves on them)
     "space_ly", "civ_orbital_lasers", "city_lasers",  # the Exoplanet flight: LY travelled, the seat's orbital stations, the terrestrial ones per city
-    "civ_stockpile", "civ_fuel_short", "city_powered",  # GS strategic banks, the slots short at the last fuel bill, and the grid they run
+    "civ_stockpile", "citystate_stockpile", "civ_fuel_short", "city_powered",  # GS strategic banks, the slots short at the last fuel bill, and the grid they run
     "civ_wmd",  # nuclear devices held, dense over the device catalog
     "tile_fallout",  # turns of radioactive fallout still on a tile
     "district_dead",  # captured districts are paved-but-dead

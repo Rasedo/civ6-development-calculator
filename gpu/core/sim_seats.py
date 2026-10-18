@@ -10248,7 +10248,10 @@ class SimSeats:
         # accrues nothing, whatever stands on its tile
         owned = ((self.tile_seat == int(self._ROW_SEAT[row])) & self._res_extracting()
                  & ~self._res_hidden(row))
-        bank = self.civ_stockpile[:, row]
+        bank = self._stock_bank(row)
+        # a city-state's row holds none of the majors' dedications, governors,
+        # Great People or suzerain rows
+        maj = row < self.n_majors
         for k, (rid, rate) in enumerate(zip(self._strat_rid, self._strat_rate)):
             here = owned & (self.res_id == rid)
             n = here.sum(dim=1)
@@ -10257,9 +10260,9 @@ class SimSeats:
                 # Aluminum mines accumulate +2 and Uranium mines +1 more per
                 # turn, so the bonus rides the SOURCE COUNT, not the seat.
                 per = torch.full_like(n, rate)
-                if k == self._sky_alu_slot:
+                if k == self._sky_alu_slot and maj:
                     per = per + self._golden_ded(row, self._ded_sky).long() * self._sky_alu_rate
-                if k == self._auto_ura_slot:
+                if k == self._auto_ura_slot and maj:
                     per = per + self._golden_ded(row, self._ded_automaton).long() * self._auto_ura_mine
                 # CIV6 (EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION_SPECIFIC_RESOURCE):
                 # the roster's flat add for this resource (`STOCKPILE_RATE_ROWS`)
@@ -10271,7 +10274,7 @@ class SimSeats:
                 if row < self.n_majors:
                     per = per + self._gov_mods(row)[12]["stockps"][:, k].round().long()
                 pt = here.long() * per.unsqueeze(1)  # [B, T] — each accruing tile's own rate
-                if self.n_governors:
+                if self.n_governors and maj:
                     # CIV6 (Defense Logistics): "Accumulating Strategic
                     # resources gain an additional +1 per turn" — per accruing
                     # tile of the governed city.
@@ -10328,30 +10331,30 @@ class SimSeats:
                     bank[:, k] += (_held & (_cnt > 0)).sum(dim=1) * int(_zamt)
         # CIV6 (Automaton Warfare, Golden face): "Receive 3 Uranium per turn" —
         # a standing grant, owed whether or not the seat mines any.
-        if self._auto_ura_slot >= 0:
+        if self._auto_ura_slot >= 0 and maj:
             bank[:, self._auto_ura_slot] += (
                 self._golden_ded(row, self._ded_automaton).long() * self._auto_ura_rate)
         # CIV6 (MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_EXTRACTION): a spent Great
         # Person's standing grant — the seat's own, then (Rockefeller) each held
         # city's (`GP_FREE_EXTRACTION`)
-        for _fk, _fs in self._gp_free_extraction:
+        for _fk, _fs in (self._gp_free_extraction if maj else ()):
             if _fk >= 0 and 0 <= _fs < bank.shape[1]:
                 bank[:, _fs] += self._gp_perm(row, self._gp_perm_names[_fk]).long()
-        for _fk, _fs in self._gp_city_free_extraction:
+        for _fk, _fs in (self._gp_city_free_extraction if maj else ()):
             if _fk >= 0 and 0 <= _fs < bank.shape[1]:
                 _cp = self.city_gp_perm[:, row, : self.RC, _fk].long()
                 bank[:, _fs] += (_cp * self.city_alive[:, row, : self.RC].long()).sum(dim=1)
         # CIV6 (Future Victory Science, MODIFIER_SINGLE_CITY_ADJUST_FREE_RESOURCE_EXTRACTION):
         # each city holding a live district of the row's type (`extractionWithDistrict`)
-        for _eon, _ed, _es, _en in self._gov_mods(row)[12]["dext"]:
+        for _eon, _ed, _es, _en in (self._gov_mods(row)[12]["dext"] if maj else ()):
             if _es < bank.shape[1]:
                 _has = (self._dist_counts(row)[:, : self.RC, _ed] > 0) & self.city_alive[:, row, : self.RC]
                 bank[:, _es] += (_has & _eon.unsqueeze(1)).long().sum(dim=1) * _en
         # CIV6 (Hattusa, MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_IMPORT_EXTRACTION
         # under PLAYER_HAS_NO_IMPROVED_<R>): each strategic the suzerain sees
         # and improves on none of its own plots pays it a standing amount
-        _hat = self._suz_effect_count(row, self._suz_c_free_strat)
-        if bool(_hat.count_nonzero()):
+        _hat = self._suz_effect_count(row, self._suz_c_free_strat) if maj else None
+        if _hat is not None and bool(_hat.count_nonzero()):
             _techs = self._seat_techs(row)
             for k, rid in enumerate(self._strat_rid):
                 _rt = int(self._res_reveal_tech[rid])
@@ -10366,11 +10369,18 @@ class SimSeats:
             for _k in range(bank.shape[1]):
                 self._log_stock(range(self.B), row, _k, "ac")
 
+    def _stock_bank(self, row: int) -> torch.Tensor:
+        """[B, K] — the strategic banks of seat row `row`, a view: a major's
+        (`civ_stockpile`), a city-state's (`citystate_stockpile`)"""
+        if row < self.n_majors:
+            return self.civ_stockpile[:, row]
+        return self.citystate_stockpile[:, row - self._CITY_MINOR0]
+
     def _seat_cap_stockpile(self, row: int) -> torch.Tensor:
         """THE TURN END's cap (`capStockpiles`): each strategic bank over
         `_stockpile_cap` is handed back to the cap. [B] bool — was any slot
         over (the hand-back that rebuilds the luxury allocation)."""
-        bank = self.civ_stockpile[:, row]
+        bank = self._stock_bank(row)
         if self._n_strategic == 0:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         cap = self._stockpile_cap(row).unsqueeze(1)
@@ -14046,7 +14056,7 @@ class SimSeats:
                 continue
             self._diff_events.setdefault(int(_b), []).append(
                 f"sk:{int(self._ROW_SEAT[row])}:{int(self.turn)}:{int(_k)}:{tag}"
-                f" {int(self.civ_stockpile[_b, row, _k])}")
+                f" {int(self._stock_bank(row)[_b, _k])}")
 
     def _log_pop(self, rows, row: int, cols, tag: str) -> None:
         """`logPopWrite`'s twin — WHICH writer moved this city's count, keyed
