@@ -29,7 +29,7 @@
  * from the game's draw log where the recording kept it.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import type { BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Unit } from '../core/types';
+import type { BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Tile, Unit } from '../core/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { NO_SEAT, type Governor } from '../core/types';
@@ -40,7 +40,7 @@ import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, uni
 import { completeQueueItem } from '../core/production';
 import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
-import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
+import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, seatGovernment, darkAgeEra,
@@ -1837,10 +1837,9 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         break;
       }
       case 'worked': {
-        // a city-state's citizens are its script's decision as a major's
-        // are its player's
-        const minor = state.cityStates.find((x) => x.centerIndex === d.city);
-        const city = cityAt(state, d.city) ?? (minor ? minorCity(minor) : undefined);
+        // a city-state's citizens are the engine's citizen manager's
+        // (cpu/core/citizens.ts), never imposed
+        const city = cityAt(state, d.city);
         if (!city) break;
         for (const t of state.map.tiles) {
           if (t.ownerSeat !== city.seat || t.ownerCity !== city.id) continue;
@@ -1879,6 +1878,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
             builder.charges = (builder.charges ?? 0) - 1;
             if (builder.charges <= 0) disbandUnit(state, builder.id);
           }
+          replaceOwnerCitizens(state, t);
           count(ctx, 'minorAi:improve', 'fallback', d.player, `plot ${d.plot}: the engine laid none of ${want}`);
           break;
         }
@@ -2970,7 +2970,16 @@ function undoMinorPlots(ctx: Ctx, before: (string | null)[], charges: Map<Unit, 
     t.improvement = next.state.map.tiles[t.index].improvement;
     count(ctx, 'minorAi:improve', 'fallback', ctx.playerOfSeat.get(t.ownerSeat), `plot ${t.index}: the engine laid ${was}, the game ${t.improvement}`);
     if (was) refund(t.index);
+    replaceOwnerCitizens(state, t);
   }
+}
+
+/** an improvement the replay lays or undoes in a city-state's plot
+ *  re-places that city-state's citizens, as its own laying does
+ *  (`minorBuilderLays`) */
+function replaceOwnerCitizens(state: GameState, t: Tile): void {
+  const owner = state.cityStates.find((c) => c.seat === t.ownerSeat);
+  if (owner) minorReplaceCitizens(state, owner);
 }
 
 /** THE DEDICATIONS are each player's pick at its age's start, which the
