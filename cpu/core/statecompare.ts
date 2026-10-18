@@ -38,7 +38,8 @@
 imports this.
  */
 import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
-import { LUXURY_IDS } from '../../world/resources';
+import { LUXURY_IDS, RESOURCES } from '../../world/resources';
+import { installType } from './minorBuild';
 import { wonderExtraSlots } from './effects';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -977,6 +978,9 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorThreat: overCityStates((cityState) => cityState.threat ?? -1),
   minorCombatDesire: overCityStates((cityState) => cityState.combatDesire ?? 0),
   minorStandingArmyShort: overCityStates((cityState) => cityState.standingArmyShort ?? 0),
+  minorUnitValues: overCityStates((cityState) => [...(cityState.unitValues ?? [])]),
+  minorResourceCounts: overCityStates((cityState) =>
+    Object.keys(RESOURCES).map((id) => cityState.resourceCounts?.[installType('resource', id, 'RESOURCE_')] ?? 0)),
   minorSavings: overCityStates((cityState) => [...(cityState.economy?.savings ?? [0, 0, 0, 0]), cityState.economy?.balance ?? 0]),
   minorAiSlots: overCityStates((cityState) => cityAiSlots(cityState)),
   minorAiTrees: overCityStates((cityState, state) => cityAiTrees(cityState, state)),

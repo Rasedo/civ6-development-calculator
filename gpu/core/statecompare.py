@@ -991,6 +991,9 @@ CITY_STATE = {
     "minorThreat": lambda sim, b, rows: [int(sim.citystate_threat[b, s]) for s in rows],
     "minorCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, s]) for s in rows],
     "minorStandingArmyShort": lambda sim, b, rows: [int(sim.citystate_standing_short[b, s]) for s in rows],
+    "minorUnitValues": lambda sim, b, rows: [[int(x) for x in sim.citystate_unit_values[b, s].tolist()]
+                                             if bool(sim.citystate_unit_on[b, s]) else [] for s in rows],
+    "minorResourceCounts": lambda sim, b, rows: [[int(x) for x in sim.citystate_res_counts[b, s].tolist()] for s in rows],
     "minorSavings": lambda sim, b, rows: [[int(x) for x in sim.citystate_savings[b, s].tolist()] + [int(sim.citystate_balance[b, s])]
                                           for s in rows],
     "minorAiSlots": lambda sim, b, rows: [[int(x) for x in sim.cai_slots[b, s].tolist()] for s in rows],

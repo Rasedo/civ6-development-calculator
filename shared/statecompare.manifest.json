@@ -2540,6 +2540,29 @@
           "note": "the count the minor city's standing army lacks (CityBuildAI +0x2d8)"
         },
         {
+          "name": "minorUnitValues",
+          "compare": "exact",
+          "covers": [
+            "CityState.unitValues"
+          ],
+          "planes": [
+            "citystate_unit_values",
+            "citystate_unit_on"
+          ],
+          "note": "the minor city's UNITS table as its city AI's last turn left it, raw 24.8 in the AI unit rows' order; empty before its first"
+        },
+        {
+          "name": "minorResourceCounts",
+          "compare": "exact",
+          "covers": [
+            "CityState.resourceCounts"
+          ],
+          "planes": [
+            "citystate_res_counts"
+          ],
+          "note": "the minor city's unimproved resources' counts as its city AI's last update counted them (CityBuildAI +0x978), per resource in the resource rows' order; zeros before its first count"
+        },
+        {
           "name": "minorSavings",
           "compare": "exact",
           "covers": [
