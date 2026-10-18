@@ -284,9 +284,10 @@ const flag = (args: Readonly<Record<string, string>>, name: string, dflt: boolea
 /** the percent `a` (24.8) of `v` (24.8), the fixed-point x a / 100 (0x6c8e60) */
 const pct = (v: number, a: number): number => Math.trunc((v * a) / (100 * FX));
 
-/** the Amenity value's turn in a city of the player (0x79f7c0's, one Amenity) */
-const amenityTurn = (t: ValueTerms, c: { balance: number; yields: Readonly<Record<string, number>> }): number =>
-  amenityPerTurn({ view: t.view, seat: t.seat }, c);
+/** the Amenity value's turn in a city of the player (0x79f7c0's, `n`
+ *  Amenities) */
+const amenityTurn = (t: ValueTerms, c: { balance: number; yields: Readonly<Record<string, number>> }, n = 1): number =>
+  amenityPerTurn({ view: t.view, seat: t.seat }, c, n);
 
 const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // 0x6a8320 (the Luxury Policy, A): on the player's own subject, with a
@@ -698,6 +699,20 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const v = fmul(yieldValue(t.view, t.seat, fmul(pctOf(args), culture), 'YIELD_CULTURE'), fxConst(0.5));
     return whole(span(t, v));
   },
+  // 0x6b45a0: a city subject (the context's city, +0x70, the walk sets it);
+  // the Amount's Amenities more in it (0x79f7c0) from the start to the
+  // horizon (0x7a2140)
+  EFFECT_ADJUST_POLICY_AMENITY: (t, args, s) => {
+    if (s.kind !== 'city') return 0;
+    const v = amenityTurn(t, t.view.cityAmenity(s.seat, s.id), Number(args.Amount ?? 0) | 0);
+    return whole(valueBetween(v, t.start, t.horizon, t.rate));
+  },
+  // 0x6b5eb0: a city subject; one Housing more where the Amount is above 0,
+  // none else (`setg`: the Amount itself is not passed), at its population,
+  // from the start to the horizon (0x7a3d70 on its CityBuildAI's growth
+  // forecast)
+  EFFECT_ADJUST_POLICY_HOUSING: (t, args, s) =>
+    s.kind === 'city' ? whole(t.view.cityHousingValue(s.seat, s.id, (Number(args.Amount ?? 0) | 0) > 0 ? 1 : 0, t.start, t.horizon)) : 0,
   // 0x6beb00: a city subject's Food surplus (its growth object's 0x1b5620),
   // with none 2.0, x fx(Amount x 0.01), as bare Food from the start to the
   // horizon (0x7a2140)

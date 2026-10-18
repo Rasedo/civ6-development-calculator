@@ -26,7 +26,7 @@ import { FX, fxOf, turnsAt } from './aiValue';
 import { unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
 import { civicAnalysis } from './aiCivics';
-import { majorView, type MajorViewInputs } from './majorView';
+import { cityGrowth, majorView, type MajorViewInputs } from './majorView';
 import { analysedTurns, installType, promotionWeight } from './minorBuild';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost } from './economy';
@@ -151,13 +151,7 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
     return unique ? unique.type : u;
   };
   const mods = getModifiers(state, seat);
-  const growth = {
-    surplus: fxOf(stats.foodSurplus),
-    housing: stats.housing,
-    population: city.population,
-    stored: fxOf(city.foodBox),
-    multiplier: stats.foodSurplus > 0 ? Math.round((stats.effectiveFoodSurplus / stats.foodSurplus) * FX) : FX,
-  };
+  const growth = cityGrowth(state, city);
   return {
     view,
     seat,

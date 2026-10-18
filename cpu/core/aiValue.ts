@@ -261,6 +261,9 @@ export interface AiValueView {
   /** a city's Amenity balance (have less needed) and its yields by
    *  YieldType, as the Amenity value reads them (0x79f7c0) */
   cityAmenity(seat: number, cityId: number): { balance: number; yields: Readonly<Record<string, number>> };
+  /** `housing` more in a city from `t` to `h` (0x7a3d70 on its growth and
+   *  its CityBuildAI's growth forecast), raw */
+  cityHousingValue(seat: number, cityId: number, housing: number, t: number, h: number): number;
   /** the seat's Great Person points a turn toward a class
    *  (GREAT_PERSON_CLASS_*) */
   greatPersonPointsPerTurn(seat: number, cls: string): number;

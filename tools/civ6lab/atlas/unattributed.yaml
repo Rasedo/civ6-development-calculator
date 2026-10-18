@@ -4646,6 +4646,27 @@
   context:
     - "...(+0x2e0) and its district (0x810d0) has DistrictInfo +0x58 set — the HitPoints column (0xabfc20, Districts column 0x16; the install: CITY_CENTER 200, ENCAMPMENT 100, IKANDA 100). Ag..."
   review: imported
+- addr: 0xac62c0
+  final: 0x7c1500
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: "Logged (runs/h1_duelw1121, 1124, 1127, 1128 minors' Civil   Prestige): every city staying in its level reads 14, PSEUDOYIELD_HAPPINESS   of 1;"
+    - recording: 1124
+      turn: 55
+      value: "the Housing term matches (1124 Cardiff t55-57: 23, 24, 24);"
+    - recording: 1121
+      turn: 45
+      value: a city   changing level reads more than the reading gives (1121 Hunza t45 62 against   42, t48 66 against 47;
+    - recording: 1124
+      turn: 61
+      value: 1124 Bologna t61 60 against 50;
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...0x527b40: the Happinesses row's NonFoodYieldModifier (+0x3c, its flag +0x38; the loader 0xac62c0) plus the city's own per-level rows (+0x11d8, 0x1cb0f0), at the player's weight, the to..."
+  review: imported
 - addr: 0xac6bb0
   final: 0x7c1ee0
   kind: function

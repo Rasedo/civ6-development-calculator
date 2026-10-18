@@ -587,6 +587,7 @@
   kind: function
   name: EFFECT_ADJUST_POLICY_AMENITY
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
@@ -666,6 +667,7 @@
   kind: function
   name: EFFECT_ADJUST_POLICY_HOUSING
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"

@@ -915,14 +915,14 @@ class SimCityValue:
         v = _fmul(v, torch.full_like(v, _FX + depth * 2 * _FX))
         return v - self._cv_yield(torch.full_like(like, b["maintenance"] * _FX), "YIELD_GOLD", f.yield_w("YIELD_GOLD"))
 
-    def _cv_amenity_per_turn(self, f, balance: torch.Tensor, yields: dict) -> torch.Tensor:
-        """`amenityPerTurn` (0x79f7c0's turn): one Amenity more in a city"""
+    def _cv_amenity_per_turn(self, f, balance: torch.Tensor, yields: dict, n: int = 1) -> torch.Tensor:
+        """`amenityPerTurn` (0x79f7c0's turn): `n` Amenities more in a city"""
         tiers = self.rules.amenity_tiers
-        n = len(tiers)
+        nt = len(tiers)
 
         def tier(bal):
-            idx = torch.full_like(bal, n - 1)
-            for i in range(n - 1, -1, -1):
+            idx = torch.full_like(bal, nt - 1)
+            for i in range(nt - 1, -1, -1):
                 idx = torch.where(bal >= tiers[i][0], torch.full_like(idx, i), idx)
             return idx
 
@@ -930,13 +930,13 @@ class SimCityValue:
             yf = torch.tensor([round((t[2] - 1) * 100) for t in tiers], dtype=torch.long, device=bal.device)
             return yf[tier(bal)]
 
-        before = n - 1 - tier(balance)
-        after = n - 1 - tier(balance + 1)
+        before = nt - 1 - tier(balance)
+        after = nt - 1 - tier(balance + n)
         w = f.pseudo_w("PSEUDOYIELD_HAPPINESS")
         same = before == after
-        one = self._cv_pseudo(torch.full_like(balance, _FX), "PSEUDOYIELD_HAPPINESS", w)
+        one = self._cv_pseudo(torch.full_like(balance, n * _FX), "PSEUDOYIELD_HAPPINESS", w)
         v = self._cv_pseudo((after - before) * _FX, "PSEUDOYIELD_HAPPINESS", w)
-        pb, pa = pct(balance), pct(balance + 1)
+        pb, pa = pct(balance), pct(balance + n)
         ratio = torch.div((pa + 100) * _FX * _FX, ((pb + 100) * _FX).clamp(min=1), rounding_mode="trunc") - _FX
         for y, amount in yields.items():
             if y == "YIELD_FOOD":
@@ -944,7 +944,7 @@ class SimCityValue:
             amt = torch.floor(torch.as_tensor(amount, dtype=torch.float64, device=balance.device) * _FX + 0.5).long()
             add = self._cv_yield(_fmul(amt.expand_as(ratio), ratio), y, f.yield_w(y))
             v = v + torch.where(pb != -100, add, torch.zeros_like(add))
-        return torch.where(same, one, v.clamp(min=_FX))
+        return torch.where(same, one, v.clamp(min=n * _FX))
 
     def _cv_building(self, f, building: str, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         """0x7a7590, `buildingValue`"""

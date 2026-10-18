@@ -26,7 +26,7 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN", "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN",
     "EFFECT_ADJUST_TRADE_ROUTE_YIELD", "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL",
     "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC", "EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT", "EFFECT_ADJUST_PROJECT_PRODUCTION",
-    "EFFECT_ADJUST_GREAT_PERSON_POINTS",
+    "EFFECT_ADJUST_GREAT_PERSON_POINTS", "EFFECT_ADJUST_POLICY_AMENITY", "EFFECT_ADJUST_POLICY_HOUSING",
 }
 # worth 0 in a minor's policy context: the context's own city (none), the
 # Influence a minor may not give, its tributaries and placed envoys (none)
@@ -339,6 +339,18 @@ class SimPolicy:
             if not p:
                 return zero
             return _present_value(self._cv_pseudo(full(amount * _FX), p, f0.pseudo_w(p)), r, hh) >> 8
+        if eff == "EFFECT_ADJUST_POLICY_AMENITY":
+            # the Amount's Amenities more in the city subject (0x79f7c0)
+            if not city:
+                return zero
+            bal, ys = sub["f"].amenity()
+            return between(self._cv_amenity_per_turn(sub["f"], bal, ys, amount)) >> 8
+        if eff == "EFFECT_ADJUST_POLICY_HOUSING":
+            # one Housing more in the city subject where the Amount is above
+            # 0, none else (0x7a3d70)
+            if not city:
+                return zero
+            return sub["f"].housing_value(1 if amount > 0 else 0, t0, hh) >> 8
         if eff == "EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT":
             mine = self.major_unit_alive & (self.major_unit_seat == ctx["seat"])
             m = self._type_maintenance.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)).long()

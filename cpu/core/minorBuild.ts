@@ -69,7 +69,7 @@ import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildi
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
-import { majorView, storeUnitStrength } from './majorView';
+import { cityGrowth, majorView, storeUnitStrength } from './majorView';
 import { governmentValues } from './aiPolicyValue';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
@@ -1182,15 +1182,7 @@ export function minorKnownUnits(cityState: CityState): (unit: string) => number 
 
 /** A minor's city growth as the growth forecast reads it (`CityGrowth`) */
 export function minorCityGrowth(state: GameState, cityState: CityState): CityGrowth {
-  const city = minorCity(cityState);
-  const stats = computeCityStats(state, city);
-  return {
-    surplus: fxOf(stats.foodSurplus),
-    housing: stats.housing,
-    population: cityState.population,
-    stored: fxOf(city.foodBox),
-    multiplier: stats.foodSurplus > 0 ? Math.round((stats.effectiveFoodSurplus / stats.foodSurplus) * FX) : FX,
-  };
+  return cityGrowth(state, minorCity(cityState));
 }
 
 /** THE CITY BUILD AI'S VIEW OF A MINOR'S CITY (`aiCityBuild.ts`), its

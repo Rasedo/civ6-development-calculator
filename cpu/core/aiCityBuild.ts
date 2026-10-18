@@ -439,24 +439,27 @@ export interface AmenityCity {
  *  tier of the balance) */
 const levelPct = (balance: number): number => Math.round((amenityTier(balance).yieldFactor - 1) * 100);
 
-/** 0x79f7c0's turn: one Amenity more in the city — PSEUDOYIELD_HAPPINESS of
- *  1 where its happiness level holds; else of the levels it climbs, plus per
- *  yield but Food the level's NonFoodYieldModifier change on the city's
- *  yield at the player's weight, at least the Amenity's own 1 */
-export function amenityPerTurn(f: { view: CityBuildFacts['view'] | null; seat: number }, c: AmenityCity): number {
+/** 0x79f7c0's turn: `n` Amenities more in the city — PSEUDOYIELD_HAPPINESS
+ *  of `n` where its happiness level holds; else of the levels it climbs,
+ *  plus per yield but Food the level's NonFoodYieldModifier change on the
+ *  city's yield at the player's weight, at least the Amenities' own `n`. Its
+ *  term of a negative balance (PSEUDOYIELD_GOLDENAGE_POINT of
+ *  THRESHOLD_SHIFT_PER_MISSING_AMENITY x the balance) is 0: the parameter is
+ *  0 (Expansion2_GlobalParameters.xml) */
+export function amenityPerTurn(f: { view: CityBuildFacts['view'] | null; seat: number }, c: AmenityCity, n = 1): number {
   const before = AMENITY_TIERS.length - 1 - AMENITY_TIERS.indexOf(amenityTier(c.balance) as never);
-  const after = AMENITY_TIERS.length - 1 - AMENITY_TIERS.indexOf(amenityTier(c.balance + 1) as never);
-  if (before === after) return pseudoYieldValue(f.view, f.seat, FX, 'PSEUDOYIELD_HAPPINESS');
+  const after = AMENITY_TIERS.length - 1 - AMENITY_TIERS.indexOf(amenityTier(c.balance + n) as never);
+  if (before === after) return pseudoYieldValue(f.view, f.seat, n * FX, 'PSEUDOYIELD_HAPPINESS');
   let v = pseudoYieldValue(f.view, f.seat, (after - before) * FX, 'PSEUDOYIELD_HAPPINESS');
   const pb = levelPct(c.balance);
-  const pa = levelPct(c.balance + 1);
+  const pa = levelPct(c.balance + n);
   if (pb !== -100) {
     const ratio = fdiv((pa + 100) * FX, (pb + 100) * FX) - FX;
     for (const [y, amount] of Object.entries(c.yields)) {
       if (y !== 'YIELD_FOOD') v += yieldValue(f.view, f.seat, fmul(fxOf(amount), ratio), y);
     }
   }
-  return Math.max(v, FX);
+  return Math.max(v, n * FX);
 }
 
 /** 0x7a7590: a building's value landing in `t` turns, to horizon `h` */

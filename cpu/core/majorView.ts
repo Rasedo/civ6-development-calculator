@@ -48,6 +48,7 @@ import type { ImprovementId } from './types';
 import { computeUnlocks } from './effects';
 import type { ContractCity } from './aiContracts';
 import { civicAnalysis } from './aiCivics';
+import { growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, hasMet, minorCity, minorWarGate, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
@@ -125,6 +126,18 @@ const cityDefence = (state: GameState, c: City): MajorCityDefenceView => ({
 const districtDefence = (d: { plot: number; def: number; strike: number }): MajorCityDefenceView => ({
   plot: d.plot, strength: d.def, ranged: d.strike, range: CITY_STRIKE_RANGE,
 });
+
+/** a city's growth as the growth forecast reads it (`CityGrowth`) */
+export function cityGrowth(state: GameState, city: City): CityGrowth {
+  const stats = computeCityStats(state, city);
+  return {
+    surplus: fxOf(stats.foodSurplus),
+    housing: stats.housing,
+    population: city.population,
+    stored: fxOf(city.foodBox),
+    multiplier: stats.foodSurplus > 0 ? Math.round((stats.effectiveFoodSurplus / stats.foodSurplus) * FX) : FX,
+  };
+}
 
 export function majorView(state: GameState, inputs: MajorViewInputs = {}): MajorView {
   const seat = (i: number) => {
@@ -570,11 +583,20 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       return c ? PROMO_INSTALL[c] ?? `PROMOTION_CLASS_${c}` : null;
     },
     cityAmenity: (i, id) => {
-      const city = citiesOf(state, i).find((c) => c.id === id);
+      const city = cityOf(i, id);
       if (!city) return { balance: 0, yields: {} };
       const stats = computeCityStats(state, city);
       return { balance: stats.amenities.have - stats.amenities.needed,
         yields: Object.fromEntries(Object.entries(YIELD_KEY).map(([y, k]) => [y, stats.total[k]])) };
+    },
+    // a city-state's forecast is its city's update's (`CityState.aiGrowth`),
+    // any other city's its growth as it stands
+    cityHousingValue: (i, id, housing, t, h) => {
+      const city = cityOf(i, id);
+      if (!city) return 0;
+      const g = cityGrowth(state, city);
+      const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      return housingValue(g, growthForecast(cs?.aiGrowth ?? g), housing, t, h);
     },
     greatPersonPointsPerTurn: (i, cls) => greatPersonPointsPerTurn(state, i)[cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass] ?? 0,
     diplomaticPoints: (i) => seat(i).diplomaticPoints ?? 0,

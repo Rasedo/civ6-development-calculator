@@ -28,6 +28,27 @@
     - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0x1108 of the city's yield component) a...
     - "...'s step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Production toward the item), B with none (the city's plain P..."
   review: imported
+- addr: 0x1c64d0
+  final: 0x130df0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: "Logged (runs/h1_duelw1121, 1124, 1127, 1128 minors' Civil   Prestige): every city staying in its level reads 14, PSEUDOYIELD_HAPPINESS   of 1;"
+    - recording: 1124
+      turn: 55
+      value: "the Housing term matches (1124 Cardiff t55-57: 23, 24, 24);"
+    - recording: 1121
+      turn: 45
+      value: a city   changing level reads more than the reading gives (1121 Hunza t45 62 against   42, t48 66 against 47;
+    - recording: 1124
+      turn: 61
+      value: 1124 Bologna t61 60 against 50;
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - ...f974), CityBuildAI's yield (+0x1028's vector +0x1080, filled per yield by 0x5cc510 from 0x1c64d0's attribute) x (after + 100) / (before + 100) - 1, the level's percent being 0x527b40...
+  review: imported
 - addr: 0x1c77c0
   final: 0x131a10
   kind: function
@@ -76,6 +97,27 @@
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
   context:
     - ...over the cities the city build AI's +0x10f8[class] where it has one and the city's own 0x1cb000 on its amenities, the player's bonus a turn +0x1d8[class] whole, x (1 + 0x43c340 / 100:...
+  review: imported
+- addr: 0x1cb0f0
+  final: 0x132ad0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: "Logged (runs/h1_duelw1121, 1124, 1127, 1128 minors' Civil   Prestige): every city staying in its level reads 14, PSEUDOYIELD_HAPPINESS   of 1;"
+    - recording: 1124
+      turn: 55
+      value: "the Housing term matches (1124 Cardiff t55-57: 23, 24, 24);"
+    - recording: 1121
+      turn: 45
+      value: a city   changing level reads more than the reading gives (1121 Hunza t45 62 against   42, t48 66 against 47;
+    - recording: 1124
+      turn: 61
+      value: 1124 Bologna t61 60 against 50;
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - ...3c, its flag +0x38; the loader 0xac62c0) plus the city's own per-level rows (+0x11d8, 0x1cb0f0), at the player's weight, the total at least n; then, n > 0 and the balance below 0, PS...
   review: imported
 - addr: 0x1cb470
   final: 0x132cb0

@@ -205,6 +205,7 @@
     - "B-D-S1: the war-weariness split — CLOSED (structure)"
     - "H-1: the luxury allocation — READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL inser..."
@@ -277,6 +278,27 @@
   context:
     - ...g < 1 a step (0, S(1 - g), pop); the turns to the next citizen 0x1b6390 (the threshold 0x5276e0 less the store +0x80 over S x the overall growth multiplier 0x1b62d0, rounded up; -1 wi...
   review: imported
+- addr: 0x527850
+  final: 0x371120
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: "Logged (runs/h1_duelw1121, 1124, 1127, 1128 minors' Civil   Prestige): every city staying in its level reads 14, PSEUDOYIELD_HAPPINESS   of 1;"
+    - recording: 1124
+      turn: 55
+      value: "the Housing term matches (1124 Cardiff t55-57: 23, 24, 24);"
+    - recording: 1121
+      turn: 45
+      value: a city   changing level reads more than the reading gives (1121 Hunza t45 62 against   42, t48 66 against 47;
+    - recording: 1124
+      turn: 61
+      value: 1124 Bologna t61 60 against 50;
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...h n Amenities: the balance (GetAmenities less the need of +0x588, 0x5275a0), its level (0x527850) and that of balance + n; one level: PSEUDOYIELD_HAPPINESS of n; else PSEUDOYIELD_HAPPI..."
+  review: imported
 - addr: 0x527a50
   final: 0x371260
   kind: function
@@ -290,6 +312,27 @@
   context:
     - "...e player holds (0x510960), resource index order: reach = the resource's per-copy reach (0x527a50); a no-cap resource (`m_aiNoCapResources` > 0, the Luxury Policy's duplicate) multiplie..."
   review: reviewed
+- addr: 0x527b40
+  final: 0x371350
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: "Logged (runs/h1_duelw1121, 1124, 1127, 1128 minors' Civil   Prestige): every city staying in its level reads 14, PSEUDOYIELD_HAPPINESS   of 1;"
+    - recording: 1124
+      turn: 55
+      value: "the Housing term matches (1124 Cardiff t55-57: 23, 24, 24);"
+    - recording: 1121
+      turn: 45
+      value: a city   changing level reads more than the reading gives (1121 Hunza t45 62 against   42, t48 66 against 47;
+    - recording: 1124
+      turn: 61
+      value: 1124 Bologna t61 60 against 50;
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...0x1c64d0's attribute) x (after + 100) / (before + 100) - 1, the level's percent being 0x527b40: the Happinesses row's NonFoodYieldModifier (+0x3c, its flag +0x38; the loader 0xac62c0..."
+  review: imported
 - addr: 0x527ca0
   final: 0x371420
   kind: function

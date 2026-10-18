@@ -6373,11 +6373,7 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
 - PARTLY (their inputs unported): EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (per
   city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's
   expected count 0x5d4750 x its Production [+0x1008], bare, from the start to
-  start + the train turns), EFFECT_ADJUST_POLICY_AMENITY 0x6b45a0 (0x79f7c0:
-  the Happiness level before and after, PSEUDOYIELD_HAPPINESS of the step and
-  each yield's percent change x CityBuildAI's yields +0x1080),
-  EFFECT_ADJUST_POLICY_HOUSING 0x6b5eb0 (0x7a3d70 on CityBuildAI and the
-  city's housing +0x1788), EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER
+  start + the train turns), EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER
   0x6b8930 (per resource, or the named one, the player's count of it 0x4aa790
   x Amount through the resource value 0x7a21e0),
   EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY 0x6adb20 (the player's
@@ -6385,6 +6381,36 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   parser's scaling unread), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work
   type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURISM,
   between).
+- READ, the policy Amenity and Housing (Civil Prestige, Retainers, Robber
+  Barons, Monarchy's walls, Collectivism, Digital Democracy):
+  EFFECT_ADJUST_POLICY_AMENITY 0x6b45a0: with arguments and the context's
+  city (+0x70, which COLLECTION_PLAYER_CITIES' walk sets per subject), its
+  whole part of 0x79f7c0(player +0x80, city, Amount +8, the rate +0xbc, start
+  +0xb4, horizon +0xb8). EFFECT_ADJUST_POLICY_HOUSING 0x6b5eb0: with the
+  context's city, the whole part of 0x7a3d70(CityBuildAI, the city's growth
+  +0x1788, the rate, the population +0x588, Amount > 0 (`setg`: one Housing,
+  the Amount itself not passed), start, horizon). 0x79f7c0(out, player, city,
+  n, &rate, start, horizon) with n Amenities: the balance (GetAmenities less
+  the need of +0x588, 0x5275a0), its level (0x527850) and that of balance + n;
+  one level: PSEUDOYIELD_HAPPINESS of n; else PSEUDOYIELD_HAPPINESS of the
+  levels' difference plus, per yield but Food (@f2f974), CityBuildAI's yield
+  (+0x1028's vector +0x1080, filled per yield by 0x5cc510 from 0x1c64d0's
+  attribute) x (after + 100) / (before + 100) - 1, the level's percent being
+  0x527b40: the Happinesses row's NonFoodYieldModifier (+0x3c, its flag
+  +0x38; the loader 0xac62c0) plus the city's own per-level rows (+0x11d8,
+  0x1cb0f0), at the player's weight, the total at least n; then, n > 0 and the
+  balance below 0, PSEUDOYIELD_GOLDENAGE_POINT of -(GlobalParameters +0x6b4
+  THRESHOLD_SHIFT_PER_MISSING_AMENITY x the balance) (0 under Expansion1/2's
+  Replace), n < 0 and the balance at most 0 the same subtracted; from start to
+  horizon (0x7a2140). Port: `aiModifiers.ts` / `amenityPerTurn`,
+  `sim_policy.py`. Logged (runs/h1_duelw1121, 1124, 1127, 1128 minors' Civil
+  Prestige): every city staying in its level reads 14, PSEUDOYIELD_HAPPINESS
+  of 1; the Housing term matches (1124 Cardiff t55-57: 23, 24, 24); a city
+  changing level reads more than the reading gives (1121 Hunza t45 62 against
+  42, t48 66 against 47; 1124 Bologna t61 60 against 50; 1128 Bologna t70 55
+  against 39), as if a Food term of about 0.8 x its Food stood beside the
+  others — ASK: CityBuildAI +0x1080's yields (0x1c64d0's attribute and its
+  Value flag) unread.
 - The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66
   requirements; the effects the policies and governments name, ranked by the
   score lines they miss, with their analyzers and whether they reach
