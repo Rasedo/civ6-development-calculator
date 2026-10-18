@@ -95,27 +95,41 @@ function hooksOf(state: GameState): BarbarianHooks {
       if (!tr || !tr.op) return false;
       const force = barbForce(tr.kind, raiding, handicapOf(state, tr.op.target.seat));
       const fresh = new Set(tr.fresh ?? []);
-      const free = tr.units.filter((id) => unitOf(state, id) && !fresh.has(id))
+      // the unit evaluator's walk (0x60a8c0): the player's units unassigned
+      // (+0x7d0 -1), alive, in the pool's slot order; the tribe's request
+      // (0x7c62f0) fills each class's count in that order, and a later unit
+      // of the class with less damage (+0xcf0) takes the place of the first
+      // held one with more
+      const inOps = new Set(opsOf(opsOfBarbs(state)).flatMap((o) => opUnits(o)));
+      const free = tr.units.filter((id) => unitOf(state, id) && !fresh.has(id) && !inOps.has(id))
         .sort((a, b) => (unitOf(state, a)!.slot ?? 0) - (unitOf(state, b)!.slot ?? 0));
+      const damage = (id: number) => UNIT_HP - unitOf(state, id)!.hp;
       const taken: number[] = [];
       const missing: string[] = [];
       for (const [tag, n] of force?.units ?? []) {
         const type = barbUnitFor(state, tag);
         if (!type) continue;
-        let have = 0;
+        const held: number[] = [];
         for (const id of free) {
-          if (have >= n) break;
           const u = unitOf(state, id)!;
           if (taken.includes(id) || !BARB_TAG_UNITS[tag].includes(u.type)) continue;
-          taken.push(id);
-          have++;
+          if (held.length < n) {
+            held.push(id);
+            continue;
+          }
+          const k = held.findIndex((h) => damage(id) < damage(h));
+          if (k >= 0) held[k] = id;
         }
-        for (let j = have; j < n; j++) missing.push(type);
+        taken.push(...held);
+        for (let j = held.length; j < n; j++) missing.push(type);
       }
       if (missing.length) {
         tr.queue = missing;
         return false;
       }
+      // the operation's units listed by the player's walk (0x6092c0) join in
+      // slot order
+      taken.sort((a, b) => (unitOf(state, a)!.slot ?? 0) - (unitOf(state, b)!.slot ?? 0));
       for (const id of taken) addMember(op.teams[0], { id, type: gameTypeOf('unit', unitOf(state, id)!.type, 'UNIT_') });
       return true;
     },

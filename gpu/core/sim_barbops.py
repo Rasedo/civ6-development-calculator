@@ -920,8 +920,10 @@ class SimBarbOps:
         """BARBARIAN RECRUIT (0x7c7580) for tribe `k`'s operation in the games
         `act`: the force (the BarbarianAttackForces row of the AI's handicap,
         a raid's or an assault's) from the tribe's units of each class not
-        raised this turn, in pool slot order (the unit evaluator's walk,
-        0x60a8c0); whole, it joins the team in force
+        raised this turn and in no operation, in pool slot order (the unit
+        evaluator's walk, 0x60a8c0): each class's first n held, a later one
+        with less damage taking the place of the first held with more
+        (0x7c62f0); whole, it joins the team in slot
         order (`barb_unit_join`); else the rest is asked for, melee first.
         [B] the force joined."""
         if not bool(act.count_nonzero()):
@@ -933,14 +935,15 @@ class SimBarbOps:
         forces = bb["forces"]  # [kind][raid 0 / assault 1] = [rate, [[tag, n] ...]]
         unit_for = self._barb_unit_for()  # [B, n_tags]
         free = (self.barb_unit_alive & (self.barb_unit_tribe == k) & ~self.barb_unit_scout & ~self.barb_unit_fresh
-                & act.unsqueeze(1))
+                & ~self.barb_unit_op & ~self._bcap_members() & act.unsqueeze(1))
+        bidx = self._bidx
+        dmg = int(self.rules.combat["unitHp"]) - self.barb_unit_hp.long()
         taken = torch.zeros_like(free)
         rank = torch.full_like(self.barb_unit_join, -1)
         queue = torch.full((self.B, self.TQ), -1, dtype=torch.long, device=dev)
         off = torch.zeros(self.B, dtype=torch.long, device=dev)
         n_e = max(len(f[1]) for fk in forces for f in fk)
         ptype = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
-        joined = torch.zeros(self.B, dtype=torch.long, device=dev)
         for e in range(n_e):
             tag_t = torch.tensor([[f[1][e][0] if e < len(f[1]) else -1 for f in fk] for fk in forces],
                                  dtype=torch.long, device=dev)[kind, col]
@@ -950,11 +953,31 @@ class SimBarbOps:
             valid = act & (tag_t >= 0) & (utype >= 0) & (n_t > 0)
             member = self._barb_tag_member[tag_t.clamp(min=0).unsqueeze(1), ptype]  # [B, P]
             elig = free & ~taken & member & valid.unsqueeze(1)
-            cum = elig.long().cumsum(dim=1)
-            take = elig & (cum <= n_t.unsqueeze(1))
+            # the request's fill in slot order: the first n held, a later
+            # one with less damage taking the place of the first held with more
+            nmax = int(n_t.max()) if n_t.numel() else 0
+            held = torch.full((self.B, max(nmax, 1)), -1, dtype=torch.long, device=dev)
+            cnt = torch.zeros(self.B, dtype=torch.long, device=dev)
+            for j in [int(x) for x in elig.any(dim=0).nonzero(as_tuple=True)[0].tolist()]:
+                e = elig[:, j]
+                fill = e & (cnt < n_t)
+                if bool(fill.any()):
+                    held[bidx[fill], cnt[fill]] = j
+                rep_ = e & ~fill
+                done_r = torch.zeros_like(rep_)
+                for q in range(nmax):
+                    hq = held[:, q]
+                    hd = dmg.gather(1, hq.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    c = rep_ & ~done_r & (q < n_t) & (hq >= 0) & (dmg[:, j] < hd)
+                    held[:, q] = torch.where(c, torch.full_like(hq, j), hq)
+                    done_r |= c
+                cnt = cnt + fill.long()
+            take = torch.zeros_like(elig)
+            for q in range(nmax):
+                hq = held[:, q]
+                ok_q = hq >= 0
+                take[bidx[ok_q], hq[ok_q]] = True
             taken |= take
-            rank = torch.where(take, joined.unsqueeze(1) + cum - 1, rank)
-            joined = joined + take.long().sum(dim=1)
             miss = torch.where(valid, n_t - take.long().sum(dim=1), torch.zeros_like(n_t))
             for j in range(int(n_t.max()) if n_t.numel() else 0):
                 put = valid & (j < miss) & (off + j < self.TQ)
@@ -965,6 +988,9 @@ class SimBarbOps:
         self.tribe_queue[need, k] = queue[need]
         whole = act & (off == 0)
         add = taken & whole.unsqueeze(1)
+        # the operation's units listed by the player's walk (0x6092c0) join
+        # in slot order
+        rank = torch.where(add, add.long().cumsum(dim=1) - 1, rank)
         self.barb_unit_op |= add
         self.barb_unit_join = torch.where(add, rank, self.barb_unit_join)
         return whole

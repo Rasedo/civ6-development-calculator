@@ -452,6 +452,20 @@ class SimTactics:
             cliffs_b = self._tac_cliffs(seat)
             waive_cliff = self._promo_flag(utype, getattr(self, f"{pre}_unit_promos")[rows, slots], "CLIFFS")
         zp = (self._tac_zoc(seat)[rows] & ~self._tac_zoc_ignored(utype).unsqueeze(1)) if zoc else None
+        # a path's turn may not end on a plot its own stacking unit holds (the
+        # path validity 0x2720a0; `groundOf`'s full)
+        full_n = None
+        if zoc:
+            me = (slots + self.POOL_LO[pre]).unsqueeze(1)
+
+            def own_at(pl: torch.Tensor) -> torch.Tensor:
+                pr = pl[rows]
+                return (pr >= 0) & (pr != me) & (self.unit_seat[rows].gather(1, pr.clamp(min=0)) == seat)
+
+            civ_u = self._type_civilian.take(utype).unsqueeze(1)
+            sup_u = self._type_support.take(utype).unsqueeze(1)
+            full_n = torch.where(civ_u, own_at(self.civilian_at),
+                                 torch.where(sup_u, own_at(self.support_at), own_at(self.military_at) | own_at(self.embarked_at)))
         tseat = self.tile_seat
         g = torch.full((N, T), NONE, dtype=torch.long, device=dev)
         tie = torch.zeros(N, T, dtype=torch.long, device=dev)
@@ -559,6 +573,8 @@ class SimTactics:
             cst = torch.where(a6, cst + moves, cst)
             moves = torch.where(a6, 0, moves)
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6) & (turns <= max_turns)
+            if full_n is not None:
+                ok = ok & ~(full_n.gather(1, b1) & (turns > bt))
             if cliff6 is not None:
                 ok = ok & ~cliff6
             if link is not None:

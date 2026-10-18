@@ -127,15 +127,21 @@ interface Ground {
   attack: (t: Tile) => boolean;
   known: (i: number) => boolean;
   stand: (i: number) => boolean;
+  /** a unit of its own that stacks with it holds the plot (0x585eb0, the
+   *  unit itself not counted: the path node's +0x54) */
+  full: (i: number) => boolean;
 }
 
 function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true): Ground {
   const held = new Set<number>();
   const foes = new Set<number>();
+  const own = new Set<number>();
+  const dom = unitDomain(unit.type);
   // the plots a unit at war with it that fights holds, whatever its domain
   // (the planning's attack test; a move order's path strikes its own domain)
   const fighters = new Set<number>();
   for (const u of state.units) {
+    if (u !== unit && u.seat === unit.seat && unitDomain(u.type) === dom) own.add(u.tileIndex);
     if (u.seat === unit.seat || !onMap(u)) continue;
     held.add(u.tileIndex);
     if (!unitsHostile(state, unit, u)) continue;
@@ -160,6 +166,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   return {
     known,
     stand: (i) => !held.has(i),
+    full: (i) => own.has(i),
     enter: (t) => {
       let v = enters.get(t.index);
       if (v === undefined) {
@@ -287,6 +294,10 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
         moves = 0;
       }
       if (turns > maxTurns) continue;
+      // a path's turn may not end on a plot its own stacking unit holds (the
+      // path validity 0x2720a0: each node where the next starts a turn,
+      // against the stacking limit)
+      if (zoc && turns > best.turns && ground.full(best.tile)) continue;
       onLink?.(to.index, best.tile, turns, moves, attack);
       const ends = moves <= 0 ? 4 + (tileSeat(to) !== unit.seat ? 3 : 0) : 0;
       const g = best.g + cost * 1000 + (ends + 2) * FIX;

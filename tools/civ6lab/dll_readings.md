@@ -1825,7 +1825,12 @@ The recruit's request (0x7c7580 -> 0x60a8c0, the unit evaluator +0x12d0)
 walks the player's units (+0x12e8 -> +0xd8) unassigned (+0x7d0 -1), alive,
 and the operation's units it took are then listed (0x6092c0) and join in
 that order (0x737e80): the pool's slot order (runs/h1_duelw1127 t35: Warrior
-2162693, slot 5, taken before 1835024, slot 16, the older).
+2162693, slot 5, taken before 1835024, slot 16, the older). The tribe's
+request (0x7c62f0, its vtable @d72bb8) walks that list: a unit of the tribe
+(+0x11d0) of each class (0x8c2880 on the force's class lists, never
+CLASS_ZOMBIE) fills the class's count in order; the class full, it takes the
+place of the first held one with more damage (+0xcf0, strictly) — 1121 t11:
+Horseman 851980 (whole) displaces 655369 (20 damage) beside 720906.
 
 - The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at
   signals +0x10c8, which the unit sight update 0x58aa90 raises per plot
@@ -4904,6 +4909,20 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   DirectionTypes order (0xeff730: (0,1) (1,0) (1,-1) (0,-1) (-1,0) (-1,1)
   in the game's (x - y//2, y) — NE, E, SE, SW, W, NW), each the valid
   callback admits (LinkChild 0x78750).
+- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of
+  0x26e570): each node records (0x271be0) whether its player sees its plot
+  (+0x50 bit 2) and the count of the unit's own stacking units on it, the
+  unit itself not counted (0x585eb0, +0x54); the validity walks the new
+  node back through its parents and, at each node after which a turn
+  begins, refuses the link where the plot is seen and the count reaches the
+  stacking limit (+0x1b0) — search flags +4 / +0x1000 clear. A node is
+  tested at the destination only where it is the pathfinder's +0xd8 plot
+  (unread: taken as never), so a path may end on its own unit's plot and
+  the walk stops short (the move mission). runs/h1_duelw1121 t11: the
+  Horse Archer at 34:8 for 30:7 takes the path whose turn ends on the free
+  33:6, not the one through 33:7 / 32:7, both held by its own units. Ported
+  (`search`'s zone-of-control paths, `groundOf`'s full; `_tac_search` with
+  `zoc`).
 - A step's turns and Movement (0x26e920, in 24.8 fixed point): a parent with
   no Movement starts the next turn at the domain's full Movement; the step's
   cost (Rules_Movement 0x531660..0x530240: the terrain's MovementCost, the
