@@ -6,7 +6,8 @@
  * as the game's Control Manager runs a player's lists:
  *
  *  - B: the Economic AI's savings turn (0x687bf0, `savingsTurn`), the
- *    military AI's turn (`minorOpsEvaluate`);
+ *    military AI's turn (`minorOpsEvaluate`) — both `minorMilitaryTurn`,
+ *    before the knowledge base's look;
  *  - A: the city's update (0x5ce680): its threat (0x5cbd10, `cityThreat`
  *    on its knowledge base's records; its operations, against no enemy,
  *    leave it as it is), the contract in hand checked (0x5d7e00), the slots
@@ -606,18 +607,31 @@ export function traceMinorAi(fn: ((line: string) => void) | null): void {
 }
 
 /**
- * THE MINOR'S AI TURN (the order above): its savings, its city's update and
- * events, the Default Specialization on an empty queue, its purchases, its
- * trees' tick.
+ * B: THE MINOR'S SAVINGS AND MILITARY AI'S TURN, on its knowledge base as
+ * its last look left it: the look of the turn comes after the operations'
+ * evaluation (runs/h1_duelv1124 player 2: the camp 8:14 placed in t5, in
+ * its knowledge base's t6 log, its candidate from t7; so 1121 player 2's
+ * 10:2 and player 4's 34:23, 1127 player 4's 6:8: each a camp placed on a
+ * plot the minor had revealed).
  */
-export function minorAiTurn(state: GameState, cs: CityState): void {
+export function minorMilitaryTurn(state: GameState, cs: CityState): void {
   if (cs.centerIndex < 0) return;
-  const fresh = !cs.cityAi;
-  const ai = (cs.cityAi ??= newCityAi());
   const eco = (cs.economy ??= newEconomicMemory());
-  // B: the savings, the military AI's turn
   savingsTurn(eco, Math.trunc(cs.treasury * FX), false);
   minorOpsEvaluate(state, cs);
+}
+
+/**
+ * THE MINOR'S CITY AI TURN (the order above, after `minorMilitaryTurn` and
+ * the knowledge base's look): its city's update and events, the Default
+ * Specialization on an empty queue, its purchases, its trees' tick.
+ * `fresh`: its city AI had not run before this turn (the founding turn's
+ * first look).
+ */
+export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): void {
+  if (cs.centerIndex < 0) return;
+  const ai = (cs.cityAi ??= newCityAi());
+  const eco = (cs.economy ??= newEconomicMemory());
   // A: the city's update
   // its trade list, kept at the city's analysis (none the turn it is founded)
   if (!fresh) minorTradeList(state, cs);

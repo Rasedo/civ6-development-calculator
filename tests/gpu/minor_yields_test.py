@@ -132,11 +132,13 @@ def test_clock(rules, path) -> None:
     tot = walk(sim, row)
     # the clock alone: the city AI's purchases and its units' walk (a camp
     # or a village it clears pays Gold) sit this phase out
+    sim._minor_military_turn = lambda s_: None
     sim._minor_ai_turn = lambda s_: None
     sim._minor_tactics = lambda s_: None
     try:
         sim._city_state_phase()
     finally:
+        del sim._minor_military_turn
         del sim._minor_ai_turn
         del sim._minor_tactics
     assert abs(float(sim.citystate_tech_prog[B0, s]) - tot[3]) < 1e-9, "the tech pot did not take the walk's Science"

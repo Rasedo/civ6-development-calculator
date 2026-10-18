@@ -14,7 +14,8 @@ class SimMinors:
         # grid; its economy and the research it completes; its city — the
         # step works the item in hand, then growth and borders on the city as
         # it stands after that (its city presses a religion it follows on the
-        # founder's turn); its military AI's Combat Desire; its knowledge
+        # founder's turn); its military AI's Combat Desire; its savings and
+        # military AI's turn (`_minor_military_turn`); its knowledge
         # base's look; then its actions — the
         # upgrades a completion triggers, its city AI's turn (`_minor_ai_turn`:
         # its builds, purchases and trees, the trees' Builders' work), its
@@ -37,6 +38,7 @@ class SimMinors:
             self._minor_growth(s)
             self._minor_research_ai(s)
             self._minor_combat_desire(s)
+            self._minor_military_turn(s)
             self._minor_knowledge(s, True)
             self._minor_upgrades(s, gained)
             self._minor_ai_turn(s)

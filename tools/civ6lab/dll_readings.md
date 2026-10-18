@@ -5396,10 +5396,18 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   marked (+0x3c8) with no operation (+0x888 == -1) releases them, else
   their turn is done (0x570b40). The operation's end (0x7353d0 -> 0x73ea10,
   the teams' destructor 0x735790) writes no unit, and the release 0x73d1f0
-  is Defend Units'; yet 1117 city-state 2's Warrior 131073, its Attack
-  Barb Camp complete at t9, takes tactical moves from t10 — the path that
-  frees an ended operation's units is unread (0x73f7d0 rebuilds a team
-  from the units' assignments).
+  is Defend Units'. The team rebuild (0x73f7d0, before the team update)
+  lists the operation's units by its id (0x6092c0 on +0x720) and adds each
+  one alive (+0x770 clear) that no team of it holds to its first team
+  (0x737f90); it resets no field. The team update (0x73fba0, at 0x740016)
+  sets a member's assignment to -1 where its slot is flagged (+0x18), the
+  operation's +0x890 is clear and the unit's +0x1fb8 +0x738 is 1, and
+  counts it otherwise. The engines free an ended operation's units with
+  its end (a unit is the operation's while a live operation's team holds
+  it); 1117 city-state 2's Warrior 131073, its Attack Barb Camp complete at
+  t9 after the Warrior's attack, offered to no recruit at t9 and taking
+  tactical moves from t10, agrees. Why 1128's city-state 2 offers its
+  units none at t167-183 stays unread.
 - NOTIFY OWNER (0x7c6fa0 -> the player signals +0x288 -> 0x148270): the
   tree's tribe; the raid's tree (+0x3c) offers its city to the city assault
   (0x1497d0), which refuses while the raid stands (+0x3c or +0x40 set): the
@@ -7312,14 +7320,30 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   0x449b70, "LEVIED FROM") and the stealing signal's gate (player signal
   +0x1c8, Allow Stealing) are unread.
 - THE KNOWLEDGE BASE'S CAMPS (CivKnowledge m_barbarians +0x638, 0x10 bytes:
-  the plot, an age, the camp's unit): the look (0x7877e0) adds each camp
-  (plot +0x44 the barbarians' camp) on a plot the player sees (0x5f0110);
-  the update (0x5ebb30) drops one whose plot the player sees (visibility
-  +0x290, or +0x2f0) with no camp. A city-state sees its own look
-  (`cityStateSight`). Its operations' camp targets and Is Target Gone read
-  them: a city-state knows the camps it has seen, not every camp (1128
-  players 2 and 3: no Attack Barb Camp in the log, every camp of the map in
-  the port before).
+  the plot, an age, the camp's unit): the look (0x7877e0) walks every plot —
+  one the player sees (visibility +0x290 above 0) its units and camp, one it
+  has revealed (the byte +0x2f0, 0x787bee..0x787cd5) its city and camp —
+  and adds each camp (plot +0x44 the barbarians' camp) through 0x5f0110;
+  the update (0x5ebb30) drops one whose plot the player sees or has
+  revealed with no camp: the list is the camps on the plots it has
+  revealed. A city-state's revealed plots are those its looks have seen
+  (`CityState.revealed`, `cityStateSight` at each look). Its operations'
+  camp targets and Is Target Gone read them: a city-state knows the camps
+  on plots it has revealed, not every camp (1128 players 2 and 3: no
+  Attack Barb Camp in the log, every camp of the map in the port before).
+- THE KNOWLEDGE LOG (AI_Knowledge.csv, "START LOG", 0x5ed280) is written by
+  0x783980 at the end of 0x785f30, after the ageing and the look. A camp
+  placed in turn N on a plot a minor had revealed is in its log at N+1 and
+  its Attack Barb Camp candidate first at N+2 (runs/h1_duelv1124 player 2's
+  8:14 placed t5, revealed by its Warrior at 9:13 t2 and 10:14 t4: logged
+  t6, a candidate and Started t7; 1121 player 2's 10:2 and player 4's
+  34:23, 1127 player 4's 6:8 the same); a camp a minor first sees by its
+  moves is a candidate the turn the log first lists it (1117 player 2's
+  13:12 t4, 1124 player 4's 41:7 t54). The minor's operations' evaluation
+  runs before that turn's ageing and look (`minorMilitaryTurn`, then
+  `minorKnowledge`), though the job list (0x6096c0) names the target list
+  0x785f30 before the operation manager 0x722690 — the look the log follows
+  runs on player signal +0x1f8, its moment in the turn unread.
 - MEASURED (the replay on the AI majors and the city-states, before /
   after, runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128): the candidates
   against no enemy with every line equal 99 / 196, 231 / 428, 122 / 411,

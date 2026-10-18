@@ -1201,6 +1201,10 @@ export interface CityState extends Seat {
   /** the camps its knowledge base holds, in their order (m_barbarians
    *  +0x638) */
   campsKnown?: number[];
+  /** per plot 1 where its knowledge base's looks have seen it (the
+   *  player's revealed plots, visibility +0x2f0, as `minorCampsLook` reads
+   *  them) */
+  revealed?: number[];
   /** its military AI's Combat Desire (`minorCombatDesire`), raw 24.8: its
    *  PSEUDOYIELD_UNIT_COMBAT weight */
   combatDesire?: number;

@@ -1212,11 +1212,11 @@ _MUTABLE = [
     "cai_c_in_tree", "cai_c_listed", "cai_in_hand", "cai_r_plot", "cai_r_tree", "cai_r_value", "cai_c_serial", "cai_t_serial",
     "citystate_kb_slot", "citystate_kb_owner", "citystate_kb_type", "citystate_kb_seen", "citystate_kb_plot",  # its knowledge base's army records
     "citystate_kb_damage",  # the damage each record's unit had when last seen
-    # its operations (`OpsAi`, sim_minorops.py): the pool, the trees, the teams, the stores, the pick, the camps known
+    # its operations (`OpsAi`, sim_minorops.py): the pool, the trees, the teams, the stores, the pick, the camps known, the plots revealed
     "mops_def", "mops_id", "mops_target", "mops_rally", "mops_bk_target", "mops_bk_rally", "mops_started", "mops_estr",
     "mops_str", "mops_st", "mops_ma", "mops_mb", "mops_bb", "mops_tm", "mops_mem", "mops_cnt", "mops_goal", "mops_eng",
     "mops_mins", "mops_ready", "mops_ong", "mops_unit", "mops_tstr", "mops_join", "mops_mvs", "mops_mvg", "mops_free", "mops_nfree",
-    "mops_size", "mops_pick", "mops_pick_target", "mops_pick_rally", "mops_camps",
+    "mops_size", "mops_pick", "mops_pick_target", "mops_pick_rally", "mops_camps", "mops_revealed",
     "citystate_kb_seq", "citystate_kb_next",  # the records' order
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on

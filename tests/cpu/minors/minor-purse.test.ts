@@ -1,7 +1,8 @@
 /**
  * THE MINOR'S PURSE: its units' upkeep, the units a threatened city buys
- * (`minorAiTurn`'s purchases: the Economic AI's savings, TryPurchaseUnits
- * over the city's unit list) and the upgrade a research completion
+ * (the Economic AI's savings in `minorMilitaryTurn`, `minorAiTurn`'s
+ * purchases: TryPurchaseUnits over the city's unit list) and the upgrade a
+ * research completion
  * triggers. The GPU twin is tests/gpu/minor_purse_test.py.
  */
 import { describe, it, expect } from 'vitest';
@@ -9,7 +10,7 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { BARB_SEAT, emptySeat, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { minorEconomy, minorUpgrades } from '../../../cpu/core/minorBuild';
-import { minorAiTurn, minorThreat } from '../../../cpu/core/minorCityAi';
+import { minorAiTurn, minorMilitaryTurn, minorThreat } from '../../../cpu/core/minorCityAi';
 import { computeCityStats } from '../../../cpu/core/city';
 import { spawnUnit } from '../../../cpu/core/units';
 import { MINOR_UPGRADE_GOLD } from '../../../cpu/data/cityStates';
@@ -63,7 +64,8 @@ describe("a city-state's purse", () => {
     const ring = tilesWithin(state.map, 6, 6, 2).filter((t) => hexDistance(state.map, t.col, t.row, 6, 6) === 2);
     cs.armyKnown = ring.slice(0, 6).map((t, i) => ({ id: 900 + i, owner: BARB_SEAT, type: 'HORSEMAN', seen: 5, plot: t.index, damage: 0 }));
     expect(minorThreat(state, cs)).toBeGreaterThan(-1);
-    minorAiTurn(state, cs);
+    minorMilitaryTurn(state, cs);
+    minorAiTurn(state, cs, true);
     expect(cs.threat).toBeGreaterThan(-1);
     expect(army(state, cs).length).toBeGreaterThan(0);
     expect(cs.treasury).toBeLessThan(2000);
@@ -73,7 +75,8 @@ describe("a city-state's purse", () => {
     const { state, cs } = scene();
     state.turn = 5;
     cs.treasury = 2000;
-    minorAiTurn(state, cs);
+    minorMilitaryTurn(state, cs);
+    minorAiTurn(state, cs, true);
     expect(cs.threat).toBe(-1);
     expect(army(state, cs)).toEqual([]);
     expect(cs.treasury).toBe(2000);

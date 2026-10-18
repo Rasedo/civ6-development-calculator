@@ -5,7 +5,8 @@ city events, trees and contracts"). Each city-state's turn after its step
 (`_minor_build`), as the game's Control Manager runs a player's lists:
 
  - B: the Economic AI's savings turn (0x687bf0, `_cv_savings_turn`), the
-   military AI's turn (`_mops_evaluate`, sim_minorops.py);
+   military AI's turn (`_mops_evaluate`, sim_minorops.py) — both
+   `_minor_military_turn`, before the knowledge base's look;
  - A: the city's update (0x5ce680): its threat (0x5cbd10, `_minor_threat`),
    the contract in hand checked (0x5d7e00), the slots of trees no longer
    running freed, the plot analysis (0x5ce970, `_minor_plot_evals`), the
@@ -84,22 +85,28 @@ class SimMinorAi:
 
     # -- the minor's AI turn -------------------------------------------------
 
+    def _minor_military_turn(self, s: int) -> None:
+        """`minorMilitaryTurn` — B: the savings and the military AI's turn, on
+        the knowledge base as its last look left it"""
+        alive = self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0)
+        if not bool(alive.count_nonzero()):
+            return
+        tre = torch.trunc(self.citystate_treasury[:, s] * _FX).long()
+        sav, bal = self._cv_savings_turn(self.citystate_savings[:, s], self.citystate_balance[:, s], tre,
+                                         torch.zeros_like(alive))
+        self.citystate_savings[:, s] = torch.where(alive.unsqueeze(1), sav, self.citystate_savings[:, s])
+        self.citystate_balance[:, s] = torch.where(alive, bal, self.citystate_balance[:, s])
+        self._mops_evaluate(s)
+
     def _minor_ai_turn(self, s: int) -> None:
-        """`minorAiTurn` — THE MINOR'S AI TURN (the order above)"""
+        """`minorAiTurn` — THE MINOR'S CITY AI TURN (the order above, after
+        `_minor_military_turn` and the knowledge base's look)"""
         alive = self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0)
         if not bool(alive.count_nonzero()):
             return
         ai = self.cityai
         fresh = alive & ~self.citystate_ai_on[:, s]
         self.citystate_ai_on[:, s] |= alive
-        # B: the savings
-        tre = torch.trunc(self.citystate_treasury[:, s] * _FX).long()
-        sav, bal = self._cv_savings_turn(self.citystate_savings[:, s], self.citystate_balance[:, s], tre,
-                                         torch.zeros_like(alive))
-        self.citystate_savings[:, s] = torch.where(alive.unsqueeze(1), sav, self.citystate_savings[:, s])
-        self.citystate_balance[:, s] = torch.where(alive, bal, self.citystate_balance[:, s])
-        # B: the military AI's turn
-        self._mops_evaluate(s)
         # A: the city's update; its trade list, kept at the city's analysis
         self._minor_trade_list(s, alive & ~fresh)
         f = self._cv_minor_facts(s)

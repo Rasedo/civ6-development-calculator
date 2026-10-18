@@ -4,7 +4,8 @@ operation manager cpu/core/operations; `tools/civ6lab/dll_readings.md`
 manager state as `mops_*` planes ([B, S, ...]), its turn in three parts as
 the game's Control Manager runs a player's lists —
 
- - B: the military AI's turn (`_mops_evaluate`, from `_minor_ai_turn`): the
+ - B: the military AI's turn (`_mops_evaluate`, from `_minor_military_turn`,
+   before the turn's knowledge base look): the
    members gone leave their operations, each operation's strengths and
    teams refreshed, the candidates — Attack Barb Camp against each camp its
    knowledge base holds, the running operation's naming its backup — and
@@ -233,6 +234,8 @@ class SimMinorOps:
         self.mops_pick_rally = torch.full((B, S), -1, dtype=L, device=device)
         # the camps the knowledge base holds, in its order (-1 padded)
         self.mops_camps = torch.full((B, S, N_CAMPS), -1, dtype=L, device=device)
+        # the plots its knowledge base's looks have seen (`CityState.revealed`)
+        self.mops_revealed = torch.zeros(B, S, self.T, dtype=torch.bool, device=device)
 
     # -- the minor's units --------------------------------------------------
 
@@ -300,11 +303,14 @@ class SimMinorOps:
     # -- the knowledge base --------------------------------------------------
 
     def _mops_camps_look(self, s: int, sight: torch.Tensor, alive: torch.Tensor) -> None:
-        """`lookCamps` on minor `s`'s camps where `alive`: a camp whose plot it
-        sees with none there dropped, each camp on a plot it sees added in plot
-        order"""
+        """`minorCampsLook` on minor `s`'s camps where `alive`: the plots it
+        sees join its revealed ones (`mops_revealed`); a camp whose plot it
+        has revealed with none there dropped, each camp on a plot it has
+        revealed added in plot order (`lookCamps`)"""
         T = self.T
         dev = self.device
+        self.mops_revealed[:, s] |= sight & alive.unsqueeze(1)
+        sight = self.mops_revealed[:, s]
         now = torch.zeros(self.B, T + 1, dtype=torch.bool, device=dev)
         cp = self.camp_tile
         now.scatter_(1, torch.where(cp >= 0, cp, T), True)

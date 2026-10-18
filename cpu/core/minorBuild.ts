@@ -35,7 +35,7 @@ import { detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, urbanDefensesFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { freeCityBuildFacts, majorQueueItem } from './majorCityBuild';
-import { minorAiTurn, minorItemBuilt } from './minorCityAi';
+import { minorAiTurn, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
 import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
@@ -83,8 +83,9 @@ import { minorTradeValue } from './aiTrade';
  *  (`minorGrowth`) — its city presses a religion it follows on that
  *  religion's founder's turn (`spreadReligiousPressure`) — then its research
  *  and civics AIs' turns on the city so grown (`minorResearchAi`), its military
- *  AI's Combat Desire (`minorCombatDesire`), then its
- *  knowledge base's look (`minorKnowledge`), then its actions: a research
+ *  AI's Combat Desire (`minorCombatDesire`), its savings and military AI's
+ *  turn (`minorMilitaryTurn`), then its knowledge base's look
+ *  (`minorKnowledge`), then its actions: a research
  *  completion's upgrades, its city AI's turn (`minorAiTurn`: its builds,
  *  purchases and trees, the trees' Builders' work), its routes' walk and a
  *  free Trader's route, its city's ranged strikes (the majors' own body
@@ -106,9 +107,11 @@ export function minorPhase(state: GameState): void {
     // its military AI's turn: the Combat Desire on the records as its last
     // update aged them
     cityState.combatDesire = minorCombatDesire(state, cityState, state.turn - 1).desire;
+    const fresh = !cityState.cityAi;
+    minorMilitaryTurn(state, cityState);
     minorKnowledge(state, cityState, true);
     if (!ordersHeld) minorUpgrades(state, cityState, gained);
-    minorAiTurn(state, cityState);
+    minorAiTurn(state, cityState, fresh);
     minorTrade(state, cityState, !ordersHeld);
     const city = minorCity(cityState);
     cityStrikes(state, city, cityStrikeStrength(state, city));

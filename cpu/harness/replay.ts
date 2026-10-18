@@ -83,7 +83,7 @@ import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, mi
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
-import { minorAiTurn, traceMinorAi } from '../core/minorCityAi';
+import { minorAiTurn, minorMilitaryTurn, traceMinorAi } from '../core/minorCityAi';
 import { cityStateMilitary, traceMinorOps } from '../core/minorOps';
 import { traceBarbOps } from '../core/barbarianOps';
 import { opsOf } from '../core/operations/manager';
@@ -984,6 +984,7 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
       else delete cs.armyKnown;
       if (c.campsKnown) cs.campsKnown = c.campsKnown;
       else delete cs.campsKnown;
+      if (c.revealed) cs.revealed = c.revealed;
     }
     if (!c.prodItem && cs.prodItem) minorSetItem(state, cs, null);
     const player = ctx.playerOfSeat.get(cs.seat);
@@ -1630,8 +1631,9 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     // military AI's Combat Desire, run before the founding on a player
     // that holds no city (its PSEUDOYIELD_UNIT_COMBAT weight, which the
     // first look's unit values read: runs/h1_duelw1117 Antananarivo's Default
-    // Specialization a Slinger at 8.3), its knowledge base's look, which its
-    // military AI reads on its next turn, and its city AI's first look,
+    // Specialization a Slinger at 8.3), its savings and military AI's turn,
+    // its knowledge base's look, which that military AI reads on its next
+    // turn, and its city AI's first look,
     // which runs no events and picks the Default Specialization. A minor's founding lands after the
     // engine's turn (its player is never the active one), the clock already
     // on the record's next turn: that turn stamps the founding turn's, the
@@ -1644,8 +1646,10 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     try {
       minorResearch(state, placed.research, placed.seat, 0, 0, () => undefined, () => undefined, []);
       placed.combatDesire = minorCombatDesire(state, placed, state.turn - 1).desire;
+      const fresh = !placed.cityAi;
+      minorMilitaryTurn(state, placed);
       minorKnowledge(state, placed, false);
-      minorAiTurn(state, placed);
+      minorAiTurn(state, placed, fresh);
       detectBoosts(state, placed.seat);
     } finally {
       state.turn += 1;

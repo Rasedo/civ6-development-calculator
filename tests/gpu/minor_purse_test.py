@@ -139,6 +139,7 @@ def test_threatened_buys(rules, path) -> None:
     assert int(sim._minor_threat(s)[B0]) > -1, "six Horsemen beside the city did not threaten it"
     sim.citystate_treasury[B0, s] = 2000.0
     sim.citystate_ai_on[B0, s] = True
+    sim._minor_military_turn(s)
     sim._minor_ai_turn(s)
     assert int(sim.citystate_threat[B0, s]) > -1
     assert kinds(sim, s), "the threatened city bought nothing"
@@ -150,6 +151,7 @@ def test_threatened_buys(rules, path) -> None:
     sim.citystate_kb_slot[B0, s] = -2
     sim.citystate_treasury[B0, s] = 2000.0
     sim.citystate_ai_on[B0, s] = True
+    sim._minor_military_turn(s)
     sim._minor_ai_turn(s)
     assert int(sim.citystate_threat[B0, s]) == -1
     assert kinds(sim, s) == [] and float(sim.citystate_treasury[B0, s]) == 2000.0

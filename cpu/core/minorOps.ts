@@ -8,7 +8,8 @@
  * operations' trees taking their ids from the city AI's tree serial. Its
  * turn, as the game's Control Manager runs a player's lists:
  *
- *  - B: the military AI's turn (`minorOpsEvaluate`, from `minorAiTurn`);
+ *  - B: the military AI's turn (`minorOpsEvaluate`, from `minorMilitaryTurn`,
+ *    before the turn's knowledge base look);
  *  - A: the city's defence event starts City Defense (`minorOpsStart`);
  *  - C: the operations' run in its tactical pass, after each unit's
  *    planning (`cityStateMilitary`): the operations' units are theirs, the
@@ -71,10 +72,14 @@ export function knownOf(records: readonly ArmyRecord[] | undefined, player: numb
 }
 
 /** the knowledge base's camps (its look, `lookCamps`) on the plots the
- *  minor sees */
+ *  minor has revealed: the plots it sees join its revealed ones first */
 export function minorCampsLook(state: GameState, cs: CityState): void {
   const sight = cityStateSight(state, cs.seat);
-  const camps = lookCamps(cs.campsKnown ?? [], (p) => !!sight[p], campTiles(state));
+  const revealed = (cs.revealed ??= new Array<number>(state.map.tiles.length).fill(0));
+  sight.forEach((v, p) => {
+    if (v) revealed[p] = 1;
+  });
+  const camps = lookCamps(cs.campsKnown ?? [], (p) => revealed[p] === 1, campTiles(state));
   if (camps.length) cs.campsKnown = camps;
   else delete cs.campsKnown;
 }
