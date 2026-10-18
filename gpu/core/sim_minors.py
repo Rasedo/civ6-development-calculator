@@ -1096,6 +1096,7 @@ class SimMinors:
         st = site if site is not None else torch.full_like(k_all, -1)
         self.citystate_prod_site[:, s] = torch.where(mask, torch.where(is_d, st, torch.full_like(st, -1)),
                                                      self.citystate_prod_site[:, s])
+        self._minor_place_district(s, mask & is_d, k_all, st)
         cur = self.citystate_item[:, s]
         ch = mask & (cur != k_all)
         if not bool(ch.count_nonzero()):
@@ -1114,6 +1115,32 @@ class SimMinors:
             self.citystate_kept[rr[has], s, k[has]] = 0
         self.citystate_prod[rr, s] = resume
         self.citystate_item[rr, s] = k
+
+    def _minor_place_district(self, s: int, mask: torch.Tensor, key: torch.Tensor, site: torch.Tensor) -> None:
+        """`minorPlaceDistrict` where `mask` (`key` the item, `site` its plot):
+        the district stands on its plot from its production's start, under
+        construction and paved, the city's own (`city_dist_tile`), its
+        citizens re-placed off it; one standing there already is resumed"""
+        row = self._CITY_MINOR0 + s
+        is_d = (key >= self._mk_d0) & (key < self._mk_p0) & (site >= 0)
+        dv_all = (key - self._mk_d0).clamp(min=0)
+        sc = site.clamp(min=0)
+        go = mask & is_d & (self.district[self._bidx, sc] != dv_all)
+        if not bool(go.count_nonzero()):
+            return
+        rr = go.nonzero(as_tuple=True)[0]
+        dv = dv_all[rr]
+        tt = sc[rr]
+        self.district[rr, tt] = dv
+        self.district_complete[rr, tt] = False
+        self._pave_plot(rr, tt)
+        for d in sorted(set(dv.tolist())):
+            k = dv == d
+            r_d, t_d = rr[k], tt[k]
+            _held = self.city_dist_tile[r_d, row, 0, d]
+            self.city_dist_tile[r_d, row, 0, d] = torch.where(_held >= 0, _held, t_d) if bool(self._is_repeatable[d]) else t_d
+        self._eff_version += 1
+        self._minor_replace_citizens(s, go)
 
     def _minor_can_train(self, s: int, ui: torch.Tensor) -> torch.Tensor:
         """[B] — `minorCanTrain` of chassis `ui` ([B], -1 none): the minor's
@@ -1153,17 +1180,17 @@ class SimMinors:
             ok = ok & ((u0 != self._archaeologist_idx) | has)
         return ok
 
-    def _minor_district_plane(self, s: int, dv: int, own: bool, research: bool,
-                              placed: bool = False) -> torch.Tensor:
+    def _minor_district_plane(self, s: int, dv: int, own: bool, research: bool) -> torch.Tensor:
         """[B, T] — `canPlaceDistrictIn` of district `dv` in minor `s`'s city
         on each plot: with `own` the minor's own plots alone, else any; with
         `research` its research unlocks the district and clears the plot's
         feature, else neither is asked. Within three of the centre and not
         on it, no district, centre or wonder there, a bonus resource at most
-        (an unseen one plain ground; with `placed`, a district the plot
-        already holds, no resource asked), the district's surface and placement
+        (an unseen one plain ground), the district's surface and placement
         (`_district_elig`), one of a type to the city (a repeatable one
-        aside), a specialty district under the population's limit."""
+        aside), a specialty district under the population's limit — and the
+        plot holding this district the city placed and is building (no
+        resource asked, the city's count without it)."""
         row = self._CITY_MINOR0 + s
         B, dev = self.B, self.device
         sc = {int(di): (int(ut), int(uc), int(plc)) for (di, ut, uc, plc, _fc) in self._scaffold}
@@ -1171,10 +1198,12 @@ class SimMinors:
             return torch.zeros(B, self.T, dtype=torch.bool, device=dev)
         ut, uc, plc = sc[dv]
         center = self.citystate_center[:, s].clamp(min=0)
-        base = ((self.district < 0) & (self.built_wonder < 0) & ~self._centre_plane()
+        dist_t = self.city_dist_tile[:, row, 0, dv]
+        held_p = ((self.district == dv) & ~self.district_complete & (dist_t >= 0).unsqueeze(1)
+                  & (torch.arange(self.T, device=dev).unsqueeze(0) == dist_t.unsqueeze(1)))
+        base = (((self.district < 0) | held_p) & (self.built_wonder < 0) & ~self._centre_plane()
                 & (self.pair_dist[center] <= 3) & (self.citystate_center[:, s] >= 0).unsqueeze(1))
-        if not placed:
-            base = base & ((self.res_priority <= 1) | self._res_hidden(row))
+        base = base & (held_p | (self.res_priority <= 1) | self._res_hidden(row))
         if own:
             base = base & (self.tile_seat == 100 + s)
         if research:
@@ -1188,19 +1217,21 @@ class SimMinors:
         base[torch.arange(B, device=dev), center] = False
         elig = self._district_elig(row, 0, dv, plc, base=base)
         held = (self.city_dist_tile[:, row, 0, dv] >= 0) & ~self._is_repeatable[dv]
-        ok = ~held
+        ok = (~held).unsqueeze(1)
+        ok_h = held_p
         if bool(self._is_specialty[dv]):
             spec = ((self.city_dist_tile[:, row, 0] >= 0) & self._is_specialty).sum(dim=1)
-            ok = ok & (spec < torch.div(self.city_pop[:, row, 0].long() - 1, 3, rounding_mode="floor") + 1)
-        return elig & ok.unsqueeze(1)
+            cap = torch.div(self.city_pop[:, row, 0].long() - 1, 3, rounding_mode="floor") + 1
+            ok = ok & (spec < cap).unsqueeze(1)
+            ok_h = ok_h & (spec - 1 < cap).unsqueeze(1)
+        return elig & (ok | ok_h)
 
-    def _minor_queue_ok(self, s: int, key: torch.Tensor, site: torch.Tensor,
-                        placed: bool = False) -> torch.Tensor:
+    def _minor_queue_ok(self, s: int, key: torch.Tensor, site: torch.Tensor) -> torch.Tensor:
         """[B] — `minorQueueOk`: may the minor's queue take the item now? A
         building it may raise (a worship building only the one its religion
-        offers), a district its plot takes (with `placed` one the plot
-        already holds, its resources asking nothing), a unit it may train, a
-        project it may run (the walls' repair while available)"""
+        offers), a district its plot takes (the one it placed there among
+        them), a unit it may train, a project it may run (the walls' repair
+        while available)"""
         row = self._CITY_MINOR0 + s
         is_u, is_b, is_d, is_p, _is_r = self._mk_kinds(key)
         ok = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -1216,7 +1247,7 @@ class SimMinors:
             for dv in sorted({int(x) - self._mk_d0 for x in key[is_d].tolist()}):
                 m = is_d & (key == self._mk_d0 + dv) & (site >= 0)
                 if bool(m.any()):
-                    pl = self._minor_district_plane(s, dv, True, True, placed)
+                    pl = self._minor_district_plane(s, dv, True, True)
                     ok = ok | (m & pl.gather(1, site.clamp(min=0).unsqueeze(1)).squeeze(1))
         if bool(is_p.any()):
             P = self._mb_proj()
@@ -1475,23 +1506,20 @@ class SimMinors:
         m = done & is_d
         if bool(m.any()):
             site = self.citystate_prod_site[:, s]
-            ok = self._minor_queue_ok(s, item, site, placed=True)
+            ok = self._minor_queue_ok(s, item, site)
             gone = m & ~ok
             if bool(gone.any()):
                 self._minor_set_item(s, gone, -1)
             place = m & ok
             if bool(place.any()):
+                self._minor_place_district(s, place, item, site)
                 rr = place.nonzero(as_tuple=True)[0]
                 dv = (item - self._mk_d0)[rr]
                 tt = site[rr]
-                self.district[rr, tt] = dv
                 self.district_complete[rr, tt] = True
-                self._pave_plot(rr, tt)
                 for d in sorted(set(dv.tolist())):
                     k = dv == d
                     r_d, t_d = rr[k], tt[k]
-                    _held = self.city_dist_tile[r_d, row, 0, d]
-                    self.city_dist_tile[r_d, row, 0, d] = torch.where(_held >= 0, _held, t_d) if bool(self._is_repeatable[d]) else t_d
                     if d == self._encamp_didx:
                         self.encamp_hp[r_d, t_d] = self._encamp_hp_max
                         self.encamp_outer_hp[r_d, t_d] = self._walls_tier_hp[self._minor_walls_tier(s)][r_d]

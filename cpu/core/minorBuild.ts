@@ -712,7 +712,8 @@ export function minorItemKey(item: MinorItem): string {
  * also needs a free tile on or beside the centre — and leaves the store A
  * less what it lacked before the step, never below 0 (A is the city's plain
  * Production: a minor holds no flat toward its head). With nothing in hand
- * the step adds A to the store. A district paves its plot (`paveGround`).
+ * the step adds A to the store. A district stands on its paved plot from its
+ * start (`minorPlaceDistrict`) and completes there.
  * The walls' repair restores the walls, the city's and its Encampment's, at
  * the HP it puts back (`projectCost`); a district project converts the row's
  * `yieldPct` of what the step paid in (never above its cost) into its yield,
@@ -798,10 +799,11 @@ export function minorItemInHand(cityState: CityState): Exclude<MinorItem, { none
  *  resumes at what it kept; a district's plot rides with it
  *  (`CityState.prodSite`) */
 export function minorSetItem(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }> | null): void {
-  void state;
   const key = item ? minorItemKey(item) : '';
-  if (item && 'district' in item) cityState.prodSite = item.site;
-  else delete cityState.prodSite;
+  if (item && 'district' in item) {
+    cityState.prodSite = item.site;
+    minorPlaceDistrict(state, cityState, item.district, item.site);
+  } else delete cityState.prodSite;
   if (key === (cityState.prodItem ?? '')) return;
   const kept = { ...cityState.prodRetained };
   if (cityState.prodItem && (cityState.prodProgress ?? 0) > 0) kept[cityState.prodItem] = cityState.prodProgress!;
@@ -813,11 +815,25 @@ export function minorSetItem(state: GameState, cityState: CityState, item: Exclu
   else delete cityState.prodItem;
 }
 
+/** A DISTRICT STANDS ON ITS PLOT FROM ITS PRODUCTION'S START: the plot takes
+ *  it under construction, paved, the city's own, and the city's citizens are
+ *  re-placed off it (runs/h1_duelw1127 Hattusa t17: the Campus taken in hand
+ *  at t16 stands on plot 532 at 0%, its citizen moved 532 -> 574, complete at
+ *  t19); a district already standing there is the one the city resumes */
+function minorPlaceDistrict(state: GameState, cityState: CityState, district: DistrictId, site: number): void {
+  const t = state.map.tiles[site];
+  if (t.district === district) return;
+  t.district = district;
+  t.districtComplete = false;
+  paveGround(t);
+  (cityState.districts ??= []).push({ type: district, tileIndex: site });
+  minorReplaceCitizens(state, cityState);
+}
+
 /** May the minor's queue take the item now (0x5c9ea0 / 0x5ca170 / 0x5ca5a0 /
- *  0x5ca450)? A building it may raise, a district its plot takes, a unit it
- *  may train, a project it may run; with `placed` a district its plot
- *  already holds, the plot's resources asking nothing. */
-export function minorQueueOk(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>, placed = false): boolean {
+ *  0x5ca450)? A building it may raise, a district its plot takes (the one it
+ *  placed there among them), a unit it may train, a project it may run. */
+export function minorQueueOk(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): boolean {
   const unlocks = computeUnlocksIn(cityState.research, []); // a MINOR carries no roster row
   if ('building' in item) {
     const worship = minorWorship(state, cityState);
@@ -826,7 +842,7 @@ export function minorQueueOk(state: GameState, cityState: CityState, item: Exclu
   if ('district' in item) {
     if (item.site < 0) return false;
     const owns = (t: Tile) => tileSeat(t) === cityState.seat;
-    return canPlaceDistrictIn(state, minorCity(cityState), item.district, item.site, { unlocks, ownsTile: owns, placed }).ok;
+    return canPlaceDistrictIn(state, minorCity(cityState), item.district, item.site, { unlocks, ownsTile: owns }).ok;
   }
   if ('unit' in item) return minorCanTrain(state, cityState, item.unit);
   if ('project' in item) {
@@ -1428,15 +1444,13 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
   } else if ('district' in item) {
     // the plot no longer takes it: the item leaves the queue (a resource
     // seen since it was placed does not refuse it)
-    if (!minorQueueOk(state, cityState, item, true)) {
+    if (!minorQueueOk(state, cityState, item)) {
       minorSetItem(state, cityState, null);
       return false;
     }
+    minorPlaceDistrict(state, cityState, item.district, item.site);
     const t = state.map.tiles[item.site];
-    t.district = item.district;
     t.districtComplete = true;
-    paveGround(t);
-    (cityState.districts ??= []).push({ type: item.district, tileIndex: item.site });
     if (item.district === 'ENCAMPMENT') {
       t.encampHp = ENCAMPMENT_HP;
       t.encampOuterHp = wallsMax(state, { buildings: cityState.buildings ?? [], seat: cityState.seat });

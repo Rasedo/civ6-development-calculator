@@ -542,12 +542,18 @@ export function canPlaceDistrictIn(
   city: City,
   type: DistrictId,
   tileIndex: number,
-  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean; placed?: boolean },
+  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean },
 ): RuleResult {
   const map = state.map;
   const def = DISTRICTS[type];
   const tile = map.tiles[tileIndex];
   const center = map.tiles[city.centerIndex];
+  // the plot holds this district the city placed and is building: it takes
+  // it still (no other district, the plot's resources asking nothing, the
+  // city's count without it)
+  const held = tile.district === type && !tile.districtComplete
+    && city.districts.some((d) => d.tileIndex === tileIndex && d.type === type);
+  const others = held ? city.districts.filter((d) => d.tileIndex !== tileIndex) : city.districts;
 
   // CIV6 (Religious Convert): "May not build Holy Site districts" — a
   // PERMANENT refusal, so it answers before the research gate
@@ -563,7 +569,7 @@ export function canPlaceDistrictIn(
   const dist = hexDistance(state.map, center.col, center.row, tile.col, tile.row);
   if (dist === 0) return no('City center occupies this tile.');
   if (dist > CITY_WORK_RADIUS) return no('Too far from the city center.');
-  if (tile.district) return no('Another district is here.');
+  if (tile.district && !held) return no('Another district is here.');
   if (irradiated(tile)) return no('Radioactive fallout covers this tile.');
   if (tile.builtWonder) return no('A wonder occupies this tile.');
   if (naturalWonderAt(tile)) return no('Cannot build on a natural wonder.');
@@ -612,20 +618,20 @@ export function canPlaceDistrictIn(
   // CIV6 (Resources.PrereqTech): a strategic the city's seat cannot see yet
   // is plain ground — the district may stand on it (the resource is lost);
   // a district already placed is not refused by a resource its owner has
-  // seen since (`placed`: runs/h1_duelw1128 Nazca's Holy Site on 473, laid
+  // seen since (`held`: runs/h1_duelw1128 Nazca's Holy Site on 473, laid
   // t14 on Horses unseen, completes t15 after Animal Husbandry)
-  if (!opts.placed && tile.resource && !hiddenResourcesFor(state, city.seat).has(tile.resource)) {
+  if (!held && tile.resource && !hiddenResourcesFor(state, city.seat).has(tile.resource)) {
     const cat = RESOURCES[tile.resource].category;
     if (cat !== 'bonus') return no(`Cannot build over a ${cat} resource.`);
   }
 
-  if (!def.allowMultiple && city.districts.some((d) => d.type === type)) {
+  if (!def.allowMultiple && others.some((d) => d.type === type)) {
     return no(`${def.name} already exists in this city.`);
   }
   // CIV6 (Water Park): "cannot be built if an Entertainment Complex already
   // exists in this city."
   for (const x of def.exclusiveDistricts ?? []) {
-    if (city.districts.some((d) => d.type === x)) {
+    if (others.some((d) => d.type === x)) {
       return no(`${DISTRICTS[x].name} already exists in this city.`);
     }
   }
@@ -633,13 +639,13 @@ export function canPlaceDistrictIn(
   // civilization" — every city this seat holds, not just this one.
   if (def.oneCivWide) {
     for (const other of citiesOf(state, city.seat)) {
-      if (other.districts.some((d) => d.type === type)) {
+      if ((other.id === city.id ? others : other.districts).some((d) => d.type === type)) {
         return no(`${def.name} already exists in this civilization.`);
       }
     }
   }
   if (def.countsTowardLimit) {
-    const specialty = city.districts.filter((d) => DISTRICTS[d.type].countsTowardLimit).length;
+    const specialty = others.filter((d) => DISTRICTS[d.type].countsTowardLimit).length;
     // CIV6 (Bi Sheng, Ada Lovelace): "Lets this city build one more district
     // than the Population limit allows" — a permanent per-city raise.
     // CIV6 (Free Imperial Cities): "Each city can build one more district
