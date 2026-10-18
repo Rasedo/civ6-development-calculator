@@ -4296,6 +4296,13 @@ operations' contracts, the improvement values below, the purchases).
   earlier targets' attacks moved them (`strikers` / `_tac_attack_units`;
   seed9001 t33: a barbarian Warrior's move onto 906 bars the Slinger's spot
   there, and the Slinger wanders).
+- 0x5ce970's plot test reads the plot as the player sees it: a resource
+  whose revealing technology it lacks (and its suzerain does not see,
+  0x4ac140) is none — the plot's plain ground takes its improvements
+  (runs/h1_duelv1128 t2 Nazca: plot 473's Horses unrevealed, "No resource",
+  its Farm 72.45 beside plot 472's; the improvement event takes 473, whose
+  tree loses its reservation to the Holy Site tree's on it and fails, and
+  the Builder contract comes at t3 for 472, as runs/h1_duelw1128 logs).
 - 0x5ce970's improvable flag (+0x54): no district, no improvement (the
   plot's +0x1e word -1), not a canyon, and an improvement the plot test
   (0x35fd60, its fifth argument 1) takes; the values are written for every

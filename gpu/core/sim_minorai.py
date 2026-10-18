@@ -285,7 +285,11 @@ class SimMinorAi:
         civ = self.citystate_civics[:, s]
         hf = (civ[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
               else torch.zeros(B, dtype=torch.bool, device=dev)).unsqueeze(1)
-        res = self._res_live()
+        # a resource the minor cannot see is none: its plot reads as plain
+        # ground (`seenGround`)
+        live = self._res_live()
+        hid = live & self._res_hidden(self._CITY_MINOR0 + s)
+        res = live & ~hid
         harv_tab = torch.tensor([bool(tabs["res"].get(n, {}).get("harvests")) for n in PN["resourceType"]] + [False],
                                 dtype=torch.bool, device=dev)
         rem_tab = torch.tensor([bool(tabs["feat"].get(n, {}).get("removable")) for n in PN["feature"]] + [False],
@@ -310,12 +314,14 @@ class SimMinorAi:
             lumber_civic = lumber_civic & ~((self.feat_id == _lf) & ~civ[:, _lc].unsqueeze(1))
         lumber_live = ~gone & (self.feat_id == self.feat_id0) & lumber_civic
         # the three readings: as it stands, harvested, cleared (and both)
-        land = base & ~res & ~self.water
-        sea = base & ~res & self.water
+        land = base & ~live & ~self.water
+        sea = base & ~live & self.water
         # `standing`: the plot as it stands alone (`standingImprovements`)
         keep = torch.full_like(base, not standing)
-        land_h = base & harvestable & ~self.water & keep
-        sea_h = base & harvestable & self.water & keep
+        # a hidden resource's plot reads the resource-free planes, as a
+        # harvested one does, as it stands too
+        land_h = (base & harvestable & ~self.water & keep) | (base & hid & ~self.water)
+        sea_h = (base & harvestable & self.water & keep) | (base & hid & self.water)
         land_c = base & clearable & (~res | harvestable) & ~self.water & keep
         sea_c = base & clearable & (~res | harvestable) & self.water & keep
         any_c = bool(land_c.any()) or bool(sea_c.any())

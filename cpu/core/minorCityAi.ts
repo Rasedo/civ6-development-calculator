@@ -38,7 +38,6 @@ import { AI_BUILDINGS, AI_DISTRICT_LISTS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEM
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS } from '../data/aiCityTrees';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
-import { RESOURCES } from '../../world/resources';
 import { axialToOffset, hexDistance, inBounds, neighbors, offsetToAxial, wrapCol } from '../../world/hex';
 import { isCoastalLand } from '../../world/query';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingTable, defaultSpecialization, growthForecast, housingValue, specializationBests, unitTable,
@@ -60,7 +59,7 @@ import { majorView } from './majorView';
 import { minorOpContracts, minorOpLive, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
 import { joinBuilt } from './operations/manager';
 import { minorCity } from './cityStates';
-import { campTiles, civOf, seatOf, tileSeat } from './seats';
+import { campTiles, civOf, hiddenResourcesFor, seatOf, tileSeat } from './seats';
 import { cityAppealResolver } from './governors';
 import { canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
 import { borderCandidates } from './city';
@@ -134,7 +133,14 @@ function groundOpts(state: GameState, cs: CityState) {
  *  Builder on plot 570's Marsh t7-t21, the Marsh gone t22, the Alcazar
  *  t24) */
 function standingImprovements(state: GameState, cs: CityState, tile: Tile): readonly string[] {
-  return validImprovementsIn(tile, groundOpts(state, cs));
+  return validImprovementsIn(seenGround(state, cs, tile), groundOpts(state, cs));
+}
+
+/** the plot as the minor sees it: a resource whose revealing technology it
+ *  lacks is none (runs/h1_duelv1128 t2 Nazca: plot 473's unrevealed Horses
+ *  read "No resource", its Farm valued 72.45) */
+function seenGround(state: GameState, cs: CityState, tile: Tile): Tile {
+  return tile.resource && hiddenResourcesFor(state, cs.seat).has(tile.resource) ? { ...tile, resource: null } : tile;
 }
 
 /** the improvements the ground of a plot takes for the minor, the
@@ -143,8 +149,9 @@ function standingImprovements(state: GameState, cs: CityState, tile: Tile): read
  *  plot as it stands, of the plot with its resource harvested (one with
  *  Resource_Harvests rows) and with its
  *  removable feature cleared (the value prices the harvest and the clearing) */
-function groundImprovements(state: GameState, cs: CityState, tile: Tile): Set<string> {
+function groundImprovements(state: GameState, cs: CityState, actual: Tile): Set<string> {
   const opts = groundOpts(state, cs);
+  const tile = seenGround(state, cs, actual);
   const clearable = !!tile.feature && !!FEATURE_ROW.get(installFeature(tile.feature))?.removable;
   const harvestable = !!tile.resource && (RES.get(gameTypeOf('resource', tile.resource, 'RESOURCE_'))?.harvests.length ?? 0) > 0;
   const out = new Set<string>(validImprovementsIn(tile, opts));
@@ -194,7 +201,8 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
   const centre = map.tiles[cs.centerIndex];
   const candidates = new Set(borderCandidates(state, city));
   const specialty = (cs.districts ?? []).filter((x) => DISTRICTS[x.type]?.countsTowardLimit).length;
-  const hidden = (res: string): boolean => !!RESOURCES[res]?.revealTech && !r.techs.includes(RESOURCES[res].revealTech!);
+  const unseen = hiddenResourcesFor(state, cs.seat);
+  const hidden = (res: string): boolean => unseen.has(res);
   const impT = AI_IMPROVEMENTS.map((row) => Math.max(facts.techTurns(row.tech), facts.civicTurns(row.civic)));
   const distT = AI_DISTRICTS.map((row) => facts.buildTurns(row.type) + Math.max(facts.techTurns(row.tech), facts.civicTurns(row.civic)));
   const trainsSea = facts.trainsDomain('DOMAIN_SEA') || (centre.riverMask ?? 0) !== 0;
