@@ -96,6 +96,7 @@ class SimCityValue:
             "reads": {k: set(v) for k, v in cb["modifierReads"].items()},
             "engine": cb["engineIndex"],
             "promo_minor": {k: int(v) for k, v in cb["minorPromotionWeights"].items()},
+            "minor_dverdict": torch.tensor(cb["minorDistrictVerdict"], dtype=torch.long),
             "promo_free": {k: int(v) for k, v in cb["freePromotionWeights"].items()},
             "default_handicap": int(cb["defaultHandicap"]),
             "plot_names": cb["plotNames"],

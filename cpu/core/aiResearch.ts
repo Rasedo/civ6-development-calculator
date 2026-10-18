@@ -11,7 +11,9 @@
  * turns left (its cost where the seat makes no Science), the NEXT step being
  * the last prerequisite the walk added. A row whose walk still has rows to add
  * after the third level is out of reach (turns -1, value 0); any other is
- * valued (`techValue`, 0x7b3e50). The PROPAGATION (0x7604e0) then adds to each
+ * valued (`techValue`, 0x7b3e50). The seat's TECH CONTRACTS (its city AI's
+ * Add Goal Tech contracts) add their values to their rows' scores, an
+ * unowned row's whose score is not negative. The PROPAGATION (0x7604e0) then adds to each
  * row in reach the values of its unowned prerequisites one and two levels up,
  * and takes a favored row's score 1.5 times.
  *
@@ -62,6 +64,12 @@ function researchable(r: ResearchState, id: string): boolean {
 
 /** the rows no row requires (the comparator's leaf flag, 0x761b70) */
 const REQUIRED = new Set(Object.values(TECHS).flatMap((t) => t.prereqs));
+
+/** a Tech Contract the research AI holds: its technology and its value, raw */
+export interface TechContract {
+  tech: string;
+  value: number;
+}
 
 export interface ResearchEntry {
   tech: string;
@@ -200,9 +208,12 @@ function researchOf(state: GameState, seat: number): ResearchState {
  *  value's terms its cities give where the seat's facts give them — the
  *  unlocked units' (their City Analysis values and their upgrade sources) and
  *  the resources' (per improvement the row unlocks, the resources its cities
- *  hold unimproved, 0x5d45c0 -> 0x7a21e0) */
+ *  hold unimproved, 0x5d45c0 -> 0x7a21e0); `contracts` the seat's Tech
+ *  Contracts, each adding its value (raw) to its row's score before the
+ *  propagation where the row is unowned and its score not negative
+ *  (0x760980's contract walk, 0x5f36e0 -> 0x761980) */
 export function researchAnalysis(state: GameState, seat: number, science: number, weights: AiWeightInputs = {},
-  cityTerm?: (tech: string, turns: number) => number): ResearchEntry[] {
+  cityTerm?: (tech: string, turns: number) => number, contracts: readonly TechContract[] = []): ResearchEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(science);
   const pw = pseudoYieldWeights(state, seat, weights);
@@ -213,6 +224,10 @@ export function researchAnalysis(state: GameState, seat: number, science: number
     const base = turns < 0 ? 0 : techValue(state, id, turns, pw) + (cityTerm && turns <= AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
     return { tech: id, next, turns, owned: false, leaf, base, score: base };
   });
+  for (const c of contracts) {
+    const e = entries.find((x) => x.tech === c.tech);
+    if (e && !e.owned && e.score >= 0) e.score += c.value;
+  }
   const leader = leaderOf(state, seat);
   propagate(r, entries, new Set(leader ? RESEARCH_AI_FAVORED[leader] ?? [] : []));
   return entries;

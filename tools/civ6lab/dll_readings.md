@@ -4045,6 +4045,24 @@ DISTRICTS rows of the five verbose duels: 8,629 of 55,800 within 0.02
 911 of 6,108, Neighborhood 2,057 of 15,864, Campus 409 of 5,842, Holy
 Site 181 of 402; Theater 124 and Encampment 21 of ~5,000 each).
 
+- The plot analysis' district loop (0x5ce970, 0x5ced80..0x5cefed), per
+  Districts row: the verdict 0x5d2ae0 (the player's districts list,
+  [rbp-0x70] +0x40 per row: above 0 -> 1, else its sign) of -1 writes
+  FX(-9999) before any other check (0x5cee0a); one of 1 takes the value
+  0x7a51f0 gives x1.5 (0xd2f32c, 0x5cef8f..0x5cefd3). The list is the
+  AiFavoredItems of the player's AiLists System Districts, a row +1
+  Favored, -1 not, summed (`minorDistrictVerdict`): MINOR_CIV_DEFAULT_TRAIT
+  -1 on Holy Site, Campus, Encampment, Commercial Hub, Theater, Industrial
+  Zone, Aqueduct and the later specialty districts, each type's trait +1 on
+  its own — no city-state favours a district, none values one its type does
+  not own (runs/h1_duelv1117, 1121, 1124: no city-state's plot values a
+  Holy Site; the cultural Antananarivo values Theaters, the militaristic
+  Valletta Encampments, the scientific Bologna Campuses; Valletta's t2
+  Encampment at (15,10) logs 59.93, our unscaled value 63.05 — no x1.5,
+  the two lists summing to 0). The other
+  districts 0x7aaf80 sets against the row (0x406c00, 0x1aec20, 0x35f2d0)
+  do not read the verdict.
+
 - 0x7a51f0 (out, district, &rate, T, H, plot, city, ...): T past H
   FX(-9999). A plot without an owner pays its price: the city's Gold price
   0x1b1cb0 (city +0x1688; -1 where the plot lies beyond GlobalParameters
@@ -4424,8 +4442,15 @@ Contract %d").
   with turns > 0 and a researchable next step: goal := row, research := next.
   Else a goal still unowned stays; else one draw "BT Research Choice" over
   the researchable rows in table order (range 5 at 1124 t1: the five roots).
-- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the
-  score), the propagation, then: with no research the choice (key -1); with
+- THE TURN, 0x760980: contracts — the research AI's list (+0x210, 0x10 an
+  entry) walked, each live contract's interface (vtable 0xd5bae8) called at
+  +0x40 = 0x5f36e0: 0x761980(research AI, the contract's tech +0x408, its
+  value +0x3a0), which adds the value to the entry's score (+0x14) where
+  the score is not negative and the row unowned (+0x18 clear); a contract
+  IN PROGRESS (5) or ACCEPTED (3) whose +0x70 (0x5f5940) holds is also
+  called at +0x10, any other released (0x600b00) after the add (`researchAnalysis`'s
+  `contracts`; runs/h1_duelv1124 t6 player 4: Writing 251.0 = 124.0 + its
+  Tech Contract 127.0, Astrology 124.0 none). Then the propagation, then: with no research the choice (key -1); with
   one, the best (first entry, then any unowned higher) replaces it only if
   its next step differs, it scores more than the goal's (the research's
   without a goal) + AI_CURRENT_TASK_BIAS x 10, it is researchable itself.

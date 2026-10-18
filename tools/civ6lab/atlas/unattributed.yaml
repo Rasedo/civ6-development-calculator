@@ -1599,6 +1599,21 @@
   context:
     - "...0x5f3710 (IN PROGRESS, bound to the city, the completion signals 0x5f5650 / 0x5f35d0 / 0x5f3610 connected; the queue's refusal FAILED, no line). The in-hand check 0x5d7e00: not eligib..."
   review: imported
+- addr: 0x5f36e0
+  final: 0x3f82e0
+  kind: function
+  name: techContractAddValue
+  semantics: "a Tech Contract's research-AI interface +0x40: 0x761980 with its tech (+0x408) and value (+0x3a0)"
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 6
+      value: player 4's Writing 251.0 = 124.0 + its Tech Contract 127.0; Astrology 124.0
+  impl: [cpu/core/aiResearch.ts:researchAnalysis]
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...an entry) walked, each live contract's interface (vtable 0xd5bae8) called at +0x40 = 0x5f36e0: 0x761980(research AI, the contract's tech +0x408, its value +0x3a0), which adds the va..."
+  review: reviewed
 - addr: 0x5f3710
   final: 0x3f8310
   kind: function
@@ -1691,6 +1706,7 @@
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ugh the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8 holds weak handles, and 0x5d4d70's head skips an emptied one wit...

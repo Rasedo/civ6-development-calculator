@@ -737,6 +737,15 @@ def build_city(rows, modifier) -> str:
         lst = pc_lists.get(c.get("ListType", ""))
         if lst and lst.get("LeaderType") and c.get("Item"):
             pc_by_trait[lst["LeaderType"]][c["Item"]] = num(c, "Value")
+    # the district lists by leader trait (AiLists System Districts): each
+    # item +1 where Favored, -1 where not
+    dl_lists = {c["ListType"]: c for c in rows("AiLists") if c.get("ListType") and c.get("System") == "Districts"}
+    dl_by_trait: dict[str, dict[str, int]] = collections.defaultdict(dict)
+    for c in rows("AiFavoredItems"):
+        lst = dl_lists.get(c.get("ListType", ""))
+        if lst and lst.get("LeaderType") and c.get("Item"):
+            fav = c.get("Favored", "").lower() == "true"
+            dl_by_trait[lst["LeaderType"]][c["Item"]] = dl_by_trait[lst["LeaderType"]].get(c["Item"], 0) + (1 if fav else -1)
     # the resources (the resource value 0x7a21e0: class, Happiness, PeakEra;
     # the units whose StrategicResource it is, Units' order) and the
     # improvements (the research value's improvement walk: PrereqTech /
@@ -883,6 +892,10 @@ def build_city(rows, modifier) -> str:
         " *  AiLists of System UnitPromotionClasses): class -> Value */\n"
         "export const AI_PROMOTION_CLASS_LISTS: Readonly<Record<string, Readonly<Record<string, number>>>> = "
         f"{json.dumps(dict(sorted(pc_by_trait.items())), indent=1)};\n\n"
+        "/** the district lists by leader trait (AiFavoredItems of the AiLists of\n"
+        " *  System Districts): district -> +1 favored, -1 not */\n"
+        "export const AI_DISTRICT_LISTS: Readonly<Record<string, Readonly<Record<string, number>>>> = "
+        f"{json.dumps(dict(sorted(dl_by_trait.items())), indent=1)};\n\n"
         "/** THE UNIT EFFICIENCIES (UnitProduction's m_efficiencies, GlobalAI\n"
         " *  +0x3c8): row the opposing unit, column the unit valued, AI_UNITS'\n"
         " *  order, raw 24.8 — the table the game computes once a game (0x79a440)\n"

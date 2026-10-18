@@ -21076,6 +21076,57 @@ export const AI_PROMOTION_CLASS_LISTS: Readonly<Record<string, Readonly<Record<s
  }
 };
 
+/** the district lists by leader trait (AiFavoredItems of the AiLists of
+ *  System Districts): district -> +1 favored, -1 not */
+export const AI_DISTRICT_LISTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+ "MINOR_CIV_CULTURAL_TRAIT": {
+  "DISTRICT_THEATER": 1
+ },
+ "MINOR_CIV_DEFAULT_TRAIT": {
+  "DISTRICT_HOLY_SITE": -1,
+  "DISTRICT_CAMPUS": -1,
+  "DISTRICT_ENCAMPMENT": -1,
+  "DISTRICT_AERODROME": -1,
+  "DISTRICT_COMMERCIAL_HUB": -1,
+  "DISTRICT_ENTERTAINMENT_COMPLEX": -1,
+  "DISTRICT_THEATER": -1,
+  "DISTRICT_INDUSTRIAL_ZONE": -1,
+  "DISTRICT_AQUEDUCT": -1,
+  "DISTRICT_SPACEPORT": -1,
+  "DISTRICT_GOVERNMENT": -1,
+  "DISTRICT_WATER_ENTERTAINMENT_COMPLEX": -1,
+  "DISTRICT_CANAL": -1,
+  "DISTRICT_DAM": -1,
+  "DISTRICT_DIPLOMATIC_QUARTER": -1,
+  "DISTRICT_PRESERVE": -1
+ },
+ "MINOR_CIV_INDUSTRIAL_TRAIT": {
+  "DISTRICT_INDUSTRIAL_ZONE": 1
+ },
+ "MINOR_CIV_MILITARISTIC_TRAIT": {
+  "DISTRICT_ENCAMPMENT": 1
+ },
+ "MINOR_CIV_RELIGIOUS_TRAIT": {
+  "DISTRICT_HOLY_SITE": 1
+ },
+ "MINOR_CIV_SCIENTIFIC_TRAIT": {
+  "DISTRICT_CAMPUS": 1
+ },
+ "MINOR_CIV_TRADE_TRAIT": {
+  "DISTRICT_COMMERCIAL_HUB": 1
+ },
+ "TRAIT_CIVILIZATION_SCOTTISH_ENLIGHTENMENT": {
+  "DISTRICT_CAMPUS": 1,
+  "DISTRICT_INDUSTRIAL_ZONE": 1
+ },
+ "TRAIT_LEADER_ELEANOR_LOYALTY": {
+  "DISTRICT_THEATER": 1
+ },
+ "TRAIT_LEADER_MEDITERRANEAN": {
+  "DISTRICT_DAM": -1
+ }
+};
+
 /** THE UNIT EFFICIENCIES (UnitProduction's m_efficiencies, GlobalAI
  *  +0x3c8): row the opposing unit, column the unit valued, AI_UNITS'
  *  order, raw 24.8 — the table the game computes once a game (0x79a440)

@@ -332,6 +332,7 @@ import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS, AI_CITY_EVENT_TYPES, AI_CITY_TREES
 import { AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_TEAMS, AI_TEAM_REQS, AI_TREES, AI_UNIT_AI, AI_UNIT_AI_PRIORITY } from '../data/aiOperations';
 import { MINOR_OP_DEFS } from '../core/minorOps';
 import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS, AI_UNIT_EFFICIENCY } from '../data/aiBuildTables';
+import { minorDistrictVerdict } from '../core/minorCityAi';
 import { AI_YIELDS } from '../core/aiWeights';
 import type { Era } from '../data/techs';
 import { BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CAMP_DIST_CITY, BARB_TECH_PCT, BARB_REGION_MIN,
@@ -1087,6 +1088,8 @@ export function buildRules() {
         resourceType: RESOURCE_IDS.map((r) => gameTypeOf('resource', r, 'RESOURCE_')),
         improvement: IMPROVEMENT_IDS.map((i) => gameTypeOf('improvement', i, 'IMPROVEMENT_')),
       },
+      // a minor's verdict per type (CITY_STATE_TYPES' order) on each AI district row
+      minorDistrictVerdict: CITY_STATE_TYPES.map((t) => AI_DISTRICTS.map((r) => minorDistrictVerdict(t, r.type))),
       // a minor's promotion class weights (MINOR_CIV_DEFAULT_TRAIT's list)
       minorPromotionWeights: Object.fromEntries([...new Set(AI_UNITS.map((u) => u.promotionClass).filter((c): c is string => !!c))]
         .map((c) => [c, promotionWeight(['MINOR_CIV_DEFAULT_TRAIT'], c)])),

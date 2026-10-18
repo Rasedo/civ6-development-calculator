@@ -422,9 +422,11 @@ export function reseatUnit(state: GameState, unit: Unit, seat: number): void {
   unit.seat = seat;
   unit.movesLeft = 0;
   unit.fortifyTurns = 0;
-  // a new owner's pool takes it as a new unit (`barbSlots`)
+  // a new owner takes it as a new unit: a new id (the knowledge bases'
+  // records of the old one age out) and a new slot in its pool (`barbSlots`)
   delete unit.slot;
   state.units = state.units.filter((u) => u.id !== unit.id);
+  unit.id = state.nextUnitId++;
   state.units.push(unit);
 }
 

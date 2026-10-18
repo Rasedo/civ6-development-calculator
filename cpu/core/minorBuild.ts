@@ -41,7 +41,7 @@ import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost, selectResearch } from './economy';
-import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchTurnsLeft, type ResearchChoice } from './aiResearch';
+import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchTurnsLeft, type ResearchChoice, type TechContract } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw } from './aiCivics';
 import { minorCity, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from './effects';
@@ -182,6 +182,20 @@ export function minorPower(state: GameState, cityState: CityState): void {
   cityState.powered = p.demand > 0 && (p.supply >= p.demand || !!cityState.fullyPowered);
 }
 
+/** the minor's Tech Contracts (its city AI's Add Goal Tech contracts): each
+ *  goal technology and the contract's value */
+function minorTechContracts(cityState: CityState): TechContract[] {
+  const ai = cityState.cityAi;
+  if (!ai) return [];
+  const out: TechContract[] = [];
+  for (const c of ai.contracts) {
+    const goal = ai.techContracts[c.id];
+    const tech = goal === undefined ? null : engineId('tech', goal, 'TECH_', TECHS);
+    if (tech) out.push({ tech, value: c.value });
+  }
+  return out;
+}
+
 /**
  * THE MINOR'S ECONOMY, in the order every player's start of turn runs
  * (tools/civ6lab/turn_order_civ6.md): its city's Science and Culture as the
@@ -195,7 +209,7 @@ export function minorPower(state: GameState, cityState: CityState): void {
 export function minorEconomy(state: GameState, cityState: CityState): number {
   let y = computeCityStats(state, minorCity(cityState)).total;
   const gained = minorResearch(state, cityState.research, cityState.seat, y.science, y.culture,
-    () => minorResearchResources(state, cityState), () => minorUrbanFit(state, cityState));
+    () => minorResearchResources(state, cityState), () => minorUrbanFit(state, cityState), minorTechContracts(cityState));
   if (gained > 0) y = computeCityStats(state, minorCity(cityState)).total;
   let upkeep = 0;
   for (const u of state.units) if (u.seat === cityState.seat) upkeep += unitMaintenance(u);
@@ -240,11 +254,12 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
  * modern fortifications around the City Centers of all current and future
  * cities and their Encampment districts" — `urban` fits the holder's cities
  * on its completion. `resources` gives the research analysis its resources
- * term. Returns how many trees completed a row this turn — the upgrade
- * trigger's count.
+ * term, `contracts` the seat's Tech Contracts. Returns how many trees
+ * completed a row this turn — the upgrade trigger's count.
  */
 export function minorResearch(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
-  resources: () => ((tech: string, turns: number) => number) | undefined, urban: () => void): number {
+  resources: () => ((tech: string, turns: number) => number) | undefined, urban: () => void,
+  contracts: readonly TechContract[]): number {
   let gained = 0;
   // THE TECHNOLOGIES: the turn's Science banks; a completion's choice reads
   // the research AI's analysis of the turn before (0x762d60); then the AI's
@@ -260,11 +275,11 @@ export function minorResearch(state: GameState, r: ResearchState, seat: number, 
     if (!r.techs.includes(cur)) r.techs.push(cur);
     delete r.techRetained[cur];
     r.tech = null;
-    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, resources()), cur, researchDraw(state)));
+    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, resources(), contracts), cur, researchDraw(state)));
     r.aiLeft = r.tech ? researchTurnsLeft(state, seat, r, r.tech, fxOf(science)) : 0;
     if (cur === URBAN_DEFENSES_TECH) urban();
   }
-  r.aiEntries = researchAnalysis(state, seat, science, {}, resources());
+  r.aiEntries = researchAnalysis(state, seat, science, {}, resources(), contracts);
   r.aiLeftSeen = r.aiLeft ?? 0;
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
   r.aiLeft = r.tech ? researchTurnsLeft(state, seat, r, r.tech, fxOf(science)) : 0;

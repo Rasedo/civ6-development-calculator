@@ -246,8 +246,24 @@ class SimResearch:
         # the value (`techValue`) and the resources term `researchAnalysis` adds
         val = self._rai_value(s, turns) + self._rai_resources(s, turns)
         base = torch.where(turns < 0, torch.zeros_like(val), val)
-        score = base + self._rai_upstream(have, base, turns)
+        score = base + self._rai_contracts(s, base, spent) + self._rai_upstream(have, base, turns)
         return turns, nxt, base, score, spent
+
+    def _rai_contracts(self, s: int, base: torch.Tensor, spent: torch.Tensor) -> torch.Tensor:
+        """the seat's Tech Contracts (its city AI's Add Goal Tech contracts):
+        per row the values of the contracts on it, an unowned row's whose
+        score is not negative (0x761980); the Free Cities hold none"""
+        from .sim_citytrees import GOAL_TECH  # sim_citytrees imports this module
+        add = torch.zeros_like(base)
+        ai = self.cityai
+        if s >= ai.S:
+            return add
+        on = (ai.c_id[:, s] >= 0) & (ai.c_goal_kind[:, s] == GOAL_TECH) & (ai.c_goal[:, s] >= 0)
+        if not bool(on.count_nonzero()):
+            return add
+        add.scatter_add_(1, ai.c_goal[:, s].clamp(min=0, max=base.shape[1] - 1),
+                         torch.where(on, ai.c_value[:, s], torch.zeros_like(ai.c_value[:, s])))
+        return torch.where(~spent & (base >= 0), add, torch.zeros_like(add))
 
     def _ai_district_share(self, s: int) -> torch.Tensor:
         """[B] a district's share at minor `s`'s pseudo-yield weight

@@ -707,7 +707,8 @@ class SimMinors:
         prog[:, s] = torch.where(alive, prog[:, s] + sci + self.citystate_tech_ovf[:, s], prog[:, s])
         self.citystate_tech_ovf[:, s] = torch.where(alive, torch.zeros_like(self.citystate_tech_ovf[:, s]),
                                                     self.citystate_tech_ovf[:, s])
-        c = self.citystate_cur_tech[:, s]
+        # the research in hand, kept apart from the column the completion clears
+        c = self.citystate_cur_tech[:, s].clone()
         cval = rc.gather(1, c.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
         fire = alive & (c >= 0) & (prog[:, s] >= cval)
         gained = gained + fire.long()
@@ -740,7 +741,8 @@ class SimMinors:
         prog[:, s] = torch.where(alive, prog[:, s] + cul + ovf[:, s], prog[:, s])
         ovf[:, s] = torch.where(alive, torch.zeros_like(ovf[:, s]), ovf[:, s])
         # THE COMPLETION and its choice
-        c = cur[:, s]
+        # the civic in hand, kept apart from the column the completion clears
+        c = cur[:, s].clone()
         cval = rc.gather(1, c.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
         fire = alive & (c >= 0) & (prog[:, s] >= cval)
         gained = gained + fire.long()

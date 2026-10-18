@@ -805,9 +805,15 @@ class SimTactics:
         def own_at(pl: torch.Tensor) -> torch.Tensor:
             return (pl >= 0) & (self.unit_seat[rows].gather(1, pl.clamp(min=0)) == seat)
 
-        # where it may not end: its own military-domain unit (ashore, afloat
-        # or embarked), any other player's unit
-        no_end = own_at(self.military_at[rows]) | own_at(self.embarked_at[rows]) | self._tac_foreign(seat)[rows]
+        # where it may not end: its own unit of its own stacking class (a
+        # military one ashore, afloat or embarked; a civilian; a support
+        # unit), any other player's unit
+        civ_u = self._type_civilian.take(ut).unsqueeze(1)
+        sup_u = self._type_support.take(ut).unsqueeze(1)
+        own_mil = own_at(self.military_at[rows]) | own_at(self.embarked_at[rows])
+        own_same = torch.where(civ_u, own_at(self.civilian_at[rows]),
+                               torch.where(sup_u, own_at(self.support_at[rows]), own_mil))
+        no_end = own_same | self._tac_foreign(seat)[rows]
         # how far its Movement carries it
         mp = mp_p[rows, sr].clone()
         full = getattr(self, f"{pre}_unit_mp_full")[rows, sr]

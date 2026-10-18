@@ -473,7 +473,8 @@ class SimMinorAi:
         district stands, a district may stand where the analysis values one,
         an unowned plot beside one of the minor's — and its improvements' and
         districts' values in database order. An improvement the ground does
-        not take, a district the plot cannot hold or the city has: FX(-9999).
+        not take, a district the plot cannot hold or the city has, one the
+        minor's type disfavours (`minorDistrictVerdict`): FX(-9999).
         The centre and a district's plot stand unanalysed (0). T: an
         improvement's the research and civics AIs' turns to its technology
         and civic (the larger), a district's its build turns plus those. The
@@ -530,7 +531,10 @@ class SimMinorAi:
                 continue
             pl = self._minor_district_plane(s, dv, False, False).gather(1, p0) & ev & (held[:, dv] < 0).unsqueeze(1)
             if bool(pl.count_nonzero()):
-                cand_rows.append((i, r["type"], dv, pl))
+                # the minor's type's verdict: a district it disfavours is
+                # valued at none of its plots (it stays among the others)
+                ok_t = T["minor_dverdict"].to(dev)[self.citystate_type[:, s].clamp(min=0), i] >= 0
+                cand_rows.append((i, r["type"], dv, pl, ok_t))
         # each plot's facts, the plots grouped by their improvement,
         # resource and feature
         PN = T["plot_names"]
@@ -552,7 +556,7 @@ class SimMinorAi:
                             PN["improvement"][ii] if ii >= 0 else None,
                             PN["resourceType"][ri] if ri >= 0 else None,
                             PN["feature"][fi] if fi >= 0 else None,
-                            [(name, pl[bb, pp]) for (_i, name, _dv, pl) in cand_rows])
+                            [(name, pl[bb, pp]) for (_i, name, _dv, pl, _ok) in cand_rows])
             for i, r in enumerate(imp_rows):
                 ke = int(imp_eng[i])
                 if ke < 0:
@@ -564,8 +568,8 @@ class SimMinorAi:
                     continue
                 v = self._cv_improvement(pf, r["type"], ti, torch.full_like(bb, hz))
                 imps[bb, pp, i] = torch.where(gi, v, torch.full_like(v, _FX_MIN))
-            for (i, name, _dv, pl) in cand_rows:
-                ci = pl[bb, pp]
+            for (i, name, _dv, pl, ok_t) in cand_rows:
+                ci = pl[bb, pp] & ok_t[bb]
                 ti = distT[i][bb]
                 # landing past the horizon: FX(-9999)
                 if not bool(ci.any()) or bool((ti > hz).all()):

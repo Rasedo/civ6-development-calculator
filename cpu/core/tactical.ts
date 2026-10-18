@@ -590,7 +590,9 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
       continue;
     }
     const civs = here.filter((u) => unitIsNoncombat(u.type) && !UNITS[u.type]?.trader && !unitReligious(u.type));
-    if (civs.length === 1 && civs[0].seat !== seat) {
+    // the plot's one civilian ends its chain, the player's own included
+    // (a NEUTRAL_CIVILIAN, no entry)
+    if (civs.length === 1) {
       if (unitsHostile(state, me, civs[0])) out.push({ type: 'CIVILIAN', tile: t.index, seat: civs[0].seat, unit: civs[0] });
       continue;
     }

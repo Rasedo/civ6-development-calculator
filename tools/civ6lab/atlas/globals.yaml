@@ -86,6 +86,7 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - ...nothing), x1.5 if favored ([+0x268], the leader's Civics lists' AiFavoredItems; 1.5 at 0xd2f32c).
   review: imported
@@ -126,6 +127,17 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- A contract (vtable 0xd5b948; progress +0x100: 1 CLAIMED, 2 SUBMITTED, 3 ACCEPTED, 4 FAILED, 5 IN PROGRESS, 6 CANCEL..."
+  review: imported
+- addr: 0xd5bae8
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 6
+      value: "runs/h1_duelv1124 t6 player 4: Writing 251.0 = 124.0 + its   Tech Contract 127.0, Astrology 124.0 none)."
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...search AI's list (+0x210, 0x10 an entry) walked, each live contract's interface (vtable 0xd5bae8) called at +0x40 = 0x5f36e0: 0x761980(research AI, the contract's tech +0x408, its va..."
   review: imported
 - addr: 0xd5d420
   kind: global

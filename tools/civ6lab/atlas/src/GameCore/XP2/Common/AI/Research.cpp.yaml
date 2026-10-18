@@ -45,6 +45,7 @@
     - cpu/core/minorBuild.ts:minorResearch
     - cpu/core/types.ts:ResearchState
     - cpu/data/aiResearch.ts:RESEARCH_AI_TASK_BIAS
+    - cpu/core/aiResearch.ts:researchAnalysis
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
@@ -93,11 +94,18 @@
 - addr: 0x761980
   final: 0x4f9810
   kind: function
-  status: PARTLY
+  name: addTechContractValue
+  semantics: adds a value to a technology's entry score (+0x14) where the score is not negative and the row unowned (+0x18)
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 6
+      value: player 4's Writing 251.0 = 124.0 + its Tech Contract 127.0; Astrology 124.0
+  impl: [cpu/core/aiResearch.ts:researchAnalysis, gpu/core/sim_research.py:_rai_contracts]
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the score), the propagation, then: with no research the choi..."
-  review: imported
+  review: reviewed
 - addr: 0x761b70
   final: 0x4f9990
   kind: function

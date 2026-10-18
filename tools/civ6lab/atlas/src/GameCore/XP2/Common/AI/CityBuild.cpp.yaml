@@ -364,6 +364,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...== f2f988?) & cond -> +5.0. Initial best FX(-9999). CITY ANALYSIS job vtable d59af0 -> 0x5ce910 -> 0x5ce970 (per PLOT eval): +0x20 districts, +0x28 buildings, +0x30 improvements, +0x38 projects, +0x40 units...."
   context:
@@ -486,6 +487,22 @@
   context:
     - ...(0x5ce5b0) runs the same pick on an empty queue (queue +0x1e0 / +0x1d0) and then walks 0x5d2810's items through 0x68be60.
     - "...oject, queued by 0x5c9ea0 / 0x5ca5a0 / 0x5ca450; with none, or the queue refusing it, 0x5d2810's item for a full civilization (\"Generic Offense\"), \"NO BUILDS AT ALL (maybe city was n..."
+  review: reviewed
+- addr: 0x5d2ae0
+  final: 0x2ea6f0
+  kind: function
+  name: districtVerdict
+  semantics: "the player's verdict on a Districts row: its districts list (+0x40) above 0 -> 1, else the sign; the plot analysis writes FX(-9999) on -1 and takes x1.5 on 1"
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 2
+      value: no city-state values a Holy Site; Valletta's Encampment 59.93 at (15,10), unscaled
+  impl: [cpu/core/minorCityAi.ts:minorDistrictVerdict, gpu/core/sim_minorai.py:_minor_plot_evals]
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  context:
+    - "...analysis' district loop (0x5ce970, 0x5ced80..0x5cefed), per Districts row: the verdict 0x5d2ae0 (the player's districts list, [rbp-0x70] +0x40 per row: above 0 -> 1, else its sign) of..."
   review: reviewed
 - addr: 0x5d2bc0
   final: 0x3e63c0

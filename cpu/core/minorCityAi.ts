@@ -34,7 +34,7 @@ import { CIVICS as CIVICS_KNOWN } from '../data/civics';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import { GAME_COST_ESCALATION, gameProgressPct, scaleByGameSpeed } from '../data/constants';
-import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
+import { AI_BUILDINGS, AI_DISTRICT_LISTS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS } from '../data/aiCityTrees';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
@@ -138,6 +138,19 @@ function groundImprovements(state: GameState, cs: CityState, tile: Tile): Set<st
   return out;
 }
 
+/** a minor's verdict on a district by its type, its traits' district lists summed
+ *  (AiLists System Districts: MINOR_CIV_DEFAULT_TRAIT disfavours the
+ *  specialty districts, its type's trait favours its own): 1 favoured, -1
+ *  disfavoured — the analysis values no district it disfavours
+ *  (runs/h1_duelv1117: no city-state's plot ever values a Holy Site; the
+ *  cultural Antananarivo values Theaters, the militaristic Valletta
+ *  Encampments) — 0 neither */
+export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1 {
+  const v = (AI_DISTRICT_LISTS.MINOR_CIV_DEFAULT_TRAIT?.[district] ?? 0)
+    + (AI_DISTRICT_LISTS[`MINOR_CIV_${type.toUpperCase()}_TRAIT`]?.[district] ?? 0);
+  return v > 0 ? 1 : v < 0 ? -1 : 0;
+}
+
 /**
  * THE PLOT ANALYSIS of a minor's city (0x5ce970 per plot, the centre first):
  * per plot its flags — the seat owns it, an improvement may stand on its
@@ -145,7 +158,8 @@ function groundImprovements(state: GameState, cs: CityState, tile: Tile): Set<st
  * where the analysis values one, an unowned plot beside one of the seat's —
  * and its improvements' and districts' values in database order. An
  * improvement the ground does not take, a district the plot cannot hold or
- * the city has: FX(-9999). The centre and a district's plot stand
+ * the city has, one the minor's type disfavours (`minorDistrictVerdict`):
+ * FX(-9999). The centre and a district's plot stand
  * unanalysed (0). T: an improvement's the research and civics AIs' turns to
  * its technology and civic (the larger), a district's its build turns plus
  * those. A flood's turns as the AI expects them (`floodHazardTurns`); LAB: the
@@ -263,6 +277,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       if (row.trait !== null || row.type === 'DISTRICT_CITY_CENTER' || row.type === 'DISTRICT_WONDER') return FX_MIN;
       const id = DISTRICT_ENGINE.get(row.type) ?? null;
       if (!id || (cs.districts ?? []).some((c) => c.type === id) || !placeable(id)) return FX_MIN;
+      if (minorDistrictVerdict(cs.type, row.type) < 0) return FX_MIN;
       return districtValue(df, row.type, distT[i], AI_VALUE_HORIZON);
     });
     out.push({

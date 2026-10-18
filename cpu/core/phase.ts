@@ -993,7 +993,7 @@ export function freeCitiesPhase(state: GameState): void {
   const free = freeSeatOf(state);
   const urban = () => urbanDefensesFit(state, FREE_SEAT);
   if (free.cities.length === 0) {
-    minorResearch(state, free.research, FREE_SEAT, 0, 0, () => undefined, urban);
+    minorResearch(state, free.research, FREE_SEAT, 0, 0, () => undefined, urban, []);
     return;
   }
   // a Free City's reactor keeps its clock: the seat resolves no power, so the
@@ -1010,7 +1010,7 @@ export function freeCitiesPhase(state: GameState): void {
     science += s.total.science;
     culture += s.total.culture;
   }
-  if (minorResearch(state, free.research, FREE_SEAT, science, culture, () => undefined, urban) > 0) {
+  if (minorResearch(state, free.research, FREE_SEAT, science, culture, () => undefined, urban, []) > 0) {
     luxMap = luxuryAmenities(state, FREE_SEAT);
     mods = getModifiers(state, FREE_SEAT);
     free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, luxMap, mods); });
