@@ -37,6 +37,7 @@
  * the browser build
 imports this.
  */
+import { AI_GOVERNMENTS } from '../../ai/major/tables';
 import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { installType } from './minorBuild';
@@ -651,7 +652,16 @@ function researchRecord(r: ResearchState | undefined): number[] {
       const e = cents.get(id)!;
       return [e.turns, idx(CIVIC_IDX, e.next), e.base, e.score, e.owned ? 1 : 0];
     }) : []),
+    r?.civicGovValues ? 1 : 0,
+    ...govValuesRow(r),
   ];
+}
+
+/** the civics AI's government values in the governments' database order,
+ *  none before its first turn */
+function govValuesRow(r: ResearchState | undefined): number[] {
+  const g = r?.civicGovValues;
+  return g ? AI_GOVERNMENTS.map((x) => g[x.type] ?? 0) : [];
 }
 
 const wwPairs = (rec: Record<number, number>, live: (v: number) => boolean): number[] => {
@@ -932,6 +942,9 @@ const CITY_STATE_G: Record<string, Extractor> = {
       return [e.turns, idx(CIVIC_IDX, e.next), e.base, e.score, e.owned ? 1 : 0];
     });
   }),
+  // the civics AI's government values (+0xb38) in the governments' database
+  // order; empty before its first turn
+  minorCivicGovValues: overCityStates((cityState) => govValuesRow(cityState.research)),
   minorResearchLeft: overCityStates((cityState) => [cityState.research.aiLeft ?? 0, cityState.research.aiLeftSeen ?? 0]),
   minorTechOverflow: overCityStates((cityState) => cityState.research.techOverflow ?? 0),
   minorCivicOverflow: overCityStates((cityState) => cityState.research.civicOverflow ?? 0),

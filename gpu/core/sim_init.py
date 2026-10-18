@@ -300,6 +300,11 @@ class SimInit:
         self.citystate_cai_score = torch.zeros(B, r_pad, nc_ai, dtype=torch.long, device=device)
         self.citystate_cai_owned = torch.zeros(B, r_pad, nc_ai, dtype=torch.bool, device=device)
         self.citystate_cai_valid = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
+        # the civics AI's government values (+0xb38, raw, the governments'
+        # database order) its last turn wrote, and whether it has had one
+        # (`ResearchState.civicGovValues`)
+        self.citystate_gov_values = torch.zeros(B, r_pad, len(rules.civic_ai["governments"]), dtype=torch.long, device=device)
+        self.citystate_gov_valid = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         # its strength over every domain as its turn started, before its
         # production (`Seat.unitStrength`, `_store_unit_strength`)
         self.citystate_unit_strength = torch.zeros(B, r_pad, dtype=torch.long, device=device)

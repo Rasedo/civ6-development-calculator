@@ -452,7 +452,9 @@
             "citystate_cai_next",
             "citystate_cai_base",
             "citystate_cai_score",
-            "citystate_cai_owned"
+            "citystate_cai_owned",
+            "citystate_gov_values",
+            "citystate_gov_valid"
           ],
           "note": "the Free Cities' research (`minorResearch` on `freeSeat.research`; the research row `FR`): its techs and civics, progress, items in hand, goal, overflows, turns left, kept progress and the two AIs' last analyses; empty until its first turn makes the seat."
         },
@@ -2063,6 +2065,18 @@
             "citystate_cai_valid"
           ],
           "note": "the civics AI's analysis of the last turn, per civic [turns, next, base, score, owned]; empty before the first"
+        },
+        {
+          "name": "minorCivicGovValues",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.civicGovValues"
+          ],
+          "planes": [
+            "citystate_gov_values",
+            "citystate_gov_valid"
+          ],
+          "note": "the civics AI's government values (+0xb38) its last turn wrote, in the governments' database order; empty before the first"
         },
         {
           "name": "minorCurrentCivic",
@@ -4287,10 +4301,6 @@
       {
         "path": "GameState.barbCaptures",
         "why": "the turn's captures awaiting their operations, read and cleared at the barbarians' turn's end: never live at a compare point."
-      },
-      {
-        "path": "ResearchState.civicGovValues",
-        "why": "TS only: the civics AI's government values (+0xb38) need the policy and government scoring, which the GPU does not port yet (AUDIT C-98 BUILD); its civics value carries no government term until then."
       }
     ],
     "gpu": [

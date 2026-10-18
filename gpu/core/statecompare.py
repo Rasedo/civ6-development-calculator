@@ -320,7 +320,15 @@ def _research_record(sim, b: int, s: int) -> list:
         out += [v for c in range(sim.citystate_cai_turns.shape[2]) for v in (
             int(sim.citystate_cai_turns[b, s, c]), int(sim.citystate_cai_next[b, s, c]), int(sim.citystate_cai_base[b, s, c]),
             int(sim.citystate_cai_score[b, s, c]), int(sim.citystate_cai_owned[b, s, c]))]
-    return out
+    gv = bool(sim.citystate_gov_valid[b, s])
+    out.append(1 if gv else 0)
+    return out + _gov_values_row(sim, b, s)
+
+
+def _gov_values_row(sim, b: int, s: int) -> list:
+    """`govValuesRow`: the civics AI's government values in the
+    governments' database order, none before its first turn"""
+    return [int(x) for x in sim.citystate_gov_values[b, s].tolist()] if bool(sim.citystate_gov_valid[b, s]) else []
 
 
 def _barb_tribes_row(sim, b: int) -> list[int]:
@@ -931,6 +939,7 @@ CITY_STATE = {
             int(sim.citystate_cai_turns[b, s, c]), int(sim.citystate_cai_next[b, s, c]), int(sim.citystate_cai_base[b, s, c]),
             int(sim.citystate_cai_score[b, s, c]), int(sim.citystate_cai_owned[b, s, c]))]
         if bool(sim.citystate_cai_valid[b, s]) else [] for s in rows],
+    "minorCivicGovValues": lambda sim, b, rows: [_gov_values_row(sim, b, s) for s in rows],
     "minorResearchLeft": lambda sim, b, rows: [[int(sim.citystate_ai_left[b, s]), int(sim.citystate_ai_left_seen[b, s])] for s in rows],
     "minorTechOverflow": lambda sim, b, rows: [float(sim.citystate_tech_ovf[b, s]) for s in rows],
     "minorCivicOverflow": lambda sim, b, rows: [float(sim.citystate_civic_ovf[b, s]) for s in rows],

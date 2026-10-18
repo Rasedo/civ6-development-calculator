@@ -130,6 +130,7 @@ class SimCivics:
         era = T["era"].unsqueeze(0)
         game = self.game_era.unsqueeze(1)
         own = self._rai_from_landing(torch.full((B, NC), T["own"], dtype=torch.long, device=self.device), nn)
+        own = own + self._cai_gov_term(s, B, NC)
         own = torch.where(era < game, _fmul(own, (game - era) * _FX), own)
         u = T["unlocks"].unsqueeze(0)
 
@@ -155,6 +156,25 @@ class SimCivics:
         val = (own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * district
                + m[:, :, 3] * formation.unsqueeze(1) + T["floor"] + tokens + spies + adjacency)
         return torch.where(turns >= T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
+
+    def _cai_gov_term(self, s: int, B: int, NC: int) -> torch.Tensor:
+        """[B, NC] the civic value's governments (0x7a9a10): per government
+        a civic unlocks, max(v - v(current), v / 2) of the government values
+        the civics AI's last turn wrote (none before its first; a
+        city-state's current government Chiefdom, the Free Cities' none),
+        bare, before the era count"""
+        Tp = self._pol_tables()
+        out = torch.zeros(B, NC, dtype=torch.long, device=self.device)
+        valid = self.citystate_gov_valid[:, s]
+        if not bool(valid.count_nonzero()):
+            return out
+        gv = self.citystate_gov_values[:, s]
+        cur = gv[:, Tp["cs_gov"]] if s != self.FR and Tp["cs_gov"] >= 0 else torch.zeros(B, dtype=torch.long, device=self.device)
+        for c, gs in Tp["gov_of"].items():
+            for g in gs:
+                v = gv[:, g]
+                out[:, c] = out[:, c] + torch.maximum(v - cur, v >> 1)
+        return torch.where(valid.unsqueeze(1), out, torch.zeros_like(out))
 
     def _cai_strength(self, s: int) -> torch.Tensor:
         """[B] minor `s`'s strength over every domain (`domainStrength`) as
@@ -254,11 +274,18 @@ class SimCivics:
         self._cai_take(s, self._cai_choice(s, fire, ent, done))
 
     def _cai_turn(self, s: int, alive: torch.Tensor, cul: torch.Tensor) -> None:
-        """the AI's turn (0x620110): the analysis, kept for the next
-        completion, and with nothing in hand the choice"""
+        """the AI's turn (0x620110): the analysis on the government values
+        its last turn wrote, kept for the next completion, this turn's
+        government values kept for the next analysis (`governmentValues`),
+        and with nothing in hand the choice"""
+        # its government values on the policy scores its last analysis lists
+        # (0x620110), which the next turn's analysis reads
+        gov = self._pol_gov_values(s)
         ent = self._cai_analysis(s, cul)
         turns, nxt, base, score, owned = ent
         m = alive.unsqueeze(1)
+        self.citystate_gov_values[:, s] = torch.where(m, gov, self.citystate_gov_values[:, s])
+        self.citystate_gov_valid[:, s] = self.citystate_gov_valid[:, s] | alive
         self.citystate_cai_turns[:, s] = torch.where(m, turns, self.citystate_cai_turns[:, s])
         self.citystate_cai_next[:, s] = torch.where(m, nxt, self.citystate_cai_next[:, s])
         self.citystate_cai_base[:, s] = torch.where(m, base, self.citystate_cai_base[:, s])

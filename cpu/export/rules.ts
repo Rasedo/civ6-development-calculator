@@ -33,10 +33,11 @@ import { PANTHEONS, RELIGION_TYPES, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_B
 import { PROJECTS, isSpaceProject, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import {
-  AI_DISCOUNT_PCT, AI_PROJECT_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON,
+  AI_DISCOUNT_PCT, AI_POLICY_HORIZON, AI_PROJECT_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON,
   PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
 } from '../data/aiValue';
 import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
+import { AI_GOVERNMENTS, AI_POLICIES, AI_SLOT_TYPES } from '../../ai/major/tables';
 import { CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
 import { techUnlocks } from '../core/aiResearch';
 import { civicUnlocks } from '../core/aiCivics';
@@ -318,7 +319,7 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
 
 import { RESOURCES } from '../../world/resources';
 import { AI_RESOURCE_EXPORT, aiTechResources } from '../core/aiResource';
-import { AI_CIVIC_MODIFIERS, AI_DEFAULT_SAVINGS, AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
+import { AI_CIVIC_MODIFIERS, AI_DEFAULT_SAVINGS, AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD, AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
 /** an engine row's install type: its own where that names it, else the one
  *  its catalog tag names */
@@ -1140,6 +1141,15 @@ export function buildRules() {
       // a player in no government's points a token (EFFECT_GRANT_INFLUENCE_TOKEN):
       // Chiefdom's threshold at the speed
       tokenPoints: Math.trunc((AI_GOVERNMENT_INFLUENCE_THRESHOLD.GOVERNMENT_CHIEFDOM * COST_MULTIPLIER_PCT) / 100),
+      // the policy and government values (`aiPolicyValue.ts`): the cards, the
+      // governments and the slot types in database order, the policy horizon,
+      // a city-state's government
+      policies: AI_POLICIES,
+      governments: AI_GOVERNMENTS,
+      slotTypes: AI_SLOT_TYPES,
+      policyHorizon: AI_POLICY_HORIZON,
+      cityStateGovernment: gameTypeOf('government', CITY_STATE_GOVERNMENT, 'GOVERNMENT_'),
+      gpClassPseudo: AI_GP_CLASS_PSEUDOYIELD,
     },
     cityState: {
       government: CITY_STATE_GOVERNMENT,

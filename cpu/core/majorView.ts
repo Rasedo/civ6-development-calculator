@@ -284,12 +284,13 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     gameEra: state.gameEra ?? 0,
     cityStates: state.cityStates.length,
     civicsHeld: (i) => inputs.civicsHeld?.(i) ?? new Set(seat(i).research.civics.filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))),
-    // the civics AI's last analysis (a city-state's kept on its research, a
-    // major's taken now), its rows whose score the analysis job left above 0
-    // — the row's own value, the turn's propagation not yet run
-    // (runs/h1_duelw1121: a city-state's Charismatic Leader first scores the
-    // turn after Political Philosophy comes within the horizon, 102 of 105)
-    civicList: (i) => new Set((seat(i).research.civicAiEntries ?? civicAnalysis(state, i, seat(i).culRate ?? 0, weightInputs(i)))
+    // the civics AI's last analysis (a city-state's and the Free Cities' kept
+    // on their research, none before their first; a major's taken now), its
+    // rows whose score the analysis job left above 0 — the row's own value,
+    // the turn's propagation not yet run (runs/h1_duelw1121: a city-state's
+    // Charismatic Leader first scores the turn after Political Philosophy
+    // comes within the horizon, 102 of 105; none of its cards at t1)
+    civicList: (i) => new Set((seat(i).research.civicAiEntries ?? (isCiv(i) ? civicAnalysis(state, i, seat(i).culRate ?? 0, weightInputs(i)) : []))
       .filter((e) => e.base > 0).map((e) => gameTypeOf('civic', e.civic, 'CIVIC_'))),
     government: (i) => {
       const g = seatGovernment(state, i);
