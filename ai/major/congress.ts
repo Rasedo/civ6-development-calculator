@@ -40,7 +40,7 @@ import { AI_DISTRICTS, AI_GOVERNMENTS, AI_POLICIES, AI_PROJECTS, AI_PROMOTION_CL
   AI_RESOLUTION_LEADER_TRAITS, AI_RESOLUTION_LISTS, AI_RESOLUTION_LISTS_BY_STRATEGY, AI_RESOLUTION_LISTS_BY_TRAIT, AI_SLOT_TYPES, AI_STRATEGIES } from './tables';
 import type { AiResolution } from './types';
 import type { MajorView } from './view';
-import { policyObsolete, policyScore } from './policies';
+import { policyObsolete, policyScore } from '../../cpu/core/aiPolicyValue';
 import { AI_RATE, FX } from '../../cpu/core/aiValue';
 import { modifiersValue } from '../../cpu/core/aiModifiers';
 import { voteCost, votesFor } from '../../cpu/core/congress';

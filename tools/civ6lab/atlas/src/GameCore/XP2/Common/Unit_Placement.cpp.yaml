@@ -123,6 +123,8 @@
     - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:alternateLocation
     - cpu/core/tactical.ts:moveBarred
+    - cpu/core/tactical.ts:bestIn
+    - gpu/core/sim_tactics.py:_op_move_exec
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"

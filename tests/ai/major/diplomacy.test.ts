@@ -11,7 +11,7 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     civicsHeld: () => new Set(), civicList: () => new Set(), government: () => null,
     governmentsHeld: () => new Set(), governmentsUnlocked: () => new Set(), slots: () => [], slotsUnder: () => [],
     policiesSlottableUnder: () => new Set(), darkAge: () => false, goldenAge: () => false,
-    greatPersonClassAvailable: () => true, cities: () => [], cityYield: () => 0, policyColumn: () => -1, governmentColumn: () => -1,
+    greatPersonClassAvailable: () => true, fullCiv: () => true, cities: () => [], cityYield: () => 0, policyColumn: () => -1, governmentColumn: () => -1,
     pantheonColumn: () => -1, beliefColumn: () => null, religionColumn: () => -1, religionsFounded: () => new Set(),
     pantheonOpen: () => false, religionOpen: () => false, beliefPicks: () => 0, treasury: () => 0, missionOpen: () => null, actionOpen: () => null, warOpen: () => false,
     declaredFriends: () => false, allied: () => false, denouncing: () => false, favor: () => 0, congressTarget: () => 0,

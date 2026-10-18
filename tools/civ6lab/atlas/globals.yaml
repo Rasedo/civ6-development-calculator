@@ -235,6 +235,18 @@
   context:
     - "- The evaluation (0x7bc580, vtable 0xd71c30 slot 1, at the player's activation): a strategy disqualified for good is skipped; a vic..."
   review: imported
+- addr: 0xd760f8
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 7
+      value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  context:
+    - "...FROM\") is unread. THE SECOND OFFER (0x60a8c0): the evaluator's satisfied test (vtable @0xd760f8 +8, 0xb3c380) answers false always, so after the first offer (the units in no job, not..."
+  review: imported
 - addr: 0xdb11b8
   kind: global
   status: READ

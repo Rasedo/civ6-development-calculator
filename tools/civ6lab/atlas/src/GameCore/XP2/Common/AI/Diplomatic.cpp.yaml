@@ -284,3 +284,15 @@
   context:
     - "...rom sender to receiver and the mission is set; then the sender's AI records the answer (0x6543a0: a refusal returns the cost to savings slot 2; answer 12 sets +0x6338[p][a]). Confirmed..."
   review: reviewed
+- addr: 0x6544d0
+  final: 0x434ed0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 50
+      value: "runs/h1_duelv1117 Caguana t50: three   Warrior records on 611 seen t33, t35, t50 — the last alone counts, 20   against 23 + 23, no threat, and the game starts no City Defense."
+  readings: ["C-95: an operation's enemy strength — READ (0x73eb60), ported"]
+  context:
+    - "...heck (0x73abf0), the evaluation's own strength (0x746d07), the city value (0x7a0142), 0x654c9a, 0x7aed3b. runs/h1_duelv1117 Caguana t50: three Warrior records on 611 seen t33, t35, t..."
+  review: imported

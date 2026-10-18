@@ -328,12 +328,16 @@
     - recording: h1_duelw1117
       turn: 85
       value: "runs/h1_duelw1117 Antananarivo t85-90 and runs/h1_duelw1118 Armagh t83-95: the next-plot scorer's -1 for the Niter beside 339/340 and 872 counts from the turn China (their suzerain) holds Military Eng"
-  impl: [cpu/core/minorBuild.ts:minorResourceCounts, cpu/core/aiPlotValue.ts:PlotValueFacts]
+  impl:
+    - cpu/core/minorBuild.ts:minorResourceCounts
+    - cpu/core/aiPlotValue.ts:PlotValueFacts
+    - cpu/core/aiCityTrees.ts:CityTreeWorld
   readings:
     - "Border plot: GetNextBuyablePlot — READ"
     - "H-1: a city-state sees its suzerain's resources — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...to the total, at 1 into the   inner ring; a feature within 2 counted; a resource the player sees   (0x4ab4b0) counted by its plot's amount, and at distance 1 one the player   holds none of (0x4aa790, ownershi..."
   context:

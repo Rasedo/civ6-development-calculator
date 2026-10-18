@@ -284,8 +284,13 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     gameEra: state.gameEra ?? 0,
     cityStates: state.cityStates.length,
     civicsHeld: (i) => inputs.civicsHeld?.(i) ?? new Set(seat(i).research.civics.filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))),
-    civicList: (i) => new Set(civicAnalysis(state, i, seat(i).culRate ?? 0, weightInputs(i)).filter((e) => e.score > 0)
-      .map((e) => gameTypeOf('civic', e.civic, 'CIVIC_'))),
+    // the civics AI's last analysis (a city-state's kept on its research, a
+    // major's taken now), its rows whose score the analysis job left above 0
+    // — the row's own value, the turn's propagation not yet run
+    // (runs/h1_duelw1121: a city-state's Charismatic Leader first scores the
+    // turn after Political Philosophy comes within the horizon, 102 of 105)
+    civicList: (i) => new Set((seat(i).research.civicAiEntries ?? civicAnalysis(state, i, seat(i).culRate ?? 0, weightInputs(i)))
+      .filter((e) => e.base > 0).map((e) => gameTypeOf('civic', e.civic, 'CIVIC_'))),
     government: (i) => {
       const g = seatGovernment(state, i);
       return g ? govType(g) : null;
@@ -309,11 +314,13 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     },
     darkAge: (i) => inDarkAge(state, i),
     goldenAge: (i) => seat(i).age === 2,
+    fullCiv: (i) => isCiv(i),
     greatPersonClassAvailable: (cls) => {
       const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
       return !GP_CLASSES.includes(c) || gpOffer(state, c) !== -2;
     },
-    cities: (i): AiCityView[] => citiesOf(state, i).map((c) => ({ id: c.id, capital: c.isCapital })),
+    // a city-state's one city is its capital
+    cities: (i): AiCityView[] => seatCities(i).map((c) => ({ id: c.id, capital: c.isCapital || isCityStateSeat(i) })),
     cityOwnedPlots: (i, id): AiPlotView[] => {
       // a city-state's one city is its own view (`minorCity`, id -1) and owns
       // its whole ground
@@ -344,11 +351,11 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     },
     yieldWeight: (i, type) => weightsOf(i)[type] ?? 0,
     pseudoYieldWeight: (i, type) => pseudoOf(i).get(type) ?? 0,
-    districts: (i): AiDistrictView[] => citiesOf(state, i).flatMap((c) => c.districts
+    districts: (i): AiDistrictView[] => seatCities(i).flatMap((c) => c.districts
       .filter((d) => d.type !== 'CITY_CENTER')
       .map((d) => ({ cityId: c.id, type: districtType(d.type) }))),
     districtYield: (i, id, type, yieldType) => {
-      const city = citiesOf(state, i).find((c) => c.id === id);
+      const city = cityOf(i, id);
       const key = YIELD_KEY[yieldType];
       const d = city?.districts.find((x) => districtType(x.type) === type);
       return city && d && key ? districtYieldOf(state, i, city, d, key) : 0;

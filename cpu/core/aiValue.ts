@@ -202,6 +202,10 @@ export interface AiValueView {
   districtBuildingYields(seat: number, district: string, yieldType: string): readonly { building: string; amount: number }[];
   /** the seat's trade route capacity (PlayerTrade +0xf0) */
   tradeRouteCapacity(seat: number): number;
+  /** the seat's civilization level is a full civilization's
+   *  (CIVILIZATION_LEVEL_FULL_CIV: CanEarnGreatPeople and CanGiveInfluence,
+   *  which a city-state's and the Free Cities' levels lack) */
+  fullCiv(seat: number): boolean;
   /** the seat's best combat strength (PlayerStats +0xf0, 0x4d9320: the
    *  strongest melee strength it has trained, m_iMaxMeleeStrengthTrained) */
   bestCombatStrength(seat: number): number;

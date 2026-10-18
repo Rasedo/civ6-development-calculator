@@ -6,7 +6,7 @@
 - addr: 0x2f1ed0
   kind: function
   status: PARTLY
-  impl: [cpu/core/quests.ts:gpTargets]
+  impl: [cpu/core/quests.ts:gpTargets, cpu/core/aiPolicyValue.ts:policyObsolete]
   readings:
     - "H-1: the city-states' quests — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"

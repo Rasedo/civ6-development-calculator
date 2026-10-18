@@ -499,7 +499,7 @@
   kind: function
   name: ObsoletePolicies
   status: PARTLY
-  impl: [ai/major/policies.ts:policyObsolete]
+  impl: [cpu/core/aiPolicyValue.ts:policyObsolete, cpu/core/aiPolicyValue.ts:policyObsolete]
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - "- The value (0x7b26b0): FX_MIN when start >= horizon or the card is obsolete (0x39e050: an ObsoletePolicies row whose ObsoletePolicy is unlocked, 0x39e1e0, or whose RequiresA..."

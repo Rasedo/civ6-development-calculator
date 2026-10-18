@@ -39,8 +39,9 @@
   impl:
     - cpu/core/minorBuild.ts:minorResearch
     - gpu/core/sim_civics.py:_cai_turn
-    - ai/major/policies.ts:slotTypeBest
+    - cpu/core/aiPolicyValue.ts:slotTypeBest
     - cpu/core/minorBuild.ts:minorResearchTurn
+    - cpu/core/aiPolicyValue.ts:slotTypeBest
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
@@ -96,7 +97,10 @@
   final: 0x415170
   kind: function
   status: PARTLY
-  impl: [cpu/data/aiValue.ts:AI_POLICY_HORIZON, ai/major/policies.ts:policyScore]
+  impl:
+    - cpu/data/aiValue.ts:AI_POLICY_HORIZON
+    - cpu/core/aiPolicyValue.ts:policyScore
+    - cpu/core/aiPolicyValue.ts:policyScore
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"

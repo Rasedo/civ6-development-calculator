@@ -554,12 +554,26 @@
     - ...h reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
     - "- The city's walk 0x7aaf80 shifts each row's integer back to fixed point and applies the adjacency percent per row..."
   review: reviewed
+- addr: 0x7adde0
+  final: 0x52ec70
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 50
+      value: "runs/h1_duelv1117 Caguana t50: three   Warrior records on 611 seen t33, t35, t50 — the last alone counts, 20   against 23 + 23, no threat, and the game starts no City Defense."
+  readings: ["C-95: an operation's enemy strength — READ (0x73eb60), ported"]
+  context:
+    - "...73abf0), the evaluation's own strength (0x746d07), the city value (0x7a0142), 0x654c9a, 0x7aed3b. runs/h1_duelv1117 Caguana t50: three Warrior records on 611 seen t33, t35, t50 — the l..."
+  review: imported
 - addr: 0x7b0330
   final: 0x52fd20
   kind: function
   status: PARTLY
-  impl: [ai/major/policies.ts:governmentValue]
-  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  impl: [cpu/core/aiPolicyValue.ts:governmentValue, cpu/core/aiPolicyValue.ts:governmentValue]
+  readings:
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "...its (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to valueHorizons[0]; the first strictly highest; a different one is commanded (civics..."
     - "- The government's value (0x7b0330): FX_MIN when start >= horizon, or for one held before (PlayerCulture +0x350 [governmen..."
@@ -634,7 +648,7 @@
   final: 0x5310d0
   kind: function
   status: PARTLY
-  impl: [ai/major/policies.ts:policyScore]
+  impl: [cpu/core/aiPolicyValue.ts:policyScore, cpu/core/aiPolicyValue.ts:policyScore]
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"

@@ -2460,6 +2460,7 @@
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) -> discount rate (GlobalParameters AI_DISCOUNT_RATE=2.0 -> r=0.02 via /25600). PV 0x..."
   context:
@@ -2596,6 +2597,19 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "...ckup\" FAILURE; Always Swap; Fail on Invalid Team; Required Tag; the strength gates over 0x723ab0 — WEAK to the backup, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7..."
+  review: imported
+- addr: 0x723b90
+  final: 0x4cf390
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 7
+      value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  context:
+    - "...raised (0x6075b0) with the recruit's priority (the tree's +0x5a8, else its operation's 0x723b90: the root tree's +0x548, its definition's Priority, 0x73a120 -> 0x7cb230), its value, i..."
   review: imported
 - addr: 0x723cf0
   kind: function
@@ -3293,6 +3307,7 @@
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x5cd4e0; then 0x5d4d70 where the queue is empty. A tree is made (0x7ff9a0) and seeded (0x7cb230) by its event, never ticked there: no city-tree contract of the five logs is SUBMITTED..."
@@ -3311,6 +3326,19 @@
   context:
     - "...RS (the dispatcher 0x7cbca0 storing each type's functions under the id the registration 0x7db850 gives it, the k-th id stored the k-th name, @d5b198 one unnamed): Operation Move update..."
   review: reviewed
+- addr: 0x7e7080
+  final: 0x54f530
+  kind: function
+  status: UNREAD
+  cases:
+    - recording: h1_duelw1124
+      turn: 2
+      value: "none SUCCESS, else RUNNING   (runs/h1_duelw1124 Granada t2: the Alcazar tree on plot 570's Rainforest   posts Bronze Working, Tech Contract 7 at the tree's 104.0)."
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  context:
+    - ...lears the feature, a removable feature's RemoveTech (not ported). The tech list sorted (0x7e7080, its key unread), the first the goal; none SUCCESS, else RUNNING (runs/h1_duelw1124 G...
+  review: imported
 - addr: 0x7e7200
   final: 0x54f6b0
   kind: function
@@ -3890,6 +3918,8 @@
     - cpu/core/tactical.ts:passMoveExec
     - cpu/core/tactical.ts:passMoveExec
     - gpu/core/sim_barbops.py:_bop_move_exec
+    - cpu/core/tactical.ts:bestIn
+    - gpu/core/sim_tactics.py:_op_move_exec
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -4810,6 +4840,19 @@
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
     - "...envoys and more of the subject's than PercentCompeting of them), NOT_COMPETING_MINORS (0xb32500: no city-state holding envoys of both)."
+  review: imported
+- addr: 0xb3c380
+  final: 0x3fa120
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 7
+      value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  context:
+    - "...read. THE SECOND OFFER (0x60a8c0): the evaluator's satisfied test (vtable @0xd760f8 +8, 0xb3c380) answers false always, so after the first offer (the units in no job, not done, alive)..."
   review: imported
 - addr: 0xb468d0
   kind: function

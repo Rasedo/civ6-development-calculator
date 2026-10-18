@@ -3,7 +3,8 @@
 // analyzers reproduce, and the choice's order, ties, bar and deferral.
 import { describe, expect, it } from 'vitest';
 import { FX_MIN, presentValue } from '../../../cpu/core/aiValue';
-import { NO_SCORE, choosePolicies, governmentValue, policyScore, policyScores, slotTypeBest } from '../../../ai/major/policies';
+import { choosePolicies } from '../../../ai/major/policies';
+import { NO_SCORE, governmentValue, policyScore, policyScores, slotTypeBest } from '../../../cpu/core/aiPolicyValue';
 import { AI_POLICIES } from '../../../ai/major/tables';
 import type { MajorSlotView, MajorView } from '../../../ai/major/view';
 
@@ -23,7 +24,7 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     policiesSlottableUnder: () => new Set(['POLICY_DISCIPLINE', 'POLICY_SURVEY', 'POLICY_GOD_KING', 'POLICY_URBAN_PLANNING']),
     darkAge: () => false,
     goldenAge: () => false,
-    greatPersonClassAvailable: () => true,
+    greatPersonClassAvailable: () => true, fullCiv: () => true,
     cities: () => [{ id: 1, capital: true }],
     cityYield: () => 0,
     yieldWeight: () => 0,

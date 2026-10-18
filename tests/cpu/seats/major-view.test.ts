@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import { majorView } from '../../../cpu/core/majorView';
-import { choosePolicies, policyRecord, policyScores } from '../../../ai/major/policies';
+import { choosePolicies, policyRecord } from '../../../ai/major/policies';
+import { policyScores } from '../../../cpu/core/aiPolicyValue';
 import { applySeatPolicies } from '../../../cpu/core/phase';
 import { seatOf } from '../../../cpu/core/seats';
 import { POLICY_LIST } from '../../../cpu/data/policies';

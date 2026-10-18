@@ -23,7 +23,8 @@
  * and the civic list the civics AI's (`majorView`).
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { NO_SCORE, choosePolicies, policyRecord, policyScores, type PolicyScores } from '../../ai/major/policies';
+import { choosePolicies, policyRecord } from '../../ai/major/policies';
+import { NO_SCORE, policyScores, type PolicyScores } from '../core/aiPolicyValue';
 import { AI_POLICIES } from '../../ai/major/tables';
 import type { MajorView } from '../../ai/major/view';
 import { majorView, type MajorViewInputs } from '../core/majorView';

@@ -64,6 +64,8 @@
     - gpu/core/sim_minorops.py:_mops_army_term
     - cpu/core/operations/nodes.ts:refreshStrengths
     - gpu/core/sim_minorops.py:_ops_enemy_str
+    - cpu/core/operations/knowledge.ts:ARMY_READ_AGE
+    - gpu/core/sim_minorops.py:_ARMY_READ_AGE
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -283,7 +285,11 @@
 - addr: 0x5ef760
   kind: function
   status: PARTLY
-  impl: [cpu/core/operations/evaluate.ts:armyStrength]
+  impl:
+    - cpu/core/operations/evaluate.ts:armyStrength
+    - cpu/core/operations/knowledge.ts:ARMY_READ_AGE
+    - gpu/core/sim_minorops.py:_ARMY_READ_AGE
+  readings: ["C-95: an operation's enemy strength — READ (0x73eb60), ported"]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x5ef9a0

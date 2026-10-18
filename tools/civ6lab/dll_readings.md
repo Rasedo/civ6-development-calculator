@@ -4835,8 +4835,12 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   governments, ...): at or past H, -9999 (the research value's: past H). The
   own term PSEUDOYIELD_CIVIC of 1.0 (0x7a60d0) paid from landing to the
   horizon (PV(H) - PV(turns), 0x7a16e0); the governments it unlocks, each
-  max(v - v(the current), v / 2) of the government values [+0xb38] (0x621eb0
-  -> 0x7b26b0, unread); then a civic of an era before [player+0x1358]+0x158
+  max(v - v(the current), v / 2) of the government values [+0xb38], bare (a
+  city-state's current is Chiefdom); +0xb38 [gov] is written by the civics
+  AI's turn 0x620110 after its propagation, 0x7b0330(gov, the rate
+  0x6fec30, start 0, valueHorizons[1] = 50), the government value of "C-97:
+  the government and policy choice" (0x621eb0 is the policy job, not this
+  term); then a civic of an era before [player+0x1358]+0x158
   (the game's era, as the research value reads it) is taken (that - era)
   times — no +1 here (runs/h1_duelv1127: every city-state's Ancient civic at
   1 turn 120.6 in the Classical era) — and a later one adds
@@ -6380,15 +6384,22 @@ the logged scores), the action replay's majors' AI section
   order).
 - The policy job (0x621eb0): score -1.0; a card that is not a Dark Age
   card needs its PrereqCivic held (0x39d1f0) or on the civic list with a
-  score above 0 (+0x978 [civic] +0x14); a Dark Age / Golden Age card needs
+  score above 0 (+0x978 [civic] +0x14, as the analysis job left it — its own
+  value, the turn's propagation not yet run: runs/h1_duelw1121's city-states
+  log Charismatic Leader from the turn after Political Philosophy comes
+  within the horizon, nothing at t1); a Dark Age / Golden Age card needs
   the age (0x412880 / 0x412910); the game era (the player's era object
   +0x158 -> Eras +0x1c) inside the window; then the value 0x7b26b0(policy,
   the rate 0x6fec30 = GlobalAI +0x290, start 0, horizon `m_valueHorizons[0]`
   via 0x5d2bc0, the player, the card's modifier list +0xb80 [policy]).
 - The value (0x7b26b0): FX_MIN when start >= horizon or the card is
   obsolete (0x39e050: an ObsoletePolicies row whose ObsoletePolicy is
-  unlocked, 0x39e1e0, or whose RequiresAvailableGreatPersonClass has no
-  person left, 0x2f1ed0); 250.0 for a Dark Age card in a Dark Age or a
+  unlocked, 0x39e1e0, or whose RequiresAvailableGreatPersonClass the
+  player cannot earn, 0x2f1ed0: its civilization level's CanEarnGreatPeople
+  (0x43a980; a city-state's and the Free Cities' levels lack it — no
+  city-state of the five duels logs Inspiration, Revelation, Strategos,
+  Literary Tradition or Navigation), a civilization or leader trait barring
+  the class, or no person left); 250.0 for a Dark Age card in a Dark Age or a
   Golden Age card in a Golden Age; plus the modifiers' sum 0x7a4b20.
 - The modifiers' sum (0x7a4b20): per modifier (0x40 bytes: the effect's
   analyzer, the collection, the requirement set's key +0x10, the parsed
@@ -6418,7 +6429,8 @@ the logged scores), the action replay's majors' AI section
   PV(horizon) alone); EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN 0x6ae510
   (PSEUDOYIELD_INFLUENCE, PV(horizon) - PV(start));
   EFFECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN 0x6afcd0 (a player that may
-  take Influence, 0x449940: the Game +0x3f8 +0x1650 list's count x
+  give Influence, 0x449940, its civilization level's flag byte +0x28 bit 6:
+  a full civilization's — no city-state logs Diplomatic League —, the Game +0x3f8 +0x1650 list's count x
   Player_Influence +0x270 x the amount as PSEUDOYIELD_INFLUENCE, 0x7a1240
   from the start; +0x270 is the government's InfluencePointsThreshold at
   the speed, added on adoption 0x44eaa0). PARTLY: Discipline's 0x6bef40 (a

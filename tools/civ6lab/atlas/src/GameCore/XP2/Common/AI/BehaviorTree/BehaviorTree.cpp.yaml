@@ -36,6 +36,19 @@
   impl: [cpu/core/aiCityTrees.ts:treeContract, cpu/core/aiContracts.ts:treeContractOf]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0x7cbb40
+  final: 0x540460
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 7
+      value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  context:
+    - "...node's Allow Stealing (TreeData +0x60, no default: false); each behaviour tree listens (0x7cbb40 binds tree +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by..."
+  review: imported
 - addr: 0x7cbca0
   final: 0x5405c0
   kind: function
@@ -69,6 +82,19 @@
   context:
     - "...val / Naval Choose Target: the index their update stored) and the parent propagation's (0x7d1750: a finished child tells its parent's function, @f2ed70, which may finish the parent and..."
   review: imported
+- addr: 0x7d1e40
+  final: 0x543830
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 7
+      value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  context:
+    - "...a +0x60, no default: false); each behaviour tree listens (0x7cbb40 binds tree +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by its reset 0x7d3670) or asked w..."
+  review: imported
 - addr: 0x7d2190
   final: 0x543a50
   kind: function
@@ -91,6 +117,19 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8 holds weak handles, and 0x5d4d70's he...
+  review: imported
+- addr: 0x7d3670
+  final: 0x544020
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 7
+      value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  context:
+    - "...e +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by its reset 0x7d3670) or asked with Allow Stealing, of a priority below the request's (or marked, of equal..."
   review: imported
 - addr: 0x7d3a00
   final: 0x544360

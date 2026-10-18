@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x43a980
+  final: 0x2e2dc0
+  kind: function
+  name: CanEarnGreatPeople
+  status: PARTLY
+  impl: [cpu/core/aiPolicyValue.ts:policyObsolete]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - "...nClass the player cannot earn, 0x2f1ed0: its civilization level's CanEarnGreatPeople (0x43a980; a city-state's and the Free Cities' levels lack it — no city-state of the five duels l..."
+  review: imported
 - addr: 0x43c340
   kind: function
   status: PARTLY

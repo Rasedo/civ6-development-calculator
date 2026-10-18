@@ -488,12 +488,15 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     if (!pseudo) return 0;
     return whole(presentValue(pseudoYieldValue(t.view, t.seat, amountOf(args), pseudo), t.rate, t.horizon));
   },
-  // 0x6afcd0: a player that may take Influence (0x449940); the game's
+  // 0x6afcd0: a player that may give Influence (0x449940, its civilization
+  // level's flag: a full civilization's; a city-state's DIPLOMATIC_LEAGUE
+  // never logs a score, runs/h1_duelw1117-1128); the game's
   // city-states (the list at Game +0x3f8 +0x1650) x the player's points a
   // token (Player_Influence +0x270: the government's InfluencePointsThreshold
   // at the game speed, 0x44eaa0) x the amount, as PSEUDOYIELD_INFLUENCE,
   // discounted from the start (0x7a1240)
   EFFECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN: (t, args) => {
+    if (!t.view.fullCiv(t.seat)) return 0;
     const gov = t.view.government(t.seat);
     const threshold = gov ? AI_GOVERNMENT_INFLUENCE_THRESHOLD[gov] : undefined;
     if (threshold === undefined) return 0;
