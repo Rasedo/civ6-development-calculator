@@ -98,6 +98,8 @@ export interface OpsEnv {
   /** the tribes the barbarians' operations run for (none for another
    *  party) */
   barbarian?: BarbarianHooks;
+  /** Operation Defend Units' orders (`OpsContext`), where the seat's units' turn gives them */
+  defend?: OpsContext['defend'];
   /** the operation lines (AI_Operation.csv without its turn and player) and
    *  the candidate lines (AI_Operation_Eval.csv) */
   log(line: string): void;
@@ -413,6 +415,7 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     attack: env.attack,
     moveUpdate: env.moveUpdate,
     moveExec: env.moveExec,
+    defend: env.defend,
     op,
     assigned: () => assigned(ai),
     others: () => opsOf(ai),

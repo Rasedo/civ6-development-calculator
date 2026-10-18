@@ -22,6 +22,28 @@
     - "Rules_Combat 0x5197e0 (called by every resolver; the air strike 0x203cb0 picks the combat type 0x204451: BOMBAR..."
     - "- XP: the interceptor's = 0x5197e0 with the MELEE / UNIT_VS_UNIT types, the kill flag 0 and the interceptor as the DEFENDE..."
   review: imported
+- addr: 0x51a080
+  final: 0x367320
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...(\"Move\"); with Movement a plunder where the plot's district or improvement pays a heal (0x51a080 / 0x51a160, \"Plunder\"); with Movement, not a barbarian, on a plot of a player it figh..."
+  review: imported
+- addr: 0x51a160
+  final: 0x367400
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...h Movement a plunder where the plot's district or improvement pays a heal (0x51a080 / 0x51a160, \"Plunder\"); with Movement, not a barbarian, on a plot of a player it fights (0x469cd0)..."
+  review: imported
 - addr: 0x51a240
   final: 0x3674e0
   kind: function
@@ -33,9 +55,12 @@
     - recording: 1120
       turn: 13
       value: 1120 t13 17 / 32 (a defender at 18 HP).
+  impl: [cpu/core/opsOrders.ts:endangered]
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the attacker's damage — is never drawn where the defender is embarked (..."
   review: imported

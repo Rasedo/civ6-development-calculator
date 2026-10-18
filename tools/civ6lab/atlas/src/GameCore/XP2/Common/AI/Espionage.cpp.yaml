@@ -13,3 +13,16 @@
   context:
     - ...90), Policy Tree / Civic Tree / Great Work Collection Analysis (0x4136b0), Espionage (0x45cf70), Governor Analyzer (0x4a79b0), Victory Conditions + Settle City Evaluation (0x4b13f0),...
   review: imported
+- addr: 0x695660
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      turn: 167
+      value: "Why 1128's city-state 2 offers its six   units none at t167-183 (its City Defense started and completed each turn,   no tactical row for them) stays unread: no setter before the operations'   tick nam"
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - ...s), the homeland (0x70a440), Defend Units, a conversion (0x590a30), the espionage AI (0x695660), a retreat (0x212500), and the unit-created handler 0x60a440 (player signals +0x60, ra...
+  review: imported

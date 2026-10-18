@@ -34,6 +34,8 @@
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the homeland's Plunder Trader — READ, ported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...he chosen list; the round's move orders (0x962030) are carried out together as it ends (0x70a440); another round only where one moved.

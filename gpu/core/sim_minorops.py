@@ -1296,6 +1296,86 @@ class SimMinorOps:
 
     # -- the units' orders ----------------------------------------------------------
 
+    def _mops_endangered(self, s: int, j: torch.Tensor, on: torch.Tensor, view: dict) -> torch.Tensor:
+        """[B] bool — the team update's endangered (`endangered`, 0x738f20)
+        for minor `s`'s unit at pool slot `j` [B] where `on`: the target
+        list's entries within twice its base Movement — a unit of an entry
+        that fights, where no unit of the minor stands beside the member and
+        its plot holds danger or the entry is HIGH, within the unit's
+        Movement or its range, adds its blow on the member (`damageExpected`
+        on their strengths); a combat district's city that strikes, the
+        member within its range of the centre, its strike — and the member
+        the sum leaves with no hit points (one that does not fight, any blow
+        at all on land) is endangered"""
+        B, dev = self.B, self.device
+        b = torch.arange(B, device=dev)
+        jc = j.clamp(min=0)
+        seat = 100 + s
+        tg, op = view["tg"], view["op"]
+        danger = op["danger"]
+        ut = self.major_unit_type[b, jc].clamp(min=0, max=self.NU - 1)
+        mcb = self._type_combat.take(ut)
+        fights = (mcb > 0) | (self._type_ranged_strength.take(ut) > 0) | (self._type_bombard.take(ut) > 0)
+        plot = self.major_unit_tile[b, jc].clamp(min=0)
+        near = 2 * self._type_moves.take(ut)
+        d = self.pair_dist[plot].to(torch.long)  # [B, T]
+        own = self.major_unit_alive & (self.major_unit_seat == seat)
+        own_d = self.pair_dist[plot.unsqueeze(1), self.major_unit_tile.clamp(min=0)].to(torch.long)
+        others = torch.arange(own.shape[1], device=dev).unsqueeze(0) != jc.unsqueeze(1)
+        beside = (own & others & (own_d == 1) & (self.major_unit_tile >= 0)).any(dim=1)
+        here = danger.gather(1, plot.unsqueeze(1)).squeeze(1)
+        # the unit entries
+        uk, uu = tg["uk"], tg["uu"]
+        uc = uu.clamp(min=0)
+        et = self.unit_type.gather(1, uc).clamp(min=0, max=self.NU - 1)
+        ecb, erg, ebm = self._type_combat.take(et), self._type_ranged_strength.take(et), self._type_bombard.take(et)
+        full_all = torch.cat((self._full_mp("major") - self.major_unit_aura_mp,
+                              self._full_mp("barb") - self.barb_unit_aura_mp), dim=1)
+        emm = torch.div(full_all.gather(1, uc), self._mp_scale, rounding_mode="floor")
+        lo = self.POOL_LO["barb"]
+        bi = b.unsqueeze(1).expand_as(uc)
+        r_major = self._tac_range(bi, uc.clamp(max=self.major_unit_type.shape[1] - 1), "major")
+        r_barb = self._tac_range(bi, (uc - lo).clamp(min=0, max=self.barb_unit_type.shape[1] - 1), "barb")
+        erng = torch.where(uc >= lo, r_barb, r_major)
+        ent = ((uk > 0) & (uu >= 0) & (d <= near.unsqueeze(1)) & ((ecb > 0) | (erg > 0) | (ebm > 0))
+               & ~beside.unsqueeze(1) & ((here > 0).unsqueeze(1) | (uk == 3)) & ((d <= emm) | (d <= erng)))
+        dmg = self._damage_expected((torch.maximum(ecb, erg) - mcb.unsqueeze(1)).to(torch.float64))
+        total = torch.where(ent, dmg, torch.zeros_like(dmg)).sum(dim=1)
+        # the combat districts' cities: each entry its city's strike
+        dk = tg["dk"]
+        ent_d = (dk == 1) & (d <= near.unsqueeze(1))
+        if bool((ent_d & on.unsqueeze(1)).any()):
+            for row in range(self.city_alive.shape[1]):
+                rs = int(self._ROW_SEAT[row])
+                if rs == seat:
+                    continue
+                for col in range(self.city_alive.shape[2]):
+                    alive = self.city_alive[:, row, col]
+                    if not bool((alive & on).any()):
+                        continue
+                    mine = ent_d & (self.tile_seat == rs) & (self.tile_city == self.city_id[:, row, col].unsqueeze(1))
+                    n = mine.sum(dim=1)
+                    if not bool((n > 0).any()):
+                        continue
+                    ctr = self.city_center[:, row, col].clamp(min=0)
+                    str_ = self._strike_strength(row, torch.full_like(ctr, col))
+                    ok = alive & (n > 0) & (str_ > 0) & (self.pair_dist[plot, ctr].to(torch.long) <= 2)
+                    hit = self._damage_expected(str_ - mcb.to(torch.float64))
+                    total = total + torch.where(ok, n * hit, torch.zeros_like(hit))
+        hp_max = int(self.rules.combat["unitHp"])
+        dmg_now = hp_max - self.major_unit_hp[b, jc].long()
+        weak = (total > 0) & ~fights
+        land = ~self.water[b, plot]
+        return on & ((weak & land) | (~weak & (dmg_now + total > hp_max)))
+
+    def _mops_hurt(self, j: torch.Tensor, pct: int) -> torch.Tensor:
+        """[B] bool — the unit at pool slot `j` hurt to `pct` percent of its
+        hit points (single precision)"""
+        b = torch.arange(self.B, device=self.device)
+        hp_max = int(self.rules.combat["unitHp"])
+        bar = float(torch.tensor(hp_max, dtype=_F32) * torch.tensor(float(torch.tensor(pct, dtype=_F32) * torch.tensor(0.01, dtype=_F32)), dtype=_F32))
+        return (hp_max - self.major_unit_hp[b, j.clamp(min=0)].long()).to(torch.float64) >= bar
+
     def _mops_move(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor) -> None:
         """a member's move order to `dest` (tactical `moveTo`, no strike):
         none where it stands there or has no Movement left"""
@@ -1936,9 +2016,137 @@ def _x_attack_city(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         raise NotImplementedError("minor operations: Operation Attack City over a district target (the TS twin's assignment)")
 
 
+def _defend_pct(c: _OpCtx, i: int) -> int:
+    v = c.tree.int_(i, "AutoProtect Percentage")
+    return 33 if v is None else v
+
+
+def _u_defend(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """OPERATION DEFEND UNITS' update (0x80ee70): SUCCESS, the node marked
+    where a team's member is endangered, hurt to AutoProtect Percentage of
+    its hit points, or fortified on a plot of danger"""
+    s, k = c.s, c.k
+    pct = _defend_pct(c, i)
+    view = c.view
+    danger = view["op"]["danger"]
+    u = sim._mops_units(s)
+    b = torch.arange(sim.B, device=sim.device)
+    marked = torch.zeros_like(at)
+    for ti in range(N_TEAMS):
+        for jj in range(sim.mops_mem.shape[-1]):
+            us = sim.mops_mem[:, s, k, ti, jj]
+            ok = at & (us >= 0) & u["own"].gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
+            if not bool(ok.any()):
+                continue
+            uc = us.clamp(min=0)
+            plot = sim.major_unit_tile[b, uc].clamp(min=0)
+            fort = sim.major_unit_fortify[b, uc] >= 2
+            marked |= ok & (sim._mops_endangered(s, us, ok, view) | sim._mops_hurt(us, pct)
+                            | (fort & (danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0)))
+    c.ma[:, i] = torch.where(at, marked.long(), c.ma[:, i])
+    return _status(c, BT_SUCCESS)
+
+
+def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
+    """OPERATION DEFEND UNITS' execution (0x80d790) where marked, per team
+    over its members outside Protect Outside Range of the target: the
+    endangered — not bombard, with Movement, out of a city — to their safe
+    plots (0x716b90); then the hurt (or fortified afloat in danger), not
+    bombard: one not dug in off friendly ground released from the team; one
+    fortified afloat to its safe plot; one with Movement on an enemy's
+    ground or a plot of danger to its safe plot; each fortified (its turn
+    ends where it stands)"""
+    s, k = c.s, c.k
+    g = on & (c.ma[:, i] == 1)
+    if not bool(g.any()):
+        return
+    pct = _defend_pct(c, i)
+    rng = c.tree.int_(i, "Protect Outside Range")
+    rng = -1 if rng is None else rng
+    view = c.view
+    op, done = view["op"], view["done"]
+    danger = op["danger"]
+    seat = 100 + s
+    B, dev = sim.B, sim.device
+    b = torch.arange(B, device=dev)
+    target = sim.mops_target[:, s, k].clamp(min=0)
+    none_taken = torch.zeros(B, sim.T, dtype=torch.bool, device=dev)
+
+    def live(us: torch.Tensor) -> torch.Tensor:
+        uc = us.clamp(min=0)
+        return (us >= 0) & sim.major_unit_alive[b, uc] & (sim.major_unit_seat[b, uc] == seat) & (sim.major_unit_tile[b, uc] >= 0)
+
+    def off(us: torch.Tensor) -> torch.Tensor:
+        if rng < 0:
+            return torch.ones(B, dtype=torch.bool, device=dev)
+        return sim.pair_dist[sim.major_unit_tile[b, us.clamp(min=0)].clamp(min=0), target].to(torch.long) >= rng
+
+    def to_safe(us: torch.Tensor, m: torch.Tensor, stay_ok: bool) -> None:
+        if not bool(m.any()):
+            return
+        uc = us.clamp(min=0)
+        dest = sim._tac_safe_plot(m, uc, "major", seat, danger, op["rowof"], op["res"], none_taken)
+        done[b, uc] = torch.where(m, True, done[b, uc])
+        here = sim.major_unit_tile[b, uc]
+        go = m & (dest >= 0) & (stay_ok | (dest != here))
+        sim._mops_move(s, us, dest, go)
+
+    for ti in range(N_TEAMS):
+        tm = sim.mops_tm[:, s, k, ti]
+        gt = g & (tm >= 0)
+        if not bool(gt.any()):
+            continue
+        n_m = sim.mops_mem.shape[-1]
+        # the endangered, in the team's order
+        for jj in range(n_m):
+            us = sim.mops_mem[:, s, k, ti, jj]
+            ok = gt & live(us)
+            if not bool(ok.any()):
+                continue
+            uc = us.clamp(min=0)
+            ok &= sim._mops_endangered(s, us, ok, view)
+            ut = sim.major_unit_type[b, uc].clamp(min=0, max=sim.NU - 1)
+            ok &= off(us) & (sim._type_bombard.take(ut) <= 0) & (sim.major_unit_mp[b, uc] > 0) & ~sim._centre_plane()[b, sim.major_unit_tile[b, uc].clamp(min=0)]
+            to_safe(us, ok, True)
+        # the hurt
+        release = torch.zeros(B, n_m, dtype=torch.bool, device=dev)
+        for jj in range(n_m):
+            us = sim.mops_mem[:, s, k, ti, jj]
+            ok = gt & live(us)
+            if not bool(ok.any()):
+                continue
+            uc = us.clamp(min=0)
+            ok &= (sim.major_unit_mp[b, uc] > 0) & off(us)
+            plot = sim.major_unit_tile[b, uc].clamp(min=0)
+            fort = sim.major_unit_fortify[b, uc]
+            wat = sim.water[b, plot]
+            dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
+            afloat = (fort >= 2) & wat & dang
+            ok &= sim._mops_hurt(us, pct) | afloat
+            ut = sim.major_unit_type[b, uc].clamp(min=0, max=sim.NU - 1)
+            ok &= sim._type_bombard.take(ut) <= 0
+            if not bool(ok.any()):
+                continue
+            rel = ok & (fort == 0) & (sim.tile_seat[b, plot] != seat)
+            release[:, jj] = rel
+            ok &= ~rel
+            sea = ok & (fort >= 2) & wat
+            to_safe(us, sea, True)
+            ok &= live(us)
+            plot = sim.major_unit_tile[b, uc].clamp(min=0)
+            owner = sim.tile_seat[b, plot]
+            war = (owner >= 0) & (owner != seat) & sim._seats_hostile(seat, owner.unsqueeze(1)).squeeze(1)
+            dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
+            to_safe(us, ok & (sim.major_unit_mp[b, uc] > 0) & (war | dang), False)
+            ok &= live(us)
+            done[b, uc] = torch.where(ok, True, done[b, uc])
+        if bool(release.any()):
+            sim._mops_compact(s, k, ti, ~release, gt)
+
+
 _UPDATE = {
     "Decode Trigger": _u_decode,
-    "Operation Defend Units": _u_success,
+    "Operation Defend Units": _u_defend,
     "Operation Change Target": _u_change_target,
     "Contract Manager Decorator": lambda sim, c, i, at: _u_contract_manager(c, i, at),
     "Recruit Units": _u_recruit,
@@ -1953,6 +2161,7 @@ _UPDATE = {
 }
 
 _EXECUTE = {
+    "Operation Defend Units": _x_defend,
     "Recruit Units": _x_recruit,
     "Operation Move": _x_move,
     "Operation Attack Units": _x_attack_units,

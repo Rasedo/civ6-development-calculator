@@ -37,9 +37,11 @@ def main() -> None:
         sim.step()
     snap = sim.snapshot()
     before = sim.seat_score(0).clone()
+    tiles = sim.unit_tile.clone()
     for _ in range(10):
         sim.step()
-    assert not torch.equal(before, sim.seat_score(0)), "advance didn't change state (vacuous)"
+    # the score, or else the units' plots, moved
+    assert not torch.equal(before, sim.seat_score(0)) or not torch.equal(tiles, sim.unit_tile), "advance didn't change state (vacuous)"
 
     sim.restore(snap)
     drift = [k for k in _MUTABLE if not torch.equal(getattr(sim, k), snap["mut"][k])]

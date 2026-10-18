@@ -39,6 +39,18 @@ export interface DiplomacyRequest {
   op: number;
 }
 
+/** OPERATION DEFEND UNITS' orders (0x80ee70 / 0x80d790) for a team's
+ *  members in the seat's units' turn: `flagged` the update's test — a
+ *  member endangered (the team update's list, 0x738f20), hurt to the
+ *  percentage or fortified in danger; `execute` the execution's — the
+ *  endangered to their safe plots, the hurt released off friendly ground,
+ *  moved off a plot of danger, fortified — its lines, the units released */
+export interface DefendOrders {
+  flagged(members: readonly number[], pct: number): boolean;
+  execute(members: readonly number[], target: number, pct: number, range: number):
+    { lines: readonly { type: string; what: string }[]; released: readonly number[] };
+}
+
 export interface OpsContext {
   seat: number;
   turn: number;
@@ -68,6 +80,9 @@ export interface OpsContext {
    *  went for and the plot it stands on */
   moveExec(members: readonly number[], goal: number, range: number, arrived: boolean, ready: boolean,
     zero: (id: number, type: string) => boolean, leaderNamed: boolean): readonly { type: string; from: number; dest: number; after: number }[];
+  /** Operation Defend Units' orders, where the seat's units' turn gives
+   *  them; none, the node moves no unit */
+  defend?: DefendOrders;
   op: Operation;
   /** the units in any operation (none recruitable elsewhere) */
   assigned(): ReadonlySet<number>;
@@ -679,9 +694,34 @@ const turnLimiter: BtHandler<OpsContext> = {
   },
 };
 
+// OPERATION DEFEND UNITS (0x80ee70 update, 0x80d790 execution): the update
+// SUCCEEDS, marking the node where a team's member is endangered, hurt to
+// AutoProtect Percentage (33) of its hit points, or fortified in danger; the
+// marked node's execution protects the members outside Protect Outside
+// Range (-1: all) of the target, and a unit it releases leaves its team
+const operationDefendUnits: BtHandler<OpsContext> = {
+  update(node, run, ctx) {
+    const pct = dataInt(node, 'AutoProtect Percentage') ?? 33;
+    const d = ctx.defend;
+    run.mem[node.index].marked = !!d && ctx.op.teams.some((t) => d.flagged(t.members, pct));
+    return BT_SUCCESS;
+  },
+  execute(node, run, ctx) {
+    const d = ctx.defend;
+    if (!d || !run.mem[node.index].marked) return;
+    const pct = dataInt(node, 'AutoProtect Percentage') ?? 33;
+    const range = dataInt(node, 'Protect Outside Range') ?? -1;
+    for (const t of ctx.op.teams) {
+      const out = d.execute(t.members, ctx.op.target, pct, range);
+      if (out.released.length) t.members = t.members.filter((id) => !out.released.includes(id));
+      for (const x of out.lines) ctx.log(`${ctx.op.def}, Operation Protect Units, ${x.type}, ${x.what}`);
+    }
+  },
+};
+
 export const OP_NODES: Readonly<Record<string, BtHandler<OpsContext>>> = {
   'Decode Trigger': decodeTrigger,
-  'Operation Defend Units': success,
+  'Operation Defend Units': operationDefendUnits,
   'Operation Change Target': changeTarget,
   'Find Available Unit': findAvailableUnit,
   'Contract Manager Decorator': contractManagerNode<OpsContext>((ctx) => ctx.contractWorld()),

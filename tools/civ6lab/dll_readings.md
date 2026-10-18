@@ -5173,6 +5173,60 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   (Protect Outside Range), no bombard strength, not in a city, to its safe
   plot (0x716b90 with the target), "Operation Protect Units, Move"; then the
   hurt: a promotion (0x7b5d70, "Promote"), a plunder, a safe plot afloat.
+  The second pass in full (0x80de60..0x80ebfc), each member alive with
+  Movement outside Protect Outside Range of the target, hurt to the
+  percentage or fortified afloat on danger: a promotion due (0x116f80 on
+  +0x1bc0) takes the best (0x7b5d70, "Promote"); a bombard unit stops
+  there; one not fortified (+0x650 == 0) whose plot is not friendly ground
+  (Rules_Movement 0x530880: 1 the player's own, a city-state it is
+  suzerain of, an ally's; 2 no one's; 3 another's) is released from the
+  operation (0x73d1f0: its operation field +0x778 to -1, out of every
+  team); one fortified afloat to its safe plot ("Move"); with Movement a
+  plunder where the plot's district or improvement pays a heal (0x51a080 /
+  0x51a160, "Plunder"); with Movement, not a barbarian, on a plot of a
+  player it fights (0x469cd0) or of danger, to its safe plot ("Move", then
+  its turn ends 0x56d6f0); then, still on the map, fortified (0x56ef30's
+  mission, "Fortify"). Each order sets the unit's turn done (0x570b40).
+- THE TEAM UPDATE'S ENDANGERED (0x738f20, +0xa0, cleared each tick): per
+  live member, each entry of the player's target list (+0x370, 40 bytes)
+  within twice its base Movement (0x56d9f0): an entry's unit (kind 1) that
+  fights, where no unit of the member's player stands on its ring (0x6b1b0
+  over the lambda 0x737610) and the member's plot holds danger (0x716a60)
+  or the entry is HIGH, within the unit's Movement (0x56e130) or its range,
+  adds its blow on the member (0x51a240 on GetCombat's strengths); a
+  district's city (kind 3, 0x408770) that strikes, the member within its
+  strike range of the centre, its strike (0x519370); after each entry a
+  member not yet listed joins where the sum is above 0 and it does not
+  fight (a lone unit on land), else where its damage plus the sum passes
+  its hit points.
+- THE RECRUIT'S OFFER (0x60a8c0): the player's units with no operation
+  (+0x7d0 == -1), their turn not done (+0x530 clear) and alive (+0x770
+  clear), then the evaluator's test (Recruit Units' 0x816380 -> 0x738050).
+  The turn-done flag's one setter 0x570b40 (through the replicated field at
+  +0x4d8, a game event 0xd70ba51f when set): cleared for every unit in
+  DoTurn (0x4e4560), set by the tactical moves (the attacks' carry-out
+  0x771f80, Chase Target, Random Direction's wander, the air moves), the
+  homeland (0x70a440), Defend Units, a conversion (0x590a30), the
+  espionage AI (0x695660), a retreat (0x212500), and the unit-created
+  handler 0x60a440 (player signals +0x60, raised by the unit's creation
+  0x4eeb70) for an AI player whose Control Manager's job list (+0x2b8)
+  holds an entry with +8 == 0. Why 1128's city-state 2 offers its six
+  units none at t167-183 (its City Defense started and completed each turn,
+  no tactical row for them) stays unread: no setter before the operations'
+  tick names them.
+- THE UNIT'S ASSIGNMENT (the field at +0x778, its value +0x7d0): the job
+  the unit is in — the tactical pass's, the homeland's, an operation's
+  (`addMember` 0x737e80 writes the operation's id +0x720) — listed by job
+  through 0x6092c0. The tactical pass (0x7715a0) and the homeland
+  (0x70a370) release their units (-1) as they end. A tree's units each
+  tick (0x7d2190 from the tree manager 0x7cb3d0), those not done: the tree
+  marked (+0x3c8) with no operation (+0x888 == -1) releases them, else
+  their turn is done (0x570b40). The operation's end (0x7353d0 -> 0x73ea10,
+  the teams' destructor 0x735790) writes no unit, and the release 0x73d1f0
+  is Defend Units'; yet 1117 city-state 2's Warrior 131073, its Attack
+  Barb Camp complete at t9, takes tactical moves from t10 — the path that
+  frees an ended operation's units is unread (0x73f7d0 rebuilds a team
+  from the units' assignments).
 - NOTIFY OWNER (0x7c6fa0 -> the player signals +0x288 -> 0x148270): the
   tree's tribe; the raid's tree (+0x3c) offers its city to the city assault
   (0x1497d0), which refuses while the raid stands (+0x3c or +0x40 set): the

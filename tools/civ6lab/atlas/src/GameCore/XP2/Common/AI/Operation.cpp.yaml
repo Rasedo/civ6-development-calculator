@@ -3,6 +3,17 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x737610
+  final: 0x4db690
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ights, where no unit of the member's player stands on its ring (0x6b1b0 over the lambda 0x737610) and the member's plot holds danger (0x716a60) or the entry is HIGH, within the unit's...
+  review: imported
 - addr: 0x737920
   final: 0x4db820
   kind: function
@@ -21,6 +32,20 @@
   context:
     - ...he rally +0xe8, 1 the target +0xf0); the node keeps a list per team (the member storage 0x737920, slots +0x78 and +0x74, made on its first tick) with the goal it was kept for (0x739f60...
   review: reviewed
+- addr: 0x737e80
+  final: 0x4dbd90
+  kind: function
+  name: addMember
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 9
+      value: "yet 1117 city-state 2's Warrior 131073, its Attack   Barb Camp complete at t9, takes tactical moves from t10 — the path that   frees an ended operation's units is unread (0x73f7d0 rebuilds a team   fr"
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - "...job the unit is in — the tactical pass's, the homeland's, an operation's (`addMember` 0x737e80 writes the operation's id +0x720) — listed by job through 0x6092c0. The tactical pass (..."
+  review: imported
 - addr: 0x737f90
   final: 0x4dbea0
   kind: function
@@ -38,7 +63,10 @@
     - cpu/core/operations/recruit.ts:recruitOperation
     - gpu/core/sim_minorops.py:SimMinorOps
     - gpu/core/sim_minorops.py:_mops_recruit
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...e Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations); Lock Units..."
   review: imported
@@ -63,6 +91,9 @@
     - cpu/core/operations/assault.ts:updateTeam
     - cpu/core/operations/operation.ts:OpTeam
     - gpu/core/sim_minorops.py:_mops_update_team
+    - cpu/core/operations/nodes.ts:DefendOrders
+    - cpu/core/opsOrders.ts:endangered
+    - gpu/core/sim_minorops.py:_mops_endangered
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -241,6 +272,17 @@
     - cpu/core/operations/recruit.ts:recruitStrength
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0x73d1f0
+  final: 0x4e09f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...t is suzerain of, an ally's; 2 no one's; 3 another's) is released from the operation (0x73d1f0: its operation field +0x778 to -1, out of every team); one fortified afloat to its safe..."
+  review: imported
 - addr: 0x73e610
   final: 0x4e1620
   kind: function
@@ -274,6 +316,19 @@
   context:
     - ...ate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870).
   review: imported
+- addr: 0x73ea10
+  final: 0x4e1aa0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 9
+      value: "yet 1117 city-state 2's Warrior 131073, its Attack   Barb Camp complete at t9, takes tactical moves from t10 — the path that   frees an ended operation's units is unread (0x73f7d0 rebuilds a team   fr"
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - ...-1) releases them, else their turn is done (0x570b40). The operation's end (0x7353d0 -> 0x73ea10, the teams' destructor 0x735790) writes no unit, and the release 0x73d1f0 is Defend U...
+  review: imported
 - addr: 0x73eb60
   final: 0x4e1bf0
   kind: function
@@ -305,6 +360,7 @@
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...f none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")..."

@@ -112,6 +112,19 @@
   context:
     - "- The pass (TacticalAI 0x771530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a..."
   review: imported
+- addr: 0x7715a0
+  final: 0x503590
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 9
+      value: "yet 1117 city-state 2's Warrior 131073, its Attack   Barb Camp complete at t9, takes tactical moves from t10 — the path that   frees an ended operation's units is unread (0x73f7d0 rebuilds a team   fr"
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - "...writes the operation's id +0x720) — listed by job through 0x6092c0. The tactical pass (0x7715a0) and the homeland (0x70a370) release their units (-1) as they end. A tree's units each..."
+  review: imported
 - addr: 0x771670
   final: 0x503660
   kind: function

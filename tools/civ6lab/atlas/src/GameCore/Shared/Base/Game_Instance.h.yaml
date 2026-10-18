@@ -31,6 +31,8 @@
     - "H-1: the governors' clocks — READ"
     - "H-1: a National Park's amenities, stored at the owner's turn — READ"
     - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0: production, growth, the border turn 0x1a9bc0, loyalty): a WONDER..."
     - "- Player DoTurn 0x4e4560, in order: the culture (+0x1310, 0x396860: the civic progress), the resources (+0x1320,..."

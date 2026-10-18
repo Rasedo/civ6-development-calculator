@@ -276,12 +276,14 @@
     - recording: 1109
       turn: 225
       value: "and a National Park's Tourism (1109 Handan t225-241) read the park's appeal before the Conservation term until t242 — the same cache."
-  impl: [gpu/core/sim_economy.py:SimEconomy]
+  impl: [gpu/core/sim_economy.py:SimEconomy, cpu/core/opsOrders.ts:endangered]
   readings:
     - "C-74: the fire — READ"
     - "H-1: the plot's Appeal — READ"
     - "C-74: the fire's spread — READ (the order)"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "SPREAD (0x336a50's last arm → 0x33b580): the plot's neighbours within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, the event's own start test 0x28ec10 (its Ran..."
     - ...e pillaged, -1 for its own pillaged improvement (+0x4d bit 0), then the ring of radius 1 (0x6b1b0 -> 0x691f0, the centre not in it) through 0x513780, and last +1 when the plot's owner hol...
@@ -467,7 +469,10 @@
   cases:
     - recording: AI_Tactical.csv
       value: "The tactical move Promotion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv);"
-  readings: ["C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"]
+  readings:
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...ion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv); 0x774970 then runs..."
   review: imported
@@ -1184,11 +1189,16 @@
     - recording: 1117
       turn: 14
       value: "The log carries   one UnitDamageChanged for the three (1117 t14: a barbarian Warrior at 27 HP   on Valletta;"
-  impl: [cpu/data/constants.ts:COMBAT_MAX_HIT_POINTS, cpu/harness/replayActions.ts:unit]
+  impl:
+    - cpu/data/constants.ts:COMBAT_MAX_HIT_POINTS
+    - cpu/harness/replayActions.ts:unit
+    - cpu/core/opsOrders.ts:endangered
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "- The damage law (0x519090; struct 0x519370): damage = trunc((24 + r) x expf(x) + 0.5), clamped [1, 100], x = (k x D) >> 8 in 1/256..."
     - "- A unit's attack on a city (0x206080, melee) draws three times: 0x519370 the attacker's damage, then 0x519440 the district's hit points (hash 0x5e97d629) and..."
@@ -1500,6 +1510,20 @@
   readings: ["H-1: the upgrade's gold — READ"]
   context:
     - "Unit_Upgrade_Manager's cost 0x5376d0 (via 0x590520; \"Upgraded unit is cheaper than current unit\", \"iNetProduction >= 0\"), in 24.8: UPGRADE_B..."
+  review: imported
+- addr: 0x590a30
+  final: 0x3b8080
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      turn: 167
+      value: "Why 1128's city-state 2 offers its six   units none at t167-183 (its City Defense started and completed each turn,   no tactical row for them) stays unread: no setter before the operations'   tick nam"
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - ...irection's wander, the air moves), the homeland (0x70a440), Defend Units, a conversion (0x590a30), the espionage AI (0x695660), a retreat (0x212500), and the unit-created handler 0x6...
   review: imported
 - addr: 0x5bbf80
   final: 0x3d4270
@@ -2430,6 +2454,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the..."
   context:
@@ -2578,6 +2603,19 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ds the operation's tree gone and the manager ends it (\"Operation complete\", 0x725000 -> 0x7353d0)."
+  review: imported
+- addr: 0x735790
+  final: 0x4d99d0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 9
+      value: "yet 1117 city-state 2's Warrior 131073, its Attack   Barb Camp complete at t9, takes tactical moves from t10 — the path that   frees an ended operation's units is unread (0x73f7d0 rebuilds a team   fr"
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - ...rn is done (0x570b40). The operation's end (0x7353d0 -> 0x73ea10, the teams' destructor 0x735790) writes no unit, and the release 0x73d1f0 is Defend Units'; yet 1117 city-state 2's War...
   review: imported
 - addr: 0x747f30
   final: 0x4e73f0
@@ -3657,6 +3695,20 @@
   context:
     - ...nted and arrived is cleared; the listed members within the unit distance of the others (0x8160a0) leave the list, one within the range arriving; the list stored with the goal. The stat...
   review: reviewed
+- addr: 0x816380
+  final: 0x5760b0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      turn: 167
+      value: "Why 1128's city-state 2 offers its six   units none at t167-183 (its City Defense started and completed each turn,   no tactical row for them) stays unread: no setter before the operations'   tick nam"
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - ...done (+0x530 clear) and alive (+0x770 clear), then the evaluator's test (Recruit Units' 0x816380 -> 0x738050). The turn-done flag's one setter 0x570b40 (through the replicated field at...
+  review: imported
 - addr: 0x81c820
   final: 0x57c0a0
   kind: function

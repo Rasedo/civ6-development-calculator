@@ -62,8 +62,11 @@
   final: 0x378410
   kind: function
   status: PARTLY
+  impl: [cpu/core/opsOrders.ts:groundOf]
   readings:
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ted on the unit's `m_bEligibleToHeal` (+0x1590) and its plot's relation to the owner (0x530880: 1 own or allied, 2 unowned, 3 another's; the owner's no-neutral / no-foreign flags +0x..."

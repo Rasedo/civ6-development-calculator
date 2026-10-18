@@ -650,12 +650,12 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
 }
 
 /** the unit's whole Movement in Movement points (0x56e130) */
-function maxMoves(state: GameState, u: Unit): number {
+export function maxMoves(state: GameState, u: Unit): number {
   return Math.floor(unitFullMoves(state, u) / MP_SCALE);
 }
 
 /** the unit's attack range: 0 for a unit that fights in melee */
-function rangeOf(u: Unit): number {
+export function rangeOf(u: Unit): number {
   return UNITS[u.type]?.ranged ? unitAttackRange(u) : 0;
 }
 
@@ -831,7 +831,7 @@ export function unitDanger(melee: number, ranged: number, bombard: number): numb
 
 /** a unit's strengths as the AI reads them (0x56dc90, 0x56e3e0, 0x56daa0):
  *  combat, ranged (none for a unit with a bombard) and bombard */
-function aiStrengths(u: Unit): { melee: number; ranged: number; bombard: number } {
+export function aiStrengths(u: Unit): { melee: number; ranged: number; bombard: number } {
   const d = UNITS[u.type];
   const bombard = d?.bombard ?? 0;
   return { melee: d?.combat ?? 0, ranged: bombard > 0 ? 0 : d?.ranged?.strength ?? 0, bombard };

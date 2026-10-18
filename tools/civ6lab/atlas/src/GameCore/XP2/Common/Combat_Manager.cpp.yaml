@@ -233,7 +233,10 @@
   name: Combat_Manager
   status: PARTLY
   impl: [cpu/core/combat.ts:seizeCivilian]
-  readings: ["H-1: a civilian stepped on — READ"]
+  readings:
+    - "H-1: a civilian stepped on — READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e +0x1ba bit 2, and whose player the mover's player is at war with (0x469cd0), it calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 wi...

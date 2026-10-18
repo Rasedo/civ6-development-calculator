@@ -1,6 +1,7 @@
 """THE CITY-STATES' OPERATIONS ON A WORLD, GPU twin (`gpu/core/sim_minorops.py`
-over the minor's turn): seed9001's opening — each major's capital founded on
-its settler's plot, nothing else ordered — for 38 turns; per turn per
+over the minor's turn): the openings of seed9001 and seed9235 (the turns the
+pins hold) — each major's capital founded on its settler's plot, nothing
+else ordered; per turn per
 city-state its operations as the census reads them (the pool, the pick, each
 operation's target, rally, backup, strengths and teams), the camps its
 knowledge base holds, its army records, its contracts, its event slots, its
@@ -49,18 +50,19 @@ def unit_plots(sim, b: int, s: int) -> list[int]:
 
 def main() -> int:
     rules = load_rules()
-    sim = opened(rules, FIXTURES / "seed9001.json", 0)
     man = statecompare.load_manifest()
-    for t, want in enumerate(PINS):
-        sim.step()
-        got = statecompare.group_dump(sim, 0, "cityState", man)
-        for key, fields in want.items():
-            row = got.get(int(key))
-            assert row is not None, f"turn {t + 1}: city-state {key} missing"
-            for f, v in fields.items():
-                g = unit_plots(sim, 0, int(key)) if f == "unitPlots" else row[f]
-                assert same(v, g), f"turn {t + 1}: city-state {key} {f}: TS {v}, GPU {g}"
-    print(f"  the city-states' operations OK — {len(PINS)} turns of seed9001, every minor's operations as pinned")
+    for world, turns in PINS.items():
+        sim = opened(rules, FIXTURES / f"{world}.json", 0)
+        for t, want in enumerate(turns):
+            sim.step()
+            got = statecompare.group_dump(sim, 0, "cityState", man)
+            for key, fields in want.items():
+                row = got.get(int(key))
+                assert row is not None, f"{world} turn {t + 1}: city-state {key} missing"
+                for f, v in fields.items():
+                    g = unit_plots(sim, 0, int(key)) if f == "unitPlots" else row[f]
+                    assert same(v, g), f"{world} turn {t + 1}: city-state {key} {f}: TS {v}, GPU {g}"
+        print(f"  the city-states' operations OK — {len(turns)} turns of {world}, every minor's operations as pinned")
     print("BATTERY OK minor_ops")
     return 0
 

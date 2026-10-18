@@ -11,11 +11,18 @@ import type { GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { attacksLeftOf } from './promotions';
-import { hostileRangedStrike, unitAttackRange } from './combat';
-import { moveTo, passAttack, passMoveExec, passMoveUpdate, plotDistance, type Pass } from './tactical';
+import { cityStrikeStrength, damageExpected, hostileRangedStrike, unitAttackRange } from './combat';
+import { aiStrengths, maxMoves, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passSafePlot, plotDistance, rangeOf,
+  type Pass } from './tactical';
 import type { OpsEnv } from './operations/manager';
+import type { DefendOrders } from './operations/nodes';
 import { unitDomain } from './units';
 import { CITY_STRIKE_RANGE } from './phase';
+import { allianceTypeWith, cityAtTile, cityStateOfSeat, civsAtWar, isCityStateSeat, tileSeat } from './seats';
+import { NO_SEAT, type City } from './types';
+import { cityStateAt, minorCity } from './cityStates';
+import { COMBAT_MAX_HIT_POINTS } from '../data/constants';
+import { isWater } from '../../world/query';
 import type { MajorAttackTargetView, MajorView } from '../../ai/major/view';
 
 /** `base` as `seat`'s operations read it in its pass: the pass's target list
@@ -56,9 +63,153 @@ export function passView(state: GameState, seat: number, pass: Pass, base: Major
   };
 }
 
+/** a plot's relation to `seat` (Rules_Movement 0x530880): 1 its own, a
+ *  city-state's it is suzerain of, an ally's; 2 no one's; 3 another's */
+function groundOf(state: GameState, seat: number, plot: number): number {
+  const owner = tileSeat(state.map.tiles[plot]);
+  if (owner === NO_SEAT || owner < 0) return 2;
+  if (owner === seat) return 1;
+  if (isCityStateSeat(owner) && state.cityStates.find((c) => c.id === cityStateOfSeat(owner))?.suzerain === seat) return 1;
+  return allianceTypeWith(state, seat, owner) >= 0 ? 1 : 3;
+}
+
+/** the city a district plot belongs to (0x408770), a city-state's included */
+function cityOfPlot(state: GameState, plot: number): City | undefined {
+  const t = state.map.tiles[plot];
+  const cs = cityStateAt(state, plot);
+  return cs ? minorCity(cs) : cityAtTile(state, t);
+}
+
+/** a unit's damage, its hit points' complement */
+const damageOf = (u: Unit): number => COMBAT_MAX_HIT_POINTS - u.hp;
+
+/** the unit hurt to `pct` percent of its hit points (single precision) */
+const hurt = (u: Unit, pct: number): boolean =>
+  damageOf(u) >= Math.fround(COMBAT_MAX_HIT_POINTS * Math.fround(pct * Math.fround(0.01)));
+
+/** the unit fortified (+0x650 == 2, two turns dug in) */
+const fortified = (u: Unit): boolean => (u.fortifyTurns ?? 0) >= 2;
+
+/**
+ * THE TEAM UPDATE'S ENDANGERED (0x738f20 over the members): per member, the
+ * pass's targets within twice its base Movement in the list's order — a
+ * unit of the target that fights, where no unit of the member's player
+ * stands beside it (0x6b1b0's ring) and the member's plot holds danger or
+ * the target is HIGH, within the target's Movement or its range, adds the
+ * blow it would strike the member (0x51a240 on their strengths); a city
+ * that strikes, within its range, its strike (0x519370) — and the member
+ * the sum would leave with no hit points (a unit that does not fight, any
+ * blow at all) is endangered.
+ */
+function endangered(state: GameState, pass: Pass, members: readonly Unit[]): Unit[] {
+  const out: Unit[] = [];
+  for (const u of members) {
+    const near = 2 * (UNITS[u.type]?.moves ?? 0);
+    const mine = aiStrengths(u);
+    const fights = mine.melee > 0 || mine.ranged > 0 || mine.bombard > 0;
+    const beside = state.units.some((x) => x !== u && x.seat === u.seat && plotDistance(state, x.tileIndex, u.tileIndex) === 1);
+    let sum = 0;
+    for (const e of pass.targets) {
+      const d = plotDistance(state, u.tileIndex, e.tile);
+      if (d <= near) {
+        const ev = e.unit && state.units.includes(e.unit) ? e.unit : null;
+        if (ev) {
+          const theirs = aiStrengths(ev);
+          if ((theirs.melee > 0 || theirs.ranged > 0 || theirs.bombard > 0) && !beside
+            && (pass.danger[u.tileIndex] > 0 || e.type === 'HIGH')
+            && (d <= maxMoves(state, ev) || d <= rangeOf(ev))) {
+            sum += damageExpected(Math.max(theirs.melee, theirs.ranged) - mine.melee);
+          }
+        } else if (e.type === 'COMBAT_DISTRICT') {
+          const city = cityOfPlot(state, e.tile);
+          const str = city ? cityStrikeStrength(state, city) : 0;
+          if (city && str > 0 && plotDistance(state, u.tileIndex, city.centerIndex) <= CITY_STRIKE_RANGE) {
+            sum += damageExpected(str - mine.melee);
+          }
+        }
+      }
+      if (out.includes(u)) continue;
+      if (sum > 0 && !fights) {
+        if (!isWater(state.map.tiles[u.tileIndex])) out.push(u);
+      } else if (damageOf(u) + sum > COMBAT_MAX_HIT_POINTS) out.push(u);
+    }
+  }
+  return out;
+}
+
+/** OPERATION DEFEND UNITS' orders in `seat`'s pass (`DefendOrders`) */
+function passDefend(state: GameState, seat: number, pass: Pass, changed: () => void): DefendOrders {
+  const unitsOf = (ids: readonly number[]): Unit[] =>
+    ids.map((id) => state.units.find((u) => u.id === id && u.seat === seat)).filter((u): u is Unit => !!u);
+  const type = (u: Unit) => gameTypeOf('unit', u.type, 'UNIT_');
+  const xy = (p: number) => `${p % state.map.width} ${Math.floor(p / state.map.width)}`;
+  const inCity = (u: Unit) => state.map.tiles[u.tileIndex].district === 'CITY_CENTER';
+  const off = (u: Unit, target: number, range: number) => range < 0 || plotDistance(state, u.tileIndex, target) >= range;
+  return {
+    flagged: (members, pct) => {
+      const us = unitsOf(members);
+      if (endangered(state, pass, us).length) return true;
+      return us.some((u) => hurt(u, pct) || (fortified(u) && pass.danger[u.tileIndex] > 0));
+    },
+    execute: (members, target, pct, range) => {
+      const lines: { type: string; what: string }[] = [];
+      const released: number[] = [];
+      const us = unitsOf(members);
+      // the endangered to their safe plots (0x716b90)
+      for (const u of endangered(state, pass, us)) {
+        if (!off(u, target, range) || aiStrengths(u).bombard > 0 || u.movesLeft <= 0 || inCity(u)) continue;
+        const to = passSafePlot(state, pass, u);
+        passFinish(pass, u, 'Operation', u.tileIndex);
+        if (to >= 0) {
+          moveTo(state, u, to, false);
+          lines.push({ type: type(u), what: `Move ${xy(to)}` });
+          changed();
+        }
+      }
+      // the hurt, or fortified afloat in danger
+      for (const u of us) {
+        if (!state.units.includes(u) || u.movesLeft <= 0 || !off(u, target, range)) continue;
+        const afloat = fortified(u) && isWater(state.map.tiles[u.tileIndex]) && pass.danger[u.tileIndex] > 0;
+        if (!hurt(u, pct) && !afloat) continue;
+        if (aiStrengths(u).bombard > 0) continue;
+        if ((u.fortifyTurns ?? 0) === 0 && groundOf(state, seat, u.tileIndex) !== 1) {
+          released.push(u.id);
+          continue;
+        }
+        if (fortified(u) && isWater(state.map.tiles[u.tileIndex])) {
+          const to = passSafePlot(state, pass, u);
+          passFinish(pass, u, 'Operation', u.tileIndex);
+          if (to >= 0) {
+            moveTo(state, u, to, false);
+            lines.push({ type: type(u), what: `Move ${xy(to)}` });
+            changed();
+          }
+          if (!state.units.includes(u)) continue;
+        }
+        if (u.movesLeft > 0) {
+          const owner = tileSeat(state.map.tiles[u.tileIndex]);
+          if ((owner !== NO_SEAT && owner >= 0 && civsAtWar(state, seat, owner)) || pass.danger[u.tileIndex] > 0) {
+            const to = passSafePlot(state, pass, u);
+            passFinish(pass, u, 'Operation', u.tileIndex);
+            if (to >= 0 && to !== u.tileIndex) {
+              moveTo(state, u, to, false);
+              lines.push({ type: type(u), what: `Move ${xy(to)}` });
+              changed();
+              if (!state.units.includes(u)) continue;
+            }
+          }
+        }
+        passFinish(pass, u, 'Operation', u.tileIndex);
+        lines.push({ type: type(u), what: 'Fortify' });
+      }
+      return { lines, released };
+    },
+  };
+}
+
 /** the orders of `seat`'s operations in `pass`; `changed` after each */
 export function passOrders(state: GameState, seat: number, pass: Pass, changed: () => void):
-  Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec'> {
+  Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend'> {
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id && u.seat === seat);
   return {
     move: (id, dest) => {
@@ -88,5 +239,6 @@ export function passOrders(state: GameState, seat: number, pass: Pass, changed: 
       changed();
       return out.map((x) => ({ type: gameTypeOf('unit', x.unit.type, 'UNIT_'), from: x.from, dest: x.dest, after: x.unit.tileIndex }));
     },
+    defend: passDefend(state, seat, pass, changed),
   };
 }

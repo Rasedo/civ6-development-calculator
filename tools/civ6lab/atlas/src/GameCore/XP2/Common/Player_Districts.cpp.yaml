@@ -19,6 +19,17 @@
     - "..., a wonder (+0x158 & 0x40) PSEUDOYIELD_WONDER of 0.5; per district the player may have (0x406c00) PSEUDOYIELD_DISTRICT of 0.5; per project (+0x160) PSEUDOYIELD_SPACE_RACE of 0x7b8a30²..."
     - "...'s version 0.5, a wonder PSEUDOYIELD_WONDER of 0.5; per district the player may have (0x406c00) PSEUDOYIELD_DISTRICT of 0.5 — each paid from landing to the horizon; its policies: the..."
   review: imported
+- addr: 0x408770
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/opsOrders.ts:cityOfPlot]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...its blow on the member (0x51a240 on GetCombat's strengths); a district's city (kind 3, 0x408770) that strikes, the member within its strike range of the centre, its strike (0x519370);...
+  review: imported
 - addr: 0x408b60
   final: 0x2c45b0
   kind: function

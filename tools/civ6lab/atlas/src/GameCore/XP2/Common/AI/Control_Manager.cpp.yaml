@@ -13,6 +13,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...able slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list..."
@@ -44,6 +45,20 @@
     - "...(0x60a8c0, unread) taken by the player's first job (0x5c2650, before the tribes' turn in 0x6096c0) would not hold a unit raised in the turn. The raid's end: \"C-95: the barbarians' raid\" (..."
     - "- THE TURN (0x6096c0, the player AI's jobs): a first list — the unit evaluator 0x5c2650, the barbarian manag..."
   review: reviewed
+- addr: 0x60a440
+  final: 0x402d20
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      turn: 167
+      value: "Why 1128's city-state 2 offers its six   units none at t167-183 (its City Defense started and completed each turn,   no tactical row for them) stays unread: no setter before the operations'   tick nam"
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - ...a30), the espionage AI (0x695660), a retreat (0x212500), and the unit-created handler 0x60a440 (player signals +0x60, raised by the unit's creation 0x4eeb70) for an AI player whose C...
+  review: imported
 - addr: 0x60a8c0
   final: 0x403190
   kind: function
@@ -64,6 +79,8 @@
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "H-1: the raids — READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...is not yet recruitable (W at t7 recruited at t8, the t9 W not at t9): LAB — the evaluator 0x60a8c0 is unread. The raid operation's own end (its tree's last Notify Owner, which opens the ci..."
     - "...71530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tact..."

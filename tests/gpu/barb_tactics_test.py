@@ -419,6 +419,10 @@ def main() -> None:
     sim.barb_unit_tile[0, d] = away[0]
     sim._occ_set(torch.tensor([0]), torch.tensor([away[0]]), torch.tensor([d + lo]))
     sim._barb_reset_mp()
+    # the other barbarians hold: none walks onto the camp before it
+    held = torch.ones_like(sim.barb_unit_alive)
+    held[0, d] = False
+    sim.barb_unit_mp[held] = 0
     acting = torch.zeros_like(sim.barb_unit_alive)
     acting[0, d] = True
     tgt = sim._tac_search(torch.tensor([0]), torch.tensor([d]), BARB_SEAT, 2, False)["turns"][0, camp]

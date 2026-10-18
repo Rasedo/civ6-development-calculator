@@ -36,7 +36,10 @@
       turn: 129
       value: 1122 t129 and 1124 t248 a Spy, trained and granted by the   Intelligence Agency, a name and no level offer).
   impl: [cpu/data/units.ts:CITIZEN_NAMED_UNITS, cpu/harness/checks.ts:doneBefore]
-  readings: ["H-1: a city's name, a citizen's name — READ"]
+  readings:
+    - "H-1: a city's name, a citizen's name — READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...l falls 40, 39, 38 ... as storms and Spies take names. Which units: the unit's creation 0x4eeb70 calls 0x486bf0 → 0x486c20 where the unit info's Spy (+0x1ba bit 2) or ExtractsArtifac..."
   review: imported
