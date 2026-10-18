@@ -54,6 +54,8 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
   context:
     - "...7, k = rate/100, a perpetuity a/k past nk >= 10; the horizon itself one discounted turn 0x7a1240, (1-k)^n with -0.16667). Then: per unlocked unit the player's version, 10 x the cities'..."
     - ...yer AI, as PSEUDOYIELD_INFLUENCE @0xf2e240 with the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's poin...
@@ -73,6 +75,7 @@
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb/notes.txt: ...30(player+0x1290) -> discount rate (GlobalParameters AI_DISCOUNT_RATE=2.0 -> r=0.02 via /25600). PV 0x7a16e0(out,&v,&rate,n): n==0 ->v; n<0 ->0; rate==0 -> v*n; if rate>=50.0 or ((rate*n>>8)*2>>8)>=fx(10): v/..."
@@ -378,6 +381,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
   notes: ["label: pseudoYieldValue(out,&amt,pseudo,playerAI,..)"]
   context:
     - ...ds' +0x638, +0x7a8, the +0x6b0 list or +0x6c8); per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 fo...
@@ -431,19 +435,34 @@
   final: 0x52b650
   kind: function
   name: traderValue
+  signature: fx* traderValue(fx* out, Player* player, fx* rate, int start, int horizon, int extra)
+  semantics: |
+    0 once the player's trade units (Units +0x1b9 bit 0x40) reach the trade
+    route capacity (0x4d9320) + extra; else K (knowledge base +0x6d8)
+    discounted to start where min(start + 30, horizon) is start, else
+    PV(K, end) - PV(K, start); plus the eras' points (0x2c4470) through
+    PSEUDOYIELD_GOLDENAGE_POINT; x4. The unit value 0x7b62c0 passes
+    start = horizon = T.
   status: READ
   cases:
+    - recording: h1_duelv1121
+      turn: 14
+      value: player 4 UNIT_TRADER logged 22.02, ours 22.12 (T 22; K the turn before's AI_Knowledge.csv)
+    - recording: h1_duelv1121
+      turn: 15
+      value: player 4 UNIT_TRADER logged 58.79, ours 58.93 (T 12)
+    - recording: h1_duelv1117
+      turn: 17
+      value: player 2 UNIT_TRADER logged 19.95, ours 19.95 (T 25)
     - recording: h1_duelv1124
-      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
-    - recording: AI_Knowledge.csv
-      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
-    - recording: 1124
-      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
-    - recording: 1124
-      turn: 28
-      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:traderValue]
+      turn: 32
+      value: player 3 UNIT_TRADER logged 55.21, ours 55.21 (T 15)
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:traderValue
+    - gpu/core/sim_cityvalue.py:_cv_trader_value
   readings:
+    - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -455,7 +474,7 @@
     - "...ON — `pyglob` over 0x5bbf80, each global stored after the next name's load): a Trader 0x7a7110 through PSEUDOYIELD_UNIT_TRADE; a religious unit from ReligiousStrength (+0x78) x 0.01,..."
     - "...ater (0x82a10) and no Harbor (0xcbecc739) for a unit of no RangedCombat (+0x6c). TRADE: 0x7a7110 through PSEUDOYIELD_UNIT_TRADE. RELIGIOUS: ReligiousStrength (+0x78) x 0.01, SpreadChar..."
     - ...om the start); EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 PARTLY (the Trader's value 0x7a7110 of Amount, start to horizon).
-  review: imported
+  review: reviewed
 - addr: 0x7a7400
   final: 0x52b7d0
   kind: function
@@ -707,6 +726,9 @@
     - recording: 1124
       turn: 28
       value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+    - recording: h1_duelv1121
+      turn: 14
+      value: "the TRADE branch (0x7b6525) calls 0x7a7110 with start = horizon = T: player 4 UNIT_TRADER logged 22.02, ours 22.12"
   impl:
     - cpu/core/aiCityBuild.ts:CityBuildFacts
     - cpu/core/aiCityBuild.ts:unitValueExit
@@ -717,6 +739,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...req buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) ->..."
     - ".claude/scratchpad/cb/notes.txt: ...turns). regional (+0x2c) via 0x79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x..."

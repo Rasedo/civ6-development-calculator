@@ -554,7 +554,8 @@ export function unitTurns(f: CityBuildFacts, u: AiUnitRow): number {
  *  obsolete to the player), plus half the count player +0x12f0 +0xc0 holds where its Combat exceeds the
  *  player's trade route capacity; an explorer, settler or spy 1.0 plus the
  *  eras' points as PSEUDOYIELD_GOLDENAGE_POINT; a Trader its worth
- *  (`traderValue`) through PSEUDOYIELD_UNIT_TRADE — then x (the city's extra
+ *  (`traderValue` with start and horizon both `t`: one turn's route value
+ *  discounted to `t`) through PSEUDOYIELD_UNIT_TRADE — then x (the city's extra
  *  copies + 1) x the promotion class weight, 0 outright for a strategic
  *  resource the player cannot reach, through its pseudo-yield, less its
  *  Maintenance as Gold below handicap 3, paid from `t` to `h`. Null where a
@@ -573,7 +574,7 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
     if (e?.obsolete) v = fmul(v, 3 * FX);
     if (u.combat > f.view.tradeRouteCapacity(f.seat)) v += fxConst(f.combatCount * 0.5);
   } else if (pseudo === 'PSEUDOYIELD_UNIT_TRADE') {
-    const tv = traderValue(f.view, f.seat, 0, t, h);
+    const tv = traderValue(f.view, f.seat, 0, t, t);
     if (tv === null) return null;
     v = pseudoYieldValue(f.view, f.seat, tv, pseudo);
   } else if (pseudo === 'PSEUDOYIELD_UNIT_EXPLORER' || pseudo === 'PSEUDOYIELD_UNIT_SETTLER' || pseudo === 'PSEUDOYIELD_UNIT_SPY') {

@@ -924,6 +924,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...NCE_MODIFIER (0x6c09b0), EFFECT_ADJUST_PLOT_YIELD (0x6afa10),   EFFECT_ADJUST_TRADE_ROUTE_CAPACITY (0x6c0ff0), plot evaluators TERRAIN/FEATURE/RESOURCE_TYPE/RESOURCE_VISIBLE/HAS_ANY_IMPROVEMENT. - aiValue.ts:..."
   context:

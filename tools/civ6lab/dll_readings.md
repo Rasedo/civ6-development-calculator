@@ -3809,8 +3809,12 @@ rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
   term (its count read 0); AIR + 30.0 where its PrereqDistrict (+0x278) in
   the city holds no aircraft, else 5.0 a free slot; NAVAL FX(-9999) at a
   city with no water (0x82a10) and no Harbor (0xcbecc739) for a unit of no
-  RangedCombat (+0x6c). TRADE: 0x7a7110 through PSEUDOYIELD_UNIT_TRADE.
-  RELIGIOUS: ReligiousStrength (+0x78) x 0.01, SpreadCharges (+0x7c) or
+  RangedCombat (+0x6c). TRADE (0x7b6525..0x7b6582): 0x7a7110(out, player,
+  &rate, T, T, 0) — the landing turn T passed as both start (r9d) and
+  horizon (the fifth argument, both from [rbp+0x118]), extra 0 — so its end
+  min(T + 30, T) is T and its value is one turn's K discounted to T
+  (0x7a1240), x4; then through PSEUDOYIELD_UNIT_TRADE, into the tail.
+  Section "C-96: the Trader's value" holds the cases. RELIGIOUS: ReligiousStrength (+0x78) x 0.01, SpreadCharges (+0x7c) or
   ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority
   religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCharges
   +0x64, Units_XP2 TourismBomb). ARCHAEOLOGIST: min(artifacts / 56, 10) and
@@ -4448,6 +4452,38 @@ EFFECT_ADJUST_TRADE_ROUTE_CAPACITY term read the K it keeps.
 - Unread: the knowledge base's city entries' order (the engines take the
   route scorer's: the other city-states by id, then the majors' cities) and
   0x2d2220 (taken as true: a minor holds no fog); 0x54c630's term.
+
+## C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)
+
+`traderValue` in `cpu/core/aiValue.ts` (GPU `_cv_trader_value`,
+gpu/core/sim_cityvalue.py); its unit-value call `unitValue`
+(cpu/core/aiCityBuild.ts, GPU `_cv_unit`). Check:
+`cpu/harness/cityBuildLab.ts`, the UNIT_TRADER rows.
+
+- 0x7a7110(out rcx, player rdx, &rate r8, start r9d, horizon [rsp+0x28],
+  extra [rsp+0x30]): a null player 0. The player's units (+0x12e8 +0xd8
+  list) whose Units row (+0xa0) has +0x1b9 bit 0x40 (a trade unit) counted;
+  at or above the trade route capacity (0x4d9320 on player +0x12e0) +
+  extra -> 0. Else K = the knowledge base's (0x786160 on player +0x12b8)
+  +0x6d8; end = min(start + 30, horizon); start == end: discounted(K, rate,
+  start) (0x7a1240); else PV(K, rate, end) - PV(K, rate, start) (0x7a16e0
+  twice). Plus 0x2c4470(the eras 0x2c3660, player id +0x128) x 256 through
+  PSEUDOYIELD_GOLDENAGE_POINT (0x7a60d0); the sum (sign-extended) << 10 >> 8,
+  x4.
+- Its caller 0x7b62c0 (the TRADE branch) passes start = horizon = the
+  unit's landing turn T and extra 0: the value is 4 x discounted(K, rate,
+  T), which the unit value's tail then weights again through the
+  pseudo-yield and takes PV(H) - PV(T) of. EFFECT_ADJUST_TRADE_ROUTE_CAPACITY
+  (0x6c0ff0) passes its own start and horizon.
+- Cases (the lab, K from AI_Knowledge.csv a turn back): runs/h1_duelv1121
+  p4 t14 logged 22.02 (ours 22.12; 284.71 with the horizon H passed),
+  t15 58.79 (58.93; 939.93), t17 68.11 (68.11); h1_duelv1117 p2 t17 19.95
+  (19.95; 243.64), t19 56.72 (56.87; 892.15); h1_duelv1124 p3 t31 21.37
+  (21.37; 260.88), t32 55.21 (55.21; 814.49). UNIT_TRADER rows within
+  0.005: 1121 259 -> 314 of 338, 1117 386 -> 473 of 543, 1124 427 -> 543
+  of 584. The rows left are T (1121 p4 t20 ours at T 6, the log's value
+  t21's at T 6; 1124 p3 t33 likewise) or K (1121 p2 t129 424.02 against
+  353.63).
 
 ## C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired
 

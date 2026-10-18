@@ -737,7 +737,9 @@ class SimCityValue:
             v = torch.where(_t(obs, like).bool(), _fmul(_t(val, like), torch.full_like(like, 3 * _FX)), _t(val, like))
             v = v + (u["combat"] > _t(f.trade_route_capacity(), like)).long() * _fx_const(f.combat_count() * 0.5)
         elif pseudo == "PSEUDOYIELD_UNIT_TRADE":
-            tv, tv_read = self._cv_trader_value(f, 0, t, h)
+            # 0x7b62c0 passes the landing turn as both start and horizon:
+            # one turn's route value discounted to `t`
+            tv, tv_read = self._cv_trader_value(f, 0, t, t)
             read = read & tv_read
             v = self._cv_pseudo(tv, pseudo, f.pseudo_w(pseudo))
         elif pseudo in ("PSEUDOYIELD_UNIT_EXPLORER", "PSEUDOYIELD_UNIT_SETTLER", "PSEUDOYIELD_UNIT_SPY"):

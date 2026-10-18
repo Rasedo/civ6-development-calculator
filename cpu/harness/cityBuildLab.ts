@@ -271,7 +271,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     // the growth its city's update read before the turn's growth: the
     // record before's citizens, store and surplus
     const before = prevImp!.minorOfPlayer.get(player);
-    if (before) cs.aiGrowth = minorCityGrowth(prevImp!.state, before);
+    if (before && before.centerIndex >= 0) cs.aiGrowth = minorCityGrowth(prevImp!.state, before);
     const facts = minorBuildFacts(state, cs, args.includes('--enginekb') ? minorKnownUnits(cs) : (u) => kb?.get(u) ?? 0);
     // the inputs the port does not read, as the game's logs give them: the
     // trade AI's route value (AI_Knowledge.csv) and, under --zero, the
