@@ -547,7 +547,17 @@ export function minorBuyUnit(state: GameState, cityState: CityState, id: string,
   applyTrainingGrants(state, minorCity(cityState), u);
   cityState.treasury -= price;
   if (id === 'BUILDER') cityState.buildersTrained += 1;
+  purchaseTracer?.(cityState, u, price);
   return u;
+}
+
+let purchaseTracer: ((cityState: CityState, u: Unit, price: number) => void) | null = null;
+
+/** The action replay's view of a minor's own Gold purchases (the unit and
+ *  its price), so that it can undo one the record's player did not make
+ *  whole. Null outside a replay. */
+export function traceMinorPurchases(fn: ((cityState: CityState, u: Unit, price: number) => void) | null): void {
+  purchaseTracer = fn;
 }
 
 /** CIV6 (`CivilizationLevels.IgnoresUnitStrategicResourceRequirements`): a

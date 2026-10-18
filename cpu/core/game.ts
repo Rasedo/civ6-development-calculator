@@ -1548,6 +1548,39 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
   return { ok: true };
 }
 
+/** a new game era's opening: its quests (0x93ac50) before its inspirations
+ *  (runs/h1_duelw1104 t181) */
+function eraOpening(state: GameState): void {
+  giveEraQuests(state);
+  eraInspirations(state);
+}
+
+let eraOpeningHeld = false;
+let eraOpeningOwed = false;
+
+/** A replay applying the other players' actions of a turn after `endTurn`
+ *  holds the opening of the era that turn opens until they have landed
+ *  (`openHeldEra`): in the game it comes after every player's actions of the
+ *  turn before (runs/h1_duelw1117 t30-31: China's kill of t30 boosts Bronze
+ *  Working, then the era's quest for Caguana draws over Sailing and Writing
+ *  alone, its "Choosing random tech type" range 2) */
+export function holdEraOpening(on: boolean): void {
+  eraOpeningHeld = on;
+  eraOpeningOwed = false;
+}
+
+/** whether a held `endTurn` owes its era's opening */
+export function eraOpeningDue(): boolean {
+  return eraOpeningOwed;
+}
+
+/** the era opening a held `endTurn` owes, where it owes one */
+export function openHeldEra(state: GameState): void {
+  if (!eraOpeningOwed) return;
+  eraOpeningOwed = false;
+  eraOpening(state);
+}
+
 /**
  * ONE GAME TURN, as Civ 6 runs it (tools/civ6lab/turn_order_civ6.md,
  * runs/turnorder/): the barbarians' turn, which closes the turn every
@@ -1578,9 +1611,8 @@ export function endTurn(state: GameState): void {
   climateTurn(state);
   if (state.unitsMode) releaseBarbarians(state);
   if (gameEraTurn(state, state.turn + 1)) {
-    // the era's quests (0x93ac50) before its inspirations (runs/h1_duelw1104 t181)
-    giveEraQuests(state);
-    eraInspirations(state);
+    if (eraOpeningHeld) eraOpeningOwed = true;
+    else eraOpening(state);
   }
   seatPhase(state);
   if (state.unitsMode) barbariansBesideMinors(state, true);

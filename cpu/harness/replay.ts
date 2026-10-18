@@ -36,7 +36,7 @@ import { NO_SEAT, type Governor } from '../core/types';
 import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
-  serialize, deserialize, itemCost } from '../core/game';
+  serialize, deserialize, itemCost, holdEraOpening, eraOpeningDue, openHeldEra } from '../core/game';
 import { completeQueueItem } from '../core/production';
 import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
@@ -80,7 +80,7 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -2406,7 +2406,17 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // the order is the player's, through the engine's verb; the game's
         // new id names the same unit from here on
         const u = unitOf(ctx, d.unit);
-        if (!u) { count(ctx, 'upgrade', 'refused', d.player); break; }
+        if (!u) {
+          // a unit trained and upgraded within the turn, which no record
+          // holds before its upgrade, stands as record t+1 holds it
+          // (runs/h1_duelw1117 t160: Antananarivo's Scout 1900550, built and
+          // upgraded to the Ranger 1966081 in its turn)
+          const into = !unitOf(ctx, d.into) && b.units.some((x) => `${x.owner}:${x.id}` === d.into) ? spawnRecorded(ctx, b, d.into) : undefined;
+          const major = seatOfP(ctx, d.player) >= 0 && seatOfP(ctx, d.player) < state.seats.length;
+          if (into) count(ctx, major ? 'unitNew:other' : 'minorAi:unitNew', 'fallback', d.player, `${d.into} ${into.type} upgraded from ${d.unit} within the turn: the engine made none`);
+          else count(ctx, 'upgrade', 'refused', d.player);
+          break;
+        }
         // the unit stood where the game added its upgrade, with moves to
         // spend (the order needs them); the record's steps before it are the
         // replay's, outside the engine's turn
@@ -3506,6 +3516,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdMinorOrders(true);
   holdCityStrikes(true);
   holdLevies(true);
+  // the era a pair's engine turn opens opens after the other players'
+  // actions of the pair (`openHeldEra`), as their research prices read the
+  // era before (`holdResearchEra`)
+  holdEraOpening(true);
+  // the city-states' own purchases of the pair, each with its price
+  const minorBought = new Map<Unit, { cityState: CityState; price: number }>();
+  traceMinorPurchases((cityState, u, price) => minorBought.set(u, { cityState, price }));
   const state = first.state;
   // each seat starts on the plots the record says it revealed
   // (`TurnRecord.revealed`), else on what its own plots, cities and units
@@ -3637,6 +3654,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.minorBlows = new Map();
     ctx.barbNew = [];
     ctx.lateEnvoys = [];
+    minorBought.clear();
     traceTurn = b.turn;
     const holders = [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])];
     ctx.researchBefore = new Map(holders.map((s) => [s.seat, s.research.tech]));
@@ -3827,12 +3845,21 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     religionAi.postTurn(state);
     matchNewUnits(ctx, b);
     // a unit the engine's own city-state, Free City or barbarian scripts made
-    // that the record's players did not: their decision, undone
+    // that the record's players did not: their decision, undone — a
+    // city-state's purchase with its Gold back (runs/h1_duelw1117 t24:
+    // Antananarivo's Archer, bought for 120 of its 121.5 Gold under City
+    // Defense's threat, which the game never bought; kept spent, the purse
+    // ran 124 short to the bankruptcy that disbanded its Bombard at t149)
     const mapped = new Set(ctx.units.values());
     for (const u of [...state.units]) {
       if (standing.has(u) || mapped.has(u) || u.seat < state.seats.length) continue;
       disbandUnit(state, u.id);
       const cs = state.cityStates.find((c) => c.seat === u.seat);
+      const paid = minorBought.get(u);
+      if (paid) {
+        paid.cityState.treasury += paid.price;
+        if (u.type === 'BUILDER') paid.cityState.buildersTrained -= 1;
+      }
       const op = cs?.ops ? opsOf(cs.ops).find((o) => opUnits(o).includes(u.id))?.def : undefined;
       count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat),
         `${u.type}${op ? ` for ${op}` : ''}`);
@@ -3861,6 +3888,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
           .filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))));
     }
     applyPhase(ctx, ds, 'after', b, b);
+    // the era's opening, its quests drawn on what those actions earned
+    // (runs/h1_duelw1117 t30: China's kill boosts Bronze Working before the
+    // Classical era's quest for Caguana, which draws over Sailing and
+    // Writing); its draws are the new turn's, before the looks of the other
+    // players' moves, which meet (t31: China meets Antananarivo after it,
+    // the log's second quest)
+    if (eraOpeningDue()) {
+      stream.actions(a.turn + 1);
+      openHeldEra(state);
+      stream.actions(a.turn);
+    }
     // an AI major's governor turn where record t+1 holds its roster as it
     // was: the record's
     for (const p of ctx.governorAi.actedAlone(new Set(ds.filter((d) => d.kind === 'governors').map((d) => d.player)))) {
@@ -4038,6 +4076,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdMinorOrders(false);
   holdCityStrikes(false);
   holdLevies(false);
+  holdEraOpening(false);
+  traceMinorPurchases(null);
   holdBarbarians(null);
   holdCongressBallots(null);
   if (strategies.active) {
