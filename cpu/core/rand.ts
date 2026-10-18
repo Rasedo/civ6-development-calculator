@@ -48,8 +48,9 @@ function step(state: GameState): number {
 }
 
 /** A point of the turn the game's own record witnesses the generator at: a
- *  seat's start of turn (`seat`, a city-state's included) or the turn's
- *  random-event step (`step`). */
+ *  seat's start of turn (`seat`, a city-state's and the barbarians'
+ *  included) or the turn's random-event step (`step`), in the engine's turn
+ *  `turn` (`endTurn` on `state.turn`). */
 export type RngPoint = { kind: 'seat' | 'step'; seat: number; turn: number };
 
 /** The action replay's hold on the generator (`cpu/harness/streamHold.ts`):

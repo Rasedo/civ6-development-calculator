@@ -91,11 +91,16 @@ export interface StreamHold extends RngHooks {
 
 
 /**
- * The hold for a replay of `recs`. The engine's seat phase of turn t is the
- * game's starts of turn t + 1 (the replay steps from record t to record
- * t + 1), so each seat takes the state its player's start of turn t + 1
- * began from; the random-event step that follows takes the state its first
- * draw was taken from.
+ * The hold for a replay of `recs`. The engine's turn t steps from record t to
+ * record t + 1, and the record of turn t is read at the active player's start
+ * of t: the game's starts between the two are every other player's start of
+ * turn t, then the random-event step and the active player's start of
+ * t + 1. Each seat's point in the engine's turn t takes the state of its
+ * player's start the pair holds — the last that record t + 1 witnesses
+ * (runs/h1_duelw1121: China's, Hunza's, Ayutthaya's and Antioch's border
+ * picks and Hunza's and Antioch's district ties of their starts of t, Rome's
+ * border picks of its start of t + 1); the random-event step takes the state
+ * its first draw was taken from.
  */
 export function streamHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Map<number, number>, history: History): StreamHold {
   last = makeHold(game, recs, playerOfSeat, history);
@@ -111,9 +116,15 @@ export function lastStreamLedger(): StreamLedger | undefined {
 }
 
 function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Map<number, number>, history: History): StreamHold {
-  const pre = new Map<string, number>();
-  for (const r of recs) {
-    for (const w of r.witness ?? []) if (w.point === 'pre' && typeof w.seed === 'number') pre.set(`${w.turn}:${w.player}`, w.seed >>> 0);
+  // per engine turn and player: the start the pair holds, its game turn and
+  // the generator's state as it began
+  const pre = new Map<string, { turn: number; seed: number }>();
+  for (let i = 1; i < recs.length; i++) {
+    for (const w of recs[i].witness ?? []) {
+      if (w.point !== 'pre' || typeof w.seed !== 'number') continue;
+      const k = `${recs[i - 1].turn}:${w.player}`;
+      if ((pre.get(k)?.turn ?? -Infinity) <= w.turn) pre.set(k, { turn: w.turn, seed: w.seed >>> 0 });
+    }
   }
   const log = history.randLog;
   const holdDraws = !!log && process.env.STREAM_HOLD !== 'points';
@@ -135,8 +146,9 @@ function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Ma
   let placedDraws = false;
   const marks: number[] = [];
   if (log) {
-    for (const s of pre.values()) {
-      const i = log.index(s);
+    for (const r of recs) for (const w of r.witness ?? []) {
+      if (w.point !== 'pre' || typeof w.seed !== 'number') continue;
+      const i = log.index(w.seed >>> 0);
       if (i !== undefined) marks.push(i);
     }
     for (const [, gap] of history.replay?.gaps ?? []) {
@@ -213,19 +225,23 @@ function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Ma
     point(state: GameState, point: RngPoint): number | undefined {
       if (state !== game) return undefined;
       let s: number | undefined;
+      // the game turn of the start or the step
+      let T = point.turn + 1;
       if (point.kind === 'seat') {
         const player = playerOfSeat.get(point.seat);
-        s = player === undefined ? undefined : pre.get(`${point.turn + 1}:${player}`);
+        const w = player === undefined ? undefined : pre.get(`${point.turn}:${player}`);
+        s = w?.seed;
+        if (w) T = w.turn;
       } else s = stepState(point);
       const i = s === undefined || !log ? undefined : log.index(s);
       if (i === undefined) {
         from = to = -1;
-        turn = point.turn + 1;
+        turn = T;
         window = null;
       } else {
         from = i;
         to = nextMark(i);
-        turn = i < n ? log!.draws[i].turn : point.turn + 1;
+        turn = i < n ? log!.draws[i].turn : T;
         window = { kind: point.kind, from, to, spoiled: false, seq: [] };
         windows.push(window);
       }

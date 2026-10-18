@@ -610,7 +610,7 @@ export function barbSlotsDying(state: GameState): void {
  * before the next turn's random-event step (`endTurn`).
  */
 export function barbarianRules(state: GameState, closing: number): void {
-  atRngPoint(state, { kind: 'seat', seat: BARB_SEAT, turn: closing - 1 });
+  atRngPoint(state, { kind: 'seat', seat: BARB_SEAT, turn: closing });
   // the military AI's part of their turn: their operations logged and refreshed
   barbarianOpsTurn(state);
   barbarianTechs(state);
