@@ -313,16 +313,20 @@ class SimResearch:
         live = (turns >= 0) & ((turns < h) if below else (turns <= h))
         return torch.where(live, out, torch.zeros_like(out))
 
-    def _rai_contracts(self, s: int, base: torch.Tensor, spent: torch.Tensor) -> torch.Tensor:
+    def _rai_contracts(self, s: int, base: torch.Tensor, spent: torch.Tensor, live: bool = False) -> torch.Tensor:
         """the seat's Tech Contracts (its city AI's Add Goal Tech contracts):
         per row the values of the contracts on it, an unowned row's whose
-        score is not negative (0x761980); the Free Cities hold none"""
-        from .sim_citytrees import GOAL_TECH  # sim_citytrees imports this module
+        score `base` is not negative (0x761980); `live` only the claimed or
+        in-progress ones (a completion's, 0x762d60); the Free Cities hold none"""
+        from .sim_citytrees import CP_CLAIMED, CP_IN_PROGRESS, GOAL_TECH  # sim_citytrees imports this module
         add = torch.zeros_like(base)
         ai = self.cityai
         if s >= ai.S:
             return add
         on = (ai.c_id[:, s] >= 0) & (ai.c_goal_kind[:, s] == GOAL_TECH) & (ai.c_goal[:, s] >= 0)
+        if live:
+            prog = ai.c_progress[:, s]
+            on = on & ((prog == CP_CLAIMED) | (prog == CP_IN_PROGRESS))
         if not bool(on.count_nonzero()):
             return add
         add.scatter_add_(1, ai.c_goal[:, s].clamp(min=0, max=base.shape[1] - 1),
@@ -651,7 +655,8 @@ class SimResearch:
     def _rai_completion(self, s: int, fire: torch.Tensor, done: torch.Tensor, sci: torch.Tensor) -> None:
         """`researchCompletionChoice` where `fire` [B] completed row `done`:
         the turn before's analysis (a fresh one before the first) adds its
-        prerequisites' values once more, the choice passes the row over"""
+        prerequisites' values once more, then the live Tech Contracts' once
+        more, the choice passes the row over"""
         fresh = self._rai_analysis(s, sci)
         v = self.citystate_ai_valid[:, s].unsqueeze(1)
         turns = torch.where(v, self.citystate_ai_turns[:, s], fresh[0])
@@ -660,6 +665,7 @@ class SimResearch:
         score = torch.where(v, self.citystate_ai_score[:, s], fresh[3])
         owned = torch.where(v, self.citystate_ai_owned[:, s], fresh[4])
         score = score + self._rai_upstream(self.citystate_techs[:, s], base, turns)
+        score = score + self._rai_contracts(s, score, owned, live=True)
         pick, goal = self._rai_choice(s, fire, (turns, nxt, base, score, owned), done)
         self._rai_take(s, pick, goal)
         self.citystate_ai_left[:, s] = torch.where(fire, self._rai_left(s, sci), self.citystate_ai_left[:, s])

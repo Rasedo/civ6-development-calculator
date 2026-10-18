@@ -41,6 +41,7 @@ import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost, selectResearch } from './economy';
+import { CP_CLAIMED, CP_IN_PROGRESS } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw } from './aiCivics';
 import { minorCity, suzerainOf } from './cityStates';
@@ -195,7 +196,7 @@ export function minorPower(state: GameState, cityState: CityState): void {
 }
 
 /** the minor's Tech Contracts (its city AI's Add Goal Tech contracts): each
- *  goal technology and the contract's value */
+ *  goal technology, the contract's value, live while claimed or in progress */
 function minorTechContracts(cityState: CityState): TechContract[] {
   const ai = cityState.cityAi;
   if (!ai) return [];
@@ -203,7 +204,7 @@ function minorTechContracts(cityState: CityState): TechContract[] {
   for (const c of ai.contracts) {
     const goal = ai.techContracts[c.id];
     const tech = goal === undefined ? null : engineId('tech', goal, 'TECH_', TECHS);
-    if (tech) out.push({ tech, value: c.value });
+    if (tech) out.push({ tech, value: c.value, live: c.progress === CP_CLAIMED || c.progress === CP_IN_PROGRESS });
   }
   return out;
 }
@@ -315,7 +316,8 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
     if (!r.techs.includes(cur)) r.techs.push(cur);
     delete r.techRetained[cur];
     r.tech = null;
-    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, terms()?.tech, contracts), cur, researchDraw(state)));
+    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, terms()?.tech, contracts), cur,
+      researchDraw(state), contracts));
     r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
     if (cur === URBAN_DEFENSES_TECH) urban();
   }
@@ -434,15 +436,16 @@ export function minorCompleteNow(state: GameState, seat: number, id: string): vo
   if (r.techs.includes(id)) return;
   r.techs.push(id);
   delete r.techRetained[id];
+  const cs = state.cityStates.find((x) => x.seat === seat);
   if (id === URBAN_DEFENSES_TECH) {
-    const cs = state.cityStates.find((x) => x.seat === seat);
     if (cs) minorUrbanFit(state, cs);
     else urbanDefensesFit(state, seat);
   }
   if (r.tech !== id) return;
   r.tech = null;
   r.techProgress = 0;
-  if (r.aiEntries) takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries.map((e) => ({ ...e })), id, researchDraw(state)));
+  if (r.aiEntries) takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries.map((e) => ({ ...e })), id, researchDraw(state),
+    cs ? minorTechContracts(cs) : []));
 }
 
 /** the civics AI's choice taken */

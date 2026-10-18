@@ -966,6 +966,14 @@
   context:
     - "- The pantheon's price (0x340c90, at the game's setup): 0x5254d0 of RELIGION_PANTHEON_MIN_FAITH (gp +0x5cc), stored at +..."
   review: imported
+- addr: 0x353cb0
+  final: 0x2514d0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...else a next step still researchable stays; else the prerequisites walked from the tech (0x353cb0) to an unheld researchable one, next step := it — each passes, the status otherwise unc..."
+  review: imported
 - addr: 0x35e1f0
   final: 0x2598b0
   kind: function
@@ -2096,6 +2104,21 @@
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
+- addr: 0x68d090
+  final: 0x4599d0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 6
+      value: "- A COMPLETION, 0x762d60 (the completed row): the in-hand turns +0x528   zeroed (0x731d10 on +0x4d0), the propagation once more on the entries as   they stand, then the contract list (+0x210) walked o"
+    - recording: h1_duelw1117
+      turn: 14
+      value: "runs/h1_duelw1117 t14 Caguana:   Astrology done, Celestial Navigation 477.1 + its Tech Contract 36's 40.0   over Iron Working's 480.7, Sailing taken, as logged)."
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...6e0 -> 0x761980) and is called at +0x10, any other released (0x600b00) — then per row 0x68d090 (the player +0x1288, the row's prerequisite the completed one), then the choice with th..."
+  review: imported
 - addr: 0x69e790
   final: 0x463260
   kind: function
@@ -2666,6 +2689,7 @@
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ct Manager's check 0x7f2220 sets FAILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8...
@@ -2776,6 +2800,14 @@
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "- THE CHOICE, 0x763020 (key): the comparator 0x75d530 over the entries — the same next step: the larger turns where their product is not posi..."
+  review: imported
+- addr: 0x7635c0
+  final: 0x4faee0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "- THE TECH CONTRACT'S CHECK, vt +0x70 0x5f5940 (the research AI's submission listener 0x7635c0 on player signal +0x270 takes a contract it passes — ACCEPTED — into +0x210; the turn w..."
   review: imported
 - addr: 0x76eb50
   final: 0x501180

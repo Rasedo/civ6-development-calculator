@@ -29,8 +29,9 @@
  * THE TURN (0x760980): with nothing researched the seat chooses; with a
  * research in hand it drops it only for a researchable row scoring
  * `RESEARCH_AI_TASK_BIAS` x 10 more than its goal (or its research, with no
- * goal). A completion (0x762d60) adds the prerequisites' values once more to
- * the turn's scores and chooses with the completed row passed over.
+ * goal). A completion (0x762d60) adds the prerequisites' values and the live
+ * Tech Contracts' once more to the turn's scores and chooses with the
+ * completed row passed over.
  *
  * Arithmetic is the DLL's 24.8 fixed point throughout (`aiValue.ts`).
  */
@@ -65,10 +66,22 @@ function researchable(r: ResearchState, id: string): boolean {
 /** the rows no row requires (the comparator's leaf flag, 0x761b70) */
 const REQUIRED = new Set(Object.values(TECHS).flatMap((t) => t.prereqs));
 
-/** a Tech Contract the research AI holds: its technology and its value, raw */
+/** a Tech Contract the research AI holds: its technology, its value, raw,
+ *  and whether it is live — accepted or in progress, the contracts a
+ *  completion adds once more */
 export interface TechContract {
   tech: string;
   value: number;
+  live: boolean;
+}
+
+/** 0x761980: each contract's value added to its row's score where the row is
+ *  unowned and its score not negative */
+function addContracts(entries: ResearchEntry[], contracts: readonly TechContract[]): void {
+  for (const c of contracts) {
+    const e = entries.find((x) => x.tech === c.tech);
+    if (e && !e.owned && e.score >= 0) e.score += c.value;
+  }
 }
 
 export interface ResearchEntry {
@@ -232,10 +245,7 @@ export function researchAnalysis(state: GameState, seat: number, science: number
     const base = turns < 0 ? 0 : techValue(state, id, turns, pw) + (cityTerm && turns <= AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
     return { tech: id, next, turns, owned: false, leaf, base, score: base };
   });
-  for (const c of contracts) {
-    const e = entries.find((x) => x.tech === c.tech);
-    if (e && !e.owned && e.score >= 0) e.score += c.value;
-  }
+  addContracts(entries, contracts);
   const leader = leaderOf(state, seat);
   propagate(r, entries, new Set(leader ? RESEARCH_AI_FAVORED[leader] ?? [] : []));
   return entries;
@@ -324,14 +334,19 @@ export function researchTurnChoice(state: GameState, seat: number, entries: read
 }
 
 /** 0x762d60: A COMPLETION — the turn's entries add their prerequisites'
- *  values once more, and the choice passes the completed row over */
-export function researchCompletionChoice(state: GameState, seat: number, entries: ResearchEntry[], done: string, draw: ResearchDraw): ResearchChoice | null {
+ *  values once more, then the live Tech Contracts their values once more
+ *  (runs/h1_duelw1117 t14 Caguana: Celestial Navigation 477.1 + its
+ *  contract's 40.0 over Iron Working's 480.7, Sailing taken), and the
+ *  choice passes the completed row over */
+export function researchCompletionChoice(state: GameState, seat: number, entries: ResearchEntry[], done: string, draw: ResearchDraw,
+  contracts: readonly TechContract[] = []): ResearchChoice | null {
   const r = researchOf(state, seat);
   const byId = new Map(entries.map((e) => [e.tech, e]));
   for (const e of entries) {
     if (e.turns < 0) continue;
     for (const p of upstream(r, e.tech)) e.score += Math.max(0, byId.get(p)?.base ?? 0);
   }
+  addContracts(entries, contracts.filter((c) => c.live));
   return researchChoice(state, seat, entries, done, draw);
 }
 

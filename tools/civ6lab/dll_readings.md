@@ -4427,8 +4427,9 @@ operations' contracts, the improvement values below, the purchases).
   player 3 t19 "City Defense, Started"); the threat, the one manager and
   the tree's nodes: "City Defense and the assault target's validity".
 - A tech contract (Add Goal Tech) is IN PROGRESS while the tech is the
-  research (AI_Research.csv prints it alive while RESEARCHING), CLAIMED
-  off it, COMPLETED when held. The AI's view at turn T: the record of T,
+  research (AI_Research.csv prints it alive while RESEARCHING), ACCEPTED
+  off it (the research AI's check 0x5f5940; the engines' trees hold it
+  CLAIMED), COMPLETED when held. The AI's view at turn T: the record of T,
   plus what the player's turn start completes (the research's tech or
   civic, the buildings built, the units trained and bought); the districts
   placed as the record of T has them, refused for good only complete.
@@ -4687,11 +4688,28 @@ Contract %d").
   one, the best (first entry, then any unowned higher) replaces it only if
   its next step differs, it scores more than the goal's (the research's
   without a goal) + AI_CURRENT_TASK_BIAS x 10, it is researchable itself.
-- A COMPLETION, 0x762d60 (the completed row): the propagation once more on
-  the entries as they stand, then the choice with the row as the key
-  (1124 t6: minors 2 and 3 pass Writing, Currency and Irrigation over —
-  their next step was Pottery — and take Celestial Navigation through
-  Astrology and Bronze Working through Mining, as logged).
+- A COMPLETION, 0x762d60 (the completed row): the in-hand turns +0x528
+  zeroed (0x731d10 on +0x4d0), the propagation once more on the entries as
+  they stand, then the contract list (+0x210) walked once more — a contract
+  IN PROGRESS (5) or ACCEPTED (3) adds its value again (+0x40 0x5f36e0 ->
+  0x761980) and is called at +0x10, any other released (0x600b00) — then
+  per row 0x68d090 (the player +0x1288, the row's prerequisite the
+  completed one), then the choice with the row as the key (1124 t6: minors
+  2 and 3 pass Writing, Currency and Irrigation over — their next step was
+  Pottery — and take Celestial Navigation through Astrology and Bronze
+  Working through Mining, as logged; runs/h1_duelw1117 t14 Caguana:
+  Astrology done, Celestial Navigation 477.1 + its Tech Contract 36's 40.0
+  over Iron Working's 480.7, Sailing taken, as logged).
+- THE TECH CONTRACT'S CHECK, vt +0x70 0x5f5940 (the research AI's
+  submission listener 0x7635c0 on player signal +0x270 takes a contract it
+  passes — ACCEPTED — into +0x210; the turn walk calls it on the IN
+  PROGRESS / ACCEPTED ones): no tech (+0x408 -1) CANCELLED (6), fails; IN
+  PROGRESS with the research (0x761940) other than its next step (+0x468)
+  CANCELLED, fails; the tech held COMPLETED (7); the tech the research: next
+  step := the tech, IN PROGRESS; the tech researchable (0x4c8c40): next step
+  := the tech; else a next step still researchable stays; else the
+  prerequisites walked from the tech (0x353cb0) to an unheld researchable
+  one, next step := it — each passes, the status otherwise unchanged.
 - THE SCIENCE THE TURN READS: the research and civics AIs' turns (list B)
   run after the player's own turn start banked the pots and grew its
   cities, on the Science and Culture the grown city makes — runs/h1_duelw1124

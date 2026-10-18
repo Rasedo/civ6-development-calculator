@@ -92,6 +92,14 @@
   context:
     - "- THE ANALYSIS, 0x761170 (the \"Tech Tree Analysis\" job 0x760890): next := row, turns := -1; a non-repeatable row..."
   review: imported
+- addr: 0x761940
+  final: 0x4f97d0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...CCEPTED ones): no tech (+0x408 -1) CANCELLED (6), fails; IN PROGRESS with the research (0x761940) other than its next step (+0x468) CANCELLED, fails; the tech held COMPLETED (7); the t..."
+  review: imported
 - addr: 0x761980
   final: 0x4f9810
   kind: function
@@ -102,7 +110,10 @@
     - recording: h1_duelv1124
       turn: 6
       value: player 4's Writing 251.0 = 124.0 + its Tech Contract 127.0; Astrology 124.0
-  impl: [cpu/core/aiResearch.ts:researchAnalysis, gpu/core/sim_research.py:_rai_contracts]
+  impl:
+    - cpu/core/aiResearch.ts:researchAnalysis
+    - gpu/core/sim_research.py:_rai_contracts
+    - cpu/core/aiResearch.ts:addContracts
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the score), the propagation, then: with no research the choi..."
@@ -144,6 +155,7 @@
     - cpu/core/types.ts:ResearchState
     - cpu/core/minorBuild.ts:minorCompleteNow
     - cpu/core/minorBuild.ts:minorResearchBank
+    - gpu/core/sim_research.py:_rai_contracts
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on the entries as they stand, then the c..."
