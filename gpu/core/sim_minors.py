@@ -197,6 +197,7 @@ class SimMinors:
         seq = self.citystate_kb_seq[:, r]
         K = slot.shape[1]
         if age:
+            self.citystate_kb_aged[:, r] = torch.where(alive, turn, self.citystate_kb_aged[:, r])
             drop = (slot != -2) & (turn - seen_t.long() > 21) & alive.unsqueeze(1)
             if bool(drop.count_nonzero()):
                 slot[drop] = -2

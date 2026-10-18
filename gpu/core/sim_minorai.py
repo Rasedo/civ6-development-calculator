@@ -36,6 +36,7 @@ from .sim_citytrees import (
 )
 from .sim_cityvalue import _FX_MIN, _MinorFacts, _t
 from .sim_research import _FX, _discounted, _fmul, _fx_const, _present_value
+from .sim_minorops import _ARMY_READ_AGE
 
 # the city's plots, the centre first, as axial offsets from it (the city's
 # plot order, AI_CityBuild.csv's PLOT ANALYSIS LOG)
@@ -235,7 +236,10 @@ class SimMinorAi:
         owner = self.citystate_kb_owner[:, s].long()
         typ = self.citystate_kb_type[:, s].long()
         plot = self.citystate_kb_plot[:, s].long()
-        rec = slot != -2
+        # the records aged at most ARMY_READ_AGE (`minorThreat`), all where the
+        # row never aged
+        aged = self.citystate_kb_aged[:, s].unsqueeze(1)
+        rec = (slot != -2) & ((aged < 0) | (aged - self.citystate_kb_seen[:, s].long() <= _ARMY_READ_AGE))
         er = T["engine_row"].to(dev)
         arow = torch.where(typ >= 0, er.take(typ.clamp(min=0, max=er.numel() - 1)), torch.full_like(typ, -1))
         comb = torch.tensor([int(r["combat"]) for r in rows] or [0], dtype=torch.long, device=dev)

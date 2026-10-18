@@ -57,7 +57,7 @@ import { newEconomicMemory, purchaseTurn, purchasePick, savingsTurn, type Purcha
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat } from './operations/cityThreat';
 import { majorView } from './majorView';
-import { minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
+import { ARMY_READ_AGE, minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
 import { joinBuilt } from './operations/manager';
 import { minorCity } from './cityStates';
 import { campTiles, civOf, hiddenResourcesFor, seatOf, tileSeat } from './seats';
@@ -620,11 +620,15 @@ export function minorStandingArmy(state: GameState, cs: CityState): number {
   return quota - list.length;
 }
 
-/** the minor's city threat (0x5cbd10) on its knowledge base's records and
- *  its running operations (`minorOpNear`) */
+/** the minor's city threat (0x5cbd10) on its knowledge base's records aged
+ *  at most ARMY_READ_AGE (runs/h1_duelv1117 Caguana t50: three Warrior
+ *  records on 611, seen at t33, t35 and t50, the one of t50 alone counts,
+ *  and the game starts no City Defense) and its running operations
+ *  (`minorOpNear`) */
 export function minorThreat(state: GameState, cs: CityState): number {
   const view = majorView(state);
-  const records = cs.armyKnown ?? [];
+  const aged = cs.armyAged;
+  const records = (cs.armyKnown ?? []).filter((x) => aged === undefined || aged - x.seen <= ARMY_READ_AGE);
   return cityThreat(view as unknown as Parameters<typeof cityThreat>[0], cs.seat, cs.centerIndex, {
     army: (p) => records.filter((x) => x.owner === p).map((x) => ({
       id: x.id, owner: x.owner, type: installType('unit', x.type, 'UNIT_'), plot: x.plot, combat: 0, ranged: 0, damage: 0, seen: x.seen,

@@ -5680,6 +5680,19 @@ cpu/core/operations/barbarian.ts); gpu/core/sim_barbops.py.
 `_ops_enemy_str` (gpu/core/sim_minorops.py), read by the city-states' and the
 barbarians' operations alike.
 
+- THE ARMY STRENGTH'S AGE: 0x5eadb0 counts per unit type the records of
+  0x5ef760, which skips a record whose age (+0xc, the ageing's count since
+  last seen) passes its seventh argument; every caller passes 2 — the city
+  threat (0x5cbfc1, 0x5cc394), the target walk (0x747433, 0x7477ca,
+  0x747a0e), the enemy strength (0x73ecda / 0x73ecf4), the target check
+  (0x73abf0), the evaluation's own strength (0x746d07), the city value
+  (0x7a0142), 0x654c9a, 0x7aed3b. runs/h1_duelv1117 Caguana t50: three
+  Warrior records on 611 seen t33, t35, t50 — the last alone counts, 20
+  against 23 + 23, no threat, and the game starts no City Defense. The
+  engines read the city-states' records so (`minorRecentOf` /
+  `_mops_records`' recent, `minorThreat`, the age the last ageing's turn
+  `armyAged` / `citystate_kb_aged` less the turn last seen); the
+  barbarians' and the majors' records are read whole.
 - 0x73eb60 over the player list (+0x4a0): the players it counts — the
   operation's enemy (op +0x2a0), else (-1) each player the seat is at war
   with (0x469cd0 -> IsAtWarWith; the barbarians at war with every player).

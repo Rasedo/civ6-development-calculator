@@ -375,6 +375,8 @@ class SimInit:
         _kb = (B, s_pad + 1, simbase.KB_RECORDS)
         self.citystate_kb_seq = torch.full(_kb, -1, dtype=torch.int32, device=device)
         self.citystate_kb_next = torch.zeros(B, s_pad + 1, dtype=torch.long, device=device)
+        # the turn each row's records last aged (`armyAged`), -1 never
+        self.citystate_kb_aged = torch.full((B, s_pad + 1), -1, dtype=torch.long, device=device)
         self.citystate_kb_slot = torch.full(_kb, -2, dtype=torch.int16, device=device)
         self.citystate_kb_owner = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_type = torch.full(_kb, -1, dtype=torch.int16, device=device)

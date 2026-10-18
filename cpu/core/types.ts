@@ -817,6 +817,9 @@ export interface Seat {
    *  unit type, the turn and plot last seen; a record drops 22 turns after.
    *  Absent = none. */
   armyKnown?: ArmyRecord[];
+  /** the turn the records last aged (`knowledgeLook` with its ageing): a
+   *  record's age is this less the turn it was last seen */
+  armyAged?: number;
   /** the operation manager of a city-state (`minorOps.ts`) or the
    *  barbarians (`barbarianOps.ts`), and the id the barbarians' next
    *  operation's tree takes */

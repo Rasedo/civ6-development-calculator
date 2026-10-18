@@ -513,9 +513,10 @@ export const ARMY_RECORD_AGE = 21;
  * barbarian Scout at age 1 at t7 that its Warrior's t6 move brought into
  * view.
  */
-export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord[] }, seat: number,
+export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord[]; armyAged?: number }, seat: number,
   sight: ArrayLike<number>, age: boolean): void {
   const kept = (holder.armyKnown ?? []).filter((r) => !age || state.turn - r.seen <= ARMY_RECORD_AGE);
+  if (age) holder.armyAged = state.turn;
   for (const u of state.units) {
     if (!sight[u.tileIndex] || !unitVisibleTo(state, u, seat)) continue;
     const r = kept.find((x) => x.id === u.id && x.type === u.type && x.owner === u.seat);

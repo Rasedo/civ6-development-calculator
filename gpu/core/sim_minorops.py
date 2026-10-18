@@ -43,6 +43,9 @@ N_TEAMS = 2
 N_MEMBERS = 16
 N_CAMPS = 16
 N_MOVES = 2
+# the age at most of a record the army strength reads (`ARMY_READ_AGE`,
+# 0x5eadb0 -> 0x5ef760 with 2)
+_ARMY_READ_AGE = 2
 # a goal of a team (Operation Move's "Move To (enum)" slots)
 G_RALLY, G_TARGET, G_CENTRE, G_LINE, G_MARCH = 0, 1, 3, 4, 5
 # the list's unit entries the operations' attacks take (0x80c080: a
@@ -336,8 +339,10 @@ class SimMinorOps:
         self.mops_camps[:, s] = torch.where(alive.unsqueeze(1), new, known)
 
     def _mops_records(self, s: int) -> dict:
-        """minor `s`'s knowledge base's army records ([B, K]): live, owner,
-        AI unit row, plot, combat and ranged strengths, damage"""
+        """minor `s`'s knowledge base's army records ([B, K]): live, those the
+        army strength reads (`minorRecentOf`: aged at most ARMY_READ_AGE, all
+        where the row never aged), owner, AI unit row, plot, combat and
+        ranged strengths, damage"""
         T = self._cv_tables()
         dev = self.device
         slot = self.citystate_kb_slot[:, s]
@@ -345,7 +350,9 @@ class SimMinorOps:
         er = T["engine_row"].to(dev)
         tc = typ.clamp(min=0, max=self.NU - 1)
         live = slot != -2
-        return {"live": live, "owner": self.citystate_kb_owner[:, s].long(),
+        aged = self.citystate_kb_aged[:, s].unsqueeze(1)
+        recent = live & ((aged < 0) | (aged - self.citystate_kb_seen[:, s].long() <= _ARMY_READ_AGE))
+        return {"live": live, "recent": recent, "owner": self.citystate_kb_owner[:, s].long(),
                 "row": torch.where(typ >= 0, er.take(tc), torch.full_like(typ, -1)),
                 "plot": self.citystate_kb_plot[:, s].long(),
                 "combat": self._type_combat.take(tc), "ranged": self._type_ranged_strength.take(tc),
@@ -687,7 +694,7 @@ class SimMinorOps:
         on = target >= 0
         rec = self._mops_records(r)
         rd = self.pair_dist[rec["plot"].clamp(min=0), tc.unsqueeze(1)].to(torch.long)
-        near = rec["live"] & (rec["plot"] >= 0) & (rd <= 3) & on.unsqueeze(1)
+        near = rec["recent" if r != self.BK else "live"] & (rec["plot"] >= 0) & (rd <= 3) & on.unsqueeze(1)
         term = self._mops_army_term(rec["combat"], rec["ranged"], rec["dmg"])
         counted = near & self._ops_counted(seat, rec["owner"], enemy)
         strength = torch.where(counted, term, torch.zeros_like(term)).sum(dim=1)
@@ -908,7 +915,7 @@ class SimMinorOps:
             term = self._mops_army_term(u["combat"], u["ranged"], u["dmg"])
         else:
             r = self._mops_records(s)
-            m = r["live"] & (r["owner"] == BARB_SEAT)
+            m = r["recent"] & (r["owner"] == BARB_SEAT)
             d = self.pair_dist[r["plot"].clamp(min=0), plot.clamp(min=0).unsqueeze(1)].to(torch.long)
             term = self._mops_army_term(r["combat"], r["ranged"], r["dmg"])
         m = m & (d <= radius)
