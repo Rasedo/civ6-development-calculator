@@ -631,6 +631,12 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   const copy = deserialize(serialize(state));
   const twin = new Map<Unit, Unit>();
   state.units.forEach((u, i) => twin.set(copy.units[i], u));
+  // the turn's captures are the record's, landed on the state with its
+  // battles: they start their operations at the copy's turn end, and a
+  // capture the copy's own moves take adds none (the record's battles are the
+  // pair's); the state's list is spent there
+  copy.barbCaptures = Object.assign([...(state.barbCaptures ?? [])], { push: () => 0 });
+  delete state.barbCaptures;
   // the units the barbarians' battles of the pair struck (or lost) stand as
   // they were before the first blow, where the blow found them
   const acting = new Set([...before].map((u) => u.id));

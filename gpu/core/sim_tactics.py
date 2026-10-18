@@ -260,15 +260,16 @@ class SimTactics:
         naval = self.wpass & (~self.ocean_tile | cart.unsqueeze(1)) & ~block
         return land, naval
 
-    def _tac_attack_planes(self, seat: int, revealed_only: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
+    def _tac_attack_planes(self, seat: int, revealed_only: bool = True, planning: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat`
-        attacks into (`groundOf`'s attack): a unit of a player at war with it
-        that fights, on any ground (0x26e570 -> 0x209dd0), any such unit on
-        ground of the mover's domain, a city centre of such a player, an
-        Encampment that blocks a land mover — on plots it revealed."""
+        attacks into (`groundOf`'s attack): in the planning (`planning`) a
+        unit of a player at war with it that fights, on any ground (0x26e570
+        -> 0x209dd0); any such unit on ground of the mover's domain, a city
+        centre of such a player, an Encampment that blocks a land mover — on
+        plots it revealed."""
         foe = self._tac_hostile(seat)
         fight = torch.zeros_like(foe)
-        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at) if planning else ():
             pc = pl.clamp(min=0)
             ut = self.unit_type.gather(1, pc).clamp(min=0, max=self.NU - 1)
             st = (self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0) | (self._type_bombard.take(ut) > 0)
@@ -431,9 +432,10 @@ class SimTactics:
         ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & embarks.unsqueeze(1)))  # [N, T]
         water_n = self.water[rows]
         # the plots each unit attacks into (`groundOf`'s attack): an enemy
-        # unit's of its own domain, a hostile city centre, an Encampment for a
-        # land unit — the path's end, the attack spending the Movement left
-        a_land, a_nav = self._tac_attack_planes(seat, not zoc)
+        # unit's of its own domain (the planning's: one that fights, on any
+        # ground), a hostile city centre, an Encampment for a land unit — the
+        # path's end, the attack spending the Movement left
+        a_land, a_nav = self._tac_attack_planes(seat, not zoc, not zoc)
         fights = self._type_combat.take(utype) > 0
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows]) & fights.unsqueeze(1) & ~ent_n
         cost_b = self._tac_cost()  # [B, T, 6]

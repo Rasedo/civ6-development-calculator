@@ -129,10 +129,11 @@ interface Ground {
   stand: (i: number) => boolean;
 }
 
-function groundOf(state: GameState, unit: Unit, revealedOnly = true): Ground {
+function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true): Ground {
   const held = new Set<number>();
   const foes = new Set<number>();
   // the plots a unit at war with it that fights holds, whatever its domain
+  // (the planning's attack test; a move order's path strikes its own domain)
   const fighters = new Set<number>();
   for (const u of state.units) {
     if (u.seat === unit.seat || !onMap(u)) continue;
@@ -140,7 +141,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true): Ground {
     if (!unitsHostile(state, unit, u)) continue;
     foes.add(u.tileIndex);
     const st = aiStrengths(u);
-    if (st.melee > 0 || st.ranged > 0 || st.bombard > 0) fighters.add(u.tileIndex);
+    if (planning && (st.melee > 0 || st.ranged > 0 || st.bombard > 0)) fighters.add(u.tileIndex);
   }
   const enters = new Map<number, boolean>();
   const zocs = new Map<number, boolean>();
@@ -169,8 +170,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true): Ground {
     },
     attack: (t) => {
       if (!melee || !known(t.index) || isImpassable(t)) return false;
-      // a unit at war that fights (0x26e570 -> 0x209dd0): a land mover's
-      // strike onto a ship's water as a ship's onto the shore
+      // in the planning, a unit at war that fights (0x26e570 -> 0x209dd0): a
+      // land mover's strike onto a ship's water as a ship's onto the shore
       if (fighters.has(t.index) || (foes.has(t.index) && isWater(t) === naval)) return true;
       const owner = tileSeat(t);
       if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
@@ -195,7 +196,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true): Ground {
  * at full; a step dearer than the Movement left waits for the next turn,
  * unless it leaves the unit's own plot unmoved, where it spends everything; a
  * zone of control spends everything (`zoc`; the planning's breadth-first
- * search, flag 0x800, reads none). Its cost (0x270dd0): 1000 x the step's
+ * search, flag 0x800, reads none, and strikes a unit at war on any ground,
+ * a move order's path one on its own domain's). Its cost (0x270dd0): 1000 x the step's
  * Movement +2, and where the step ends the turn's Movement +4, +3 more off
  * the unit's own territory. `onClose` sees each node as it closes; the
  * search stops where it answers true. `onLink` sees each link the search
@@ -206,7 +208,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true): Ground {
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void): void {
   const { map } = state;
-  const ground = groundOf(state, unit, !zoc);
+  const ground = groundOf(state, unit, !zoc, !zoc);
   const held = heldCostsOf(state, unit);
   const nodes = new Map<number, PNode>();
   // a turn starts on the full Movement of the domain its plot holds the unit
