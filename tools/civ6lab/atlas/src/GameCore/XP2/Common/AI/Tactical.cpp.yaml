@@ -218,6 +218,26 @@
   context:
     - "- HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has taken damage (+0xcf0 > 0), in no formation (0x8be30..."
   review: imported
+- addr: 0x773bd0
+  final: 0x505bc0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1105
+      turn: 34
+      value: "The minors: runs/h1_duelw1105 city-state 3's five Warriors to   its captured Settler at 5 15 (t34) and 3 15 (t64), none while the Settler   stands in a formation;"
+    - recording: 1128
+      turn: 251
+      value: "1128 t251 city-state 3's Spec Ops to the Settler it   holds from t251 (the Settler's turn done: no row until t252)."
+    - recording: 1128
+      turn: 251
+      value: "A minor's   pass walks its military units alone, so the support half finds none (1128   t251: its Supply Convoy, alone beside the Spec Ops, ends its turn)."
+  impl: [cpu/core/tactical.ts:supportFormation, gpu/core/sim_tactics.py:_tac_support_formation]
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  context:
+    - "...nd logged \"Support Formation, <unit> (<id>), x y\" (the other's plot); then the moves (0x773bd0, also called at 0x779d00): per entry the unit woken (0x53e20), sent to the plot (the mo..."
+  review: imported
 - addr: 0x773fb0
   final: 0x505fa0
   kind: function
@@ -274,7 +294,13 @@
   cases:
     - recording: AI_Tactical.csv
       value: "The tactical move Promotion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv);"
-  readings: ["C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"]
+  impl:
+    - cpu/core/promotions.ts:aiPromotionPick
+    - cpu/core/tactical.ts:promotion
+    - gpu/core/sim_tactics.py:_tac_promotion
+  readings:
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
   context:
     - "## C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "...tion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv); 0x774970 then runs each: over the UnitPromotions rows in database order that the unit can earn (0x..."
@@ -484,6 +510,25 @@
     - "...ds (0x5bbf80, each global the hash of the string loaded before its store): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190), f2e164 Wander Near City (0x77bf50)."
     - "- HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has taken damage (+0xcf0 > 0), in n..."
   review: imported
+- addr: 0x779d00
+  final: 0x50bc20
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1105
+      turn: 34
+      value: "The minors: runs/h1_duelw1105 city-state 3's five Warriors to   its captured Settler at 5 15 (t34) and 3 15 (t64), none while the Settler   stands in a formation;"
+    - recording: 1128
+      turn: 251
+      value: "1128 t251 city-state 3's Spec Ops to the Settler it   holds from t251 (the Settler's turn done: no row until t252)."
+    - recording: 1128
+      turn: 251
+      value: "A minor's   pass walks its military units alone, so the support half finds none (1128   t251: its Supply Convoy, alone beside the Spec Ops, ends its turn)."
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  context:
+    - "...ation, <unit> (<id>), x y\" (the other's plot); then the moves (0x773bd0, also called at 0x779d00): per entry the unit woken (0x53e20), sent to the plot (the move order 0x962030), on ar..."
+  review: imported
 - addr: 0x77a190
   final: 0x50c0b0
   kind: function
@@ -547,9 +592,11 @@
   cases:
     - recording: AI_Operation.csv
       value: "- Not ported (AUDIT C-96): Attack High/Medium/Low (C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' ope"
+  impl: [cpu/core/tactical.ts:promotion, gpu/core/sim_tactics.py:_tac_promotion]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' operations (Naval   Superiority, City Defense, Attack Barb C..."
   context:
@@ -562,6 +609,7 @@
   cases:
     - recording: AI_Operation.csv
       value: "- Not ported (AUDIT C-96): Attack High/Medium/Low (C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' ope"
+  impl: [cpu/core/tactical.ts:supportFormation, gpu/core/sim_tactics.py:_tac_support_formation]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes:

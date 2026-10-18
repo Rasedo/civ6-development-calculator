@@ -12,3 +12,22 @@
   context:
     - "...the step crosses a river (0x531510 on the from / to plots) and the unit is not exempt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x3..."
   review: imported
+- addr: 0x266950
+  final: 0x1a4160
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1105
+      turn: 34
+      value: "The minors: runs/h1_duelw1105 city-state 3's five Warriors to   its captured Settler at 5 15 (t34) and 3 15 (t64), none while the Settler   stands in a formation;"
+    - recording: 1128
+      turn: 251
+      value: "1128 t251 city-state 3's Spec Ops to the Settler it   holds from t251 (the Settler's turn done: no row until t252)."
+    - recording: 1128
+      turn: 251
+      value: "A minor's   pass walks its military units alone, so the support half finds none (1128   t251: its Supply Convoy, alone beside the Spec Ops, ends its turn)."
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  context:
+    - "...f its domain (+0x650), with Combat (0x56dc90), whose formation holds none of its class (0x266950): of those its planning reaches within two turns (0x791300) the strongest, else the n..."
+  review: imported

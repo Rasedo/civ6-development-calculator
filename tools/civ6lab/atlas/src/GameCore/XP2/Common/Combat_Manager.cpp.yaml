@@ -25,6 +25,15 @@
   context:
     - "- An attack ends the attacker's fortification: 0x1fbae0 sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0)...."
   review: imported
+- addr: 0x200e10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...always) — raised as AI_EVENT_UNIT_CAPTURED (@f2e088) on the player's signals (+0x2b8, 0x200e10). The barbarians' triggered trees (BarbarianTriggeredTrees: TRIGGER_CAPTURE_BARBARIAN,..."
+  review: imported
 - addr: 0x203cb0
   final: 0x155510
   kind: function
@@ -192,7 +201,11 @@
     - recording: 1124
       turn: 157
       value: a military unit its city's production completes garrisons from that city's turn (1124 t157 Taiyuan grows Content).
-  readings: ["H-1: the garrison requirement — READ", "H-1: a civilian stepped on — READ"]
+  impl: [cpu/core/tactical.ts:minor, gpu/core/sim_tactics.py:_tac_attack_planes]
+  readings:
+    - "H-1: the garrison requirement — READ"
+    - "H-1: a civilian stepped on — READ"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - "...Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a MilitaryFormation argument (+0x90), compa..."
     - ...'s units from the last to the first; for each one not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's player is at w...
@@ -232,11 +245,17 @@
   kind: function
   name: Combat_Manager
   status: PARTLY
-  impl: [cpu/core/combat.ts:seizeCivilian]
+  impl:
+    - cpu/core/combat.ts:seizeCivilian
+    - cpu/core/barbarianOps.ts:barbarianCaptures
+    - cpu/core/combat.ts:def
+    - cpu/core/types.ts:GameState
+    - gpu/core/sim_barbops.py:_barb_capture_event
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e +0x1ba bit 2, and whose player the mover's player is at war with (0x469cd0), it calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 wi...

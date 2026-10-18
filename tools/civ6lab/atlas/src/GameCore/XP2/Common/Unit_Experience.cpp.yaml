@@ -10,7 +10,10 @@
   cases:
     - recording: AI_Tactical.csv
       value: "The tactical move Promotion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv);"
-  readings: ["C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"]
+  impl: [cpu/core/promotions.ts:aiPromotionPick]
+  readings:
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
   context:
     - "...70 then runs each: over the UnitPromotions rows in database order that the unit can earn (0x55d750), the row's modifiers gathered (+0x28) and valued by 0x7b5d70 (start 0, the horizon [Glob..."
   review: imported

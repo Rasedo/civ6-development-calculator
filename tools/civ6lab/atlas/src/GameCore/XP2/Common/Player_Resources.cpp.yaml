@@ -435,6 +435,7 @@
     - "H-1: a city-state sees its suzerain's resources — READ"
     - "H-1: the goody hut's other gates and the Relic — READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...40, count +0x42 > 0) when the plot's owner is the player, the resource's condition holds (0x4ac140, the revealing tech), and EITHER a district stands there — any type, the city centre incl..."
     - "0x4ac140 (a player's resource condition, 0x4ab4b0's): the player's own reveal bit (+0xf0), then —..."

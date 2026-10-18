@@ -14,6 +14,7 @@
     - cpu/core/tactical.ts:moveTo
     - cpu/core/tactical.ts:exploreLand
     - cpu/core/tactical.ts:passMoveExec
+    - cpu/core/tactical.ts:supportFormation
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the danger map and Move to Safety — READ, ported"

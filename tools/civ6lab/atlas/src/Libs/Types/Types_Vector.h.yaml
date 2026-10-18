@@ -388,7 +388,10 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the barbarians' logged Current Danger 114 of 240 equal; HL: Move To Safety ends 184 of 371"
-  impl: [cpu/core/tactical.ts:dangerPlane, gpu/core/sim_tactics.py:_danger_plane]
+  impl:
+    - cpu/core/tactical.ts:dangerPlane
+    - gpu/core/sim_tactics.py:_danger_plane
+    - cpu/core/tactical.ts:featureDanger
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -416,6 +419,7 @@
     - ai/major/warValue.ts:regionalStrength
     - cpu/core/aiMilitary.ts:combatDesire
     - gpu/core/sim_cityvalue.py:_cv_combat_desire
+    - cpu/core/aiWeights.ts:cs
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -467,7 +471,7 @@
   final: 0x4d2400
   kind: function
   status: PARTLY
-  impl: [cpu/core/operations/manager.ts:blank]
+  impl: [cpu/core/operations/manager.ts:blank, cpu/core/barbarianOps.ts:barbarianOpsTurn]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x727510

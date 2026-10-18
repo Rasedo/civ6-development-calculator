@@ -40,6 +40,7 @@
     - cpu/core/minorBuild.ts:minorResearch
     - gpu/core/sim_civics.py:_cai_turn
     - ai/major/policies.ts:slotTypeBest
+    - cpu/core/minorBuild.ts:minorResearchTurn
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
@@ -233,6 +234,7 @@
     - cpu/core/minorBuild.ts:minorResearch
     - gpu/core/sim_civics.py:_cai_completion
     - cpu/core/minorBuild.ts:minorCompleteNow
+    - cpu/core/minorBuild.ts:minorResearchBank
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"

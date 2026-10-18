@@ -1,0 +1,24 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x94bb50
+  final: 0x659de0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1105
+      turn: 34
+      value: "The minors: runs/h1_duelw1105 city-state 3's five Warriors to   its captured Settler at 5 15 (t34) and 3 15 (t64), none while the Settler   stands in a formation;"
+    - recording: 1128
+      turn: 251
+      value: "1128 t251 city-state 3's Spec Ops to the Settler it   holds from t251 (the Settler's turn done: no row until t252)."
+    - recording: 1128
+      turn: 251
+      value: "A minor's   pass walks its military units alone, so the support half finds none (1128   t251: its Supply Convoy, alone beside the Spec Ops, ends its turn)."
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  context:
+    - ...the plot (the move order 0x962030), on arrival the formation joined (the unit operation 0x94bb50 with the other's id) and the other's turn done (0x570b40); the unit's turn done and it...
+  review: imported

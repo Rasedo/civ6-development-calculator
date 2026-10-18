@@ -54,6 +54,7 @@
     - cpu/core/tactical.ts:passSafePlot
     - gpu/core/sim_minorops.py:_x_defend
     - cpu/core/opsOrders.ts:us
+    - gpu/core/sim_barbops.py:_bop_defend_exec
   readings:
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

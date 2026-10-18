@@ -464,6 +464,7 @@
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:
     - "...he turn after's, the record keeping only the whole part; the build turns 0x17b1e0 are 0x8c4540's ceil((cost - progress) / Production toward the item) — the progress kept on the item..."
     - "...] and the bank [+0x1e8] read through max(0, ·), ceil over the Science rate 0x4c9f40 — 0x8c4540 compares the remainder to rate x the truncated quotient; with no Science the cost); a r..."

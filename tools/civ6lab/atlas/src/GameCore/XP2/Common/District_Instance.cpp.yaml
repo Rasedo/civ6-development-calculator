@@ -48,6 +48,7 @@
     - cpu/core/tactical.ts:dangerPlane
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/tactical.ts:dangerDistricts
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -71,7 +72,9 @@
     - recording: 1119
       turn: 112
       value: 1119 t112 an Archer, no   term).
-  readings: ["H-1: a pillaged building's specialist, the centre's defence, three moments — READ"]
+  readings:
+    - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "- A district's GetDefenseStrength (Lua 0x98ca00 -> 0x24ae80) is computed live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's un..."
   review: imported
@@ -133,6 +136,7 @@
     - cpu/harness/checks.ts:luxAtRebuild
     - cpu/core/tactical.ts:dangerPlane
     - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/tactical.ts:dangerDistricts
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -236,7 +240,10 @@
     - recording: 1108
       turn: 97
       value: "- The walls' term: each wall building's OuterDefenseStrength (+0x44) and   the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the   district's outer damage (+0x8d8) below its outer "
-  readings: ["C-94: the wounded law and the garrison — READ"]
+  impl: [cpu/core/tactical.ts:dangerDistricts]
+  readings:
+    - "C-94: the wounded law and the garrison — READ"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "...OuterDefenseStrength (+0x44) and the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the district's outer damage (+0x8d8) below its outer maximum — a breached peri..."
   review: imported

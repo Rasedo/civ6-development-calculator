@@ -55,11 +55,14 @@
     - cpu/core/operations/nodes.ts:DefendOrders
     - cpu/core/operations/nodes.ts:operationDefendUnits
     - gpu/core/sim_minorops.py:_x_defend
+    - gpu/core/sim_barbops.py:_bop_defend_exec
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   context:
     - "...0c180 (Attack Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval P..."
   review: reviewed
@@ -108,10 +111,12 @@
     - cpu/core/operations/nodes.ts:DefendOrders
     - cpu/core/operations/nodes.ts:operationDefendUnits
     - gpu/core/sim_minorops.py:_u_defend
+    - gpu/core/sim_barbops.py:_bop_defend_update
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   context:
     - ...val Pillage 0x803880 (RUNNING with units, else FAILURE); Operation Defend Units' update 0x80ee70 (SUCCESS; marks a member wounded past AutoProtect Percentage).
   review: reviewed

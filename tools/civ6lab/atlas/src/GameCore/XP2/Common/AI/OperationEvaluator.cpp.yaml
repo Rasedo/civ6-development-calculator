@@ -14,6 +14,8 @@
     - cpu/export/rules.ts:rules
   readings:
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The evaluation (job \"Op Evaluation\", 0x746920): MustBeAtWar, MustHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each tar..."

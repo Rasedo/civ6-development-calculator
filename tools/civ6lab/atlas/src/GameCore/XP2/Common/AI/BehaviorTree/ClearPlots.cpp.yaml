@@ -7,7 +7,10 @@
   final: 0x55e160
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:checkPlot, gpu/core/sim_citytrees.py:_u_check_plot]
+  impl:
+    - cpu/core/aiCityTrees.ts:checkPlot
+    - gpu/core/sim_citytrees.py:_u_check_plot
+    - cpu/core/minorCityAi.ts:owned
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]

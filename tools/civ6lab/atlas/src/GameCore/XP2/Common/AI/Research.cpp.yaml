@@ -46,6 +46,7 @@
     - cpu/core/types.ts:ResearchState
     - cpu/data/aiResearch.ts:RESEARCH_AI_TASK_BIAS
     - cpu/core/aiResearch.ts:researchAnalysis
+    - cpu/core/minorBuild.ts:minorResearchTurn
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
@@ -142,6 +143,7 @@
     - cpu/core/minorBuild.ts:minorResearch
     - cpu/core/types.ts:ResearchState
     - cpu/core/minorBuild.ts:minorCompleteNow
+    - cpu/core/minorBuild.ts:minorResearchBank
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on the entries as they stand, then the c..."

@@ -39,6 +39,7 @@
     - recording: 1124
       turn: 1
       value: With them   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->   758 of 1,241, the game's plots within ours 862 -> 1,192.
+  impl: [cpu/core/tactical.ts:minor, gpu/core/sim_tactics.py:_tac_attack_planes]
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"

@@ -414,6 +414,26 @@
     - "...e, on water for AdjacentSeaResource, by class name for AdjacentResourceClass; a wonder (0x81330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) is the player, its district (0x8..."
     - "...(0xa2b200: the district flagged +0x48 & 0x40) on a plot of the list whose city holds it (0x81330) — the list, not the river's whole network (`riverShielded` over `riverReach`). The engin..."
   review: imported
+- addr: 0x8bcd0
+  final: 0x668a0
+  kind: function
+  name: GetFormationClass
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1105
+      turn: 34
+      value: "The minors: runs/h1_duelw1105 city-state 3's five Warriors to   its captured Settler at 5 15 (t34) and 3 15 (t64), none while the Settler   stands in a formation;"
+    - recording: 1128
+      turn: 251
+      value: "1128 t251 city-state 3's Spec Ops to the Settler it   holds from t251 (the Settler's turn done: no row until t252)."
+    - recording: 1128
+      turn: 251
+      value: "A minor's   pass walks its military units alone, so the support half finds none (1128   t251: its Supply Convoy, alone beside the Spec Ops, ends its turn)."
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  context:
+    - "...ac_support_formation`): per unit of the pass's list (+0x240), alive. GetFormationClass (0x8bcd0 -> 0xadd5e0, over the class's hash, ~CRC32 of its name): LAND_COMBAT 0, SUPPORT 1, CI..."
+  review: imported
 - addr: 0x8be30
   final: 0x66a00
   kind: function
@@ -469,10 +489,12 @@
   cases:
     - recording: AI_Tactical.csv
       value: "The tactical move Promotion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv);"
+  impl: [cpu/core/tactical.ts:promotion]
   readings:
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
   context:
     - "...ion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv); 0x774970 then runs..."
   review: imported
@@ -557,6 +579,7 @@
     - "H-1: the raids — READ"
     - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...100); boldness at it, no raid running (+0x3c) and no bribe -> the raid starts at once (0x149980), else the city goes on the raid list (+0x48). For a raid's own tree ending: threshold..."
@@ -988,6 +1011,17 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...hanges 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x385b50 by the card's policy row +0x88 link's +0x1c — the PrereqCivic's Cost, the ci..."
+  review: imported
+- addr: 0x46cdd0
+  final: 0x2fb530
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      value: "Each DISTRICT of such   a player (the player's +0x1308 -> +0xd8, its district list: every district   placed, built or not — the recordings' city district lists hold districts   under construction — an"
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  context:
+    - ...(DLC GranColombia_Maya), no other. The map is built at the player's DoTurn (0x4e4560 -> 0x46cdd0 at 0x4e4aa4); the engines build it as each tactical pass opens, the hostile units' sear...
   review: imported
 - addr: 0x484a10
   final: 0x307950
@@ -2386,6 +2420,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) -> discount rate (GlobalParameters AI_DISCOUNT_RATE=2.0 -> r=0.02 via /25600). PV 0x..."
   context:
@@ -2502,6 +2537,7 @@
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om the behaviour tree — \"HL: Rock Band Move\" (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a unit's name for its log (the band template over 118 and 155): the AI'..."
@@ -2532,6 +2568,8 @@
     - cpu/core/operations/cityThreat.ts:OWN_OPERATION_RANGE
     - cpu/core/operations/cityThreat.ts:ThreatInputs
     - cpu/core/operations/cityThreat.ts:cityThreat
+    - cpu/core/minorOps.ts:minorOpNear
+    - gpu/core/sim_minorai.py:_minor_threat
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
@@ -2564,6 +2602,16 @@
   context:
     - "...my's known cities (TargetParameter 0: 0x5eb600 at most +0x58), not another operation's (0x724dd0), reached from a city of the player (its build AI's +0x870 set), value the city value 0..."
   review: reviewed
+- addr: 0x725b80
+  final: 0x4d10a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ach Targets update (0x7877e0: the tactical knowledge turn 0x785f30, the scripted starts 0x725b80 / 0x726a20) — a barbarian player's: the knowledge base's camps (KB +0x638, 16 bytes eac..."
+  review: imported
 - addr: 0x726470
   final: 0x4d18d0
   kind: function
@@ -2588,14 +2636,28 @@
     - cpu/core/operations/manager.ts:startOperationNamed
     - cpu/core/operations/manager.ts:operationsEvaluate
     - cpu/core/operations/manager.ts:startOperationAt
+    - cpu/core/barbarianOps.ts:barbarianCaptures
+    - gpu/core/sim_barbops.py:_barb_captures
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's flag any, el..."
+  review: imported
+- addr: 0x726a20
+  final: 0x4d1e20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...update (0x7877e0: the tactical knowledge turn 0x785f30, the scripted starts 0x725b80 / 0x726a20) — a barbarian player's: the knowledge base's camps (KB +0x638, 16 bytes each, count..."
   review: imported
 - addr: 0x731d10
   final: 0x64a6d0
@@ -2749,6 +2811,7 @@
   status: PARTLY
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within range strikes it (0x9...
@@ -3241,6 +3304,16 @@
   context:
     - ...ING keeps the resume), Concurrent 0x7eb0f0 (Max Failures, Exit on Success; its update 0x7eb210 clears failures and the last good child), Not 0x7f15f0, pass-through 0x7f15a0, Turn Lim...
   review: imported
+- addr: 0x7eb220
+  final: 0x30fcf0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...tribe +0x10): the target to op +0x2a8, the rally through the autovariable at op +0x2c0 (0x7eb220) to op +0x318, then each team's goals, slot 0 (+0xe8) the rally and slot 1 (+0xf0) th..."
+  review: imported
 - addr: 0x7edde0
   final: 0x555ee0
   kind: function
@@ -3464,9 +3537,11 @@
   kind: function
   name: AI_EVENT_DESIRE_SETTLE
   status: PARTLY
+  impl: [cpu/core/barbarianOps.ts:barbarianCaptures]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's..."
@@ -4572,7 +4647,9 @@
     - recording: 1106
       turn: 62
       value: 1106 t62 Swordsman;
-  readings: ["H-1: a unit's Production cost in the queue — READ"]
+  readings:
+    - "H-1: a unit's Production cost in the queue — READ"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   context:
     - "...`m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 through 0xadd5e0 (unread) and the player's +0x1048 equals the global at 0xf2f978 (the currency the resolut..."
   review: imported

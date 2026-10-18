@@ -3,6 +3,25 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x75c50
+  final: 0x56a20
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 9
+      value: "AI_Planning.csv lists them (1124 t9:   the barbarian Warrior at 40:22 holds 39:23 (1/0), China's Warrior there);"
+    - recording: h1_duelw1117
+      turn: 73
+      value: "The   wrapper's attack test: a district at war with hit points (DistrictInfo   +0x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any   unit on the plot (0x75c50) of a player at war t"
+    - recording: 1124
+      turn: 1
+      value: With them   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->   758 of 1,241, the game's plots within ours 862 -> 1,192.
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0: combat, ranged or bombard above 0) — no doma..."
+  review: imported
 - addr: 0x75ce0
   final: 0x56ab0
   kind: function
