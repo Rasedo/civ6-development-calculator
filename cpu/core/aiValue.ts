@@ -202,6 +202,9 @@ export interface AiValueView {
   districtBuildingYields(seat: number, district: string, yieldType: string): readonly { building: string; amount: number }[];
   /** the seat's trade route capacity (PlayerTrade +0xf0) */
   tradeRouteCapacity(seat: number): number;
+  /** the seat's best combat strength (PlayerStats +0xf0, 0x4d9320: the
+   *  strongest melee strength it has trained, m_iMaxMeleeStrengthTrained) */
+  bestCombatStrength(seat: number): number;
   /** the envoys the seat has placed (0x44a440) */
   influenceTokensUsed(seat: number): number;
   /** the city-states the seat is suzerain of (0x44a5a0) */

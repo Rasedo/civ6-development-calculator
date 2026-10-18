@@ -24,3 +24,17 @@
   context:
     - "...D_BY_NUMBER_OF_RESOURCES (the factory 0xc2e490, the instance vtable 0xdece90): its apply (0xb48710) registers the yield type and Amount on the city's +0x1da8 table (0xc705d0); the count th..."
   review: imported
+- addr: 0xb7e0d0
+  kind: function
+  name: EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1121
+      turn: 17
+      value: "read back by 0x17c1c0: city +0x2c0[unit] +   player +0x12e8 +0x4a0[unit]) — support units too (runs/h1_duelv1121 t17   Hunza's Battering Ram valued at its Spearman's 22 turns, -3.10 as logged,   again"
+  impl: [cpu/core/minorBuild.ts:minorItemPct]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...UNITS_PRODUCTION, registered 0xc1e610, its arguments' object vt 0xdf78a8, apply +0x60 0xb7e0d0): per Units row whose FormationClass (+0xa0, 0xadd5e0) is not the civilian one (2) and..."
+  review: imported

@@ -527,6 +527,17 @@
   context:
     - ...h boost's unit choice, the religious units' targets (0x74ea60's list +0x4a0, 0x74cf50 / 0x74d320) and moves, the faith purchases.
   review: imported
+- addr: 0x75d3d0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...ereqTech or PrereqCivic unheld, 0x4cb590 / 0x39d490; the one listener the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: its m_turnsToResearchUnit (+0x388, data +0x3e0)..."
+  review: imported
 - addr: 0x763020
   final: 0x4fa9a0
   kind: function
@@ -554,6 +565,18 @@
     - "...es: a city-state whose research or civic completed picks the next (\"BT Research Choice\" 0x763020: the AI plan's tech, no draw, else ONE uniform draw over every researchable tech; \"Rand..."
     - "...t (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research in hand; the analysis reads the value b..."
     - "- THE CHOICE, 0x763020 (key): the comparator 0x75d530 over the entries — the same next step: the larger turns..."
+  review: imported
+- addr: 0x763b00
+  final: 0x4fb250
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...30: its m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0 — the vector 0x763b00 fills from 0x761090 on player signal +0x228, the turn's end after the city AI: zeroed,..."
   review: imported
 - addr: 0x78f5d0
   kind: function
@@ -629,4 +652,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...is one weighted pick over the offered routes (weights as read in C-16); \"Spy EscapeRoute\" 0x81d360 is the AI's route choice, which the driver makes."
+  review: imported
+- addr: 0xc6f950
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1121
+      turn: 17
+      value: "read back by 0x17c1c0: city +0x2c0[unit] +   player +0x12e8 +0x4a0[unit]) — support units too (runs/h1_duelv1121 t17   Hunza's Battering Ram valued at its Spearman's 22 turns, -3.10 as logged,   again"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...280) lies in StartEra..EndEra, the Amount onto the city's per-unit production modifier (0xc6f950; read back by 0x17c1c0: city +0x2c0[unit] + player +0x12e8 +0x4a0[unit]) — support unit..."
   review: imported

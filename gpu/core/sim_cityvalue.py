@@ -69,6 +69,21 @@ def _withheld(surplus: torch.Tensor, f: torch.Tensor) -> torch.Tensor:
 
 
 class SimCityValue:
+    def _unit_formation_military(self) -> torch.Tensor:
+        """[NU] bool per engine unit: its FormationClass is not civilian
+        (EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION's units, support
+        units too), built once"""
+        cached = getattr(self, "_formation_mil_cache", None)
+        if cached is not None:
+            return cached
+        rows = self._cv_tables()["unit_rows"]
+        out = torch.zeros(self.NU, dtype=torch.bool, device=self.device)
+        for e, k in enumerate(self.rules.ai_city_build["engineUnitRow"][: self.NU]):
+            if k >= 0 and not rows[k]["civilian"]:
+                out[e] = True
+        self._formation_mil_cache = out
+        return out
+
     def _cv_tables(self) -> dict:
         """the city build AI's rows and DefaultValues, built once"""
         cached = getattr(self, "_cv_cache", None)
@@ -735,7 +750,9 @@ class SimCityValue:
                 read = read & False
             val, obs = f.unit_production(unit)
             v = torch.where(_t(obs, like).bool(), _fmul(_t(val, like), torch.full_like(like, 3 * _FX)), _t(val, like))
-            v = v + (u["combat"] > _t(f.trade_route_capacity(), like)).long() * _fx_const(f.combat_count() * 0.5)
+            # half the player's cities where its Combat tops the strongest
+            # melee strength the player has trained
+            v = v + (u["combat"] > _t(f.best_combat_strength(), like)).long() * (_t(f.city_count(), like) * (_FX // 2))
         elif pseudo == "PSEUDOYIELD_UNIT_TRADE":
             # 0x7b62c0 passes the landing turn as both start and horizon:
             # one turn's route value discounted to `t`
@@ -1573,11 +1590,11 @@ class _MinorFacts:
             return self.sim._naval_capable_minor(self.s)
         return 1
 
-    def trade_route_capacity(self):
-        return self.sim._trade_capacity(self.row)
+    def best_combat_strength(self):
+        return self.sim.citystate_best_melee[:, self.s]
 
-    def combat_count(self):
-        return 0
+    def city_count(self):
+        return 1
 
     def extra_copies(self, u):
         return 0
@@ -1586,15 +1603,15 @@ class _MinorFacts:
         return self.T["promo_minor"].get(c, _FX) if c else _FX
 
     def resource_access(self, res):
-        # a plot within three of the centre holds the resource
+        # a plot it owns hands the resource over, or its city's counts as
+        # its last update left them hold it (owned, unimproved)
         ri = self.E["resource"].get(res, -1)
         if ri < 0:
             return 0
         sim = self.sim
-        d = self._disk()
-        on = sim.res_id.gather(1, d.clamp(min=0)) == ri
-        live = sim._res_live().gather(1, d.clamp(min=0))
-        return (on & live & (d >= 0)).any(dim=1)
+        counted = sim.citystate_res_counts[:, self.s, ri] > 0
+        ext = (sim.res_id == ri) & (sim.tile_seat == self.seat) & sim._res_live() & sim._res_extracting()
+        return counted | ext.any(dim=1)
 
     def handicap(self):
         return 0
@@ -1742,7 +1759,7 @@ class _MinorFacts:
             ui = self._uidx(item)
             if ui == sim._builder_idx:
                 return zero + sim._mb_builder_pct
-            if not bool(sim._type_military[ui]):
+            if ui < 0 or not bool(sim._unit_formation_military()[ui]):
                 return zero
             return torch.where(self._military() < sim._mb_small_military, zero + sim._mb_military_pct, zero)
         if item.startswith("BUILDING_"):
@@ -2103,8 +2120,23 @@ class _FreeFacts(_MinorFacts):
             return self.sim._naval_capable(self.row)[:, self.j]
         return 1
 
-    def trade_route_capacity(self):
-        return 0
+    def resource_access(self, res):
+        # a plot within three of the centre holds the resource
+        ri = self.E["resource"].get(res, -1)
+        if ri < 0:
+            return 0
+        sim = self.sim
+        d = self._disk()
+        on = sim.res_id.gather(1, d.clamp(min=0)) == ri
+        live = sim._res_live().gather(1, d.clamp(min=0))
+        return (on & live & (d >= 0)).any(dim=1)
+
+    def best_combat_strength(self):
+        return self.sim.free_best_melee
+
+    def city_count(self):
+        sim = self.sim
+        return sim.city_alive[:, self.row].long().sum(dim=1)
 
     def promotion_weight(self, c):
         return self.T["promo_free"].get(c, _FX) if c else _FX

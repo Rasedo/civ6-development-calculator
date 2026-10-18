@@ -196,6 +196,17 @@
   context:
     - "...- 20 above Enemy: where Regional + 60 is below Other, (Other - Regional - 60) x 0.025 (0xd6ced0) capped at 2.0, else (Enemy - max(Other - 60, Regional)) x 0.025 capped at 3.0. W below..."
   review: reviewed
+- addr: 0xd6f258
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...ic unheld, 0x4cb590 / 0x39d490; the one listener the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: its m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0..."
+  review: imported
 - addr: 0xd70c98
   kind: global
   status: PARTLY
@@ -252,6 +263,18 @@
   readings: ["H-1: Johannesburg's yield per resource type — PARTLY READ"]
   context:
     - "EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES (the factory 0xc2e490, the instance vtable 0xdece90): its apply (0xb48710) registers the yield type and Amount on the city's +0x1da8 table (0..."
+  review: imported
+- addr: 0xdf78a8
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1121
+      turn: 17
+      value: "read back by 0x17c1c0: city +0x2c0[unit] +   player +0x12e8 +0x4a0[unit]) — support units too (runs/h1_duelv1121 t17   Hunza's Battering Ram valued at its Spearman's 22 turns, -3.10 as logged,   again"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...DJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION, registered 0xc1e610, its arguments' object vt 0xdf78a8, apply +0x60 0xb7e0d0): per Units row whose FormationClass (+0xa0, 0xadd5e0) is not t..."
   review: imported
 - addr: 0xdf85f8
   kind: global

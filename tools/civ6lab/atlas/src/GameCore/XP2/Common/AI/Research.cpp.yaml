@@ -55,6 +55,18 @@
     - "...h the research in hand — a tracked int (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research..."
     - "- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the score), the propagation, then: with..."
   review: imported
+- addr: 0x761090
+  final: 0x4f8f10
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...esearchUnit (+0x388, data +0x3e0) at the unit is not 0 — the vector 0x763b00 fills from 0x761090 on player signal +0x228, the turn's end after the city AI: zeroed, then per technology..."
+  review: imported
 - addr: 0x7610e0
   final: 0x4f8f60
   kind: function
@@ -126,9 +138,23 @@
     - recording: AI_Research.csv
       value: "Its log is AI_Research.csv (0x762b40: \"%d, %d, Tech, %s, %3.1f, %s, %d\" — OWNED / RESEARCHING / GOAL / BOOSTED, the score and the turns;"
   impl: [cpu/core/aiResearch.ts:REQUIRED]
-  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...next step, +0x10 its own value, +0x14 its score, +0x18 owned, +0x19 boosted, +0x1a leaf (0x761b70: no row lists it as a prerequisite), +0x1b Repeatable (`Technologies` +0x70 bit 8), +0x1c..."
+  review: imported
+- addr: 0x761d30
+  final: 0x4f9b50
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...0 / 0x39d490; the one listener the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: its m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0 — the vector 0x..."
   review: imported
 - addr: 0x762b40
   final: 0x4fa5c0

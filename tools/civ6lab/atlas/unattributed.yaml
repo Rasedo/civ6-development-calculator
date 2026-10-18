@@ -2721,6 +2721,13 @@
   context:
     - ...rn is done (0x570b40). The operation's end (0x7353d0 -> 0x73ea10, the teams' destructor 0x735790) writes no unit, and the release 0x73d1f0 is Defend Units'; yet 1117 city-state 2's War...
   review: imported
+- addr: 0x745f40
+  final: 0x4e5790
+  kind: function
+  status: PARTLY
+  impl: [gpu/core/sim_tactics.py:_tac_known_entries]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x747f30
   final: 0x4e73f0
   kind: function
@@ -4697,6 +4704,7 @@
   readings:
     - "H-1: a unit's Production cost in the queue — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...`m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 through 0xadd5e0 (unread) and the player's +0x1048 equals the global at 0xf2f978 (the currency the resolut..."
   review: imported
@@ -4962,6 +4970,18 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - ...adds each ability modifier's analysis. Where no subject passes, the analyzer's slot 2 (0xbe4aa0, nothing, but for EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4750).
+  review: imported
+- addr: 0xc1e610
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1121
+      turn: 17
+      value: "read back by 0x17c1c0: city +0x2c0[unit] +   player +0x12e8 +0x4a0[unit]) — support units too (runs/h1_duelv1121 t17   Hunza's Battering Ram valued at its Spearman's 22 turns, -3.10 as logged,   again"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...LITARY PRODUCTION'S UNITS (EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION, registered 0xc1e610, its arguments' object vt 0xdf78a8, apply +0x60 0xb7e0d0): per Units row whose Formatio..."
   review: imported
 - addr: 0xc25910
   kind: function

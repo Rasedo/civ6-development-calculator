@@ -3793,7 +3793,9 @@ rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
 
 - THE TURNS (0x5ce970's unit loop, 0x5cf360..0x5cf6ac): FX(-9999) where the
   CityBuildAI's CanTrain 0x172820 (the player AI +0x12a0 +0xba8 flag set)
-  refuses; else T = max(the research AI's turns 0x7610e0 to PrereqTech + 5,
+  refuses — called with its sixth argument set (+0xe8: the PrereqTech and
+  PrereqCivic checks 0x172951..0x1729ab skipped), so a locked unit is
+  valued on the research AI's turns, not m_turnsToResearchUnit; else T = max(the research AI's turns 0x7610e0 to PrereqTech + 5,
   the civics AI's 0x621920 to PrereqCivic + 5) — the +5 (`lea ebx, [rax+5]`)
   whenever the column is set, the technology held or not —, then the least
   of the Unit_BuildingPrereqs buildings' turns (+0x258), then, but for
@@ -3809,9 +3811,13 @@ rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
   COMBAT / NAVAL / AIR: the military AI's unit production value 0x79ca90
   (player AI +0x1290 +0x268: a linear find in its 0x168-byte entries, +0x160;
   0 for a unit it lacks), x3.0 where the entry's obsolete flag (+0x08,
-  0x79d2d0) is set, + fx(0.5 x (player +0x12f0 +0xc0)) where Combat (+0x48)
-  exceeds 0x4d9320 (PlayerTrade +0xf0) — a city-state's logs read no such
-  term (its count read 0); AIR + 30.0 where its PrereqDistrict (+0x278) in
+  0x79d2d0) is set, + fx(0.5 x the player's cities (player +0x12f0 +0xc0))
+  where Combat (+0x48) exceeds 0x4d9320 on player +0x1330 (PlayerStats
+  +0xf0, the strongest melee strength trained: a city-state's 25 at the
+  start) — runs/h1_duelv1121 t17 Hunza: the Heavy Chariot (Combat 28) its
+  table's 1.16 + 0.5, 7.35 as logged, the Spearman (25) and Warrior (20)
+  their table values alone (2.87, 14.31; runs/h1_duelv1124 Cardiff's
+  Warrior likewise); AIR + 30.0 where its PrereqDistrict (+0x278) in
   the city holds no aircraft, else 5.0 a free slot; NAVAL FX(-9999) at a
   city with no water (0x82a10) and no Harbor (0xcbecc739) for a unit of no
   RangedCombat (+0x6c). TRADE (0x7b6525..0x7b6582): 0x7a7110(out, player,
@@ -3845,7 +3851,15 @@ rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
   of itself, an obsolete one (0x538460: MandatoryObsoleteCivic +0x238 /
   Tech +0x240, ObsoleteCivic +0x248 / Tech +0x250 held) only while the player
   holds one (0x4f2c90), a unit not yet trainable only where the player
-  signal +0x168 (0x79ba50) answers; per entry its flags (+0x08 obsolete,
+  signal +0x168 (0x79ba50) answers (a not-yet-trainable unit: its
+  PrereqTech or PrereqCivic unheld, 0x4cb590 / 0x39d490; the one listener
+  the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: its
+  m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0 — the
+  vector 0x763b00 fills from 0x761090 on player signal +0x228, the turn's
+  end after the city AI: zeroed, then per technology entry whose turns
+  (+0x1c) are >= 0 each unit the technology unlocks (the entry's list
+  +0x20, 0x761b70) takes those turns; a unit locked by a civic alone never
+  answers); per entry its flags (+0x08 obsolete,
   +0x0b Units +0x1ba bit 128, +0x0c TraitType +0x2d0, +0x0e a held strategic
   resource), Cost +0x38, Range +0x68, max(Combat, RangedCombat), Combat, the
   Units_XP2 maintenance resource and amount, and a per-player vector of 64.
@@ -3880,6 +3894,15 @@ rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
   Valletta and Caguana; Hunza's (6 / 5 against 7 / 6 without it) and
   Antananarivo's (23 / 19 / 10 against 14 / 12 / 6) production at founding
   differs from the record's of t2 (its citizens' first placement unread).
+- THE MILITARY PRODUCTION'S UNITS (EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION,
+  registered 0xc1e610, its arguments' object vt 0xdf78a8, apply +0x60
+  0xb7e0d0): per Units row whose FormationClass (+0xa0, 0xadd5e0) is not
+  the civilian one (2) and whose PrereqCivic's / PrereqTech's era (+0x270 /
+  +0x280) lies in StartEra..EndEra, the Amount onto the city's per-unit
+  production modifier (0xc6f950; read back by 0x17c1c0: city +0x2c0[unit] +
+  player +0x12e8 +0x4a0[unit]) — support units too (runs/h1_duelv1121 t17
+  Hunza's Battering Ram valued at its Spearman's 22 turns, -3.10 as logged,
+  against 27 without the +200%).
 - THE EFFICIENCIES (0x79d040 allocates, the job 0x79a440 fills, "Could not
   find a neutral player"): per pair of Units rows both without strength
   (max(Combat, RangedCombat, Bombard) 0 and AntiAirCombat 0) 1.0; one

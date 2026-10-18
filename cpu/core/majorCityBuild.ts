@@ -36,7 +36,6 @@ import { cityLowlands } from './climate';
 import { buildingCostIn, worshipOffered } from './rules';
 import { builderCost, cityNavalCapable, traderCost } from './units';
 import { districtCost, projectCost, settlerCost, unitStepCost, unitsAcquired } from './game';
-import { tradeCapacity } from './trade';
 import { handicapOf } from './barbarians';
 import { productionObs, unitGates } from './decideObsCities';
 import { prodLayout, queueItemColumn } from './prodLayout';
@@ -207,7 +206,7 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
       known,
     }),
     trainsDomain: (d) => d !== 'DOMAIN_SEA' || cityNavalCapable(state, city),
-    combatCount: tradeCapacity(state, seat),
+    cities: own.length,
     extraCopies: () => 0,
     promotionWeight: (cls) => promotionWeight(traits, cls),
     resourceAccess: (res) => {
@@ -278,8 +277,7 @@ export function majorPickFacts(state: GameState, city: City, facts: CityBuildFac
  *  over the Free Cities' seat, but no full civilization, its trait
  *  TRAIT_LEADER_FREE_CITIES' promotion lists, its research and civics turns
  *  its own research AI's analysis (`minorResearch`'s entries, as a
- *  city-state's), no strategic stockpile, no government, no combat units
- *  counted against its trade */
+ *  city-state's), no strategic stockpile, no government */
 export function freeCityBuildFacts(state: GameState, city: City): CityBuildFacts {
   const f = majorBuildFacts(state, city, () => 0);
   const r = seatOf(state, city.seat)!.research;
@@ -292,7 +290,6 @@ export function freeCityBuildFacts(state: GameState, city: City): CityBuildFacts
     ...f,
     fullCiv: false,
     governmentTier: 0,
-    combatCount: 0,
     promotionWeight: (cls) => promotionWeight(['TRAIT_LEADER_FREE_CITIES'], cls),
     resourceAccess: (res) => {
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);

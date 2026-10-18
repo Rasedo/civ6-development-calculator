@@ -1222,12 +1222,18 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     unitCount: state.units.filter((u) => u.seat === cityState.seat).length,
     unitProduction: minorUnitProduction(state, cityState, known),
     trainsDomain: (d) => d !== 'DOMAIN_SEA' || cityNavalCapable(state, city),
-    combatCount: 0,
+    cities: 1,
     extraCopies: () => 0,
     promotionWeight: (cls) => promotionWeight(['MINOR_CIV_DEFAULT_TRAIT'], cls),
+    // a plot it owns hands the resource over (0x4aa790), or its city's
+    // counts as its last update left them hold it (CityBuildAI +0x978,
+    // 0x5d45c0: owned, unimproved; runs/h1_duelv1121 t17 Hunza's Horseman
+    // 0.00, its Horses unowned)
     resourceAccess: (res) => {
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
-      return !!id && tilesWithin(state.map, centre.col, centre.row, 3).some((t) => t.resource === id);
+      if (!id) return false;
+      if ((cityState.resourceCounts?.[res] ?? 0) > 0) return true;
+      return state.map.tiles.some((t) => t.resource === id && tileSeat(t) === cityState.seat && extractsResource(t));
     },
     handicap: 0,
     growth: minorCityGrowth(state, cityState),
@@ -1334,13 +1340,17 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
 }
 
 /** The percent a minor's step pays toward the item on top of its Production:
- *  a Builder +200%, a military unit +200% while the minor holds fewer than
+ *  a Builder +200%, a unit not of the civilian formation +200% while the minor holds fewer than
  *  ten, walls +200%, the Harbor and the type's own district +500% (the
  *  install's MINOR_CIV_PRODUCTION_* and MINOR_CIV_<TYPE>_TRAIT rows). */
 export function minorItemPct(state: GameState, cityState: CityState, item: MinorItem): number {
   if ('unit' in item) {
     if (item.unit === 'BUILDER') return MINOR_BUILDER_PROD_PCT;
-    if (!unitIsMilitary(item.unit)) return 0;
+    // EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION (0xb7e0d0): every unit
+    // whose FormationClass is not civilian, support units too
+    // (runs/h1_duelv1121 t17 Hunza's Battering Ram valued at its Spearman's
+    // 22 turns, -3.10 as logged)
+    if (AI_UNITS[AI_UNIT_INDEX.get(installType('unit', item.unit, 'UNIT_')) ?? -1]?.civilian ?? true) return 0;
     const military = state.units.filter((u) => u.seat === cityState.seat && unitIsMilitary(u.type)).length;
     return military < MINOR_SMALL_MILITARY ? MINOR_MILITARY_PROD_PCT : 0;
   }

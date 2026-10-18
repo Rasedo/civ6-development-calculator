@@ -425,9 +425,6 @@ export interface MajorView extends AiValueView {
    *  CityBuildAI's threat flag (+0x1b8), its production turn (+0x2600) and its
    *  values (+0xa48, the analysis) unread for a major and none */
   contractCities(seat: number): readonly ContractCity[];
-  /** the seat's best combat strength (PlayerStats +0xf0, 0x4d9320: the
-   *  strongest melee strength it has trained, m_iMaxMeleeStrengthTrained) */
-  bestCombatStrength(seat: number): number;
   /** the player's units the seat sees now (its own: all of them) */
   knownUnits(seat: number, player: number): readonly MajorUnitView[];
   /** the barbarians' seat */

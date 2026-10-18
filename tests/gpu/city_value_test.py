@@ -439,10 +439,10 @@ class City:
         k = self.idx[u]
         return self.val[:, k], ~self.entry[:, k] & False
 
-    def trade_route_capacity(self):
+    def best_combat_strength(self):
         return 0
 
-    def combat_count(self):
+    def city_count(self):
         return 0
 
     def trains_domain(self, d):

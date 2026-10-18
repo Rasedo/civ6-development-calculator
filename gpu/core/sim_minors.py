@@ -1051,14 +1051,14 @@ class SimMinors:
         return out
 
     def _minor_item_pct(self, s: int, key: torch.Tensor) -> torch.Tensor:
-        """[B] f64 — `minorItemPct`: a Builder +200%, a military unit +200%
+        """[B] f64 — `minorItemPct`: a Builder +200%, a unit not of the civilian formation +200%
         while the minor holds fewer than ten, walls +200%, the Harbor and the
         type's own district +500%; else 0"""
         rd = self.rules_dev
         is_u, is_b, is_d, _is_p, _is_r = self._mk_kinds(key)
         zero = torch.zeros(self.B, dtype=torch.float64, device=self.device)
         ui = key.clamp(min=0, max=self.NU - 1)
-        mil = self._type_military.take(ui) & (self._minor_military_count(s) < self._mb_small_military)
+        mil = self._unit_formation_military().take(ui) & (self._minor_military_count(s) < self._mb_small_military)
         pu = torch.where(mil, zero + self._mb_military_pct, zero)
         if self._builder_idx >= 0:
             pu = torch.where(ui == self._builder_idx, zero + self._mb_builder_pct, pu)

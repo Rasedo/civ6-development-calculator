@@ -219,6 +219,7 @@
     - ai/major/congress.ts:h
     - cpu/core/aiUnitProduction.ts:UnitProductionFacts
     - cpu/core/operations/unitRows.ts:seatUnitRows
+    - cpu/core/minorBuild.ts:civicEntries
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the goody hut's other gates and the Relic — READ"

@@ -220,10 +220,12 @@ export interface CityBuildFacts {
   /** the city trains units of the domain (0x17d660: a sea unit at a
    *  coastal city) */
   trainsDomain(domain: string): boolean;
-  /** the count 0x7b62c0 adds half of to a combat unit stronger than the
-   *  player's trade capacity (player +0x12f0 +0xc0; none at a city-state:
-   *  runs/h1_duelv1124 Cardiff's Warrior reads its table value alone) */
-  combatCount: number;
+  /** the player's cities (player +0x12f0 +0xc0), half of which 0x7b62c0
+   *  adds to a combat unit stronger than the strongest melee strength the
+   *  player has trained (runs/h1_duelv1121 t17 Hunza: its Heavy Chariot's
+   *  Combat 28 over the city-state's 25, its table value 1.16 + 0.5, 7.35 as
+   *  logged; its Spearman's 25 not, 2.87) */
+  cities: number;
   /** the city's extra copies of a unit it trains (0x179dd0) */
   extraCopies(unit: string): number;
   /** the promotion class weight (0x723bb0), raw */
@@ -551,8 +553,9 @@ export function unitTurns(f: CityBuildFacts, u: AiUnitRow): number {
  *  exits (`unitValueExit`, a domain the city cannot train) by its
  *  pseudo-yield — a combat unit (PSEUDOYIELD_UNIT_COMBAT, the default, or a
  *  naval or air one) the military AI's table value (x3 for an entry
- *  obsolete to the player), plus half the count player +0x12f0 +0xc0 holds where its Combat exceeds the
- *  player's trade route capacity; an explorer, settler or spy 1.0 plus the
+ *  obsolete to the player), plus half the player's cities (player +0x12f0
+ *  +0xc0) where its Combat exceeds the strongest melee strength the player
+ *  has trained (PlayerStats +0xf0, 0x4d9320); an explorer, settler or spy 1.0 plus the
  *  eras' points as PSEUDOYIELD_GOLDENAGE_POINT; a Trader its worth
  *  (`traderValue` with start and horizon both `t`: one turn's route value
  *  discounted to `t`) through PSEUDOYIELD_UNIT_TRADE — then x (the city's extra
@@ -572,7 +575,7 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
     const e = f.unitProduction.get(u.type);
     v = e?.value ?? 0;
     if (e?.obsolete) v = fmul(v, 3 * FX);
-    if (u.combat > f.view.tradeRouteCapacity(f.seat)) v += fxConst(f.combatCount * 0.5);
+    if (u.combat > f.view.bestCombatStrength(f.seat)) v += fxConst(f.cities * 0.5);
   } else if (pseudo === 'PSEUDOYIELD_UNIT_TRADE') {
     const tv = traderValue(f.view, f.seat, 0, t, t);
     if (tv === null) return null;

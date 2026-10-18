@@ -11,7 +11,7 @@ import { unitProductionTable } from '../../../cpu/core/aiUnitProduction';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingValue, defaultSpecialization, growthForecast, housingValue, unitValue, type CityBuildFacts, type PickFacts } from '../../../cpu/core/aiCityBuild';
 import type { AiValueView } from '../../../cpu/core/aiValue';
 
-const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0, tradeRouteCapacity: () => 0 } as unknown as AiValueView;
+const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0, tradeRouteCapacity: () => 0, bestCombatStrength: () => 0 } as unknown as AiValueView;
 const facts: CityBuildFacts = {
   view, seat: 100, cityId: -1, population: 1, capital: true, districtCount: 1, hasWonder: false, atWar: false, era: 0,
   yieldPct: (y) => (y === 'YIELD_PRODUCTION' ? -50 : 0), version: (b) => b, hasBuilding: () => false,
@@ -20,7 +20,7 @@ const facts: CityBuildFacts = {
   amenity: { balance: 0, yields: {} }, regionalAmenities: () => [], unitVersion: (u) => u, fullCiv: false, tribe: false, unitCount: 1,
   growth: { surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 },
   forecast: growthForecast({ surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 }),
-  unitProduction: new Map(), trainsDomain: () => true, combatCount: 0, extraCopies: () => 0, promotionWeight: () => 256,
+  unitProduction: new Map(), trainsDomain: () => true, cities: 0, extraCopies: () => 0, promotionWeight: () => 256,
   resourceAccess: () => true, handicap: 0,
 };
 
