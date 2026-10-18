@@ -6,7 +6,10 @@
 - addr: 0x5cc00
   kind: function
   status: PARTLY
-  impl: [cpu/harness/citizens.ts:hexPlot]
+  impl:
+    - cpu/core/citizens.ts:hexPlot
+    - cpu/core/citizens.ts:hexPlot
+    - gpu/core/simbase.py:CITIZEN_HEXSPACE
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:

@@ -1,0 +1,24 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x975550
+  final: 0x67ee60
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: "Scored on the records with no favored yield (`dpcheck.py`, `dpgrow.py` in the r22 scratchpad): the full set of worked non-district plots 1,133 of 1,284 city-turns on runs/h1_duelw1117 (need 0 or the o"
+    - recording: 1117
+      value: the incremental growth pick 186 of 203 (1117, 1118).
+    - recording: 1117
+      turn: 199
+      value: "The rest follow the AI's favored yields: the log's CityFocusChanged rows (an AI city every turn or two) carry no yields, and the records hold none — 1117 Xiurong t199-240 (4 <-> 5 citizens: the growth"
+    - recording: 1121
+      turn: 21
+      value: "The H-1 harness places by it (`cpu/core/citizens.ts`, no favored yields): a Settler's citizen lost re-places them all, a grown citizen goes beside the rest, a starved city re-places them all (1121 t21"
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  context:
+    - "...is set favored; otherwise a favored Food is cleared — each through the SET_FOCUS command (0x975550), a full re-place. The H-1 harness places by it (`cpu/core/citizens.ts`, no favored yield..."
+  review: imported

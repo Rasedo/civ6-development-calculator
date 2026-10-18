@@ -11,6 +11,7 @@
     - recording: 1121
       turn: 41
       value: "Recorded: a city-state's envoy annex re-places before its growth (1121   Hunza t41: 229 annexed, the growth on surplus 3 where the record's set   read 4;"
+  impl: [cpu/core/minorBuild.ts:owner, gpu/core/sim_minorai.py:order]
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
   context:

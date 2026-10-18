@@ -315,6 +315,7 @@
 - addr: 0xefedf0
   kind: global
   status: PARTLY
+  impl: [gpu/core/simbase.py:CITIZEN_HEXSPACE]
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
@@ -323,6 +324,7 @@
 - addr: 0xefeef0
   kind: global
   status: PARTLY
+  impl: [gpu/core/simbase.py:CITIZEN_HEXSPACE]
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:

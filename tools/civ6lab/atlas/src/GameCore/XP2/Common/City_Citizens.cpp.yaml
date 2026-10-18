@@ -16,7 +16,11 @@
   kind: function
   name: ChangeNumUnassigned
   status: PARTLY
-  impl: [cpu/harness/citizens.ts:replaceAllCitizens]
+  impl:
+    - cpu/harness/citizens.ts:replaceAllCitizens
+    - cpu/core/citizens.ts:replaceAllCitizens
+    - cpu/core/minorBuild.ts:minorGrowth
+    - gpu/core/sim_minors.py:_minor_growth
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
@@ -46,6 +50,24 @@
   context:
     - "...ld is above 0, a district's specialist slots, else 1) less its workers. An entry's score (0x195f90): food (+0x08) the plot's Food; each yield not disfavored (+0x50) counted twice, Gold onc..."
   review: imported
+- addr: 0x1962a0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: "Scored on the records with no favored yield (`dpcheck.py`, `dpgrow.py` in the r22 scratchpad): the full set of worked non-district plots 1,133 of 1,284 city-turns on runs/h1_duelw1117 (need 0 or the o"
+    - recording: 1117
+      value: the incremental growth pick 186 of 203 (1117, 1118).
+    - recording: 1117
+      turn: 199
+      value: "The rest follow the AI's favored yields: the log's CityFocusChanged rows (an AI city every turn or two) carry no yields, and the records hold none — 1117 Xiurong t199-240 (4 <-> 5 citizens: the growth"
+    - recording: 1121
+      turn: 21
+      value: "The H-1 harness places by it (`cpu/core/citizens.ts`, no favored yields): a Settler's citizen lost re-places them all, a grown citizen goes beside the rest, a starved city re-places them all (1121 t21"
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  context:
+    - "...0) below 1.0 with its Housing (0x1b5840) above the population (+0x588): Food not favored (0x1962a0 on +0x1ba8) is set favored; otherwise a favored Food is cleared — each through the SET_FO..."
+  review: imported
 - addr: 0x196320
   kind: function
   status: READ
@@ -58,7 +80,15 @@
       value: "a start-window row lands after the city turns: re-placing at those rows before the border step costs 112 step.border passes on 1129, before the growth 129 step.growth passes — the city turns bank on t"
     - recording: 1129
       value: "`citizens.ts` YieldFlags: a favored flag puts the yield's doubled value in the favored score, a disfavored one drops it) and re-places on a start's wonder annex where the record holds them (1129: step"
-  impl: [cpu/harness/checks.ts:startWin, cpu/harness/checks.ts:annexed]
+  impl:
+    - cpu/harness/checks.ts:startWin
+    - cpu/harness/checks.ts:annexed
+    - cpu/core/cityStates.ts:minorReplaceCitizens
+    - cpu/core/cityStates.ts:envoyTiles
+    - cpu/core/minorBuild.ts:owner
+    - gpu/core/sim_minorai.py:order
+    - gpu/core/sim_minors.py:_minor_envoy_tiles
+    - gpu/core/sim_minors.py:_minor_replace_citizens
   readings:
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
@@ -132,6 +162,7 @@
     - recording: 1120
       turn: 13
       value: 1120 t13 17 / 32 (a defender at 18 HP).
+  impl: [cpu/core/cityStates.ts:minorPlaceCitizens]
   readings:
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"

@@ -56,6 +56,10 @@
     - cpu/core/production.ts:pct
     - cpu/harness/checks.ts:startWin
     - cpu/harness/checks.ts:annexed
+    - cpu/core/cityStates.ts:envoyTiles
+    - cpu/core/minorBuild.ts:minorGrowth
+    - gpu/core/sim_minors.py:_minor_growth
+    - gpu/core/sim_minors.py:_minor_envoy_tiles
   readings:
     - "H-1: the annex, the purchase and the stored next plot — READ"
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
