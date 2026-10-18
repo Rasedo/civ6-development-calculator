@@ -4619,9 +4619,15 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T,
   0x79f0c0); its modifiers 0x7a4b20; at the top level its neighbours'
   improvements and districts revalued with it (0x79ed40). Unported: the
-  tourism, defence, claims, modifiers and neighbours terms; the 1127 Farm
-  misses are mostly a constant +10 to +16 over turns 10..25 the housing or
-  modifiers term owes.
+  tourism, defence, claims, modifiers and neighbours terms. LAB: the
+  Housing counted a second time at its whole value (the housing value's
+  whole part, as an analyzer's): runs/h1_duelv1117 Caguana's Farm rows
+  each the value without it plus exactly that whole part (18.00 at t6, 30.00
+  at t12, 47.00 at t38, 88.00 at t45), the Batey over a Farm as much below;
+  1,115 -> 1,623 of Caguana's 2,716 Farm rows exact with it. Its writer in
+  0x7a58f0 / 0x7b1320 / the modifiers 0x7a4b20 unread (0x7b1320 calls the
+  housing value once, over TilesRequired; 0x6ad2b0, an analyzer beside
+  EFFECT_ADJUST_DISTRICT_AMENITY, calls it too).
 - The research AI's turns (0x7610e0): the entry's turns plus its +0x528,
   the turns left on the research as its last turn wrote them; a city
   founded the turn before reads -1 (1127 t2: the minors' Mines at T 4 of
@@ -7380,7 +7386,13 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   (0x5eadb0) each by its unit row: s = max(Combat +0x48, RangedCombat
   +0x6c, Bombard + 20 where +0x40 is above 0), counted where it bombards,
   where ranged and s above D - 15.0, or s above D - 5.0 (D the centre's
-  GetDefenseStrength, 24.8), an explorer (PSEUDOYIELD_UNIT_EXPLORER) never;
+  GetDefenseStrength, 24.8), an explorer (PSEUDOYIELD_UNIT_EXPLORER) never,
+  nor a barbarian's (0x484910) of a type in the barbarian manager's list
+  (+0x298, its vector +0x2f0; 0x153e40), which its start (0x153720) fills
+  with each Units row tagged CLASS_ANTI_CAVALRY — the camps' defenders
+  (runs/h1_duelv1121 t4-t12: a barbarian Spearman 3 from city-states 2's
+  and 4's cities, 25 against 18 + 5, starts no City Defense; t13 a
+  Quadrireme beside it does);
   their sum at D plus the margin or more threatens the city, at level 2 —
   +1 above 2 of city +0x1a60, +2 with +0x5e8, +1 with +0x1c78's list, +
   +0x588 / 5, all unread — at most 1 for a player not hostile; the first

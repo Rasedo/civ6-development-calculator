@@ -216,7 +216,8 @@ class SimMinorAi:
         within 5 (a full civ's) or 3 of the city summed by their threat
         strengths (the larger of Combat, RangedCombat and Bombard + 20; a
         Bombard unit counts, a ranged one above the defense less 15, any above
-        the defense less 5; never an explorer); at the city's defense plus
+        the defense less 5; never an explorer nor a barbarian camp defender);
+        at the city's defense plus
         the margin (5.0 hostile, else 20.0 or the city's strength) the city
         is threatened at its level (`threatLevel`: 2, 3 above two districts
         the centre included; +2 its capital, the city-state's one city
@@ -241,6 +242,10 @@ class SimMinorAi:
         rng = torch.tensor([int(r["rangedCombat"]) for r in rows] or [0], dtype=torch.long, device=dev)
         bomb = torch.tensor([int(r["bombard"]) for r in rows] or [0], dtype=torch.long, device=dev)
         expl = torch.tensor([r["pseudo"] == "PSEUDOYIELD_UNIT_EXPLORER" for r in rows] or [False], dtype=torch.bool, device=dev)
+        # the barbarians' camp defenders (their manager's CLASS_ANTI_CAVALRY
+        # types, 0x153e40) count for none
+        acav = torch.tensor([r["promotionClass"] == "PROMOTION_CLASS_ANTI_CAVALRY" for r in rows] or [False],
+                            dtype=torch.bool, device=dev)
         a0 = arow.clamp(min=0)
         bb = bomb.take(a0)
         bv = torch.where(bb > 0, bb + 20, torch.zeros_like(bb))
@@ -282,7 +287,8 @@ class SimMinorAi:
             if barb:
                 mine = mine & ~(undamaged & camp_ops).unsqueeze(1)
             anyu = mine.any(dim=1)
-            tot = torch.where(mine, strength, torch.zeros_like(strength)).sum(dim=1)
+            sums = mine & ~acav.take(a0) if barb else mine
+            tot = torch.where(sums, strength, torch.zeros_like(strength)).sum(dim=1)
             hit = (out < 0) & anyu & (tot.double() >= d + margin)
             if not full and not barb:
                 hit = hit & war

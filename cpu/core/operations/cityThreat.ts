@@ -49,6 +49,16 @@ function threatStrength(type: string, d: number): number | null {
   return s;
 }
 
+/** a type of the barbarians' camp defenders, which threaten no city: the
+ *  barbarian manager's list (+0x298, filled at its start 0x153720 with each
+ *  Units row tagged CLASS_ANTI_CAVALRY, read by 0x153e40) — the
+ *  anti-cavalry rows (runs/h1_duelv1121 t4-t12: a barbarian Spearman 3 from
+ *  city-state 2's and city-state 4's cities, 25 against a defense of 18,
+ *  starts no City Defense; t13 a Quadrireme beside it does) */
+function campDefender(type: string): boolean {
+  return AI_UNITS[AI_UNIT_INDEX.get(type) ?? -1]?.promotionClass === 'PROMOTION_CLASS_ANTI_CAVALRY';
+}
+
 /**
  * 0x5cbd10: per player of the game but the owner and those it declared
  * friendship with — a full civ the owner fights (the barbarians not), or one
@@ -57,7 +67,8 @@ function threatStrength(type: string, d: number): number | null {
  * the owner does not fight: none — an undamaged city with a running
  * operation of the owner against the player within 5 is left alone; else
  * the player's known units within 5 (a full civ's) or 3 of the city summed
- * by their threat strengths; at the city's defense plus the margin or more,
+ * by their threat strengths (a barbarian camp defender none); at the city's
+ * defense plus the margin or more,
  * the city is threatened at its level (`threatLevel`), at most 1 for a
  * player not hostile. The first such player decides; none, -1.
  */
@@ -82,7 +93,8 @@ export function cityThreat(view: MajorView, seat: number, city: number, inp: Thr
       if (view.plotDistance(u.plot, city) > range) continue;
       any = true;
       const s = threatStrength(u.type, d);
-      if (s !== null) sum += s;
+      if (s === null || (p === barb && campDefender(u.type))) continue;
+      sum += s;
     }
     if (!any) continue;
     if (sum < d + margin) continue;

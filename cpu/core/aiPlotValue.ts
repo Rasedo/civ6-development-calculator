@@ -153,7 +153,15 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
   if (imp.appealYield) v += yieldValue(f.view, f.seat, fmul(f.appeal * FX, fxConst(imp.appealPct * 0.01)), imp.appealYield);
   if (imp.buildUnits.some(([, consumes]) => !consumes)) v *= 3;
   let value = between(v, t, h);
-  if (imp.housing > 0) value += Math.trunc((f.housingValue(imp.housing, t, h) * FX) / (Math.max(imp.tilesRequired, 1) * FX));
+  if (imp.housing > 0) {
+    const hv = f.housingValue(imp.housing, t, h);
+    value += Math.trunc((hv * FX) / (Math.max(imp.tilesRequired, 1) * FX));
+    // the Housing again at its whole value — LAB: its source in 0x7a58f0 /
+    // 0x7b1320 unread (runs/h1_duelv1117 Caguana's Farms: the log's each the
+    // value without it plus the housing value's whole part, 18.00 at t6,
+    // 88.00 at t45)
+    value += Math.trunc(hv / FX) * FX;
+  }
   return value;
 }
 

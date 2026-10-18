@@ -368,6 +368,8 @@ class SimCityValue:
         if row["housing"] > 0:
             hv = f.housing_value(row["housing"], t, h)
             value = value + torch.div(hv * _FX, max(row["tilesRequired"], 1) * _FX, rounding_mode="trunc")
+            # the Housing again, its whole value (LAB, `improvementYieldsValue`)
+            value = value + torch.div(hv, _FX, rounding_mode="trunc") * _FX
         value = torch.where(dead, torch.zeros_like(value), value)
         return torch.where(past, torch.full_like(value, _FX_MIN), value)
 
