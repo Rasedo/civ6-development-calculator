@@ -15,10 +15,10 @@ import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { CITY_STATE_MAX_HP } from '../data/cityStates';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
-import { AI_FEATURES } from '../data/aiBuildTables';
-import { installFeature } from '../data/aliases';
+import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
+import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  canEmbark, cityAtIndex, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, stepCost, stepUnit, unitDomain, unitFullMoves, unitIsNoncombat, unitReligious,
+  canEmbark, cityAtIndex, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, stepCost, stepUnit, unitDomain, unitFullMoves, unitIsNoncombat, unitReligious,
   unitsHostile, unitVisibleTo,
   waterEnterable,
 } from './units';
@@ -2177,6 +2177,68 @@ function alternateLocation(state: GameState, unit: Unit, plot: number, range: nu
   return best;
 }
 
+/** the chassis whose AI row's PseudoYieldType is PSEUDOYIELD_UNIT_SETTLER
+ *  (Units.xml: the Settler alone) */
+let settlerChassis: ReadonlySet<string> | null = null;
+function settlerPseudo(type: string): boolean {
+  settlerChassis ??= new Set(Object.values(UNITS).map((d) => d.id).filter((id) => {
+    const own = engineId('unit', `UNIT_${id}`, 'UNIT_', UNITS) === id ? `UNIT_${id}` : gameTypeOf('unit', id, 'UNIT_');
+    return AI_UNITS.some((r) => r.type === own && r.pseudo === 'PSEUDOYIELD_UNIT_SETTLER');
+  }));
+  return settlerChassis.has(type);
+}
+
+/**
+ * SUPPORT FORMATION (0x77ae80, its moves 0x773bd0): each land unit left
+ * (+0x650 2), in pool order, takes of its player's units — in pool order —
+ * a Settler (its AI row's PSEUDOYIELD_UNIT_SETTLER) on the map, in no
+ * formation (+0x1fb8 +0x738 1) and no operation (a minor's operations
+ * recruit no Settler): the first such, held where
+ * its planning reaches the Settler's plot within two turns (0x791300), else
+ * the nearest of those it does not reach (the first of equals) — a Settler's
+ * Combat is 0, so a reached one never displaces another. Once every unit
+ * has chosen, the moves in that order: the unit goes to the Settler's plot
+ * (the move order 0x962030); arrived, the Settler joins its formation
+ * (`escortUnit`); its turn is done ("Support Formation", the Settler's
+ * plot). The move's other half — a lone support unit (FormationClass
+ * SUPPORT) joining the strongest combat unit its planning reaches — finds
+ * none: a minor's pass walks its military units alone (runs/h1_duelw1128
+ * t251: city-state 3's Supply Convoy ends its turn beside its Spec Ops'
+ * Support Formation).
+ */
+function supportFormation(state: GameState, pass: Pass): void {
+  const settlers = state.units.filter((v) => v.seat === pass.seat && settlerPseudo(v.type) && !inEscort(state, v))
+    .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+  if (!settlers.length) return;
+  const moves: { u: Unit; v: Unit; plot: number }[] = [];
+  for (const u of pass.units) {
+    if (!live(state, pass, u) || unitDomain(u.type) !== 'military' || UNITS[u.type]?.naval) continue;
+    let pick: Unit | null = null;
+    let reached = false;
+    let near = 0;
+    for (const v of settlers) {
+      if (reachAt(state, pass, u, v.tileIndex, PLAN_TURNS, false, 0) >= 0) {
+        if (pick) continue;
+        pick = v;
+        reached = true;
+        continue;
+      }
+      if (reached) continue;
+      const d = plotDistance(state, u.tileIndex, v.tileIndex);
+      if (pick && d >= near) continue;
+      pick = v;
+      near = d;
+    }
+    if (pick) moves.push({ u, v: pick, plot: pick.tileIndex });
+  }
+  for (const { u, v, plot } of moves) {
+    if (!state.units.includes(u)) continue;
+    moveTo(state, u, plot, pass.strike);
+    if (u.tileIndex === plot && state.units.includes(v) && v.tileIndex === plot) escortUnit(state, v);
+    finish(pass, u, 'Support Formation', plot);
+  }
+}
+
 /** the units a pass walks of a player of no full AI (a city-state, the Free
  *  Cities) or of an operations probe: its military units, of AI type
  *  COMBAT (a civilian, a support unit none) */
@@ -2191,10 +2253,10 @@ export function militaryAiTypeOf(u: Unit): number {
  * taken before any moves, its tactical target list; its operations' run
  * (`operations`: their units the operations'); then the moves in the
  * list's order, each walking the units the moves before it left, in pool
- * order — Attack High Priority, Move to Safety, Attack Medium Priority,
- * Promotion, Attack Low Priority, Heal, Chase Target (no strike), Wander
- * Near City (Support Formation, Attack Civilians and Make Military
- * Formation not ported); the homeland's Move to Safety, then its End Turn
+ * order — Support Formation, Attack High Priority, Move to Safety, Attack
+ * Medium Priority, Promotion, Attack Low Priority, Heal, Chase Target (no
+ * strike), Wander Near City (Attack Civilians and Make Military Formation
+ * not ported); the homeland's Move to Safety, then its End Turn
  * takes the rest (its Promotion finds no unit the tactical one left due).
  */
 export function cityStateTactics(state: GameState, cityState: CityState, operations: (pass: Pass) => void): void {
@@ -2204,6 +2266,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
   try {
     const pass = openPass(state, cityState.seat, militaryAiTypeOf);
     operations(pass);
+    supportFormation(state, pass);
     attackUnits(state, pass, 'HIGH');
     moveToSafety(state, pass);
     attackUnits(state, pass, 'MEDIUM');

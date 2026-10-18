@@ -3254,8 +3254,9 @@ class SimTactics:
         """A CITY-STATE'S TACTICAL TURN (`cityStateTactics`) for minor `s`:
         its unit pool (`_seat_pool_slots`), each unit's planning reach taken
         before any moves, its tactical target list and danger map, its
-        operations' run (`_mops_run`, their units theirs), then Attack
-        High Priority, Move to Safety, Attack Medium and Low Priority, Heal,
+        operations' run (`_mops_run`, their units theirs), then Support
+        Formation, Attack High Priority, Move to Safety, Attack Medium and Low
+        Priority, Heal,
         Chase Target (no strike) and Wander Near City in pool order (Promotion
         after Attack Medium Priority), the
         homeland's Move to Safety; the rest end their turn."""
@@ -3301,6 +3302,84 @@ class SimTactics:
         done |= has
         self._gen_ver += 1
 
+    def _tac_settler_types(self) -> torch.Tensor:
+        """[NU] bool — the chassis whose AI row's PseudoYieldType is
+        PSEUDOYIELD_UNIT_SETTLER (`settlerPseudo`)"""
+        c = getattr(self, "_tac_settler_cache", None)
+        if c is None:
+            T = self._cv_tables()
+            rows = T["unit_rows"]
+            c = torch.tensor([r >= 0 and rows[r]["pseudo"] == "PSEUDOYIELD_UNIT_SETTLER"
+                              for r in T["engine_row"].tolist()], dtype=torch.bool, device=self.device)
+            self._tac_settler_cache = c
+        return c
+
+    def _tac_support_formation(self, live, done: torch.Tensor, op: dict, pre: str, seat: int) -> None:
+        """SUPPORT FORMATION (`supportFormation`, 0x77ae80, its moves
+        0x773bd0): each land unit left, in pool order, takes of its player's
+        Settlers on the map in no formation — in pool order — the first,
+        held where its planning reaches its plot within two turns, else the
+        nearest it does not reach (the lowest slot of equals); then the moves
+        in that order: the unit goes to the Settler's plot and, arrived, the
+        Settler joins its formation; its turn is done"""
+        dev = self.device
+        B = self.B
+        bidx = torch.arange(B, device=dev)
+        BIG = 1 << 40
+        lo = self.POOL_LO[pre]
+        alive = getattr(self, f"{pre}_unit_alive")
+        useat = getattr(self, f"{pre}_unit_seat")
+        utile = getattr(self, f"{pre}_unit_tile")
+        utype = getattr(self, f"{pre}_unit_type")
+        pslot = getattr(self, f"{pre}_unit_pslot")
+        P = alive.shape[1]
+        vt = utile.clamp(min=0)
+        cand = (alive & (useat == seat) & (utile >= 0)
+                & self._tac_settler_types().take(utype.clamp(min=0, max=self.NU - 1)))
+        if not bool(cand.count_nonzero()):
+            return
+        # a Settler in a formation: its flag with a military unit of its
+        # player, not embarked, on its plot (`inEscort`)
+        gv = torch.arange(P, device=dev).unsqueeze(0).expand(B, P) + lo
+        mil = self.military_at.gather(1, vt)
+        mc = mil.clamp(min=0)
+        formed = (self.unit_escorted.gather(1, gv) & (mil >= 0) & (self.unit_seat.gather(1, mc) == seat)
+                  & ~self.unit_emb.gather(1, mc))
+        cand &= ~formed
+        if not bool(cand.count_nonzero()):
+            return
+        order, npass = op["order"], op["npass"]
+        first = torch.where(cand, pslot, torch.full_like(pslot, BIG)).argmin(dim=1)
+        picks = []
+        for j in range(int(npass.max()) if B else 0):
+            u_b = order[:, j]
+            ut = utype[bidx, u_b].clamp(min=0, max=self.NU - 1)
+            ok = (j < npass) & live()[bidx, u_b] & ~self.unit_naval.take(ut) & cand.any(dim=1)
+            if not bool(ok.count_nonzero()):
+                continue
+            rt, _ = self._seat_reach_turns(op, u_b)
+            t_rt = rt.gather(1, vt)
+            reached = cand & (t_rt >= 0) & (t_rt <= _PLAN_TURNS)
+            d = self.pair_dist[utile[bidx, u_b].clamp(min=0)].to(torch.long).gather(1, vt)
+            near = torch.where(cand & ~reached, d * BIG + pslot, torch.full_like(pslot, 1 << 62)).argmin(dim=1)
+            pick = torch.where(reached[bidx, first], first, near)
+            picks.append((ok, u_b, pick, vt[bidx, pick]))
+        for ok, u_b, pick, plot in picks:
+            go = ok & getattr(self, f"{pre}_unit_alive")[bidx, u_b]
+            if not bool(go.count_nonzero()):
+                continue
+            self._tac_move_to(go, u_b, plot, pre, seat, False)
+            alive = getattr(self, f"{pre}_unit_alive")
+            utile = getattr(self, f"{pre}_unit_tile")
+            gp = pick + lo
+            gu = u_b + lo
+            arrived = (go & (utile[bidx, u_b] == plot) & alive[bidx, pick] & (utile[bidx, pick] == plot)
+                       & ~self.unit_escorted[bidx, gp] & ~self.unit_emb[bidx, gu])
+            if bool(arrived.count_nonzero()):
+                r = arrived.nonzero(as_tuple=True)[0]
+                self.unit_escorted[r, gp[r]] = True
+            done[bidx[go], u_b[go]] = True
+
     def _minor_pass(self, s: int, act: torch.Tensor) -> None:
         """`_minor_tactics`' moves"""
         dev = self.device
@@ -3324,6 +3403,8 @@ class SimTactics:
         home = self.citystate_center[:, s].clamp(min=0)
         danger = op["danger"]
         ai = torch.where(units, _AI_COMBAT, -1)
+        # SUPPORT FORMATION
+        self._tac_support_formation(live, done, op, pre, seat)
         # ATTACK HIGH PRIORITY, MOVE TO SAFETY, ATTACK MEDIUM and LOW PRIORITY
         # (the attacks where a foe stands near)
         if tg is not None:

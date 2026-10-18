@@ -5904,8 +5904,34 @@ gpu/core/sim_tactics.py.
   unported move left or entered a plot before the draw (Attack Units, an
   operation), the embark quirk above and the record's ground between its
   snapshots. 1,925 unit-turns log no tactical row: the minors' operations.
+- SUPPORT FORMATION (0x77ae80; `supportFormation` / `_tac_support_formation`):
+  per unit of the pass's list (+0x240), alive. GetFormationClass (0x8bcd0 ->
+  0xadd5e0, over the class's hash, ~CRC32 of its name): LAND_COMBAT 0,
+  SUPPORT 1, CIVILIAN 2, NAVAL 3, AIR 4. One of class 1 (SUPPORT), in
+  no formation (+0x1fb8 +0x738 1), with a planning (+0x1fc0), takes of its
+  player's units (+0xd8) one alive on the map, in no job or the pass's
+  (+0x7d0 -1 or +0x188), of its domain (+0x650), with Combat (0x56dc90),
+  whose formation holds none of its class (0x266950): of those its
+  planning reaches within two turns (0x791300) the strongest, else the
+  nearest. One of the land domain (+0x650 2) with a planning takes a unit
+  alive on the map, in no job (+0x7d0 -1), in no formation, whose AI row's
+  pseudo-yield is PSEUDOYIELD_UNIT_SETTLER: the first reached, else the
+  nearest unreached (a reached one replaces only a weaker one, an unreached
+  one only a farther one while the pick's Combat is 0). Each pick is listed
+  (+0x270: the unit, the other, the other's plot) and logged "Support
+  Formation, <unit> (<id>), x y" (the other's plot); then the moves
+  (0x773bd0, also called at 0x779d00): per entry the unit woken (0x53e20),
+  sent to the plot (the move order 0x962030), on arrival the formation
+  joined (the unit operation 0x94bb50 with the other's id) and the other's
+  turn done (0x570b40); the unit's turn done and it leaves the list
+  (0x77d180). The minors: runs/h1_duelw1105 city-state 3's five Warriors to
+  its captured Settler at 5 15 (t34) and 3 15 (t64), none while the Settler
+  stands in a formation; 1128 t251 city-state 3's Spec Ops to the Settler it
+  holds from t251 (the Settler's turn done: no row until t252). A minor's
+  pass walks its military units alone, so the support half finds none (1128
+  t251: its Supply Convoy, alone beside the Spec Ops, ends its turn).
 - Not ported (AUDIT C-96): Attack High/Medium/Low (C-95's prediction), Move to
-  Safety (the influence map), Support Formation 0x77ae80, Promotion
+  Safety (the influence map), Promotion
   0x77ac30, Attack Civilians' strike, the minors' operations (Naval
   Superiority, City Defense, Attack Barb Camp: AI_Operation.csv; their units
   log no tactical row), the embark waiver's quirk above, the planning's
