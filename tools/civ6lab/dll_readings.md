@@ -1821,6 +1821,11 @@ recruited at t8, the t9 W not at t9): LAB — the recruit's list (0x60a8c0,
 unread) taken by the player's first job (0x5c2650, before the tribes' turn in
 0x6096c0) would not hold a unit raised in the turn. The raid's end: "C-95: the
 barbarians' raid" (its tree's Notify Owner lists the city for the assault).
+The recruit's request (0x7c7580 -> 0x60a8c0, the unit evaluator +0x12d0)
+walks the player's units (+0x12e8 -> +0xd8) unassigned (+0x7d0 -1), alive,
+and the operation's units it took are then listed (0x6092c0) and join in
+that order (0x737e80): the pool's slot order (runs/h1_duelw1127 t35: Warrior
+2162693, slot 5, taken before 1835024, slot 16, the older).
 
 - The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at
   signals +0x10c8, which the unit sight update 0x58aa90 raises per plot
@@ -5354,7 +5359,11 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
 - IN DIFFICULTY RANGE (0x7f1d70): the opponent's handicap (Apply to
   opponent) below Low or above High: the child skipped, SUCCESS (FAILURE
   with Fail if Outside). The duels' Prince and Warlord: Operation Attack City
-  never runs in a raid.
+  never runs in a raid. The engines read the node's bounds (Raid City's
+  Low Difficulty DIFFICULTY_IMMORTAL, no High) against the target owner's
+  handicap: TS the seat's (`Seat.handicap`, the AI's Prince where none),
+  the GPU the rules' one handicap (no seat carries its own outside the
+  replay's lab seat).
 - OPERATION DEFEND UNITS. Update (0x80ee70): SUCCESS; marks the node where a
   team lists endangered units (+0xb0), a member is hurt past AutoProtect
   Percentage (default 33), or one fortified (+0x650 == 2) stands in danger.
@@ -5566,8 +5575,12 @@ the event in `seizeCivilian` (cpu/core/combat.ts, `GameState.barbCaptures`);
   0x737e80, the unit leaving the team it held: runs/h1_duelw1128 t25-26, the
   raid's Slinger to the capture, the raid's team two Warriors).
 - THE BACKUP: the military AI's turn names a running operation's candidate
-  its backup (0x73e610): of the camps, at the team's strength from the
-  target, the enemy's 6 and the barbarians' units within 3 (0x746920);
+  its backup (0x73e610): of the camps, from the target, at the strength
+  the last refresh left (0x727510 sets the backups at 0x72763d, before the
+  strengths 0x73eb60 / 0x73f7d0 at 0x727c74: none on the turn after the
+  start), against the walk's 6 alone (0x746920); runs/h1_duelw1127 t23: at
+  strength 0 both odds fall below 0 and the farther camp 14:13 reads the
+  higher (the 0.97 power shrinks a negative base), the game's backup;
   the tree's Change Target finds the capture's plot no camp (INVALID) and
   switches to it (1128 t26: "INVALID Changing to backup", the target 30:6).
 - THE TREE ("Escort Worker To Camp"): Sequence 0 over Make Formation 1
@@ -6824,8 +6837,10 @@ AI_Operation.csv and AI_Operation_Eval.csv (the verbose recordings).
   holds a sea plot not a lake (callback @d6e100: 0x834d0, 0x82e80), value
   100, enemy strength the largest best combat strength of the game's
   majors; BARBARIAN_CAMP — each camp of the knowledge base (+0x638), value
-  50 x the camps known, enemy strength 6 (@d26898) + the barbarians' army
-  within 3; FRIENDLY_CITY — the player's own cities (TargetParameter > 0
+  50 x the camps known, enemy strength 6 (@d26898), + the barbarians' army
+  within 3 only for an evaluating player not the barbarians with no enemy
+  (0x7476f9..0x747745: the camps are walked where the player is the
+  barbarians, the enemy none or the barbarians); FRIENDLY_CITY — the player's own cities (TargetParameter > 0
   needs the city AI's +0x1b8 above -1), value 0, enemy strength 0x5eb2c0 x
   1.5 per 0x5eb600 > 1 and +0x58 > 1 (unread terms); COMBAT_DISTRICT /
   PASSIVE — the enemy's known cities, valued by the city value 0x79fef0

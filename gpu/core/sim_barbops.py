@@ -52,7 +52,7 @@ class _Trees:
     """the data of the barbarians' trees the ticks read, each tree's shape
     checked against the walk the tick is written for"""
 
-    def __init__(self, trees: dict):
+    def __init__(self, trees: dict, bb: dict):
         raid = trees["Raid City"]
         ass = trees["Barbarian City Attack"]
         sc = trees["Barbarian Found City"]
@@ -98,6 +98,13 @@ class _Trees:
         self.raid_moves = [move(raid[11]), move(raid[21]), move(raid[24])]
         self.cap_moves = [move(cap[6]), move(cap[8])]
         self.raid_score = _num(_node_data(raid[13], "Score"))
+        # IN DIFFICULTY RANGE 18 over Operation Attack City 19 (0x7f1d70):
+        # the bounds, the opponent's handicap asked, a skip SUCCEEDING
+        names = list(bb["difficulties"])
+        lo, hi = _node_data(raid[18], "Low Difficulty"), _node_data(raid[18], "High Difficulty")
+        self.raid_city_lo = names.index(lo) if lo else -1
+        self.raid_city_hi = names.index(hi) if hi else -1
+        assert _flag(_node_data(raid[18], "Apply to opponent")) and not _flag(_node_data(raid[18], "Fail if Outside")),             "Raid City's In Difficulty Range asks the opponent and succeeds outside"
         assert _flag(_node_data(raid[14], "Limit Is Min")) and _flag(_node_data(raid[14], "Fail at Limit")) is False
         self.raid_turns = _num(_node_data(raid[14], "Turns to Run"))
         self.ass_recruit = _num(_node_data(ass[7], "Turns to Run"))
@@ -116,7 +123,7 @@ class SimBarbOps:
     def _bop_trees(self) -> _Trees:
         t = getattr(self, "_bop_trees_cache", None)
         if t is None:
-            t = self._bop_trees_cache = _Trees(self._bb["trees"])
+            t = self._bop_trees_cache = _Trees(self._bb["trees"], self._bb)
         return t
 
     # -- the operation and its members ---------------------------------------
@@ -279,10 +286,11 @@ class SimBarbOps:
         (0x73fba0: a civilian and a UNITAI_COMBAT member — the
         InitialStrengthAdvantage 0 asks no strength — the members' strength),
         the enemy's about the target (`_ops_enemy_str`), and the running
-        operation's candidate as its backup (0x73e610, `evaluate`: of the
-        camps, in plot order, the one of the best odds from the target at the
-        team's strength, the enemy's 6 and the barbarians' own units within 3
-        of it; a camp on the target, or off its area, none)"""
+        operation's candidate as its backup (0x73e610, `evaluate`, before
+        the strengths' refresh: of the camps, in plot order, the one of the
+        best odds from the target at the strength the last refresh left —
+        none on the turn after the start — against the walk's 6; a camp on
+        the target, or off its area, none)"""
         self._bcap_bury()
         B, dev = self.B, self.device
         bidx = self._bidx
@@ -290,16 +298,12 @@ class SimBarbOps:
         civ_ai = self._bop_civ_ai.take(ut)
         cp = self.camp_tile
         n_camps = (cp >= 0).sum(dim=1)
-        # each camp's enemy strength: 6 and the barbarians' units within 3
-        full = int(self.rules.combat["unitHp"])
-        own = self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT) & (self.barb_unit_tile >= 0)
-        dmg = (full - self.barb_unit_hp).clamp(min=0)
-        term = self._mops_army_term(self._type_combat.take(ut), self._type_ranged_strength.take(ut), dmg)
         best = 1  # the barbarians' best trained strength none: max(1, 0)
         for c in range(self.bcap_id.shape[1]):
             on = self.bcap_id[:, c] >= 0
             if not bool(on.any()):
                 continue
+            ours = self.bcap_str[:, c].clone()
             cs, es = self.bcap_civ[:, c], self.bcap_esc[:, c]
             civ_in = on & (cs >= 0) & civ_ai[bidx, cs.clamp(min=0)]
             esc_in = on & (es >= 0) & combat_ai[bidx, es.clamp(min=0)]
@@ -313,7 +317,6 @@ class SimBarbOps:
             # the backup: the camps in plot order, the last of the best
             rally = tgt
             rc = rally.clamp(min=0)
-            ours = self.bcap_str[:, c]
             value = n_camps * 50 * 256
             order = torch.where(cp >= 0, cp, torch.full_like(cp, 1 << 30)).argsort(dim=1)
             got_t = torch.full_like(tgt, -1)
@@ -328,8 +331,7 @@ class SimBarbOps:
                 d = self.pair_dist[rc, cc].to(torch.long)
                 same_area = self.tile_area[bidx, rc] == self.tile_area[bidx, cc]
                 ok &= (d > 0) & same_area
-                near = own & (self.pair_dist[self.barb_unit_tile.clamp(min=0), cc.unsqueeze(1)].to(torch.long) <= 3)
-                enemy = 6 + torch.where(near, term, torch.zeros_like(term)).sum(dim=1)
+                enemy = torch.full_like(ours, 6)
                 odds = self._mops_odds(ours, enemy, d, torch.full_like(ours, best))
                 prod = torch.div(self._mops_fixed(odds) * value, 256, rounding_mode="trunc")
                 held = torch.div(got_v * self._mops_fixed(got_o), 256, rounding_mode="trunc")
@@ -580,7 +582,9 @@ class SimBarbOps:
         team = self._bop_team(k)
         pct20, rng20 = tr.raid_defend
         mk20 = self._bop_defend_update(cont, team, pct20, ctx)
-        inside = bool(self._bb["attackCityHandicap"])
+        # the target owner's handicap — every seat's the one the rules give
+        h = int(self._bb["handicap"])
+        inside = (tr.raid_city_lo < 0 or h >= tr.raid_city_lo) and (tr.raid_city_hi < 0 or h <= tr.raid_city_hi)
         ac = torch.where(gone, _S, _R)
         sl, rg, sp = tr.raid_moves[1]
         st21, ar21 = self._bop_move_update(cont, k, 1, target, sl == 1, rg, sp, ctx)
@@ -914,7 +918,8 @@ class SimBarbOps:
         """BARBARIAN RECRUIT (0x7c7580) for tribe `k`'s operation in the games
         `act`: the force (the BarbarianAttackForces row of the AI's handicap,
         a raid's or an assault's) from the tribe's units of each class not
-        raised this turn, in raise order; whole, it joins the team in force
+        raised this turn, in pool slot order (the unit evaluator's walk,
+        0x60a8c0); whole, it joins the team in force
         order (`barb_unit_join`); else the rest is asked for, melee first.
         [B] the force joined."""
         if not bool(act.count_nonzero()):

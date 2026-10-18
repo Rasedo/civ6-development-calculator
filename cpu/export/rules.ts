@@ -2091,15 +2091,18 @@ export function buildRules() {
         // THE BARBARIANS' TREES (`barbarianOps.ts`): the raid's, the city
         // assault's and the scout's, their nodes as the interpreter reads them;
         // per unit (in `units` order) whether it carries UNITAI_COMBAT (the
-        // raid team's requirement); whether the AI's handicap lies in the
-        // raid's In Difficulty Range (its Operation Attack City runs)
+        // raid team's requirement)
         trees: Object.fromEntries([AI_OP_DEFS[BARB_RAID_DEF].tree!, AI_OP_DEFS[BARB_ASSAULT_DEF].tree!, BARB_SCOUT_TREE,
           AI_OP_DEFS[BARB_CAPTURE_DEF].tree!].map((t) => [t, AI_TREES[t]])),
         unitCombatAi: Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes('UNITAI_COMBAT')),
         // the AI types the capture's formation pairs (UnitAiInfos)
         unitLandCombatAi: Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes('UNITTYPE_LAND_COMBAT')),
         unitCivilianAi: Object.keys(UNITS).map((id) => (AI_UNIT_AI[gameTypeOf('unit', id, 'UNIT_')] ?? []).includes('UNITTYPE_CIVILIAN')),
-        attackCityHandicap: DEFAULT_HANDICAP >= DIFFICULTIES.indexOf('IMMORTAL'),
+        // the handicap every seat plays at (the engines' seats carry none of
+        // their own) and the Difficulties in index order, for the raid's In
+        // Difficulty Range
+        handicap: DEFAULT_HANDICAP,
+        difficulties: DIFFICULTIES.map((d) => `DIFFICULTY_${d}`),
       },
       // the civic a camp's clear inspires (BOOST_TRIGGER_CLEAR_CAMP)
       // COMBAT: the single-precision factor e^(x/256) per exponent x in

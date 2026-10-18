@@ -86,14 +86,17 @@ function hooksOf(state: GameState): BarbarianHooks {
     // the force (0x7c7580: the BarbarianAttackForces row by the target
     // owner's handicap, each class the barbarians cannot raise dropped,
     // 0x144610) from the tribe's units of each class, those raised this turn
-    // not yet among them; whole, it joins the operation's team; else the
-    // rest is asked for, melee first
+    // not yet among them, in the unit evaluator's walk (0x60a8c0: the
+    // player's units +0x12e8 -> +0xd8, the pool's slot order; runs/h1_duelw1127
+    // t35 the Warrior of slot 5 before the older one of slot 16); whole, it
+    // joins the operation's team; else the rest is asked for, melee first
     recruit(k, op, raiding) {
       const tr = tribeAt(state, k);
       if (!tr || !tr.op) return false;
       const force = barbForce(tr.kind, raiding, handicapOf(state, tr.op.target.seat));
       const fresh = new Set(tr.fresh ?? []);
-      const free = tr.units.filter((id) => unitOf(state, id) && !fresh.has(id));
+      const free = tr.units.filter((id) => unitOf(state, id) && !fresh.has(id))
+        .sort((a, b) => (unitOf(state, a)!.slot ?? 0) - (unitOf(state, b)!.slot ?? 0));
       const taken: number[] = [];
       const missing: string[] = [];
       for (const [tag, n] of force?.units ?? []) {
@@ -248,13 +251,15 @@ export function barbarianOpsTurn(state: GameState): void {
   const ai = state.barbSeat.ops;
   if (!ai || !opsOf(ai).length) return;
   const env = barbEnv(state, null);
-  operationsRefresh(ai, env);
-  // a running operation's candidate names its backup (0x7271d0 ->
-  // 0x73e610): its target from its own, at its strength
+  // a running operation's candidate names its backup (0x727510 -> 0x73e610,
+  // before the operations' strengths are refreshed at 0x727c74): its target
+  // from its own, at the strength its last refresh left (none on the turn
+  // after its start); a camp's enemy strength the walk's 6 alone, the
+  // barbarians' army about it counted only for another player (0x7476f9)
   const view = env.view();
   const inputs: EvalInputs = {
     settle: null, camps: campsKnown(state), taken: new Set(opsOf(ai).map((o) => o.target)), known: () => view.knownCities(BARB_SEAT),
-    army: (p) => (p === BARB_SEAT ? view.units(BARB_SEAT) : env.army(p)),
+    army: (p) => (p === BARB_SEAT ? [] : env.army(p)),
   };
   for (const op of opsOf(ai)) {
     const c: Candidate = { def: opDef(op), enemy: op.enemy, presetRally: op.target, presetStrength: op.strength, op,
@@ -262,6 +267,7 @@ export function barbarianOpsTurn(state: GameState): void {
     evaluate(view, BARB_SEAT, c, [], inputs);
     if (c.valid) op.backup = { target: c.target, rally: c.rally, enemy: c.enemy };
   }
+  operationsRefresh(ai, env);
 }
 
 /**
