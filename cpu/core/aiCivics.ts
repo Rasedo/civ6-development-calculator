@@ -34,6 +34,8 @@ import { AI_BUILDINGS } from '../data/aiBuildTables';
 import { AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_UNIT_COMBAT, PSEUDOYIELD_WONDER } from '../data/aiValue';
 import { CIVIC_AI_FAVORED, CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
 import { AI_CIVIC_MODIFIERS } from '../data/aiTables';
+import { AI_GOVERNMENTS } from '../../ai/major/tables';
+import { gameTypeOf } from '../data/aliases';
 import { FORMATION_CIVIC } from '../data/units';
 import { researchCost } from './economy';
 import { randRange } from './rand';
@@ -133,9 +135,11 @@ const UNLOCKS = new Map(Object.values(CIVICS).map((c) => {
  * `CIVIC_AI_POLICY_FLOOR` (the best new card's score over the weakest
  * slotted one's is not read: the floor); its modifiers (CivicModifiers)
  * analysed from landing to the horizon (0x7a4b20) on `view` (the
- * state's `majorView` where none is given). The
- * governments it unlocks (max(v - v(current), v / 2) of the government
- * values) are not read: none. At the horizon or past it -9999.
+ * state's `majorView` where none is given). The governments it unlocks
+ * add, bare, max(v - v(current), v / 2) of the government values its civics
+ * AI's last turn wrote (`ResearchState.civicGovValues`, +0xb38; none before
+ * the first, and v(current) 0 with no government), before the era count.
+ * At the horizon or past it -9999.
  */
 export function civicValue(state: GameState, seat: number, id: string, turns: number, pw: ReadonlyMap<string, number>,
   view?: AiValueView): number {
@@ -143,6 +147,16 @@ export function civicValue(state: GameState, seat: number, id: string, turns: nu
   const def = CIVICS[id];
   const w = (p: string): number => pw.get(p) ?? 0;
   let v = fromLanding(pseudoYield(PSEUDOYIELD_CIVIC, FX, w('PSEUDOYIELD_CIVIC')), turns);
+  const govs = researchOf(state, seat).civicGovValues;
+  if (govs) {
+    const vw = view ?? majorView(state);
+    const now = vw.government(seat);
+    const cur = now ? govs[now] ?? 0 : 0;
+    for (const g of GOVERNMENTS_OF.get(gameTypeOf('civic', id, 'CIVIC_')) ?? []) {
+      const gv = govs[g] ?? 0;
+      v += Math.max(gv - cur, gv >> 1);
+    }
+  }
   const era = ERAS.indexOf(def.era);
   const game = state.gameEra ?? 0;
   if (era < game) v = fmul(v, (game - era) * FX);
@@ -157,6 +171,10 @@ export function civicValue(state: GameState, seat: number, id: string, turns: nu
     + fxConst(CIVIC_AI_POLICY_FLOOR)
     + (mods.length ? modifiersValue({ view: view ?? majorView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0);
 }
+
+/** per install civic the governments it unlocks, in database order */
+const GOVERNMENTS_OF = new Map<string, string[]>();
+for (const g of AI_GOVERNMENTS) if (g.civic) GOVERNMENTS_OF.set(g.civic, [...GOVERNMENTS_OF.get(g.civic) ?? [], g.type]);
 
 /** the civic a land formation of `tier` (1 Corps, 2 Army) needs for the
  *  seat: its own (EFFECT_ADJUST_CORPS_ARMY_PREREQ), else the game's */

@@ -570,7 +570,10 @@
   final: 0x52fd20
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiPolicyValue.ts:governmentValue, cpu/core/aiPolicyValue.ts:governmentValue]
+  impl:
+    - cpu/core/aiPolicyValue.ts:governmentValue
+    - cpu/core/aiPolicyValue.ts:governmentValue
+    - cpu/core/aiPolicyValue.ts:governmentValues
   readings:
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"

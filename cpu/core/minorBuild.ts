@@ -70,6 +70,7 @@ import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { majorView, storeUnitStrength } from './majorView';
+import { governmentValues } from './aiPolicyValue';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
 import { minorTradeValue } from './aiTrade';
@@ -351,8 +352,9 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
 /**
  * THE AIS' TURNS (list B, after the city's production and growth): the
  * research AI analyses the tree on the Science the city now makes and makes
- * its turn's choice (0x760980); the civics AI analyses its tree and, with
- * nothing in hand, chooses (0x620110). runs/h1_duelw1124 t5 Granada: grown
+ * its turn's choice (0x760980); the civics AI analyses its tree on the
+ * government values its last turn wrote, keeps this turn's (`governmentValues`)
+ * for the next and, with nothing in hand, chooses (0x620110). runs/h1_duelw1124 t5 Granada: grown
  * to two citizens that turn, every row at 3.0 Science (Animal Husbandry 4
  * turns where 2.5 gives 5).
  */
@@ -364,7 +366,11 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   r.aiLeftSeen = r.aiLeft ?? 0;
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
   r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
+  // its government values on the policy scores its last analysis lists
+  // (0x620110), which the next turn's analysis reads
+  const govs = governmentValues(majorView(state), seat);
   r.civicAiEntries = civicAnalysis(state, seat, culture, {}, city()?.civic);
+  r.civicGovValues = govs;
   if (!r.civic) takeCivic(r, civicChoice(state, seat, r.civicAiEntries, null, civicDraw(state)));
 }
 

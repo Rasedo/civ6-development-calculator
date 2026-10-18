@@ -42,6 +42,9 @@
     - cpu/core/aiPolicyValue.ts:slotTypeBest
     - cpu/core/minorBuild.ts:minorResearchTurn
     - cpu/core/aiPolicyValue.ts:slotTypeBest
+    - cpu/core/aiPolicyValue.ts:governmentValues
+    - cpu/core/minorBuild.ts:govs
+    - cpu/core/types.ts:ResearchState
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"

@@ -4287,6 +4287,10 @@
       {
         "path": "GameState.barbCaptures",
         "why": "the turn's captures awaiting their operations, read and cleared at the barbarians' turn's end: never live at a compare point."
+      },
+      {
+        "path": "ResearchState.civicGovValues",
+        "why": "TS only: the civics AI's government values (+0xb38) need the policy and government scoring, which the GPU does not port yet (AUDIT C-98 BUILD); its civics value carries no government term until then."
       }
     ],
     "gpu": [

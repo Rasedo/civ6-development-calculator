@@ -4,12 +4,13 @@
  * its value (0x7b26b0), the best card per slot type (0x620110) and a
  * government's value (0x7b0330), on any party's view (a city-state's one
  * city its capital, its civilization level barring great people and
- * Influence); the majors' policy choice (`ai/major/policies.ts`) reads them.
+ * Influence); the majors' policy choice (`ai/major/policies.ts`) and a
+ * minor's civics AI turn (`governmentValues`, read by `civicValue`) take them.
  */
 import { AI_GOVERNMENTS, AI_POLICIES, AI_SLOT_TYPES } from '../../ai/major/tables';
 import type { AiPolicy } from '../../ai/major/types';
 import type { MajorView } from '../../ai/major/view';
-import { AI_POLICY_HORIZON } from '../data/aiValue';
+import { AI_POLICY_HORIZON, AI_VALUE_HORIZON } from '../data/aiValue';
 import { AI_RATE, FX_MIN, fdiv, presentValue, pseudoYieldValue } from './aiValue';
 import { modifiersValue, type ValueTerms } from './aiModifiers';
 
@@ -129,4 +130,13 @@ export function governmentValue(view: MajorView, seat: number, gov: string, best
     v += presentValue(f, t.rate, t.horizon) - presentValue(f, t.rate, t.start);
   }
   return v + modifiersValue(t, g.modifiers);
+}
+
+/** THE CIVICS AI'S GOVERNMENT VALUES (0x620110, after its propagation:
+ *  +0xb38 [gov] = 0x7b0330(gov, the rate, start 0, valueHorizons[1])): every
+ *  government's value on the best card per slot type of the seat's policy
+ *  scores, by GOVERNMENT_ type */
+export function governmentValues(view: MajorView, seat: number): Record<string, number> {
+  const best = slotTypeBest(policyScores(view, seat));
+  return Object.fromEntries(AI_GOVERNMENTS.map((g) => [g.type, governmentValue(view, seat, g.type, best, AI_VALUE_HORIZON)]));
 }

@@ -4863,7 +4863,12 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   AI's turn 0x620110 after its propagation, 0x7b0330(gov, the rate
   0x6fec30, start 0, valueHorizons[1] = 50), the government value of "C-97:
   the government and policy choice" (0x621eb0 is the policy job, not this
-  term); then a civic of an era before [player+0x1358]+0x158
+  term) — the sum of the own term and these, not the own term alone, is
+  what the era count multiplies (0x7a9f11: r13 holds both). Ported TS-only
+  (`civicValue`, `governmentValues`): runs/h1_duelw1121's city-states'
+  Political Philosophy -78..-81 -> -29 under the log at t11-t13, -64..-67 ->
+  -13..-18 from t14, the rest the policy analyzers still at 0 (Discipline
+  34, Ilkum 1 ...); the first civic pick off the log t21 -> t46; then a civic of an era before [player+0x1358]+0x158
   (the game's era, as the research value reads it) is taken (that - era)
   times — no +1 here (runs/h1_duelv1127: every city-state's Ancient civic at
   1 turn 120.6 in the Classical era) — and a later one adds
