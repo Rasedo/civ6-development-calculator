@@ -187,7 +187,7 @@ class SimBarbOps:
         combat_ai = self._bop_combat_ai.take(ut)
         full = int(self.rules.combat["unitHp"])
         dmg = (full - self.barb_unit_hp).clamp(min=0)
-        st = torch.maximum(self._type_combat.take(ut), self._type_ranged_strength.take(ut)) - torch.div(dmg, 10, rounding_mode="floor")
+        st = torch.maximum(self._ai_combat("barb"), self._type_ranged_strength.take(ut)) - torch.div(dmg, 10, rounding_mode="floor")
         for k in range(int(self.n_tribes.max()) if self.B else 0):
             on = (self.tribe_op[:, k] > 0) & ~self.tribe_op_done[:, k]
             if not bool(on.count_nonzero()):
@@ -708,7 +708,8 @@ class SimBarbOps:
         jc = j.clamp(min=0)
         tg, danger = ctx["tg"], ctx["danger"]
         ut = self.barb_unit_type[b, jc].clamp(min=0, max=self.NU - 1)
-        mcb = self._type_combat.take(ut)
+        cb_all = self._ai_combat()
+        mcb = cb_all[:, self.POOL_LO["barb"]:self.POOL_HI["barb"]][b, jc]
         fights = (mcb > 0) | (self._type_ranged_strength.take(ut) > 0) | (self._type_bombard.take(ut) > 0)
         plot = self.barb_unit_tile[b, jc].clamp(min=0)
         near = 2 * self._type_moves.take(ut)
@@ -723,7 +724,7 @@ class SimBarbOps:
         uc = uu.clamp(min=0)
         du = d.repeat(1, uk.shape[1] // self.T)  # [B, U]
         et = self.unit_type.gather(1, uc).clamp(min=0, max=self.NU - 1)
-        ecb, erg, ebm = self._type_combat.take(et), self._type_ranged_strength.take(et), self._type_bombard.take(et)
+        ecb, erg, ebm = cb_all.gather(1, uc), self._type_ranged_strength.take(et), self._type_bombard.take(et)
         full_all = torch.cat((self._full_mp("major") - self.major_unit_aura_mp,
                               self._full_mp("barb") - self.barb_unit_aura_mp), dim=1)
         emm = torch.div(full_all.gather(1, uc), self._mp_scale, rounding_mode="floor")

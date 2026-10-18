@@ -269,7 +269,7 @@ class SimMinorOps:
         mp = self.major_unit_mp
         return {
             "own": own, "key": key, "row": row, "tile": self.major_unit_tile,
-            "combat": self._type_combat.take(ut), "ranged": self._type_ranged_strength.take(ut),
+            "combat": self._ai_combat("major"), "ranged": self._type_ranged_strength.take(ut),
             "bombard": self._type_bombard.take(ut), "range": self._type_ranged_range.take(ut),
             "dmg": hp_max - self.major_unit_hp, "mp": mp, "mp_whole": torch.div(mp, self._mp_scale, rounding_mode="floor"),
             "base_moves": base,
@@ -1317,7 +1317,8 @@ class SimMinorOps:
         tg, op = view["tg"], view["op"]
         danger = op["danger"]
         ut = self.major_unit_type[b, jc].clamp(min=0, max=self.NU - 1)
-        mcb = self._type_combat.take(ut)
+        cb_all = self._ai_combat()
+        mcb = cb_all[:, self.POOL_LO["major"]:self.POOL_HI["major"]][b, jc]
         fights = (mcb > 0) | (self._type_ranged_strength.take(ut) > 0) | (self._type_bombard.take(ut) > 0)
         plot = self.major_unit_tile[b, jc].clamp(min=0)
         near = 2 * self._type_moves.take(ut)
@@ -1332,7 +1333,7 @@ class SimMinorOps:
         uc = uu.clamp(min=0)
         du = d.repeat(1, uk.shape[1] // self.T)  # [B, U]
         et = self.unit_type.gather(1, uc).clamp(min=0, max=self.NU - 1)
-        ecb, erg, ebm = self._type_combat.take(et), self._type_ranged_strength.take(et), self._type_bombard.take(et)
+        ecb, erg, ebm = cb_all.gather(1, uc), self._type_ranged_strength.take(et), self._type_bombard.take(et)
         full_all = torch.cat((self._full_mp("major") - self.major_unit_aura_mp,
                               self._full_mp("barb") - self.barb_unit_aura_mp), dim=1)
         emm = torch.div(full_all.gather(1, uc), self._mp_scale, rounding_mode="floor")
@@ -1967,6 +1968,7 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     b_r = torch.zeros(B, dtype=torch.long, device=dev)
     b_c = torch.zeros(B, dtype=torch.long, device=dev)
     pick = torch.full((B,), -1, dtype=torch.long, device=dev)
+    cb_all = sim._ai_combat("major")
     for j in range(mem.shape[1]):
         us = mem[:, j]
         uc = us.clamp(min=0)
@@ -1974,7 +1976,7 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         if not bool(ok.any()):
             continue
         ut = sim.major_unit_type[b, uc].clamp(min=0, max=sim.NU - 1)
-        cb, rg, bm = sim._type_combat.take(ut), sim._type_ranged_strength.take(ut), sim._type_bombard.take(ut)
+        cb, rg, bm = cb_all[b, uc], sim._type_ranged_strength.take(ut), sim._type_bombard.take(ut)
         on_city = ok & (sim.major_unit_tile[b, uc] == city)
         gar = torch.where(on_city, us, gar)
         g_c = torch.where(on_city, cb, g_c)

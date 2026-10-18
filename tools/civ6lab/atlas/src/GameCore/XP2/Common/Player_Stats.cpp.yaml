@@ -17,6 +17,7 @@
     - cpu/core/aiValue.ts:AiValueView
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "...gth the rank conditions read (PlayerStats m_iMilitaryStrength, data +0x210, computed at 0x4bb1e0, stored as each player's turn starts, before its production): per unit max(Combat, Ra..."
   review: imported

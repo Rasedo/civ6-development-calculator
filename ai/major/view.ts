@@ -62,8 +62,10 @@ export interface MajorUnitView {
   plot: number;
   /** Units.FoundCity */
   founder: boolean;
-  /** the unit's combat and ranged strengths (the install's), its damage
-   *  (0 to 100) and its Movement left (24.8 fixed point, as the reach's) */
+  /** the unit's combat strength as the AI reads it (0x56dc90 with 0: an
+   *  embarked land combat unit its owner's era's embarked strength), its
+   *  ranged strength (the install's), its damage (0 to 100) and its Movement
+   *  left (24.8 fixed point, as the reach's) */
   combat: number;
   ranged: number;
   /** the ranged attack's Range, 0 for none */

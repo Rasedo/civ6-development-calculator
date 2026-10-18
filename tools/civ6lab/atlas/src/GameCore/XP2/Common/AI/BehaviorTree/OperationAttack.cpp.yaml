@@ -63,6 +63,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "...0c180 (Attack Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval P..."
   review: reviewed

@@ -460,7 +460,8 @@ class SimMinorAi:
         civilian, not recon, a fighter) outside every running operation, of
         the land or — the city coastal — the sea, in pool order, joining
         while the list is below the quota, else replacing the list's weakest
-        (the first of the lowest Combat) where its Combat is higher; the
+        (the first of the lowest Combat, `_ai_combat`) where its Combat is
+        higher; the
         count it lacks, the quota less the list (CityBuildAI +0x2d8)"""
         B, dev = self.B, self.device
         T = self._cv_tables()
@@ -492,7 +493,7 @@ class SimMinorAi:
         order = torch.where(own, torch.where(pslot >= 0, pslot, torch.full_like(pslot, P)), torch.full_like(pslot, BIG))
         order = order.argsort(dim=1, stable=True)
         n_own = own.sum(dim=1)
-        comb = self._type_combat.take(ut)
+        comb = self._ai_combat("major")
         # each member's place in the list: the DEFENDERs in pool order, a
         # joiner after them all
         place = torch.where(flag, order.argsort(dim=1), torch.full_like(pslot, BIG))

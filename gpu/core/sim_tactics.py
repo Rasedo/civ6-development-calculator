@@ -2132,7 +2132,7 @@ class SimTactics:
             u_b = sl[:, r]
             strike(can_act(r) & bomb[bidx, u_b] & ~civ[:, r], r)
         rs = self._type_ranged_strength.take(ut_all)
-        cb = self._type_combat.take(ut_all)
+        cb = self._ai_combat(pre)
         rsafe = rowof.clamp(min=0)
         for r in range(U):
             u_b = sl[:, r]
@@ -2985,6 +2985,22 @@ class SimTactics:
 
     # ------------------------------------------------------- the danger map
 
+    def _ai_combat(self, pre: str | None = None) -> torch.Tensor:
+        """[B, P] long — `aiStrengths`' combat over pool `pre` (the merged
+        pool for None), 0x56dc90 with 0: the type's Combat, an embarked land
+        combat unit's its owner's era's embarked strength
+        (`_embarked_def_cs`)."""
+        p = "unit" if pre is None else f"{pre}_unit"
+        ut = getattr(self, f"{p}_type").clamp(min=0, max=self.NU - 1)
+        seat = getattr(self, f"{p}_seat")
+        out = self._type_combat.take(ut)
+        emb = getattr(self, f"{p}_alive") & getattr(self, f"{p}_emb") & self._type_dom_mil.take(ut)
+        if bool(emb.any()):
+            for sv in torch.unique(seat[emb]).tolist():
+                cs = self._embarked_def_cs(torch.full((self.B,), int(sv), dtype=torch.long, device=self.device))
+                out = torch.where(emb & (seat == sv), cs.unsqueeze(1).to(out.dtype), out)
+        return out
+
     def _danger_plane(self, seat: int, need: torch.Tensor) -> torch.Tensor:
         """[B, T] long — `dangerPlane`, `seat`'s danger map, on the plots of
         `need` [B, T] (those its pass reads): each unit of a player at war
@@ -3006,7 +3022,7 @@ class SimTactics:
         seen = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
         U = self.unit_tile.shape[1]
         ut = self.unit_type.clamp(min=0, max=self.NU - 1)
-        melee = self._type_combat.take(ut)
+        melee = self._ai_combat()
         bomb = self._type_bombard.take(ut)
         rng_s = torch.where(bomb > 0, torch.zeros_like(bomb), self._type_ranged_strength.take(ut))
         tile = self.unit_tile
@@ -3018,13 +3034,6 @@ class SimTactics:
             for pl in (self.military_at, self.embarked_at):
                 hid = self._stealth_hidden(seat, pl)
                 ok &= ~((pl.gather(1, tc) == me) & hid.gather(1, tc))
-        # an embarked unit's combat strength its owner's era's (0x56dc90 with
-        # 0: IsEmbarked, a land combat unit), its ranged and bombard its own
-        emb = ok & self.unit_emb & ~self._type_support.take(ut)
-        if bool(emb.any()):
-            for sv in torch.unique(self.unit_seat[emb]).tolist():
-                cs = self._embarked_def_cs(torch.full((B,), int(sv), dtype=torch.long, device=dev))
-                melee = torch.where(emb & (self.unit_seat == sv), cs.unsqueeze(1).to(melee.dtype), melee)
         vs = bomb - self._bombard_vs_unit
         s = torch.where(bomb > 0, torch.maximum(melee, vs), torch.maximum(melee, rng_s))
         promos = self.unit_promos
@@ -3197,7 +3206,7 @@ class SimTactics:
         flees where the danger tops its strength by 20 (the larger of combat
         and ranged; tactical) or 15 (`unitDanger`; homeland)."""
         ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
-        melee = self._type_combat.take(ut)
+        melee = self._ai_combat(pre)
         bomb = self._type_bombard.take(ut)
         rng_s = torch.where(bomb > 0, torch.zeros_like(bomb), self._type_ranged_strength.take(ut))
         d = danger.gather(1, getattr(self, f"{pre}_unit_tile").clamp(min=0))

@@ -24,6 +24,7 @@
     - "H-1: the city-states' quests — READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "- A player's era (0x467eb0, the techs object +0xf8) is the highest era of its techs and civics as of its turn's en..."
     - "...x6c4); when TOURISM_ADVANCED_ERA_WONDER (GP +0x6c0) is set, plus the owner's era index (0x467eb0) less the wonder's — its PrereqTech's era (+0x210 → +0xc0), else its PrereqCivic's (+..."

@@ -5226,6 +5226,25 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   the centre counts its 20 in the copy and nothing in the game (the unit
   walk skips +0x770; fortified as a skip is unread). End plots: "HL: Move To Safety" 183 of 371 (60 with
   the stand-in), "Move to safety" 29 of 60 (0).
+- THE AI'S COMBAT STRENGTH (0x56dc90(unit, flag); `aiStrengths` /
+  `_ai_combat`): the row's Combat (+0xa0 +0x48; a row with +0x1ba bit 0x20
+  raised to its player's best trained melee, PlayerStats +0xf0); with the
+  flag 0, an embarked unit (0x8be30) not fighting embarked (+0x18c3 clear),
+  of formation class neither 1 (SUPPORT) nor 2 (CIVILIAN) — GetFormationClass
+  0x8bcd0: LAND_COMBAT 0, SUPPORT 1, CIVILIAN 2, NAVAL 3, AIR 4 — and +0x21e0
+  -1 takes its owner's era's (0x467eb0) embarked strength (the Eras row
+  +0x20) in its place; then +0x18a8 where positive, the formation's
+  strength (+0xc90 1 corps, 2 army), 0x56df30. GetRangedCombat 0x56e3e0 and
+  GetBombardCombat 0x56daa0 have no embarked test. Of the AI's callers only
+  the safe plot's no-strength test (0x716e8b) passes 1 (the row's own); every
+  other passes 0: the danger map (0x7164b9..0x716502), the homeland's safety
+  (0x70f4a5..0x70f59a), Move to Safety (0x77a5fb..), the assignment carried
+  out's melee-over-ranged test (0x772437), Attack Strikers (0x7753fa), the
+  planning's fights flag (0x793453), the team updates (0x738f20 — the
+  endangered — and 0x73fba0, the members' strength), Operation Defend Units
+  (0x80dcc5), Garrison City (0x810e3e..0x810f13), Operation Move (0x817847),
+  the standing army and its weakest (0x5ca7e0, 0x5c4910) and
+  m_iMilitaryStrength (0x4bb1e0).
 
 ## C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)
 

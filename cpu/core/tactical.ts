@@ -140,7 +140,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     held.add(u.tileIndex);
     if (!unitsHostile(state, unit, u)) continue;
     foes.add(u.tileIndex);
-    const st = aiStrengths(u);
+    const st = aiStrengths(state, u);
     if (planning && (st.melee > 0 || st.ranged > 0 || st.bombard > 0)) fighters.add(u.tileIndex);
   }
   const enters = new Map<number, boolean>();
@@ -841,12 +841,16 @@ export function unitDanger(melee: number, ranged: number, bombard: number): numb
   return melee > ranged ? melee : ranged;
 }
 
-/** a unit's strengths as the AI reads them (0x56dc90, 0x56e3e0, 0x56daa0):
- *  combat, ranged (none for a unit with a bombard) and bombard */
-export function aiStrengths(u: Unit): { melee: number; ranged: number; bombard: number } {
+/** a unit's strengths as the AI reads them (0x56dc90(unit, 0), 0x56e3e0,
+ *  0x56daa0): combat — an embarked land combat unit's its owner's era's
+ *  embarked strength (IsEmbarked, formation class neither SUPPORT nor
+ *  CIVILIAN) — ranged (none for a unit with a bombard) and bombard, its own
+ *  embarked or not */
+export function aiStrengths(state: GameState, u: Unit): { melee: number; ranged: number; bombard: number } {
   const d = UNITS[u.type];
   const bombard = d?.bombard ?? 0;
-  return { melee: d?.combat ?? 0, ranged: bombard > 0 ? 0 : d?.ranged?.strength ?? 0, bombard };
+  const melee = u.embarked && unitDomain(u.type) === 'military' ? embarkedDefenseCS(state, u.seat) : d?.combat ?? 0;
+  return { melee, ranged: bombard > 0 ? 0 : d?.ranged?.strength ?? 0, bombard };
 }
 
 /**
@@ -877,13 +881,9 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
   for (const u of state.units) {
     if (!onMap(u) && unitDomain(u.type) !== 'air') continue;
     if (unitReligious(u.type) || !unitsHostile(state, { seat }, u) || !seen[u.tileIndex] || !unitVisibleTo(state, u, seat)) continue;
-    const st = aiStrengths(u);
+    const st = aiStrengths(state, u);
     if (st.melee <= 0 && st.ranged <= 0 && st.bombard <= 0) continue;
-    // an embarked unit's combat strength its owner's era's (0x56dc90 with 0:
-    // IsEmbarked, a land combat unit), its ranged and bombard its own
-    // (runs/h1_duelw1117 t107: a city-state's embarked Trebuchet reads 30)
-    const melee = u.embarked && unitDomain(u.type) === 'military' ? embarkedDefenseCS(state, u.seat) : st.melee;
-    const s = unitDanger(melee, st.ranged, st.bombard);
+    const s = unitDanger(st.melee, st.ranged, st.bombard);
     const R = rangeOf(u);
     if (unitDomain(u.type) === 'air') {
       for (const p of within(u.tileIndex, R)) out[p] += s;
@@ -1660,7 +1660,7 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
   for (const a of out) {
     const u = a.unit;
     if (a.civilian || !canAct(state, pass, u) || rangedStrength(u) <= 0) continue;
-    const melee = (UNITS[u.type]?.combat ?? 0) > rangedStrength(u)
+    const melee = aiStrengths(state, u).melee > rangedStrength(u)
       && !!pass.reach.get(u.id)?.some((e) => e.tile === a.attack && e.turns <= 1);
     if (melee) continue;
     strikeAt(u, a.attack);
@@ -1827,8 +1827,8 @@ function heal(state: GameState, pass: Pass): void {
  * the larger of combat and ranged, by 20 (tactical); `unitDanger`, by 15
  * (homeland).
  */
-function flees(pass: Pass, u: Unit, d: number, hl: boolean): boolean {
-  const st = aiStrengths(u);
+function flees(state: GameState, pass: Pass, u: Unit, d: number, hl: boolean): boolean {
+  const st = aiStrengths(state, u);
   const ranged = st.ranged;
   if (st.melee <= 0 && ranged <= 0 && st.bombard <= 0) return true;
   if (u.embarked) return true;
@@ -1873,7 +1873,8 @@ function garrisonDistrict(state: GameState, t: Tile): boolean {
 function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<number>): number {
   const plan = pass.plan.get(u.id);
   if (!plan) return -1;
-  const noCombat = aiStrengths(u).melee <= 0;
+  // its own combat strength, embarked or not (0x56dc90 with 1)
+  const noCombat = (UNITS[u.type]?.combat ?? 0) <= 0;
   let best = -1;
   let bFort = false;
   let bSafe = false;
@@ -1923,7 +1924,7 @@ function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<numb
  */
 function moveToSafety(state: GameState, pass: Pass): void {
   const list = pass.units.filter((u) => live(state, pass, u) && pass.danger[u.tileIndex] > 0
-    && flees(pass, u, pass.danger[u.tileIndex], false));
+    && flees(state, pass, u, pass.danger[u.tileIndex], false));
   const taken = new Set<number>();
   for (const u of list) {
     if (!live(state, pass, u)) continue;
@@ -1947,7 +1948,7 @@ function homelandSafety(state: GameState, pass: Pass): void {
   for (const u of pass.units) {
     if (!live(state, pass, u)) continue;
     const d = pass.danger[u.tileIndex];
-    if (d <= 0 || !flees(pass, u, d, true)) continue;
+    if (d <= 0 || !flees(state, pass, u, d, true)) continue;
     const p = safePlot(state, pass, u, taken);
     if (p >= 0) {
       taken.add(p);

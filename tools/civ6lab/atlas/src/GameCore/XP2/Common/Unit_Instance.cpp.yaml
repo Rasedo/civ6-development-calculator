@@ -96,6 +96,7 @@
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...order, makes each LOW or MEDIUM unit that   threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HI..."
     - ".claude/scratchpad/st1/reading.md: ..., each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the   bombard less COMB..."
@@ -125,6 +126,11 @@
     - cpu/core/tactical.ts:aiStrengths
     - cpu/core/tactical.ts:within
     - gpu/core/sim_tactics.py:_danger_plane
+    - cpu/core/majorView.ts:militaryStrength
+    - cpu/core/minorCityAi.ts:minorStandingArmy
+    - cpu/core/tactical.ts:safePlot
+    - gpu/core/sim_tactics.py:_ai_combat
+    - ai/major/view.ts:MajorUnitView
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-94: the wounded law and the garrison — READ"
@@ -140,6 +146,15 @@
     - "...l(2 + S_plane / S_interceptor) x its XP percent)), S the Combat column plus corps/army (0x56dc90). Fighter 100 v Bomber 85: 3 before the percent; the measured 4 (Georgia's Fighter) is..."
     - "- The centre's garrison term (0x24a180): FP(Combat incl. formation, 0x56dc90) less the wounded loss, less the base, where positive (H-1 1108 Jiaodong 30.8359375 = 2..."
     - "...hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), raises it to 0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in it — where 0x4bffa0 pas..."
+  review: imported
+- addr: 0x56df30
+  final: 0x3a3830
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...place; then +0x18a8 where positive, the formation's strength (+0xc90 1 corps, 2 army), 0x56df30. GetRangedCombat 0x56e3e0 and GetBombardCombat 0x56daa0 have no embarked test. Of the A...
   review: imported
 - addr: 0x56e0d0
   final: 0x3a39a0
@@ -212,6 +227,7 @@
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(an ally's), in list order, makes each LOW or MEDIUM unit that   threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Move..."
     - ".claude/scratchpad/st1/reading.md: ...(0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the   bombard..."

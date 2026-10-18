@@ -70,7 +70,7 @@ import { floodHazardTurns } from './disasters';
 import { baseAdjacency, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
 import { builderHarvest, builderRemoveFeature, tileFreeForUnit } from './units';
-import { moveTo, reachPlots, turnsToPlot } from './tactical';
+import { aiStrengths, moveTo, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import { minorTradeList } from './aiTrade';
 import {
@@ -581,7 +581,8 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
  * of the land or — where the city is coastal — the sea, in that order, joins
  * as a DEFENDER while the list is below the quota, else takes the place of
  * the list's weakest (the first of the lowest Combat, 0x5c4910) where its
- * Combat is higher, the weakest turned COMBAT. The count it lacks, the quota
+ * Combat is higher (`aiStrengths`, 0x56dc90 with 0), the weakest turned
+ * COMBAT. The count it lacks, the quota
  * less the list (CityBuildAI +0x2d8, below 0 where the list outgrows a quota
  * that fell), which the military AI adds to its Combat Desire as
  * PSEUDOYIELD_STANDING_ARMY_VALUE each. The release of a DEFENDER with
@@ -597,7 +598,7 @@ export function minorStandingArmy(state: GameState, cs: CityState): number {
   const coastal = isCoastalLand(state.map, state.map.tiles[cs.centerIndex]);
   const own = state.units.filter((u) => u.seat === cs.seat).sort((a, b) => (a.slot ?? Infinity) - (b.slot ?? Infinity));
   const list = own.filter((u) => u.aiDefender);
-  const combat = (u: Unit) => UNITS[u.type]?.combat ?? 0;
+  const combat = (u: Unit) => aiStrengths(state, u).melee;
   const weakest = (): Unit | null => list.reduce<Unit | null>((w, u) => (w === null || combat(u) < combat(w) ? u : w), null);
   for (const u of own) {
     if (u.aiDefender || busy.has(u.id)) continue;

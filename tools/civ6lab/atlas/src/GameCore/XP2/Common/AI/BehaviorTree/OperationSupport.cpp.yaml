@@ -50,6 +50,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - ...e Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (...
     - "- Operation Move's destination (0x816cb0): radius = min(Range to goal, the unit's attack Range +0x19f8), 0 for a unit in a forma..."

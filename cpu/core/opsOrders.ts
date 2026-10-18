@@ -105,7 +105,7 @@ function endangered(state: GameState, pass: Pass, members: readonly Unit[]): Uni
   const out: Unit[] = [];
   for (const u of members) {
     const near = 2 * (UNITS[u.type]?.moves ?? 0);
-    const mine = aiStrengths(u);
+    const mine = aiStrengths(state, u);
     const fights = mine.melee > 0 || mine.ranged > 0 || mine.bombard > 0;
     const beside = state.units.some((x) => x !== u && x.seat === u.seat && plotDistance(state, x.tileIndex, u.tileIndex) === 1);
     let sum = 0;
@@ -114,7 +114,7 @@ function endangered(state: GameState, pass: Pass, members: readonly Unit[]): Uni
       if (d <= near) {
         const ev = e.unit && state.units.includes(e.unit) ? e.unit : null;
         if (ev) {
-          const theirs = aiStrengths(ev);
+          const theirs = aiStrengths(state, ev);
           if ((theirs.melee > 0 || theirs.ranged > 0 || theirs.bombard > 0) && !beside
             && (pass.danger[u.tileIndex] > 0 || e.type === 'HIGH')
             && (d <= maxMoves(state, ev) || d <= rangeOf(ev))) {
@@ -157,7 +157,7 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
       const us = unitsOf(members);
       // the endangered to their safe plots (0x716b90)
       for (const u of endangered(state, pass, us)) {
-        if (!off(u, target, range) || aiStrengths(u).bombard > 0 || u.movesLeft <= 0 || inCity(u)) continue;
+        if (!off(u, target, range) || aiStrengths(state, u).bombard > 0 || u.movesLeft <= 0 || inCity(u)) continue;
         const to = passSafePlot(state, pass, u);
         passFinish(pass, u, 'Operation', u.tileIndex);
         if (to >= 0) {
@@ -171,7 +171,7 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
         if (!state.units.includes(u) || u.movesLeft <= 0 || !off(u, target, range)) continue;
         const afloat = fortified(u) && isWater(state.map.tiles[u.tileIndex]) && pass.danger[u.tileIndex] > 0;
         if (!hurt(u, pct) && !afloat) continue;
-        if (aiStrengths(u).bombard > 0) continue;
+        if (aiStrengths(state, u).bombard > 0) continue;
         if ((u.fortifyTurns ?? 0) === 0 && groundOf(state, seat, u.tileIndex) !== 1) {
           released.push(u.id);
           continue;

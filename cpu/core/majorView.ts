@@ -16,7 +16,7 @@ import { governedCityIds, governorPromotionOpen, governorSum, governorsOf, gover
 import { GOVERNORS, GOVERNOR_INSTALL_ID, GOVERNOR_PROMOTIONS, GOVERNOR_TITLE_CIVICS, PROMO_INSTALL_ID, promotionBit } from '../data/governors';
 import { CITY_STATE_SUZERAIN_BONUS } from '../data/cityStates';
 import { BARB_SEAT, borderTurnsFrom, campTiles, cityStateOfSeat, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
-import { assignTo, dangerDistricts, districtHealth, pathTo, planUnit, reachPlots, tacticalTargets, type Pass, type Target } from './tactical';
+import { aiStrengths, assignTo, dangerDistricts, districtHealth, pathTo, planUnit, reachPlots, tacticalTargets, type Pass, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
@@ -956,15 +956,15 @@ function startPlots(state: GameState): { plot: number; seat: number }[] {
 }
 
 /** PlayerStats' m_iMilitaryStrength (0x4bb1e0, every domain): per unit the
- *  greater of its combat and ranged strengths x its hit points left over its
- *  most, 24.8 truncated, and the treasury's whole gold / 12 as a raw 24.8;
- *  the sum's whole part */
+ *  greater of its combat (`aiStrengths`, 0x56dc90 with 0) and ranged
+ *  strengths x its hit points left over its most, 24.8 truncated, and the
+ *  treasury's whole gold / 12 as a raw 24.8; the sum's whole part */
 function militaryStrength(state: GameState, seat: number): number {
   let sum = 0;
   for (const u of unitsOf(state, seat)) {
     const d = UNITS[u.type];
     if (!d) continue;
-    const str = Math.max(d.combat ?? 0, d.ranged?.strength ?? 0) << 8;
+    const str = Math.max(aiStrengths(state, u).melee, d.ranged?.strength ?? 0) << 8;
     const left = Math.max(0, u.hp) << 8;
     sum += Math.trunc((Math.trunc((str * left) / 256) * 256) / (UNIT_HP << 8));
   }
@@ -995,7 +995,7 @@ function domainStrength(state: GameState, seat: number): number {
 function unitView(state: GameState, u: Unit): MajorUnitView {
   const d = UNITS[u.type];
   return { id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_'), plot: u.tileIndex, founder: !!d?.settler,
-    combat: d?.combat ?? 0, ranged: d?.ranged?.strength ?? 0, range: d?.ranged?.range ?? 0, damage: UNIT_HP - u.hp,
+    combat: aiStrengths(state, u).melee, ranged: d?.ranged?.strength ?? 0, range: d?.ranged?.range ?? 0, damage: UNIT_HP - u.hp,
     movesLeft: Math.trunc(u.movesLeft * 256 / MP_SCALE),
     baseMoves: u.embarked && !d?.naval ? EMBARK_MOVES + embarkTechMoves(state, u.seat) : d?.moves ?? 0,
     bombard: d?.bombard ?? 0, domain: d?.air ? 'air' : d?.naval ? 'sea' : 'land' };

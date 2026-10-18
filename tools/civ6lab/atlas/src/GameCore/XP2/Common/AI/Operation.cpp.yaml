@@ -102,6 +102,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "...ays Running); FAILURE where a team is in battle (+0x90, the team update's battle points 0x738f20) and the operation holds no unit — a team in battle has a member, so never in a turn...."
   review: reviewed
@@ -402,5 +403,6 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

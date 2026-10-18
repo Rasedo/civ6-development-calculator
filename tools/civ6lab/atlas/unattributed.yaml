@@ -431,6 +431,7 @@
       value: "A minor's   pass walks its military units alone, so the support half finds none (1128   t251: its Supply Convoy, alone beside the Spec Ops, ends its turn)."
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "...ac_support_formation`): per unit of the pass's list (+0x240), alive. GetFormationClass (0x8bcd0 -> 0xadd5e0, over the class's hash, ~CRC32 of its name): LAND_COMBAT 0, SUPPORT 1, CI..."
   review: imported
@@ -1627,6 +1628,7 @@
   impl: [cpu/core/minorCityAi.ts:minorStandingArmy]
   readings:
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...th player +0x1278 holding it (then it is released: COMBAT 3, home -1); the list sorted (0x5c4910); each unit of AI type COMBAT (3) — or EXPLORE (2) whose type's highest AI flag up to..."
@@ -2939,6 +2941,15 @@
   status: PARTLY
   impl: [ai/major/view.ts:MajorView]
   notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x793400
+  final: 0x51de50
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ee-over-ranged test (0x772437), Attack Strikers (0x7753fa), the planning's fights flag (0x793453), the team updates (0x738f20 — the endangered — and 0x73fba0, the members' strength), O..."
   review: imported
 - addr: 0x7976f0
   final: 0x521430
