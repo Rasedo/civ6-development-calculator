@@ -4430,7 +4430,12 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
 - The research AI's turns (0x7610e0): the entry's turns plus its +0x528,
   the turns left on the research as its last turn wrote them; a city
   founded the turn before reads -1 (1127 t2: the minors' Mines at T 4 of
-  Mining's 5).
+  Mining's 5). The write is GetTurnsLeft 0x4ca120: -1 with the queue empty
+  (+0x188 0) or its head -1, else 0x4c9f90 -> 0x4ca000 at the player's
+  Science, whose 0x8c4540 gives -1 at no Science with no fallback to the
+  cost — the founding turn's research AI turn, before the city stands, writes
+  -1 (runs/h1_duelw1117 t2: Valletta's and Caguana's Walls trees, Masonry's
+  21 - 1, no Warrior contract in AI_CityBuild until t9).
 
 ## H-1: the research AI — READ (the choice), PARTLY READ (the value)
 
@@ -4450,8 +4455,9 @@ Contract %d").
   Else three levels: each walked row adds its turns left (0x4ca000: the cost
   0x353a70 in fixed point less the progress kept on it [+0x388] and the bank
   [+0x1e8] read through max(0, ·), ceil over the Science rate 0x4c9f40 —
-  0x8c4540 compares the remainder to rate x the truncated quotient; with no
-  Science the cost); a row not researchable (0x4c8c40) adds its unowned
+  0x8c4540 compares the remainder to rate x the truncated quotient, -1 with
+  no Science — the walk itself takes the cost where the turns are not above
+  0, 0x7612ea `test eax; jg`); a row not researchable (0x4c8c40) adds its unowned
   prerequisites, each level's rows once, the next step the last one added
   that is not the research in hand ([PlayerTechs+0x178][0]). Rows still
   added at the third level leave the entry out of reach (turns -1, value

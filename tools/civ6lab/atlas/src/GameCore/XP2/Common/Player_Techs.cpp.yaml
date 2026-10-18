@@ -61,7 +61,8 @@
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "...player holds is owned, value 0. Else three levels: each walked row adds its turns left (0x4ca000: the cost 0x353a70 in fixed point less the progress kept on it [+0x388] and the bank..."
-  review: imported
+    - "returns 0x8c4540's turns as they come, -1 at no Science; the cost fallback is the walk's own (0x7612ea test eax; jg)"
+  review: reviewed
 - addr: 0x4ca120
   final: 0x334080
   kind: function
@@ -72,10 +73,15 @@
     - recording: 1124
       turn: 3
       value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+    - recording: h1_duelw1117
+      turn: 2
+      value: "-1 at no Science (0x4ca000 -> 0x8c4540, no cost fallback): the founding turn's write; Valletta's and Caguana's Walls trees at t2, no Warrior contract until t9"
+  impl: [cpu/core/aiResearch.ts:researchInHandLeft, gpu/core/sim_research.py:_rai_left]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ", "H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "...+0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research in hand; the analysis reads the value before its own..."
-  review: imported
+    - "-1 where the queue is empty (+0x188 0) or its head is -1, else 0x4c9f90 -> 0x4ca000 at the player's Science"
+  review: reviewed
 - addr: 0x4ca470
   final: 0x3342e0
   kind: function

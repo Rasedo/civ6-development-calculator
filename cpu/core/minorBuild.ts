@@ -41,7 +41,7 @@ import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost, selectResearch } from './economy';
-import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchTurnsLeft, type ResearchChoice, type TechContract } from './aiResearch';
+import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw } from './aiCivics';
 import { minorCity, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from './effects';
@@ -280,13 +280,13 @@ export function minorResearch(state: GameState, r: ResearchState, seat: number, 
     delete r.techRetained[cur];
     r.tech = null;
     takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, city()?.tech, contracts), cur, researchDraw(state)));
-    r.aiLeft = r.tech ? researchTurnsLeft(state, seat, r, r.tech, fxOf(science)) : 0;
+    r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
     if (cur === URBAN_DEFENSES_TECH) urban();
   }
   r.aiEntries = researchAnalysis(state, seat, science, {}, city()?.tech, contracts);
   r.aiLeftSeen = r.aiLeft ?? 0;
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
-  r.aiLeft = r.tech ? researchTurnsLeft(state, seat, r, r.tech, fxOf(science)) : 0;
+  r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
   // THE CIVICS: the turn's Culture banks; a completion's choice reads the
   // civics AI's analysis of the turn before, the completed civic its key
   // (0x6293e0); then the AI's turn analyses the tree and, with nothing in

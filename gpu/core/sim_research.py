@@ -628,15 +628,14 @@ class SimResearch:
         self.citystate_tech_goal[:, s] = torch.where(go, goal, self.citystate_tech_goal[:, s])
 
     def _rai_left(self, s: int, sci: torch.Tensor) -> torch.Tensor:
-        """`researchTurnsLeft` of the research in hand ([B], 0 with none): its
-        cost less the progress (and the overflow) over the Science rate,
-        rounded up; its cost where the minor makes no Science"""
+        """`researchInHandLeft` ([B]): the research in hand's cost less the
+        progress (and the overflow) over the Science rate, rounded up; -1 with
+        none in hand or where the minor makes no Science"""
         cur = self.citystate_cur_tech[:, s]
         cost = self._research_cost(False).gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1)
         prog = torch.floor((self.citystate_tech_prog[:, s] + self.citystate_tech_ovf[:, s].clamp(min=0)) * _FX + 0.5).long()
         tl = _turns_at(cost * _FX - prog, torch.floor(sci * _FX + 0.5).long())
-        tl = torch.where(tl < 0, cost, tl)
-        return torch.where(cur >= 0, tl, torch.zeros_like(tl))
+        return torch.where(cur >= 0, tl, torch.full_like(tl, -1))
 
     def _rai_store(self, s: int, mask: torch.Tensor, ent) -> None:
         """the turn's analysis kept for the next completion (`aiEntries`)"""

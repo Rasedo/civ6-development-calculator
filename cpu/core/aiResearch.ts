@@ -85,13 +85,19 @@ export interface ResearchEntry {
 }
 
 /** 0x4ca000 / 0x8c4540: the turns a row needs at `rate` (raw Science a turn) —
- *  ceil of what is left over the rate, 1 where nothing is left; its cost in
- *  whole Science where the seat makes none */
+ *  ceil of what is left over the rate, 1 where nothing is left, -1 where the
+ *  seat makes no Science */
 export function researchTurnsLeft(state: GameState, seat: number, r: ResearchState, id: string, rate: number): number {
   const cost = researchCost(state, id, false, seat);
   const kept = id === r.tech ? r.techProgress : r.techRetained[id] ?? 0;
-  const t = turnsAt(cost * FX - fxOf(kept + Math.max(0, r.techOverflow ?? 0)), rate);
-  return t < 0 ? cost : t;
+  return turnsAt(cost * FX - fxOf(kept + Math.max(0, r.techOverflow ?? 0)), rate);
+}
+
+/** 0x4ca120, the turns left on the research in hand (the research AI's
+ *  +0x528 its turn and a completion's choice write): -1 with none in hand
+ *  or no Science (a minor's turn on its founding, before its city stands) */
+export function researchInHandLeft(state: GameState, seat: number, r: ResearchState, rate: number): number {
+  return r.tech ? researchTurnsLeft(state, seat, r, r.tech, rate) : -1;
 }
 
 /** 0x761170's walk: the turns through the prerequisites and the next step;
@@ -103,7 +109,9 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
   for (let level = 0; level < 3 && front.length; level++) {
     const added: string[] = [];
     for (const e of front) {
-      turns += researchTurnsLeft(state, seat, r, e, rate);
+      // a row's turns, its cost in whole Science where they are not above 0
+      const t = researchTurnsLeft(state, seat, r, e, rate);
+      turns += t > 0 ? t : researchCost(state, e, false, seat);
       if (researchable(r, e)) continue;
       for (const p of prereqs(e)) {
         if (r.techs.includes(p) || added.includes(p)) continue;
