@@ -1366,6 +1366,8 @@ class SimMinorOps:
                         continue
                     ctr = self.city_center[:, row, col].clamp(min=0)
                     str_ = self._strike_strength(row, torch.full_like(ctr, col))
+                    if row < self.n_majors:
+                        str_ = str_ + self._gov_mods(row)[12]["crng"].to(str_.dtype)
                     ok = alive & (n > 0) & (str_ > 0) & (self.pair_dist[plot, ctr].to(torch.long) <= 2)
                     hit = self._damage_expected(str_ - mcb.to(torch.float64))
                     total = total + torch.where(ok, n * hit, torch.zeros_like(hit))
@@ -2060,8 +2062,8 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     endangered — not bombard, with Movement, out of a city — to their safe
     plots (0x716b90); then the hurt (or fortified afloat in danger), not
     bombard: one not dug in off friendly ground released from the team; one
-    fortified afloat to its safe plot; one with Movement on an enemy's
-    ground or a plot of danger to its safe plot; each fortified (its turn
+    fortified afloat to its safe plot; one with Movement on the ground of a
+    player it is at war with or a plot of danger to its safe plot; each fortified (its turn
     ends where it stands)"""
     s, k = c.s, c.k
     g = on & (c.ma[:, i] == 1)
@@ -2142,7 +2144,8 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             ok &= live(us)
             plot = sim.major_unit_tile[b, uc].clamp(min=0)
             owner = sim.tile_seat[b, plot]
-            war = (owner >= 0) & (owner != seat) & sim._seats_hostile(seat, owner.unsqueeze(1)).squeeze(1)
+            orow = sim._seat_row.take(owner.clamp(min=0, max=sim._seat_row.numel() - 1))
+            war = (owner >= 0) & (owner != seat) & sim.war[b, int(sim._seat_row[seat])].gather(1, orow.unsqueeze(1)).squeeze(1)
             dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
             to_safe(us, ok & (sim.major_unit_mp[b, uc] > 0) & (war | dang), False)
             ok &= live(us)

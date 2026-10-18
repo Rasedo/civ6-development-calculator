@@ -2319,7 +2319,7 @@ export interface MoveStore { list: number[]; goal: number }
  * OPERATION MOVE'S UPDATE (0x81a130) for a team of the pass's player — its
  * members, the node's store — the status (SUCCESS, RUNNING), the team
  * arrived, the store kept: its members not stored at the node (the node's
- * list, kept while its goal holds) nearest the goal first (a member killed
+ * list, kept while its goal holds, of the team's living members) nearest the goal first (a member killed
  * last); the nearest within the range — or its planning reaching a plot at
  * the range this turn with Movement left — has the team arrived, a stored
  * member within the range too. A goal of the target: arrived is SUCCESS.
@@ -2331,7 +2331,7 @@ export function passMoveUpdate(state: GameState, pass: Pass, members: readonly n
   target: boolean, range: number, spread: number): { status: number; arrived: boolean; store: MoveStore | undefined } {
   const memberAt = (id: number) => memberAtOf(state, pass.seat, id);
   const kept = store?.goal === goal ? store.list : [];
-  let list = kept.filter((id) => memberAt(id));
+  let list = kept.filter((id) => members.includes(id) && memberAt(id));
   const others: { id: number; u: Unit | null; d: number }[] = members
     .filter((id) => !list.includes(id))
     .map((id) => {
