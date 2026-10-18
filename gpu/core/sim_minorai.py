@@ -531,8 +531,9 @@ class SimMinorAi:
         ground = self._minor_ground_imps(s)
         K = ground.shape[2]
         g = ground.gather(1, p0.unsqueeze(-1).expand(-1, -1, K)) & (owned & ev).unsqueeze(-1)
-        # a plot holding an improvement takes no other (0x5ce970's +0x54)
-        improvable = owned & ev & g.any(-1) & (self.improvement.gather(1, p0) < 0)
+        # 0x5ce970's +0x54: an improvement the plot test takes, a plot
+        # holding one among them, its own valued 0
+        improvable = owned & ev & g.any(-1)
         out = {"plot": plots, "valid": valid, "owned": owned, "improvable": improvable, "near_owned": near,
                "imps": imps, "dists": dists}
         if not bool(ev.count_nonzero()):
@@ -1523,7 +1524,12 @@ class _MinorWorld:
         flat_p = plot.reshape(sim.B, -1).clamp(min=0)
         flat_k = k.reshape(sim.B, -1).clamp(min=0)
         v = g[torch.arange(sim.B, device=sim.device).unsqueeze(1), flat_p, flat_k].reshape(plot.shape)
-        return v & (imp >= 0) & (k >= 0) & (plot >= 0)
+        # a plot holding an improvement takes none but its own pillaged
+        # one's repair
+        cur = sim.improvement.gather(1, flat_p).reshape(plot.shape)
+        pil = sim.pillaged.gather(1, flat_p).reshape(plot.shape)
+        free = (cur < 0) | ((cur == k) & pil)
+        return v & free & (imp >= 0) & (k >= 0) & (plot >= 0)
 
     def plot_owner(self, plot):
         sim = self.sim
@@ -1607,12 +1613,22 @@ class _MinorWorld:
         if not bool(here.count_nonzero()):
             return
         ch = sim.major_unit_charges.gather(1, g.unsqueeze(1)).squeeze(1)
-        spent = here & (ch <= 1)
-        if bool(spent.count_nonzero()):
-            self._spent.append(torch.where(spent, uid, -1))
+        pc = plot.clamp(min=0)
+        cur = sim.improvement[sim._bidx, pc]
         if kind == "improve":
             k = self._ei.take(imp.clamp(min=0))
-            lay = here & (imp >= 0) & (k >= 0)
+            # the repair of the plot's own pillaged improvement: no charge
+            fix = here & (imp >= 0) & (k >= 0) & (cur == k) & sim.pillaged[sim._bidx, pc]
+            if bool(fix.count_nonzero()):
+                rr = fix.nonzero(as_tuple=True)[0]
+                sim.pillaged[rr, pc[rr]] = False
+                sim.unit_mp[rr, uid[rr]] = 0
+                sim._eff_version += 1
+                sim._gen_ver += 1
+            lay = here & (imp >= 0) & (k >= 0) & ~fix
+            spent = lay & (ch <= 1)
+            if bool(spent.count_nonzero()):
+                self._spent.append(torch.where(spent, uid, -1))
             if bool(lay.count_nonzero()):
                 rr = lay.nonzero(as_tuple=True)[0]
                 tt = plot[rr]
@@ -1622,7 +1638,20 @@ class _MinorWorld:
                 sim._spend_build_charge(rr, uid, plot)
                 sim._gen_ver += 1
             return
-        sim._minor_clear(self.s, here, uid, plot)
+        # the plot's improvement goes first, at no charge; then its feature,
+        # else its resource
+        rem = here & (cur >= 0)
+        if bool(rem.count_nonzero()):
+            rr = rem.nonzero(as_tuple=True)[0]
+            sim.improvement[rr, pc[rr]] = -1
+            sim.pillaged[rr, pc[rr]] = False
+            sim.unit_mp[rr, uid[rr]] = 0
+            sim._eff_version += 1
+        rest = here & ~rem
+        spent = rest & (ch <= 1)
+        if bool(spent.count_nonzero()):
+            self._spent.append(torch.where(spent, uid, -1))
+        sim._minor_clear(self.s, rest, uid, plot)
         sim._gen_ver += 1
 
     def unit_alive(self, ids):

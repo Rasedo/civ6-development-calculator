@@ -308,10 +308,11 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     });
     out.push({
       plot, owned, nearOwned,
-      // a plot holding an improvement, pillaged or not, takes no other
-      // (0x5ce970's +0x54; runs/h1_duelw1117-1128: no city-state improvement
-      // ever laid over another)
-      improvable: owned && !tile.improvement && ground.size > 0,
+      // 0x5ce970's +0x54: an improvement the plot test takes, a plot holding
+      // one among them, its own valued 0 (runs/h1_duelv1117 Valletta t10-t14:
+      // its improved Farms' 0.00 the researched pick over plot 321's Mine
+      // without Mining, no tree until Mining at t15)
+      improvable: owned && ground.size > 0,
       districtOk: districts.some((v) => v > FX_MIN && v !== 0),
       improvements, districts,
     });
@@ -422,7 +423,11 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     },
     canImprove: (plot, imp) => {
       const id = engineId('improvement', imp, 'IMPROVEMENT_', IMPROVEMENTS);
-      return !!id && owned(plot) && standingImprovements(state, cs, state.map.tiles[plot]).includes(id);
+      const tile = state.map.tiles[plot];
+      // a plot holding an improvement takes none but its own pillaged one's
+      // repair (0x7f6ea0: the plot test, then the repair, else FAILURE)
+      if (tile.improvement && !(tile.pillaged && tile.improvement === id)) return false;
+      return !!id && owned(plot) && standingImprovements(state, cs, tile).includes(id);
     },
     builderType: () => (minorUnitVersion('UNIT_BUILDER') === 'UNIT_BUILDER' ? 'UNIT_BUILDER' : null),
     plotCity: (plot) => (owned(plot) ? city.id : -2),
@@ -459,13 +464,31 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
         return;
       }
       if (unit.tileIndex !== plot) return;
-      if ((unit.charges ?? 0) <= 1) spent.add(u);
+      const tile = state.map.tiles[plot];
       if (kind === 'improve') {
         const id = imp ? engineId('improvement', imp, 'IMPROVEMENT_', IMPROVEMENTS) : null;
-        if (id) minorBuilderLays(state, unit, plot, id);
+        if (!id) return;
+        // the repair of the plot's own pillaged improvement: no charge
+        if (tile.improvement === id && tile.pillaged) {
+          tile.pillaged = false;
+          unit.movesLeft = 0;
+          return;
+        }
+        if ((unit.charges ?? 0) <= 1) spent.add(u);
+        minorBuilderLays(state, unit, plot, id);
         return;
       }
-      const tile = state.map.tiles[plot];
+      // the plot's improvement goes first, at no charge (runs/h1_duelv1124
+      // Cardiff's Lumber Mill on plot 626 gone at t116 with the Builder's
+      // charge kept, the Forest at t117, the Farm at t122); then its
+      // feature, else its resource
+      if (tile.improvement) {
+        tile.improvement = null;
+        tile.pillaged = false;
+        unit.movesLeft = 0;
+        return;
+      }
+      if ((unit.charges ?? 0) <= 1) spent.add(u);
       if (tile.feature && canRemoveFeature(state, tile, cs.seat).ok) builderRemoveFeature(state, unit.id, cs.seat);
       else if (tile.resource) builderHarvest(state, unit.id);
     },

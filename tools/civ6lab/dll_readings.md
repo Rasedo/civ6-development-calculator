@@ -4334,12 +4334,22 @@ operations' contracts, the improvement values below, the purchases).
   its Farm 72.45 beside plot 472's; the improvement event takes 473, whose
   tree loses its reservation to the Holy Site tree's on it and fails, and
   the Builder contract comes at t3 for 472, as runs/h1_duelw1128 logs).
-- 0x5ce970's improvable flag (+0x54): no district, no improvement (the
-  plot's +0x1e word -1), not a canyon, and an improvement the plot test
-  (0x35fd60, its fifth argument 1) takes; the values are written for every
-  plot (the five verbose duels log values beside an improvement 1,868
-  times; runs/h1_duelw1117-1128: no city-state improvement laid over
-  another).
+- 0x5ce970's improvable flag (+0x54): no city, no district, the word at
+  +0x1e of the plot's interface (0x30) -1 (not the improvement: Check Plot
+  reads that at the plot's +0x44), not a canyon, and an improvement the
+  plot test (0x35fd60, its fifth argument 1) takes. A plot holding an
+  improvement is improvable, its own valued 0.00 (runs/h1_duelv1117
+  Valletta t10-t14: the improved Farms' 0.00 the improvement pick's
+  researched one over plot 321's Mine at 55.03 without Mining, no tree and
+  no Mining contract until Mining at t15, the Builder contract then 71.0).
+  CHECK PLOT 0x7f6ea0 (the improvement): the plot test (0x35fd60, fifth
+  argument 0) or the plot's own pillaged improvement (+0x4d bit 1, +0x44)
+  SUCCESS; else FAILURE, a feature (+0x3c) or resource (+0x40) on a plot
+  holding no improvement set to clear. The clear takes the improvement first at
+  no charge (runs/h1_duelv1124 Cardiff's Lumber Mill on plot 626 gone t116
+  with its Builder's charge kept, the Forest t117, the Farm t122; LAB,
+  Clear Plot's execution unread). No city-state improvement is laid over
+  another (runs/h1_duelw1117-1128).
 - BUILD IMPROVEMENT, READ. Update 0x7e9670: over the Worker List, the
   first unit with charges (+0xed0) on the Goal Plot, or whose planning
   (+0x1fc0) reaches the Builder Plot (the goal where none) this turn with
