@@ -3725,6 +3725,15 @@ building tables).
   factor 0: the Barracks 0 -> 740, the Stable 0 -> 468 of the five duels'
   within 0.005; every other class counts: the Prophet's, Scientist's,
   Admiral's, Engineer's and Writer's at 0 lose their buildings' matches).
+  The military AI's turn writes PSEUDOYIELD_UNIT_EXPLORER's weight (its
+  +0x790 array) as (desired explorers +0x930 - held +0x9f0) - 1.0 and
+  PSEUDOYIELD_UNIT_NAVAL_COMBAT's as (desired naval +0x990 - held +0xa50)
+  - 1.0 (0x7204c3..0x7205ae, `shl 8; sub 0x100`); a city-state desires and
+  holds none (AI_Military.csv "0:0, 0:0" on every city-state turn of
+  runs/h1_duelw1117 / 1121 / 1124), so both read -1.0, factor 0: every
+  Galley and Quadrireme the city-states log is its Maintenance alone
+  (runs/h1_duelv1117 Caguana t18 Galley -4.14 at T 19, Valletta t13 -2.28
+  at T 27) and Sailing's unit term none.
   0x700810's sum is max(-1.0, military AI +0x7e8 + player AI +0x620 + the
   lists +0x768 / +0x748) plus, for the GP pseudo-yields (@0xf2e218
   GPP_GENERAL .. @0xf2e238 GPP_MUSICIAN), the eras' 0x2c4230 points as

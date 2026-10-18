@@ -1637,13 +1637,16 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     // on the record's next turn: that turn stamps the founding turn's, the
     // item's set turn first among them (runs/h1_duelw1124 Bologna:
     // AI_CityBuild.csv's Default Specialization Monument at t1, the Builder
-    // contract at t3 clearing none of it)
+    // contract at t3 clearing none of it). The city's boosts land on the
+    // founding turn too (runs/h1_duelv1117: a coastal minor's Sailing
+    // BOOSTED at 7 turns in AI_Research.csv from t2)
     state.turn -= 1;
     try {
       minorResearch(state, placed.research, placed.seat, 0, 0, () => undefined, () => undefined, []);
       placed.combatDesire = minorCombatDesire(state, placed, state.turn - 1).desire;
       minorKnowledge(state, placed, false);
       minorAiTurn(state, placed);
+      detectBoosts(state, placed.seat);
     } finally {
       state.turn += 1;
     }

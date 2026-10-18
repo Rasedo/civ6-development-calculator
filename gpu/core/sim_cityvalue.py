@@ -1398,6 +1398,10 @@ class _MinorFacts:
         # PSEUDOYIELD_UNIT_COMBAT (the Free Cities' row past the city-states')
         if p == "PSEUDOYIELD_UNIT_COMBAT" and self.s < self.sim.S:
             return self.sim.citystate_combat_desire[:, self.s]
+        # its explorers' and naval scouts' desire less what it holds, less
+        # 1.0: none desired, none counted (`pseudoYieldWeights`)
+        if p in ("PSEUDOYIELD_UNIT_EXPLORER", "PSEUDOYIELD_UNIT_NAVAL_COMBAT") and self.s < self.sim.S:
+            return -_FX
         return 0
 
     def _stats(self):

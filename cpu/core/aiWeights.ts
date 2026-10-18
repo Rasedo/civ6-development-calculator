@@ -173,8 +173,16 @@ export function pseudoYieldWeights(state: GameState, seat: number, inputs: AiWei
   const chronology = civEraIndex(s.research.techs, s.research.civics) + 1;
   out.set('PSEUDOYIELD_DISTRICT', (out.get('PSEUDOYIELD_DISTRICT') ?? 0) + fxConst(0.5 * chronology));
   // a city-state's military AI writes its Combat Desire over its
-  // PSEUDOYIELD_UNIT_COMBAT weight
+  // PSEUDOYIELD_UNIT_COMBAT weight, and its explorers' and naval scouts'
+  // desire less what it holds, less 1.0, into PSEUDOYIELD_UNIT_EXPLORER and
+  // PSEUDOYIELD_UNIT_NAVAL_COMBAT (0x71fb80, 0x7204c3..0x7205ae): a
+  // city-state desires none and counts none (AI_Military.csv "0:0, 0:0" on
+  // every city-state turn), so both read -1.0 — a Galley valued at its
+  // Maintenance alone (runs/h1_duelv1117 Caguana t18 -4.14 at T 19)
   const cs = state.cityStates.find((c) => c.seat === seat);
-  if (cs) out.set('PSEUDOYIELD_UNIT_COMBAT', cs.combatDesire ?? 0);
+  if (cs) {
+    out.set('PSEUDOYIELD_UNIT_COMBAT', cs.combatDesire ?? 0);
+    for (const p of ['PSEUDOYIELD_UNIT_EXPLORER', 'PSEUDOYIELD_UNIT_NAVAL_COMBAT']) out.set(p, Math.max(-FX, (out.get(p) ?? 0) - FX));
+  }
   return out;
 }
