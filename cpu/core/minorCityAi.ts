@@ -70,7 +70,7 @@ import { floodHazardTurns } from './disasters';
 import { baseAdjacency, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
 import { builderHarvest, builderRemoveFeature, tileFreeForUnit } from './units';
-import { moveTo, pathTo } from './tactical';
+import { moveTo, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import {
   installType, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts,
@@ -114,6 +114,28 @@ const IMPROVEMENT_ENGINE = new Map(AI_IMPROVEMENTS.map((r) => [r.type, engineId(
 const districtType = (id: string): string =>
   AI_DISTRICTS.find((r) => r.trait === null && engineId('district', r.type, 'DISTRICT_', DISTRICTS) === id)?.type ?? `DISTRICT_${id}`;
 
+/** the improvement rows' options for the minor, the improvements' own
+ *  research waived, a ground row's civic held */
+function groundOpts(state: GameState, cs: CityState) {
+  const seat = cs.seat;
+  const unlocks = { ...computeUnlocksIn(cs.research, []), improvements: new Set(Object.keys(IMPROVEMENTS)) };
+  return {
+    unlocks, ownsTile: (t: Tile) => tileSeat(t) === seat, map: state.map, camps: campTiles(state),
+    gpAppeal: cityAppealResolver(state), suzerain: suzerainNames(state, seat), civ: civOf(state, seat),
+  };
+}
+
+/** the improvements the plot takes as it stands — its feature and resource
+ *  kept — for the trees' nodes (Check Plot, Clear Plot, Build Improvement:
+ *  0x35fd60). A city-state's Builder clears a plot before it builds there,
+ *  never both at once (runs/h1_duelw1117-1128: no city-state improvement
+ *  laid the turn its plot's feature or resource went; 1124 Granada's
+ *  Builder on plot 570's Marsh t7-t21, the Marsh gone t22, the Alcazar
+ *  t24) */
+function standingImprovements(state: GameState, cs: CityState, tile: Tile): readonly string[] {
+  return validImprovementsIn(tile, groundOpts(state, cs));
+}
+
 /** the improvements the ground of a plot takes for the minor, the
  *  improvements' own research waived (CanHaveImprovement, 0x35fd60) — a
  *  ground row's civic (the Farm on Hills, a feature row) held: those of the
@@ -121,12 +143,7 @@ const districtType = (id: string): string =>
  *  Resource_Harvests rows) and with its
  *  removable feature cleared (the value prices the harvest and the clearing) */
 function groundImprovements(state: GameState, cs: CityState, tile: Tile): Set<string> {
-  const seat = cs.seat;
-  const unlocks = { ...computeUnlocksIn(cs.research, []), improvements: new Set(Object.keys(IMPROVEMENTS)) };
-  const opts = {
-    unlocks, ownsTile: (t: Tile) => tileSeat(t) === seat, map: state.map, camps: campTiles(state),
-    gpAppeal: cityAppealResolver(state), suzerain: suzerainNames(state, seat), civ: civOf(state, seat),
-  };
+  const opts = groundOpts(state, cs);
   const clearable = !!tile.feature && !!FEATURE_ROW.get(installFeature(tile.feature))?.removable;
   const harvestable = !!tile.resource && (RES.get(gameTypeOf('resource', tile.resource, 'RESOURCE_'))?.harvests.length ?? 0) > 0;
   const out = new Set<string>(validImprovementsIn(tile, opts));
@@ -154,7 +171,7 @@ export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1
 /**
  * THE PLOT ANALYSIS of a minor's city (0x5ce970 per plot, the centre first):
  * per plot its flags — the seat owns it, an improvement may stand on its
- * ground (research waived) where no district stands, a district may stand
+ * ground (research waived) where no district or improvement stands, a district may stand
  * where the analysis values one, an unowned plot beside one of the seat's —
  * and its improvements' and districts' values in database order. An
  * improvement the ground does not take, a district the plot cannot hold or
@@ -282,7 +299,10 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     });
     out.push({
       plot, owned, nearOwned,
-      improvable: owned && ground.size > 0,
+      // a plot holding an improvement, pillaged or not, takes no other
+      // (0x5ce970's +0x54; runs/h1_duelw1117-1128: no city-state improvement
+      // ever laid over another)
+      improvable: owned && !tile.improvement && ground.size > 0,
       districtOk: districts.some((v) => v > FX_MIN && v !== 0),
       improvements, districts,
     });
@@ -381,7 +401,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     turn: state.turn, seat: cs.seat, cities: [city],
     get units() {
       return state.units.filter((u) => u.seat === cs.seat)
-        .map((u): TreeUnit => ({ id: u.id, type: installType('unit', u.type, 'UNIT_', UNITS), plot: u.tileIndex, charges: u.charges ?? 0 }));
+        .map((u): TreeUnit => ({ id: u.id, type: installType('unit', u.type, 'UNIT_'), plot: u.tileIndex, charges: u.charges ?? 0 }));
     },
     techHeld: (t) => {
       const id = engineId('tech', t, 'TECH_', TECHS_KNOWN);
@@ -393,13 +413,17 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     },
     canImprove: (plot, imp) => {
       const id = engineId('improvement', imp, 'IMPROVEMENT_', IMPROVEMENTS);
-      return !!id && owned(plot) && groundImprovements(state, cs, state.map.tiles[plot]).has(id);
+      return !!id && owned(plot) && standingImprovements(state, cs, state.map.tiles[plot]).includes(id);
     },
     builderType: () => (minorUnitVersion('UNIT_BUILDER') === 'UNIT_BUILDER' ? 'UNIT_BUILDER' : null),
     plotCity: (plot) => (owned(plot) ? city.id : -2),
-    reachable: (u, plot) => {
+    reachThisTurn: (u, plot, moves) => {
       const unit = unitOf(u.id);
-      return !!unit && (unit.tileIndex === plot || pathTo(state, unit, plot).length > 0);
+      return !!unit && reachPlots(state, unit, 1).some((e) => e.tile === plot && (!moves || e.moves > 0));
+    },
+    turnsTo: (u, plot) => {
+      const unit = unitOf(u.id);
+      return unit ? turnsToPlot(state, unit, plot) : 0;
     },
     canPlaceDistrict: (plot, d) => {
       const id = engineId('district', d, 'DISTRICT_', DISTRICTS) as DistrictId | null;
@@ -465,14 +489,14 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
   const known = new Map<string, number>();
   const by = new Map<string, number>();
   for (const rec of records) {
-    const t = installType('unit', rec.type, 'UNIT_', UNITS);
+    const t = installType('unit', rec.type, 'UNIT_');
     known.set(t, (known.get(t) ?? 0) + 1);
     by.set(`${t}:${rec.owner}`, (by.get(`${t}:${rec.owner}`) ?? 0) + 1);
   }
   const own = new Map<string, number>();
   for (const u of state.units) {
     if (u.seat !== cs.seat) continue;
-    const t = installType('unit', u.type, 'UNIT_', UNITS);
+    const t = installType('unit', u.type, 'UNIT_');
     own.set(t, (own.get(t) ?? 0) + 1);
   }
   const holds = (x: string): boolean => {
@@ -520,7 +544,7 @@ export function minorStandingArmyShort(state: GameState, cs: CityState): number 
   let held = 0;
   for (const u of state.units) {
     if (u.seat !== cs.seat || busy.has(u.id)) continue;
-    const row = AI_UNITS[AI_UNIT_INDEX.get(installType('unit', u.type, 'UNIT_', UNITS)) ?? -1];
+    const row = AI_UNITS[AI_UNIT_INDEX.get(installType('unit', u.type, 'UNIT_')) ?? -1];
     if (!row || row.civilian || row.recon || Math.max(row.combat, row.rangedCombat, row.bombard) <= 0) continue;
     if (row.domain !== 'DOMAIN_LAND' && !(row.domain === 'DOMAIN_SEA' && coastal)) continue;
     held += 1;
@@ -535,7 +559,7 @@ export function minorThreat(state: GameState, cs: CityState): number {
   const records = cs.armyKnown ?? [];
   return cityThreat(view as unknown as Parameters<typeof cityThreat>[0], cs.seat, cs.centerIndex, {
     army: (p) => records.filter((x) => x.owner === p).map((x) => ({
-      id: x.id, owner: x.owner, type: installType('unit', x.type, 'UNIT_', UNITS), plot: x.plot, combat: 0, ranged: 0, damage: 0, seen: x.seen,
+      id: x.id, owner: x.owner, type: installType('unit', x.type, 'UNIT_'), plot: x.plot, combat: 0, ranged: 0, damage: 0, seen: x.seen,
     })),
     operationNear: () => false,
   });
@@ -579,7 +603,7 @@ export function minorAiTurn(state: GameState, cs: CityState): void {
   const w = minorTreeWorld(state, cs, ai, city);
   const r = cs.research;
   goalsReached(ai, (g) => w.techHeld(g) || w.civicHeld(g),
-    (g) => (r.tech !== null && g === installType('tech', r.tech, 'TECH_', TECHS_KNOWN)) || (r.civic !== null && g === installType('civic', r.civic, 'CIVIC_', CIVICS_KNOWN)),
+    (g) => (r.tech !== null && g === installType('tech', r.tech, 'TECH_')) || (r.civic !== null && g === installType('civic', r.civic, 'CIVIC_')),
     (p) => tileSeat(state.map.tiles[p]) === cs.seat);
   freeSlots(ai, w, city.id);
   inHandCheck(ai, city, () => minorSetItem(state, cs, null));

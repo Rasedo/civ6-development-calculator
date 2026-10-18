@@ -1707,13 +1707,15 @@ class SimTactics:
         urng = torch.where(ranged, self._tac_range(bidx.unsqueeze(1).expand(B, P), sl, pre), torch.zeros_like(sl))
         rsafe = rowof.clamp(min=0)
         rturn, rmoves = res["turns"], res["moves"]
-        mil = self.military_at
-        own_stk = (mil >= 0) & (self.unit_seat.gather(1, mil.clamp(min=0)) == seat)
         for j in range(J):
             t = tiles[:, j].clamp(max=T - 1)
             on = (j < cnt) & standing(tiles[:, j:j + 1]).squeeze(1)
             if not bool(on.count_nonzero()):
                 continue
+            # its own stacking units where they stand now, the earlier
+            # targets' attacks moved (`stackedAt`)
+            mil = self.military_at
+            own_stk = (mil >= 0) & (self.unit_seat.gather(1, mil.clamp(min=0)) == seat)
             # `strikers`: in melee the plot within two turns, at range a plot
             # exactly the range from it within two turns with Movement left and
             # none of its own stacking there but its own plot
@@ -1790,7 +1792,7 @@ class SimTactics:
         # each unit's planning entry for each target
         n_u = rowof.gather(1, us).clamp(min=0)                               # [B, U]
         tp = res["tp"][n_u]                                                   # [B, U, E]
-        kind_e = ~res["other"][n_u] if district else (res["other"][n_u] & ~res["civ"][n_u])
+        kind_e = ~res["other"][n_u] if district else res["other"][n_u]
         hit = (tp.unsqueeze(2) == tk.view(B, 1, K, 1)) & kind_e.unsqueeze(2)
         hit &= tp.unsqueeze(2) >= 0
         has_e = hit.any(dim=3)                                               # [B, U, K]
@@ -1963,7 +1965,10 @@ class SimTactics:
         # the tie-break: the pool slot
         pslot = getattr(self, "barb_unit_slotno" if seat == BARB_SEAT else f"{pre}_unit_pslot").gather(1, us)
         perm = self._tac_merge_sort(uv.sum(dim=1), got, move, frm, dmg, pslot)
+        # a CIVILIAN target's: no strike, the move onto it captures
+        civ = got & (kinds.gather(1, tk.gather(1, ck.gather(1, c4c))) == 7)
         return {"slot": slot.gather(1, perm), "move": move.gather(1, perm), "attack": att.gather(1, perm),
+                "civ": civ.gather(1, perm),
                 "valid": got.gather(1, perm)}
 
     def _tac_merge_sort(self, n: torch.Tensor, got, move, frm, dmg, us) -> torch.Tensor:
@@ -2018,13 +2023,14 @@ class SimTactics:
                        seat: int = BARB_SEAT) -> None:
         """`carryOut` (0x771f80) in the assignment's order: every unit to its
         spot (again where it stopped short and no unit at war or of its own
-        holds it); a siege unit strikes its attack; a ranged unit strikes it
+        holds it); a siege unit strikes its attack (a civilian's none); a ranged unit strikes it
         unless its melee is the stronger and its reach takes the plot this
         turn; then every unit moves onto its attack — each one's turn done."""
         dev = self.device
         B = self.B
         bidx = torch.arange(B, device=dev)
         slot, move, att, valid = out["slot"], out["move"], out["attack"], out["valid"]
+        civ = out["civ"]
         U = slot.shape[1]
         sl = slot.clamp(min=0)
         ut_all = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
@@ -2065,13 +2071,13 @@ class SimTactics:
         bomb = self._type_bombard.take(ut_all) > 0
         for r in range(U):
             u_b = sl[:, r]
-            strike(can_act(r) & bomb[bidx, u_b], r)
+            strike(can_act(r) & bomb[bidx, u_b] & ~civ[:, r], r)
         rs = self._type_ranged_strength.take(ut_all)
         cb = self._type_combat.take(ut_all)
         rsafe = rowof.clamp(min=0)
         for r in range(U):
             u_b = sl[:, r]
-            m = can_act(r) & (rs[bidx, u_b] > 0)
+            m = can_act(r) & (rs[bidx, u_b] > 0) & ~civ[:, r]
             if not bool(m.count_nonzero()):
                 continue
             a = att[:, r]

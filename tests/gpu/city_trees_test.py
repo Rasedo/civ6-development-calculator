@@ -263,8 +263,11 @@ class World:
     def distance(self, plots, plot):
         return (plots - plot.unsqueeze(1)).abs()
 
-    def reachable(self, plot):
+    def reach_this_turn(self, plot, moves, among):
         return True
+
+    def turns_to(self, plot, among):
+        return torch.ones_like(among, dtype=torch.long)
 
     def order(self, uid, kind, plot, imp, mask):
         for b in range(self.B):

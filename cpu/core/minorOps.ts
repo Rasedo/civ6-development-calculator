@@ -107,7 +107,7 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
     unitRows: () => (rows ??= (() => {
       const by = new Map<string, number>();
       for (const r of cs.armyKnown ?? []) {
-        const k = `${installType('unit', r.type, 'UNIT_', UNITS)}|${r.owner}`;
+        const k = `${installType('unit', r.type, 'UNIT_')}|${r.owner}`;
         by.set(k, (by.get(k) ?? 0) + 1);
       }
       const v = fresh();

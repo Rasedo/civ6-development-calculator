@@ -4260,6 +4260,66 @@ operations' contracts, the improvement values below, the purchases).
   0x7ec7b0; Cancel Contract 0x7f5200 / 0x7f4980; Protect Unit 0x7f07c0;
   Move Unit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670;
   Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
+- MOVE UNIT, READ (the danger test 0x716a60 unported). Update 0x7f0020: its
+  kept unit (+0x50, kept across turns; an id of 0 or -1 none) alive with a
+  planning: SUCCESS where the planning reaches the location within one turn
+  (0x791300, the flag clear), else RUNNING. None kept: over its units in
+  order, the first reaching it this turn with Movement left (the flag set)
+  is kept and it SUCCEEDS; else the first reaching it this turn, where none
+  is kept yet, or the one whose path (0x272a60) takes the fewest turns
+  (fewer than the best so far), is kept, RUNNING; none FAILURE. Execution
+  0x7eeba0: the kept unit, else each of its units, moves. In "Build City
+  Improvement" Move Unit (27) sits in a Concurrent with Protect Unit before
+  Build Improvement (28) in their Sequence: its SUCCESS on the turn the
+  Builder can arrive lets 28 update in the same walk.
+- CLEAR PLOT, READ (its execution unread: the clear by the kept unit
+  standing on the plot). Update 0x7f7960: over its Builder List (the
+  tree's units where none), the first unit with charges on the Plot To
+  Clear, or whose planning reaches it this turn with Movement left, is
+  kept (+0x40): SUCCESS; else RUNNING where one reaches it this turn with
+  none left, else FAILURE. It reads no improvement: in "Build City
+  Improvement" its SUCCESS walks on into Build Improvement in the same
+  tick, whose plot test still finds the feature, and the tree fails; the
+  next improvement event builds.
+- A CAPTURED CIVILIAN is a new unit with a new ID (runs/h1_duelw1124 t112:
+  player 4's Builder 1114113 becomes the barbarians' Builder 5111833), so a
+  knowledge base's record of the old unit stays with its owner as a unit
+  gone (`seizeCivilian`; the GPU takes a new pool slot). Operation Attack
+  Units' assignment (0x776140, `assignTo` / `_tac_assign`) holds CIVILIAN
+  targets with the rest (0x80c080's list: a civilian through a HIGH unit;
+  a civilian's blow 150), the carry-out striking none of them and moving
+  onto them (seed9001 t30: Nan Madol's Warrior retakes its Builder from
+  plot 603 over the barbarian Warrior at 648). Attack Units' strikers for
+  each target read the stacking where the units stand then, after the
+  earlier targets' attacks moved them (`strikers` / `_tac_attack_units`;
+  seed9001 t33: a barbarian Warrior's move onto 906 bars the Slinger's spot
+  there, and the Slinger wanders).
+- 0x5ce970's improvable flag (+0x54): no district, no improvement (the
+  plot's +0x1e word -1), not a canyon, and an improvement the plot test
+  (0x35fd60, its fifth argument 1) takes; the values are written for every
+  plot (the five verbose duels log values beside an improvement 1,868
+  times; runs/h1_duelw1117-1128: no city-state improvement laid over
+  another).
+- BUILD IMPROVEMENT, READ. Update 0x7e9670: over the Worker List, the
+  first unit with charges (+0xed0) on the Goal Plot, or whose planning
+  (+0x1fc0) reaches the Builder Plot (the goal where none) this turn with
+  Movement left (0x791300: one turn, the flag set), is the node's (+0x50);
+  a unit reaching it this turn with none left (the flag clear) keeps it
+  RUNNING; else FAILURE. The improvement (+0x54): the list's first the goal
+  can take (0x35fd60, no district there), or the goal's pillaged one
+  (+0x58, the repair, unported); none FAILURE. The nodes' plot test reads
+  the plot as it stands (Check Plot, Clear Plot, Build Improvement: a
+  feature or resource to clear first goes through Clear Plot; LAB:
+  0x35fd60's fifth argument, 1 here, lets an improvement whose +0x108 has
+  bit 8 take a removable feature, and runs/h1_duelw1117-1128 hold no
+  city-state improvement laid the turn its plot's feature or resource
+  went; 1124 Granada's Builder on plot 570's Marsh t7-t21, the Marsh gone
+  t22, the Alcazar t24). Execution 0x7e8ef0: that unit standing on the
+  Builder Plot when it runs — after Move Unit's (node 27 before 28), which
+  moved it — builds (0x95a010; the repair 0x967560): a Builder lays on the
+  turn it arrives, and on the turn it was trained (runs/h1_duelw1117-1128:
+  of the city-states' improvements, 88 the turn the builder arrived, 27
+  the turn it was trained, 144 by one already there).
 - THE PURCHASES (`cpu/core/aiEconomic.ts`, the savings shared with the
   majors' sender): 0x5ce5b0's tail, for a city whose CityBuildAI +0x1b8 is
   above -1 and a player no human drives, buys 0x5d2810's unit while

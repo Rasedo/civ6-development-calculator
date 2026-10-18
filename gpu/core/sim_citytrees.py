@@ -974,60 +974,81 @@ def _u_protect(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 
 def _u_move(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
-    """MOVE UNIT (0x7f0020)"""
+    """MOVE UNIT (0x7f0020): the unit it keeps (+0x50, `ma`) reaching the
+    location this turn SUCCEEDS, else RUNS; none kept, over its units in
+    order: the first reaching it this turn with Movement left SUCCEEDS and is
+    kept; else the first reaching it this turn (none kept before), or the one
+    a path brings there soonest, is kept, RUNNING; none FAILURE"""
     plot = c.tag(i, "Location")
     none = (plot == NONE) | (plot < 0)
     p = torch.where(none, 0, plot)
-    us = _units_of(c, i, "Unit ID List")
     u = c.units()
-    there = (u["plot"] == p.unsqueeze(1))
-    every = (~us | there).all(dim=1)
-    reach = (us & _b(c.w.reachable(p), us)).any(dim=1)
-    st = torch.where(every, BT_SUCCESS, torch.where(reach, BT_RUNNING, BT_FAILURE))
-    return torch.where(none | ~us.any(dim=1), BT_FAILURE, st)
+    kcol = u["valid"] & (u["id"] == c.ma[:, i].unsqueeze(1)) & (c.ma[:, i] >= 0).unsqueeze(1) & at.unsqueeze(1)
+    kept = kcol.any(dim=1)
+    us = _units_of(c, i, "Unit ID List") & ~kept.unsqueeze(1) & at.unsqueeze(1)
+    r1 = _b(c.w.reach_this_turn(p, False, us | kcol), us)
+    rm = _b(c.w.reach_this_turn(p, True, us), us)
+    tt = c.w.turns_to(p, us & ~r1)
+    U = us.shape[1]
+    pick = torch.full_like(p, -1)
+    best = torch.full_like(p, 1 << 40)
+    moves = torch.zeros_like(kept)
+    for j in range(U):
+        a = us[:, j] & r1[:, j]
+        b = a & ~moves & rm[:, j]
+        pick = torch.where(b | (a & (pick < 0)), j, pick)
+        moves = moves | b
+        best = torch.where(a, 1, best)
+        t = tt[:, j]
+        q = us[:, j] & ~r1[:, j] & (t > 0) & ((pick < 0) | (t < best))
+        pick = torch.where(q, j, pick)
+        best = torch.where(q, t, best)
+    k_reach = (kcol & r1).any(dim=1)
+    c.ma[:, i] = torch.where(at & ~kept, torch.where(pick >= 0, _pick(u["id"], pick), -1), c.ma[:, i])
+    st = torch.where(kept, torch.where(k_reach, BT_SUCCESS, BT_RUNNING),
+                     torch.where(pick < 0, BT_FAILURE, torch.where(moves, BT_SUCCESS, BT_RUNNING)))
+    return torch.where(none, BT_FAILURE, st)
 
 
 def _x_move(c: _Ctx, i: int, at: torch.Tensor) -> None:
+    """the execution (0x7eeba0): the kept unit, else each of its units"""
     plot = c.tag(i, "Location")
     go = at & (plot != NONE)
-    us = _units_of(c, i, "Unit ID List")
     u = c.units()
+    kcol = u["valid"] & (u["id"] == c.ma[:, i].unsqueeze(1)) & (c.ma[:, i] >= 0).unsqueeze(1)
+    us = torch.where(kcol.any(dim=1, keepdim=True), kcol, _units_of(c, i, "Unit ID List"))
     off = us & (u["plot"] != plot.unsqueeze(1)) & go.unsqueeze(1)
     for j in off.any(dim=0).nonzero(as_tuple=True)[0].tolist():
         c.w.order(u["id"][:, j], "move", plot, torch.full_like(plot, -1), off[:, j])
 
 
-def _clear_imp(c: _Ctx) -> torch.Tensor:
-    """the improvement the tree's Decode Trigger names (node 1's Trigger
-    Improvements tag), NONE none"""
-    t = c.tree.tag(1, "Trigger Improvements")
-    return torch.full_like(c.ref, NONE) if t is None else c.bb[:, t]
-
-
 def _u_clear(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
-    """CLEAR PLOT (0x7f7960)"""
+    """CLEAR PLOT (0x7f7960): the first of its units with charges on the
+    plot or reaching it this turn with Movement left is the node's (`ma`):
+    SUCCESS; else RUNNING where one reaches it this turn, else FAILURE"""
     plot = c.tag(i, "Plot To Clear")
     none = (plot == NONE) | (plot < 0)
     p = torch.where(none, 0, plot)
-    imp = _clear_imp(c)
-    ok = (imp != NONE) & _b(c.w.can_improve(p, torch.where(imp != NONE, imp, -1)), p)
     us = _units_of(c, i, "Builder List")
     u = c.units()
-    on = (us & (u["plot"] == p.unsqueeze(1)) & (u["charges"] > 0)).any(dim=1)
-    st = torch.where(ok, BT_SUCCESS, torch.where(on, BT_RUNNING, BT_FAILURE))
+    workers = us & (u["charges"] > 0) & at.unsqueeze(1)
+    taken = workers & ((u["plot"] == p.unsqueeze(1)) | _b(c.w.reach_this_turn(p, True, workers), workers))
+    j = _first(taken)
+    reach = (workers & _b(c.w.reach_this_turn(p, False, workers), workers)).any(dim=1)
+    c.ma[:, i] = torch.where(at, torch.where(~none & (j >= 0), _pick(u["id"], j), -1), c.ma[:, i])
+    st = torch.where(j >= 0, BT_SUCCESS, torch.where(reach, BT_RUNNING, BT_FAILURE))
     return torch.where(none, BT_FAILURE, st)
 
 
 def _x_clear(c: _Ctx, i: int, at: torch.Tensor) -> None:
+    """the execution, after Move Unit's: the node's unit clears where it
+    then stands on the plot"""
     plot = c.tag(i, "Plot To Clear")
-    go = at & (plot != NONE)
-    us = _units_of(c, i, "Builder List")
     u = c.units()
-    on = us & (u["plot"] == plot.unsqueeze(1)) & (u["charges"] > 0)
-    j = _first(on)
-    go = go & (j >= 0)
+    stands = ((u["id"] == c.ma[:, i].unsqueeze(1)) & (u["plot"] == plot.unsqueeze(1))).any(dim=1)
+    go = at & (plot != NONE) & (c.ma[:, i] >= 0) & stands
     if bool(go.any()):
-        c.w.order(_pick(u["id"], j), "clear", plot, torch.full_like(plot, -1), go)
+        c.w.order(c.ma[:, i], "clear", plot, torch.full_like(plot, -1), go)
 
 
 def _u_build_improvement(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
@@ -1038,11 +1059,14 @@ def _u_build_improvement(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     plot = c.tag(i, "Goal Plot")
     none = (plot == NONE) | (plot < 0)
     p = torch.where(none, 0, plot)
+    to = _builder_plot(c, i, p)
     u = c.units()
     workers = _units_of(c, i, "Worker List") & (u["charges"] > 0)
-    at_plot = workers & (u["plot"] == p.unsqueeze(1))
-    j = _first(at_plot)
-    reach = (workers & _b(w.reachable(p), workers)).any(dim=1)
+    # the first worker on the goal or reaching the builder plot this turn
+    # with Movement left; one reaching it with none left keeps it RUNNING
+    taken = workers & ((u["plot"] == p.unsqueeze(1)) | _b(w.reach_this_turn(to, True, workers), workers))
+    j = _first(taken)
+    reach = (workers & _b(w.reach_this_turn(to, False, workers), workers)).any(dim=1)
     imp = c.tag(i, "Improvements")
     has_i = (imp != NONE) & _b(w.can_improve(p, torch.where(imp != NONE, imp, -1)), p)
     done = at & ~none & (j >= 0) & has_i
@@ -1056,9 +1080,21 @@ def _u_build_improvement(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     return torch.where(none, BT_FAILURE, st)
 
 
+def _builder_plot(c: _Ctx, i: int, goal: torch.Tensor) -> torch.Tensor:
+    """the node's builder plot, the goal where none"""
+    bp = c.tag(i, "Builder Plot")
+    return torch.where((bp == NONE) | (bp < 0), goal, bp)
+
+
 def _x_build_improvement(c: _Ctx, i: int, at: torch.Tensor) -> None:
+    """the execution (0x7e8ef0), after Move Unit's in node order: the worker
+    standing on the builder plot builds — a Builder lays on the turn it
+    arrives"""
     plot = c.tag(i, "Goal Plot")
-    go = at & (c.ma[:, i] >= 0) & (plot != NONE)
+    to = _builder_plot(c, i, torch.where(plot == NONE, 0, plot))
+    u = c.units()
+    stands = ((u["id"] == c.ma[:, i].unsqueeze(1)) & (u["plot"] == to.unsqueeze(1))).any(dim=1)
+    go = at & (c.ma[:, i] >= 0) & (plot != NONE) & stands
     if bool(go.any()):
         c.w.order(c.ma[:, i], "improve", plot, c.mb[:, i], go)
 

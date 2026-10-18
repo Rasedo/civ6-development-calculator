@@ -255,8 +255,10 @@ class SimMinorAi:
 
     # -- the plot analysis ---------------------------------------------------
 
-    def _minor_ground_imps(self, s: int) -> torch.Tensor:
-        """[B, T, K] — `groundImprovements`: the improvements the ground of
+    def _minor_ground_imps(self, s: int, standing: bool = False) -> torch.Tensor:
+        """[B, T, K] — `groundImprovements` (with `standing`,
+        `standingImprovements`: the plot as it stands alone, the trees'
+        nodes' test): the improvements the ground of
         each plot takes for minor `s`, the improvements' own research waived
         and a ground row's civic held (the Farm on Hills, the Lumber Mill's
         Rainforest) (CanHaveImprovement 0x35fd60, `validImprovementsIn`): of
@@ -301,10 +303,12 @@ class SimMinorAi:
         # the three readings: as it stands, harvested, cleared (and both)
         land = base & ~res & ~self.water
         sea = base & ~res & self.water
-        land_h = base & harvestable & ~self.water
-        sea_h = base & harvestable & self.water
-        land_c = base & clearable & (~res | harvestable) & ~self.water
-        sea_c = base & clearable & (~res | harvestable) & self.water
+        # `standing`: the plot as it stands alone (`standingImprovements`)
+        keep = torch.full_like(base, not standing)
+        land_h = base & harvestable & ~self.water & keep
+        sea_h = base & harvestable & self.water & keep
+        land_c = base & clearable & (~res | harvestable) & ~self.water & keep
+        sea_c = base & clearable & (~res | harvestable) & self.water & keep
         any_c = bool(land_c.any()) or bool(sea_c.any())
         out = torch.zeros(B, T, K, dtype=torch.bool, device=dev)
         for k in range(K):
@@ -509,7 +513,8 @@ class SimMinorAi:
         ground = self._minor_ground_imps(s)
         K = ground.shape[2]
         g = ground.gather(1, p0.unsqueeze(-1).expand(-1, -1, K)) & (owned & ev).unsqueeze(-1)
-        improvable = owned & ev & g.any(-1)
+        # a plot holding an improvement takes no other (0x5ce970's +0x54)
+        improvable = owned & ev & g.any(-1) & (self.improvement.gather(1, p0) < 0)
         out = {"plot": plots, "valid": valid, "owned": owned, "improvable": improvable, "near_owned": near,
                "imps": imps, "dists": dists}
         if not bool(ev.count_nonzero()):
@@ -1489,7 +1494,7 @@ class _MinorWorld:
         sim = self.sim
         ver = (sim._eff_version, sim._gen_ver)
         if self._ground is None or self._ground_ver != ver:
-            self._ground = sim._minor_ground_imps(self.s)
+            self._ground = sim._minor_ground_imps(self.s, standing=True)
             self._ground_ver = ver
         return self._ground
 
@@ -1532,24 +1537,41 @@ class _MinorWorld:
         sim = self.sim
         return sim.pair_dist[plots.clamp(min=0), plot.clamp(min=0).unsqueeze(1).expand_as(plots)].long()
 
-    def reachable(self, plot):
-        """[B, U] the unit stands on the plot or its path reaches it; asked of
-        a tree's units alone (MOVE UNIT, BUILD IMPROVEMENT), so the path is
-        searched for the units a tree holds"""
+    def _reach_turns(self, plot, among, max_turns: int, moves: bool):
+        """[B, U] per unit of `among` ([B, U]) the turns its planning (the
+        pathfinder within `max_turns`, no zone of control) takes to stand on
+        the plot, 0 none — with Movement left there where `moves` asks it"""
         sim = self.sim
         u = self.units()
-        out = u["valid"] & (u["plot"] == plot.unsqueeze(1))
+        out = torch.zeros_like(u["id"])
         lo = sim.POOL_LO["major"]
-        held = sim.cityai.tr_units[:, self.s].reshape(sim.B, -1)
-        in_tree = (u["id"].unsqueeze(2) == held.unsqueeze(1)).any(-1) & (u["id"] >= 0)
         for j in range(u["id"].shape[1]):
-            m = u["valid"][:, j] & ~out[:, j] & (plot >= 0) & in_tree[:, j]
+            m = u["valid"][:, j] & (plot >= 0) & among[:, j]
             if not bool(m.count_nonzero()):
                 continue
             rows = m.nonzero(as_tuple=True)[0]
-            res = sim._tac_search(rows, u["id"][rows, j] - lo, self.seat, 1 << 30, True, plot[rows], pre="major")
-            out[rows, j] = res["found"]
+            # one turn: the whole planning; no limit: stopped once the plot closes
+            res = sim._tac_search(rows, u["id"][rows, j] - lo, self.seat, max_turns, False,
+                                  None if max_turns == 1 else plot[rows], pre="major")
+            ar = torch.arange(rows.shape[0], device=sim.device)
+            p = plot[rows]
+            t = res["turns"][ar, p]
+            ok = t > 0
+            if moves:
+                ok &= res["moves"][ar, p] > 0
+            out[rows, j] = torch.where(ok, t, torch.zeros_like(t))
         return out
+
+    def reach_this_turn(self, plot, moves: bool, among):
+        """[B, U] the unit of `among` whose planning reaches the plot this
+        turn (one turn, range 0), with Movement left there where `moves`
+        asks it (MOVE UNIT, BUILD IMPROVEMENT)"""
+        return self._reach_turns(plot, among, 1, moves) == 1
+
+    def turns_to(self, plot, among):
+        """[B, U] the turns the path of the unit of `among` takes to the plot
+        (0x272a60), 0 none (MOVE UNIT)"""
+        return self._reach_turns(plot, among, 1 << 30, False)
 
     def order(self, uid, kind, plot, imp, mask):
         sim = self.sim

@@ -175,8 +175,11 @@ export interface CityTreeWorld {
   builderType(improvement: string): string | null;
   /** the city id a plot belongs to, -2 none (a city-state's one city is -1) */
   plotCity(plot: number): number;
-  /** a unit can reach the plot */
-  reachable(unit: TreeUnit, plot: number): boolean;
+  /** the unit's planning reaches the plot this turn (0x791300, one turn,
+   *  range 0), with Movement left there where `moves` asks it */
+  reachThisTurn(unit: TreeUnit, plot: number, moves: boolean): boolean;
+  /** the turns the unit's path takes to the plot (0x272a60), 0 none */
+  turnsTo(unit: TreeUnit, plot: number): number;
   /** the district may stand on the plot as it is (0x35f2d0) */
   canPlaceDistrict(plot: number, district: string): boolean;
   /** the plot's owner, -1 none */
@@ -620,48 +623,94 @@ function unitsOf(ctx: Ctx, run: BtRun, node: BtNode, name: string): TreeUnit[] {
 // PROTECT UNIT (0x7f07c0): SUCCESS
 const protectUnit: BtHandler<Ctx> = { update: () => BT_SUCCESS };
 
-// MOVE UNIT (0x7f0020): RUNNING until the units stand on the location, the
-// execution moving them; SUCCESS there; FAILURE where none can reach it
+// MOVE UNIT (0x7f0020): the unit it moves (+0x50), kept across turns, whose
+// planning reaches the location this turn: SUCCESS, else RUNNING. With none
+// kept (or the kept one gone), over its units: one reaching it this turn
+// with Movement left SUCCEEDS and is kept; else one reaching it this turn,
+// else the one a path brings there soonest, is kept, RUNNING; none FAILURE.
+// SUCCESS this turn lets the nodes after it run in the same tick, their
+// executions after its own, which moves the units: a Builder lays (Build
+// Improvement) or clears (Clear Plot) on the turn it arrives
 const moveUnit: BtHandler<Ctx> = {
   update(node, run, ctx) {
+    const m = run.mem[node.index];
     const plot = tagOf(run, node, 'Location');
     if (typeof plot !== 'number' || plot < 0) return BT_FAILURE;
-    const us = unitsOf(ctx, run, node, 'Unit ID List');
-    if (!us.length) return BT_FAILURE;
-    if (us.every((u) => u.plot === plot)) return BT_SUCCESS;
-    return us.some((u) => ctx.w.reachable(u, plot)) ? BT_RUNNING : BT_FAILURE;
+    const kept = typeof m.unit === 'number' ? ctx.w.units.find((u) => u.id === m.unit) : undefined;
+    if (kept) return ctx.w.reachThisTurn(kept, plot, false) ? BT_SUCCESS : BT_RUNNING;
+    m.unit = -1;
+    let pick: TreeUnit | undefined;
+    let soon = Infinity;
+    let moves = false;
+    for (const u of unitsOf(ctx, run, node, 'Unit ID List')) {
+      if (ctx.w.reachThisTurn(u, plot, false)) {
+        if (!moves && ctx.w.reachThisTurn(u, plot, true)) {
+          moves = true;
+          pick = u;
+        } else if (!pick) pick = u;
+        soon = 1;
+        continue;
+      }
+      const turns = ctx.w.turnsTo(u, plot);
+      if (turns > 0 && turns < soon) {
+        soon = turns;
+        pick = u;
+      }
+    }
+    if (!pick) return BT_FAILURE;
+    m.unit = pick.id;
+    return moves ? BT_SUCCESS : BT_RUNNING;
   },
   execute(node, run, ctx) {
     const plot = tagOf(run, node, 'Location');
     if (typeof plot !== 'number') return;
-    for (const u of unitsOf(ctx, run, node, 'Unit ID List')) if (u.plot !== plot) ctx.w.order(u.id, 'move', plot);
+    // the execution (0x7eeba0): the kept unit, else each of its units
+    const m = run.mem[node.index];
+    const kept = typeof m.unit === 'number' && m.unit >= 0 ? ctx.w.units.filter((u) => u.id === m.unit) : null;
+    for (const u of kept ?? unitsOf(ctx, run, node, 'Unit ID List')) if (u.plot !== plot) ctx.w.order(u.id, 'move', plot);
   },
 };
 
-// CLEAR PLOT (0x7f7960): the plot cleared for the improvement: SUCCESS once
-// it can take it; RUNNING while a unit of the tree stands on it, its
-// execution clearing it
+// CLEAR PLOT (0x7f7960): the first of its units with charges on the plot,
+// or whose planning reaches it this turn with Movement left, is the node's
+// (+0x40): SUCCESS; none so: RUNNING where one reaches it this turn, else
+// FAILURE. The execution, after Move Unit's, clears where that unit then
+// stands on the plot. Its SUCCESS walks on into the build in the same tick,
+// whose plot test still finds the feature or resource: the tree fails and
+// the next improvement event builds (runs/h1_duelw1124 Granada: plot 570's
+// Marsh cleared at t21, the Alcazar laid two turns on)
 const clearPlot: BtHandler<Ctx> = {
   update(node, run, ctx) {
+    const m = run.mem[node.index];
+    m.unit = -1;
     const plot = tagOf(run, node, 'Plot To Clear');
     if (typeof plot !== 'number' || plot < 0) return BT_FAILURE;
-    const imp = list(run.blackboard.get(dataTag(run.nodes[1], 'Trigger Improvements') ?? '')).map(String)[0];
-    if (imp && ctx.w.canImprove(plot, imp)) return BT_SUCCESS;
-    const us = unitsOf(ctx, run, node, 'Builder List');
-    return us.some((u) => u.plot === plot && u.charges > 0) ? BT_RUNNING : BT_FAILURE;
+    let running = false;
+    for (const u of unitsOf(ctx, run, node, 'Builder List')) {
+      if (u.charges <= 0) continue;
+      if (u.plot === plot || ctx.w.reachThisTurn(u, plot, true)) {
+        m.unit = u.id;
+        return BT_SUCCESS;
+      }
+      if (ctx.w.reachThisTurn(u, plot, false)) running = true;
+    }
+    return running ? BT_RUNNING : BT_FAILURE;
   },
   execute(node, run, ctx) {
+    const m = run.mem[node.index];
     const plot = tagOf(run, node, 'Plot To Clear');
-    if (typeof plot !== 'number') return;
-    const u = unitsOf(ctx, run, node, 'Builder List').find((x) => x.plot === plot && x.charges > 0);
-    if (u) ctx.w.order(u.id, 'clear', plot);
+    if (typeof plot !== 'number' || typeof m.unit !== 'number' || m.unit < 0) return;
+    if (ctx.w.units.find((u) => u.id === m.unit)?.plot === plot) ctx.w.order(m.unit, 'clear', plot);
   },
 };
 
-// BUILD IMPROVEMENT (0x7e9670; its execution 0x7e8ef0): a worker with
-// charges on the goal plot that can take an improvement of the list:
-// SUCCESS, the execution building it; else RUNNING where a worker can reach
-// the plot, FAILURE where none can
+// BUILD IMPROVEMENT (0x7e9670; its execution 0x7e8ef0): the first worker
+// with charges on the goal plot, or whose planning reaches the builder plot
+// (the goal where none) this turn with Movement left, is the node's, and the
+// first improvement of the list the goal plot can take: SUCCESS. No worker
+// so: RUNNING where one reaches the builder plot this turn, else FAILURE.
+// The execution, after Move Unit's in node order, builds where the worker
+// then stands on the builder plot: a Builder lays on the turn it arrives.
 const buildImprovement: BtHandler<Ctx> = {
   update(node, run, ctx) {
     const m = run.mem[node.index];
@@ -669,9 +718,20 @@ const buildImprovement: BtHandler<Ctx> = {
     m.improvement = null;
     const plot = tagOf(run, node, 'Goal Plot');
     if (typeof plot !== 'number' || plot < 0) return BT_FAILURE;
-    const workers = unitsOf(ctx, run, node, 'Worker List').filter((u) => u.charges > 0);
-    const at = workers.find((u) => u.plot === plot);
-    if (!at) return workers.some((u) => ctx.w.reachable(u, plot)) ? BT_RUNNING : BT_FAILURE;
+    const bp = tagOf(run, node, 'Builder Plot');
+    const to = typeof bp === 'number' && bp >= 0 ? bp : plot;
+    let at: TreeUnit | undefined;
+    let running = false;
+    for (const u of unitsOf(ctx, run, node, 'Worker List')) {
+      if (u.charges <= 0) continue;
+      if (u.plot === plot || ctx.w.reachThisTurn(u, to, true)) {
+        at = u;
+        break;
+      }
+      if (ctx.w.reachThisTurn(u, to, false)) running = true;
+    }
+    if (!at) return running ? BT_RUNNING : BT_FAILURE;
+    m.at = to;
     const imp = list(tagOf(run, node, 'Improvements')).map(String).find((i) => ctx.w.canImprove(plot, i));
     if (!imp) return BT_FAILURE;
     m.unit = at.id;
@@ -683,7 +743,8 @@ const buildImprovement: BtHandler<Ctx> = {
   execute(node, run, ctx) {
     const m = run.mem[node.index];
     const plot = tagOf(run, node, 'Goal Plot');
-    if (typeof m.unit === 'number' && m.unit >= 0 && typeof plot === 'number') ctx.w.order(m.unit, 'improve', plot, m.improvement as string);
+    if (typeof m.unit !== 'number' || m.unit < 0 || typeof plot !== 'number') return;
+    if (ctx.w.units.find((u) => u.id === m.unit)?.plot === m.at) ctx.w.order(m.unit, 'improve', plot, m.improvement as string);
   },
 };
 

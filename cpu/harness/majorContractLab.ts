@@ -326,7 +326,8 @@ for (let i = 0; i + 1 < recs.length; i++) {
         const t = state.map.tiles[plot];
         return t.ownerSeat === seat ? (t.ownerCity ?? -2) : -2;
       },
-      reachable: () => true,
+      reachThisTurn: () => true,
+      turnsTo: () => 1,
       distance: (x, y) => hexDistance(state.map, state.map.tiles[x].col, state.map.tiles[x].row, state.map.tiles[y].col, state.map.tiles[y].row),
       newContractId: () => contractSerial++,
       newTreeId: () => treeSerial++,

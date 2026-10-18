@@ -1608,9 +1608,19 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     // the game's minor took its first turn the turn the city was founded:
     // its knowledge base's look, which its military AI reads on its next
     // turn, and its city AI's first look, which runs no events and picks
-    // the Default Specialization
-    minorKnowledge(state, placed, false);
-    minorAiTurn(state, placed);
+    // the Default Specialization. A minor's founding lands after the
+    // engine's turn (its player is never the active one), the clock already
+    // on the record's next turn: that turn stamps the founding turn's, the
+    // item's set turn first among them (runs/h1_duelw1124 Bologna:
+    // AI_CityBuild.csv's Default Specialization Monument at t1, the Builder
+    // contract at t3 clearing none of it)
+    state.turn -= 1;
+    try {
+      minorKnowledge(state, placed, false);
+      minorAiTurn(state, placed);
+    } finally {
+      state.turn += 1;
+    }
     count(ctx, 'found:minor', 'applied');
     return;
   }
@@ -2811,9 +2821,35 @@ function minorResearch(ctx: Ctx, b: TurnRecord, tally: MinorResearchTally): void
 
 /** the plots whose improvement the engine's own city-state, Free City or
  *  barbarian scripts changed in the turn take the record's: their builders'
- *  and raiders' decisions */
-function undoMinorPlots(ctx: Ctx, before: (string | null)[]): void {
+ *  and raiders' decisions; a feature or resource their Builders cleared that
+ *  record t+1 still holds is the record's again (`minorAi:clear`) */
+function undoMinorPlots(ctx: Ctx, before: (string | null)[], ground: [string | null, string | null][],
+  charges: Map<Unit, number>): void {
   const { state, next } = ctx;
+  // the Builder whose charge the undone order spent gets it back: one that
+  // stood on the plot after it with fewer charges than it began the turn on,
+  // a Builder its last charge disbanded back on the map
+  const refund = (plot: number): void => {
+    for (const [u, c] of charges) {
+      if (u.tileIndex !== plot || (u.charges ?? 0) >= c) continue;
+      u.charges = (u.charges ?? 0) + 1;
+      if (!state.units.includes(u)) state.units.push(u);
+      return;
+    }
+  };
+  for (const t of state.map.tiles) {
+    if (t.ownerSeat < state.seats.length) continue;
+    const r = next.state.map.tiles[t.index];
+    const [feature, resource] = ground[t.index];
+    for (const k of ['feature', 'resource'] as const) {
+      const was = k === 'feature' ? feature : resource;
+      if (!was || t[k] || !r[k]) continue;
+      if (k === 'feature') t.feature = r.feature;
+      else t.resource = r.resource;
+      count(ctx, 'minorAi:clear', 'fallback', ctx.playerOfSeat.get(t.ownerSeat), `plot ${t.index}: the engine cleared its ${k}, the game kept it`);
+      refund(t.index);
+    }
+  }
   for (const t of state.map.tiles) {
     if ((t.improvement ?? null) === before[t.index]) continue;
     if (t.ownerSeat >= 0 && t.ownerSeat < state.seats.length) continue;
@@ -2822,6 +2858,7 @@ function undoMinorPlots(ctx: Ctx, before: (string | null)[]): void {
     const was = t.improvement;
     t.improvement = next.state.map.tiles[t.index].improvement;
     count(ctx, 'minorAi:improve', 'fallback', ctx.playerOfSeat.get(t.ownerSeat), `plot ${t.index}: the engine laid ${was}, the game ${t.improvement}`);
+    if (was) refund(t.index);
   }
 }
 
@@ -3483,6 +3520,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const seed = turnSeed(b);
     const standing = new Set(state.units);
     const improvements = state.map.tiles.map((x) => x.improvement ?? null);
+    const ground = state.map.tiles.map((x): [string | null, string | null] => [x.feature ?? null, x.resource ?? null]);
+    const charges = new Map(state.units.filter((u) => minorAiSeat(u.seat) && (u.charges ?? 0) > 0).map((u) => [u, u.charges ?? 0]));
     // what each unit did in its player's actions of the turn, which the
     // turn's heal and fortification read: one that stood on its plot and
     // fought nobody rested, any other spent its moves. A record's moves do
@@ -3518,6 +3557,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const key = `${r.owner}:${r.id}`;
       const u = unitOf(ctx, key);
       if (!u) continue;
+      // a city-state's or Free City's unit acts in the engine's turn, its own
+      // AI's: it starts that turn on its moves (runs/h1_duelw1121 t8: Hunza's
+      // Builder, its Farm laid at t7, walks to plot 275 on its moves)
+      if (minorAiSeat(u.seat)) {
+        u.movesLeft = grantedMoves(state, u);
+        continue;
+      }
       const stood = logged ? !walked.has(key) : was.get(key) === r.y * ctx.W + r.x;
       const rested = stood && !fought.has(key);
       u.movesLeft = rested ? grantedMoves(state, u) : 0;
@@ -3646,7 +3692,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat),
         `${u.type}${op ? ` for ${op}` : ''}`);
     }
-    undoMinorPlots(ctx, improvements);
+    undoMinorPlots(ctx, improvements, ground, charges);
     minorBuilds(ctx, b, report.minorBuilds);
     minorResearch(ctx, b, report.minorResearch);
     // REPLAY_TRACE=minorProd: each city-state's item, purse, units and research after the engine's turn

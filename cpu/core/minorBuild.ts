@@ -57,7 +57,7 @@ import { knowledgeLook } from './tactical';
 import { cityStateMilitary, minorCampsLook } from './minorOps';
 import { tilesWithin } from '../../world/hex';
 import { hasRiver } from '../../world/query';
-import { engineId, gameTypeOf } from '../data/aliases';
+import { aliases, engineId, gameTypeOf } from '../data/aliases';
 import { DISTRICTS } from '../data/districts';
 import { AI_BUILDINGS, AI_PROMOTION_CLASS_LISTS, AI_UNITS } from '../data/aiBuildTables';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
@@ -801,11 +801,13 @@ export function minorItemOfType(type: string): Exclude<MinorItem, { none: true }
   return p ? { project: p } : null;
 }
 
-/** The install type of an engine row: its own type where that names it
- *  (a civilization's unique row maps onto the row it replaces, never the
- *  reverse), else the type its catalog tag names */
-export function installType(kind: string, id: string, prefix: string, known: object): string {
-  return engineId(kind, prefix + id, prefix, known) === id ? prefix + id : gameTypeOf(kind, id, prefix);
+/** The install type of an engine row: its own type where the catalog tags
+ *  that type with the row (a civilization's unique row maps onto the row it
+ *  replaces, never the reverse), else the type its catalog tag names —
+ *  DRAMA_AND_POETRY is CIVIC_DRAMA_POETRY, HOPLITE UNIT_GREEK_HOPLITE */
+export function installType(kind: string, id: string, prefix: string): string {
+  const own = prefix + id;
+  return aliases()[kind]?.get(own) === id ? own : gameTypeOf(kind, id, prefix);
 }
 
 /** The install type of the minor's item in hand, null with none */
@@ -813,10 +815,10 @@ export function minorItemType(cityState: CityState): string | null {
   const k = cityState.prodItem;
   if (!k) return null;
   const [kind, id] = k.split(':');
-  return kind === 'building' ? installType('building', id, 'BUILDING_', BUILDINGS)
-    : kind === 'district' ? installType('district', id, 'DISTRICT_', DISTRICTS)
-      : kind === 'unit' ? installType('unit', id, 'UNIT_', UNITS)
-        : kind === 'project' ? installType('project', id, 'PROJECT_', PROJECTS) : null;
+  return kind === 'building' ? installType('building', id, 'BUILDING_')
+    : kind === 'district' ? installType('district', id, 'DISTRICT_')
+      : kind === 'unit' ? installType('unit', id, 'UNIT_')
+        : kind === 'project' ? installType('project', id, 'PROJECT_') : null;
 }
 
 /** The turns the research AI's analysis gives a technology or the civics
@@ -865,7 +867,7 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
   const own = new Map<string, number>();
   for (const u of state.units) {
     if (u.seat !== cityState.seat) continue;
-    const t = installType('unit', u.type, 'UNIT_', UNITS);
+    const t = installType('unit', u.type, 'UNIT_');
     own.set(t, (own.get(t) ?? 0) + 1);
   }
   const holds = (x: string): boolean => {
@@ -916,7 +918,7 @@ export function minorCombatDesire(state: GameState, cityState: CityState, turn: 
     records: cityState.armyKnown ?? [],
     areaOf: (plot) => state.map.tiles[plot]?.area ?? -1,
     strength: (type) => {
-      const u = AI_UNITS[AI_UNIT_INDEX.get(installType('unit', type, 'UNIT_', UNITS)) ?? -1];
+      const u = AI_UNITS[AI_UNIT_INDEX.get(installType('unit', type, 'UNIT_')) ?? -1];
       return u ? Math.max(u.combat, u.rangedCombat) : 0;
     },
     turn,
@@ -942,7 +944,7 @@ export function minorResourceCounts(state: GameState, cityState: CityState): Map
   const c = state.map.tiles[cityState.centerIndex];
   for (const t of tilesWithin(state.map, c.col, c.row, 3)) {
     if (tileSeat(t) !== cityState.seat || t.improvement || !t.resource || hidden.has(t.resource)) continue;
-    const k = installType('resource', t.resource, 'RESOURCE_', RESOURCES);
+    const k = installType('resource', t.resource, 'RESOURCE_');
     out.set(k, (out.get(k) ?? 0) + 1);
   }
   return out;
@@ -967,7 +969,7 @@ export function minorResourceFacts(state: GameState, cityState: CityState): Reso
   const extracted = new Map<string, number>();
   for (const t of state.map.tiles) {
     if (tileSeat(t) !== cityState.seat || !t.resource || !extractsResource(t)) continue;
-    const k = installType('resource', t.resource, 'RESOURCE_', RESOURCES);
+    const k = installType('resource', t.resource, 'RESOURCE_');
     extracted.set(k, (extracted.get(k) ?? 0) + 1);
   }
   const table = minorUnitProduction(state, cityState, minorKnownUnits(cityState));
@@ -1082,7 +1084,7 @@ export function minorResearchResources(state: GameState, cityState: CityState): 
 export function minorKnownUnits(cityState: CityState): (unit: string) => number {
   const n = new Map<string, number>();
   for (const r of cityState.armyKnown ?? []) {
-    const t = installType('unit', r.type, 'UNIT_', UNITS);
+    const t = installType('unit', r.type, 'UNIT_');
     n.set(t, (n.get(t) ?? 0) + 1);
   }
   return (unit) => n.get(unit) ?? 0;
@@ -1139,7 +1141,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       return id === 'CITY_CENTER' || (!!id && (cityState.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete));
     },
     governmentTier: 0,
-    worship: worship ? installType('building', worship, 'BUILDING_', BUILDINGS) : null,
+    worship: worship ? installType('building', worship, 'BUILDING_') : null,
     riverside: hasRiver(centre),
     groundRefuses: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
@@ -1356,9 +1358,9 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
   cityState.prodProgress = 0;
   delete cityState.prodItem;
   delete cityState.prodSite;
-  if ('unit' in item) minorItemBuilt(cityState, { unit: installType('unit', item.unit, 'UNIT_', UNITS), building: null, district: null }, built);
-  else if ('building' in item) minorItemBuilt(cityState, { unit: null, building: installType('building', item.building, 'BUILDING_', BUILDINGS), district: null }, -1);
-  else if ('district' in item) minorItemBuilt(cityState, { unit: null, building: null, district: installType('district', item.district, 'DISTRICT_', DISTRICTS) }, -1);
+  if ('unit' in item) minorItemBuilt(cityState, { unit: installType('unit', item.unit, 'UNIT_'), building: null, district: null }, built);
+  else if ('building' in item) minorItemBuilt(cityState, { unit: null, building: installType('building', item.building, 'BUILDING_'), district: null }, -1);
+  else if ('district' in item) minorItemBuilt(cityState, { unit: null, building: null, district: installType('district', item.district, 'DISTRICT_') }, -1);
   return true;
 }
 
@@ -1518,7 +1520,7 @@ function freeCityProjectFacts(state: GameState, city: City, facts: CityBuildFact
 export function freeCityPickFacts(state: GameState, city: City, facts: CityBuildFacts): PickFacts {
   const r = freeSeatOf(state).research;
   const unlocks = computeUnlocksIn(r, []);
-  const inHand = city.queue[0]?.kind === 'building' ? installType('building', city.queue[0].building, 'BUILDING_', BUILDINGS) : null;
+  const inHand = city.queue[0]?.kind === 'building' ? installType('building', city.queue[0].building, 'BUILDING_') : null;
   return {
     buildingHeld: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);

@@ -58,7 +58,7 @@ export function seatUnitRows(state: GameState, seat: number, knownBy: (unit: str
   const own = new Map<string, number>();
   for (const u of state.units) {
     if (u.seat !== seat) continue;
-    const t = installType('unit', u.type, 'UNIT_', UNITS);
+    const t = installType('unit', u.type, 'UNIT_');
     own.set(t, (own.get(t) ?? 0) + 1);
   }
   const owned = new Set<string>();

@@ -317,6 +317,19 @@ export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reac
   return out;
 }
 
+/** the turns the unit's planning takes to stand on `dest` (0x272a60: the
+ *  pathfinder with no zone of control, as `reachPlots` with no turn limit,
+ *  stopped once `dest` closes); 0 where it cannot */
+export function turnsToPlot(state: GameState, unit: Unit, dest: number): number {
+  let turns = 0;
+  search(state, unit, Infinity, false, (n, ground) => {
+    if (n.tile !== dest) return false;
+    if (n.attack || ground.stand(n.tile)) turns = n.turns;
+    return true;
+  });
+  return turns;
+}
+
 /** the plots from the unit's to `dest`, the unit's own left out, by the
  *  pathfinder's path (its parents once `dest` closes); empty where none */
 export function pathTo(state: GameState, unit: Unit, dest: number): number[] {

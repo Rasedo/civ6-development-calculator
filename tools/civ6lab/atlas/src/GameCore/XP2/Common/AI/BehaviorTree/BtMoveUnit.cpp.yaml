@@ -20,12 +20,16 @@
   name: moveUnitExec
   semantics: "Move Unit's execution: the unit's planning plot at To Range this turn, else the location; no move into danger unless allowed; MoveTo"
   status: PARTLY
-  impl: [cpu/core/barbarianOps.ts:SCOUT_NODES]
+  impl:
+    - cpu/core/barbarianOps.ts:SCOUT_NODES
+    - cpu/core/aiCityTrees.ts:execute
+    - gpu/core/sim_citytrees.py:_x_move
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.

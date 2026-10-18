@@ -95,11 +95,11 @@ const keyOf = (q: QueueItem): string => (q.kind === 'building' ? `b:${q.building
 /** the install type of a major's queue item, null for a wonder */
 export function majorItemType(q: QueueItem | undefined): string | null {
   if (!q) return null;
-  if (q.kind === 'building') return installType('building', q.building, 'BUILDING_', BUILDINGS);
-  if (q.kind === 'unit') return installType('unit', q.unit, 'UNIT_', UNITS);
+  if (q.kind === 'building') return installType('building', q.building, 'BUILDING_');
+  if (q.kind === 'unit') return installType('unit', q.unit, 'UNIT_');
   if (q.kind === 'settler') return 'UNIT_SETTLER';
-  if (q.kind === 'district') return installType('district', q.district, 'DISTRICT_', DISTRICTS);
-  if (q.kind === 'project') return installType('project', q.project, 'PROJECT_', PROJECTS);
+  if (q.kind === 'district') return installType('district', q.district, 'DISTRICT_');
+  if (q.kind === 'project') return installType('project', q.project, 'PROJECT_');
   return null;
 }
 
@@ -134,7 +134,7 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
   const own_units = new Map<string, number>();
   for (const u of state.units) {
     if (u.seat !== seat) continue;
-    const t = installType('unit', u.type, 'UNIT_', UNITS);
+    const t = installType('unit', u.type, 'UNIT_');
     own_units.set(t, (own_units.get(t) ?? 0) + 1);
   }
   const holds = (x: string): boolean => {
@@ -180,7 +180,7 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
       return id === 'CITY_CENTER' || (!!id && city.districts.some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete));
     },
     governmentTier: GOVERNMENTS[seatGovernment(state, seat) ?? '']?.tier ?? 0,
-    worship: worship ? installType('building', worship, 'BUILDING_', BUILDINGS) : null,
+    worship: worship ? installType('building', worship, 'BUILDING_') : null,
     riverside: hasRiver(centre),
     groundRefuses: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
