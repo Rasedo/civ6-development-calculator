@@ -619,7 +619,7 @@ MOD_PINS = {
     "BUILDING_AQUARIUM": [5120, 4096, 1536],
     "BUILDING_AQUATICS_CENTER": [0, 0, 0],
     "BUILDING_GOV_TALL": [0, 0, 0],
-    "BUILDING_GOV_WIDE": [0, 0, 0],
+    "BUILDING_GOV_WIDE": [5632, 5376, 2816],
     "BUILDING_GOV_CONQUEST": [0, 0, 0],
     "BUILDING_GOV_CITYSTATES": [16128, 13056, 5888],
     # its spy (EFFECT_GRANT_SPY, 402 / 330 / 152) and its 40
@@ -694,6 +694,12 @@ class Mods:
 
     def unit_cost(self, u):
         return 40
+
+    def unit_turns(self, u, extra):
+        return 8
+
+    def unit_expected(self, u):
+        return FX
 
 
 def test_modifiers(v: Values) -> None:

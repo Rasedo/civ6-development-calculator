@@ -22,6 +22,7 @@ function modView(over: Record<string, unknown> = {}): AiValueView {
     cityOwnedPlots: () => plots, cityYield: (_s: number, _c: number, y: string) => (y === 'YIELD_PRODUCTION' ? 7.5 : 3),
     cityStrikes: () => true, cityHasBuilding: (_s: number, _c: number, b: string) => b === 'BUILDING_MONUMENT',
     traders: () => 0, tradeRouteCapacity: () => 1, tradeKnowledge: () => 4 * 256 + 64, unitCost: () => 40,
+    cityUnitTurns: () => 8, cityUnitExpected: () => 256,
     ...over,
   } as unknown as AiValueView;
 }
@@ -50,7 +51,10 @@ const PINS: Record<string, number[]> = {
   BUILDING_AQUARIUM: [5120, 4096, 1536],
   BUILDING_AQUATICS_CENTER: [0, 0, 0],
   BUILDING_GOV_TALL: [0, 0, 0],
-  BUILDING_GOV_WIDE: [0, 0, 0],
+  // its +50% Production toward Settlers (EFFECT_ADJUST_UNIT_PRODUCTION): the
+  // 7.5 Production x one expected Settler x 0.5, from the start over the 8
+  // train turns
+  BUILDING_GOV_WIDE: [5632, 5376, 2816],
   BUILDING_GOV_CONQUEST: [0, 0, 0],
   BUILDING_GOV_CITYSTATES: [16128, 13056, 5888],
   // its spy (EFFECT_GRANT_SPY: PSEUDOYIELD_UNIT_SPY 20 a turn from the start

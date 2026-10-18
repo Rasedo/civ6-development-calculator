@@ -56,7 +56,7 @@ describe('the contracts (Contracts.cpp)', () => {
     expect(cleared).toEqual([7]);
   });
 
-  it('the economic AI takes a contract for a unit or a non-wonder building it may buy with gold, never a district', () => {
+  it('the economic AI takes a contract for a unit or a non-wonder building it may buy with gold, the religious AI one it may buy with faith, never a district', () => {
     const none = [city({ canTrain: () => false, buildingBlocked: () => true, districtBlocked: () => true })];
     const book = newContractBook();
     const make = (over: Partial<AiContract>) => {
@@ -67,8 +67,11 @@ describe('the contracts (Contracts.cpp)', () => {
     expect(make({ id: 1, unit: 'UNIT_SETTLER', building: null })).toBe(CP_ACCEPTED);
     expect(make({ id: 2, building: 'BUILDING_MONUMENT' })).toBe(CP_ACCEPTED);
     expect(make({ id: 3, building: 'BUILDING_PYRAMIDS' })).toBe(CP_SUBMITTED);
-    expect(make({ id: 4, unit: 'UNIT_MISSIONARY', building: null })).toBe(CP_SUBMITTED);
+    // the Missionary's PurchaseYield is YIELD_FAITH: the religious AI's listener takes it
+    expect(make({ id: 4, unit: 'UNIT_MISSIONARY', building: null })).toBe(CP_ACCEPTED);
     expect(make({ id: 5, building: null, district: 'DISTRICT_CAMPUS' })).toBe(CP_SUBMITTED);
+    expect(make({ id: 6, building: 'BUILDING_WALLS' })).toBe(CP_SUBMITTED);
+    expect(make({ id: 7, unit: 'UNIT_SPY', building: null })).toBe(CP_SUBMITTED);
   });
 
   it('the Default Specialization takes the highest valued contract it may still take, logs the others, and a released one leaves silently', () => {

@@ -2555,7 +2555,7 @@
           "name": "minorStockpile",
           "compare": "exact",
           "covers": [
-            "CityState.stockpile"
+            "Seat.stockpile"
           ],
           "planes": [
             "citystate_stockpile"
