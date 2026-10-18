@@ -5022,15 +5022,27 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   0x6b0a0 radius 1, lambda 0x715f40: water skipped, deduped within the second
   list alone, so a reached plot beside another takes the danger twice). The
   danger is added once per list entry (two loops at 0x71690c / 0x7169a1). An
-  air unit (+0x650 == 1): the plots within its range. Each city of such a
-  player whose centre the player sees ([player +0x290] > 0): its defence
-  (0x24ae80) >> 8 on the centre; its strike (0x249ee0) >> 8 over its strike's
-  reach (0x249e40) less the centre, else 1 on each plot beside it (0x6b1b0 ->
-  0x691f0, the ring at distance 1, lambda 0x715ff0). Then the player's own
-  cities: a centre with a defence 0; each plot of its strike's reach with
-  danger down by the strike, to 1 at least. Features' +0x2c last (0 for
-  every feature of the install). The engines build it as each tactical pass
-  opens, the hostile units' searches on their full Movement.
+  air unit (+0x650 == 1): the plots within its range. Each DISTRICT of such
+  a player (the player's +0x1308 -> +0xd8, its district list: every district
+  placed, built or not — the recordings' city district lists hold districts
+  under construction — and each wonder's DISTRICT_WONDER plot, 1,948 entries
+  on 1117) whose plot the player sees ([player +0x290] > 0): its defence
+  (0x24ae80) >> 8 on its plot; its strike (0x249ee0) >> 8 over its strike's
+  reach (0x249e40) less its plot, else 1 on each plot beside it (0x6b1b0 ->
+  0x691f0, the ring at distance 1, lambda 0x715ff0). A district's defence
+  base (0x24a000) is 0 unless its DistrictInfo has hit points (+0x58 set,
+  +0x5c > 0: the City Center, the Encampment); its strike is 0 unless
+  0x24b960 holds (its outer damage +0x8d8 below its outer maximum,
+  GetMaxDamage 0x5e97d629). So every other district — a Campus, a Harbor, a
+  wonder — puts 1 on the six plots round it. Then the player's own
+  districts: one with a defence its plot 0; each plot of its strike's reach
+  with danger down by the strike, to 1 at least. Features' DangerValue
+  (+0x2c) last: FEATURE_BURNING_FOREST / FEATURE_BURNING_JUNGLE 80 and the
+  Bermuda Triangle 10 (DLC GranColombia_Maya), no other. The map is built
+  at the player's DoTurn (0x4e4560 -> 0x46cdd0 at 0x4e4aa4); the engines
+  build it as each tactical pass opens, the hostile units' searches on their
+  full Movement; an Encampment's defence the engines' (its city's standing
+  strength without the garrison) and its strike its city's.
 - MOVE TO SAFETY (0x77a4b0): each unit left (+0x530, +0x770 clear) on a plot
   of danger above 0 is listed ("Move to safety ... Current Danger") when it
   has no strength, or is embarked (0x8be30, IsEmbarked); hurt (+0xcf0 > 0): a
@@ -5066,11 +5078,13 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   religious map (0x716b10) to the danger: no party on the tactical core
   holds one. A goal plot argument (0x497d20 valid) puts the nearer to it
   first off its own territory: both callers pass none.
-- MEASURED: the replay's barbarian "Current Danger" rows (5 seeds, the map
-  as the barbarians' turn opens on the copy) 114 of 240 equal; the misses
-  are mostly +1 to +3 (a no-strike city at distance 2 would explain them: a
-  LAB question, the ring reads distance 1) and the replay's placing of the
-  other players' units. End plots: "HL: Move To Safety" 183 of 371 (60 with
+- MEASURED: the replay's barbarian "Current Danger" rows (the map as the
+  barbarians' turn opens on the copy), 1117: 30 of 35 equal with the
+  districts (17 with the cities alone: the +1 misses were the rings of the
+  Harbor, Campus and other districts beside the plot). The five left: t73 /
+  t74 an Archer on a city centre the game's barbarians see and the copy's
+  do not (+25), t107 a Trebuchet's 35 against the game's 30, t108 / t109 +85
+  on a Man-at-Arms beside Longxi with no unit of the record within six. End plots: "HL: Move To Safety" 183 of 371 (60 with
   the stand-in), "Move to safety" 29 of 60 (0).
 
 ## C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)
@@ -5336,13 +5350,34 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   operation stands with none (runs/h1_duelw1124: the t22 raid empty for 444
   turns; h1_duelw1128: the t78 raid at home empty from t143) — its tribe
   starts no other.
-- LAB (the engines): the rally is the tribe's camp (the staging plot the
-  operation's candidate names, player +0x12b8 +0xb58, unread); a member
-  killed stays a member off the map, a stray of the way home (the lone
-  Crossbowman of runs/h1_duelw1128 at its rally t90-t142, its team three);
-  the execution's gathering test is the update's arrival (the team's
-  readiness +0x11, 0x73fba0's strength advantage, unread); the team's +0x48
-  units are none; ties go by the pool slot.
+- THE RALLY (READ): the tribe's camp. The tribe's init (0x147fc0) writes
+  the camp's plot to tribe +0x10 (the defender placed on it, +0x18 the camp
+  standing); the raid's start (0x149980) and the assault's (0x1497d0) call
+  0x73e7d0 (op, the city's plot +0x158, &tribe +0x10): the target to op
+  +0x2a8, the rally through the autovariable at op +0x2c0 (0x7eb220) to op
+  +0x318, then each team's goals, slot 0 (+0xe8) the rally and slot 1
+  (+0xf0) the target — over whatever rally the start by name (0x7265b0)
+  took from the candidate.
+- THE STAGING PLOTS (READ): m_operationStartPoints, the Targets object's
+  autovariable (player +0x12b8 +0xb00, its vector +0xb58 / count +0xb68,
+  8 bytes a plot), rebuilt at each Targets update (0x7877e0: the tactical
+  knowledge turn 0x785f30, the scripted starts 0x725b80 / 0x726a20) — a
+  barbarian player's: the knowledge base's camps (KB +0x638, 16 bytes each,
+  count +0x648) in its order; any other's: its cities' plots (+0x158 /
+  +0x15c) in Player_Cities' order. The evaluation (0x746920) walks them as
+  the candidate's rallies; the barbarians' rally a running operation's
+  fixed one, and a capture's tree moves on the target (Move To 1), so no
+  barbarian move reads a staging plot.
+- RECORDED (the engines): a member killed stays a member off the map, a
+  stray of the way home — runs/h1_duelw1128's raid, three at its start, its
+  Crossbowman alone on its rally 15:15 t90-t142 (the way home's Move: the
+  rally, range 1, unit distance 4) never arrives, two strays of three. The
+  update's member walk (0x81a909) leaves a unit it cannot find (or one with
+  +0x1939 set) out of the members it sorts; the count the stray test sets
+  them against is unread. LAB: the execution's gathering test is the
+  update's arrival (the team's readiness +0x11, 0x73fba0's strength
+  advantage, unread); the team's +0x48 units are none; ties go by the pool
+  slot.
 - THE TURN LIMITER over a child the walk has not reached yet (FRESH) has
   not finished it: the limiter RUNS (the raid's Concurrent 15 under it
   ticks the turn it is reached).
@@ -6361,12 +6396,13 @@ region's plots with their scores, per turn and player.
   (0x56e3d0) of them; a unit with the flag +0x18bd also onto the land plots
   beside each reach plot (the ring 0x6b0a0 -> 0x691f0, deduped within its
   own list). An air unit (+0x650 == 1, taken as the air domain) onto the
-  plots within its range. Each such city whose centre the player sees: its
-  strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach
-  (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the
-  player's own cities: the centre 0, each plot their strike covers down by
-  its strength to 1 at least (0x716080). Features' DangerValue last (none in
-  the install).
+  plots within its range. Each district of such a player on a plot the
+  player sees ("C-95: the danger map and Move to Safety"): its strength
+  (0x24ae80) on its plot, its strike (0x249ee0) over its reach (0x249e40)
+  or, with none, 1 on each plot beside it (0x715ff0). Then the player's own
+  districts: one with a strength its plot 0, each plot their strike covers
+  down by its strength to 1 at least (0x716080). Features' DangerValue last
+  (the burning Woods and Rainforest 80, the Bermuda Triangle 10).
 - PARTLY READ: the unit flag +0x18bd (CanRaid: "C-95: the danger map
   and Move to Safety"; ai/major/danger.ts takes it as a unit with no ranged
   or bombard strength), the units' strengths (the install's base, the
@@ -6648,7 +6684,8 @@ AI_Operation.csv and AI_Operation_Eval.csv (the verbose recordings).
 - The evaluation (job "Op Evaluation", 0x746920): MustBeAtWar, MustHaveNukes,
   MustHaveUnits (player +0x12e8 +0xc0) first; then each target of the walk
   0x747230 (an enemy's target needs a value above 0) against each staging
-  plot (player +0x12b8 +0xb58; the fixed rally for a running one): the
+  plot (m_operationStartPoints, player +0x12b8 +0xb58: "THE STAGING
+  PLOTS"; the fixed rally for a running one): the
   distance 0 refused but for TARGET_FRIENDLY_CITY; MaxTargetDistInRegion /
   InArea / InWorld by the rally's and target's region (+0x18) and area
   (+8), -1 none; ours = the fixed strength, else the knowledge base's army
@@ -6699,8 +6736,11 @@ AI_Operation.csv and AI_Operation_Eval.csv (the verbose recordings).
   72 ... 114, Civilian Builder Capture 0.0, Naval Superiority 100.0, the
   running Settle operation's backup absent on its start turn); the Attack
   Barb Camp start on t32 at 6:3 with value 50.
-- Unread: the staging list (+0x12b8 +0xb58, the port takes the player's
-  cities), the ALLY gate, City Defense's start (0x5cced0 "Defense %s"), the
+- The staging list: "THE STAGING PLOTS" above (the port takes the player's
+  cities; the port's barbarians evaluate their running operations alone,
+  the game's also the Builder Capture candidate each turn — its eval line
+  50 x the camps known). Unread:
+  the ALLY gate, City Defense's start (0x5cced0 "Defense %s"), the
   knowledge base's camp order (the port reads plot order).
 
 ## C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ

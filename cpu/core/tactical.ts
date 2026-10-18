@@ -15,17 +15,19 @@ import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { CITY_STATE_MAX_HP } from '../data/cityStates';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
+import { AI_FEATURES } from '../data/aiBuildTables';
+import { installFeature } from '../data/aliases';
 import {
-  canEmbark, cityAtIndex, cliffBlocksStep, encampmentBlocks, inEnemyZoc, stepCost, stepUnit, unitDomain, unitFullMoves, unitIsNoncombat, unitReligious,
+  canEmbark, cityAtIndex, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, stepCost, stepUnit, unitDomain, unitFullMoves, unitIsNoncombat, unitReligious,
   unitsHostile, unitVisibleTo,
   waterEnterable,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { cityDefenseStrength, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { centreStrength, cityDefenseStrength, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
-import { outerPool } from './rules';
+import { encampOuterPool, outerPool } from './rules';
 import { cityStateAt, minorCity } from './cityStates';
 import { irradiated } from './nuclear';
 import { canSee, unitSight } from './fog';
@@ -846,12 +848,13 @@ export function aiStrengths(u: Unit): { melee: number; ranged: number; bombard: 
  * included), and to a second list, each plot once: every other plot within
  * its range (0x56e3d0) of those and — a unit that may coastal raid (+0x18bd,
  * CanRaid) — the land plots beside them (one it reaches too takes the
- * danger twice); an aircraft to the plots within its range. Each such
- * city whose centre the seat sees adds its defence on its centre and its
- * strike over its strike's reach, else 1 on each plot beside it (0x715ff0).
- * Then the seat's own cities: each centre 0, each plot their strike covers
- * down by its strength, to 1 at least (0x716080). The game builds it as the
- * player's turn opens.
+ * danger twice); an aircraft to the plots within its range. Each district of
+ * such a player (`dangerDistricts`) whose plot the seat sees adds its
+ * defence on its plot and its strike over its strike's reach, else 1 on each
+ * plot beside it (0x715ff0). Then the seat's own districts: each plot of one
+ * with a defence 0, each plot their strike covers down by its strength, to 1
+ * at least (0x716080). Last, each plot's feature its DangerValue
+ * (`featureDanger`). The game builds it as the player's turn opens.
  */
 export function dangerPlane(state: GameState, seat: number): Int16Array {
   const { map } = state;
@@ -900,30 +903,67 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     for (const p of reach) out[p] += s;
     for (const p of extra) out[p] += s;
   }
-  // a city's strengths in whole numbers (the 24.8 values shifted down, 0x24ae80, 0x249ee0)
-  const cityStrike = (c: City) => outerPool(state, c) > 0 ? Math.floor(cityStrikeStrength(state, c)) : 0;
   const citiesHeld = (h: { seat: number; cities: City[] }) => isCityStateSeat(h.seat)
     ? state.cityStates.filter((cs) => cs.seat === h.seat && cs.centerIndex >= 0).map(minorCity) : h.cities;
   for (const h of [...cityHolders(state), ...state.cityStates]) {
     if (!unitsHostile(state, { seat }, h)) continue;
     for (const c of citiesHeld(h)) {
-      if (!seen[c.centerIndex]) continue;
-      const def = Math.floor(cityDefenseStrength(state, c));
-      if (def > 0) out[c.centerIndex] += def;
-      const strike = cityStrike(c);
-      for (const p of within(c.centerIndex, strike > 0 ? CITY_STRIKE_RANGE : 1)) if (p !== c.centerIndex) out[p] += strike > 0 ? strike : 1;
+      for (const d of dangerDistricts(state, c)) {
+        if (!seen[d.plot]) continue;
+        if (d.def > 0) out[d.plot] += d.def;
+        for (const p of within(d.plot, d.strike > 0 ? CITY_STRIKE_RANGE : 1)) if (p !== d.plot) out[p] += d.strike > 0 ? d.strike : 1;
+      }
     }
   }
   const own = seatOf(state, seat);
   for (const c of own ? citiesHeld(own) : []) {
-    if (cityDefenseStrength(state, c) > 0) out[c.centerIndex] = 0;
-    const strike = cityStrike(c);
-    if (strike <= 0) continue;
-    for (const p of within(c.centerIndex, CITY_STRIKE_RANGE)) {
-      if (p === c.centerIndex || out[p] <= 0) continue;
-      out[p] = out[p] - strike > 1 ? out[p] - strike : 1;
+    for (const d of dangerDistricts(state, c)) {
+      if (d.def > 0) out[d.plot] = 0;
+      if (d.strike <= 0) continue;
+      for (const p of within(d.plot, CITY_STRIKE_RANGE)) {
+        if (p === d.plot || out[p] <= 0) continue;
+        out[p] = out[p] - d.strike > 1 ? out[p] - d.strike : 1;
+      }
     }
   }
+  for (const t of map.tiles) if (t.feature) out[t.index] += featureDanger(t.feature);
+  return out;
+}
+
+const FEATURE_DANGER = new Map(AI_FEATURES.map((r) => [r.type, r.danger] as const));
+
+/** a feature's DangerValue, every plot of it adds to the danger map last
+ *  (0x717e19: the burning Woods and Rainforest 80, the Bermuda Triangle 10) */
+export function featureDanger(feature: string): number {
+  return FEATURE_DANGER.get(installFeature(feature)) ?? 0;
+}
+
+/**
+ * A CITY'S DISTRICTS AS THE DANGER MAP READS THEM (the player's district
+ * list, +0x1308 -> +0xd8): every district placed, built or not, pillaged or
+ * not, its wonders' plots among them (DISTRICT_WONDER), each with its
+ * defence (0x24ae80) and strike (0x249ee0) in whole numbers (the 24.8 values
+ * shifted down). Only a district with hit points (DistrictInfo +0x58 / +0x5c:
+ * the City Center, the Encampment) has a defence, and it strikes only while
+ * its own perimeter stands (0x24b960: its outer damage below its maximum):
+ * the centre on its city's defence and strike, the Encampment on its city's
+ * standing strength without the garrison and the city's strike; any other
+ * district neither.
+ */
+export function dangerDistricts(state: GameState, c: City): { plot: number; def: number; strike: number }[] {
+  const strike = Math.floor(cityStrikeStrength(state, c));
+  const out: { plot: number; def: number; strike: number }[] = [];
+  for (const d of c.districts) {
+    if (d.type === 'CITY_CENTER') {
+      out.push({ plot: d.tileIndex, def: Math.floor(cityDefenseStrength(state, c)), strike: outerPool(state, c) > 0 ? strike : 0 });
+    } else if (d.type === 'ENCAMPMENT') {
+      const t = state.map.tiles[d.tileIndex];
+      out.push({ plot: d.tileIndex, def: Math.floor(centreStrength(state, c, false)), strike: encampmentIntact(t) && encampOuterPool(state, c, t) > 0 ? strike : 0 });
+    } else {
+      out.push({ plot: d.tileIndex, def: 0, strike: 0 });
+    }
+  }
+  for (const w of c.wonders) out.push({ plot: w.tileIndex, def: 0, strike: 0 });
   return out;
 }
 

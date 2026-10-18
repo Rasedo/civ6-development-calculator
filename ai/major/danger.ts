@@ -4,8 +4,9 @@
  * tools/civ6lab/dll_readings.md "C-97: the settle site evaluation"). A plot's
  * danger is the strength of every unit of a player at war with the seat that
  * the seat sees now and that can reach or strike the plot in a turn, the
- * strength of every such city on its centre and its strike over its reach,
- * less the cover of the seat's own cities.
+ * defence of every district of such a player on its plot and its strike over
+ * its reach (1 beside a district with none), less the cover of the seat's own
+ * districts.
  */
 import { AI_GLOBALS } from './tables';
 import type { MajorView } from './view';
@@ -58,18 +59,18 @@ export function dangerMap(view: MajorView, seat: number): Int16Array {
     for (const p of extra) out[p] += s;
     for (const p of ring) out[p] += s;
   }
-  for (const c of view.hostileCities(seat)) {
+  for (const c of view.hostileDistricts(seat)) {
     if (c.strength > 0) out[c.plot] += c.strength;
     if (c.ranged > 0) {
       for (const p of view.plotsWithin(c.plot, c.range)) if (p !== c.plot) out[p] += c.ranged;
     } else {
-      // a city with no strike: each plot beside it, one (0x715ff0)
+      // a district with no strike: each plot beside it, one (0x715ff0)
       for (const p of view.plotsWithin(c.plot, 1)) if (p !== c.plot) out[p] += 1;
     }
   }
-  // the seat's own cities: their centres safe, the plots their strike covers
-  // down by its strength, to 1 at least (0x716080)
-  for (const c of view.cityDefences(seat)) {
+  // the seat's own districts: those with a defence safe, the plots their
+  // strike covers down by its strength, to 1 at least (0x716080)
+  for (const c of view.districtDefences(seat)) {
     if (c.strength > 0) out[c.plot] = 0;
     if (c.ranged <= 0) continue;
     for (const p of view.plotsWithin(c.plot, c.range)) {

@@ -87,6 +87,8 @@ export interface AiFeatureRow {
   removable: boolean;
   removeTech: string | null;
   appeal: number;
+  /** Features.DangerValue: what the plot adds to the AI's danger map */
+  danger: number;
   /** Feature_YieldChanges and Feature_Removes: [YieldType, amount] */
   yields: readonly (readonly [string, number])[];
   removes: readonly (readonly [string, number])[];

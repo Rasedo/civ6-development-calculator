@@ -2916,10 +2916,12 @@ class SimTactics:
         its danger (`unitDanger`) over the plots its one-turn search closes
         from where it stands on its full Movement, those within its range of
         them and, a raider's, the land beside them — each set once; an
-        aircraft over its range. Each such city whose centre it sees adds its
-        defence on the centre and its strike over its strike's reach, else 1
-        beside it; its own cities zero their centres and take their strike
-        off the plots it covers, to 1 at least. A unit whose search cannot
+        aircraft over its range. Each district of such a player
+        (`_danger_districts`) whose plot it sees adds its defence on its plot
+        and its strike over its strike's reach, else 1 beside it; its own
+        districts with a defence zero their plots and take their strike off
+        the plots it covers, to 1 at least; last each plot's feature its
+        DangerValue (`featureDanger`). A unit whose search cannot
         touch a plot of `need` (its full Movement over the cheapest step, its
         range and the raider's ring past it) is not searched."""
         dev = self.device
@@ -2993,8 +2995,8 @@ class SimTactics:
                         second[rd] |= ring
                     count[mm] = reach.long() + second.long()
             out.index_add_(0, b_i, count * s[b_i, u_i].unsqueeze(1))
-        # the cities: the holders at war with `seat` whose centres it sees,
-        # then its own
+        # the districts (`dangerDistricts`): the holders' at war with `seat`
+        # on the plots it sees, then its own
         bidx = self._bidx
         disk2 = self.pair_dist <= _CITY_STRIKE_RANGE
         ring1 = self.pair_dist == 1
@@ -3010,33 +3012,71 @@ class SimTactics:
                 live = self.city_alive[:, row, c]
                 if not bool(live.count_nonzero()):
                     continue
-                col = torch.full((B,), c, dtype=torch.long, device=dev)
-                rt = torch.full_like(col, row)
-                ctr = self.city_center[:, row, c].clamp(min=0)
-                pool = torch.minimum(self.city_outer_hp[bidx, row, col].long(), self._walls_max_at(rt, col).long())
-                strike = self._strike_strength(row, col)
-                if row < self.n_majors:
-                    strike = strike + self._gov_mods(row)[12]["crng"].to(strike.dtype)
-                strike = torch.where(pool > 0, torch.floor(strike).long(), torch.zeros_like(col))
-                def_cs = self._city_defense_cs(rt, col)[0]
-                if mine:
-                    own.append((live, ctr, strike, def_cs))
-                    continue
-                on = live & hostile & seen[bidx, ctr]
-                if not bool(on.count_nonzero()):
-                    continue
-                d = torch.floor(def_cs).long()
-                out[bidx, ctr] += torch.where(on & (d > 0), d, torch.zeros_like(d))
-                area = torch.where((strike > 0).unsqueeze(1), disk2[ctr], ring1[ctr])
-                area[bidx, ctr] = False
-                val = torch.where(strike > 0, strike, torch.ones_like(strike))
-                out += (area & on.unsqueeze(1)).long() * val.unsqueeze(1)
-        for live, ctr, strike, def_cs in own:
+                for live_d, plot, def_cs, strike in self._danger_districts(row, c, live):
+                    if mine:
+                        own.append((live_d, plot, strike, def_cs))
+                        continue
+                    on = live_d & hostile & seen[bidx, plot]
+                    if not bool(on.count_nonzero()):
+                        continue
+                    out[bidx, plot] += torch.where(on & (def_cs > 0), def_cs, torch.zeros_like(def_cs))
+                    area = torch.where((strike > 0).unsqueeze(1), disk2[plot], ring1[plot])
+                    area[bidx, plot] = False
+                    val = torch.where(strike > 0, strike, torch.ones_like(strike))
+                    out += (area & on.unsqueeze(1)).long() * val.unsqueeze(1)
+        for live, plot, strike, def_cs in own:
             on = live & (def_cs > 0)
-            out[bidx[on], ctr[on]] = 0
-            hit = live.unsqueeze(1) & (strike > 0).unsqueeze(1) & disk2[ctr] & (out > 0)
-            hit[bidx, ctr] = False
+            out[bidx[on], plot[on]] = 0
+            hit = live.unsqueeze(1) & (strike > 0).unsqueeze(1) & disk2[plot] & (out > 0)
+            hit[bidx, plot] = False
             out = torch.where(hit, (out - strike.unsqueeze(1)).clamp(min=1), out)
+        # each plot's live feature its DangerValue
+        live = (self.feat_id >= 0) & ~self.feat_stripped
+        return out + torch.where(live, self._feat_danger[self.feat_id.clamp(min=0)], torch.zeros_like(out))
+
+    def _danger_districts(self, row: int, c: int, live: torch.Tensor) -> list:
+        """`dangerDistricts` of the city at (`row`, `c`) where `live` [B]:
+        per district placed (the centre, the registry's, the wonders' plots)
+        (placed [B], plot [B], defence [B], strike [B]) in whole numbers — the
+        centre on its city's defence and its strike while the walls stand,
+        the Encampment on the city's standing strength without the garrison
+        and its strike while it stands intact behind its own perimeter, any
+        other neither"""
+        dev = self.device
+        B = self.B
+        bidx = self._bidx
+        col = torch.full((B,), c, dtype=torch.long, device=dev)
+        rt = torch.full_like(col, row)
+        zero = torch.zeros_like(col)
+        wmax = self._walls_max_at(rt, col).long()
+        raw = self._strike_strength(row, col)
+        if row < self.n_majors:
+            raw = raw + self._gov_mods(row)[12]["crng"].to(raw.dtype)
+        raw = torch.floor(raw).long()
+        pool = torch.minimum(self.city_outer_hp[bidx, row, col].long(), wmax)
+        ctr = self.city_center[:, row, c].clamp(min=0)
+        out = [(live, ctr, torch.floor(self._city_defense_cs(rt, col)[0]).long(), torch.where(pool > 0, raw, zero))]
+        reg = self.city_dist_tile[:, row, c]
+        for di in range(reg.shape[1]):
+            plot = reg[:, di]
+            placed = live & (plot >= 0)
+            if not bool(placed.count_nonzero()):
+                continue
+            p0 = plot.clamp(min=0)
+            if di == self._encamp_didx:
+                intact = (self.district_complete[bidx, p0] & ~self.district_pillaged[bidx, p0]
+                          & (self.encamp_hp[bidx, p0] > 0)
+                          & (torch.minimum(self.encamp_outer_hp[bidx, p0].long(), wmax) > 0))
+                d = torch.floor(self._centre_strength(rt, col, garrisoned=False)).long()
+                out.append((placed, p0, d, torch.where(intact, raw, zero)))
+            else:
+                out.append((placed, p0, zero, zero))
+        wreg = self.city_wonder[:, row, c]
+        for wi in range(wreg.shape[1] if self._wond_n else 0):
+            plot = wreg[:, wi]
+            placed = live & (plot >= 0)
+            if bool(placed.count_nonzero()):
+                out.append((placed, plot.clamp(min=0), zero, zero))
         return out
 
     def _tac_min_step_mp(self) -> int:

@@ -16,7 +16,7 @@ import { governedCityIds, governorPromotionOpen, governorSum, governorsOf, gover
 import { GOVERNORS, GOVERNOR_INSTALL_ID, GOVERNOR_PROMOTIONS, GOVERNOR_TITLE_CIVICS, PROMO_INSTALL_ID, promotionBit } from '../data/governors';
 import { CITY_STATE_SUZERAIN_BONUS } from '../data/cityStates';
 import { BARB_SEAT, borderTurnsFrom, campTiles, cityStateOfSeat, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
-import { assignTo, districtHealth, pathTo, planUnit, reachPlots, tacticalTargets, type Pass, type Target } from './tactical';
+import { assignTo, dangerDistricts, districtHealth, pathTo, planUnit, reachPlots, tacticalTargets, type Pass, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
@@ -120,6 +120,10 @@ const PROMO_INSTALL: Readonly<Record<string, string>> = {
 const cityDefence = (state: GameState, c: City): MajorCityDefenceView => ({
   plot: c.centerIndex, strength: cityDefenseStrength(state, c),
   ranged: outerPool(state, c) > 0 ? cityStrikeStrength(state, c) : 0, range: CITY_STRIKE_RANGE,
+});
+
+const districtDefence = (d: { plot: number; def: number; strike: number }): MajorCityDefenceView => ({
+  plot: d.plot, strength: d.def, ranged: d.strike, range: CITY_STRIKE_RANGE,
 });
 
 export function majorView(state: GameState, inputs: MajorViewInputs = {}): MajorView {
@@ -268,7 +272,13 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       return cityHolders(state).filter((s) => unitsHostile(state, { seat: i }, s))
         .flatMap((s) => s.cities.filter((c) => seen[c.centerIndex]).map((c) => cityDefence(state, c)));
     },
-    cityDefences: (i) => citiesOf(state, i).map((c) => cityDefence(state, c)),
+    hostileDistricts: (i) => {
+      const seen = plotsSeenNow(state, new Set([i]));
+      const held = [...cityHolders(state).filter((s) => unitsHostile(state, { seat: i }, s)).flatMap((s) => s.cities),
+        ...state.cityStates.filter((cs) => cs.centerIndex >= 0 && unitsHostile(state, { seat: i }, cs)).map(minorCity)];
+      return held.flatMap((c) => dangerDistricts(state, c)).filter((d) => seen[d.plot]).map(districtDefence);
+    },
+    districtDefences: (i) => citiesOf(state, i).flatMap((c) => dangerDistricts(state, c)).map(districtDefence),
     turn: state.turn,
     costMultiplierPct: COST_MULTIPLIER_PCT,
     gameEra: state.gameEra ?? 0,

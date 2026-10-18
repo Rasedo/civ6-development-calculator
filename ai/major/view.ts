@@ -238,8 +238,11 @@ export interface MajorView extends AiValueView {
   hostileUnits(seat: number): readonly MajorHostileUnitView[];
   /** the cities of the players at war with the seat whose centres it sees now */
   hostileCities(seat: number): readonly MajorCityDefenceView[];
-  /** the seat's own cities */
-  cityDefences(seat: number): readonly MajorCityDefenceView[];
+  /** the districts of the players at war with the seat on the plots it sees
+   *  now, each with its defence and strike as the danger map reads them */
+  hostileDistricts(seat: number): readonly MajorCityDefenceView[];
+  /** the seat's own districts, each with its defence and strike */
+  districtDefences(seat: number): readonly MajorCityDefenceView[];
   readonly turn: number;
   /** the game era, an index into AI_ERAS */
   readonly gameEra: number;

@@ -20445,6 +20445,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": -1,
+  "danger": 0,
   "yields": [
    [
     "YIELD_FOOD",
@@ -20458,6 +20459,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 0,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20466,6 +20468,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": true,
   "removeTech": "TECH_BRONZE_WORKING",
   "appeal": -1,
+  "danger": 0,
   "yields": [
    [
     "YIELD_FOOD",
@@ -20488,6 +20491,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": true,
   "removeTech": "TECH_MINING",
   "appeal": 1,
+  "danger": 0,
   "yields": [
    [
     "YIELD_PRODUCTION",
@@ -20506,6 +20510,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 1,
+  "danger": 0,
   "yields": [
    [
     "YIELD_FOOD",
@@ -20523,6 +20528,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": true,
   "removeTech": "TECH_IRRIGATION",
   "appeal": -1,
+  "danger": 0,
   "yields": [
    [
     "YIELD_FOOD",
@@ -20541,6 +20547,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_FOOD",
@@ -20558,6 +20565,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 4,
+  "danger": 0,
   "yields": [
    [
     "YIELD_CULTURE",
@@ -20579,6 +20587,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_FAITH",
@@ -20596,6 +20605,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_CULTURE",
@@ -20613,6 +20623,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20621,6 +20632,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20629,6 +20641,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20637,6 +20650,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_CULTURE",
@@ -20654,6 +20668,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20662,6 +20677,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20670,6 +20686,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20678,6 +20695,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20686,6 +20704,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_FOOD",
@@ -20707,6 +20726,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20715,6 +20735,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20723,6 +20744,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20731,6 +20753,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 4,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20739,6 +20762,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20747,6 +20771,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_PRODUCTION",
@@ -20764,6 +20789,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_CULTURE",
@@ -20785,6 +20811,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20793,6 +20820,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20801,6 +20829,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_FAITH",
@@ -20822,6 +20851,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20830,6 +20860,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 0,
+  "danger": 0,
   "yields": [
    [
     "YIELD_FOOD",
@@ -20847,6 +20878,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": -1,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20855,6 +20887,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": -1,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20863,6 +20896,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 0,
+  "danger": 0,
   "yields": [
    [
     "YIELD_SCIENCE",
@@ -20876,6 +20910,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 0,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20884,6 +20919,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 0,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20892,6 +20928,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_FOOD",
@@ -20913,6 +20950,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20921,6 +20959,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_CULTURE",
@@ -20938,6 +20977,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20946,6 +20986,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20954,6 +20995,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -20962,6 +21004,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_CULTURE",
@@ -20983,6 +21026,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 10,
   "yields": [],
   "removes": []
  },
@@ -20991,6 +21035,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [
    [
     "YIELD_SCIENCE",
@@ -21008,6 +21053,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": 2,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -21016,6 +21062,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": -1,
+  "danger": 80,
   "yields": [],
   "removes": []
  },
@@ -21024,6 +21071,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": -1,
+  "danger": 0,
   "yields": [],
   "removes": []
  },
@@ -21032,6 +21080,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": -1,
+  "danger": 80,
   "yields": [],
   "removes": []
  },
@@ -21040,6 +21089,7 @@ export const AI_FEATURES: readonly AiFeatureRow[] = [
   "removable": false,
   "removeTech": null,
   "appeal": -1,
+  "danger": 0,
   "yields": [],
   "removes": []
  }

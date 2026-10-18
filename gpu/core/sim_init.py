@@ -1880,6 +1880,8 @@ class SimInit:
         # stand at and block with, and the hex lines of every pair within the
         # farthest sight (`FEATURE_SIGHT_THROUGH`, `ELEVATION_SIGHT`, `SIGHT_MAX`)
         self._feat_sight_through = torch.tensor([int(x) for x in rules.improvements["featSightThrough"]], dtype=torch.long, device=device)
+        # each feature's DangerValue (`featureDanger`), the danger map's last term
+        self._feat_danger = torch.tensor([int(x) for x in rules.improvements["featDanger"]], dtype=torch.long, device=device)
         self._sight_hills = int(rules.improvements["sightHills"])
         self._sight_mountain = int(rules.improvements["sightMountain"])
         self._sight_max = int(rules.improvements["sightMax"])
