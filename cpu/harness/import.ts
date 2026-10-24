@@ -2412,6 +2412,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         minor.prodItem = key;
         minor.prodProgress = num(c.queueProgress?.[0]) || 0;
       }
+      // a district in hand stands at the record's queued Location
+      if (item && 'district' in item) minor.prodSite = item.site;
+      else delete minor.prodSite;
       dumpOfMinor.set(minor, c);
       for (const q of c.plots) setTileOwner(tiles[q], seat);
       // its citizens pinned as a major's are: the minor's walk works the
