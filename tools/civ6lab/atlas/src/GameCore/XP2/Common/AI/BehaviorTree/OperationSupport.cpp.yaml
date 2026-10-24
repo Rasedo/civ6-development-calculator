@@ -120,12 +120,15 @@
   final: 0x579f00
   kind: function
   name: opMoveUpdate
-  semantics: "Operation Move's update: the node's stored members per team and goal; the nearest unstored within the range (or reaching it this turn) arrives; a target goal SUCCEEDS; else the run within the unit distance of the goal, half strays clear it; the store kept"
+  semantics: "Operation Move's update: one arrival byte for the node (+0x70, cleared at entry, each team writing it in turn, a team ready with no member passed over); the node's stored members per team and goal; the nearest unstored within the range arrives; AlwaysRunning (+0x50) clears the byte and returns RUNNING at the first team; reaching the target this turn or arrived with a target goal returns SUCCESS at that team, the byte as the distance left it; else the run within the unit distance of the goal, half strays clear it; the store kept; the status the byte"
   status: READ
   cases:
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
+    - recording: h1_duelv1117
+      turn: 113
+      value: City Defense (AlwaysRunning), Operation Move, UNIT_CROSSBOWMAN, 42:13, 41:13, 41:13 each turn t112-122 (AI_Operation.csv); the replay t113-114 the same
   impl:
     - cpu/core/tactical.ts:passMoveUpdate
     - gpu/core/sim_tactics.py:_op_move_update

@@ -5699,14 +5699,26 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   range this turn with Movement left (0x791300: 1 turn, the flag set) counts
   as arrived for the success test; else a listed member within the range
   arrives, joining the others. No member unlisted: the nearest listed one
-  joins them. Arrived (or reaching) with the target the goal: SUCCESS.
+  joins them. AlwaysRunning (data +0x50, 0x81be70): +0x70 cleared and the
+  update returns RUNNING at that team (0x81c3a6), no store written; no
+  member of the Leader Tag (+0x6c) and arrived (or reaching) with the target
+  the goal: the update returns SUCCESS at that team (0x81bed5), +0x70 as
+  the distance left it, so the execution moves a team that only reaches.
   Else, Unit distance (default 1) above 0: the members within it of the
   goal, then each next one within it of one of those (0x814930, 0x815a10,
   0x814840 grow the run in the sorted order), the rest strays — two strays
   or more for each member counted and arrived is cleared; the listed members
   within the unit distance of the others (0x8160a0) leave the list, one
-  within the range arriving; the list stored with the goal. The status:
-  SUCCESS arrived, else RUNNING (AlwaysRunning: RUNNING).
+  within the range arriving; the list stored with the goal. The status
+  (0x81c32c): +0x70 SUCCESS, else RUNNING, a member of the Leader Tag
+  RUNNING. +0x70 is one byte for the node, cleared at entry (0x81a15b) and
+  written by each team in turn (0x81b241 the first team's head, 0x81b3cc,
+  0x81bdf7, 0x81c07b, 0x81c1b7), the last team's write standing for the
+  execution. Recorded: runs/h1_duelv1117 t112-122, city-state 3's City
+  Defense (Simple City Defense node 10: Move To 1, Range 0, AlwaysRunning)
+  Crossbowman recruited in its city 42:13, then garrisoned there each turn
+  (Garrison City), moves on to 41:13 each turn ("Operation Move,
+  UNIT_CROSSBOWMAN, 42:13, 41:13, 41:13", AI_Operation.csv).
 - OPERATION MOVE'S EXECUTION (0x816cb0): none where the operation's teams
   gather (0x73aa60: op +0x5d0, or every team's 0x73ab20) and the update
   found it arrived, and the node names no Leader Tag (+0x7c, the tag's
@@ -6350,8 +6362,12 @@ gpu/core/sim_tactics.py.
   0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's
   (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else
   NEUTRAL_CITY — each where the player's type flags (+0xb0) take it.
-- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a
-  plot only where 0x586900 lets the unit end — another player's unit at
+- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps
+  the unit's own plot whatever holds it, LAB (a fit: every AI_Planning.csv
+  row opens on the unit's plot; runs/h1_duelv1117 t115, city-state 3's
+  Crossbowman on 41:13 lists 41:13(1/2) first, China's Trader on 41:13 by
+  the turn's end — the replay holds the Trader there before the
+  Crossbowman's turn) and another plot only where 0x586900 lets the unit end — another player's unit at
   peace it passes and never ends on (runs/h1_duelw1117 t52: city-state 2's
   Swordsman at (15,9) plans (14,11) in turn 1 past Rome's Scout on (15,10),
   which its list leaves out); a city-state's unit never takes a major's

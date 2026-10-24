@@ -391,8 +391,9 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
 export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reach[] {
   const out: Reach[] = [];
   search(state, unit, maxTurns, false, (n, ground) => {
-    // a plot another player's unit holds the unit only passes (0x586900)
-    if (n.attack || ground.stand(n.tile)) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    // a plot another player's unit holds the unit only passes (0x586900),
+    // its own plot listed whatever holds it
+    if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   });
   return out;
@@ -405,7 +406,7 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number): number 
   let turns = 0;
   search(state, unit, Infinity, false, (n, ground) => {
     if (n.tile !== dest) return false;
-    if (n.attack || ground.stand(n.tile)) turns = n.turns;
+    if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) turns = n.turns;
     return true;
   });
   return turns;
@@ -888,8 +889,11 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     }
   };
   search(state, unit, PLAN_TURNS, false, (n, ground) => {
-    // a plot another player's unit holds the unit only passes (0x586900)
-    if (n.attack || ground.stand(n.tile)) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    // a plot another player's unit holds the unit only passes (0x586900),
+    // its own plot listed whatever holds it (runs/h1_duelv1117 t115: city-state
+    // 3's Crossbowman on 41:13 lists 41:13 first, China's Trader on it by the
+    // turn's end)
+    if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   }, entries.length ? onLink : undefined);
   let wins = false;
@@ -2552,16 +2556,17 @@ export interface MoveStore { list: number[]; goal: number }
  * arrived, the store kept: its members not stored at the node (the node's
  * list, kept while its goal holds, of the team's living members), a member
  * killed none of them, nearest the goal first and equals in member order;
- * the nearest within the range — or its planning reaching a plot at
- * the range this turn with Movement left — has the team arrived, a stored
- * member within the range too. A goal of the target: arrived is SUCCESS.
+ * the nearest within the range has the team arrived, a stored member
+ * within the range too; with the target the goal, arrived or the nearest's
+ * planning reaching a plot at the range this turn with Movement left is
+ * SUCCESS and win, arrived as it stood.
  * Else the members within the unit distance of the goal, and of those in
  * turn, are the team; half of the others or more outside it and it has not
  * arrived (0x81c068: twice the strays at least the count). The
  * list keeps the stored members out of the unit distance of the others.
  */
 export function passMoveUpdate(state: GameState, pass: Pass, members: readonly number[], store: MoveStore | undefined, goal: number,
-  target: boolean, range: number, spread: number): { status: number; arrived: boolean; store: MoveStore | undefined } {
+  target: boolean, range: number, spread: number): { status: number; arrived: boolean; store: MoveStore | undefined; win: boolean } {
   const memberAt = (id: number) => memberAtOf(state, pass.seat, id);
   const kept = store?.goal === goal ? store.list : [];
   let list = kept.filter((id) => members.includes(id) && memberAt(id));
@@ -2606,7 +2611,7 @@ export function passMoveUpdate(state: GameState, pass: Pass, members: readonly n
     }
   }
   // the store kept as it stood
-  if ((arrived || reach) && target) return { status: BT_SUCCESS, arrived: true, store };
+  if ((arrived || reach) && target) return { status: BT_SUCCESS, arrived, store, win: true };
   if (spread !== 0) {
     let end = others.findIndex((o) => o.d > spread);
     if (end < 0) end = others.length;
@@ -2632,11 +2637,12 @@ export function passMoveUpdate(state: GameState, pass: Pass, members: readonly n
     }
     list = keep;
   }
-  return { status: arrived ? BT_SUCCESS : BT_RUNNING, arrived, store: { list, goal } };
+  return { status: arrived ? BT_SUCCESS : BT_RUNNING, arrived, store: { list, goal }, win: false };
 }
 
 /** the goal barred to the unit (0x586360 under flag 0x40, 0x5862e0,
- *  0x585eb0): no path to it, a plot it would attack into (a unit at war
+ *  0x585eb0, the unit itself counted, so a unit standing on its goal finds
+ *  it barred): no path to it, a plot it would attack into (a unit at war
  *  with it, a city centre of a player at war with it — flag 0x40 bars that
  *  to every unit —, an Encampment that bars it), or one of its own that
  *  stacks with it */
@@ -2659,7 +2665,9 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * distance) and its Range (GetRange, unit +0x19f8: 0 for a melee unit; 0
  * for a ship) — runs/h1_duelw1121 t73-t74: the raid's Archer (Range 2)
  * under Unit distance 1 goes for 6:13 beside its target 6:12 and stays
- * there —, at least 1 where the goal is barred to it
+ * there —, at least 1 where the goal is barred to it, a member on the goal
+ * itself too (runs/h1_duelv1117 t113-122: city-state 3's City Defense
+ * Crossbowman, garrisoned on 42:13, moves on to 41:13)
  * (`moveBarred`); the first plot of its planning of two turns at the radius
  * (0x791300) where it lies in the goal's region, else of the plots within
  * the radius of the goal (the ring walk 0x6aef0, the test 0x815d50) one in
@@ -2681,7 +2689,7 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     const z = zero(u);
     let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, rangeOf(u));
     const paths = pathPlots(state, u);
-    if (u.tileIndex !== goal && moveBarred(state, u, goal, paths)) r = Math.max(1, r);
+    if (moveBarred(state, u, goal, paths)) r = Math.max(1, r);
     else if (range > 0 && leaderNamed && !z) r = Math.max(1, r);
     let dest = goal;
     let strike = false;

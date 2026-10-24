@@ -708,8 +708,10 @@ class SimTactics:
             put(st, torch.ones_like(s0), new6)
             put(key, nk6, ins6)
         # the planning's list keeps the plots the unit may end on (0x586900):
-        # none another player's unit holds, but where it attacks
-        stand = ~self._tac_foreign(seat)[rows] | atk_n
+        # none another player's unit holds, but where it attacks, and its own
+        own = torch.zeros(N, T, dtype=torch.bool, device=dev)
+        own[ar, start] = True
+        stand = ~self._tac_foreign(seat)[rows] | atk_n | own
         closed = rturn
         rank = torch.where(stand, rank, torch.full_like(rank, -1))
         rturn = torch.where(stand, rturn, torch.full_like(rturn, -1))
@@ -2275,13 +2277,14 @@ class SimTactics:
     def _op_move_update(self, on: torch.Tensor, mem: torch.Tensor, rank: torch.Tensor, store: torch.Tensor,
                         store_goal: torch.Tensor, goal: torch.Tensor, target: bool, rng: int, spread: int,
                         rowof: torch.Tensor, res: dict, pre: str = "barb",
-                        seat: int = BARB_SEAT) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+                        seat: int = BARB_SEAT) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """`passMoveUpdate` for an operation's team in the games `on`: its
         living members `mem` [B, P] of pool `pre`, `rank` [B, P] its member order
         (a member killed is none of them), the node's store `store` [B, P] and the goal it holds it for
         `store_goal` [B] (written in place where the store is kept): its status
-        (1 SUCCESS, 2 RUNNING), whether the team arrived, and the games whose
-        store the update kept (`rest`)."""
+        (1 SUCCESS, 2 RUNNING), whether the team arrived, the games whose
+        store the update kept (`rest`) and those where it reached the target
+        (`win`, SUCCESS with arrived as it stood)."""
         B = self.B
         dev = self.device
         bidx = torch.arange(B, device=dev)
@@ -2360,7 +2363,7 @@ class SimTactics:
             store[st] = L[st]
             store_goal[st] = goal[st]
         status = torch.where(win | arrived, 1, 2)
-        return status, win | arrived, rest
+        return status, arrived, rest, win
 
     def _op_move_exec(self, on: torch.Tensor, mem: torch.Tensor, rank: torch.Tensor, goal: torch.Tensor, rng: int,
                       arrived: torch.Tensor, ready: torch.Tensor, done: torch.Tensor, rowof: torch.Tensor, res: dict, pre: str = "barb",
@@ -2371,7 +2374,7 @@ class SimTactics:
         no Leader Tag (`leader`); else each living member `mem` [B, P] that
         can act, nearest the goal first: its radius (the smaller of the
         node's Unit distance `rng` and its Range, `_tac_range`: 0 in melee; 0 for a ship or
-        a unit of `zero` [B, P]; at least 1 where the goal is barred, and with a Leader
+        a unit of `zero` [B, P]; at least 1 where the goal is barred (a member on the goal too), and with a Leader
         Tag named), its plot (its planning's at the radius in the goal's
         region, else the ring walk's), its turn done, its move order. The
         moves: per mover [B] its slot (-1 none), its plot before, its plot
@@ -2420,9 +2423,9 @@ class SimTactics:
             own = self._tac_own_mil(seat)[rows]
             barred = ((~path.gather(1, gr.unsqueeze(1)).squeeze(1)) | atk[rows, gr] | own[torch.arange(rows.numel(), device=dev), gr]
                       | foreign[rows, gr])
-            r = torch.where((here != gr) & barred, r.clamp(min=1), r)
+            r = torch.where(barred, r.clamp(min=1), r)
             if leader:
-                r = torch.where(~((here != gr) & barred) & (rng > 0) & ~z, r.clamp(min=1), r)
+                r = torch.where(~barred & (rng > 0) & ~z, r.clamp(min=1), r)
             dest = gr.clone()
             strike = torch.zeros_like(act[rows])
             p = self._op_reach_at(rows, ur, gr, _PLAN_TURNS, False, r, rowof, res, pre, seat)

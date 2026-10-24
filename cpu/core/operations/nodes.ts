@@ -73,9 +73,10 @@ export interface OpsContext {
   attack(ids: readonly number[], keep: (k: number) => boolean, even: boolean, survive: boolean): readonly MajorAttackView[];
   /** OPERATION MOVE's update for a team (0x81a130): its members, the node's
    *  store for it, the goal, whether the goal is the target, Range to goal
-   *  and Unit distance — its status, arrived, the store kept */
+   *  and Unit distance — its status, arrived, the store kept, and win: the
+   *  target reached, which ends the node's update */
   moveUpdate(members: readonly number[], store: MoveStore | undefined, goal: number, target: boolean, range: number,
-    spread: number): { status: number; arrived: boolean; store: MoveStore | undefined };
+    spread: number): { status: number; arrived: boolean; store: MoveStore | undefined; win: boolean };
   /** OPERATION MOVE's execution for a team (0x816cb0): range: the radius
    *  cap, the node's Unit distance; zero: a unit whose
    *  radius is 0 (a formation's, the Leader Tag's), leaderNamed: the node
@@ -564,13 +565,20 @@ const makeFormation: BtHandler<OpsContext> = {
   },
 };
 
-// OPERATION MOVE (0x81a130 update, 0x816cb0 execution): each team's
-// update over its members and the node's store for it (`moveUpdate`), the
-// goal its slot (Move To: 0 the rally, 1 the target), Range to goal and Unit
-// distance (default 1); SUCCESS where every team's is, else RUNNING
-// (AlwaysRunning: RUNNING); a team with no goal FAILS. The execution moves
-// each team (`moveExec`, its radius capped by the Unit distance) but one
-// arrived of an operation ready, a unit in a formation or of the node's
+// OPERATION MOVE (0x81a130 update, 0x816cb0 execution): the node holds one
+// arrival flag (+0x70), cleared as its update begins; the teams in turn, a
+// team ready with no member passed over (0x73ab20), each team's update over
+// its members and the node's store for it (`moveUpdate`) writing the flag,
+// the goal its slot (Move To: 0 the rally, 1 the target), Range to goal and
+// Unit distance (default 1); a team with no goal FAILS; AlwaysRunning, the
+// first team's update leaves the flag clear and the node RUNNING, no store
+// kept (runs/h1_duelv1117 t112-122: city-state 3's City Defense Crossbowman,
+// recruited in its city 42:13, then each turn garrisoned there, moves on to
+// 41:13); a team reaching the target ends the update SUCCESS, the flag as
+// that team's distance left it; else SUCCESS where the flag stands, else
+// RUNNING. The execution moves each team (`moveExec`, its radius capped by
+// the Unit distance) unless the flag stands in an operation ready, a unit in
+// a formation or of the node's
 // Leader Tag on its goal itself
 const operationMove: BtHandler<OpsContext> = {
   update(node, run, ctx) {
@@ -578,20 +586,19 @@ const operationMove: BtHandler<OpsContext> = {
     const slot = dataInt(node, 'Move To (enum)') ?? 1;
     const range = dataInt(node, 'Range to goal') ?? 0;
     const spread = dataInt(node, 'Unit distance') ?? 1;
-    const arrived: boolean[] = [];
-    let all = true;
+    m.arrived = false;
     for (const [k, t] of ctx.op.teams.entries()) {
+      if (t.ready && t.members.length === 0) continue;
       const goal = t.goals[slot] ?? NO_PLOT;
       if (goal === NO_PLOT) return BT_FAILURE;
+      if (dataBool(node, 'AlwaysRunning')) return BT_RUNNING;
       const stores = (m.stores ??= {}) as Record<number, MoveStore>;
       const r = ctx.moveUpdate(t.members, stores[k], goal, slot === 1, range, spread);
       if (r.store) stores[k] = r.store;
-      arrived[k] = r.arrived;
-      if (r.status !== BT_SUCCESS) all = false;
+      m.arrived = r.arrived;
+      if (r.win) return BT_SUCCESS;
     }
-    m.arrived = arrived;
-    if (dataBool(node, 'AlwaysRunning')) return BT_RUNNING;
-    return all ? BT_SUCCESS : BT_RUNNING;
+    return m.arrived ? BT_SUCCESS : BT_RUNNING;
   },
   execute(node, run, ctx) {
     const m = run.mem[node.index];
@@ -600,15 +607,15 @@ const operationMove: BtHandler<OpsContext> = {
     // node +0x30; 1 where the node names none), not its Range to goal
     const range = dataInt(node, 'Unit distance') ?? 1;
     const leader = dataValue(node, 'Leader Tag');
-    const arrived = (m.arrived as boolean[] | undefined) ?? [];
+    const arrived = !!m.arrived;
     const paired = new Set(ctx.op.formations.flat());
     // the operation ready (0x73aa60): its units may be built, or every team ready
     const ready = ctx.op.allowUnitConstruction || ctx.op.teams.every((t) => t.ready);
-    for (const [k, t] of ctx.op.teams.entries()) {
+    for (const t of ctx.op.teams) {
       const goal = t.goals[slot] ?? NO_PLOT;
       if (goal === NO_PLOT) continue;
       const v = ctx.view();
-      const moved = ctx.moveExec(t.members, goal, range, !!arrived[k], ready, (id, type) => paired.has(id) || (!!leader && hasAiType(type, leader)), !!leader);
+      const moved = ctx.moveExec(t.members, goal, range, arrived, ready, (id, type) => paired.has(id) || (!!leader && hasAiType(type, leader)), !!leader);
       for (const x of moved) ctx.log(`${ctx.op.def}, Operation Move, ${x.type}, ${xy(v, x.from)}, ${xy(v, x.dest)}, ${xy(ctx.view(), x.after)}`);
     }
   },

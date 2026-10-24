@@ -1937,10 +1937,13 @@ def _x_recruit(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
 
 
 def _u_move(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
-    """OPERATION MOVE's update (0x81a130): per team its members' update
-    (`_op_move_update`) over the node's store for it; SUCCESS where every
-    team's is, else RUNNING (AlwaysRunning: RUNNING); a team with no goal
-    FAILS"""
+    """OPERATION MOVE's update (0x81a130): the node's one arrival flag
+    (`c.mb`) cleared, the teams in turn — one ready with no member passed
+    over — each its members' update (`_op_move_update`) over the node's
+    store for it writing the flag; a team with no goal FAILS; AlwaysRunning,
+    the first team leaves the flag clear and the node RUNNING; a team
+    reaching the target ends the update SUCCESS; else SUCCESS where the flag
+    stands, else RUNNING"""
     s, k = c.s, c.k
     tree = c.tree
     slot = tree.int_(i, "Move To (enum)")
@@ -1952,42 +1955,48 @@ def _u_move(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     view = c.view
     op = view["op"]
     u = sim._mops_units(s)
-    all_ok = torch.ones_like(at)
+    always = tree.flag(i, "AlwaysRunning")
     fail = torch.zeros_like(at)
-    arrived_bits = torch.zeros_like(c.ref)
+    won = torch.zeros_like(at)
+    live = at.clone()
+    flag = torch.zeros_like(at)
     for ti in range(N_TEAMS):
         tm = sim.mops_tm[:, s, k, ti]
-        on = at & (tm >= 0) & ~fail
+        empty = sim.mops_ready[:, s, k, ti] & ~sim._mops_member_mask(s, k, ti).any(dim=1)
+        on = live & (tm >= 0) & ~empty
         if not bool(on.any()):
             continue
         goal = sim.mops_goal[:, s, k, ti, slot]
         nog = on & (goal < 0)
         fail |= nog
+        live &= ~nog
         on &= ~nog
+        if always:
+            live &= ~on
+            continue
         mem = sim._mops_member_mask(s, k, ti) & u["own"]
         P = mem.shape[1]
         store = sim.mops_mvs[:, s, k, j, ti, :P].clone()
         sg = sim.mops_mvg[:, s, k, j, ti].clone()
-        st, arr, rest = sim._op_move_update(on, mem, sim._mops_member_rank(s, k, ti), store, sg, goal, slot == 1, rng, spread,
-                                            op["rowof"], op["res"],
-                                            sim._mops_pre(s), sim._mops_seat(s))
+        _, arr, rest, win = sim._op_move_update(on, mem, sim._mops_member_rank(s, k, ti), store, sg, goal, slot == 1, rng,
+                                                spread, op["rowof"], op["res"],
+                                                sim._mops_pre(s), sim._mops_seat(s))
         rr = rest.nonzero(as_tuple=True)[0]
         if rr.numel():
             sim.mops_mvs[rr, s, k, j, ti, :P] = store[rr]
             sim.mops_mvg[rr, s, k, j, ti] = sg[rr]
-        all_ok &= ~on | (st == BT_SUCCESS)
-        arrived_bits = torch.where(on & arr, arrived_bits | (1 << ti), arrived_bits)
-    c.mb[:, i] = torch.where(at, arrived_bits, c.mb[:, i])
-    if tree.flag(i, "AlwaysRunning"):
-        out = _status(c, BT_RUNNING)
-    else:
-        out = torch.where(all_ok, BT_SUCCESS, BT_RUNNING)
+        flag = torch.where(on, arr, flag)
+        won |= on & win
+        live &= ~(on & win)
+    c.mb[:, i] = torch.where(at, flag.long(), c.mb[:, i])
+    out = torch.where(won | flag, BT_SUCCESS, BT_RUNNING)
     return torch.where(fail, BT_FAILURE, out)
 
 
 def _x_move(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """OPERATION MOVE's execution (0x816cb0): each team (`_op_move_exec`)
-    but one arrived of an operation ready (the node names no Leader Tag)"""
+    unless the node's arrival flag stands in an operation ready (the node
+    names no Leader Tag)"""
     s, k = c.s, c.k
     tree = c.tree
     assert tree.value(i, "Leader Tag") is None, "minor operations: an Operation Move's Leader Tag"
@@ -1998,7 +2007,7 @@ def _x_move(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     rng = 1 if rng is None else rng
     op = c.view["op"]
     ready = ((sim.mops_tm[:, s, k] < 0) | sim.mops_ready[:, s, k]).all(dim=1)
-    bits = torch.where(c.mb[:, i] == NONE, 0, c.mb[:, i])
+    arrived = c.mb[:, i] == 1
     for ti in range(N_TEAMS):
         tm = sim.mops_tm[:, s, k, ti]
         goal = sim.mops_goal[:, s, k, ti, slot]
@@ -2007,7 +2016,6 @@ def _x_move(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             continue
         u = sim._mops_units(s)
         mem = sim._mops_member_mask(s, k, ti) & u["own"]
-        arrived = (bits & (1 << ti)) != 0
         sim._op_move_exec(g, mem, sim._mops_member_rank(s, k, ti), goal, rng, arrived, ready, c.view["done"], op["rowof"], op["res"],
                           sim._mops_pre(s), sim._mops_seat(s))
 

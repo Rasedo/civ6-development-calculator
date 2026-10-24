@@ -479,8 +479,8 @@ class SimBarbOps:
         team arrived"""
         store = self.bcap_store[:, c, node].clone()
         sg = self.bcap_store_goal[:, c, node].clone()
-        status, arrived, rest = self._op_move_update(on, mem, self._bcap_rank(c), store, sg, goal, True, rng, spread,
-                                                     ctx["rowof"], ctx["res"])
+        status, arrived, rest, _ = self._op_move_update(on, mem, self._bcap_rank(c), store, sg, goal, True, rng, spread,
+                                                        ctx["rowof"], ctx["res"])
         st = rest.nonzero(as_tuple=True)[0]
         if st.numel():
             self.bcap_store[st, c, node] = store[st]
@@ -909,8 +909,8 @@ class SimBarbOps:
         mem = self._bop_members(k)
         store = self.tribe_store[:, k, node].clone()
         sg = self.tribe_store_goal[:, k, node].clone()
-        status, arrived, rest = self._op_move_update(on, mem, self.barb_unit_join, store, sg, goal, target, rng, spread,
-                                                     ctx["rowof"], ctx["res"])
+        status, arrived, rest, _ = self._op_move_update(on, mem, self.barb_unit_join, store, sg, goal, target, rng, spread,
+                                                        ctx["rowof"], ctx["res"])
         st = rest.nonzero(as_tuple=True)[0]
         if st.numel():
             self.tribe_store[st, k, node] = store[st]
