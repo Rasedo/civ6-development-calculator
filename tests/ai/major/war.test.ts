@@ -145,8 +145,8 @@ describe('the city\'s threat (0x5cbd10)', () => {
   });
   const inputs = (units: KnownUnit[]) => ({ army: (p: number) => (p === BARB ? units : []), operationNear: () => false });
   it('the barbarians\' units within 3 at the defense plus 5 or more threaten the city', () => {
-    expect(cityThreat(threatView, 0, at(5, 5), inputs([known(at(5, 7))]))).toBe(2);
-    expect(cityThreat(threatView, 0, at(5, 5), inputs([known(at(5, 9))]))).toBe(-1);
+    expect(cityThreat(threatView, 0, at(5, 5), inputs([known(at(5, 7))])).level).toBe(2);
+    expect(cityThreat(threatView, 0, at(5, 5), inputs([known(at(5, 9))])).level).toBe(-1);
   });
   it("the threatened city's level: 3 above two districts, +2 a capital, +1 a wonder, + its citizens / 5", () => {
     const capital = view({
@@ -154,9 +154,9 @@ describe('the city\'s threat (0x5cbd10)', () => {
       denounced: () => false,
       cityDefense: () => ({ defense: 10, strength: 12, damaged: false, districts: 3, capital: true, wonder: false, population: 6 }),
     });
-    expect(cityThreat(capital, 0, at(5, 5), inputs([known(at(5, 7))]))).toBe(6);
+    expect(cityThreat(capital, 0, at(5, 5), inputs([known(at(5, 7))])).level).toBe(6);
   });
   it('an explorer never counts', () => {
-    expect(cityThreat(threatView, 0, at(5, 5), inputs([known(at(5, 7), 'UNIT_SCOUT')]))).toBe(-1);
+    expect(cityThreat(threatView, 0, at(5, 5), inputs([known(at(5, 7), 'UNIT_SCOUT')])).level).toBe(-1);
   });
 });

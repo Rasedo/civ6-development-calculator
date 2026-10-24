@@ -4485,6 +4485,10 @@
         "why": "set only by a recorded game's replay (the record's citizens' order); no driver writes it, so every engine game holds it unset."
       },
       {
+        "path": "Tile.lockPop",
+        "why": "set only by a recorded game's replay (a citizen its growth moves off the plot, held for the turn's yields); no driver writes it, so every engine game holds it unset."
+      },
+      {
         "path": "Tile.col",
         "why": "world geometry, fixed at build."
       },

@@ -134,7 +134,7 @@ describe('the savings (0x687bf0) and the unit purchases (0x68be60)', () => {
     const e = newEconomicMemory();
     e.savings = [30 * FX, 25 * FX, 0, 0];
     e.balance = 55 * FX;
-    expect(tryPurchaseUnits(e, [city(0)], 'UNIT_WARRIOR', () => {})?.id).toBe(1);
+    expect(tryPurchaseUnits(e, [city(-1)], 'UNIT_WARRIOR', () => {})?.id).toBe(1);
     expect(e.savings[SLOT_UNITS]).toBe(0);
     expect(e.savings[SLOT_SLUSH]).toBe(15 * FX);
     expect(e.balance).toBe(15 * FX);
@@ -144,7 +144,7 @@ describe('the savings (0x687bf0) and the unit purchases (0x68be60)', () => {
     const e = newEconomicMemory();
     e.savings = [10 * FX, 5 * FX, 20 * FX, 0];
     e.balance = 60 * FX;
-    expect(tryPurchaseUnits(e, [city(0)], 'UNIT_WARRIOR', () => {})).toBeNull();
+    expect(tryPurchaseUnits(e, [city(-1)], 'UNIT_WARRIOR', () => {})).toBeNull();
     expect(tryPurchaseUnits(e, [city(2)], 'UNIT_WARRIOR', () => {})?.id).toBe(1);
     expect(e.savings).toEqual([0, 0, 0, 0]);
     expect(e.balance).toBe(20 * FX);

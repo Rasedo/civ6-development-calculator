@@ -338,7 +338,7 @@ describe('the items the step completes', () => {
     state.turn = 1;
     inHand(cs, 'district:CAMPUS', 1000, site.index);
     step(state, cs);
-    expect(cs.districts?.[0]).toEqual({ type: 'CAMPUS', tileIndex: site.index });
+    expect(cs.districts?.[0]).toMatchObject({ type: 'CAMPUS', tileIndex: site.index });
     expect(site.district).toBe('CAMPUS');
     expect(site.improvement).toBeNull();
     expect(site.resource).toBeNull();

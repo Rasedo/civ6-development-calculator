@@ -163,7 +163,7 @@ describe('combat', () => {
     expect(state.units[state.units.length - 1]).toBe(builder);
   });
 
-  it('a civilian with no UnitCaptures row dies to the step; a barbarian-held one holds and guards no camp', () => {
+  it('a civilian with no UnitCaptures row dies to the step; a barbarian-held one stays theirs', () => {
     const { state } = battlefield();
     const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 13, 9).index, BARB_SEAT)!;
     barb.tileIndex = tileAtCoords(state.map, 13, 9).index;
@@ -177,7 +177,11 @@ describe('combat', () => {
     const settler = spawnUnit(state, 'SETTLER', tileAtCoords(state.map, 9, 9).index, BARB_SEAT)!;
     settler.tileIndex = tileAtCoords(state.map, 9, 9).index;
     barbarianPhase(state);
-    expect(settler.tileIndex).toBe(tileAtCoords(state.map, 9, 9).index);
+    // the barbarians' planning runs for their civilians too: the Settler
+    // stays theirs and moves to a safe plot
+    expect(state.units.includes(settler)).toBe(true);
+    expect(settler.seat).toBe(BARB_SEAT);
+    expect(settler.type).toBe('SETTLER');
   });
 
   it('a Spy is seen by its own side alone, so no hostile fire finds it', () => {
