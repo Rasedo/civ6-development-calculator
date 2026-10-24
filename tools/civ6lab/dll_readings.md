@@ -6078,12 +6078,17 @@ gpu/core/sim_tactics.py.
   list (0x7ffdd0, creation order), so it ticks in the tactical pass among
   the operations' by id; its Notify Owner starting the raid (0x149980) the
   raid's tree ticks in the same walk.
+- The report's plot is one of an improvement or a district, and a wonder's
+  plot is a district (DISTRICT_WONDER, built or placed). runs/h1_duelw1121
+  t31: the scout steps from 4:15 to 4:14 and sees China's complete wonder at
+  5:12 (record plot district DISTRICT_WONDER, wonder complete), three from
+  4:15, two from 4:14, seen by no other barbarian unit; its tree runs from
+  t32 and the raid starts at t33. The engines take the plots of a city's
+  wonders, built or queued (`barbScoutLook`; `_barb_scout_look` on the
+  `city_wonder` registry); the action replay starts the tree there.
 - LAB: the engines look where the scout stands after its moves (the replay
   along the record's steps), a plot new against its last look and seen by
   no other barbarian unit there; the game's event fires within a move.
-  runs/h1_duelw1121 t31 (the scout from 4:15 to 4:14, its tree from t32, the
-  raid t33) holds no plot new to it of an improvement or district by the
-  engines' sight — the miss unexplained.
 
 ## C-96 / C-97: the AI's weights and the modifier evaluator — READ (the parts below), the agendas' path and most analyzers unread
 

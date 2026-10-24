@@ -24,7 +24,7 @@ import { neighbors, hexDistance, tilesWithin, tileAt, offsetToAxial, axialToOffs
 import { isWater, isImpassable } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
-import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, NO_SEAT, allCities, campTiles, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
 import { canSee, unitSight, unitSeesThrough } from './fog';
 import { spawnUnit, tileFreeForUnit } from './units';
 import { UNITS } from '../data/units';
@@ -504,14 +504,18 @@ export function barbScoutLook(state: GameState, unit: Unit): void {
   tribe.saw[unit.id] = now;
   const others = othersSee(state, unit, now.filter((p) => !saw.has(p)));
   const next = (state.barbSpotNext ??= {});
+  // the wonders' plots, built or placed in a queue: DISTRICT_WONDER's
+  const wonders = new Set(allCities(state).flatMap((c) => [...c.wonders.map((w) => w.tileIndex),
+    ...c.queue.flatMap((q) => (q.kind === 'wonder' ? [q.tileIndex] : []))]));
   for (const p of now) {
     if (saw.has(p) || others.has(p)) continue;
     const t = map.tiles[p];
     const seat = tileSeat(t);
     if (state.turn < (next[seat] ?? 0)) continue;
-    // a plot of an improvement (+0x44) or a district (a city's centre among
-    // them) alone; a major's city sends the scout home (0x484a10: a full civ)
-    if (t.improvement === null && t.district === null) continue;
+    // a plot of an improvement (+0x44) or a district (a city's centre and a
+    // wonder among them) alone; a major's city sends the scout home
+    // (0x484a10: a full civ)
+    if (t.improvement === null && t.district === null && !wonders.has(p)) continue;
     if (!tribe.homing && seat >= 0 && seat < state.seats.length) barbScoutTreeStart(state, tribe, unit.id, { seat, plot: cityCentreOf(state, t) });
     next[seat] = state.turn + Math.max(0, BARB_SPOT_THROTTLE - BARB_SPOT_THROTTLE_PER_LEVEL * handicapOf(state, seat));
   }

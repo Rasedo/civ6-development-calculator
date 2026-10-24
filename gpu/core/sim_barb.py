@@ -473,7 +473,7 @@ class SimBarb:
         """`barbScoutLook` for tribe `k`'s living scout: the owned plots newly
         visible to the barbarian player by its sight (in it now, not at its
         last look, seen by no other unit of theirs) holding an improvement or
-        a district, in plot order — per major the first, once its throttle
+        a district (a wonder among them), in plot order — per major the first, once its throttle
         allows, sends the scout home when none walks yet and spares the major
         further reports."""
         sc = self.barb_unit_alive & (self.barb_unit_tribe == k) & self.barb_unit_scout
@@ -492,8 +492,13 @@ class SimBarb:
         new = now & ~self.tribe_saw[rows, k]
         self.tribe_saw[rows, k] = now
         new &= ~self._barb_others_see(rows, slot, new)
-        new &= (self.improvement[rows] >= 0) | (self.district[rows] >= 0) | self._centre_plane()[rows]
         T = self.T
+        # the wonders' plots, built or placed in a queue (the `city_wonder`
+        # registry): DISTRICT_WONDER's
+        wr = self.city_wonder[rows].reshape(rows.numel(), -1)
+        wpl = torch.zeros(rows.numel(), T + 1, dtype=torch.bool, device=self.device)
+        wpl.scatter_(1, torch.where(wr >= 0, wr, T), True)
+        new &= (self.improvement[rows] >= 0) | (self.district[rows] >= 0) | self._centre_plane()[rows] | wpl[:, :T]
         ar = torch.arange(T, device=self.device)
         best = torch.full((rows.numel(),), T, dtype=torch.long, device=self.device)
         best_g = torch.full((rows.numel(),), -1, dtype=torch.long, device=self.device)
