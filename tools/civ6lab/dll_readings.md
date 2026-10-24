@@ -5310,6 +5310,31 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   rest the centre reads. The engines: an Encampment at its city's standing
   strength without the centre's garrison plus its own plot's garrison term
   (`districtGarrisonedStrength`, `_garrison_cs(plot=)`).
+- A SHIP'S STRIKE ONTO LAND, a LAB fit (the flag of 0x26df90 that bars it
+  under 0x311 unread): the danger search's reach holds no land plot of a
+  naval unit; the land a ship threatens is its range over its water plots.
+  runs/h1_duelv1128, the city-states' "Move to safety ... Current Danger"
+  rows: t45 city-state 3's Warrior at 3:4 logs 25 beside a barbarian Galley
+  (30, its strike onto the Warrior's plot) and a Quadrireme (25, range 1);
+  t80 its Swordsman 50 beside a Galley and two Quadriremes; t109 its
+  Man-at-Arms 50 likewise. With the rule the rows equal 10 -> 12 of 14
+  (1117 unchanged); the ZOC read as a move order's (flags without 0x800)
+  equals the same rows but takes 2-3 barbarian moves off on 1128 / 1117, so
+  the search keeps the planning's ZOC-free walk. Ported (`dangerPlane`,
+  `_danger_plane`).
+- runs/h1_duelv1128 t20, city-state 4's Operation Protect Units (the hurt
+  Warrior at 31:7, Attack Barb Camp): the game sends it to 33:8, ours to
+  31:9. The reach order is the game's (AI_Planning.csv t20: 31:7, 31:8,
+  32:7, 32:8, 32:6, 31:6, 30:7, 31:9, 30:8, 33:8 ..., 31:9 and 33:8 both
+  turn 1 with no Movement left), so 0x716b90 takes 31:9 unless the game's
+  danger there is above 0. No unit the city-state sees reaches 31:9; the
+  barbarians' Scout at 29:8 (unseen: three plots from the Warrior, its
+  sight 2) reaches 31:9 and not 33:8, and with every hostile unit counted
+  the pick is the game's — but the city-states' Move to safety rows then
+  fall 10 -> 5 of 14, and with the units the city-state saw the turn before
+  7 of 14. The danger loop's visibility test (0x5033a0: the player's
+  visibility count +0x290 at the unit's plot) reads as "seen now"; what
+  makes 31:9 a plot of danger is unread.
 - MOVE TO SAFETY (0x77a4b0): each unit left (+0x530, +0x770 clear) on a plot
   of danger above 0 is listed ("Move to safety ... Current Danger") when it
   has no strength, or is embarked (0x8be30, IsEmbarked); hurt (+0xcf0 > 0): a
@@ -7216,9 +7241,22 @@ DebugGameplay.sqlite).
 - PARTLY READ / unread: Naval Choose Target 0x803590 (the tactical
   analysis's target list by domain 0x802ea0 unread: the port finds none and
   skips its children); the executions of Defend Units 0x80d790 ("Operation Protect Units"), Naval
-  Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval
-  Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0,
-  0x791300).
+  Pillage 0x803250 (per unit with Movement left, its planning's targets
+  +0x48 (0xd0 bytes): a TARGET_ENEMY_COMBAT_DISTRICT one with +0x18 above 0,
+  else — a unit with a range (0x56e3d0) — one of TARGET_LOW_PRIORITY_UNIT
+  .. TARGET_HIGH_PRIORITY_UNIT, through 0x802cf0 into the attack assignment
+  0x776140 and its execution 0x771f80; unported), Naval Escort 0x817f60;
+  Operation Move's unit tactical block (+0x1fc0, 0x791300).
+- NAVAL PATROL's execution (0x803060), READ: over the tree's job units
+  (0x6092c0 by the job +0x488, the player's unit order), each alive (+0x770
+  clear) on the map with Movement left (+0xdb0): HL Explore's target
+  (0x70aa40 with no chosen list of the round's, a list of its own, the
+  first-round fallbacks on), the unit's turn done (0x570b40), and where a
+  target stands a move order there (0x962030, vt +0x60). No line.
+  runs/h1_duelv1121 city-state 3's Naval Superiority: its Galley, Ready from
+  t34 with no target (Naval Choose Target skipping its children), moves
+  every turn with no tactical row and no operation line (834 -> 920 -> 963
+  -> 832 ...). Ported (`passPatrol`, `_x_naval_patrol`).
 
 ## C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread
 

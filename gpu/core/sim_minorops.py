@@ -2273,6 +2273,43 @@ def _u_naval_units(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     return torch.where(_n_units(sim, c) > 0, BT_RUNNING, BT_FAILURE)
 
 
+def _x_naval_patrol(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
+    """NAVAL PATROL's execution (0x803060): over the operation's units in the
+    player's unit order (pool order), each alive with Movement left takes HL
+    Explore's target (`_tac_explore_pick` on a chosen list of its own, the
+    fallbacks taken), its turn done, and moves there (no line). Naval
+    Pillage's execution (0x803250) is unported."""
+    s, k = c.s, c.k
+    dev = sim.device
+    B, T = sim.B, sim.T
+    b = torch.arange(B, device=dev)
+    seat = 100 + s
+    mem = sim.mops_mem[:, s, k].reshape(B, -1)
+    mc = mem.clamp(min=0)
+    key = torch.where(mem >= 0, sim.major_unit_pslot.gather(1, mc).clamp(min=0), torch.full_like(mem, 1 << 30))
+    mem = mem.gather(1, key.argsort(dim=1, stable=True))
+    danger = c.view["op"]["danger"]
+    treg = sim._tac_seen_regions(seat)
+    for j in range(mem.shape[1]):
+        us = mem[:, j]
+        uc = us.clamp(min=0)
+        ok = (on & (us >= 0) & sim.major_unit_alive[b, uc] & (sim.major_unit_seat[b, uc] == seat)
+              & (sim.major_unit_tile[b, uc] >= 0) & (sim.major_unit_mp[b, uc] > 0))
+        if not bool(ok.any()):
+            continue
+        known = sim._tac_known(seat)
+        revealed = known if known is not None else torch.ones(B, T, dtype=torch.bool, device=dev)
+        seen_now = sim._barb_seen(seat)
+        rows = ok.nonzero(as_tuple=True)[0]
+        res, v1, v2, rt = sim._tac_explore_counts(rows, uc[rows], "major", seat, danger, revealed, seen_now)
+        r = torch.zeros(B, dtype=torch.long, device=dev)
+        r[rows] = torch.arange(rows.numel(), device=dev)
+        chosen = torch.zeros(B, T, dtype=torch.bool, device=dev)
+        pick, _ = sim._tac_explore_pick(ok, uc, r, res, v1, v2, rt, chosen, revealed, treg, "major", seat, True)
+        c.view["done"][b[ok], uc[ok]] = True
+        sim._mops_move(s, us, pick, ok & (pick >= 0))
+
+
 def _u_naval_choose(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     """NAVAL CHOOSE TARGET (0x803590): of the targets of its domain the
     tactical analysis lists, the nearest the operation's target becomes the
@@ -2310,4 +2347,5 @@ _EXECUTE = {
     "Operation Attack": _x_operation_attack,
     "Garrison City": _x_garrison,
     "Operation Attack City": _x_attack_city,
+    "Naval Patrol": _x_naval_patrol,
 }

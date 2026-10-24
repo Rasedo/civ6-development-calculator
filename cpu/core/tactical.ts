@@ -890,7 +890,9 @@ export function aiStrengths(state: GameState, u: Unit): { melee: number; ranged:
  * sees now with a combat, ranged or bombard strength adds its danger
  * (`unitDanger`) to every plot its one-turn planning search closes from where
  * it stands on its full Movement (0x7921e0 -> 0x26df90, its attacks
- * included), and to a second list, each plot once: every other plot within
+ * included but a ship's onto land: runs/h1_duelv1128 t45 / t80 / t109, a
+ * city-state's land unit beside a barbarian Galley and Quadriremes logs the
+ * Quadriremes' ranged danger alone), and to a second list, each plot once: every other plot within
  * its range (0x56e3d0) of those and — a unit that may coastal raid (+0x18bd,
  * CanRaid) — the land plots beside them (one it reaches too takes the
  * danger twice); an aircraft to the plots within its range. Each district of
@@ -922,8 +924,11 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     }
     const reach: number[] = [];
     const full = { ...u, movesLeft: unitFullMoves(state, u) };
+    // a ship's strike onto land is no plot of its reach: the land a ship
+    // threatens is the range of its water plots
+    const naval = !!UNITS[u.type]?.naval;
     search(state, full, 1, false, (n) => {
-      reach.push(n.tile);
+      if (!naval || isWater(map.tiles[n.tile])) reach.push(n.tile);
       return false;
     });
     const inReach = new Set(reach);
@@ -2168,6 +2173,15 @@ function exploreLand(state: GameState, pass: Pass): void {
     if (!moves.length) break;
   }
   for (const [u, m] of firstMove) finish(pass, u, m.move, m.plot);
+}
+
+/** NAVAL PATROL's move for one of its operation's units (0x803060): HL
+ *  Explore's target (`exploreTarget`) on a chosen list of its own, the
+ *  fallbacks taken (the first round); its turn done, it moves there */
+export function passPatrol(state: GameState, pass: Pass, u: Unit): void {
+  const t = exploreTarget(state, pass, u, new Set(), true, revealedOf(state, pass.seat), plotsSeenNow(state, new Set([pass.seat])));
+  passFinish(pass, u, 'Operation', t ? t.plot : u.tileIndex);
+  if (t) moveTo(state, u, t.plot, false);
 }
 
 /** WANDER NEAR CITY's radius (0x77bf50: the plots within 5 of the city) */

@@ -163,6 +163,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE EXECUTION (0x771f80): the moves (retried where not blocked), the bombard strikes, the ranged strikes (unles..."
@@ -409,6 +410,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."

@@ -2732,7 +2732,6 @@ class SimTactics:
         went = torch.full((B, P), -1, dtype=torch.long, device=dev)
         moved_any = torch.zeros(B, P, dtype=torch.bool, device=dev)
         first = torch.full((B, P), -1, dtype=torch.long, device=dev)
-        NEG = -(1 << 40)
         for rnd in range(1, _EXPLORE_ROUNDS + 1):
             hp = getattr(self, f"{pre}_unit_hp")
             elig = (live() & (ai == _AI_EXPLORE) & (getattr(self, f"{pre}_unit_mp") > 0)
@@ -2744,25 +2743,9 @@ class SimTactics:
             # what its player revealed as the round opens (the moves before lift it)
             known = self._tac_known(seat)
             revealed = known if known is not None else torch.ones(B, T, dtype=torch.bool, device=dev)
-            res = self._tac_search(rows, slots, seat, 1, False, pre=pre)
+            res, v1, v2, rt = self._tac_explore_counts(rows, slots, pre, seat, danger, revealed, seen_now)
             rowof = torch.full((B, P), -1, dtype=torch.long, device=dev)
             rowof[rows, slots] = torch.arange(rows.numel(), device=dev)
-            # each row's candidates of this turn and their two sight counts
-            stand = ~self._tac_foreign(seat)[rows]
-            reach = (res["turns"] == 1) & stand & (danger[rows] <= 0)
-            n_i, t_i = reach.nonzero(as_tuple=True)
-            v1 = torch.full((rows.numel(), T), NEG, dtype=torch.long, device=dev)
-            v2 = torch.full((rows.numel(), T), NEG, dtype=torch.long, device=dev)
-            # a revealed route in the look (plot +0x47, 0x70a6c0's second flag)
-            rt = torch.zeros(rows.numel(), T, dtype=torch.bool, device=dev)
-            if n_i.numel():
-                ut_n = getattr(self, f"{pre}_unit_type")[rows[n_i], slots[n_i]]
-                sight = self._unit_sight(ut_n, getattr(self, f"{pre}_unit_promos")[rows[n_i], slots[n_i]])
-                disk = self._los_disk(rows[n_i], t_i, sight, torch.zeros_like(n_i, dtype=torch.bool))
-                v1[n_i, t_i] = (disk & ~revealed[rows[n_i]]).sum(dim=1)
-                v2[n_i, t_i] = (disk & ~seen_now[rows[n_i]]).sum(dim=1)
-                route = self.road | self.railroad
-                rt[n_i, t_i] = (disk & revealed[rows[n_i]] & route[rows[n_i]]).any(dim=1)
             dest = torch.full((B, P), -1, dtype=torch.long, device=dev)
             kind = torch.zeros(B, P, dtype=torch.long, device=dev)
             for j in range(int(npass.max()) if B else 0):
@@ -2771,46 +2754,7 @@ class SimTactics:
                 if not bool(go.count_nonzero()):
                     continue
                 r = rowof[bidx, u_b].clamp(min=0)
-                ut = getattr(self, f"{pre}_unit_type")[bidx, u_b].clamp(min=0, max=self.NU - 1)
-                here = tile_p[bidx, u_b].clamp(min=0)
-                cand = go.unsqueeze(1) & (v1[r] > NEG) & ~chosen & self._tac_explore_ok(here, ut, seat, revealed)
-                key = res["rank"][r]
-                # the first in closing order of the largest count
-                def first_max(v: torch.Tensor, floor: int) -> torch.Tensor:
-                    vv = torch.where(cand & (v > floor), v, torch.full_like(v, NEG))
-                    m = vv.max(dim=1, keepdim=True).values
-                    k = torch.where((vv == m) & (vv > NEG), key, torch.full_like(key, 1 << 40))
-                    kmin, p = k.min(dim=1)
-                    return torch.where(kmin < (1 << 40), p, torch.full_like(p, -1))
-                best1 = first_max(v1[r], 0)
-                # the first in closing order with a route in its look and a
-                # count above 0 leads once, whatever came before; a later one
-                # replaces it only with a larger count
-                big = 1 << 40
-                lead_k = torch.where(cand & rt[r] & (v1[r] > 0), key, torch.full_like(key, big))
-                lk, lp = lead_k.min(dim=1)
-                has_lead = lk < big
-                if bool(has_lead.any()):
-                    after = cand & (key > lk.unsqueeze(1))
-                    va = torch.where(after, v1[r], torch.full_like(v1[r], NEG))
-                    ma = va.max(dim=1).values
-                    ka = torch.where(after & (va == ma.unsqueeze(1)), key, torch.full_like(key, big))
-                    kmin, ap = ka.min(dim=1)
-                    lv = v1[r].gather(1, lp.unsqueeze(1)).squeeze(1)
-                    led = torch.where((kmin < big) & (ma > lv), ap, lp)
-                    best1 = torch.where(has_lead, led, best1)
-                best2 = first_max(v2[r], NEG)
-                chosen[bidx[go], here[go]] = True
-                pick = torch.where(go, best1, torch.full_like(best1, -1))
-                knd = torch.where(pick >= 0, 1, 0)
-                fb = go & (pick < 0) & (rnd == 1)
-                if bool(fb.count_nonzero()):
-                    alt, akind = self._tac_explore_region(fb, u_b, ut, here, pre, seat, revealed, chosen, treg)
-                    pick = torch.where(fb & (alt >= 0), alt, pick)
-                    knd = torch.where(fb & (alt >= 0), akind, knd)
-                    late = fb & (alt < 0) & (best2 >= 0)
-                    pick = torch.where(late, best2, pick)
-                    knd = torch.where(late, 4, knd)
+                pick, knd = self._tac_explore_pick(go, u_b, r, res, v1, v2, rt, chosen, revealed, treg, pre, seat, rnd == 1)
                 hit = pick >= 0
                 chosen[bidx[hit], pick[hit]] = True
                 dest[bidx[hit], u_b[hit]] = pick[hit]
@@ -2828,6 +2772,92 @@ class SimTactics:
             moved_any |= act
         done |= moved_any
         return first
+
+    def _tac_explore_counts(self, rows: torch.Tensor, slots: torch.Tensor, pre: str, seat: int, danger: torch.Tensor,
+                            revealed: torch.Tensor, seen_now: torch.Tensor):
+        """`exploreTarget`'s search for the units at local `slots` of games
+        `rows` ([n]): the search of this turn on their Movement left (`res`)
+        and per plot closed this turn with no danger and no other player's
+        unit its two sight counts — the plots its player never revealed
+        (`v1`), those it does not see now (`v2`) — and whether its look
+        holds a revealed route (`rt`, plot +0x47); [n, T] each, NEG off the
+        candidates"""
+        T, dev = self.T, self.device
+        NEG = -(1 << 40)
+        res = self._tac_search(rows, slots, seat, 1, False, pre=pre)
+        stand = ~self._tac_foreign(seat)[rows]
+        reach = (res["turns"] == 1) & stand & (danger[rows] <= 0)
+        n_i, t_i = reach.nonzero(as_tuple=True)
+        v1 = torch.full((rows.numel(), T), NEG, dtype=torch.long, device=dev)
+        v2 = torch.full((rows.numel(), T), NEG, dtype=torch.long, device=dev)
+        rt = torch.zeros(rows.numel(), T, dtype=torch.bool, device=dev)
+        if n_i.numel():
+            ut_n = getattr(self, f"{pre}_unit_type")[rows[n_i], slots[n_i]]
+            sight = self._unit_sight(ut_n, getattr(self, f"{pre}_unit_promos")[rows[n_i], slots[n_i]])
+            disk = self._los_disk(rows[n_i], t_i, sight, torch.zeros_like(n_i, dtype=torch.bool))
+            v1[n_i, t_i] = (disk & ~revealed[rows[n_i]]).sum(dim=1)
+            v2[n_i, t_i] = (disk & ~seen_now[rows[n_i]]).sum(dim=1)
+            route = self.road | self.railroad
+            rt[n_i, t_i] = (disk & revealed[rows[n_i]] & route[rows[n_i]]).any(dim=1)
+        return res, v1, v2, rt
+
+    def _tac_explore_pick(self, go: torch.Tensor, u_b: torch.Tensor, r: torch.Tensor, res: dict, v1: torch.Tensor,
+                          v2: torch.Tensor, rt: torch.Tensor, chosen: torch.Tensor, revealed: torch.Tensor,
+                          treg: torch.Tensor, pre: str, seat: int, first: bool):
+        """`exploreTarget` for the unit at local slot `u_b` [B] where `go`,
+        its row `r` of `_tac_explore_counts`: of its candidates not chosen
+        that it may go to (`_tac_explore_ok`) the first in closing order of
+        the most plots never revealed (above 0; the first with a revealed
+        route in its look leads once); else, `first`, the region fallbacks
+        (`_tac_explore_region`), else the first of the most plots not seen
+        now. Its own plot joins `chosen`. [B] the plot (-1 none) and its kind
+        (1 explore, 2 region, 3 area, 4 fallback, 5 tertiary regions)"""
+        B, dev = self.B, self.device
+        bidx = torch.arange(B, device=dev)
+        NEG = -(1 << 40)
+        tile_p = getattr(self, f"{pre}_unit_tile")
+        ut = getattr(self, f"{pre}_unit_type")[bidx, u_b].clamp(min=0, max=self.NU - 1)
+        here = tile_p[bidx, u_b].clamp(min=0)
+        cand = go.unsqueeze(1) & (v1[r] > NEG) & ~chosen & self._tac_explore_ok(here, ut, seat, revealed)
+        key = res["rank"][r]
+
+        # the first in closing order of the largest count
+        def first_max(v: torch.Tensor, floor: int) -> torch.Tensor:
+            vv = torch.where(cand & (v > floor), v, torch.full_like(v, NEG))
+            m = vv.max(dim=1, keepdim=True).values
+            k = torch.where((vv == m) & (vv > NEG), key, torch.full_like(key, 1 << 40))
+            kmin, p = k.min(dim=1)
+            return torch.where(kmin < (1 << 40), p, torch.full_like(p, -1))
+        best1 = first_max(v1[r], 0)
+        # the first in closing order with a route in its look and a count
+        # above 0 leads once, whatever came before; a later one replaces it
+        # only with a larger count
+        big = 1 << 40
+        lead_k = torch.where(cand & rt[r] & (v1[r] > 0), key, torch.full_like(key, big))
+        lk, lp = lead_k.min(dim=1)
+        has_lead = lk < big
+        if bool(has_lead.any()):
+            after = cand & (key > lk.unsqueeze(1))
+            va = torch.where(after, v1[r], torch.full_like(v1[r], NEG))
+            ma = va.max(dim=1).values
+            ka = torch.where(after & (va == ma.unsqueeze(1)), key, torch.full_like(key, big))
+            kmin, ap = ka.min(dim=1)
+            lv = v1[r].gather(1, lp.unsqueeze(1)).squeeze(1)
+            led = torch.where((kmin < big) & (ma > lv), ap, lp)
+            best1 = torch.where(has_lead, led, best1)
+        best2 = first_max(v2[r], NEG)
+        chosen[bidx[go], here[go]] = True
+        pick = torch.where(go, best1, torch.full_like(best1, -1))
+        knd = torch.where(pick >= 0, 1, 0)
+        fb = go & (pick < 0) & first
+        if bool(fb.count_nonzero()):
+            alt, akind = self._tac_explore_region(fb, u_b, ut, here, pre, seat, revealed, chosen, treg)
+            pick = torch.where(fb & (alt >= 0), alt, pick)
+            knd = torch.where(fb & (alt >= 0), akind, knd)
+            late = fb & (alt < 0) & (best2 >= 0)
+            pick = torch.where(late, best2, pick)
+            knd = torch.where(late, 4, knd)
+        return pick, knd
 
     def _tac_explore_region(self, mask: torch.Tensor, u_b: torch.Tensor, ut: torch.Tensor, here: torch.Tensor,
                             pre: str, seat: int, revealed: torch.Tensor, chosen: torch.Tensor, treg: torch.Tensor):
@@ -3054,7 +3084,8 @@ class SimTactics:
         `need` [B, T] (those its pass reads): each unit of a player at war
         with it that it sees, with a combat, ranged or bombard strength, adds
         its danger (`unitDanger`) over the plots its one-turn search closes
-        from where it stands on its full Movement, those within its range of
+        from where it stands on its full Movement (a ship's strike onto land
+        none), those within its range of
         them and, a raider's, the land beside them — each set once; an
         aircraft over its range. Each district of such a player
         (`_danger_districts`) whose plot it sees adds its defence on its plot
@@ -3120,6 +3151,9 @@ class SimTactics:
                         continue
                     res = self._tac_search(b_i[mm], u_i[mm] - lo, int(sv), 1, False, pre=pre, full=True)
                     reach = res["closed"] >= 1
+                    # a ship's strike onto land is no plot of its reach
+                    ship = self.unit_naval[ut[b_i[mm], u_i[mm]]]
+                    reach &= ~(ship.unsqueeze(1) & ~self.water[b_i[mm]])
                     second = torch.zeros_like(reach)
                     rr = R[b_i[mm], u_i[mm]]
                     for r in torch.unique(rr).tolist():

@@ -1584,6 +1584,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -3719,6 +3720,14 @@
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's..."
   review: imported
+- addr: 0x802cf0
+  final: 0x5662d0
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - "...ange (0x56e3d0) — one of TARGET_LOW_PRIORITY_UNIT .. TARGET_HIGH_PRIORITY_UNIT, through 0x802cf0 into the attack assignment 0x776140 and its execution 0x771f80; unported), Naval Escort..."
+  review: imported
 - addr: 0x802ea0
   final: 0x566110
   kind: function
@@ -3730,15 +3739,26 @@
 - addr: 0x803060
   final: 0x566480
   kind: function
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 34
+      value: city-state 3's Naval Superiority Galley, Ready with no target, moves every turn with no tactical row and no operation line
+  impl:
+    - cpu/core/tactical.ts:passPatrol
+    - cpu/core/opsOrders.ts:passOrders
+    - gpu/core/sim_minorops.py:_x_naval_patrol
+    - cpu/core/operations/nodes.ts:OpsContext
+    - cpu/core/operations/nodes.ts:navalPatrol
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
-    - "...Attack Units 0x80ceb0, Defend Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation..."
-  review: imported
+    - "Naval Patrol's execution: the job's units (0x6092c0) alive with Movement left take HL Explore's target (0x70aa40, a chosen list of their own, the first-round fallbacks on), their turn done (0x570b40), a move order there (0x962030)"
+  review: reviewed
 - addr: 0x803250
   final: 0x566670
   kind: function
   status: PARTLY
+  impl: [cpu/core/operations/nodes.ts:navalUnitsRunning, gpu/core/sim_minorops.py:_x_naval_patrol]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...ation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the c..."

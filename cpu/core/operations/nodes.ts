@@ -83,6 +83,10 @@ export interface OpsContext {
   /** Operation Defend Units' orders, where the seat's units' turn gives
    *  them; none, the node moves no unit */
   defend?: DefendOrders;
+  /** NAVAL PATROL's execution for the units (0x803060), in the player's
+   *  unit order: each with Movement left takes HL Explore's target and moves
+   *  there, its turn done; none, the node moves no unit */
+  patrol?: (ids: readonly number[]) => void;
   /** the units take their type's own AI type (0x79b9c0: COMBAT for a
    *  fighting unit), a standing army's DEFENDER among them leaving it */
   ownAiType(ids: readonly number[]): void;
@@ -653,9 +657,17 @@ const operationAttackUnits: BtHandler<OpsContext> = {
 };
 
 // NAVAL PATROL, NAVAL PILLAGE (0x803880): RUNNING while the operation holds
-// units, else FAILURE
+// units, else FAILURE. Naval Pillage's execution (0x803250: its units' blows
+// on the planning's district and unit targets) is unported
 const navalUnitsRunning: BtHandler<OpsContext> = {
   update: (_node, _run, ctx) => (opUnits(ctx.op).length > 0 ? BT_RUNNING : BT_FAILURE),
+};
+
+// NAVAL PATROL's execution (0x803060): the operation's units, each with
+// Movement left, to HL Explore's target (no line)
+const navalPatrol: BtHandler<OpsContext> = {
+  ...navalUnitsRunning,
+  execute: (_node, _run, ctx) => ctx.patrol?.(opUnits(ctx.op)),
 };
 
 // NAVAL CHOOSE TARGET (0x803590): of the targets of its domain the
@@ -742,7 +754,7 @@ export const OP_NODES: Readonly<Record<string, BtHandler<OpsContext>>> = {
   ...ASSAULT_NODES,
   ...BARBARIAN_NODES,
   'Operation Attack':{ ...operationAttack, execute: operationAttackExecute },
-  'Naval Patrol': navalUnitsRunning,
+  'Naval Patrol': navalPatrol,
   'Naval Pillage': navalUnitsRunning,
   'Naval Choose Target': navalChooseTarget,
   'Operation Naval Escort': success,
