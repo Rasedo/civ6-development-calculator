@@ -3461,7 +3461,13 @@ function loadTactical(dumpPath: string): Tactical | undefined {
     if (f[2] === 'Wander') wanders.set(turn, [...(wanders.get(turn) ?? []), id]);
     let t = out.get(turn);
     if (!t) out.set(turn, (t = new Map()));
-    if (!t.has(id)) t.set(id, { move: f[2], extra: f.slice(6).join(", ") });
+    // a unit's Pillage rows that a later move of its turn follows name a
+    // target it did not take (0x77a810 logs each target it weighs): its move
+    // is the later row's
+    const cur = t.get(id);
+    if (!cur || (/^Pillage /.test(cur.move) && !/^Pillage /.test(f[2]) && f[2] !== 'HL: End Turn')) {
+      t.set(id, { move: f[2], extra: f.slice(6).join(", ") });
+    }
   }
   return { first: out, wanders, others, drawRows };
 }
