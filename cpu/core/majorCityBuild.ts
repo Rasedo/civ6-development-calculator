@@ -22,7 +22,7 @@ import { RESOURCES } from '../../world/resources';
 import { hasRiver } from '../../world/query';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, constructibleNow, growthForecast, type AmenityCity, type CityBuildFacts, type PickFacts } from './aiCityBuild';
-import { FX, fxOf, turnsAt } from './aiValue';
+import { FX, fmul, fxOf, turnsAt } from './aiValue';
 import { unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
 import { civicAnalysis } from './aiCivics';
@@ -253,16 +253,18 @@ export function seatResearchTurns(state: GameState, seat: number): (type: string
 
 /** the turns a major's or a Free City's city builds an install type in
  *  (0x17bb40 for a unit) at its Production times 1 + its percent toward the
- *  item + `extra` raw (24.8), the extra added to the percent: its price less the progress the queue holds on it and the bank;
+ *  item + `extra` raw (24.8), the extra added to the percent (with `scale`,
+ *  the Production times the extra where it is not 0, as `minorItemTurns`): its price less the progress the queue holds on it and the bank;
  *  500 for an item the city has no row for */
-export function majorItemTurns(state: GameState, city: City, type: string, extra: number): number {
+export function majorItemTurns(state: GameState, city: City, type: string, extra: number, scale = false): number {
   const s = seatOf(state, city.seat)!;
   const q = majorQueueItem(state, city.seat, city, type);
   if (!q) return 500;
   const k = keyOf(q);
   const inQueue = city.queue.find((x) => keyOf(x) === k);
   const progress = (inQueue?.progress ?? 0) + (city.productionBank ?? 0);
-  const rate = fxOf(computeCityStats(state, city).total.production * (1 + prodBoostPct(getModifiers(state, city.seat), q, s.gpPerm) + extra / FX));
+  const base = fxOf(computeCityStats(state, city).total.production * (1 + prodBoostPct(getModifiers(state, city.seat), q, s.gpPerm) + (scale ? 0 : extra / FX)));
+  const rate = scale && extra ? fmul(base, extra) : base;
   return turnsAt(itemPrice(state, city, q) * FX - fxOf(progress), rate);
 }
 

@@ -511,6 +511,10 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     let type: string;
     let cost: number;
     let floor: number;
+    // the district's turns (0x17b5a0) take the Amount as a multiplier of
+    // the Production (fx_mul_assign), not a percent added: T1 above T0, the
+    // value below 0 — no Veterancy line in any recording's AI_GovtPolicies.csv
+    let scale = false;
     if (b && !t.view.cityHasBuilding(s.seat, s.id, b.type)) {
       if (b.maxWorldInstances > 0 && t.view.buildingsBuilt(b.type) >= b.maxWorldInstances) return 0;
       if (b.district && b.district !== 'DISTRICT_CITY_CENTER' && !t.view.cityHasDistrict(s.seat, s.id, b.district)) return 0;
@@ -523,11 +527,12 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
       ({ tech, civic, type } = d);
       cost = t.view.districtCost(s.seat, d.type);
       floor = 1;
+      scale = true;
     }
     const r = Math.max(t.view.researchTurns(s.seat, tech), t.view.researchTurns(s.seat, civic));
     if (t.start + r >= t.horizon) return 0;
-    const t0 = Math.max(floor, t.view.cityItemTurns(s.seat, s.id, type, 0));
-    const t1 = Math.max(floor, t.view.cityItemTurns(s.seat, s.id, type, extra));
+    const t0 = Math.max(floor, t.view.cityItemTurns(s.seat, s.id, type, 0, scale));
+    const t1 = Math.max(floor, t.view.cityItemTurns(s.seat, s.id, type, extra, scale));
     const end = Math.min(t.start + t1 + r, t.horizon);
     const v = fdiv(Math.floor(((t0 - t1) * FX * cost * FX) / FX), Math.max(1, t1 * t0) * FX);
     return whole(yieldValue(null, null, presentValue(v, t.rate, end) - presentValue(v, t.rate, t.start + r), 'YIELD_PRODUCTION'));

@@ -3,6 +3,38 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x265ac0
+  final: 0x1a3460
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 56
+      value: "runs/h1_duelw1121   t56-t76: the raid's Archer (Range 2) and Warriors log one goal each turn,   6:13 or 7:12 beside the target 6:12 (the barred city: radius 1);"
+    - recording: h1_duelv1124
+      turn: 35
+      value: runs/h1_duelv1124 t35   (a Warrior's goal one plot short of its target) agrees.
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - ".... The ring test 0x815d50 takes a plot holding a unit of the mover's player only where 0x265ac0 -> 0x265af0 passes it on the mover's path finder (+0x738 0: any; else formation classes..."
+  review: imported
+- addr: 0x265af0
+  final: 0x1a3490
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 56
+      value: "runs/h1_duelw1121   t56-t76: the raid's Archer (Range 2) and Warriors log one goal each turn,   6:13 or 7:12 beside the target 6:12 (the barred city: radius 1);"
+    - recording: h1_duelv1124
+      turn: 35
+      value: runs/h1_duelv1124 t35   (a Warrior's goal one plot short of its target) agrees.
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - "...est 0x815d50 takes a plot holding a unit of the mover's player only where 0x265ac0 -> 0x265af0 passes it on the mover's path finder (+0x738 0: any; else formation classes, damage, th..."
+  review: imported
 - addr: 0x266470
   final: 0x1a3d30
   kind: function

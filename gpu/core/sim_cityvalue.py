@@ -1871,16 +1871,19 @@ class _MinorFacts:
         rate = torch.floor(self._total(1) * (1 + self._item_pct(item) / 100) * _FX + 0.5).long()
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
-    def item_turns(self, u, extra):
+    def item_turns(self, u, extra, scale=False):
         """`minorItemTurns`: the turns the item takes (0x17bb40, 0x17b1e0,
-        0x17b5a0) at the Production times 1 + its percent + `extra` raw"""
+        0x17b5a0) at the Production times 1 + its percent + `extra` raw;
+        with `scale` the Production times `extra` where it is not 0"""
         sim, s = self.sim, self.s
         k = self._item_key(u)
         if k < 0:
             return 500
         cur = sim.citystate_item[:, s]
         progress = torch.where(cur == k, sim.citystate_prod[:, s], sim.citystate_kept[:, s, k]) + sim.citystate_ovf[:, s]
-        rate = torch.floor(self._total(1) * (1 + self._item_pct(u) / 100 + extra / _FX) * _FX + 0.5).long()
+        rate = torch.floor(self._total(1) * (1 + self._item_pct(u) / 100 + (0 if scale else extra / _FX)) * _FX + 0.5).long()
+        if scale and extra:
+            rate = _fmul(rate, torch.full_like(rate, int(extra)))
         return _turns_at(torch.floor(self._item_cost(u) * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
     def unit_expected(self, u):
@@ -2372,9 +2375,9 @@ class _FreeFacts(_MinorFacts):
         rate = torch.floor(self._total(1) * _FX + 0.5).long()
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
-    def item_turns(self, u, extra):
+    def item_turns(self, u, extra, scale=False):
         """`majorItemTurns` of an item at the Production times 1 + `extra`
-        raw"""
+        raw; with `scale` the Production times `extra` where it is not 0"""
         sim = self.sim
         k = self._item_key(u)
         if k < 0:
@@ -2382,7 +2385,9 @@ class _FreeFacts(_MinorFacts):
         head = sim.city_current[:, self.row, self.j, 0]
         progress = torch.where(head == k, sim.city_progress[:, self.row, self.j, 0].double(), torch.zeros(sim.B, dtype=torch.float64, device=sim.device))
         progress = progress + sim.city_prod_bank[:, self.row, self.j].double()
-        rate = torch.floor(self._total(1) * (1 + extra / _FX) * _FX + 0.5).long()
+        rate = torch.floor(self._total(1) * (1 + (0 if scale else extra / _FX)) * _FX + 0.5).long()
+        if scale and extra:
+            rate = _fmul(rate, torch.full_like(rate, int(extra)))
         return _turns_at(torch.floor(self._item_cost(u) * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
     def unit_expected(self, u):

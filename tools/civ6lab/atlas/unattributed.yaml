@@ -785,6 +785,7 @@
     - cpu/core/aiCityTrees.ts:CityTreeWorld
     - cpu/core/tactical.ts:turnsToPlot
     - gpu/core/sim_minorai.py:turns_to
+    - gpu/core/sim_barbops.py:_bop_scout_tick
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
@@ -2848,6 +2849,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...ckup\" FAILURE; Always Swap; Fail on Invalid Team; Required Tag; the strength gates over 0x723ab0 — WEAK to the backup, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7..."
   review: imported

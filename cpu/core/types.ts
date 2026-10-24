@@ -1202,8 +1202,9 @@ export interface CityState extends Seat {
   idleCitizens?: number;
   /** the minor's own BUILD record — `minorBuild` writes these, the tile
    *  planes carry the districts, and the conquest hands the whole set to the
-   *  captured City. Absent = nothing built yet. */
-  districts?: { type: DistrictId; tileIndex: number }[];
+   *  captured City. Absent = nothing built yet. A district's `cost` is the
+   *  price it locked at its placement (`minorPlaceDistrict`). */
+  districts?: { type: DistrictId; tileIndex: number; cost?: number }[];
   buildings?: string[];
   /** `City.pillagedBuildings` for the minor's city — the same ONE reader. */
   pillagedBuildings?: string[];

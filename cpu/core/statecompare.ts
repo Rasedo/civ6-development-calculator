@@ -1005,6 +1005,8 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorBuildingsPillaged: overCityStates((cityState) => (cityState.pillagedBuildings ?? []).map((x) => idx(BUILDING_IDX, x)).sort((a, b) => a - b)),
   minorBuildings: overCityStates((cityState) => (cityState.buildings ?? []).map((x) => idx(BUILDING_IDX, x)).sort((a, b) => a - b)),
   minorDistricts: overCityStates((cityState) => PLACEABLE_DISTRICTS.map((d) => cityState.districts?.find((x) => x.type === d)?.tileIndex ?? -1)),
+  // the price each district locked at its placement, the latest of a type
+  minorDistrictCosts: overCityStates((cityState) => PLACEABLE_DISTRICTS.map((d) => [...(cityState.districts ?? [])].reverse().find((x) => x.type === d)?.cost ?? 0)),
   minorOuterHp: overCityStates((cityState) => cityState.outerHp ?? 0),
   religionPressure: overCityStates((cityState, st) => perCiv(st, (seat) => cityState.religionPressure?.[seat] ?? 0)),
   minorUnconverted: overCityStates((cityState) => unconvertedOf(cityState)),

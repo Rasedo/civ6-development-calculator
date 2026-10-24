@@ -108,13 +108,9 @@ export function minorPhase(state: GameState): void {
     // order: `chargeUnitUpkeep`)
     chargeUnitUpkeep(state, cityState.seat);
     minorPower(state, cityState);
-    // the research its turn opens on, which prices a district its step
-    // completes (runs/h1_duelw1124 Granada t44: the Harbor done at 57 of
-    // the 53 it cost before that turn's civic, 58 after)
-    const opening = { ...cityState.research, techs: [...cityState.research.techs], civics: [...cityState.research.civics] };
     const gained = minorEconomy(state, cityState);
     storeUnitStrength(state, cityState.seat);
-    minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production, opening);
+    minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
     // its city AI's full update reads its growth here, before the growth
     // (runs/h1_duelv1121 Ayutthaya: the Granary's housing value from the
     // forecast of the citizens and the store before each turn's growth, t18 - t24)
@@ -768,8 +764,7 @@ export function minorItemKey(item: MinorItem): string {
  * unit +200%, walls +200%, the Harbor and the type's district +500%:
  * 0x1856ed multiplies the sum; 1117 Caguana's Builder 0 → 15 on 2.5 with an
  * idle step's 2.5 stored, its Warrior 0 → 16 on 3.5 with the Monument's 2).
- * An item completes when its progress covers its cost (a district's on
- * `opening`, the research the minor's turn opened on), one a turn — a unit
+ * An item completes when its progress covers its cost, one a turn — a unit
  * also needs a free tile on or beside the centre — and leaves the store A
  * less what it lacked before the step, never below 0 (A is the city's plain
  * Production: a minor holds no flat toward its head). With nothing in hand
@@ -786,8 +781,7 @@ export function minorItemKey(item: MinorItem): string {
  * `MINOR_REPAIR_RESUME_PCT` of its cost and the rest is built
  * (`minorRepairTarget`).
  */
-export function minorBuild(state: GameState, cityState: CityState, production: number,
-  opening: ResearchState = cityState.research): void {
+export function minorBuild(state: GameState, cityState: CityState, production: number): void {
   cityState.fullyPowered = false;
   delete cityState.buildProject;
   delete cityState.projectYield;
@@ -827,7 +821,7 @@ export function minorBuild(state: GameState, cityState: CityState, production: n
     }
   }
   const pct = minorItemPct(state, cityState, item);
-  const cost = minorItemCost(state, cityState, item, opening);
+  const cost = minorItemCost(state, cityState, item);
   const before = cityState.prodProgress ?? 0;
   const paid = made + (cityState.prodOverflow ?? 0);
   cityState.prodProgress = before + paid * ((100 + pct) / 100);
@@ -903,7 +897,10 @@ function minorPlaceDistrict(state: GameState, cityState: CityState, district: Di
   t.district = district;
   t.districtComplete = false;
   paveGround(t);
-  (cityState.districts ??= []).push({ type: district, tileIndex: site });
+  // its price locks at the placement (runs/h1_duelv1124 Granada's Harbor
+  // at 53 from t42 to its completion at t44, Production Needed in
+  // City_BuildQueue.csv, through a civic that took the fresh price to 58)
+  (cityState.districts ??= []).push({ type: district, tileIndex: site, cost: districtScaledBase(cityState.research, district) });
   minorReplaceCitizens(state, cityState);
 }
 
@@ -965,15 +962,18 @@ export function minorCanTrain(state: GameState, cityState: CityState, id: string
 /** the turns a minor's city builds an install type in (0x17bb40 a unit,
  *  0x17b1e0 a building, 0x17b5a0 a district) at its Production times 1 + its
  *  percent toward the item + `extra` raw (24.8), the extra added to the
- *  percent: its cost less the progress kept on it and the city's store, as
+ *  percent — or, with `scale` (0x17b5a0's production multiplier argument,
+ *  fx_mul_assign), the Production times the extra where it is not 0 —: its
+ *  cost less the progress kept on it and the city's store, as
  *  `buildTurns` reads them; 500 for a type it has no item for */
-export function minorItemTurns(state: GameState, cityState: CityState, type: string, extra: number): number {
+export function minorItemTurns(state: GameState, cityState: CityState, type: string, extra: number, scale = false): number {
   const item = minorItemOfType(type);
   if (!item) return 500;
   const k = minorItemKey(item);
   const progress = (cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0) + (cityState.prodOverflow ?? 0);
   const stats = computeCityStats(state, minorCity(cityState));
-  const rate = fxOf(stats.total.production * (1 + minorItemPct(state, cityState, item) / 100 + extra / FX));
+  const base = fxOf(stats.total.production * (1 + minorItemPct(state, cityState, item) / 100 + (scale ? 0 : extra / FX)));
+  const rate = scale && extra ? fmul(base, extra) : base;
   return turnsAt(minorItemCost(state, cityState, item) * FX - fxOf(progress), rate);
 }
 
@@ -1605,31 +1605,30 @@ export function minorItemPct(state: GameState, cityState: CityState, item: Minor
   return 0;
 }
 
-/** A minor's district's price: the row's own base; its repair, the
+/** A minor's district's price: the price it locked at its placement on the
+ *  plot, else the row's own base at its research now; its repair, the
  *  district standing pillaged on the plot, the rest past
  *  `MINOR_REPAIR_RESUME_PCT` as a building's (runs/h1_duelw1127 Muscat t168:
- *  the Commercial Hub resumed at 85 of 114); priced on `research` */
-function minorDistrictCost(state: GameState, cityState: CityState, district: DistrictId, site: number,
-  research: ResearchState): number {
-  const full = districtScaledBase(research, district);
+ *  the Commercial Hub resumed at 85 of 114) */
+function minorDistrictCost(state: GameState, cityState: CityState, district: DistrictId, site: number): number {
+  const placed = site >= 0 ? (cityState.districts ?? []).find((d) => d.type === district && d.tileIndex === site) : undefined;
+  const full = placed?.cost ?? districtScaledBase(cityState.research, district);
   if (site < 0 || state.map.tiles[site].district !== district || !minorRepairsDistrictAt(state, cityState, site)) return full;
   return full - Math.floor((full * MINOR_REPAIR_RESUME_PCT) / 100);
 }
 
 /** A minor's item's price: a unit's Production cost (a Builder's and a
  *  Trader's climbing), a building's (`minorBuildingCost`), a district's
- *  (`minorDistrictCost`, on `research`: the minor's own unless the step's
- *  opening research), a project's, a repair's rest past
+ *  (`minorDistrictCost`), a project's, a repair's rest past
  *  `MINOR_REPAIR_RESUME_PCT`. */
-export function minorItemCost(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>,
-  research: ResearchState = cityState.research): number {
+export function minorItemCost(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): number {
   return 'unit' in item
     ? (item.unit === 'BUILDER' ? builderCost(state, cityState.seat)
       : item.unit === 'TRADER' ? traderCost(state, cityState.seat) : UNITS[item.unit].cost)
     : 'building' in item ? minorBuildingCost(state, cityState, item.building)
       // the row's OWN base, not the specialty one: a minor builds real
       // districts too and the install prices an Aqueduct at 36
-      : 'district' in item ? minorDistrictCost(state, cityState, item.district, item.site, research)
+      : 'district' in item ? minorDistrictCost(state, cityState, item.district, item.site)
         : 'project' in item ? projectCost(state, cityState.seat, item.project, minorCity(cityState))
           : minorBuildingCost(state, cityState, item.repair)
             - Math.floor((minorBuildingCost(state, cityState, item.repair) * MINOR_REPAIR_RESUME_PCT) / 100);

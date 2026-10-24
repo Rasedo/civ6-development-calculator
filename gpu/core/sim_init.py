@@ -1308,6 +1308,9 @@ class SimInit:
         # ... spanning the MINOR rows too: a city-state's one city keeps its
         # district registry at [:, n_majors+s, 0] like every other city fact.
         self.city_dist_tile = torch.full((B, self.CITY_ROWS, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
+        # a city-state's district price locked at its placement, per type, 0
+        # none (`CityState.districts`' cost, `minorPlaceDistrict`)
+        self.citystate_dist_cost = torch.zeros(B, max(self.S, 1), nd_b4, dtype=torch.long, device=device)
         # CITIZENS PINNED into each district's specialist slots, -1 where the
         # automatic rule decides (City.specialistPref). Same geometry as the
         # registry above, because a pin names a district TYPE.

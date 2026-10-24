@@ -4460,11 +4460,13 @@ operations' contracts, the improvement values below, the purchases).
   0x5d2876) and stops at the first entry it may train ranked below them
   (0x5d2941 / 0x5d2947): an eligible first entry whose sums fall below 0
   yields none.
-- A city-state's district is priced on the research its turn opened on:
-  runs/h1_duelw1124 Granada t44, its Harbor done at 39 + 18 = 57 where the
-  price before that turn's civic (8 civics, the tree further through) is
-  53 and after it 58 (the queue cache's costs, Cache_City_BuildQueue, not
-  read further).
+- A CITY-STATE'S DISTRICT PRICE locks at its placement, as a major's does
+  ("buy.districtCost"'s lock): runs/h1_duelv1124 Granada's Harbor at 53
+  (City_BuildQueue.csv Production Needed) from t42 to its completion at
+  t44 through a civic that took the fresh price to 58; runs/h1_duelw1127
+  Muscat's Commercial Hub repaired at 114 at t168 where the fresh price
+  was 148. `minorPlaceDistrict` / `minorDistrictCost`,
+  `citystate_dist_cost`.
 - The nodes (registration 0x7cbca0, names 0x7db850): Decode Trigger
   0x7f2970; Contract Manager 0x7f17a0 (parent 0x7f1500; a counter +0x50
   over the turn limit, reset when every contract it holds is alive);
@@ -6666,7 +6668,13 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   PV(min(start + R + T1, horizon)) - PV(start + R), whole. The city holding
   the building, or none named: the DistrictType (none where the city holds
   it), T0 / T1 turnsToBuildDistrict 0x17b5a0 each at least 1, the cost the
-  player's (0x4088a0), the same value. The 0x5d4650 call's result is not
+  player's (0x4088a0), the same value — 0x17b5a0 takes the Amount by
+  pointer (its fifth argument) and, where it is not 0, multiplies the
+  Production by it (fx_mul_assign 0x16eb20, 0x17b807): Veterancy's 30 makes
+  the Production 0.297 of itself, T1 above T0, the value below 0 (no
+  Veterancy line in any recording's AI_GovtPolicies.csv, majors' or
+  minors'; the building path's 0x17b1e0 adds its percent: Limes logs
+  above 0). The 0x5d4650 call's result is not
   read. Port: `aiModifiers.ts` (`researchTurns`, `cityItemTurns`,
   `districtCost`, `buildingsBuilt`), `sim_policy.py`
   (`_pol_building_production`).

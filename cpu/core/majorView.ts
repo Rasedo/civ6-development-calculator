@@ -832,13 +832,13 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     // a city-state's train turns and expected count as its city's update
     // reads them (`minorItemTurns`), any other city's its queue's
     researchTurns: (i, type) => seatResearchTurns(state, i)(type),
-    cityItemTurns: (i, id, type, extra) => {
+    cityItemTurns: (i, id, type, extra, scale) => {
       if (isCityStateSeat(i)) {
         const cs = seatOf(state, i) as CityState | undefined;
-        return cs && cs.centerIndex >= 0 ? minorItemTurns(state, cs, type, extra) : -1;
+        return cs && cs.centerIndex >= 0 ? minorItemTurns(state, cs, type, extra, scale) : -1;
       }
       const city = cityOf(i, id);
-      return city ? majorItemTurns(state, city, type, extra) : -1;
+      return city ? majorItemTurns(state, city, type, extra, scale) : -1;
     },
     cityUnitExpected: (i, id, type) => {
       if (isCityStateSeat(i)) {

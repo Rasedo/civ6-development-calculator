@@ -267,8 +267,9 @@ export interface AiValueView {
   cityStrike(seat: number, cityId: number): number;
   /** the turns a city builds a UnitType, BuildingType or DistrictType in
    *  (0x17bb40, 0x17b1e0, 0x17b5a0) at its Production times 1 + its percent
-   *  toward the item + `extra` raw (24.8) */
-  cityItemTurns(seat: number, cityId: number, type: string, extra: number): number;
+   *  toward the item + `extra` raw (24.8); with `scale` (0x17b5a0's production
+   *  multiplier) the Production times `extra` where it is not 0 */
+  cityItemTurns(seat: number, cityId: number, type: string, extra: number, scale?: boolean): number;
   /** the seat's research and civics AIs' turns to a TECH_ / CIVIC_ type
    *  (0x7610e0, 0x621920), 0 for none or one held */
   researchTurns(seat: number, type: string | null): number;

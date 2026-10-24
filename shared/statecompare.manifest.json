@@ -2531,6 +2531,17 @@
           "planes": []
         },
         {
+          "name": "minorDistrictCosts",
+          "compare": "exact",
+          "covers": [
+            "CityState.districts"
+          ],
+          "planes": [
+            "citystate_dist_cost"
+          ],
+          "note": "the price each placeable district locked at its placement (`minorPlaceDistrict`), the latest of a type, 0 none"
+        },
+        {
           "name": "minorOuterHp",
           "compare": "exact",
           "covers": [

@@ -70,6 +70,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes:
     - "label: fx_mul_assign(a*=b)"
     - ".claude/scratchpad/cb/notes.txt: ...| trunc((f-floor)*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0..."
@@ -400,6 +401,9 @@
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/minorBuild.ts:minorItemTurns
     - gpu/core/sim_cityvalue.py:item_turns
+    - cpu/core/aiModifiers.ts:floor
+    - cpu/core/aiValue.ts:playerUnits
+    - gpu/core/sim_policy.py:value
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"

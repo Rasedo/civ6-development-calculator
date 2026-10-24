@@ -35,11 +35,9 @@ class SimMinors:
             # its units' fuel, out of the same bank, before its grid
             self._seat_charge_upkeep(self._CITY_MINOR0 + s)
             self._minor_power(s)
-            # the research its turn opens on, which prices a district its step completes
-            opening = self._progress_pct_of(self.citystate_techs[:, s].sum(dim=1), self.citystate_civics[:, s].sum(dim=1))
             gained = self._minor_economy(s)
             self._store_unit_strength(s, alive)
-            self._minor_build(s, self._minor_production(s), opening)
+            self._minor_build(s, self._minor_production(s))
             # its city AI's full update reads its growth here, before the growth
             g = self._cv_minor_facts(s).growth()
             now = torch.stack([g["surplus"], g["housing"], g["population"], g["stored"], g["multiplier"]], -1)
@@ -1042,11 +1040,11 @@ class SimMinors:
                 (key >= self._mk_d0) & (key < self._mk_p0), (key >= self._mk_p0) & (key < self._mk_r0),
                 key >= self._mk_r0)
 
-    def _minor_item_cost(self, s: int, key: torch.Tensor, dpct: torch.Tensor | None = None) -> torch.Tensor:
+    def _minor_item_cost(self, s: int, key: torch.Tensor) -> torch.Tensor:
         """[B] f64 — `minorItemCost` of the key per game: a unit's Production
         cost (a Builder's and a Trader's climbing), a building's (the Flood
-        Barrier's off the lowland it covers), a district's own base (on the
-        research progress `dpct` where given, else the minor's own), a
+        Barrier's off the lowland it covers), a district's own base (the
+        price it locked at its placement where it stands on its plot), a
         project's (the walls' repair the HP it puts back), a repair's rest
         past `MINOR_REPAIR_RESUME_PCT`"""
         row = self._CITY_MINOR0 + s
@@ -1069,9 +1067,13 @@ class SimMinors:
         pct = self._progress_pct_of(self.citystate_techs[:, s].sum(dim=1), self.citystate_civics[:, s].sum(dim=1))
         if bool(is_d.any()):
             dv = (key - self._mk_d0).clamp(min=0, max=int(self._mb_d_base.shape[0]) - 1)
-            dfull = self._progress_cost(self._mb_d_base.take(dv), self._mb_d_k.take(dv), pct if dpct is None else dpct).double()
-            # a district's repair: the rest past the repair's resume percent
+            dfull = self._progress_cost(self._mb_d_base.take(dv), self._mb_d_k.take(dv), pct).double()
+            # one placed on the plot: the price it locked at its placement
             site = self.citystate_prod_site[:, s]
+            on = (site >= 0) & (self.district.gather(1, site.clamp(min=0).unsqueeze(1)).squeeze(1) == dv)
+            lk = self.citystate_dist_cost[:, s].gather(1, dv.unsqueeze(1)).squeeze(1)
+            dfull = torch.where(on & (lk > 0), lk.double(), dfull)
+            # a district's repair: the rest past the repair's resume percent
             rep = torch.zeros_like(is_d)
             for d in sorted({int(x) for x in dv[is_d].tolist()}):
                 rep = rep | (is_d & (dv == d) & self._minor_repairs_district_at(s, d, site))
@@ -1159,11 +1161,15 @@ class SimMinors:
         self.district[rr, tt] = dv
         self.district_complete[rr, tt] = False
         self._pave_plot(rr, tt)
+        # its price locks at the placement, on the research as it stands
+        pct = self._progress_pct_of(self.citystate_techs[rr, s].sum(dim=1), self.citystate_civics[rr, s].sum(dim=1))
+        locked = self._progress_cost(self._mb_d_base.take(dv), self._mb_d_k.take(dv), pct)
         for d in sorted(set(dv.tolist())):
             k = dv == d
             r_d, t_d = rr[k], tt[k]
             _held = self.city_dist_tile[r_d, row, 0, d]
             self.city_dist_tile[r_d, row, 0, d] = torch.where(_held >= 0, _held, t_d) if bool(self._is_repeatable[d]) else t_d
+            self.citystate_dist_cost[r_d, s, d] = locked[k]
         self._eff_version += 1
         self._minor_replace_citizens(s, go)
 
@@ -1416,7 +1422,7 @@ class SimMinors:
         self._gen_ver += 1
         return landed
 
-    def _minor_build(self, s: int, prod: torch.Tensor | None = None, opening: torch.Tensor | None = None) -> None:
+    def _minor_build(self, s: int, prod: torch.Tensor | None = None) -> None:
         """`minorBuild` — THE MINOR'S STEP (City_BuildQueue 0x16f050) works
         the item in hand, its city AI's pick (`_minor_ai_turn`, after the
         step). The city keeps each item's progress apart: the item it turns
@@ -1425,8 +1431,7 @@ class SimMinors:
         Production (A, `prod`, the minor's -50% among its percents) plus the
         overflow store, the sum under the item's own row (`_minor_item_pct`),
         and the item completes when its progress covers its cost
-        (`_minor_item_cost`, a district's on `opening`, the research progress
-        the turn opened on), one a turn — a unit also needs a free tile on or
+        (`_minor_item_cost`), one a turn — a unit also needs a free tile on or
         beside the centre — leaving the store A less what it lacked before
         the step, never below 0; with nothing in hand the step adds A to the
         store. A district project converts the row's percent of what the step
@@ -1480,7 +1485,7 @@ class SimMinors:
         if not bool(act.count_nonzero()):
             return
         pct = self._minor_item_pct(s, item)
-        cost = self._minor_item_cost(s, item, opening)
+        cost = self._minor_item_cost(s, item)
         before = self.citystate_prod[:, s].clone()
         paid = made + self.citystate_ovf[:, s]
         self.citystate_prod[:, s] = torch.where(act, before + paid * ((100 + pct) / 100), before)

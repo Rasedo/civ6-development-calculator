@@ -470,10 +470,10 @@ class SimPolicy:
         amount = int(float(a.get("Amount", 0) or 0))
         extra = _fx_const(_f32(amount * _f32(0.01)))
 
-        def value(type_, tech, civic, cost, floor, live):
+        def value(type_, tech, civic, cost, floor, live, scale=False):
             rr = torch.maximum(_t(f.tech_turns(tech), zero) if tech else zero, _t(f.civic_turns(civic), zero) if civic else zero)
-            t0 = _t(f.item_turns(type_, 0), zero)
-            t1 = _t(f.item_turns(type_, extra), zero)
+            t0 = _t(f.item_turns(type_, 0, scale), zero)
+            t1 = _t(f.item_turns(type_, extra, scale), zero)
             if floor is not None:
                 t0, t1 = t0.clamp(min=floor), t1.clamp(min=floor)
             end = torch.clamp(rr + t1, max=h)
@@ -497,7 +497,9 @@ class SimPolicy:
         d = T["dist"].get(a.get("DistrictType", "")) if a.get("DistrictType") else None
         if d is not None:
             held = _t(f.has_district(d["type"]), zero).bool()
-            dv = value(d["type"], d["tech"], d["civic"], f._item_cost(d["type"]).long(), 1, ~held)
+            # the district's turns (0x17b5a0) multiply the Production by the
+            # Amount (fx_mul_assign): T1 above T0, the value below 0
+            dv = value(d["type"], d["tech"], d["civic"], f._item_cost(d["type"]).long(), 1, ~held, True)
             out = torch.where(lacks, out, dv)
         return out
 
