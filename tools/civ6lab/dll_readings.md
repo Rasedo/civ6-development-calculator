@@ -4240,8 +4240,7 @@ Site 181 of 402; Theater 124 and Encampment 21 of ~5,000 each).
   modifiers and neighbours terms (as the improvement value's); the
   domain's resources path (where a city trains the domain). The residuals:
   per (turn, player) a constant across plots (Campus, Holy Site: 0.4 to
-  5.5), an Encampment's 0.5 a turn (the player's CITY_DEFENSES weight
-  reads 0 where the logs fit +0.25), Snow coast plots 3.0 a turn high
+  5.5), Snow coast plots 3.0 a turn high
   (1121 (10,2) / (34,23)), Woods / Rainforest plots 0.44 low past t11 (the
   removal), and the civic turns of the Theater and the Neighborhood (the
   minors' civics analysis).
@@ -8744,6 +8743,48 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   Scientist at 258 + 22 Faith against 257, 1117 t73 the Writer with the
   Oracle's 25% off). The rest want the turn's points and Faith as the AI
   reads them (LAB).
+
+## C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)
+
+- THE COPIES (0x7a58f0 -> 0x7a21e0's count, 0x7a5c00..0x7a6022): an
+  improvement that works the plot's resource (its Improvement_ValidResources
+  entry, Improvements +0x1e8) values the resource at `count` = 1.0 raw,
+  replaced where the resource's Resource_Consumption row (0x28a940 on
+  Resources +0x1c) is Accumulate (+0x48 bit 0) by valueBetween (0x7a2140)
+  of its ImprovedExtractionRate (+0x24) x (1 + 0.01 x the city's +0x1e00 at
+  the plot's terrain +0x2c, 0x4a9ff0; @0xd136f0 0.01, @0xcfc9f8 1.0) from T
+  to H; the count passed is its whole part (`sar 8`). The plot's own
+  improvement (its repair) passes 1, the improvement it replaces -1.
+  `resourceCopies` (cpu/core/aiPlotValue.ts), `_cv_resource_copies`
+  (gpu/core/sim_cityvalue.py). Confirmed: runs/h1_duelv1121 Hunza t19's
+  Pasture on Horses at (12,5) and (10,5) 171.45 (= the yields 71.45 + 40
+  copies x 2.5: the count held to twice the Horseman's 20), t20 118.95 and
+  t21 116.45 (38 and 36 copies at 1.25 as its Horses stand at 2 and 4);
+  the plotValueLab's Pastures 451 -> 453 exact on 1121 (the lab imports the
+  record, which holds no minor's stockpile, so its t20+ rows read 0 held).
+- THE COPIES HELD (0x4a93c0(r, 1)): Player_Resources +0x2e0[r][0] less the
+  reserved (0x4aa530, with the flag) plus +0x2e0[r][1] — a strategic one's
+  stockpile; the resource value's `have` (0x7a21e0 at 0x7a228f / 0x7a28e7).
+  A city-state's (`minorResourceFacts`, the research term
+  `_rai_resources`): its stockpile (`CityState.stockpile`,
+  `citystate_stockpile`). In 0x7a21e0 the strategic flag [rsp+0x40] (set
+  where T != H and H != 0) skips both the FX(-9999) exit and the cap clamp
+  (0x4aabe0 less 0x4aa790), so the count is held to 2 x need - have alone.
+- THE DISTRICT COUNT (0x1ae8a0, 0x1ae8f0): the most districts the
+  population allows = ceil(population (+0x588) / the globals' +0x2ac) +
+  the city's extra (+0x20), 1 below +0x2ac 1; the count 0x1ae8f0(skip
+  +0xe1 bit 2, complete only, RequiresPopulation only, the 5th flag 0x24c3b0,
+  not pillaged) — 0x7aaf80 calls it (1, 0, 1, 0, 0): the city's districts
+  that require population, complete or not. The district value's half
+  chronology term stands while the first exceeds the second.
+- LAB: a city-state's PSEUDOYIELD_GPP_GENERAL weight at its floor (-1.0,
+  factor 0); the writer unread (0x700810 sums the military AI's +0x7e8, the
+  player AI's +0x620 and the lists, the GP pseudo-yields' golden-age points
+  besides). It accounts for the Encampment's residual 0.5 a turn
+  (runs/h1_duelv1124 Granada t2 at (42,11): log 52.43, 55.54 before) — the
+  Encampment 21 -> 477 exact of 1,111 on 1124, 0 -> 1,820 of 3,915 on 1117
+  — beside the Barracks' and Stable's General point (ASK in "C-96 / C-97:
+  the city build AI"). `pseudoYieldWeights`, `_MinorFacts.pseudo_w`.
 
 ## DLL rules the engines contradict
 

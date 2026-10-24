@@ -183,6 +183,12 @@ export function pseudoYieldWeights(state: GameState, seat: number, inputs: AiWei
   if (cs) {
     out.set('PSEUDOYIELD_UNIT_COMBAT', cs.combatDesire ?? 0);
     for (const p of ['PSEUDOYIELD_UNIT_EXPLORER', 'PSEUDOYIELD_UNIT_NAVAL_COMBAT']) out.set(p, Math.max(-FX, (out.get(p) ?? 0) - FX));
+    // LAB: a city-state values its Great General points at nothing — the
+    // weight at its floor (-1.0), its writer unread: the Barracks', the
+    // Stable's and the Encampment's General point of every city-state of
+    // the five verbose duels (runs/h1_duelv1124 Granada t2's Encampment
+    // 52.43 at T 23, every other class's points counting)
+    out.set('PSEUDOYIELD_GPP_GENERAL', -FX);
   }
   return out;
 }

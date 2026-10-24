@@ -17,7 +17,7 @@ import {
   AI_RATE, FX, FX_MIN, discounted, fmul, fxConst, presentValue, pseudoYieldValue, yieldValue,
 } from './aiValue';
 import {
-  featureRemovalValue, harvestValue, improvementYieldsValue, type PlotValueFacts,
+  featureRemovalValue, fxOfFloat, harvestValue, improvementYieldsValue, type PlotValueFacts,
 } from './aiPlotValue';
 
 /** the Yields the per-yield terms run over, in the database's order */
@@ -93,13 +93,6 @@ const RESOURCE = new Map(AI_RESOURCES.map((r) => [r.type, r] as const));
 const IMPROVEMENT = new Map(AI_IMPROVEMENTS.map((r) => [r.type, r] as const));
 
 const between = (a: number, t: number, h: number): number => presentValue(a, AI_RATE, h) - presentValue(a, AI_RATE, t);
-
-/** a float's 24.8 raw as the DLL converts it: the floor's whole part, the
- *  fraction's 256ths truncated */
-function fxOfFloat(x: number): number {
-  const w = Math.floor(x);
-  return (w << 8) | (Math.trunc(Math.fround(x - w) * 256) & 0xff);
-}
 
 /** a district's per-turn value from its adjacency rows (0x365ae0 per row
  *  and yield, at the player's value), once per facts and district */

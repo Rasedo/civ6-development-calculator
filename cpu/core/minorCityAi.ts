@@ -47,6 +47,7 @@ import { projectTable } from './aiProjectValue';
 import { improvementValue, type PlotValueFacts } from './aiPlotValue';
 import { districtValue, type DistrictValueFacts } from './aiDistrictValue';
 import { resourceValue } from './aiResource';
+import { accumulationPct } from './stockpile';
 import { FX, FX_MIN, fmul, pseudoYieldValue } from './aiValue';
 import {
   buildingEvent, defenseEvent, districtEvent, freeSlots, goalsReached, improvementEvent, newCityAi, pickImprovement, tickCityTrees,
@@ -258,6 +259,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
         const row = RES.get(res);
         return row ? resourceValue(resFacts, row, count, t, h) : 0;
       },
+      accumulationPct: accumulationPct(state, cs.seat, tile.terrain),
     };
     const ground = owned ? groundImprovements(state, cs, tile) : new Set<string>();
     const improvements = AI_IMPROVEMENTS.map((row, i) => {

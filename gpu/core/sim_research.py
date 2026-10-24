@@ -459,6 +459,11 @@ class SimResearch:
             return torch.zeros(B, NT, dtype=torch.long, device=dev)
         ext = torch.zeros(B, nr, dtype=torch.long, device=dev)
         ext.scatter_add_(1, rid, (mine & live & self._res_extracting()).long())
+        # a strategic one's copies its stockpile (0x4a93c0)
+        copies = ext.clone()
+        for k, ri in enumerate(self._strat_rid):
+            if 0 <= ri < nr:
+                copies[:, ri] = self.citystate_stockpile[:, s, k]
         nn = turns.clamp(min=0)
         h = T["horizon"]
         # the luxury: one copy's amenities over the one city, at least the
@@ -504,7 +509,7 @@ class SimResearch:
             lux = torch.where(R["happy"][rc].unsqueeze(0) > 0, torch.maximum(a_amen, a_lux), a_lux)
             lux = torch.where(held, torch.zeros_like(lux), lux).clamp(max=200 * _FX)
             nd = need.gather(1, rc.unsqueeze(0).expand(B, -1))
-            hv = ext.gather(1, rc.unsqueeze(0).expand(B, -1))
+            hv = copies.gather(1, rc.unsqueeze(0).expand(B, -1))
             n = torch.clamp(torch.minimum(torch.ones_like(nd), 2 * nd - hv), min=0)
             w = chrono.unsqueeze(1) * _fx_const(25.0)
             w = torch.where(nd > 0, torch.div(w * _FX, (nd * _FX).clamp(min=1), rounding_mode="trunc"), w)

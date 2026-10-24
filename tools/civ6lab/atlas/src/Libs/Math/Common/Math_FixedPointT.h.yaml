@@ -288,6 +288,7 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb4/NOTES.md: ...f2e270 SPY,   f2e274 DISTRICT, f2e2a0 NUCLEAR, f2e2b4 STANDING_ARMY, f2e2bc TOURISM. (pyglob.py) - 0x700810 pseudo weight: max(-1, mil[+0x7e8]+ai[+0x620]+list768+list748); GP pseudos +GA pts 0x2c4230. - Mili..."

@@ -328,3 +328,13 @@
     - "...s id) is complete (district +0xb08, Lua `District:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers the plot's resource (+0x40, c..."
     - "...he MITIGATING player — the owner (0x24b4b0) of the first complete (+0xb08), unpillaged (0x24c3a0) Dam on the river's plot list, else the Great Bath's (0xa2c280); a mitigating player..."
   review: imported
+- addr: 0x24c3b0
+  final: 0x192920
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e count 0x1ae8f0(skip +0xe1 bit 2, complete only, RequiresPopulation only, the 5th flag 0x24c3b0, not pillaged) — 0x7aaf80 calls it (1, 0, 1, 0, 0): the city's districts that require..."
+  review: imported

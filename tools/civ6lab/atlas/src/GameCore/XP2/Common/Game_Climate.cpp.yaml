@@ -265,6 +265,7 @@
     - "H-1: a city's name, a citizen's name — READ"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
   context:
     - "...CanAppoint 0x430fa0 -> Appoint 0x430590): the PARAM_GOVERNOR_TYPE value is looked up by 0x28a940, which takes an INDEX when it is below the table's size and a HASH otherwise — and the..."
     - "...item whose Projects row (0xad5f10, +0x1c its index) has a Projects_XP2 row (0xad5fb0 / 0x28a940) — its +0x24, ReligiousPressureModifier (Holy Site Prayers 100, every other row 0). Rec..."

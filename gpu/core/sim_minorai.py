@@ -691,6 +691,10 @@ class SimMinorAi:
         seat = 100 + s
         mine_t = (self.tile_seat == seat) & self._res_extracting() & (self.res_id == ri)
         have = mine_t.sum(dim=1).take(bb)
+        # a strategic one's copies its stockpile (0x4a93c0)
+        if ri in self._strat_rid:
+            have = self.citystate_stockpile[:, s, self._strat_rid.index(ri)].take(bb)
+        n = count.long() if torch.is_tensor(count) else torch.full_like(t, count)
         cls = row["class"]
         if cls == "RESOURCECLASS_LUXURY":
             lux = self._cv_pseudo(torch.full_like(t, _FX), "PSEUDOYIELD_RESOURCE_LUXURY", 0)
@@ -701,8 +705,7 @@ class SimMinorAi:
                 a = self._cv_amenity_per_turn(f, _t(bal, f.like()), ys)
                 e = _between(a.take(bb), t, h, rate)
             v = torch.maximum(e, floor)
-            if count > 0:
-                v = torch.where(have > 0, zero, v)
+            v = torch.where((have > 0) & (n > 0), zero, v)
             return v.clamp(max=200 * _FX)
         if cls != "RESOURCECLASS_STRATEGIC":
             return zero
@@ -724,10 +727,8 @@ class SimMinorAi:
             used = intab.any(dim=1)
         nd, us = need.take(bb), used.take(bb)
         late = (t != h) & (h != 0)
-        n = torch.full_like(t, count)
         short = (have < 2 * nd) & ~late & (n <= 0)
-        if count > 0:
-            n = torch.clamp(torch.minimum(n, 2 * nd - have), min=0)
+        n = torch.where(n > 0, torch.clamp(torch.minimum(n, 2 * nd - have), min=0), n)
         chrono = (f.era() + 1).take(bb)
         w = chrono * _fx_const(25.0)
         w = torch.where(nd > 0, torch.div(w * _FX, (nd * _FX).clamp(min=1), rounding_mode="trunc"), w)
@@ -1210,6 +1211,17 @@ class _PlotFacts:
 
     def resource_value(self, res, count, t, h):
         return self.sim._cv_resource_value(self.s, self.mf, res, count, t, h, self.bb)
+
+    def accumulation_pct(self):
+        """the city's percent more accumulation on each plot's terrain
+        (EFFECT_ADJUST_EXTRA_ACCUMALATION_TERRAIN, the row's rate rows)"""
+        sim, row = self.sim, self.ctx.row
+        pct = self.like()
+        for _sc, _sl, _sr, _st, _sa, _sp in sim._live_rows(row, sim._stockpile_rate_rows):
+            if _st >= 0 and _sp:
+                on = sim._row_is(row, _sc, _sl).take(self.bb) & (sim.terrain[self.bb, self.tiles] == _st)
+                pct = pct + on.long() * _sp
+        return pct
 
     # the district value's facts
     def owned(self):

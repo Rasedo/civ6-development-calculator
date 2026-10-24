@@ -421,10 +421,30 @@ class SimCityValue:
                 costs = torch.where(unit == k, self._cv_charge_cost(f, u, t), costs)
             value = value - costs + self._cv_improvement_yields(f, imp, t, h)
             if keep_res:
-                value = value + f.resource_value(keep_res, 1, t, h)
+                value = value + f.resource_value(keep_res, self._cv_resource_copies(f, keep_res, t, h), t, h)
             out = torch.where(zero, torch.zeros_like(value), value)
         out = torch.where(none, torch.full_like(out, _FX_MIN), out)
         return torch.where(past, torch.full_like(out, _FX_MIN), out)
+
+    def _cv_resource_copies(self, f, res: str, t: torch.Tensor, h: torch.Tensor):
+        """`resourceCopies`: the copies of `res` an improvement working it is
+        valued at — an accumulating one the whole part of its
+        ImprovedExtractionRate a turn x (1 + 0.01 x the city's percent on the
+        plot's terrain) from `t` to `h` (0x7a2140), any other one copy"""
+        T = self._cv_tables()
+        ri = T["engine"]["resource"].get(res, -1)
+        if ri not in self._strat_rid:
+            return 1
+        rate = int(self._strat_rate[self._strat_rid.index(ri)])
+        if not rate:
+            return 1
+        x = _t(f.accumulation_pct(), t).to(torch.float32) * torch.tensor(_f32(0.01), dtype=torch.float32) + 1.0
+        w = torch.floor(x)
+        mult = w.long() * _FX + (torch.trunc((x - w) * 256).long() & 0xFF)
+        a = _fmul(torch.full_like(t, rate * _FX), mult)
+        r = T["rate"]
+        v = torch.where(t == h, _discounted(a, r, t), _between(a, t, h, r))
+        return torch.div(v, _FX, rounding_mode="floor")
 
     # -- the district value (aiDistrictValue.ts) ---------------------------
 
@@ -1474,6 +1494,10 @@ class _MinorFacts:
         # its explorers' and naval scouts' desire less what it holds, less
         # 1.0: none desired, none counted (`pseudoYieldWeights`)
         if p in ("PSEUDOYIELD_UNIT_EXPLORER", "PSEUDOYIELD_UNIT_NAVAL_COMBAT") and self.s < self.sim.S:
+            return -_FX
+        # its Great General points valued at nothing, the weight at its
+        # floor (`pseudoYieldWeights`)
+        if p == "PSEUDOYIELD_GPP_GENERAL" and self.s < self.sim.S:
             return -_FX
         return 0
 

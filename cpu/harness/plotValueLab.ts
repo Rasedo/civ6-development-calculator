@@ -37,6 +37,7 @@ import { civicAnalysis } from '../core/aiCivics';
 import { borderCandidates, computeCityStats } from '../core/city';
 import { resourceValue } from '../core/aiResource';
 import { housingValue } from '../core/aiCityBuild';
+import { accumulationPct } from '../core/stockpile';
 import { makeYieldCtx } from '../core/effects';
 import { improvementAdjacency } from '../core/yields';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
@@ -179,6 +180,7 @@ for (const rec of recs) {
           const row = RES.get(res);
           return row ? resourceValue(resFacts, row, count, t, h) : 0;
         },
+        accumulationPct: accumulationPct(state, cs.seat, tile.terrain),
       };
       if (districtsMode) {
         const city = minorCity(cs);

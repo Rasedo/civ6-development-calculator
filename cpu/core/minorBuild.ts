@@ -67,7 +67,7 @@ import { RESOURCES, extractsResource } from '../../world/resources';
 import { unitProductionTable } from './aiUnitProduction';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, unitTable, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
-import { accrueStockpiles, canPayStockpile, capStockpiles, spendStockpile, unitResourceCost, upgradeGoldCost } from './stockpile';
+import { accrueStockpiles, canPayStockpile, capStockpiles, spendStockpile, stockOf, strategicSlot, unitResourceCost, upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { cityGrowth, majorView, storeUnitStrength } from './majorView';
 import { governmentValues } from './aiPolicyValue';
@@ -1094,9 +1094,12 @@ export function minorResourceCounts(state: GameState, cityState: CityState): Map
 }
 
 /** THE RESOURCE VALUE'S VIEW OF A MINOR (`resourceValue`): a city-state; its
- *  era (`civEraIndex`) and the next as chronology; a resource held and its
- *  copies where a plot it owns hands it over (`extractsResource`); its one
- *  city's amenity balance; its unit production table */
+ *  era (`civEraIndex`) and the next as chronology; a resource held where a
+ *  plot it owns hands it over (`extractsResource`); its copies the same
+ *  plots' count, a strategic one's its stockpile (0x4a93c0: Player_Resources
+ *  +0x2e0[r] less the reserved; runs/h1_duelv1121 Hunza's Pasture on Horses
+ *  2.5 less a turn from t20 as its Horses grow 2 a turn); its one city's
+ *  amenity balance; its unit production table */
 export function minorResourceFacts(state: GameState, cityState: CityState): ResourceFacts {
   const r = cityState.research;
   const era = civEraIndex(r.techs, r.civics);
@@ -1126,7 +1129,10 @@ export function minorResourceFacts(state: GameState, cityState: CityState): Reso
       return i < 0 ? null : i + 1;
     },
     held: (res) => (extracted.get(res) ?? 0) > 0,
-    have: (res) => extracted.get(res) ?? 0,
+    have: (res) => {
+      const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
+      return id && strategicSlot(id) >= 0 ? stockOf(state, cityState.seat, id) : extracted.get(res) ?? 0;
+    },
     cities: 1,
     amenityValue: (_i, t, h) => valueBetween(amenityPerTurn({ view, seat: cityState.seat }, amenity), t, h),
     luxuryPseudo: (t, h) => valueBetween(luxury, t, h),

@@ -165,15 +165,41 @@
 - addr: 0x4a93c0
   final: 0x31f820
   kind: function
-  status: PARTLY
-  impl: [cpu/core/aiResource.ts:ResourceFacts, cpu/core/aiModifiers.ts:ANALYZERS]
+  name: Player_Resources copies held
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 20
+      value: "Hunza's Horses 2 (its stockpile): its Pasture at (12,5) 118.95 = 38 copies x 1.25 + 71.45"
+  impl:
+    - cpu/core/aiResource.ts:ResourceFacts
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/minorBuild.ts:minorResourceFacts
+    - gpu/core/sim_minorai.py:_cv_resource_value
+    - gpu/core/sim_research.py:_rai_resources
   readings:
     - "H-1: the luxury allocation — READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+  notes: [+0x2e0[r][0] less the reserved (0x4aa530) where the flag is set, plus +0x2e0[r][1]]
   context:
     - "...(`m_aiNoCapResources` > 0, the Luxury Policy's duplicate) multiplies it by its copies (0x4a93c0) and carries a wrap flag; a luxury the player owns adds `m_iExtraAmenitiesPerOwnedLuxur..."
-  review: imported
+  review: reviewed
+- addr: 0x4a9ff0
+  final: 0x5fa840
+  kind: function
+  name: the city's accumulation percent by terrain
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 19
+      value: "Hunza's Pasture: 0 on its Plains (1 + 0.01 x 0 = 1.0)"
+  impl: [cpu/core/stockpile.ts:accumulationPct, gpu/core/sim_minorai.py:accumulation_pct]
+  readings:
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+  notes:
+    - the array +0x18 indexed by the plot's terrain (+0x2c), bounds +0x28; read on the city's +0x1e00
+  review: reviewed
 - addr: 0x4aa0e0
   final: 0x31fed0
   kind: function
@@ -187,7 +213,9 @@
   kind: function
   status: PARTLY
   impl: [cpu/harness/import.ts:reserved]
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
   context:
     - "...f10): for each accumulated resource, the stockpile less the player's reserved amount (0x4aa530, m_aiReservedResources +0x528), where that is above 0, is tested strictly over the cap..."
   review: imported
@@ -233,6 +261,7 @@
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...r TOURISM weight -1 => 0); tail: extra copies,   promotion class 0x723bb0, strategic resource gate (0x4aa790 / 0x5d45c0 => value 0), maintenance < handicap 3, PV...  NEXT: unit value / military table; DS pick..."
     - ".claude/scratchpad/st1/reading.md: ...r sees   (0x4ab4b0) counted by its plot's amount, and at distance 1 one the player   holds none of (0x4aa790, ownership 0) and not a bonus (0xadd080) is a new   resource. - The score (0x702380): per entry wit..."
@@ -295,6 +324,7 @@
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the goody hut's other gates and the Relic — READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
   context:
     - "...m_aiReservedResources +0x528), where that is above 0, is tested strictly over the cap (0x4aabe0: 0x5254d0, the game speed's scaling, of the Resource_Consumption row's StockpileCap, pl..."
     - "...whose condition the player meets (0x4ac140) with its stockpile (0x4aa790) below the cap (0x4aabe0). The engines take CityState, StrategicResources and Relic (`goodyEligible` / `_goody_eli..."

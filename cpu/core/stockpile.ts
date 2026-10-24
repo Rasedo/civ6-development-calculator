@@ -93,6 +93,14 @@ function goldenMineBonus(state: GameState, seat: number, resourceId: string): nu
  * number. The income lands unclamped: the turn's fuel and plants burn from
  * it, and the cap holds only at the turn's end (`capStockpiles`).
  */
+/** CIV6 (EFFECT_ADJUST_EXTRA_ACCUMALATION_TERRAIN): the seat's percent more
+ *  accumulation on a terrain, its roster's rate rows summed */
+export function accumulationPct(state: GameState, seat: number, terrain: string): number {
+  let pct = 0;
+  for (const r of getModifiers(state, seat).stockpileRate) if (r.terrain !== undefined && r.terrain === terrain) pct += r.pct ?? 0;
+  return pct;
+}
+
 export function accrueStockpiles(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
@@ -122,11 +130,8 @@ export function accrueStockpiles(state: GameState, seat: number): void {
     // EFFECT_ADJUST_EXTRA_ACCUMALATION_TERRAIN): the roster's rate rows — a
     // flat add for the named resource, a percentage on the named terrain
     let add = 0;
-    let pct = 0;
-    for (const r of rate) {
-      if (r.resource !== undefined && r.resource === t.resource) add += r.amount ?? 0;
-      if (r.terrain !== undefined && r.terrain === t.terrain) pct += r.pct ?? 0;
-    }
+    for (const r of rate) if (r.resource !== undefined && r.resource === t.resource) add += r.amount ?? 0;
+    const pct = accumulationPct(state, seat, t.terrain);
     // CIV6 (Equestrian Orders, EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER):
     // "All improved Horses and Iron resources yield 1 additional resource"
     add += perSource[t.resource] ?? 0;

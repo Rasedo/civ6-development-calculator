@@ -12,6 +12,21 @@
   context:
     - "...MY_NUMBER, 1.0, the owner) times fx(sqrtf(the city's population +0x588)) (the IAT slot @0xcf47b0 is sqrtf), whole (sar 8). Then over the owner's units (player +0x12e8 +0xd8): a unit of..."
   review: imported
+- addr: 0xcfc9f8
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 19
+      value: "Confirmed: runs/h1_duelv1121 Hunza t19's   Pasture on Horses at (12,5) and (10,5) 171.45 (= the yields 71.45 + 40   copies x 2.5: the count held to twice the Horseman's 20), t20 118.95 and   t21 116.4"
+    - recording: 1121
+      turn: 20
+      value: the plotValueLab's Pastures 451 -> 453 exact on 1121 (the lab imports the   record, which holds no minor's stockpile, so its t20+ rows read 0 held).
+  readings:
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+  context:
+    - "...(1 + 0.01 x the city's +0x1e00 at the plot's terrain +0x2c, 0x4a9ff0; @0xd136f0 0.01, @0xcfc9f8 1.0) from T to H; the count passed is its whole part (`sar 8`). The plot's own improv..."
+  review: imported
 - addr: 0xd02108
   kind: global
   status: PARTLY
@@ -19,6 +34,21 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The path search is the generic CvAStar (Pathfinder_Instance.cpp, the base vtable 0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0..."
+  review: imported
+- addr: 0xd136f0
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 19
+      value: "Confirmed: runs/h1_duelv1121 Hunza t19's   Pasture on Horses at (12,5) and (10,5) 171.45 (= the yields 71.45 + 40   copies x 2.5: the count held to twice the Horseman's 20), t20 118.95 and   t21 116.4"
+    - recording: 1121
+      turn: 20
+      value: the plotValueLab's Pastures 451 -> 453 exact on 1121 (the lab imports the   record, which holds no minor's stockpile, so its t20+ rows read 0 held).
+  readings:
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+  context:
+    - "...onRate (+0x24) x (1 + 0.01 x the city's +0x1e00 at the plot's terrain +0x2c, 0x4a9ff0; @0xd136f0 0.01, @0xcfc9f8 1.0) from T to H; the count passed is its whole part (`sar 8`). The plo..."
   review: imported
 - addr: 0xd136f4
   kind: global

@@ -11,7 +11,10 @@
 import { AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
 import type { AiImprovementRow } from './aiResource';
 import { AI_YIELD_DEFAULT } from '../data/aiTables';
-import { AI_RATE, FX, FX_MIN, discounted, fmul, fxConst, presentValue, pseudoYieldValue, yieldValue, type AiValueView } from './aiValue';
+import { AI_RATE, FX, FX_MIN, discounted, fmul, fxConst, presentValue, pseudoYieldValue, valueBetween, whole, yieldValue, type AiValueView } from './aiValue';
+import { STRATEGIC_PER_TURN } from '../data/constants';
+import { engineId } from '../data/aliases';
+import { RESOURCES } from '../../world/resources';
 
 /** the unit 0x7a3010 and 0x7a37d0 price a charge of (the type by its hash
  *  0x11d57532) */
@@ -62,6 +65,9 @@ export interface PlotValueFacts {
   housingValue(housing: number, t: number, h: number): number;
   /** the resource value (0x7a21e0) of `count` copies from `t` to `h`, raw */
   resourceValue(resource: string, count: number, t: number, h: number): number;
+  /** the city's percent more accumulation on the plot's terrain (city
+   *  +0x1e00 at the plot's terrain: EFFECT_ADJUST_EXTRA_ACCUMALATION_TERRAIN) */
+  accumulationPct: number;
 }
 
 const IMPROVEMENT = new Map(AI_IMPROVEMENTS.map((r) => [r.type, r] as const));
@@ -206,6 +212,27 @@ export function improvementValue(f: PlotValueFacts, improvement: string, t: numb
   }
   value -= chargeCost(f, unit, t);
   value += improvementYieldsValue(f, imp, t, h);
-  if (resource) value += f.resourceValue(resource, 1, t, h);
+  if (resource) value += f.resourceValue(resource, resourceCopies(f, resource, t, h), t, h);
   return value;
+}
+
+/** the copies of the resource an improvement working it is valued at
+ *  (0x7a58f0 -> 0x7a21e0's count): an accumulating one (Resource_Consumption
+ *  Accumulate) the whole part of its ImprovedExtractionRate a turn, x (1 +
+ *  0.01 x the city's percent on the plot's terrain), from `t` to `h`
+ *  (0x7a2140); any other one copy (runs/h1_duelv1121 Hunza t19's Pasture on
+ *  Horses 171.45: 40 copies at 2.5, held to twice the Horseman's 20) */
+function resourceCopies(f: PlotValueFacts, resource: string, t: number, h: number): number {
+  const id = engineId('resource', resource, 'RESOURCE_', RESOURCES);
+  const rate = id ? STRATEGIC_PER_TURN[id] ?? 0 : 0;
+  if (!rate) return 1;
+  const mult = fxOfFloat(Math.fround(Math.fround(f.accumulationPct * Math.fround(0.01)) + 1));
+  return whole(valueBetween(fmul(rate * FX, mult), t, h));
+}
+
+/** a float's 24.8 raw as the DLL converts it: the floor's whole part, the
+ *  fraction's 256ths truncated */
+export function fxOfFloat(x: number): number {
+  const w = Math.floor(x);
+  return (w << 8) | (Math.trunc(Math.fround(x - w) * 256) & 0xff);
 }
