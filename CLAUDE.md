@@ -57,13 +57,16 @@ by one scripted decision server (`policy/`), verified against each other by
   second. Launch in the background and end the turn; never poll, never sleep.
 - Green = the pass row at the head sha in `stats/battery.jsonl`, never an
   exit code.
-- Waves (owner 2026-10-18): no slice is tested or measured. Agents develop
-  and hand back; the lead merges without a bar. At the end of a wave of
-  agents the lead runs the CPU bar (`.claude/scratchpad/m_bar.sh`) and the
-  measures once. Bugs it finds go to fresh fixing agents, never back to the
-  developing agent: an agent either strictly develops or strictly fixes.
-  GPU tests are banned: nothing under `tests/gpu` runs; the GPU twin is
-  still written and checked by `seat_symmetry_check.py` in the wave bar.
+- AI-port agents (owner 2026-10-18, 2026-10-24): no slice is tested or
+  measured. Agents develop and hand back; the lead merges without a bar and
+  hands out the next task at once. The lead runs the CPU bar and the
+  measures whenever it chooses, at a fixed head in the bar worktree
+  (`.claude/scratchpad/w_full.sh <tag> <sha>`), beside development: the
+  bar never holds up a merge or a task. Bugs it finds go to fresh fixing
+  agents, never back to the developing agent: an agent either strictly
+  develops or strictly fixes. GPU tests are banned: nothing under
+  `tests/gpu` runs; the GPU twin is still written and checked by
+  `seat_symmetry_check.py` in the bar.
 
 ## Housekeeping
 
