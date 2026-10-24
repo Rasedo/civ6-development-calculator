@@ -69,6 +69,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...odifier evaluator: a building's BuildingModifiers are analysed once, at GlobalAI's start (0x6dfc70 -> 0x6cef90 into GlobalAI +0x3948[building]): each entry holds an effect analyzer and a c..."

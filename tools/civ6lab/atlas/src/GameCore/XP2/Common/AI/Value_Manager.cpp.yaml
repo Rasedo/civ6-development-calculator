@@ -321,6 +321,7 @@
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   context:
     - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
     - ...ceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
@@ -349,6 +350,7 @@
   impl: [cpu/core/aiDistrictValue.ts:districtValue, gpu/core/sim_cityvalue.py:_cv_district]
   readings:
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
   review: reviewed
 - addr: 0x7a58f0
@@ -527,6 +529,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   notes:
     - "label: valueConstructible(modifiers+yields)"
     - ".claude/scratchpad/cb/notes.txt: ...]; g=s+256; if g<256 ->0 else den=max(trunc(rate*g/25600),2); out=((s*v>>8)<<8)/den. BUILDING value 0x7a7590 (generic constructible): per Building_YieldChanges entry: amt<<8 * (fx(1+cityPct[y]*.01)*fx(1+bldPc..."
@@ -562,11 +565,15 @@
     - recording: h1_duelv1127
       turn: 2
       value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
-  impl: [cpu/core/aiDistrictValue.ts:districtBodyValue, gpu/core/sim_cityvalue.py:_cv_district_body]
+  impl:
+    - cpu/core/aiDistrictValue.ts:districtBodyValue
+    - gpu/core/sim_cityvalue.py:_cv_district_body
+    - cpu/core/aiDistrictValue.ts:b
   readings:
     - "H-1: the district adjacency — READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...h reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
@@ -660,6 +667,7 @@
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...litary AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
   context:

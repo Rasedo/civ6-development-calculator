@@ -208,7 +208,7 @@ export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1
  * eruption's turns unread, none; an inland
  * city-state on a river trains ships (0x1c77c0's sea test unread).
  */
-export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuildFacts): PlotEval[] {
+export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuildFacts, buildings: readonly number[]): PlotEval[] {
   const map = state.map;
   const city = minorCity(cs);
   const r = cs.research;
@@ -318,6 +318,11 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       spaceRace: () => false,
       favoured: () => false,
       districtsOf: (d) => (cs.districts ?? []).filter((x) => districtType(x.type) === d).length,
+      buildingsValue: (d) => {
+        let best = FX_MIN;
+        AI_BUILDINGS.forEach((b, i) => { if (b.district === d && buildings[i] > best) best = buildings[i]; });
+        return best;
+      },
     };
     const districts = AI_DISTRICTS.map((row, i) => {
       if (row.trait !== null || row.type === 'DISTRICT_CITY_CENTER' || row.type === 'DISTRICT_WONDER') return FX_MIN;
@@ -720,7 +725,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
   cs.threat = threat;
   const pf = minorPickFacts(state, cs, facts);
   cs.standingArmyShort = minorStandingArmy(state, cs);
-  const evals = minorPlotEvals(state, cs, facts);
+  const evals = minorPlotEvals(state, cs, facts, tables.buildings);
   const city = minorTreeCity(state, cs, facts, tables, pf, evals, threat);
   const w = minorTreeWorld(state, cs, ai, city);
   const r = cs.research;

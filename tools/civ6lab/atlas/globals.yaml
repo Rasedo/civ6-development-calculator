@@ -321,6 +321,17 @@
   context:
     - ...th N = 0 every entry reads 1.0. Value +0x160 = N / +0x30 (0x16e940, truncated); x1.25 (@0xd70c98) for a TraitType unit; a shortfall of the maintenance resource scales it; the player's...
   review: imported
+- addr: 0xd71be8
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      value: A   port of the improvement half (each neighbour's yields value with the   improvement on the plot less as the map stands) lowered the plot values   lab's Farms on runs/h1_duelv1127 10,904 -> 9,376 ex
+  readings:
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+  context:
+    - "...ontext's plot list +0x10 empty): a walk of radius 1 (0x6b1b0) with a functor (vtable @0xd71be8, invoke 0x7b8a20 -> 0x79ed40): a neighbour holding a district (+0x1e) adds valueConstru..."
+  review: imported
 - addr: 0xd71c24
   kind: global
   status: PARTLY

@@ -193,6 +193,9 @@ class District(Plot):
     def districts_of(self, d, complete):
         return 0
 
+    def buildings_value(self, d):
+        return -9999 * 256
+
 
 class Project:
     """a city-state at 9% of the game's progress (district-value.test.ts)"""

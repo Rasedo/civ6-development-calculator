@@ -578,7 +578,8 @@ def test_the_trees_orders(rules, path) -> None:
 
     def world():
         f = sim._cv_minor_facts(s)
-        return _MinorWorld(sim, s, f, sim._cv_minor_tables(s, f), sim._minor_plot_evals(s, f), sim._minor_threat(s))
+        tabs = sim._cv_minor_tables(s, f)
+        return _MinorWorld(sim, s, f, tabs, sim._minor_plot_evals(s, f, tabs[0]), sim._minor_threat(s))
 
     def builder_on(t: int) -> int:
         slot = int(sim.unit_next[B0])

@@ -413,6 +413,7 @@
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...== f2f988?) & cond -> +5.0. Initial best FX(-9999). CITY ANALYSIS job vtable d59af0 -> 0x5ce910 -> 0x5ce970 (per PLOT eval): +0x20 districts, +0x28 buildings, +0x30 improvements, +0x38 projects, +0x40 units...."
   context:
@@ -560,6 +561,7 @@
   impl: [cpu/core/minorCityAi.ts:minorDistrictVerdict, gpu/core/sim_minorai.py:_minor_plot_evals]
   readings:
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   context:
     - "...analysis' district loop (0x5ce970, 0x5ced80..0x5cefed), per Districts row: the verdict 0x5d2ae0 (the player's districts list, [rbp-0x70] +0x40 per row: above 0 -> 1, else its sign) of..."
   review: reviewed
@@ -684,6 +686,8 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/aiContracts.ts:ContractCity]
+  readings:
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x5d4a20

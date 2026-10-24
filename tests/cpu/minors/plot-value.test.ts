@@ -11,6 +11,7 @@ const plot = (over: Partial<PlotValueFacts> = {}): PlotValueFacts => ({
   floodTurns: null, eruptionTurns: null, appeal: 0, besideHousingDistrict: false,
   unitCost: () => 25, buildsUnit: () => true, extraCharges: () => 0, progressPct: 0, escalation: 1000,
   speedScaled: (n) => Math.floor(n / 2), adjacency: () => 0, housingValue: () => 0, resourceValue: () => 0,
+  accumulationPct: 0,
   ...over,
 });
 

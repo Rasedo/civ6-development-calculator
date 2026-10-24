@@ -208,6 +208,16 @@
     - "...the owner's diplomatic AI names p (vt+0x30 = 0x657d90: p == the +0x6780 player, set by 0x647bb0 at the AI turn's close); two flagged branches give max(X + 20, 20) instead (AI owner an..."
     - "...+0x6320 term (the desires' D of 0, 20, 40 over the records), the focus player +0x6780 (0x647bb0: the met major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency 0x2a81..."
   review: reviewed
+- addr: 0x675e40
+  final: 0x72f750
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...HE MODIFIERS (0x7a4b20 at 0x7adc10): the list GlobalAI +0x39a8 indexed by the district (0x675e40), filled once (0x6e0736..0x6e08f5) per Districts row from \"SELECT ModifierId from Distr..."
+  review: imported
 - addr: 0x682440
   kind: function
   name: hintPowerBuilding

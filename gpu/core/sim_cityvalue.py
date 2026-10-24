@@ -549,6 +549,10 @@ class SimCityValue:
         share = (k > 0) & (not here) & (_t(f.districts_of(district, True), like) <= k)
         div = torch.div(projects * _FX, (_t(f.districts_of(district, False), like) + 1) * _FX, rounding_mode="trunc")
         value = value + torch.where(share, div, torch.zeros_like(div))
+        # the best of its buildings the city values (its centre's BUILDINGS
+        # row; `districtBodyValue`'s LAB)
+        bv = _t(f.buildings_value(district), like)
+        value = value + torch.where(bv > _FX_MIN, bv, torch.zeros_like(bv))
         value = torch.where(dead, torch.zeros_like(value), value)
         return torch.where(bad, torch.full_like(value, _FX_MIN), value)
 

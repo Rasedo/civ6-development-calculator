@@ -46,6 +46,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...d (pseudo index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) [the record +0x6c of the 0x2c3660 manager's per-player vector] valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0, and...
@@ -142,16 +143,20 @@
 - addr: 0x2c41d0
   final: 0x1e5d40
   kind: function
-  status: PARTLY
+  name: the player's era record +0x34
+  status: READ
   cases:
     - recording: 1121
       turn: 11
       value: "The residuals:   per (turn, player) a constant across plots (Campus, Holy Site: 0.4 to   5.5), an Encampment's 0.5 a turn (the player's CITY_DEFENSES weight   reads 0 where the logs fit +0.25), Snow c"
   readings:
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  notes:
+    - the era manager's +0x5b8 records (0x78 bytes) at the player's index, +0x34; 0 past the list
   context:
     - "- PARTLY READ / unported: PSEUDOYIELD_GOLDENAGE_POINT x 0x2c41d0 (the era manager's +0x5b8 record of player +0x128, its +0x34); the claims, modifiers..."
-  review: imported
+  review: reviewed
 - addr: 0x2c4230
   final: 0x1e5d90
   kind: function

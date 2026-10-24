@@ -8894,6 +8894,66 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   step), the Market's own repair contract (SUBMITTED t165, the engines'
   automatic building repair after the district).
 
+## C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values
+
+- THE ENVOYS' TERM (0x7aaf80, 0x7ab8f5..0x7abac8, per yield with an
+  adjacency above 0): over the city-states (player manager +0x1650), each
+  whose district list's verdict on the district is 1 (0x5d2ae0 on its
+  +0x1290 +0x1f8): 6 or more tokens received from the player (0x44c860)
+  +2.0 of the yield at the player's value, the player its suzerain
+  (0x44c850) +4.0 more. A city-state receives no tokens: none at a minor.
+  Not ported (the majors' district value).
+- THE GOLDEN-AGE TERM (0x7ab294..0x7ab2db): a turn's PSEUDOYIELD_GOLDENAGE_
+  POINT of 0x2c41d0(the era manager 0x2c3660, player +0x128) — the
+  player's era record (0x78 bytes each, at +0x5b8) +0x34, 0 for a player
+  past the list. Unread: what +0x34 holds. Not ported.
+- THE MODIFIERS (0x7a4b20 at 0x7adc10): the list GlobalAI +0x39a8 indexed
+  by the district (0x675e40), filled once (0x6e0736..0x6e08f5) per
+  Districts row from "SELECT ModifierId from DistrictModifiers where
+  DistrictType = ? ORDER BY ModifierId" (0xc7a880): the Aqueduct's, the
+  Bath's, the Cothon's and the Suguba's; no specialty district carries one.
+- THE NEIGHBOURS (0x79f280, at the top level only — the analysis context's
+  plot list +0x10 empty): a walk of radius 1 (0x6b1b0) with a functor
+  (vtable @0xd71be8, invoke 0x7b8a20 -> 0x79ed40): a neighbour holding a
+  district (+0x1e) adds valueConstructible 0x7a7590 of it with the
+  context's plot list less with a fresh one; else one holding an
+  improvement (+0x44) the improvement yields value 0x7b1320 likewise; T and
+  H the item's. The same functor runs in 0x7b1320 for an improvement. A
+  port of the improvement half (each neighbour's yields value with the
+  improvement on the plot less as the map stands) lowered the plot values
+  lab's Farms on runs/h1_duelv1127 10,904 -> 9,376 exact and 1117's 7,202
+  -> 6,386: what the context's list changes is unread. Not ported.
+- LAB: THE DISTRICT'S BUILDINGS — every logged DISTRICTS row stands above
+  0x7aaf80's terms by the most the city's analysis values a building of
+  the district (the centre's BUILDINGS row; max, not the sum, where two are
+  valued: runs/h1_duelv1117 player 2's Encampment: 9 turn-players the max of
+  Barracks and Stable alone, none the sum alone), within the body (a flood
+  cutting the horizon to the landing leaves the row 0, the building too).
+  runs/h1_duelv1128 Bologna's Campus each its Library's 4.37 at t13 and
+  t16, 7.04 at t24, 13.77 at t30; 1121 Hunza's Commercial Hub its Market's
+  2.38 at t26, 25.50 at t32, 80.77 at t47; 1128 player 4's Holy Site
+  its Shrine's 2.02 at t2, 15.22 at t13. The reader is unfound: 0x7a51f0,
+  0x7aaf80 and 0x5ce970's district loop call no building value, and the
+  only accessor of the centre's BUILDINGS (0x5d4920) is the contract
+  evaluation's. `districtBodyValue` (`buildingsValue`), `_cv_district_body`
+  (`buildings_value`). The plot values lab's DISTRICTS rows within 0.01
+  over the five verbose duels: 12,730 -> 23,881 of 55,447.
+- THE FARM'S ADJACENCY in the plot values: the improvement yields value's
+  adjacency term (0x7b1320 through 0x365ae0 per Improvement_Adjacencies
+  row) counts Farms_MedievalAdjacency / Farms_MechanizedAdjacency like any
+  row; the engine's `improvementAdjacency` now pays the Farm's Food per
+  group of live Farms beside the plot itself (the tile yields read it
+  there), so the city-states' Farm values carry it: runs/h1_duelv1127's
+  Forts over a Farm 20.11 a Food low before (3,952 -> 4,969 exact), Farms
+  9,611 -> 10,904; the five duels' IMPROVEMENTS rows 104,693 -> 113,299.
+- Left in the district rows: the T a turn or two off (the lab's build turns
+  under a district in production, runs/h1_duelv1121 Hunza's Commercial Hub
+  t136..t162 at 4-5 for 2-3), the floodplains' cut (a river the game has
+  not named yet: 1127 p2 (43,15) a Farm at -9.00 to t27, named at t28;
+  1128 Bologna's Campus at (5,10) 0 from t46 to t73), the Neighborhood's
+  housing value, a Theater's late rows (1117 player 4's hundreds off
+  from t99).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

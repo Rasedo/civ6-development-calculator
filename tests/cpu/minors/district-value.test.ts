@@ -11,7 +11,7 @@ import {
   SLOT_PLOTS, SLOT_SLUSH, SLOT_UNITS, newEconomicMemory, purchasePick, purchaseTurn, savingsTurn, tryPurchaseUnits,
   type PurchaseCity,
 } from '../../../cpu/core/aiEconomic';
-import { FX, type AiValueView } from '../../../cpu/core/aiValue';
+import { FX, FX_MIN, type AiValueView } from '../../../cpu/core/aiValue';
 import { growthForecast, housingValue, type CityGrowth } from '../../../cpu/core/aiCityBuild';
 
 /** a city-state of the Ancient era: every yield at its DefaultValue, the
@@ -34,7 +34,7 @@ const plot = (over: Partial<DistrictValueFacts> = {}): DistrictValueFacts => ({
   isCity: false, districtAdjacency: () => 0, rowsAdjacency: () => 0, otherDistricts: () => [], chronology: 1,
   districtCount: 0, districtCap: 1, regionalCities: () => 0, cityTrains: () => true, playerTrains: () => true,
   domainUnitsValue: () => 0, riverPlots: () => ({ improved: 0, districted: 0 }), canalTrade: 0, projectValue: () => 0,
-  spaceRace: () => false, favoured: () => false, districtsOf: () => 0,
+  spaceRace: () => false, favoured: () => false, districtsOf: () => 0, buildingsValue: () => FX_MIN, accumulationPct: 0,
   ...over,
 });
 

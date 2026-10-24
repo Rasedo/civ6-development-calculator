@@ -28,7 +28,8 @@ function terrainYields(tile: Tile): Yields {
 }
 
 /**
- * What a SUZERAIN improvement's neighbours pay it. Each rule counts the
+ * What an improvement's neighbours pay it: a Farm its Food per group of
+ * adjacent Farms (the civics' and technologies' rate), then each rule counts the
  * neighbours matching any of its sources, divides by `per`, and pays its
  * yields once per whole group (a `once` rule: once if any match); a civic in
  * `ctx.mods.impUpgrades` swaps in the improved rate and payout
@@ -37,6 +38,15 @@ function terrainYields(tile: Tile): Yields {
 export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: ImprovementId): Yields {
   const rules = IMPROVEMENTS[imp].adjacency;
   const out = emptyYields();
+  // CIV6 (Farms_MedievalAdjacency TilesRequired 2, Farms_MechanizedAdjacency
+  // TilesRequired 1): Food per whole group of adjacent Farms; a pillaged
+  // Farm is none (runs/h1_duelw1108, plot 340: a Food lost each time the
+  // Farm beside it was pillaged at t184 and t191, back at its repair)
+  const fa = ctx.mods.farmAdj;
+  if (imp === 'FARM' && fa) {
+    const adjFarms = neighbors(ctx.map, tile).filter((n) => n.improvement === 'FARM' && !n.pillaged).length;
+    out.food += fa.food * Math.floor(adjFarms / fa.per);
+  }
   if (!rules) return out;
   for (const r of rules) {
     // CIV6 (Terrace_MedievalAdjacency): a rule may WAIT on a civic of its own
@@ -192,15 +202,6 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
       for (const rule of ctx.mods.improvementOnResource) {
         if (rule.category === cat) addYields(out, rule.yields);
       }
-    }
-    // CIV6 (Farms_MedievalAdjacency TilesRequired 2, Farms_MechanizedAdjacency
-    // TilesRequired 1): Food per whole group of adjacent Farms; a pillaged
-    // Farm is none (runs/h1_duelw1108, plot 340: a Food lost each time the
-    // Farm beside it was pillaged at t184 and t191, back at its repair)
-    const fa = ctx.mods.farmAdj;
-    if (imp === 'FARM' && fa) {
-      const adjFarms = neighbors(ctx.map, tile).filter((n) => n.improvement === 'FARM' && !n.pillaged).length;
-      out.food += fa.food * Math.floor(adjFarms / fa.per);
     }
     addYields(out, improvementAdjacency(ctx, tile, imp));
     const idef = IMPROVEMENTS[imp];

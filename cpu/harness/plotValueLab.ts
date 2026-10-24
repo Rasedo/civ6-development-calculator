@@ -49,7 +49,8 @@ import { neighbors } from '../../world/hex';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from '../core/appeal';
 import { floodHazardTurns } from '../core/disasters';
-import { loadCityBuildPlots } from './cityBuildLog';
+import { loadCityBuildCentre, loadCityBuildPlots } from './cityBuildLog';
+import { AI_BUILDINGS } from '../data/aiBuildTables';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const dump = args[0];
@@ -64,6 +65,7 @@ const cat = loadCatalog(dump);
 const recs: TurnRecord[] = readFileSync(dump, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l) as TurnRecord)
   .filter((r) => !r.moved).sort((a, b) => a.turn - b.turn);
 const plots = loadCityBuildPlots(dump);
+const centreRows = loadCityBuildCentre(dump);
 
 /** AI_Research.csv: `${turn}:${player}:${tech}` -> [turns, status], and the
  *  tech each player researches each turn with its turns */
@@ -226,6 +228,16 @@ for (const rec of recs) {
           spaceRace: () => false,
           favoured: () => false,
           districtsOf: (d) => (cs.districts ?? []).filter((x) => typeOfDistrict(x.type) === d).length,
+          // the centre's logged BUILDINGS row
+          buildingsValue: (d) => {
+            const row = centreRows.get(`${turn}:${player}:${name}`)?.BUILDINGS;
+            let best = -9999 * FX;
+            AI_BUILDINGS.forEach((b, i) => {
+              const v = row?.[i];
+              if (b.district === d && v !== undefined && v > -9000) best = Math.max(best, Math.round(v * FX));
+            });
+            return best;
+          },
         };
         lp.districts.forEach((lv, i) => {
           if (lv <= -9999) return;

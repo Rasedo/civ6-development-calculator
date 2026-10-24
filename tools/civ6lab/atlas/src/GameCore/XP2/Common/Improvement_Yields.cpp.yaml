@@ -44,6 +44,7 @@
     - "H-1: the district adjacency — READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   context:
     - ...ia 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
     - "...plot): the district row's vector of Adjacency_YieldChanges rows (+0x100), each through 0x365ae0, SUMMED AS INTEGERS; then the player's modifier-added adjacencies (0x1cb470: MODIFIER..."

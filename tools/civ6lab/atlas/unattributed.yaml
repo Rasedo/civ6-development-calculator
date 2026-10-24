@@ -296,6 +296,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   context:
     - "SPREAD (0x336a50's last arm → 0x33b580): the plot's neighbours within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, the event's own start test 0x28ec10 (its Ran..."
     - ...e pillaged, -1 for its own pillaged improvement (+0x4d bit 0), then the ring of radius 1 (0x6b1b0 -> 0x691f0, the centre not in it) through 0x513780, and last +1 when the plot's owner hol...
@@ -3156,12 +3157,16 @@
   review: reviewed
 - addr: 0x79f280
   kind: function
-  status: PARTLY
+  name: the neighbours walk
+  status: READ
   readings:
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  notes:
+    - radius 1 (0x6b1b0) with the functor @0xd71be8 (invoke 0x7b8a20 -> 0x79ed40), at the top level only
   context:
     - ...the plot lacks the district; the modifiers (0x7a4b20); at the top level the neighbours (0x79f280).
-  review: imported
+  review: reviewed
 - addr: 0x7b7760
   kind: function
   name: warValue
@@ -3195,6 +3200,18 @@
   context:
     - "...-9999 (@f04cb0); else X the war value (0x7b7760: 0x7b7ab0 + 0x7b7830 unless the flag + 0x7b87b0 where a casus belli is named; the parts unread), max(X, 5) where p's rank is 1 or withi..."
   review: reviewed
+- addr: 0x7b8a20
+  final: 0x534c00
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      value: A   port of the improvement half (each neighbour's yields value with the   improvement on the plot less as the map stands) lowered the plot values   lab's Farms on runs/h1_duelv1127 10,904 -> 9,376 ex
+  readings:
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+  context:
+    - "...ist +0x10 empty): a walk of radius 1 (0x6b1b0) with a functor (vtable @0xd71be8, invoke 0x7b8a20 -> 0x79ed40): a neighbour holding a district (+0x1e) adds valueConstructible 0x7a7590 o..."
+  review: imported
 - addr: 0x7b8a30
   final: 0x534c10
   kind: function
@@ -5236,6 +5253,16 @@
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:span]
   notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0xc7a880
+  final: 0x950f50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...\"SELECT ModifierId from DistrictModifiers where DistrictType = ? ORDER BY ModifierId\" (0xc7a880): the Aqueduct's, the Bath's, the Cothon's and the Suguba's; no specialty district carr..."
   review: imported
 - addr: 0xc7e9b0
   final: 0x954be0

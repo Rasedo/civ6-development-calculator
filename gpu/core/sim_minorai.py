@@ -127,7 +127,7 @@ class SimMinorAi:
         self.citystate_threat[:, s] = torch.where(alive, threat, self.citystate_threat[:, s])
         self.citystate_standing_short[:, s] = torch.where(alive, self._minor_standing_army(s, alive),
                                                          self.citystate_standing_short[:, s])
-        evals = self._minor_plot_evals(s, f)
+        evals = self._minor_plot_evals(s, f, b_tab)
         w = _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), evals, threat)
         goals_reached(ai, s, w, alive)
         free_slots(ai, s, w, alive)
@@ -557,7 +557,7 @@ class SimMinorAi:
                             torch.full_like(tot, -fx_of(1)))
         return torch.where(member.any(dim=1), turns, torch.full_like(turns, -1))
 
-    def _minor_plot_evals(self, s: int, f: _MinorFacts) -> dict:
+    def _minor_plot_evals(self, s: int, f: _MinorFacts, b_tab: list) -> dict:
         """`minorPlotEvals` — THE PLOT ANALYSIS of minor `s`'s city (0x5ce970
         per plot, the centre first): per plot its flags — the minor owns it,
         an improvement may stand on its ground (research waived) where no
@@ -657,7 +657,7 @@ class SimMinorAi:
         NF = max(len(PN["feature"]), 1) + 1
         key = ((imp + 1) * NR + (rid + 1)) * NF + (fid + 1)
         key = torch.where(ev, key, torch.full_like(key, -1))
-        ctx = _PlotCtx(self, s, f, plots, owned)
+        ctx = _PlotCtx(self, s, f, plots, owned, b_tab)
         imp_eng = E["improvement"]
         for k in torch.unique(key[ev]).tolist():
             bb, pp = (key == k).nonzero(as_tuple=True)
@@ -1132,8 +1132,10 @@ class SimMinorAi:
 class _PlotCtx:
     """the planes the plot facts of one minor's analysis share"""
 
-    def __init__(self, sim, s: int, f: _MinorFacts, plots: torch.Tensor, owned: torch.Tensor):
+    def __init__(self, sim, s: int, f: _MinorFacts, plots: torch.Tensor, owned: torch.Tensor, b_tab: list):
         self.sim, self.s, self.f = sim, s, f
+        # the city centre's BUILDINGS table, [B] per building row
+        self.b_tab = b_tab
         self.row = sim._CITY_MINOR0 + s
         self.seat = 100 + s
         self.plots = plots
@@ -1261,7 +1263,20 @@ class _PlotFacts:
         if k < 0:
             return 0
         plane = self.ctx.get(("adj", k), lambda: sim._imp_adj_at(self.ctx.row, k))
-        return plane[self.bb, self.tiles, _YIELDS.index(y)].long()
+        out = plane[self.bb, self.tiles, _YIELDS.index(y)].long()
+        # a Farm's Food per whole group of live Farms beside the plot, at the
+        # research's adjacency row (`improvementAdjacency`)
+        if k == sim.FARM and y == "YIELD_FOOD":
+            def farms():
+                nb = sim.neigh
+                live = (sim.improvement == sim.FARM) & ~sim.pillaged
+                n = (live[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).sum(dim=2)
+                per, food = sim._farmadj_row(sim._seat_civics(self.ctx.row), sim._seat_techs(self.ctx.row))
+                pc = per.clamp(min=1).unsqueeze(1)
+                return torch.where((per > 0).unsqueeze(1), food.unsqueeze(1) * torch.div(n, pc, rounding_mode="floor"),
+                                   torch.zeros_like(n))
+            out = out + self.ctx.get("farmadj", farms)[self.bb, self.tiles].long()
+        return out
 
     def housing_value(self, housing, t, h):
         sim = self.sim
@@ -1273,6 +1288,15 @@ class _PlotFacts:
 
     def resource_value(self, res, count, t, h):
         return self.sim._cv_resource_value(self.s, self.mf, res, count, t, h, self.bb)
+
+    def buildings_value(self, d):
+        """the most the city's analysis values a building of district `d`
+        (its centre's BUILDINGS row), per element; FX(-9999) none"""
+        best = torch.full_like(self.like(), _FX_MIN)
+        for i, b in enumerate(self.sim._cv_tables()["bld_rows"]):
+            if b["district"] == d:
+                best = torch.maximum(best, self.ctx.b_tab[i].take(self.bb))
+        return best
 
     def accumulation_pct(self):
         """the city's percent more accumulation on each plot's terrain
