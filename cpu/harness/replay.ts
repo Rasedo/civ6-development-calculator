@@ -42,7 +42,7 @@ import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar
   placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -852,6 +852,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
     c.fortifyTurns = snap.fortifyTurns;
   }
   const gone = new Set<Unit>();
+  const mine: Unit[] = [];
   for (const [c, u] of twin) {
     if (!minorAiSeat(c.seat) && !isBarbSeat(c.seat)) continue;
     const key = keyOf.get(u);
@@ -868,9 +869,8 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
     if (at !== undefined) c.tileIndex = at;
     if (!minorAiSeat(c.seat) || !key) continue;
     c.slot = Number(key.split(':')[1]) & 0xffff;
-    c.movesLeft = grantedMoves(copy, c);
-    c.movesFull = c.movesLeft;
     c.attacksLeft = attacksPerTurn(c);
+    mine.push(c);
   }
   copy.units = copy.units.filter((c) => !gone.has(c));
   // a city-state's research in its actions is its start's, which record
@@ -879,6 +879,14 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
   for (const s of [...copy.cityStates, ...copy.seats]) {
     const r = seatOf(ctx.next.state, s.seat)?.research;
     if (r) s.research = { ...s.research, techs: [...r.techs], civics: [...r.civics] };
+  }
+  // each unit's Movement whole, its pool composed on that research where the
+  // first record stands it, not the engine's turn-start pool (runs/h1_duelw1121
+  // t113: city-state 2's embarked Musketmen plan on 3 Movement with the
+  // Square Rigging record t+1 holds, record t+1's maxMoves 3)
+  for (const c of mine) {
+    c.movesFull = unitFullMoves(copy, c);
+    c.movesLeft = c.movesFull;
   }
   // ...and the ground as record t+1 holds it: its owners, features,
   // improvements, districts and roads, which the planning's steps read
