@@ -598,8 +598,12 @@ class SimOrders:
                         _wq = self._q_head(row)[_r, _c] - self.WONDER_BASE
                         _cst = self._wond_cost[
                             _wq.clamp(min=0, max=max(self._wond_n - 1, 0))]
-                        self.city_progress[_r, row, _c, 0] += js_round(
-                            _cst * _pct / 100.0).to(self.city_progress.dtype)
+                        # the share unrounded, paid with the city's overflow
+                        # store (TS `wonderChargeBoost`)
+                        self.city_progress[_r, row, _c, 0] += (
+                            _cst.double() * _pct / 100.0
+                            + self.city_prod_bank[_r, row, _c].double()).to(self.city_progress.dtype)
+                        self.city_prod_bank[_r, row, _c] = 0
                         # a charge that covers the cost completes the wonder
                         # at once, the excess banked nowhere (TS
                         # `wonderChargeBoost`)

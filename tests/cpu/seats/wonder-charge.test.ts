@@ -85,7 +85,7 @@ describe("the Builder's charge into a wonder", () => {
     const cost = itemCost(city.queue[0], state, city);
     const res = wonderChargeBoost(state, u!, seatOf(state, 1)!);
     expect(res.ok).toBe(true);
-    expect(city.queue[0].progress).toBe(Math.round(cost * 15 / 100));
+    expect(city.queue[0].progress).toBe(cost * 15 / 100);
     // ORIGINAL means the catalog's cost, not what is left to pay
     expect(cost).toBe(BUILT_WONDERS[inside].cost);
     expect(u!.charges).toBe(charges0 - 1);
@@ -100,7 +100,7 @@ describe("the Builder's charge into a wonder", () => {
     const once = city.queue[0].progress;
     u!.movesLeft = 2;
     wonderChargeBoost(state, u!, seatOf(state, 1)!);
-    expect(city.queue[0].progress).toBe(once + Math.round(cost * 15 / 100));
+    expect(city.queue[0].progress).toBe(once + cost * 15 / 100);
   });
 
   it("refuses a wonder outside the row's era band", () => {

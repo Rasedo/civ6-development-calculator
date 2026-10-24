@@ -1471,7 +1471,12 @@ export function wonderChargeBoost(state: GameState, unit: Unit, actor: Seat): Ru
   const pct = wonderChargePct(state, actor.seat, q.wonder);
   if (pct <= 0) return { ok: false, reason: "This wonder's era is outside the ability." };
   const cost = itemCost(q, state, city);
-  q.progress += Math.round(cost * pct / 100);
+  // the share unrounded, paid with the city's overflow store as a turn's
+  // step pays it (runs/h1_duelw1127 Xi'an t27-29: Stonehenge 90 at 15%, 13.5
+  // a charge — the Campus's 6 overflow + 13.5 reads 19 the turn it was
+  // placed, then 43 and 66 on 10 Production a turn)
+  q.progress += cost * pct / 100 + (city.productionBank ?? 0);
+  city.productionBank = 0;
   // a charge that covers the cost completes the wonder at once, the excess
   // banked nowhere (runs/h1_duelw1117 China t26: Stonehenge's completion
   // logged ahead of the charge's own event, the turn's Production having

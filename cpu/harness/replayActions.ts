@@ -54,8 +54,9 @@ export type Decision = Base & (
    *  the log names starting the removal or harvest there */
   | { kind: 'clear'; player: number; plot: number; what: 'feature' | 'resource' | 'improvement'; unit?: string }
   /** a Builder's charge spent on the wonder its plot holds (`UnitChargesChanged`
-   *  down, standing on a wonder under construction) */
-  | { kind: 'wonderCharge'; player: number; unit: string; plot: number }
+   *  down, standing on a wonder under construction); `placed`: the wonder
+   *  was placed in the pair, its queue head the step's own */
+  | { kind: 'wonderCharge'; player: number; unit: string; plot: number; placed?: boolean }
   /** a city-state's army levied: its units leave it and come back the
    *  major's on their plots (`UnitRemovedFromMap` then `UnitAddedToMap`),
    *  each record key old → new */
@@ -69,16 +70,17 @@ export type Decision = Base & (
   | { kind: 'gpActivate'; player: number; unit: string; plot: number; individual: number }
   | { kind: 'worked'; player: number; city: number; plots: number[];
       /** each plot's lock rank (`Tile.lockRank`), all 0 when absent */
-      ranks?: number[] }
+      ranks?: number[];
+      /** each plot's lock size (`Tile.lockPop`), 0 for none, all 0 when absent */
+      upTo?: number[] }
   | { kind: 'envoy'; player: number; minor: number; n: number }
   | { kind: 'pantheon'; player: number; belief: number }
   | { kind: 'religion'; player: number }
   | { kind: 'governors'; player: number }
   | { kind: 'war'; player: number; other: number; war: boolean }
   | { kind: 'routes'; player: number }
-  /** `path`: the plots the log's `UnitMoved` steps entered, in order;
-   *  `ords`: each step's row sequence number in the log */
-  | { kind: 'move'; player: number; unit: string; plot: number; path?: number[]; ords?: number[] }
+  /** `path`: the plots the log's `UnitMoved` steps entered, in order */
+  | { kind: 'move'; player: number; unit: string; plot: number; path?: number[] }
   | { kind: 'unitNew'; player: number; unit: string; type: number; plot: number; why: 'trained' | 'other' }
   | { kind: 'unitGone'; player: number; unit: string; why: 'founded' | 'consumed' | 'lost' }
   | { kind: 'capture'; player: number; city: number }
@@ -337,14 +339,20 @@ export class InferredActions implements ActionSource {
       // 563); a citizen moved with the size standing moved after the turn's
       // yields (Rome t25: 894 to 806 with plot 850 claimed, the box and the
       // Production read 894; 1118 Rome t28: 627 to 495 as the Water Mill
-      // completed, the growth read 627)
+      // completed, the growth read 627). Where the city grew, a citizen
+      // record t+1 no longer shows on its plot works it until the growth
+      // re-places the citizens: the turn's yields read it, the border box
+      // the plots record t+1 works (1127 Xi'an t13: 232 read for the Food
+      // and the Production, the growth moving it to 231 and 320)
       const w0 = c0 ? c0.worked : c1.worked;
       const both = c1.worked.filter((q) => w0.includes(q));
       const added = c1.worked.filter((q) => !w0.includes(q));
       const left = w0.filter((q) => !c1.worked.includes(q));
-      const groups = c0 && c0.pop !== c1.pop ? [both, added, left] : [both, left, added];
+      const grew = !!c0 && c1.pop > c0.pop;
+      const groups = grew ? [both, left, added] : c0 && c0.pop !== c1.pop ? [both, added, left] : [both, left, added];
       out.push({ kind: 'worked', phase: 'before', player: c1.owner, city: at, plots: groups.flat(),
-        ranks: groups.flatMap((g, i) => g.map(() => i)) });
+        ranks: groups.flatMap((g, i) => g.map(() => i)),
+        ...(grew && left.length ? { upTo: groups.flatMap((g, i) => g.map(() => (i === 1 ? c0!.pop : 0))) } : {}) });
       // and after the turn the city works what record t+1 shows
       out.push({ kind: 'worked', phase: 'after', player: c1.owner, city: at, plots: [...c1.worked] });
       if (!c0) continue;
@@ -587,7 +595,6 @@ export class RecordedActions implements ActionSource {
     const log = new Map<string, Keyed>();
     const out0: Decision[] = [];
     const paths = new Map<string, number[]>();
-    const stepOrds = new Map<string, number[]>();
     let removed: string | null = null;
     const put = (kind: string, key: string, d: Decision) => {
       if (!log.has(kind)) log.set(kind, new Map());
@@ -665,16 +672,19 @@ export class RecordedActions implements ActionSource {
           xp: u0 ? num(u0.xp) : 0 });
       } else if (name === 'UnitChargesChanged' && n(r, 2) < n(r, 3)) {
         // a charge spent where the Builder stands on a wonder under
-        // construction is a charge toward the wonder
+        // construction is a charge toward the wonder, one placed in the
+        // pair's too (runs/h1_duelw1127 t27: Xi'an places Stonehenge on its
+        // Farm at the turn start and China's Builder charges it, record t+1
+        // reading 19)
         const u = units1.get(`${n(r, 0)}:${n(r, 1)}`) ?? a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
         const plot = u ? u.y * W + u.x : -1;
-        if (u && cat.units[u.type] === 'UNIT_BUILDER' && plot >= 0 && (plotAt(a, plot)[P.wonder] as number) >= 0 && !plotAt(a, plot)[P.wonderComplete]) {
-          out0.push({ kind: 'wonderCharge', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: `${n(r, 0)}:${n(r, 1)}`, plot });
+        const placed = plot >= 0 && (plotAt(a, plot)[P.wonder] as number) < 0 && (plotAt(b, plot)[P.wonder] as number) >= 0;
+        if (u && cat.units[u.type] === 'UNIT_BUILDER' && plot >= 0 && ((plotAt(a, plot)[P.wonder] as number) >= 0 || placed) && !plotAt(a, plot)[P.wonderComplete]) {
+          out0.push({ kind: 'wonderCharge', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: `${n(r, 0)}:${n(r, 1)}`, plot, ...(placed ? { placed } : {}) });
         }
       } else if (name === 'UnitMoved') {
         const k = `${n(r, 0)}:${n(r, 1)}`;
         paths.set(k, [...(paths.get(k) ?? []), n(r, 3) * W + n(r, 2)]);
-        stepOrds.set(k, [...(stepOrds.get(k) ?? []), r[0] as number]);
       } else if (name === 'UnitKilledInCombat') {
         const typeOf = (owner: number, id: number) => {
           const u = a.units.find((x) => x.owner === owner && x.id === id) ?? b.units.find((x) => x.owner === owner && x.id === id);
@@ -1040,7 +1050,6 @@ export class RecordedActions implements ActionSource {
     for (const d of inferred) {
       if (d.kind !== 'move' || !paths.has(d.unit)) continue;
       d.path = paths.get(d.unit);
-      d.ords = stepOrds.get(d.unit);
     }
     for (const d of inferred) {
       const by = d.kind === 'clear' ? clearer.get(`${d.player}:${d.plot}:${d.what}`) : undefined;
@@ -1051,7 +1060,7 @@ export class RecordedActions implements ActionSource {
     for (const [k, path] of paths) {
       const u0 = a.units.find((x) => unitKey(x) === k);
       if (!u0 || moved.has(k) || units1.has(k) || !path.length) continue;
-      out.push({ kind: 'move', phase: phaseOf(u0.owner), player: u0.owner, unit: k, plot: path[path.length - 1], path, ords: stepOrds.get(k) });
+      out.push({ kind: 'move', phase: phaseOf(u0.owner), player: u0.owner, unit: k, plot: path[path.length - 1], path });
     }
     const settledKinds = new Set(['found', 'buyBuilding', 'buyPlot', 'improve', 'pantheon', 'unitOrigin', 'research', 'civic', 'queueHead']);
     const inferredBy = new Map<string, Keyed>();

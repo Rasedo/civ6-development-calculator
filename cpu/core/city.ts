@@ -328,7 +328,7 @@ export function assignWorkedTiles(
 
   // LOCKED plots first, by rank then in tile order — the citizens the player
   // placed by hand, ahead of anything the score would have chosen.
-  const lockedValid = candidates.filter((t) => t.locked)
+  const lockedValid = candidates.filter((t) => t.locked && (t.lockPop === undefined || city.population <= t.lockPop))
     .sort((a, b) => (a.lockRank ?? 0) - (b.lockRank ?? 0) || a.index - b.index).map((t) => t.index);
   const worked: number[] = lockedValid.slice(0, workers);
   for (const s of scored) {

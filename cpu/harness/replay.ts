@@ -42,7 +42,7 @@ import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar
   placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, FORTIFY_MAX_TURNS } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -59,7 +59,7 @@ import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
 import { barbarianTactics, dangerPlane, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
-import { barbSlots, barbSlotsDying, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
+import { barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
@@ -154,8 +154,9 @@ interface Ctx {
   religionPort: { seats: ReadonlySet<number>; probe: ReligionProbe; inputs: MajorViewInputs; pantheonTurn: Map<number, number>;
     mustFound: Set<number> };
   /** the pair's Fortify orders: unit -> the order's place in the log and the
-   *  fortification record t+1 shows (`dugIn`) */
-  fortified: Map<string, { ord: number; turns: number }>;
+   *  fortification record t+1 shows, null for a unit record t+1 no longer
+   *  holds (`dugIn`) */
+  fortified: Map<string, { ord: number; turns: number | null }>;
   /** the units that moved in the pair dug in: unit -> its first step's place
    *  in the log and the fortification it held before it (`dugIn`) */
   undug: Map<string, { ord: number; turns: number }>;
@@ -187,6 +188,12 @@ interface Ctx {
   engineKilled: Set<string>;
   /** this pair's moved units' steps (`move`'s path), by `owner:id` */
   paths: Map<string, number[]>;
+  /** the units (`owner:id`) whose logged steps of this pair `syncUnits`
+   *  walked, each step's look taken */
+  walked: Set<string>;
+  /** this pair's logged steps by `owner:id`, each its place in the log and
+   *  the plot entered (`UnitMoved`) */
+  steps: Map<string, { ord: number; plot: number }[]>;
   /** the units a barbarian's battle of this pair struck or fought with,
    *  as they stood before its first blow: the barbarians' AI takes its turn
    *  from there (`barbarianAi`) */
@@ -1595,19 +1602,53 @@ function strike(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision, s: 
 const OP_FORTIFY = gameHash('UNITOPERATION_FORTIFY');
 
 /** each unit that took the Fortify order in the pair: the order's place in
- *  the log, and the fortification record t+1 shows for it */
-function fortifiedIn(b: TurnRecord): Map<string, { ord: number; turns: number }> {
-  const out = new Map<string, { ord: number; turns: number }>();
+ *  the log, and the fortification record t+1 shows for it — null where
+ *  record t+1 no longer holds the unit */
+function fortifiedIn(b: TurnRecord): Map<string, { ord: number; turns: number | null }> {
+  const out = new Map<string, { ord: number; turns: number | null }>();
   const rows = (b as { actions?: unknown }).actions;
   if (!Array.isArray(rows)) return out;
   const dug = new Map(b.units.map((r) => [`${r.owner}:${r.id}`, num(r.fortify)]));
   for (const x of rows as unknown[][]) {
     if (x[2] !== 'UnitOperationStarted' || x[5] !== OP_FORTIFY) continue;
     const k = `${x[3]}:${x[4]}`;
-    const turns = dug.get(k);
-    if (turns !== undefined && !out.has(k)) out.set(k, { ord: x[0] as number, turns });
+    if (!out.has(k)) out.set(k, { ord: x[0] as number, turns: dug.get(k) ?? null });
   }
   return out;
+}
+
+/** each unit's logged steps of the pair (`UnitMoved`), in the log's order */
+function loggedSteps(b: TurnRecord, W: number): Map<string, { ord: number; plot: number }[]> {
+  const out = new Map<string, { ord: number; plot: number }[]>();
+  const rows = (b as { actions?: unknown }).actions;
+  if (!Array.isArray(rows)) return out;
+  for (const x of rows as unknown[][]) {
+    if (x[2] !== 'UnitMoved') continue;
+    const k = `${x[3]}:${x[4]}`;
+    if (!out.has(k)) out.set(k, []);
+    out.get(k)!.push({ ord: x[0] as number, plot: (x[6] as number) * W + (x[5] as number) });
+  }
+  return out;
+}
+
+/** THE OTHER UNITS AS THE LOG HAD THEM at a blow (its place `ord`): each one
+ *  the pair's log steps stands on its last plot entered before the blow, or
+ *  where it stood before its first step; the restore puts them back
+ *  (runs/h1_duelw1127 t26: a barbarian Warrior steps beside Rome's Warrior
+ *  before its fellow strikes it, and flanks it, the CombatLog's +2). */
+function standAtBlow(ctx: Ctx, ord: number, fighters: readonly Unit[]): () => void {
+  const moved: [Unit, number][] = [];
+  for (const [k, steps] of ctx.steps) {
+    const u = unitOf(ctx, k);
+    if (!u || fighters.includes(u) || !ctx.state.units.includes(u)) continue;
+    const before = steps.filter((s) => s.ord < ord);
+    const r = ctx.prev.units.find((x) => `${x.owner}:${x.id}` === k);
+    const at = before.length ? before[before.length - 1].plot : r ? r.y * ctx.W + r.x : u.tileIndex;
+    if (at === u.tileIndex) continue;
+    moved.push([u, u.tileIndex]);
+    u.tileIndex = at;
+  }
+  return () => { for (const [u, at] of moved) u.tileIndex = at; };
 }
 
 /** A DEFENDER THAT TOOK THE FORTIFY ORDER before the blow (in the log's
@@ -1616,10 +1657,16 @@ function fortifiedIn(b: TurnRecord): Map<string, { ord: number; turns: number }>
  *  327683, ordered at 31 HP, defended at +6 against a barbarian Warrior and
  *  read 2; 1124 t69: an Archer's shot on Rome's Warrior, CombatLog +3 on Snow
  *  at 66 HP); a blow before the order finds it as it stood (1121 t6: a camp's
- *  Spearman struck by a city-state before its own turn's order). */
+ *  Spearman struck by a city-state before its own turn's order). A unit the
+ *  pair killed holds the order's own tick, one turn more than it stood at,
+ *  from its first blow after the order (the operation's tick 0x95ebb0;
+ *  runs/h1_duelw1127 t16: city-state 3's Warrior, moved the turn before,
+ *  orders Fortify at 51 HP on Floodplains and takes a barbarian Slinger's
+ *  23 at the CombatLog's DefenderStrMod −4, then dies to a Warrior). */
 function dugIn(ctx: Ctx, d: BattleDecision, def: Unit): void {
   const f = ctx.fortified.get(d.defender);
-  if (f && d.ord > f.ord && f.turns > (def.fortifyTurns ?? 0)) def.fortifyTurns = f.turns;
+  if (f && d.ord > f.ord && f.turns === null) f.turns = Math.min(FORTIFY_MAX_TURNS, (def.fortifyTurns ?? 0) + 1);
+  if (f && d.ord > f.ord && f.turns !== null && f.turns > (def.fortifyTurns ?? 0)) def.fortifyTurns = f.turns;
   const m = ctx.undug.get(d.defender);
   if (m && d.ord < m.ord && m.turns > (def.fortifyTurns ?? 0)) def.fortifyTurns = m.turns;
 }
@@ -1907,9 +1954,20 @@ function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnR
   // calls it home: runs/h1_duelw1117 t42); what record t+1 shows of a unit
   // lands after every player's (its loss, its health)
   const late = (d: Decision) => (d.kind === 'unitGone' && d.why !== 'founded') || d.kind === 'combat' || d.kind === 'hit';
-  const rank = (d: Decision) => (late(d) ? 1 << 20 : 'player' in d ? d.player : -1);
+  // a kill lands after the battle it ended, which a later player may have
+  // fought (runs/h1_duelw1127 t30: a barbarian Warrior attacks China's and
+  // dies on the counter, the kill China's: counted once, after the blow)
+  const fightOf = new Map<string, number>();
+  for (const d of ds) {
+    if (d.kind !== 'battle' || phaseOf(d) !== phase) continue;
+    for (const u of [d.attacker, d.defender]) if (u) fightOf.set(u, Math.max(fightOf.get(u) ?? -1, d.player));
+  }
+  const rank = (d: Decision) => (late(d) ? 1 << 20 : d.kind === 'kill' ? Math.max(d.player, fightOf.get(d.victimUnit) ?? -1)
+    : 'player' in d ? d.player : -1);
+  // a charge on a wonder the pair placed lands once the queue holds it
+  const order = (d: Decision) => (d.kind === 'wonderCharge' && d.placed ? ORDER.indexOf('queue') + 0.5 : ORDER.indexOf(d.kind));
   const mine = ds.filter((d) => phaseOf(d) === phase)
-    .sort((x, y) => (rank(x) - rank(y)) || (ORDER.indexOf(x.kind) - ORDER.indexOf(y.kind)));
+    .sort((x, y) => (rank(x) - rank(y)) || (order(x) - order(y)));
   // EACH PLAYER'S ACTIONS draw on the stream its start completed with (its
   // `PlayerTurnStartComplete` witness in `wit`: record t for the active
   // player's, record t + 1 for the others'), each player's draws its own
@@ -1950,12 +2008,14 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           if (t.ownerSeat !== city.seat || t.ownerCity !== city.id) continue;
           t.locked = false;
           t.lockRank = undefined;
+          t.lockPop = undefined;
         }
         d.plots.forEach((q, i) => {
           const t = state.map.tiles[q];
           if (q === city.centerIndex || t.district) return;
           t.locked = true;
           if (d.ranks?.[i]) t.lockRank = d.ranks[i];
+          if (d.upTo?.[i]) t.lockPop = d.upTo[i];
         });
         const read = [...next.dumpOfCity].find(([, c]) => c.y * ctx.W + c.x === d.city)?.[0];
         if (read?.specialistPref) city.specialistPref = [...read.specialistPref];
@@ -2658,11 +2718,6 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         }
         const s0 = battleDraw(ctx, wit, b, d);
         if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); if (TRACE.has('battle')) console.error(`   ${d.attacker || 'city@' + d.from} vs ${d.defender || 'city@' + d.at} seq${d.seq}`); break; }
-        // every other unit stands where the log's steps before the battle had
-        // it (its support and flanking: runs/h1_duelw1124 t20, Cardiff's
-        // Warrior stepped beside the one a barbarian Warrior then struck);
-        // `syncUnits` walks them on from where they stood
-        const standing = bystanders(ctx, ds, d.ord, [atk, def]);
         // a unit the log's steps moved holds no fortification
         if (atk.tileIndex !== d.from) atk.fortifyTurns = 0;
         if (def.tileIndex !== d.at) def.fortifyTurns = 0;
@@ -2677,6 +2732,12 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         }
         atk.movesLeft = Math.max(atk.movesLeft, grantedMoves(state, atk));
         atk.attacksLeft = Math.max(1, atk.attacksLeft ?? 1);
+        // a barbarian strikes in its own turn, after its start took the
+        // techs and civics the majors hold (`barbarianTechs`; 1127 t26:
+        // China's Military Tradition at its start, the barbarians' Warrior
+        // flanking at theirs)
+        if (isBarbSeat(atk.seat)) barbarianTechs(state);
+        const restore = standAtBlow(ctx, d.ord, [atk, def]);
         state.rngState = s0;
         const hp0 = [atk.hp, def.hp];
         if (TRACE.has('battleHp')) (globalThis as { __cbLog?: string[] }).__cbLog = [battleTerms(state, atk, def)];
@@ -2684,7 +2745,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         ctx.stream.placed(true);
         const r = d.ranged ? rangedAttack(state, atk.id, d.at) : meleeAttack(state, atk.id, d.at, atk.seat);
         ctx.stream.placed(false);
-        for (const [u, at] of standing) u.tileIndex = at;
+        restore();
         if (TRACE.has('battleHp')) console.error(`t${traceTurn} battle ${d.attacker} ${atk.type} ${hp0[0]}->${atk.hp} vs ${d.defender} ${def.type} ${hp0[1]}->${def.hp} ${d.ranged ? 'ranged' : 'melee'} seq${d.seq} game[${d.dmg}] ours[${hp0[1] - def.hp},${hp0[0] - atk.hp}] ${r.ok ? '' : r.reason} ${((globalThis as { __cbLog?: string[] }).__cbLog ?? []).join(' | ')}`);
         if (!r.ok) { count(ctx, 'battle', 'refused', d.player, r.reason); break; }
         ctx.battled.add(d.attacker);
@@ -2891,40 +2952,30 @@ function inTurn(state: GameState, turn: number, fn: () => void): void {
   }
 }
 
-/** every unit but `except` the log's steps moved before the row `ord` stands
- *  on the plot the last of those steps entered; answers each one moved with
- *  the plot it stood on, to stand back on after the battle */
-function bystanders(ctx: Ctx, ds: readonly Decision[], ord: number, except: readonly Unit[]): [Unit, number][] {
-  const out: [Unit, number][] = [];
-  for (const d of ds) {
-    if (d.kind !== 'move' || !d.path || !d.ords) continue;
-    const u = unitOf(ctx, d.unit);
-    if (!u || except.includes(u) || !ctx.state.units.includes(u)) continue;
-    let k = -1;
-    while (k + 1 < d.ords.length && d.ords[k + 1] < ord) k++;
-    if (k < 0 || u.tileIndex === d.path[k]) continue;
-    out.push([u, u.tileIndex]);
-    u.tileIndex = d.path[k];
-  }
-  return out;
-}
-
 function syncUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
   for (const r of b.units) {
     if (only !== undefined && r.owner !== only) continue;
     const u = unitOf(ctx, `${r.owner}:${r.id}`);
     if (!u) continue;
     const at = r.y * ctx.W + r.x;
-    if (u.tileIndex !== at) {
+    const key = `${r.owner}:${r.id}`;
+    const moved = u.tileIndex !== at;
+    if (moved) {
       count(ctx, 'move', 'applied');
       // a unit that moved spent its moves and holds no fortification
       // (runs/h1_duelw1117 t3: the barbarian Scout that walked to (12,10)
       // took 38 from China's... city-state Warrior at +10, unfortified)
       u.fortifyTurns = 0;
-      // the unit sees from every plot the log's steps entered, and from where
-      // it stopped; a barbarian's looks wait for its player's turn, whose
-      // planning reads the plots revealed before its moves (its steps kept)
-      const steps = [...(ctx.paths.get(`${r.owner}:${r.id}`) ?? []), at];
+    }
+    // the unit sees from every plot the log's steps entered, and from where
+    // it stopped — a unit a battle of the pair already stood at its plot
+    // walked them all the same (runs/h1_duelw1127 t10: China's Scout steps
+    // to (14,3), where a barbarian strikes it); a barbarian's looks wait for
+    // its player's turn, whose planning reads the plots revealed before its
+    // moves (its steps kept)
+    if (moved || (ctx.paths.get(key)?.length && !ctx.walked.has(key))) {
+      ctx.walked.add(key);
+      const steps = [...(ctx.paths.get(key) ?? []), at];
       if (!isBarbSeat(u.seat)) for (const p of steps) revealAround(ctx.state, u.seat, p, unitSight(u, ctx.state), { seeThrough: unitSeesThrough(u) });
       if (isBarbSeat(u.seat)) ctx.barbSteps.push({ u, plots: steps });
     }
@@ -3736,7 +3787,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
@@ -3810,6 +3861,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.battled = new Set();
     ctx.fortified = fortifiedIn(b);
     ctx.paths = new Map();
+    ctx.walked = new Set();
+    ctx.steps = loggedSteps(b, ctx.W);
     ctx.barbBlows = new Map();
     ctx.minorBlows = new Map();
     ctx.barbNew = [];
@@ -3868,6 +3921,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // (runs/h1_duelw1118 Rome's Warrior, displaced at t17, healed 8)
     const logged = Array.isArray((b as { actions?: unknown }).actions);
     const walked = new Set(ds.flatMap((d) => (d.kind === 'move' && d.path ? [d.unit] : [])));
+    // an upgrade spends the unit's turn: neither it nor what it became rests
+    // (runs/h1_duelw1127 t34: China's Slinger at 47 HP upgrades to an Archer
+    // and reads no heal, 53 + 31 damage at record t+1)
+    const upgraded = new Set(ds.flatMap((d) => (d.kind === 'upgrade' ? [d.unit, d.into] : [])));
     const spent = new Map<Unit, number>();
     const struckHp = new Map<Unit, number>();
     // a barbarian unit's rest: whether it stood the turn through and struck
@@ -3883,7 +3940,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const u = unitOf(ctx, key);
       if (!u) continue;
       const stood = logged ? !walked.has(key) : was.get(key) === r.y * ctx.W + r.x;
-      const rested = stood && !fought.has(key);
+      const rested = stood && !fought.has(key) && !upgraded.has(key);
       // a city-state's or Free City's unit acts in the engine's turn, its own
       // AI's: it starts that turn on its moves (runs/h1_duelw1121 t8: Hunza's
       // Builder, its Farm laid at t7, walks to plot 275 on its moves), its
@@ -4111,6 +4168,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // city-state's Warrior at -4)
     for (const [u, stood] of barbRest) {
       if (state.units.includes(u)) restUnit(state, u, stood);
+    }
+    // a Fortify order ticks the operation at once, its turn's rest again
+    // (the operation's tick 0x95ebb0): the unit stands dug in as record t+1
+    // reads it (runs/h1_duelw1127 t35: a barbarian Scout, moved the turn
+    // before, orders Fortify and reads 2, struck at +1 by Rome's Warrior
+    // next turn); the engines' rest has no order to tick
+    for (const [k, f] of ctx.fortified) {
+      const u = unitOf(ctx, k);
+      if (u && f.turns !== null && state.units.includes(u) && f.turns > (u.fortifyTurns ?? 0)) u.fortifyTurns = f.turns;
     }
     const campsHeld = syncDraws(ctx, b, tribesBefore);
     syncPillage(ctx);

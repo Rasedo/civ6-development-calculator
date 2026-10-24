@@ -247,6 +247,10 @@ export interface Tile {
    *  plots in tile order. A recorded game's replay ranks the plots its
    *  record says each citizen of a turn worked. */
   lockRank?: number;
+  /** the lock holds while its city has at most this many citizens: a
+   *  recorded game's replay pins here a citizen the city's growth moves
+   *  off the plot, the turn's yields read before the growth */
+  lockPop?: number;
   /** the floods of this tile's home river (`floodHome`) — the Great Bath's
    *  "+1 Faith for every time a tile belonging to this city has been
    *  Flooded" reads it. A flood counts once per episode (`countFlood`). */

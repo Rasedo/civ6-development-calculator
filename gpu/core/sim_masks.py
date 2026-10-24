@@ -3317,6 +3317,11 @@ class SimMasks:
             cap = self.city_center[nr, nsr, j]
             ok = alive.any(dim=1) & (cap >= 0)
             self.mops_revealed[nr[ok], s, cap[ok]] = True
+            # and the minor's centre and the six beside it are revealed to
+            # the major, seen or not — the revealed plots alone, no look
+            if self.fog_of_war:
+                ring = self.pair_dist[self.citystate_center[nr, s].clamp(min=0)].long() <= 1
+                self.seat_explored[nr, nsr] = self.seat_explored[nr, nsr] | ring
             for r in sorted(set(nsr.tolist())):
                 games = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                 games[nr[nsr == r]] = True

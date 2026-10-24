@@ -218,6 +218,16 @@ export function meetCityState(state: GameState, cityState: CityState, seat: numb
   // first major)
   const capital = state.seats.find((s) => s.seat === seat)?.cities[0];
   if (capital) (cityState.revealed ??= new Array<number>(state.map.tiles.length).fill(0))[capital.centerIndex] = 1;
+  // and the minor's centre and the six beside it are revealed to the major,
+  // seen or not — a write of the revealed plots alone, no look (runs/
+  // h1_duelw1127 t3: China meets Mexico City and its seven plots show, its
+  // Warrior three plots off; 1121 t7, Rome and Antananarivo)
+  const major = isCiv(seat) && state.fogOfWar && cityState.centerIndex >= 0 ? seatOf(state, seat) : undefined;
+  if (major) {
+    if (major.explored.length === 0) major.explored = new Array(state.map.tiles.length).fill(0);
+    const c = state.map.tiles[cityState.centerIndex];
+    for (const t of tilesWithin(state.map, c.col, c.row, 1)) major.explored[t.index] = 1;
+  }
   // the meeting gives the pair its quest (0x93ae70) before the first
   // envoy's ground is drawn (runs/h1_duelw1117 t17: the quest's draws, then
   // Caguana's annex)

@@ -18,7 +18,7 @@ export function formationCS(unit: Unit): number {
 }
 
 /** CIV6: fortification tops out at two turns dug in. */
-const FORTIFY_MAX_TURNS = 2;
+export const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, directionTo, DIR_E, DIR_W } from '../../world/hex';
 import { isWater, isImpassable, isMountain, canalPassage, hullTile, naturalWonderAt } from '../../world/query';
