@@ -1165,7 +1165,7 @@ export function freeKnowledge(state: GameState, age: boolean): void {
 /** THE COMBAT DESIRE of the Free Cities (`combatDesire`) at their military
  *  AI's turn, every turn with or without a city (AI_Military.csv's player
  *  62 rows), on the records as their last update aged them (`turn`): the
- *  regions of their cities, each city's unit in training, the players in
+ *  primary regions of their cities (`cityRegions`), each city's unit in training, the players in
  *  the game's order — the majors at war with them, the city-states not
  *  (runs/h1_duelw1123 t200-t201 with no Free City 0.5, the floor of two
  *  majors at war), the barbarians a tribe at war —; their cities'
@@ -1175,10 +1175,7 @@ export function freeKnowledge(state: GameState, age: boolean): void {
 export function freeCombatDesire(state: GameState, turn: number): CombatDesire {
   const free = freeSeatOf(state);
   const regions = new Set<number>();
-  for (const c of free.cities) {
-    const r = state.map.tiles[c.centerIndex]?.region ?? -1;
-    if (r >= 0) regions.add(r);
-  }
+  for (const c of free.cities) for (const r of cityRegions(state, c.centerIndex)) regions.add(r);
   const players = [
     ...state.seats.filter((s) => isCiv(s.seat)).map((s) => ({ seat: s.seat, atWar: true, tribe: false, flagged: false })),
     ...state.cityStates.map((c) => ({ seat: c.seat, atWar: false, tribe: false, flagged: false })),

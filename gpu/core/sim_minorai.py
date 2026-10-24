@@ -650,8 +650,8 @@ class SimMinorAi:
         military AI's turn, in the games of `act`, with or without a city
         (`citystate_combat_desire` on the row `FR`), on the records of their
         knowledge base (the row `FK`) as their last update aged them (the
-        turn before): the regions of their cities, each city's unit in
-        training, the majors at war with them, the city-states not, the
+        turn before): the regions of their cities' 37 plots (`_city_regions`),
+        each city's unit in training, the majors at war with them, the city-states not, the
         barbarians a tribe at war; a city threatened at its last update
         (`city_ai_threat`); no war footing, no standing-army term."""
         B, dev = self.B, self.device
@@ -674,9 +674,11 @@ class SimMinorAi:
         plot = self.citystate_kb_plot[:, r].long()
         alive_c = self.city_alive[:, row, : self.RC]
         ctr = self.city_center[:, row, : self.RC]
-        area_c = torch.where(alive_c & (ctr >= 0), self.tile_region.gather(1, ctr.clamp(min=0)), torch.full_like(ctr, -1))
+        # their primary region list: every region of each city's 37 plots
+        regs = torch.cat([self._city_regions(torch.where(alive_c[:, j], ctr[:, j], torch.full_like(ctr[:, j], -1)))
+                          for j in range(self.RC)], dim=1)
         rec_area = self.tile_region.gather(1, plot.clamp(min=0))
-        in_area = ((rec_area.unsqueeze(2) == area_c.unsqueeze(1)) & (area_c >= 0).unsqueeze(1)).any(dim=2)
+        in_area = ((rec_area.unsqueeze(2) == regs.unsqueeze(1)) & (regs >= 0).unsqueeze(1)).any(dim=2)
         turn = int(self.turn) - 1
         counted = (slot != -2) & (turn - seen <= 2) & in_area
         strength = strength_of(typ)
