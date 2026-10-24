@@ -5160,6 +5160,26 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   barbarians' Quadrireme and Galley beside Longxi in the danger map). With them
   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->
   758 of 1,241, the game's plots within ours 862 -> 1,192.
+- THE PLANNING'S ZONE OF CONTROL (0x26e570 at 0x26e83e..0x26e8ae, READ;
+  its exerters PARTLY READ): with the search's flag 0x200 clear (the
+  planning's 0x115 | 0x800 | 0x100; the danger map's 0x311 sets it), a step
+  whose parent is not the unit's own plot and lies in the unit's enemy zone
+  of control (0x26f980 -> Rules_Movement 0x530f50, the mover's owner, its
+  stacking count 0x585eb0) is refused unless it is an attack (r14b: a
+  hostile city or Encampment at war, or a unit at war that fights, 0x209dd0,
+  on the child). The cost's flag 0x800 skips the zone's "spend
+  everything"; this test is the validity's own. The exerters the engines
+  take (fit, 0x530f50 unread): hostile units that exert a zone, of the
+  mover's domain, on plots the player sees now, none across a river; the
+  mover's own ignoring (a naval raider, the cavalry but the chariot) as the
+  zone's. runs/h1_duelw1124 t1-60 planning rows (the replay's classifier):
+  855 -> 1,061 of 1,276 equal, the extra plots 609 -> 98, no new miss (65
+  revealed, 30 unrevealed as before); the seen and domain filters each
+  needed (all exerters 1,016 equal with 287 new misses; seen exerters of any
+  domain 1,056 with 125, the Galleys'). t7: the Scout at 9:18 reaches 9:17
+  beside city-state 2's Warrior at 10:16 and moves no further but onto it.
+  The engines: `groundOf`'s seenZoc in `search` (no zone of control, not
+  the danger map's) / `_tac_search`'s zs (`_tac_zoc` with seen and naval).
 - A plot the player never revealed is the reach's leaf (READ): the
   validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose
   parent is not revealed (node +0x51 bit 0) unless the parent is the unit's

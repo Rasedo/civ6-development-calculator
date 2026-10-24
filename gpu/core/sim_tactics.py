@@ -287,12 +287,13 @@ class SimTactics:
             land, naval = land & known, naval & known
         return land, naval
 
-    def _tac_zoc(self, seat: int) -> torch.Tensor:
+    def _tac_zoc(self, seat: int, seen: torch.Tensor | None = None, naval: bool | None = None) -> torch.Tensor:
         """[B, T] bool — `inEnemyZoc` for a military mover of `seat` at every
         plot: a military unit hostile to it beside the plot that exerts a zone
         (no Ranged or Siege class without SUPPRESSION, none embarked, none of a
-        chassis that exerts none), none across a river. The mover's own
-        ignoring is the caller's."""
+        chassis that exerts none), none across a river. With `seen` [B, T]
+        and `naval` (`groundOf`'s seenZoc) only an exerter on a plot it sees
+        and of the mover's domain. The mover's own ignoring is the caller's."""
         mil = self.military_at
         here = mil >= 0
         ms = mil.clamp(min=0)
@@ -304,6 +305,8 @@ class SimTactics:
             no_ex = no_ex & ~self._promo_flag(mtype, self.unit_promos.gather(1, ms), "ZOC_EXERT")
         ex = here & ~self.unit_emb.gather(1, ms) & ~self._type_zoc_none.take(mtype) & ~no_ex
         ex = ex & self._seats_hostile(seat, mseat)
+        if seen is not None:
+            ex = ex & seen & (self.unit_naval.take(mtype) == naval)
         nb = self.neigh.clamp(min=0)
         bits = torch.arange(6, device=self.device).view(1, 1, 6)
         riv = (self.river_mask.unsqueeze(2) >> bits) & 1
@@ -458,6 +461,15 @@ class SimTactics:
             cliffs_b = self._tac_cliffs(seat)
             waive_cliff = self._promo_flag(utype, getattr(self, f"{pre}_unit_promos")[rows, slots], "CLIFFS")
         zp = (self._tac_zoc(seat)[rows] & ~self._tac_zoc_ignored(utype).unsqueeze(1)) if zoc else None
+        # the planning's search (no flag 0x200: 0x26e570 at 0x26e83e) moves on
+        # from no plot of a zone of control the player sees but the unit's
+        # own; an attack it strikes from there all the same (`groundOf`'s
+        # seenZoc)
+        zs = None
+        if not zoc and not stand:
+            sn = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
+            zs = torch.where(naval.unsqueeze(1), self._tac_zoc(seat, sn, True)[rows], self._tac_zoc(seat, sn, False)[rows])
+            zs = zs & ~self._tac_zoc_ignored(utype).unsqueeze(1)
         # a path's turn may not end on a plot its own stacking unit holds (the
         # path validity 0x2720a0; `groundOf`'s full)
         full_n = None
@@ -579,6 +591,8 @@ class SimTactics:
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6) & (turns <= max_turns)
             if zoc:
                 ok = ok & ~(full_n.gather(1, b1) & (turns > bt))
+            if zs is not None:
+                ok = ok & ~(zs.gather(1, b1) & (best != start).unsqueeze(1) & ~a6)
             if stand:
                 # the danger map's search: an attack is struck from a plot
                 # the unit may stand on, its own or one none of its own

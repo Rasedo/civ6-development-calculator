@@ -8,7 +8,7 @@
  * the Free Cities' turn for theirs (`freeCityTactics`).
  */
 import type { ArmyRecord, City, CityState, GameState, Tile, Unit } from './types';
-import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
+import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, neighbors, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { COMBAT_BOMBARD_VS_UNIT, MP_SCALE } from '../data/constants';
 import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
@@ -18,7 +18,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  canEmbark, cityAtIndex, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, stepCost, stepUnit, unitDomain, unitFullMoves, unitIsNoncombat, unitReligious,
+  canEmbark, cityAtIndex, crossesRiver, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious,
   unitsHostile, unitVisibleTo,
   waterEnterable,
 } from './units';
@@ -133,6 +133,11 @@ interface Ground {
   /** a unit of its own that stacks with it holds the plot (0x585eb0, the
    *  unit itself not counted: the path node's +0x54) */
   full: (i: number) => boolean;
+  /** the plot lies in a zone of control the player sees: a hostile unit of
+   *  the mover's domain that exerts one beside it, on a plot the player sees
+   *  now, none across a river (the planning validity's 0x26f980 ->
+   *  Rules_Movement 0x530f50) */
+  seenZoc: (i: number) => boolean;
 }
 
 function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true): Ground {
@@ -154,6 +159,9 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   }
   const enters = new Map<number, boolean>();
   const zocs = new Map<number, boolean>();
+  const seenZocs = new Map<number, boolean>();
+  let seenNow: Uint8Array | undefined;
+  const ignoresZoc = !!UNITS[unit.type]?.ignoresZoc || (!!UNITS[unit.type]?.cavalry && !UNITS[unit.type]?.chariot);
   const ex = seatOf(state, unit.seat)?.explored;
   // the plots the player revealed (node +0x51 bit 0, 0x154c0); a path
   // (`revealedOnly` false) reads every plot as revealed
@@ -170,6 +178,23 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     known,
     stand: (i) => !held.has(i),
     full: (i) => own.has(i),
+    seenZoc: (i) => {
+      let v = seenZocs.get(i);
+      if (v !== undefined) return v;
+      v = false;
+      if (!ignoresZoc) {
+        seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+        const sn = seenNow;
+        const t = state.map.tiles[i];
+        for (const n of neighbors(state.map, t)) {
+          if (!sn[n.index] || crossesRiver(state.map, t, n)) continue;
+          if (state.units.some((x) => x.tileIndex === n.index && onMap(x) && !unitReligious(x.type) && unitExertsZoc(x)
+            && !!UNITS[x.type]?.naval === naval && unitsHostile(state, x, unit))) { v = true; break; }
+        }
+      }
+      seenZocs.set(i, v);
+      return v;
+    },
     enter: (t) => {
       let v = enters.get(t.index);
       if (v === undefined) {
@@ -267,6 +292,10 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // player never revealed but the unit's own (0x2720a0 under the search's
     // flag 1: the parent unrevealed)
     if (best.attack || (best !== start && !ground.known(best.tile))) continue;
+    // the planning's search (no flag 0x200: 0x26e570 at 0x26e83e) moves on
+    // from no plot of a zone of control the player sees but the unit's own;
+    // an attack it strikes from there all the same
+    const zoned = !zoc && !standToAttack && best !== start && ground.seenZoc(best.tile);
     const from = map.tiles[best.tile];
     for (let di = 0; di < DIRECTION_TYPES.length; di++) {
       const d = DIRECTION_TYPES[di];
@@ -274,6 +303,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       if (!to || cliffBlocksStep(state, from, to, unit)) continue;
       const attack = !ground.enter(to);
       if (attack && !ground.attack(to)) continue;
+      if (zoned && !attack) continue;
       // the danger map's search (0x26df90, flags 0x311): an attack is struck
       // from a plot the unit may stand on, its own or one none of its own
       // stacking units holds
