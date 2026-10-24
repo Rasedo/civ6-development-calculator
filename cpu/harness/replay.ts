@@ -605,14 +605,16 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   }
   barbSlots(state);
   barbarianAi(ctx, b, closing, before, from);
-  // the scouts look from each plot the record's steps of the turn entered (a
-  // scout reports the cities it comes to see, `barbScoutLook`), their trees
+  // each unit looks from each plot the record's steps of the turn entered,
+  // after the AI's planning read the plots revealed as the turn opened; a
+  // scout reports the cities it comes to see (`barbScoutLook`), its tree
   // ticking from the next turn
   for (const { u, plots } of ctx.barbSteps.splice(0)) {
     if (!state.units.includes(u)) continue;
     const at = u.tileIndex;
     for (const p of plots) {
       u.tileIndex = p;
+      revealAround(state, u.seat, p, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
       barbScoutLook(state, u);
     }
     u.tileIndex = at;
@@ -2778,9 +2780,10 @@ function syncUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
       // took 38 from China's... city-state Warrior at +10, unfortified)
       u.fortifyTurns = 0;
       // the unit sees from every plot the log's steps entered, and from where
-      // it stopped (a barbarian's steps kept for its scout's looks)
+      // it stopped; a barbarian's looks wait for its player's turn, whose
+      // planning reads the plots revealed before its moves (its steps kept)
       const steps = [...(ctx.paths.get(`${r.owner}:${r.id}`) ?? []), at];
-      for (const p of steps) revealAround(ctx.state, u.seat, p, unitSight(u, ctx.state), { seeThrough: unitSeesThrough(u) });
+      if (!isBarbSeat(u.seat)) for (const p of steps) revealAround(ctx.state, u.seat, p, unitSight(u, ctx.state), { seeThrough: unitSeesThrough(u) });
       if (isBarbSeat(u.seat)) ctx.barbSteps.push({ u, plots: steps });
     }
     u.tileIndex = at;

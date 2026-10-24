@@ -4980,6 +4980,23 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   33:6, not the one through 33:7 / 32:7, both held by its own units. Ported
   (`search`'s zone-of-control paths, `groundOf`'s full; `_tac_search` with
   `zoc`).
+  The walk's other turn-end tests (0x272262..0x272313), each on a seen node
+  after which a turn begins: a mountain (+0x50 bit 4, terrain bits 0x4924)
+  or an impassable feature (+0x50 bit 8) unless the unit's +0x1f6 lets it,
+  water under flag 0x80 (+0x50 bit 0x10), a city not at war (+0x51 bit 2)
+  — the stacking, mountain and city tests all off under flag +4. The
+  planning's search (0x115 | 0x800 | 0x100) carries +4: none of them runs
+  there (the planning classifier, 1124 t1-60: applying the stacking test
+  takes 822 equal rows to 472).
+  After the walk (0x272372..0x272692): the embarking tests under the unit's
+  +0x1f2 / +0x1f1 bytes on a revealed child; flag 2: a child owned by a
+  player at war refused; a clans' tribe test (0x151550, 0x147c20); under
+  the unit's +0x1f7 byte or flag 8, a child whose danger (0x716a90) is above
+  0 refused from a parent of turn 1 or less, and under flag 0x8000 the same
+  for a water child; flag 1: a parent not revealed refused unless it is the
+  unit's own plot, and a child in a major's territory not at war refused
+  unless the player may enter it (0x3dab70). Which of the +0x1f7 byte's
+  setters the planning's pool takes is UNREAD.
 - A step's turns and Movement (0x26e920, in 24.8 fixed point): a parent with
   no Movement starts the next turn at the domain's full Movement; the step's
   cost (Rules_Movement 0x531660..0x530240: the terrain's MovementCost, the
