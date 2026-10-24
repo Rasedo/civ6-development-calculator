@@ -1936,14 +1936,14 @@ class SimTactics:
             blk = (x >= 0) & self._type_dom_mil.take(xt) & ~mine
             blk = blk.view(B, U, K, 6) & (x.view(B, U, K, 6) != tslot.view(B, 1, K, 1))
             ok &= ~blk
-        # the claims, in the order the units, the targets and the spots run
+        # the claims, in the order the targets, the units and the spots run
         C = U * K * 6
-        cv = ok.view(B, C)
-        cplot = spot.reshape(B, C)
-        cu = torch.arange(U, device=dev).view(1, U, 1, 1).expand(B, U, K, 6).reshape(B, C)
-        ck = torch.arange(K, device=dev).view(1, 1, K, 1).expand(B, U, K, 6).reshape(B, C)
-        cdealt = dealt.unsqueeze(3).expand(B, U, K, 6).reshape(B, C)
-        cturn = sturn.reshape(B, C).clamp(min=1)
+        cv = ok.permute(0, 2, 1, 3).reshape(B, C)
+        cplot = spot.permute(0, 2, 1, 3).reshape(B, C)
+        cu = torch.arange(U, device=dev).view(1, 1, U, 1).expand(B, K, U, 6).reshape(B, C)
+        ck = torch.arange(K, device=dev).view(1, K, 1, 1).expand(B, K, U, 6).reshape(B, C)
+        cdealt = dealt.permute(0, 2, 1).unsqueeze(3).expand(B, K, U, 6).reshape(B, C)
+        cturn = sturn.permute(0, 2, 1, 3).reshape(B, C).clamp(min=1)
         # the spots in the order first claimed
         same = (cplot.unsqueeze(2) == cplot.unsqueeze(1)) & cv.unsqueeze(1) & cv.unsqueeze(2)
         tri = torch.ones(C, C, dtype=torch.bool, device=dev).tril()
@@ -2194,14 +2194,13 @@ class SimTactics:
 
     # ------------------------------------------------------- the raid's tree
 
-    def _op_member_key(self, mem: torch.Tensor, goal: torch.Tensor, pre: str) -> tuple[torch.Tensor, torch.Tensor]:
+    def _op_member_key(self, mem: torch.Tensor, goal: torch.Tensor, pre: str, rank: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """an operation's members `mem` [B, P] of pool `pre`: their distance to
         `goal` [B] and their order key (`nearestFirst`: the distance, then the
-        pool slot)"""
+        team's member order `rank` [B, P])"""
         tile = getattr(self, f"{pre}_unit_tile")
-        slotno = self.barb_unit_slotno if pre == "barb" else self.major_unit_pslot
         d = self.pair_dist[tile.clamp(min=0), goal.clamp(min=0).unsqueeze(1)].to(torch.long)
-        key = d * (1 << 20) + slotno.clamp(min=0)
+        key = d * (1 << 20) + rank.clamp(min=0)
         return d, key
 
     def _op_reach_at(self, rows: torch.Tensor, us: torch.Tensor, goal: torch.Tensor, turns: int, moves: bool,
@@ -2234,13 +2233,13 @@ class SimTactics:
         """`reachAt` for a barbarian (`_op_reach_at`)"""
         return self._op_reach_at(rows, us, goal, turns, moves, rng, rowof, res)
 
-    def _op_move_update(self, on: torch.Tensor, mem: torch.Tensor, dead: torch.Tensor, store: torch.Tensor,
+    def _op_move_update(self, on: torch.Tensor, mem: torch.Tensor, rank: torch.Tensor, store: torch.Tensor,
                         store_goal: torch.Tensor, goal: torch.Tensor, target: bool, rng: int, spread: int,
                         rowof: torch.Tensor, res: dict, pre: str = "barb",
                         seat: int = BARB_SEAT) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """`passMoveUpdate` for an operation's team in the games `on`: its
-        living members `mem` [B, P] of pool `pre`, `dead` [B] its members
-        killed, the node's store `store` [B, P] and the goal it holds it for
+        living members `mem` [B, P] of pool `pre`, `rank` [B, P] its member order
+        (a member killed is none of them), the node's store `store` [B, P] and the goal it holds it for
         `store_goal` [B] (written in place where the store is kept): its status
         (1 SUCCESS, 2 RUNNING), whether the team arrived, and the games whose
         store the update kept (`rest`)."""
@@ -2248,11 +2247,11 @@ class SimTactics:
         dev = self.device
         bidx = torch.arange(B, device=dev)
         big = 1 << 40
-        d, key = self._op_member_key(mem, goal, pre)
+        d, key = self._op_member_key(mem, goal, pre, rank)
         kept = store_goal == goal
         L = store & kept.unsqueeze(1) & mem
         others = mem & ~L
-        has_oth = others.any(dim=1) | (dead > 0)
+        has_oth = others.any(dim=1)
         okey = torch.where(others, key, torch.full_like(key, big))
         hk, hs = okey.min(dim=1)
         has_head = hk < big
@@ -2289,7 +2288,7 @@ class SimTactics:
         tile = getattr(self, f"{pre}_unit_tile")
         P = mem.shape[1]
         if spread != 0:
-            n_oth = others.sum(dim=1) + dead
+            n_oth = others.sum(dim=1)
             okey = torch.where(others, key, torch.full_like(key, big))
             order = okey.argsort(dim=1, stable=True)
             nv = others.sum(dim=1)
@@ -2324,8 +2323,8 @@ class SimTactics:
         status = torch.where(win | arrived, 1, 2)
         return status, win | arrived, rest
 
-    def _op_move_exec(self, on: torch.Tensor, mem: torch.Tensor, goal: torch.Tensor, rng: int, arrived: torch.Tensor,
-                      ready: torch.Tensor, done: torch.Tensor, rowof: torch.Tensor, res: dict, pre: str = "barb",
+    def _op_move_exec(self, on: torch.Tensor, mem: torch.Tensor, rank: torch.Tensor, goal: torch.Tensor, rng: int,
+                      arrived: torch.Tensor, ready: torch.Tensor, done: torch.Tensor, rowof: torch.Tensor, res: dict, pre: str = "barb",
                       seat: int = BARB_SEAT, zero: torch.Tensor | None = None,
                       leader: bool = False) -> list:
         """`passMoveExec` for an operation's team in the games `on`: nothing
@@ -2347,7 +2346,7 @@ class SimTactics:
         dev = self.device
         bidx = torch.arange(B, device=dev)
         big = 1 << 40
-        d, key = self._op_member_key(mem, goal, pre)
+        d, key = self._op_member_key(mem, goal, pre, rank)
         alive_p = getattr(self, f"{pre}_unit_alive")
         mp_p = getattr(self, f"{pre}_unit_mp")
         tile_p = getattr(self, f"{pre}_unit_tile")

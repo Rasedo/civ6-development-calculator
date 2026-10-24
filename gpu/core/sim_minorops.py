@@ -496,6 +496,15 @@ class SimMinorOps:
         out.scatter_(1, torch.where(m >= 0, m, P), True)
         return out[:, :P]
 
+    def _mops_member_rank(self, s: int, k: int, ti: int) -> torch.Tensor:
+        """[B, P] each listed member's place in the team's list, -1 none"""
+        P = self.major_unit_alive.shape[1]
+        m = self.mops_mem[:, s, k, ti]
+        out = torch.full((self.B, P + 1), -1, dtype=torch.long, device=self.device)
+        pos = torch.arange(m.shape[1], device=self.device).unsqueeze(0).expand_as(m)
+        out.scatter_(1, torch.where(m >= 0, m, P), pos)
+        return out[:, :P]
+
     def _mops_held(self, s: int) -> torch.Tensor:
         """[B, P] the units any of minor `s`'s operations' teams list"""
         P = self.major_unit_alive.shape[1]
@@ -1868,12 +1877,11 @@ def _u_move(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
         nog = on & (goal < 0)
         fail |= nog
         on &= ~nog
-        listed = sim._mops_member_mask(s, k, ti)
-        mem = listed & u["own"]
-        dead = listed.sum(dim=1) - mem.sum(dim=1)
+        mem = sim._mops_member_mask(s, k, ti) & u["own"]
         store = sim.mops_mvs[:, s, k, j, ti].clone()
         sg = sim.mops_mvg[:, s, k, j, ti].clone()
-        st, arr, rest = sim._op_move_update(on, mem, dead, store, sg, goal, slot == 1, rng, spread, op["rowof"], op["res"],
+        st, arr, rest = sim._op_move_update(on, mem, sim._mops_member_rank(s, k, ti), store, sg, goal, slot == 1, rng, spread,
+                                            op["rowof"], op["res"],
                                             "major", 100 + s)
         rr = rest.nonzero(as_tuple=True)[0]
         if rr.numel():
@@ -1910,7 +1918,7 @@ def _x_move(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         u = sim._mops_units(s)
         mem = sim._mops_member_mask(s, k, ti) & u["own"]
         arrived = (bits & (1 << ti)) != 0
-        sim._op_move_exec(g, mem, goal, rng, arrived, ready, c.view["done"], op["rowof"], op["res"], "major", 100 + s)
+        sim._op_move_exec(g, mem, sim._mops_member_rank(s, k, ti), goal, rng, arrived, ready, c.view["done"], op["rowof"], op["res"], "major", 100 + s)
 
 
 def _u_operation_attack(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:

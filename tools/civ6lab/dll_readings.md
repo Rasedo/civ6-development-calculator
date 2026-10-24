@@ -5247,7 +5247,7 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   job — unit +0x7d0, the pass's, an operation's — with Movement left
   +0xdb0: a unit raised this turn, in no job, blocks; runs/h1_duelw1124 t11,
   the camp at 40:21's new Slinger on 41:22 keeps the Warrior at 41:21 off
-  its spot there); claims in unit, target, spot order. ONE pass of the Generalized
+  its spot there); claims in target, unit, spot order (the outer loop 0x776244..0x7766f3 walks the targets, 0x28 each, the inner the units). ONE pass of the Generalized
   Assignment (0x8b5bf0): the gain λ 0x7702b0 (dealt / turns, a kill +100,
   an overkill (health - damage) + 100, a barbarian target x 0.8, less what
   the unit holds assigned; early out where the unit already claims the
@@ -5719,16 +5719,22 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   the candidate's rallies; the barbarians' rally a running operation's
   fixed one, and a capture's tree moves on the target (Move To 1), so no
   barbarian move reads a staging plot.
-- RECORDED (the engines): a member killed stays a member off the map, a
-  stray of the way home — runs/h1_duelw1128's raid, three at its start, its
-  Crossbowman alone on its rally 15:15 t90-t142 (the way home's Move: the
-  rally, range 1, unit distance 4) never arrives, two strays of three. The
-  update's member walk (0x81a909) leaves a unit it cannot find (or one with
-  +0x1939 set) out of the members it sorts; the count the stray test sets
-  them against is unread. LAB: the execution's gathering test is the
-  update's arrival (the team's readiness +0x11, 0x73fba0's strength
-  advantage, unread); the team's +0x48 units are none; ties go by the pool
-  slot.
+- A MEMBER KILLED (READ): the update's member walk over the team's list
+  (0x81a8f5..0x81a925, 0x4f2310 on each id) skips a unit it cannot find, or
+  one with +0x1939 set, before anything counts it: it is neither listed nor
+  sorted, and the stray test (0x81c042..0x81c07b) clears the arrival where
+  twice the strays reach the count of the members the walk sorted
+  (strays: those past the run of 0x814930 / 0x814840). The sort 0x814d10 is
+  an insertion sort on the distance to the goal alone, strictly nearer
+  first, so equals keep the team's member order (the order they joined,
+  0x737e80), not the pool slot. The engines: `passMoveUpdate` /
+  `_op_move_update` (the member order: the TS team's list, the GPU's
+  `barb_unit_join`, a capture's captive then captor, a city-state's
+  `mops_mem` place). runs/h1_duelw1128's raid (its Crossbowman alone on its
+  rally 15:15 t90-t142, two of three killed) is no stray case then: it is
+  a team of one. LAB: the execution's gathering test is the update's
+  arrival (the team's readiness +0x11, 0x73fba0's strength advantage,
+  unread); the team's +0x48 units are none.
 - THE TURN LIMITER over a child the walk has not reached yet (FRESH) has
   not finished it: the limiter RUNS (the raid's Concurrent 15 under it
   ticks the turn it is reached).

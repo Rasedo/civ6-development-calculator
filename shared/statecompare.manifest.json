@@ -4640,10 +4640,6 @@
         "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
       },
       {
-        "plane": "bcap_dead",
-        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
-      },
-      {
         "plane": "barb_capq",
         "why": "the turn's captures awaiting their operations (TS `GameState.barbCaptures`), empty at every turn boundary."
       }

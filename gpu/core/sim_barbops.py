@@ -267,18 +267,16 @@ class SimBarbOps:
             self.bcap_estr[r, ci] = 0
             self.bcap_store[r, ci] = False
             self.bcap_store_goal[r, ci] = -1
-            self.bcap_dead[r, ci] = 0
         self.barb_capq.fill_(-1)
 
     def _bcap_bury(self) -> None:
-        """a capture's member killed is counted to it and its slot let go"""
+        """a capture's member killed lets its slot go"""
         bidx = self._bidx
         for c in range(self.bcap_id.shape[1]):
             on = self.bcap_id[:, c] >= 0
             for pl in (self.bcap_civ, self.bcap_esc):
                 sl = pl[:, c]
                 gone = on & (sl >= 0) & ~self.barb_unit_alive[bidx, sl.clamp(min=0)]
-                self.bcap_dead[:, c] += gone.long()
                 pl[:, c] = torch.where(gone, torch.full_like(sl, -1), sl)
 
     def _bcap_refresh(self, st: torch.Tensor, combat_ai: torch.Tensor) -> None:
@@ -453,15 +451,26 @@ class SimBarbOps:
         zero[bidx[formed & esc_ok], esc_[formed & esc_ok]] = True
         ex6 = mv_on & ~no_goal & ((c6 == 1) | (c6 == 2))
         if bool(ex6.any()):
-            self._op_move_exec(ex6, mem, goal, rg6, ar6, self.bcap_ready[:, c], done, rowof, res, zero=zero)
+            self._op_move_exec(ex6, mem, self._bcap_rank(c), goal, rg6, ar6, self.bcap_ready[:, c], done, rowof, res, zero=zero)
         self.bcap_form[:, c] &= ~seq7
         ex8 = on8 & ~no_goal & ((c8 == 1) | (c8 == 2))
         if bool(ex8.any()):
-            self._op_move_exec(ex8, mem, goal, rg8, ar8, self.bcap_ready[:, c], done, rowof, res)
+            self._op_move_exec(ex8, mem, self._bcap_rank(c), goal, rg8, ar8, self.bcap_ready[:, c], done, rowof, res)
         end = root_ok | root_fail
         self.bcap_id[:, c] = torch.where(end, torch.full_like(self.bcap_id[:, c], -1), self.bcap_id[:, c])
         self.bcap_civ[:, c] = torch.where(end, torch.full_like(cs, -1), self.bcap_civ[:, c])
         self.bcap_esc[:, c] = torch.where(end, torch.full_like(es, -1), self.bcap_esc[:, c])
+
+    def _bcap_rank(self, c: int) -> torch.Tensor:
+        """[B, P] capture `c`'s team's member order: the captive, then its
+        captor"""
+        rank = torch.full_like(self.barb_unit_join, -1)
+        bidx = self._bidx
+        for i, pl in enumerate((self.bcap_civ, self.bcap_esc)):
+            sl = pl[:, c]
+            m = sl >= 0
+            rank[bidx[m], sl[m]] = i
+        return rank
 
     def _bcap_move_update(self, on: torch.Tensor, c: int, node: int, mem: torch.Tensor, goal: torch.Tensor, rng: int,
                           spread: int, ctx: dict) -> tuple[torch.Tensor, torch.Tensor]:
@@ -470,7 +479,7 @@ class SimBarbOps:
         team arrived"""
         store = self.bcap_store[:, c, node].clone()
         sg = self.bcap_store_goal[:, c, node].clone()
-        status, arrived, rest = self._op_move_update(on, mem, self.bcap_dead[:, c], store, sg, goal, True, rng, spread,
+        status, arrived, rest = self._op_move_update(on, mem, self._bcap_rank(c), store, sg, goal, True, rng, spread,
                                                      ctx["rowof"], ctx["res"])
         st = rest.nonzero(as_tuple=True)[0]
         if st.numel():
@@ -900,7 +909,7 @@ class SimBarbOps:
         mem = self._bop_members(k)
         store = self.tribe_store[:, k, node].clone()
         sg = self.tribe_store_goal[:, k, node].clone()
-        status, arrived, rest = self._op_move_update(on, mem, self.tribe_op_dead[:, k], store, sg, goal, target, rng, spread,
+        status, arrived, rest = self._op_move_update(on, mem, self.barb_unit_join, store, sg, goal, target, rng, spread,
                                                      ctx["rowof"], ctx["res"])
         st = rest.nonzero(as_tuple=True)[0]
         if st.numel():
@@ -914,7 +923,7 @@ class SimBarbOps:
         the games `on`: nothing where its team is ready and arrived"""
         if not bool(on.any()):
             return
-        self._op_move_exec(on, self._bop_members(k), goal, rng, arrived, ready, ctx["done"], ctx["rowof"], ctx["res"])
+        self._op_move_exec(on, self._bop_members(k), self.barb_unit_join, goal, rng, arrived, ready, ctx["done"], ctx["rowof"], ctx["res"])
 
     def _bop_recruit(self, act: torch.Tensor, k: int, raiding: bool) -> torch.Tensor:
         """BARBARIAN RECRUIT (0x7c7580) for tribe `k`'s operation in the games

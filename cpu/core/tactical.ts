@@ -1489,7 +1489,7 @@ export interface Assigned { unit: Unit; move: number; attack: number; from: numb
  *  - each target's health (1.1 x its whole, less its damage): a unit's, a
  *    district's (a City Center's hit points; its blow the predicted one,
  *    `predictCityBlow`, the blow back unread and none);
- *  - each unit with Movement left: per target its planning's spots (in
+ *  - per target, each unit with Movement left: its planning's spots (in
  *    order), save — but against a HIGH target — one where the damage it
  *    takes in the blow and the blow back passes the damage it deals in both,
  *    or would kill it; a DEFENDER's only on its own plot, a unit that has
@@ -1523,13 +1523,15 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
       damage: 0, units: [], barb: isBarbSeat(t.seat) });
   }
   const spots: AssignSpot[] = [];
-  units.forEach((u, i) => {
-    if (u.movesLeft <= 0) return;
-    const p = pass.plan.get(u.id);
-    if (!p) return;
-    const moved = u.movesLeft < (u.movesFull ?? unitFullMoves(state, u));
-    const job = jobOf(state, pass, u);
-    tg.forEach((T, k) => {
+  // the claims in target, unit, spot order (0x776140's outer loop walks the
+  // targets)
+  tg.forEach((T, k) => {
+    units.forEach((u, i) => {
+      if (u.movesLeft <= 0) return;
+      const p = pass.plan.get(u.id);
+      if (!p) return;
+      const moved = u.movesLeft < (u.movesFull ?? unitFullMoves(state, u));
+      const job = jobOf(state, pass, u);
       const E = p.entries.find((e) => e.target === T.target);
       if (!E) return;
       const dealt = T.unit ? E.dealt : predictCityBlow(state, u, T.target.tile);
@@ -2402,9 +2404,9 @@ function memberAtOf(state: GameState, seat: number, id: number): Unit | null {
   return state.units.find((u) => u.id === id && u.seat === seat) ?? null;
 }
 
-/** nearest the goal first, then by pool slot; a member killed last */
-const nearestFirst = (a: { u: Unit | null; d: number }, b: { u: Unit | null; d: number }): number =>
-  a.d - b.d || (a.u?.slot ?? Infinity) - (b.u?.slot ?? Infinity) || 0;
+/** nearest the goal first, equals in the team's member order (the stable
+ *  insertion sort 0x814d10 on the distance alone) */
+const nearestFirst = (a: { d: number }, b: { d: number }): number => a.d - b.d;
 
 /** every plot the unit's path finder closes (`pathTo`'s search with no
  *  end): the plots it has a path to */
@@ -2443,12 +2445,14 @@ export interface MoveStore { list: number[]; goal: number }
  * OPERATION MOVE'S UPDATE (0x81a130) for a team of the pass's player — its
  * members, the node's store — the status (SUCCESS, RUNNING), the team
  * arrived, the store kept: its members not stored at the node (the node's
- * list, kept while its goal holds, of the team's living members) nearest the goal first (a member killed
- * last); the nearest within the range — or its planning reaching a plot at
+ * list, kept while its goal holds, of the team's living members), a member
+ * killed none of them, nearest the goal first and equals in member order;
+ * the nearest within the range — or its planning reaching a plot at
  * the range this turn with Movement left — has the team arrived, a stored
  * member within the range too. A goal of the target: arrived is SUCCESS.
  * Else the members within the unit distance of the goal, and of those in
- * turn, are the team; more than half outside it and it has not arrived. The
+ * turn, are the team; half of the others or more outside it and it has not
+ * arrived (0x81c068: twice the strays at least the count). The
  * list keeps the stored members out of the unit distance of the others.
  */
 export function passMoveUpdate(state: GameState, pass: Pass, members: readonly number[], store: MoveStore | undefined, goal: number,
@@ -2456,8 +2460,9 @@ export function passMoveUpdate(state: GameState, pass: Pass, members: readonly n
   const memberAt = (id: number) => memberAtOf(state, pass.seat, id);
   const kept = store?.goal === goal ? store.list : [];
   let list = kept.filter((id) => members.includes(id) && memberAt(id));
+  // the members the walk finds (0x81a909: a member killed is none of them)
   const others: { id: number; u: Unit | null; d: number }[] = members
-    .filter((id) => !list.includes(id))
+    .filter((id) => !list.includes(id) && memberAt(id))
     .map((id) => {
       const u = memberAt(id);
       return { id, u, d: goalDistance(state, u, goal) };
