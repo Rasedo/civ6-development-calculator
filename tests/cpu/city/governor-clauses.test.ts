@@ -285,10 +285,11 @@ describe('Patron Saint', () => {
     // the bank re-armed it: a second promotion is ready NOW
     expect(u.promoBonus).toBe(0);
     expect(u.xp).toBe(xpToNextLevel(u));
+    const armed = u.xp;
     expect(promoReady(u)).toBe(true);
     expect(takePromotion(u, cols[1])).toBe(true);
-    // ...and the bank is empty, so the third stays out of reach
-    expect(u.xp).toBe(0);
+    // ...and the bank is empty: the experience is kept, short of level 4
+    expect(u.xp).toBe(armed);
     expect(promoReady(u)).toBe(false);
     expect(u.level).toBe(3);
   });

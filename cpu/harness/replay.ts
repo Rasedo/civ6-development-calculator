@@ -2524,9 +2524,9 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         }
         if (k >= 0 && takePromotion(u, k)) { count(ctx, 'promote', 'applied', d.player); break; }
         if (k >= 0) {
+          // the experience is kept through the promotion, as the engine's
           u.promos = (u.promos ?? 0) | (1 << k);
           u.level = (u.level ?? 1) + 1;
-          u.xp = 0;
           u.hp = Math.min(UNIT_HP, u.hp + PROMOTE_HEAL);
         }
         count(ctx, 'promote', 'fallback', d.player, k < 0 ? `no ${name} in the unit's class` : 'the engine offered no such pick');

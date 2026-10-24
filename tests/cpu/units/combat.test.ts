@@ -525,11 +525,11 @@ describe('XP & levels', () => {
   it('the ladder: 15 x the level it is on, 7 promotions to level 8', () => {
     expect(XP_PER_LEVEL).toBe(15);
     expect(MAX_LEVEL).toBe(8);
+    // the experience is cumulative: the next level needs 15 x L(L+1)/2
     const owed = [1, 2, 3, 4, 5, 6, 7, 8].map((level) => xpToNextLevel({ level }));
-    expect(owed).toEqual([15, 30, 45, 60, 75, 90, 105, 0]);
-    // the page's own cumulative table, which is what those rungs sum to
-    let total = 0;
-    expect(owed.slice(0, 7).map((n) => (total += n))).toEqual([15, 45, 90, 150, 225, 315, 420]);
+    expect(owed).toEqual([15, 45, 90, 150, 225, 315, 420, 0]);
+    // each rung adds 15 x the level the unit stands on
+    expect(owed.slice(0, 7).map((n, i) => n - (i > 0 ? owed[i - 1] : 0))).toEqual([15, 30, 45, 60, 75, 90, 105]);
     expect(unitLevel({})).toBe(1); // a brand new unit starts at level 1
   });
 
@@ -692,9 +692,10 @@ describe('XP & levels', () => {
     expect(u.hp).toBe(40 + PROMOTE_HEAL);
     expect(u.movesLeft).toBe(0);
     expect(unitLevel(u)).toBe(2);
-    expect(u.xp).toBe(0);
+    expect(u.xp).toBe(XP_PER_LEVEL); // the experience is kept
     expect(u.promos).toBe(1);
-    expect(takePromotion(u, 0)).toBe(false); // held already, and no XP either
+    expect(promoReady(u)).toBe(false); // level 3 needs 45
+    expect(takePromotion(u, 0)).toBe(false); // held already, and short of the next rung
   });
 
   it('promoAvailable: a tier-2 row waits for one of its prerequisites', () => {
