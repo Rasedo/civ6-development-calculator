@@ -930,6 +930,19 @@
   context:
     - "...re, then the cost), a row not researchable (0x3932d0) adds its unowned prerequisites (0x29a250, the install's order: the walk's next step, the last added that is not the civic in han..."
   review: imported
+- addr: 0x29fdf0
+  final: 0x5102c0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1103
+      turn: 46
+      value: "Recorded: runs/h1_duelw1103 Hattusa t46 and   runs/h1_duelw1105 Bandar Brunei t16 \"Canceling current build\" with their   centres whole (CombatLog.csv: no blow on either city since t23 / ever)   and no"
+  readings:
+    - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
+  context:
+    - "...NEMY AT THE GATES (READ): the value of a watched bool at CityBuildAI +0x1c0 (its setter 0x29fdf0 writes +0x1c0 + 0x58). Its one writer is the threat 0x5cbd10 itself: cleared as the wal..."
+  review: imported
 - addr: 0x2a81f0
   final: 0x1d0c10
   kind: function
@@ -1405,6 +1418,33 @@
   context:
     - "...ack on a city (0x206080, melee) draws three times: 0x519370 the attacker's damage, then 0x519440 the district's hit points (hash 0x5e97d629) and 0x519440 its outer defense (0x6da56a3d)..."
     - "- The district's hit (0x519440 builds the law's struct: +0 / +4 the two strengths, +8 the district's maximum hit point..."
+  review: imported
+- addr: 0x523520
+  final: 0x36dca0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 7
+      value: "runs/h1_duelw1124 t7-t52:   city-state 4's city at 32:8 — the barbarian Scouts beside it list 31:7   and 33:8 at 2/2 past it;"
+  impl: [cpu/core/tactical.ts:Ground]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...a node whose +0x51 bit 0x40 is set — 0x5861f0's out-flag on a seen plot, 0x585fc0 -> 0x523520: a unit at war that fights stands there (0x5237e0 the religious units' twin). An attack..."
+  review: imported
+- addr: 0x5237e0
+  final: 0x36df60
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 7
+      value: "runs/h1_duelw1124 t7-t52:   city-state 4's city at 32:8 — the barbarian Scouts beside it list 31:7   and 33:8 at 2/2 past it;"
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...out-flag on a seen plot, 0x585fc0 -> 0x523520: a unit at war that fights stands there (0x5237e0 the religious units' twin). An attack on a city centre or an Encampment with no such..."
   review: imported
 - addr: 0x523d60
   final: 0x36e340
@@ -1927,6 +1967,7 @@
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
+    - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
   context:
     - "...0 runs each city's listener 0x5d6050 in city order: a city that may take it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where..."
   review: reviewed
@@ -2782,6 +2823,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
   review: reviewed
 - addr: 0x723db0
   kind: function
@@ -3607,7 +3649,7 @@
   final: 0x5534a0
   kind: function
   status: PARTLY
-  impl: [cpu/core/behaviorTree.ts:i]
+  impl: [cpu/core/behaviorTree.ts:i, cpu/core/behaviorTree.ts:h]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...ING keeps the resume), Concurrent 0x7eb0f0 (Max Failures, Exit on Success; its update 0x7eb210 clears failures and the last good child), Not 0x7f15f0, pass-through 0x7f15a0, Turn Lim...
@@ -3831,6 +3873,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-99: the district and improvement events on one plot — the eruption's turns (a LAB, both twins)"
   context:
     - "...is empty, then TryPurchaseUnits 0x68be60 over the city's units; the tree manager's tick 0x7ffdd0; tactical). A city founded during the turn exists for C only: the Default Specializatio..."
     - "- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a loop destroys a tree whose +0x368 is set or who..."

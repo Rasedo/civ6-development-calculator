@@ -1026,6 +1026,7 @@ CITY_STATE = {
     "minorCitizens": lambda sim, b, rows: [[int(sim.citystate_fav_food[b, s]), int(sim.city_idle[b, sim._CITY_MINOR0 + s, 0])]
                                            + [int(x) for x in sim.city_spec_pin[b, sim._CITY_MINOR0 + s, 0].clamp(min=0).tolist()] for s in rows],
     "minorThreat": lambda sim, b, rows: [int(sim.citystate_threat[b, s]) for s in rows],
+    "minorThreatNear": lambda sim, b, rows: [int(bool(sim.citystate_threat_near[b, s])) for s in rows],
     "minorAiGrowth": lambda sim, b, rows: [[int(x) for x in sim.citystate_ai_growth[b, s].tolist()] for s in rows],
     "minorCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, s]) for s in rows],
     "minorStandingArmyShort": lambda sim, b, rows: [int(sim.citystate_standing_short[b, s]) for s in rows],
@@ -1284,6 +1285,7 @@ CITY = {
     "foundedTurn": _cty("city_founded_turn"),
     "freeGrantTurns": _cty("city_free_grant"),
     "freeCityThreat": _cty("city_ai_threat"),
+    "freeCityThreatNear": lambda sim, b, rows: [int(bool(sim.city_ai_near[b, c, s])) for c, s in rows],
     "freeCityRaid": _cty("city_free_raid"),
     "freeAllowed": lambda sim, b, rows: [[i for i, on in enumerate(sim.city_free_allowed[b, c, s].tolist()) if on]
                                          for c, s in rows],

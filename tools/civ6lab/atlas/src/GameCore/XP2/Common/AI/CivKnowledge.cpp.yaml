@@ -67,12 +67,16 @@
     - gpu/core/sim_minorops.py:_ops_enemy_str
     - cpu/core/operations/knowledge.ts:ARMY_READ_AGE
     - gpu/core/sim_minorops.py:_ARMY_READ_AGE
+    - cpu/core/operations/cityThreat.ts:NEAR_RANGE
+    - cpu/core/operations/cityThreat.ts:cityThreat
+    - gpu/core/sim_minorai.py:_known_threat
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
+    - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb5/NOTES.md: ...urn's KB update -> t-1); +0.5*count term absent at minors. NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..),..."

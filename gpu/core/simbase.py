@@ -1237,6 +1237,7 @@ _MUTABLE = [
     "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand
     "city_free_grant",  # a Free City's count of turns toward its next grant
     "city_ai_threat",  # a Free City's threat at its city AI's last update
+    "city_ai_near", "citystate_threat_near",  # a Free City's, a minor's city's enemy at the gates
     "city_free_raid",  # a Free City's raid record
     "city_free_allowed",  # a Free City's allowed units
     "city_proj_conv", "city_proj_yield",  # a district project's converted yield, read until the next step

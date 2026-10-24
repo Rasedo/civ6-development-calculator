@@ -245,7 +245,9 @@ for (let i = 0; i + 1 < recs.length; i++) {
     // the military AI's turn: its strengths and Combat Desire against
     // AI_Military.csv's (the records as its last update aged them)
     // its last city update's threat and standing army, on the record as it stands
-    cs.threat = minorThreat(state, cs);
+    const t = minorThreat(state, cs);
+    cs.threat = t.level;
+    cs.threatNear = t.near;
     cs.standingArmyShort = minorStandingArmy(state, cs);
     const ourDesire = minorCombatDesire(state, cs, turn - 1);
     const wantS = strengths.get(`${turn}:${player}`);

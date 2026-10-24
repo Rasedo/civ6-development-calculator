@@ -2119,11 +2119,13 @@ class _FreeFacts(_MinorFacts):
         return self.growth()
 
     # the defensive pick where the city is under threat (0x5cdc50): its
-    # threat above -1 with its centre's hit points damaged
+    # threat above -1 with its centre's hit points damaged or the enemy at
+    # its gates (CityBuildAI +0x218)
     def defense(self):
         sim = self.sim
         hp = sim.city_hp[:, self.row, self.j].long()
-        return (sim.city_ai_threat[:, self.row, self.j] > -1) & (hp < int(sim.rules.combat["cityMaxHp"]))
+        return (sim.city_ai_threat[:, self.row, self.j] > -1) & (
+            (hp < int(sim.rules.combat["cityMaxHp"])) | sim.city_ai_near[:, self.row, self.j])
 
     # the Free Cities' military AI writes their Combat Desire over
     # PSEUDOYIELD_UNIT_COMBAT, their explorers' and naval scouts' desire less

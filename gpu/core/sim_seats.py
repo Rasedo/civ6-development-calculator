@@ -11089,6 +11089,7 @@ class SimSeats:
         self.city_proj_yield[b, row, col] = -1
         self.city_free_grant[b, row, col] = 0
         self.city_ai_threat[b, row, col] = -1
+        self.city_ai_near[b, row, col] = False
         self.city_free_raid[b, row, col] = -1
         self.city_free_allowed[b, row, col] = False
         self.city_lasers[b, row, col] = 0
@@ -11562,6 +11563,7 @@ class SimSeats:
         self.city_free_press[b, dst_row, col, :] = 0
         self.city_free_grant[b, dst_row, col] = 0
         self.city_ai_threat[b, dst_row, col] = -1
+        self.city_ai_near[b, dst_row, col] = False
         self.city_free_raid[b, dst_row, col] = -1
         self.city_free_allowed[b, dst_row, col] = False
         # ...and the turn its new owner took it

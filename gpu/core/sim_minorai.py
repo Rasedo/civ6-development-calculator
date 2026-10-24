@@ -55,6 +55,9 @@ _RANGE_CIV, _RANGE_OTHER = 5, 3
 # the distance of the holder's operation's target within which an undamaged
 # city's threat passes over the operation's enemy (`OWN_OPERATION_RANGE`)
 _OWN_OPERATION_RANGE = 5
+# the enemy at the gates (CityBuildAI +0x218): more than 2 of a player's
+# records within 2, each of a strength of 5 or more
+_NEAR_RANGE, _NEAR_LEAST, _NEAR_ABOVE = 2, 5, 2
 _MARGIN_HOSTILE, _MARGIN_OTHER = 5 * _FX, 20 * _FX
 _YIELDS = ["YIELD_FOOD", "YIELD_PRODUCTION", "YIELD_GOLD", "YIELD_SCIENCE", "YIELD_CULTURE", "YIELD_FAITH"]
 
@@ -129,8 +132,10 @@ class SimMinorAi:
         if bool(counted.count_nonzero()):
             self.citystate_res_counts[:, s] = torch.where(counted.unsqueeze(1), self._minor_res_counts(s),
                                                           self.citystate_res_counts[:, s])
-        threat = torch.where(alive, self._minor_threat(s), torch.full_like(self.citystate_threat[:, s], -1))
+        lvl, near = self._minor_threat(s)
+        threat = torch.where(alive, lvl, torch.full_like(self.citystate_threat[:, s], -1))
         self.citystate_threat[:, s] = torch.where(alive, threat, self.citystate_threat[:, s])
+        self.citystate_threat_near[:, s] = torch.where(alive, near, self.citystate_threat_near[:, s])
         self.citystate_standing_short[:, s] = torch.where(alive, self._minor_standing_army(s, alive),
                                                          self.citystate_standing_short[:, s])
         evals = self._minor_plot_evals(s, f, b_tab)
@@ -334,12 +339,13 @@ class SimMinorAi:
 
     def _minor_under_threat(self, s: int, threat: torch.Tensor) -> torch.Tensor:
         """[B] bool — `minorUnderThreat` (0x5cdc50): minor `s`'s threat above
-        -1 with its centre's hit points damaged (the war footing a
-        city-state's held clear, CityBuildAI +0x218 clear)"""
-        return (threat > -1) & (self.citystate_hp[:, s] < self._cs_max_hp)
+        -1 with its centre's hit points damaged or the enemy at its gates
+        (CityBuildAI +0x218, `citystate_threat_near`; the war footing a
+        city-state's held clear)"""
+        return (threat > -1) & ((self.citystate_hp[:, s] < self._cs_max_hp) | self.citystate_threat_near[:, s])
 
-    def _minor_threat(self, s: int) -> torch.Tensor:
-        """[B] long — `minorThreat` (0x5cbd10) on minor `s`'s knowledge base's
+    def _minor_threat(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """[B] long, [B] bool — `minorThreat` (0x5cbd10) on minor `s`'s knowledge base's
         records, with no operation of its own (`_known_threat`): the players
         of the game in its order but the minor — a full civ hostile where the
         minor fights it, the barbarians hostile, a city-state or the Free
@@ -357,8 +363,8 @@ class SimMinorAi:
                                   torch.zeros(B, dtype=torch.long, device=dev), level, seats,
                                   lambda p: self.war[:, row, int(self._seat_row[p])])
 
-    def _free_city_threat(self, j: int) -> torch.Tensor:
-        """[B] long — `freeCityThreat` (0x5cbd10) of the Free City in column
+    def _free_city_threat(self, j: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """[B] long, [B] bool — `freeCityThreat` (0x5cbd10) of the Free City in column
         `j` on the Free Cities' knowledge base (the row `FK`) and their
         running operations against a player (their raids, the row `FR`): the
         full civs are the players it fights, the city-states not; its level
@@ -389,7 +395,7 @@ class SimMinorAi:
                                   lambda p: full if p < self.n_majors else none, op_near, damaged)
 
     def _known_threat(self, r: int, centre: torch.Tensor, hrow: torch.Tensor, hcol: torch.Tensor, level: torch.Tensor,
-                      seats: list, war_of, op_near=None, damaged: torch.Tensor | None = None) -> torch.Tensor:
+                      seats: list, war_of, op_near=None, damaged: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """[B] long — 0x5cbd10 on the knowledge base row `r`'s records aged at
         most ARMY_READ_AGE (all where the row never aged), the city at
         `centre` held by (`hrow`, `hcol`): per player of `seats` in order —
@@ -404,7 +410,11 @@ class SimMinorAi:
         threatened at `level`, at most 1 not hostile; a player the holder runs
         an operation against near the city (`op_near(p)`, 0x723cf0) passed
         over while the city is whole (not `damaged`). The first such player
-        decides; -1 none."""
+        decides; -1 none. Each player read sets the enemy at the gates
+        (CityBuildAI +0x218, for good once set) where more than 2 of its
+        records of a strength of 5 or more stand within 2 of the city; a
+        player the holder fights then threatens it, the margin
+        unread. [B] the level, [B] bool the enemy at the gates."""
         B, dev = self.B, self.device
         T = self._cv_tables()
         rows = T["unit_rows"]
@@ -434,6 +444,12 @@ class SimMinorAi:
         counts = (bb > 0) | ((rng.take(a0) > 0) & (st.double() > dd - 15 * _FX)) | (st.double() > dd - 5 * _FX)
         strength = torch.where((arow >= 0) & counts & ~expl.take(a0), st, torch.zeros_like(st))
         dist = self.pair_dist[centre.clamp(min=0).unsqueeze(1), plot.clamp(min=0)].long()
+        # the enemy at the gates' records (0x5eadb0 at radius 2, least
+        # strength 5: its list's per-type counts)
+        tc = typ.clamp(min=0, max=self.NU - 1)
+        kc, kr = self._type_combat.take(tc), self._type_ranged_strength.take(tc)
+        gate = rec & (typ >= 0) & (torch.maximum(kc, kr) >= _NEAR_LEAST) & (dist <= _NEAR_RANGE)
+        near = torch.zeros(B, dtype=torch.bool, device=dev)
         out = torch.full((B,), -1, dtype=torch.long, device=dev)
         for p in seats:
             full = p < self.n_majors
@@ -449,13 +465,16 @@ class SimMinorAi:
             anyu = mine.any(dim=1)
             sums = mine & ~acav.take(a0) if barb else mine
             tot = torch.where(sums, strength, torch.zeros_like(strength)).sum(dim=1)
-            hit = (out < 0) & anyu & (tot.double() >= d + margin) & (centre >= 0)
+            read = (out < 0) & anyu & (centre >= 0)
             if op_near is not None:
-                hit = hit & ~(op_near(p) & ~damaged)
+                read = read & ~(op_near(p) & ~damaged)
             if not full and not barb:
-                hit = hit & war
+                read = read & war
+            at_gates = (gate & (owner == p)).sum(dim=1) > _NEAR_ABOVE
+            near = near | (read & at_gates)
+            hit = read & ((tot.double() >= d + margin) | (war & near))
             out = torch.where(hit, torch.where(hostile, level, level.clamp(max=1)), out)
-        return out
+        return out, near
 
     # -- the plot analysis ---------------------------------------------------
 
@@ -1375,9 +1394,10 @@ class SimMinorAi:
         # its city AI's update: the city's threat (`_free_city_threat`); under
         # threat the City Defense event's defensive cancel on the item queued;
         # on an empty queue the Default Specialization
-        threat = self._free_city_threat(j)
+        threat, near = self._free_city_threat(j)
         self.city_ai_threat[:, row, j] = torch.where(act, threat, self.city_ai_threat[:, row, j])
-        under = act & (threat > -1) & (self.city_hp[:, row, j] < int(self.rules.combat["cityMaxHp"]))
+        self.city_ai_near[:, row, j] = torch.where(act, near, self.city_ai_near[:, row, j])
+        under = act & (threat > -1) & ((self.city_hp[:, row, j] < int(self.rules.combat["cityMaxHp"])) | near)
         go = act & ((self.city_current[:, row, j, 0] < 0) | under)
         if not bool(go.count_nonzero()):
             return
@@ -1451,9 +1471,10 @@ class SimMinorAi:
     def _free_raid_start(self, m: torch.Tensor, j: int, player: torch.Tensor) -> None:
         """`freeRaidStart` (0x274ea0) for the Free City in column `j` where
         `m`, against `player` [B]: where the city never raided, "Free Cities
-        Raid" on the operations' row `FR` — the target the player's first
-        city's centre (none: no start), the rally the Free City's centre —
-        and its record the player and the operation's tree id"""
+        Raid" on the operations' row `FR` against no enemy — the target the
+        player's first city's centre (none: no start), the rally the Free
+        City's centre — and its record the player and the operation's tree
+        id"""
         row = self.FREE_ROW
         m = m & self.city_alive[:, row, j] & (self.city_free_raid[:, row, j, 0] < 0)
         if not bool(m.count_nonzero()):
@@ -1463,7 +1484,7 @@ class SimMinorAi:
         if not bool(m.count_nonzero()):
             return
         T = self._mops_tables()
-        tid = self._mops_start(self.FR, T.d_raid, target, self.city_center[:, row, j], m, enemy=player)
+        tid = self._mops_start(self.FR, T.d_raid, target, self.city_center[:, row, j], m)
         rec = self.city_free_raid[:, row, j]
         rec[:, 0] = torch.where(m, player, rec[:, 0])
         rec[:, 1] = torch.where(m, tid, rec[:, 1])

@@ -2748,6 +2748,17 @@
           "note": "the minor city's threat (CityBuildAI +0x1b8), -1 for none"
         },
         {
+          "name": "minorThreatNear",
+          "compare": "exact",
+          "covers": [
+            "CityState.threatNear"
+          ],
+          "planes": [
+            "citystate_threat_near"
+          ],
+          "note": "the enemy at the minor's city's gates (CityBuildAI +0x218, `cityThreat`) as its last update left it, 1 / 0"
+        },
+        {
           "name": "minorAiGrowth",
           "compare": "exact",
           "covers": [
@@ -3393,6 +3404,17 @@
             "city_ai_threat"
           ],
           "note": "a FREE CITY's threat (CityBuildAI +0x1b8, `freeCityThreat`) as its city AI's last update left it, -1 none; -1 for any other city."
+        },
+        {
+          "name": "freeCityThreatNear",
+          "compare": "exact",
+          "covers": [
+            "City.aiThreatNear"
+          ],
+          "planes": [
+            "city_ai_near"
+          ],
+          "note": "a FREE CITY's enemy at the gates (CityBuildAI +0x218, `cityThreat`) as its city AI's last update left it, 1 / 0; 0 for any other city"
         },
         {
           "name": "freeCityRaid",

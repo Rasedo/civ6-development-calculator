@@ -13,18 +13,20 @@
  *    (0x276ff0: the owner of the last unit on the plot, the pillager) — find
  *    the Free City's record (its centre's plot, 0x277470) and, where it never
  *    raided (+0x20 and +0x24 at -1: a Free City raids ONCE in its life),
- *    start "Free Cities Raid" against that player: the target the player's
- *    first city's plot, the rally the Free City's centre (0x7265b0, 0x73e7d0),
- *    the record the player and the operation's tree (+0x20, +0x24). A Free
+ *    start "Free Cities Raid" on that player: the target the player's first
+ *    city's plot, the rally the Free City's centre (0x7265b0, 0x73e7d0), no
+ *    enemy (op +0x2a0 unset: its Attack Units lists every player's units,
+ *    runs/h1_duelw1123 t205-t212), the record the player and the
+ *    operation's tree (+0x20, +0x24). A Free
  *    City's turn (0x274010) clears +0x24 once that tree is gone; +0x20 stays.
  *  - THE RUN: in the Free Cities' tactical pass, once each unit's planning is
  *    taken, the operations' trees tick (`operationsRun`) and their units'
  *    turns are theirs (`freeCitiesMilitary`). The Free Cities weigh no
  *    candidate (AI_Operation_Eval.csv holds no player 62 line while the Raid
  *    runs).
- *  - THE THREAT: a Free City's threat passes over the raided player while
- *    the raid's target lies within 5 of the undamaged city (`freeOpNear`,
- *    0x723cf0).
+ *  - THE THREAT: a Free City's threat passes over a player the Free Cities
+ *    run an operation against whose target lies within 5 of the undamaged
+ *    city (`freeOpNear`, 0x723cf0) — the raid names none.
  */
 import type { City, GameState, Unit } from './types';
 import { majorView } from './majorView';
@@ -142,10 +144,10 @@ function freeEnv(state: GameState, pass: Pass | null): OpsEnv {
 }
 
 /**
- * 0x274ea0, A FREE CITY STARTS ITS RAID against `player`, where the city never
+ * 0x274ea0, A FREE CITY STARTS ITS RAID on `player`, where the city never
  * raided: the target the player's first city's plot (none with no city: no
- * start), the rally the Free City's centre; the record the player and the
- * operation's id. Recorded: runs/h1_duelw1123 t205, Rome's Warrior pillaging
+ * start), the rally the Free City's centre, no enemy; the record the player
+ * and the operation's id. Recorded: runs/h1_duelw1123 t205, Rome's Warrior pillaging
  * Chen's improvement — "Free Cities Raid, Started", TARGET 11:13, Rome's
  * capital, its recruit's "Contract for: UNIT_ARCHER".
  */
@@ -153,7 +155,7 @@ export function freeRaidStart(state: GameState, city: City, player: number): voi
   if (city.freeRaid) return;
   const target = seatOf(state, player)?.cities[0]?.centerIndex ?? -1;
   if (target < 0) return;
-  const op = startOperationAt(opsOfFree(state), freeEnv(state, null), FREE_RAID_DEF, player, target, city.centerIndex);
+  const op = startOperationAt(opsOfFree(state), freeEnv(state, null), FREE_RAID_DEF, -1, target, city.centerIndex);
   city.freeRaid = { player, op: op.id };
 }
 

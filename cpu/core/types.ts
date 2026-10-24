@@ -149,6 +149,9 @@ export interface City {
    *  Cities' knowledge base) as its city AI's last update left it, -1 none;
    *  absent, none */
   aiThreat?: number;
+  /** A FREE CITY's enemy at the gates (CityBuildAI +0x218) as its city AI's
+   *  last update left it (`cityThreat`); absent, none */
+  aiThreatNear?: boolean;
   /** A FREE CITY's raid (its manager record +0x20 / +0x24, `freeRaidSignal`):
    *  the player it raids once in its life, and the id of the Free Cities
    *  Raid running for it, -1 once that operation is gone; absent, none */
@@ -1246,6 +1249,9 @@ export interface CityState extends Seat {
   resourceCounts?: Record<string, number>;
   economy?: EconomicMemory;
   threat?: number;
+  /** its city's enemy at the gates (CityBuildAI +0x218) as its last update
+   *  left it (`cityThreat`); absent, none */
+  threatNear?: boolean;
   /** its city's growth as its city AI's full update read it, between the
    *  turn's production and its growth (`minorPhase`): the growth forecast's
    *  inputs (CityBuildAI +0x6c8) */

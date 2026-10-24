@@ -612,6 +612,9 @@ export function holdMinorOrders(on: boolean): void {
   ordersHeld = on;
 }
 
+/** the replay holds the minors' and the Free Cities' unit orders */
+export const minorOrdersHeld = (): boolean => ordersHeld;
+
 /** A MINOR'S BUILDER LAYS AN IMPROVEMENT: it stands on the plot, spends a
  *  charge and its turn, and is gone with its last charge. */
 export function minorBuilderLays(state: GameState, u: Unit, plot: number, imp: string): void {
@@ -1566,14 +1569,14 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
  * (0x5f6050) and the defensive pick (0x5d4d70) read: the military AI's war
  * footing (+0x4b8, a city-state's held clear as its combat desire holds
  * it), or the city's threat (CityBuildAI +0x1b8) above -1 with its
- * centre's hit points damaged (GetDamage 0x5e97d629 above 0). CityBuildAI
- * +0x218, its other clause, has no writer read and stands clear. A threat
+ * centre's hit points damaged (GetDamage 0x5e97d629 above 0) or the enemy
+ * at its gates (CityBuildAI +0x218, the threat's, `cityThreat`). A threat
  * alone does not make the city one under threat (runs/h1_duelw1124 Granada
  * t42-t44: City Defense started at t42 with its centre whole, its Harbor
  * kept and complete at t45).
  */
 export function minorUnderThreat(cityState: CityState, threat: number): boolean {
-  return threat > -1 && (cityState.hp ?? CITY_STATE_MAX_HP) < CITY_STATE_MAX_HP;
+  return threat > -1 && ((cityState.hp ?? CITY_STATE_MAX_HP) < CITY_STATE_MAX_HP || !!cityState.threatNear);
 }
 
 /** The percent a minor's step pays toward the item on top of its Production:
@@ -1782,8 +1785,10 @@ export function freeCityBuild(state: GameState, city: City, production: number):
   // threat the City Defense event's defensive cancel on the item queued
   // (the Free Cities hold no contract: their one tree, Free Cities Assault,
   // names no Contract ID); on an empty queue the Default Specialization
-  city.aiThreat = freeCityThreat(state, city);
-  const under = (city.aiThreat ?? -1) > -1 && city.hp < CITY_MAX_HP;
+  const t = freeCityThreat(state, city);
+  city.aiThreat = t.level;
+  city.aiThreatNear = t.near;
+  const under = freeUnderThreat(city);
   if (city.queue.length && !under) return;
   const facts = freeCityBuildFacts(state, city);
   const tables: CityBuildTables = {
@@ -1799,10 +1804,15 @@ export function freeCityBuild(state: GameState, city: City, production: number):
   if (item) city.queue = [item];
 }
 
+/** a FREE CITY under threat (0x5cdc50): its threat above -1 with its centre
+ *  damaged or the enemy at its gates (CityBuildAI +0x218, `cityThreat`) */
+export const freeUnderThreat = (city: City): boolean =>
+  (city.aiThreat ?? -1) > -1 && (city.hp < CITY_MAX_HP || !!city.aiThreatNear);
+
 /** a Free City's defensive cancel (`defensiveCancel`) on its queue's head
  *  over an empty book (no contract in hand, none listed), the city's
  *  tables; a Free City holds no district item */
-function freeDefensiveCancel(city: City, tables: CityBuildTables, pf: PickFacts): boolean {
+function freeDefensiveCancel(city: City, tables: CityBuildTables, pf: PickFacts): number | null {
   const q = city.queue[0];
   const head = {
     unit: q?.kind === 'unit' ? installType('unit', q.unit, 'UNIT_') : null,
@@ -1919,6 +1929,6 @@ export function freeCityPickFacts(state: GameState, city: City, facts: CityBuild
     // the defensive pick where the city is under threat (0x5cdc50): its
     // threat above -1 with its centre's hit points damaged (the war footing
     // clear, +0x218 clear)
-    defense: (city.aiThreat ?? -1) > -1 && city.hp < CITY_MAX_HP,
+    defense: freeUnderThreat(city),
   };
 }

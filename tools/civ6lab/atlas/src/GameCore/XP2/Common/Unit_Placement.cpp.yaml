@@ -73,12 +73,27 @@
     - ...he city (0x1deb0), no unit at war with it (0x5862e0), none of its own stacking with it (0x585eb0); the weighted vector's weights (influence 0x716a60, the plot's owner +0x60, revealed...
     - "...path (0x586360), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the..."
   review: imported
+- addr: 0x585fc0
+  final: 0x3b0550
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 7
+      value: "runs/h1_duelw1124 t7-t52:   city-state 4's city at 32:8 — the barbarian Scouts beside it list 31:7   and 33:8 at 2/2 past it;"
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...step leaves a node whose +0x51 bit 0x40 is set — 0x5861f0's out-flag on a seen plot, 0x585fc0 -> 0x523520: a unit at war that fights stands there (0x5237e0 the religious units' twin..."
+  review: imported
 - addr: 0x5861f0
   final: 0x3b0770
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:safePlot]
-  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  impl: [cpu/core/tactical.ts:safePlot, cpu/core/tactical.ts:Ground]
+  readings:
+    - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...eb0) with a unit of its own stacking with it (itself counted), none with a unit at war (0x5861f0); against the best so far, the first taken — of no danger over one of danger; of two..."

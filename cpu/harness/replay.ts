@@ -57,7 +57,7 @@ import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GO
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
-import { freeCitiesMilitary } from '../core/freeOps';
+import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
 import { barbarianTactics, dangerPlane, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
 import { barbSlots, barbSlotsDying, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
@@ -1111,6 +1111,24 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
         const u = copy.units.find((x) => x.id === id);
         const key = u ? keyOf.get(twin.get(u)!) : undefined;
         if (u && key) ctx.operationsAi.minorEnd(b, op.def, player, turn, key, u.tileIndex, gameTypeOf('unit', u.type, 'UNIT_'));
+      }
+    }
+  }
+  // the Free Cities' operations the engine's again, their lines against the
+  // game's, their units' plots against record t+1
+  const free = copy.freeSeat;
+  if (free && state.freeSeat) {
+    if (free.ops) state.freeSeat.ops = free.ops;
+    if (free.cityAi) state.freeSeat.cityAi = free.cityAi;
+    const player = ctx.playerOfSeat.get(FREE_SEAT);
+    if (player !== undefined) {
+      ctx.operationsAi.minorTurn(turn, player, ctx.minorOps.get(FREE_SEAT)?.lines ?? [], []);
+      for (const op of free.ops ? opsOf(free.ops) : []) {
+        for (const id of opUnits(op)) {
+          const u = copy.units.find((x) => x.id === id && x.seat === FREE_SEAT);
+          const key = u ? keyOf.get(twin.get(u)!) : undefined;
+          if (u && key) ctx.operationsAi.minorEnd(b, op.def, player, turn, key, u.tileIndex, gameTypeOf('unit', u.type, 'UNIT_'));
+        }
       }
     }
   }
@@ -3668,9 +3686,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const greatPeopleAi = new GreatPeopleProbe(dumpPath, aiSeats, cat);
   diplomacy.attach(aiInputs, (seat) => strategies.knownCities(seat), sender);
   const missions = readMissions(dumpPath);
-  // the operations of every AI party with a manager: the AI majors and the
-  // city-states
+  // the operations of every AI party with a manager: the AI majors, the
+  // city-states and the Free Cities
   const opsSeats = new Map([...aiSeats, ...[...first.minorOfPlayer].map(([player, cs]) => [cs.seat, player] as [number, number])]);
+  const freePlayer = first.playerOfSeat.get(FREE_SEAT);
+  if (freePlayer !== undefined) opsSeats.set(FREE_SEAT, freePlayer);
   const operationsAi = new OperationsProbe(dumpPath, opsSeats, cat, first.seatOfPlayer, aiInputs);
   // the wars of the AI majors' diplomatic sending read their operations' AI
   if (operationsAi.active) sender.war = operationsAi.warHooks();
@@ -3694,6 +3714,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     let e = ctx.minorOps.get(seat);
     if (!e) ctx.minorOps.set(seat, (e = { lines: [], evals: [] }));
     (candidate ? e.evals : e.lines).push(line);
+  });
+  // ...and the Free Cities': their raid's start in the pair's actions, its
+  // run in their units' turn
+  traceFreeOps((line) => {
+    let e = ctx.minorOps.get(FREE_SEAT);
+    if (!e) ctx.minorOps.set(FREE_SEAT, (e = { lines: [], evals: [] }));
+    e.lines.push(line);
   });
   // a feature or resource a city-state's Builder would clear that record t+1
   // still holds stands: the game's Builder kept it (`minorAi:clear`)
@@ -4200,6 +4227,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   traceMinorAi(null);
   holdMinorClears(null);
   traceMinorOps(null);
+  traceFreeOps(null);
   holdMinorCatchUp(null);
   holdResearchEra(null);
   holdMinorOrders(false);

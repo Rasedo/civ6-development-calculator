@@ -7324,7 +7324,9 @@ DebugGameplay.sqlite).
 - Parent functions: Priority 0x7f2390 (first SUCCESS or RUNNING child
   ends it), Sequence 0x7f3e80 (a child not SUCCESS ends it; RUNNING keeps
   the resume), Concurrent 0x7eb0f0 (Max Failures, Exit on Success; its
-  update 0x7eb210 clears failures and the last good child), Not 0x7f15f0,
+  update 0x7eb210 clears failures and the last good child), Not 0x7f15f0
+  (its decorator update 0x6a7bd0 returns 0: its child runs; the handler
+  tables at 0x7cbca0 store it at Not's index @f2eef4),
   pass-through 0x7f15a0, Turn Limiter 0x7f1620 (update 0x7f21c0; the
   limit at the game speed, 0x5254d0), Contract Manager 0x7f1500 (update
   0x7f17a0, each contract's check 0x7f2220).
@@ -8962,9 +8964,9 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   — beside the Barracks' and Stable's General point (ASK in "C-96 / C-97:
   the city build AI"). `pseudoYieldWeights`, `_MinorFacts.pseudo_w`.
 
-## C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ
+## C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ
 
-- THE CITY UNDER THREAT 0x5cdc50 (READ but +0x218's writer): true where
+- THE CITY UNDER THREAT 0x5cdc50 (READ): true where
   the player AI's [+0x12a0] +0x4b8 (the war footing) is set, else where
   CityBuildAI +0x1b8 (the city's threat) is above -1 AND either the centre
   district's GetDamage(0x5e97d629) — its hit points' damage — is above 0 or
@@ -8976,7 +8978,7 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   +0x5c non-zero (0x5f62d3, 0x5f6304) — the hit points: the City Center,
   the Encampment and its replacements (Ikanda, Oppidum, Thanh). The
   engines: `minorUnderThreat` / `_minor_under_threat` (a city-state's war
-  footing held clear as `combatDesire`'s; +0x218 clear), the contracts'
+  footing held clear as `combatDesire`'s; +0x218 the threat's, below), the contracts'
   `underThreat`, the pick's `defense`, `districtDefensive` / `d_defensive`.
   Recorded: runs/h1_duelw1124 Granada t42 "City Defense, Started" with its
   centre whole — its Harbor contract (Build City District, CONTRACT 90)
@@ -8985,8 +8987,26 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   runs/h1_duelw1127 Muscat t160-t165, its centre damaged (38, 18, 43, 23, 3)
   under major 0's army: NO BUILDS AT ALL each turn (Walls, Castle and Star
   Fort held: the defensive pick finds nothing), PROJECT_REPAIR_OUTER_DEFENSES
-  at t166 once healed. LAB: +0x218's writer. The defensive cancel's body
-  in its own section below ("C-96 / C-60: the defensive cancel").
+  at t166 once healed. The defensive cancel's body in its own section
+  below ("C-96 / C-60: the defensive cancel").
+- +0x218, THE ENEMY AT THE GATES (READ): the value of a watched bool at
+  CityBuildAI +0x1c0 (its setter 0x29fdf0 writes +0x1c0 + 0x58). Its one
+  writer is the threat 0x5cbd10 itself: cleared as the walk opens
+  (0x5cbd9e), and per player the walk reads — past the friendship, the
+  city-state-not-fought and the 0x723cf0 skips, with records within its
+  range (the first 0x5eadb0's strength above 0) — after its strength sum,
+  0x5eadb0 again at radius 2, least strength 5 (the type's larger of
+  Combat +0x48 and RangedCombat +0x6c), age 2: its out list's entries are
+  per unit type [type, count] (0x5eafd2), their counts summed above 2 —
+  three units or more — set it (0x5cc3d4), for good for the walk. Then
+  a player the owner fights (the war flag [rbp+0x6f], the barbarians not)
+  with +0x218 set threatens the city at once (0x5cc3d9 -> 0x5cc475), the
+  margin unread. Recorded: runs/h1_duelw1103 Hattusa t46 and
+  runs/h1_duelw1105 Bandar Brunei t16 "Canceling current build" with their
+  centres whole (CombatLog.csv: no blow on either city since t23 / ever)
+  and no war footing (Combat Desire 0.1 / 0). The engines: `cityThreat`'s
+  `near` (stored `CityState.threatNear` / `citystate_threat_near`,
+  `City.aiThreatNear` / `city_ai_near`), read by the city under threat.
 - A PILLAGED DISTRICT'S REPAIR (PARTLY READ): 0x7a51f0's own-district term
   (the repair x2, +12500.0 at the centre) is reached by the plot analysis on
   the plot holding the city's own pillaged district, which values that row
@@ -9104,11 +9124,11 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   military AI's turn and at the turn's end, `freeCombatDesire` /
   `_free_combat_desire` (the row `FR`) over `pseudoYieldWeights`' Combat,
   explorer and naval scout weights as a city-state's, `freeCityThreat` /
-  `_free_city_threat` (the majors fought, the city-states not, no
-  operation of theirs read) stored per city (`City.aiThreat` /
+  `_free_city_threat` (the majors fought, the city-states not) stored
+  per city (`City.aiThreat` /
   `city_ai_threat`), the defensive pick on it; the Free Cities' tactical
   target list takes the knowledge base's entries; the threat passes over a
-  player the Free Cities run a raid against whose target lies within 5 of
+  player the Free Cities run an operation against whose target lies within 5 of
   the undamaged city (0x723cf0, `freeOpNear` / `_known_threat`'s
   `op_near`, "C-60: the Free Cities Raid"). LAB: +0x4b8's writer (the only
   displacement writes are the military AI's constructor 0x71a960 at
@@ -9289,7 +9309,10 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   raided player's first city's plot (the player's +0x12f0 city list, its
   first's +0x158; with none -9999, no target), then 0x73e7d0 sets the
   target, the rally the Free City's plot (+0x0c) and each team's goals;
-  +0x24 takes the tree's id, +0x20 the player.
+  +0x24 takes the tree's id, +0x20 the player. Nothing writes the
+  operation's enemy (op +0x2a0): the raid runs against none — its Attack
+  Units lines list both majors' units (runs/h1_duelw1123 t205: Owner 0
+  and Owner 1 targets; t206 a Great General's).
 - THE CLEAR: 0x274010 (a Free City's turn) opens with: +0x24 set and its
   tree gone, +0x24 = -1 (+0x20 kept).
 - THE OPERATION (AiOperationDefs): TARGET_ENEMY_COMBAT_DISTRICT, enemy
@@ -9304,8 +9327,8 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   AI_Operation_Eval.csv line of player 62.
 - THE THREAT: 0x5cbd10 asks 0x723cf0 per player — a running operation of
   the city's owner against that player (op +0x2a0) whose target lies within
-  5 of the city — and passes the player over while the city is undamaged:
-  a Free City's raid holds back its threat from the raided player near it.
+  5 of the city — and passes the player over while the city is undamaged.
+  The raid names no enemy, so it holds back no threat.
 - Recorded: runs/h1_duelw1123 t205, Rome's Warrior pillaging the Free City
   Chen's improvement ("Pillage Improvement"): AI_Operation.csv player 62
   "Free Cities Raid, Started", TARGET 11:13 (Rome's capital), its recruit's

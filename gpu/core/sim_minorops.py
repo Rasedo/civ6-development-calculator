@@ -1175,7 +1175,9 @@ class SimMinorOps:
             h = _UPDATE.get(n["type"])
             skipped = at & (c.st[:, n["parent"]] == BT_SKIPPED) if n["parent"] >= 0 else torch.zeros_like(at)
             run = at & ~skipped
-            if n["shape"] == SHAPE_SELECTOR and h is None:
+            # a selector's update runs its children, as Not's (the decorator
+            # update 0x6a7bd0 returns 0)
+            if (n["shape"] == SHAPE_SELECTOR or n["type"] == "Not") and h is None:
                 if n["type"] == "Concurrent":
                     c.ma[:, i] = torch.where(run, 0, c.ma[:, i])
                     c.mb[:, i] = torch.where(run, 0, c.mb[:, i])

@@ -46,6 +46,7 @@
     - cpu/core/tactical.ts:minor
     - gpu/core/sim_tactics.py:_tac_attack_planes
     - cpu/core/tactical.ts:moves
+    - cpu/core/tactical.ts:planningSearch
     - cpu/core/tactical.ts:before
     - gpu/core/sim_tactics.py:_tac_search
   readings:
@@ -222,6 +223,7 @@
     - cpu/core/tactical.ts:from
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:before
+    - cpu/core/tactical.ts:planningSearch
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"

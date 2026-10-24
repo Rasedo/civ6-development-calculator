@@ -237,6 +237,18 @@
   context:
     - ...10, EFFECT_ADJUST_CITY_SIEGE_PROTECTION 0x6a9650, EFFECT_ADJUST_CITY_ATTACKS_PER_TURN 0x6a7510, EFFECT_ADJUST_CITY_AIR_DEFENSE_BONUS 0x6a3a80, and EFFECT_ADJUST_CITY_EXTRA_ACCUMULATI...
   review: imported
+- addr: 0x6a7bd0
+  final: 0x59eda0
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/behaviorTree.ts:h
+    - gpu/core/sim_citytrees.py:tick_tree
+    - gpu/core/sim_minorops.py:_mops_tick
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - "...e 0x7eb210 clears failures and the last good child), Not 0x7f15f0 (its decorator update 0x6a7bd0 returns 0: its child runs; the handler tables at 0x7cbca0 store it at Not's index @f2ee..."
+  review: imported
 - addr: 0x6a7d70
   kind: function
   name: EFFECT_ADJUST_PLAYER_YIELD_CHANGE

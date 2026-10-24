@@ -224,8 +224,10 @@ export function tick<C>(run: BtRun, handlers: Readonly<Record<string, BtHandler<
     const n = nodes[i];
     const h = handlers[n.type];
     if (n.parent >= 0 && status[n.parent] === BT_SKIPPED) status[i] = BT_SKIPPED;
-    else if (n.shape === SHAPE_SELECTOR && !h) {
-      // a Concurrent's update (0x7eb210) clears its failures and its last good child
+    else if ((n.shape === SHAPE_SELECTOR || n.type === 'Not') && !h) {
+      // a selector's update runs its children, as Not's (the decorator
+      // update 0x6a7bd0 returns 0); a Concurrent's (0x7eb210) clears its
+      // failures and its last good child
       if (n.type === 'Concurrent') Object.assign(run.mem[i], { failures: 0, lastOk: 0 });
       status[i] = BT_FRESH;
     }

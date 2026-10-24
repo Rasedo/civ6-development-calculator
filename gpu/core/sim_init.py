@@ -331,6 +331,8 @@ class SimInit:
         self.citystate_founded_turn = torch.full((B, s_pad), -99, dtype=torch.long, device=device)
         self.citystate_prod_set_value = torch.full((B, s_pad), -9999 * 256, dtype=torch.long, device=device)
         self.citystate_threat = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        # the enemy at its city's gates (CityBuildAI +0x218) as its last update left it
+        self.citystate_threat_near = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         # its city's Food favored by its city AI (`minorFoodFocus`, 0x5cdae0)
         self.citystate_fav_food = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         # the citizen manager's hexspace offsets in the DLL's order (`CITIZEN_HEXSPACE`)
@@ -3997,6 +3999,8 @@ class SimInit:
         self.city_free_grant = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
         # a FREE CITY's threat as its city AI's last update left it (`City.aiThreat`), -1 none
         self.city_ai_threat = torch.full((B, self.CITY_ROWS, self.RC), -1, dtype=torch.long, device=device)
+        # a FREE CITY's enemy at the gates (`City.aiThreatNear`, CityBuildAI +0x218)
+        self.city_ai_near = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.bool, device=device)
         # a FREE CITY's raid record (`City.freeRaid`): the player it raided
         # and its operation's tree id (-1 once gone); -1 never raided
         self.city_free_raid = torch.full((B, self.CITY_ROWS, self.RC, 2), -1, dtype=torch.long, device=device)

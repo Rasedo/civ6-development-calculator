@@ -88,11 +88,15 @@
     - recording: h1_duelw1124
       turn: 1
       value: "runs/h1_duelw1124 t1-60 planning rows (the replay's classifier):   855 -> 1,061 of 1,276 equal, the extra plots 609 -> 98, no new miss (65   revealed, 30 unrevealed as before);"
+    - recording: h1_duelw1124
+      turn: 7
+      value: "runs/h1_duelw1124 t7-t52:   city-state 4's city at 32:8 — the barbarian Scouts beside it list 31:7   and 33:8 at 2/2 past it;"
   impl: [cpu/core/tactical.ts:Ground]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - ...nit's own plot and lies in the unit's enemy zone of control (0x26f980 -> Rules_Movement 0x530f50, the mover's owner, its stacking count 0x585eb0) is refused unless it is an attack (r14...
+    - "...mpments exert the zone of control on the land beside them (Civ 6's rule; Rules_Movement 0x530f50 unread). runs/h1_duelw1124 t7-t52: city-state 4's city at 32:8 — the barbarian Scouts b..."
   review: imported
 - addr: 0x531510
   final: 0x379000

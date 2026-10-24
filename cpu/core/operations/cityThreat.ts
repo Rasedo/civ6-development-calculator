@@ -24,6 +24,20 @@ const MARGIN_OTHER = 20 * FX;
 /** a running operation of the owner against the player whose target lies
  *  within this of the city keeps an undamaged city unthreatened (0x723cf0) */
 const OWN_OPERATION_RANGE = 5;
+/** the enemy at the gates (CityBuildAI +0x218, its watched bool at +0x1c0):
+ *  more than 2 of a player's known units within 2 of the city, each of a
+ *  strength (the larger of Combat and RangedCombat) of 5 or more (0x5eadb0
+ *  at radius 2, least strength 5: its list's per-type counts summed) */
+const NEAR_RANGE = 2;
+const NEAR_LEAST = 5;
+const NEAR_ABOVE = 2;
+
+/** the city's threat: its level (-1 none) and the enemy at the gates
+ *  (+0x218) */
+export interface CityThreat {
+  level: number;
+  near: boolean;
+}
 
 /** what the threat reads beside the view */
 export interface ThreatInputs {
@@ -70,11 +84,19 @@ function campDefender(type: string): boolean {
  * by their threat strengths (a barbarian camp defender none); at the city's
  * defense plus the margin or more,
  * the city is threatened at its level (`threatLevel`), at most 1 for a
- * player not hostile. The first such player decides; none, -1.
+ * player not hostile. The first such player decides; none, -1. Each player
+ * the walk reads its units of (its units within its range) sets the enemy
+ * at the gates where more than 2 of its units of a strength of 5 or more
+ * stand within 2 of the city (0x5eadb0; CityBuildAI +0x218, cleared as the walk
+ * opens, set for good once set); a player the owner fights then threatens
+ * the city at once, the margin unread (0x5cc3d9). The city under threat
+ * reads it (0x5cdc50): runs/h1_duelw1103 Hattusa t46 and runs/h1_duelw1105
+ * Bandar Brunei t16 cancel their builds with their centres whole.
  */
-export function cityThreat(view: MajorView, seat: number, city: number, inp: ThreatInputs): number {
+export function cityThreat(view: MajorView, seat: number, city: number, inp: ThreatInputs): CityThreat {
   const c = view.cityDefense(city);
-  if (!c) return -1;
+  let near = false;
+  if (!c) return { level: -1, near };
   const d = c.defense * FX;
   const barb = view.barbarianSeat();
   const majors = view.majors();
@@ -97,11 +119,13 @@ export function cityThreat(view: MajorView, seat: number, city: number, inp: Thr
       sum += s;
     }
     if (!any) continue;
-    if (sum < d + margin) continue;
+    const atGates = inp.army(p).filter((u) => view.plotDistance(u.plot, city) <= NEAR_RANGE && Math.max(u.combat, u.ranged) >= NEAR_LEAST);
+    if (atGates.length > NEAR_ABOVE) near = true;
+    if (!(war && near) && sum < d + margin) continue;
     const level = threatLevel(c);
-    return hostile ? level : Math.min(level, 1);
+    return { level: hostile ? level : Math.min(level, 1), near };
   }
-  return -1;
+  return { level: -1, near };
 }
 
 /** the threatened city's level (0x5cbd10 from 0x5cc475): 2, 3 for a city

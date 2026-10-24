@@ -311,11 +311,11 @@ export const CURRENT_TASK_BIAS = 80 * FX;
  * runs/h1_duelw1105 Bandar Brunei t63-t69, its Walls contract FAILED and
  * re-picked each turn (OLD VALUE 468.4, 495.9, ... the Walls' value);
  * runs/h1_duelw1103 Hattusa t46 its Granary (OLD 33.1) for a Heavy Chariot.
- * Returns whether it cancelled.
+ * Returns the OLD VALUE where it cancelled, else null.
  */
 export function defensiveCancel(ai: ContractBook, cityId: number, underThreat: boolean, f: DefensiveCancelFacts,
-  clearProduction: () => void): boolean {
-  if (!underThreat) return false;
+  clearProduction: () => void): number | null {
+  if (!underThreat) return null;
   const hand = contractById(ai, ai.inHand[cityId] ?? -1) ?? null;
   const unitOff = (u: string): boolean => {
     const r = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
@@ -335,23 +335,23 @@ export function defensiveCancel(ai: ContractBook, cityId: number, underThreat: b
     old = Math.max(old, f.unitValue(h.unit));
     if (!hand) {
       const pseudo = AI_UNITS[AI_UNIT_INDEX.get(h.unit) ?? -1]?.pseudo ?? null;
-      if (pseudo === null || pseudo === 'PSEUDOYIELD_UNIT_COMBAT') return false;
+      if (pseudo === null || pseudo === 'PSEUDOYIELD_UNIT_COMBAT') return null;
     }
   } else if (h.building) {
     const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(h.building) ?? -1];
     old = Math.max(old, row?.wonder ? 0 : f.buildingValue(h.building));
   } else if (h.district) old = Math.max(old, f.districtValue(h.district));
   else if (h.project) old = Math.max(old, f.projectValue(h.project));
-  if (!h.unit && !h.building && !h.district && !h.project) return false;
+  if (!h.unit && !h.building && !h.district && !h.project) return null;
   const bar = old + Math.max(old, CURRENT_TASK_BIAS);
   const listed = (ai.city[cityId] ?? []).some((id) => {
     const c = contractById(ai, id);
     return !!c && c.progress === CP_ACCEPTED && c.value >= bar;
   });
-  if (!listed && !off && f.bestPlainBuilding() < bar && f.bestDefensiveUnit() <= bar) return false;
+  if (!listed && !off && f.bestPlainBuilding() < bar && f.bestDefensiveUnit() <= bar) return null;
   if (hand) hand.progress = CP_FAILED;
   clearProduction();
-  return true;
+  return old;
 }
 
 /** the city's event slot holds no running tree */

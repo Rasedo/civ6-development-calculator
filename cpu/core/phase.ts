@@ -31,7 +31,7 @@ import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBo
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MAX_HP } from '../data/cityStates';
-import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorResearch, trainableIn } from './minorBuild';
+import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { storeUnitStrength } from './majorView';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { plotDistance, tacticalTargets } from './tactical';
@@ -1055,7 +1055,8 @@ export function freeCitiesPhase(state: GameState): void {
     city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
     if (city.loyalty <= 0) joiners.push(city);
   });
-  freeCitiesMilitary(state);
+  // (a replay runs their units' turn on a copy beside the record's)
+  if (!minorOrdersHeld()) freeCitiesMilitary(state);
   // its knowledge base's look at its turn's end
   freeKnowledge(state, false);
   for (const city of joiners) joinFromFreeCity(state, city);

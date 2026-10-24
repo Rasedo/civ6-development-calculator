@@ -3608,7 +3608,10 @@ class SimTactics:
         bidx = torch.arange(B, device=dev)
         seat = 100 + s
         pre = "major"
-        op = self._seat_pass_open(pre, seat, act)
+        # the whole target list where an operation of its runs: its nodes
+        # take a city, a district or an improvement as a target
+        ops_on = bool((act & (self.mops_def[:, s] >= 0).any(dim=1)).any())
+        op = self._seat_pass_open(pre, seat, act, full=ops_on)
         units, order, npass = op["units"], op["order"], op["npass"]
         tg = op["tg"]
         done = torch.zeros_like(units)

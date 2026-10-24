@@ -1475,7 +1475,9 @@ def tick_tree(ai: CityAi, s: int, k: int, w, turn: int, act: torch.Tensor) -> to
         else:
             skipped = torch.zeros_like(at)
         run = at & ~skipped
-        if n["shape"] == SHAPE_SELECTOR and h is None:
+        # a selector's update runs its children, as Not's (the decorator
+        # update 0x6a7bd0 returns 0)
+        if (n["shape"] == SHAPE_SELECTOR or n["type"] == "Not") and h is None:
             if n["type"] == "Concurrent":
                 c.ma[:, i] = torch.where(run, 0, c.ma[:, i])
                 c.mb[:, i] = torch.where(run, 0, c.mb[:, i])

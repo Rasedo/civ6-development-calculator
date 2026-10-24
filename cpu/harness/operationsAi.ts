@@ -51,7 +51,7 @@ import type { Catalog, TurnRecord } from './record';
 
 /** the families measured: the operations the port starts, then all */
 const FAMILIES = ['Settle New City', 'Naval Superiority', 'Attack Barb Camp', 'City Defense', 'Attack Enemy City', 'Attack Walled City',
-  'Barbarian Attack', 'Barbarian City Assault', 'all'] as const;
+  'Barbarian Attack', 'Barbarian City Assault', 'Free Cities Raid', 'all'] as const;
 const TRACE = (process.env.REPLAY_TRACE ?? '').split(',').includes('operations');
 
 /** a line's operation name */
@@ -569,7 +569,7 @@ function cityDefense(m: MajorOps, env: OpsEnv, view: MajorView): void {
     const threat = cityThreat(view, ai.seat, city, {
       army: (p) => recentArmy(m.army, p, m.armyAged),
       operationNear: (p, plot, dist) => opsOf(ai).some((o) => o.enemy === p && o.target !== NO_PLOT && view.plotDistance(o.target, plot) <= dist),
-    });
+    }).level;
     m.threat.set(city, threat);
     const slot = m.defense.get(city) ?? -1;
     if (slot !== -1 && opsOf(ai).some((o) => o.id === slot)) continue;

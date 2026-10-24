@@ -56,7 +56,7 @@ import {
 import { cityContracts, contractBuilt, inHandCheck, queueContract, takesTurn, type AiContract, type ContractItem } from './aiContracts';
 import { newEconomicMemory, purchaseTurn, purchasePick, savingsTurn, type PurchaseCity, type PurchaseEntry } from './aiEconomic';
 import { unitProductionEntries } from './aiUnitProduction';
-import { cityThreat } from './operations/cityThreat';
+import { cityThreat, type CityThreat } from './operations/cityThreat';
 import { majorView } from './majorView';
 import { minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
 import { freeOpNear } from './freeOps';
@@ -664,7 +664,7 @@ export function minorStandingArmy(state: GameState, cs: CityState): number {
  *  records on 611, seen at t33, t35 and t50, the one of t50 alone counts,
  *  and the game starts no City Defense) and its running operations
  *  (`minorOpNear`) */
-export function minorThreat(state: GameState, cs: CityState): number {
+export function minorThreat(state: GameState, cs: CityState): CityThreat {
   return knownThreat(majorView(state) as unknown as Parameters<typeof cityThreat>[0], cs, cs.seat, cs.centerIndex,
     (p, plot, dist) => minorOpNear(state, cs, p, plot, dist));
 }
@@ -673,7 +673,7 @@ export function minorThreat(state: GameState, cs: CityState): number {
  *  item in hand (a repair its building's), its city AI's tables, the
  *  district's value at its plot off the plot analysis */
 function minorDefensiveCancel(state: GameState, cs: CityState, ai: CityAi, city: CityTreeCity, tables: CityBuildTables,
-  pf: PickFacts): boolean {
+  pf: PickFacts): number | null {
   const k = cs.prodItem ?? '';
   const [kind, id] = k.split(':');
   const head = {
@@ -700,12 +700,14 @@ function minorDefensiveCancel(state: GameState, cs: CityState, ai: CityAi, city:
 /** a city's threat (0x5cbd10) on its holder's knowledge base's records aged
  *  at most ARMY_READ_AGE */
 function knownThreat(view: Parameters<typeof cityThreat>[0], holder: Seat, seat: number, centre: number,
-  operationNear: (player: number, plot: number, dist: number) => boolean): number {
+  operationNear: (player: number, plot: number, dist: number) => boolean): CityThreat {
   const aged = holder.armyAged;
   const records = (holder.armyKnown ?? []).filter((x) => aged === undefined || aged - x.seen <= ARMY_READ_AGE);
   return cityThreat(view, seat, centre, {
     army: (p) => records.filter((x) => x.owner === p).map((x) => ({
-      id: x.id, owner: x.owner, type: installType('unit', x.type, 'UNIT_'), plot: x.plot, combat: 0, ranged: 0, damage: 0, seen: x.seen,
+      id: x.id, owner: x.owner, type: installType('unit', x.type, 'UNIT_'), plot: x.plot,
+      combat: UNITS[x.type as keyof typeof UNITS]?.combat ?? 0, ranged: UNITS[x.type as keyof typeof UNITS]?.ranged?.strength ?? 0,
+      damage: x.damage, seen: x.seen,
     })),
     operationNear,
   });
@@ -717,7 +719,7 @@ function knownThreat(view: Parameters<typeof cityThreat>[0], holder: Seat, seat:
  *  runs/h1_duelw1123 t200-t201, no Free City, desire 0.5 = -0.5 + 0.5 x 2),
  *  the city-states not; the Free Cities' running operations against a
  *  player (their raids, `freeOpNear`) */
-export function freeCityThreat(state: GameState, city: City): number {
+export function freeCityThreat(state: GameState, city: City): CityThreat {
   const view = majorView(state) as unknown as Parameters<typeof cityThreat>[0];
   const fights = (i: number, j: number): boolean => (i === FREE_SEAT && isCiv(j)) || (j === FREE_SEAT && isCiv(i));
   const free: typeof view = Object.assign(Object.create(view), { atWar: (i: number, j: number) => fights(i, j) || view.atWar(i, j) });
@@ -774,8 +776,10 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
   };
   cs.unitValues = tables.units;
   if (!fresh) cs.resourceCounts = Object.fromEntries(minorResourceCounts(state, cs));
-  const threat = minorThreat(state, cs);
+  const t = minorThreat(state, cs);
+  const threat = t.level;
   cs.threat = threat;
+  cs.threatNear = t.near;
   const pf = minorPickFacts(state, cs, facts);
   cs.standingArmyShort = minorStandingArmy(state, cs);
   const evals = minorPlotEvals(state, cs, facts, tables.buildings);
@@ -796,7 +800,12 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
     const st = computeCityStats(state, minorCity(cs));
     minorFoodFocus(state, cs, st.foodSurplus, st.housing);
     // the City Defense event (0x5cced0) opens with the defensive cancel
-    if (minorDefensiveCancel(state, cs, ai, city, tables, pf)) city.current = currentItem(cs);
+    const was = cs.prodItem;
+    const cancelled = minorDefensiveCancel(state, cs, ai, city, tables, pf);
+    if (cancelled !== null) {
+      city.current = currentItem(cs);
+      tracer?.(`t${state.turn} ${cs.name} Canceling current build ${was ?? '-'}, OLD VALUE ${(cancelled / FX).toFixed(1)}`);
+    }
     defenseEvent(ai, w, city, list.CITY_UNDER_THREAT ?? null);
     buildingEvent(ai, w, city, list.CITY_EVENT_UNIT_OR_BUILDING);
     districtEvent(ai, w, city, list.CITY_EVENT_DISTRICT);
@@ -851,7 +860,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
   if (tracer) {
     const b = specializationBests(tables, pf);
     const name = (k: string, i: number) => (i < 0 ? '-' : (k === 'b' ? AI_BUILDINGS[i].type : AI_UNITS[i]?.type ?? `${i}`));
-    tracer(`t${state.turn} ${cs.name} threat ${threat} item ${cs.prodItem ?? '-'} ${Math.round(cs.prodProgress ?? 0)}`
+    tracer(`t${state.turn} ${cs.name} threat ${threat} under ${city.underThreat} item ${cs.prodItem ?? '-'} ${Math.round(cs.prodProgress ?? 0)}`
       + ` best b ${name('b', b.building.index)} ${(b.building.value / FX).toFixed(1)} u ${name('u', b.unit.index)} ${(b.unit.value / FX).toFixed(1)} p ${b.project.index} ${(b.project.value / FX).toFixed(1)}`
       + ` imp ${city.bestImprovement} slots ${JSON.stringify(ai.slots[city.id] ?? [])}`
       + ` trees [${ai.trees.map((t) => `${t.id}:${t.name.split(' ').pop()}:${t.trigger.building ?? t.trigger.unit ?? t.trigger.district ?? t.trigger.improvement}@${t.trigger.plot}`).join(' ')}]`

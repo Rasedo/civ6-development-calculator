@@ -664,6 +664,7 @@
   impl: [cpu/core/aiCityTrees.ts:reservePlot, gpu/core/sim_citytrees.py:_u_reserve_plot]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-99: the district and improvement events on one plot — the eruption's turns (a LAB, both twins)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reservation yields to a value 20.0 above it); Check Plot 0x7f..."

@@ -1025,6 +1025,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorCitizens: overCityStates((cityState) => [cityState.favoredFood ? 1 : 0, cityState.idleCitizens ?? 0,
     ...PLACEABLE_DISTRICTS.map((_t, di) => Math.max(0, cityState.specialistPref?.[di] ?? 0))]),
   minorThreat: overCityStates((cityState) => cityState.threat ?? -1),
+  minorThreatNear: overCityStates((cityState) => (cityState.threatNear ? 1 : 0)),
   minorAiGrowth: overCityStates((cityState) => {
     const g = cityState.aiGrowth;
     return g ? [g.surplus, g.housing, g.population, g.stored, g.multiplier] : [0, 0, 0, 0, 0];
@@ -1141,6 +1142,7 @@ const CITY: Record<string, Extractor> = {
   foundedTurn: overCities((r) => r.city.foundedTurn),
   freeGrantTurns: overCities((r) => r.city.freeGrantTurns ?? 0),
   freeCityThreat: overCities((r) => r.city.aiThreat ?? -1),
+  freeCityThreatNear: overCities((r) => (r.city.aiThreatNear ? 1 : 0)),
   freeCityRaid: overCities((r) => [r.city.freeRaid?.player ?? -1, r.city.freeRaid?.op ?? -1]),
   // a FREE CITY's allowed units (`freeCityAllowed`), as unit rows
   freeAllowed: overCities((r) => (r.city.freeAllowed ?? []).map((x) => idx(UNIT_IDX, x)).sort((a, b) => a - b)),

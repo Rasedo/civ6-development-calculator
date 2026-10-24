@@ -62,6 +62,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "- THE NODES' HANDLERS (the dispatcher 0x7cbca0 storing each type's functions under the id the registration 0x7db850 gives it, the k-th..."
