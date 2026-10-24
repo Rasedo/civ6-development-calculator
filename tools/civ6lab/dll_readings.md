@@ -5360,6 +5360,15 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   7 of 14. The danger loop's visibility test (0x5033a0: the player's
   visibility count +0x290 at the unit's plot) reads as "seen now"; what
   makes 31:9 a plot of danger is unread.
+- LAB: the danger map's search (0x26df90, flags 0x311, no +4: the path
+  validity's stacking test on) strikes from a plot the unit may stand on —
+  its own, or one none of its own stacking units holds — read as the
+  stacking turn-end test on the plot an attack leaves from.
+  runs/h1_duelw1117 t38: China's Scout at 34:12 reaches the barbarian
+  Warrior at 32:13 only through 33:13 and Xi'an's centre 33:12, each held
+  by a Chinese Warrior, and its 10 is not in the game's 42 (the two
+  Warriors' 20 each, the city's rings); 36 of 36 barbarian danger rows of
+  1117 equal with it (`search`'s standToAttack, `_tac_search`'s stand).
 - MOVE TO SAFETY (0x77a4b0): each unit left (+0x530, +0x770 clear) on a plot
   of danger above 0 is listed ("Move to safety ... Current Danger") when it
   has no strength, or is embarked (0x8be30, IsEmbarked); hurt (+0xcf0 > 0): a
@@ -6069,6 +6078,14 @@ gpu/core/sim_tactics.py.
   plot the player does not see now (+0x290 count 0) takes an entry after
   the walk's: TARGET_LOW_PRIORITY_UNIT where the unit's type has Combat
   (+0x48), else TARGET_CIVILIAN_UNIT. The priorities (0x786d50) follow.
+- The barbarians' look (Targets.cpp 0x7877e0) walks each seen plot's
+  units of the map's layer 0 (0x75800(map, 0) -> 0x75ce0): no Trader is
+  one of them — none of the barbarians' AI_Knowledge.csv ARMY lines on
+  runs/h1_duelw1117-1128 names a UNIT_TRADER (the city-states' name 90-147
+  each), and none of the 207 barbarian Attack Civilian rows targets one
+  (1117 t74: China's Trader at 36:13 drew ours off a pillage). PARTLY READ:
+  which layer a Trader stands on. The engines skip a Trader in the
+  barbarians' `knowledgeLook` / `_knowledge_look`.
 - The knowledge base: the city-states' (C-96) and the barbarians' (aged
   and looked at their tactical turn's start, looked again at its end),
   `knowledgeLook` in cpu/core/tactical.ts (`Seat.armyKnown`) /

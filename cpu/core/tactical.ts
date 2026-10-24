@@ -214,10 +214,12 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
  * search stops where it answers true. `onLink` sees each link the search
  * prices (the cost callback 0x26d6f0): the plot, the plot it is linked from,
  * the turn and Movement the step reaches it with, and whether it attacks —
- * the start first, linked from itself.
+ * the start first, linked from itself. `standToAttack` (the danger map's
+ * search): an attack is struck only from the unit's own plot or one none of
+ * its own stacking units holds.
  */
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
-  onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void): void {
+  onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false): void {
   const { map } = state;
   const ground = groundOf(state, unit, !zoc, !zoc);
   const held = heldCostsOf(state, unit);
@@ -272,6 +274,10 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       if (!to || cliffBlocksStep(state, from, to, unit)) continue;
       const attack = !ground.enter(to);
       if (attack && !ground.attack(to)) continue;
+      // the danger map's search (0x26df90, flags 0x311): an attack is struck
+      // from a plot the unit may stand on, its own or one none of its own
+      // stacking units holds
+      if (attack && standToAttack && best !== start && ground.full(best.tile)) continue;
       let pm = best.moves;
       let turns = best.turns;
       if (pm <= 0) {
@@ -526,8 +532,13 @@ export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord
   sight: ArrayLike<number>, age: boolean): void {
   const kept = (holder.armyKnown ?? []).filter((r) => !age || state.turn - r.seen <= ARMY_RECORD_AGE);
   if (age) holder.armyAged = state.turn;
+  // the barbarians' look (Targets.cpp 0x7877e0) walks each plot's units of
+  // the map's layer 0 (0x75800): a Trader is none of them (none of their
+  // AI_Knowledge.csv ARMY lines on runs/h1_duelw1117-1128 names one, the
+  // city-states' do)
+  const barb = isBarbSeat(seat);
   for (const u of state.units) {
-    if (!sight[u.tileIndex] || !unitVisibleTo(state, u, seat)) continue;
+    if (!sight[u.tileIndex] || !unitVisibleTo(state, u, seat) || (barb && UNITS[u.type]?.trader)) continue;
     const r = kept.find((x) => x.id === u.id && x.type === u.type && x.owner === u.seat);
     if (r) {
       r.seen = state.turn;
@@ -930,7 +941,7 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     search(state, full, 1, false, (n) => {
       if (!naval || isWater(map.tiles[n.tile])) reach.push(n.tile);
       return false;
-    });
+    }, undefined, true);
     const inReach = new Set(reach);
     const extra: number[] = [];
     const inExtra = new Set<number>();

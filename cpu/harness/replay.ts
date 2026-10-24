@@ -199,6 +199,9 @@ interface Ctx {
    *  in their order, for their scouts' looks at the end of the barbarians'
    *  turn (`barbarianTurn`) */
   barbSteps: { u: Unit; plots: number[] }[];
+  /** the plots the record's barbarian pillages of the pair wrecked, and what
+   *  each held before (improvement, district) */
+  barbPillaged: { plot: number; was: [boolean, boolean] }[];
   /** the other players' envoys this pair staged for the engine's turn (`stageEnvoys`) */
   envoys: EnvoyDecision[];
   /** the record's units (`owner:id`) a battle of this pair the engine fought */
@@ -644,6 +647,12 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   const copy = deserialize(serialize(state));
   const twin = new Map<Unit, Unit>();
   state.units.forEach((u, i) => twin.set(copy.units[i], u));
+  // the plots stand as the barbarians' turn opens: their pillages of the
+  // turn, which the record's actions landed, not yet made
+  for (const { plot, was } of ctx.barbPillaged.splice(0)) {
+    copy.map.tiles[plot].pillaged = was[0];
+    copy.map.tiles[plot].districtPillaged = was[1];
+  }
   // the turn's captures are the record's, landed on the state with its
   // battles: they start their operations at the copy's turn end, and a
   // capture the copy's own moves take adds none (the record's battles are the
@@ -2503,6 +2512,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           applySeatUnitOrders(state, actor, [unitsOf(state, u.seat).map((x) => (x === u ? A_PILLAGE : -1))]);
         } else hostilePillage(state, u);
         const done = (!!t.pillaged && !was[0]) || (!!t.districtPillaged && !was[1]);
+        if (done && isBarbSeat(u.seat)) ctx.barbPillaged.push({ plot: d.plot, was: [was[0], was[1]] });
         count(ctx, 'pillage', done ? 'applied' : 'refused', d.player, done ? undefined : 'the engine wrecked nothing');
         break;
       }
@@ -3613,7 +3623,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),

@@ -396,7 +396,7 @@ class SimTactics:
 
     def _tac_search(self, rows: torch.Tensor, slots: torch.Tensor, seat: int, max_turns: int, zoc: bool,
                     dest: torch.Tensor | None = None, pre: str = "barb", plan: dict | None = None,
-                    full: bool = False) -> dict:
+                    full: bool = False, stand: bool = False) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
         the open nodes by (cost, tie) — a node inserted where its cost lies
@@ -413,7 +413,9 @@ class SimTactics:
         plots, "spot_turns" and "spot_n" [N, E]. With `full` each unit sets
         out on its full Movement (`unitFullMoves`); "closed" [N, T] is the
         turn of every plot the search closed, those it only passes or attacks
-        included."""
+        included. With `stand` (the danger map's search) an attack is struck
+        only from the unit's own plot or one none of its own stacking units
+        holds."""
         dev = self.device
         N, T = rows.shape[0], self.T
         NONE = _KEY_NONE
@@ -460,7 +462,7 @@ class SimTactics:
         # a path's turn may not end on a plot its own stacking unit holds (the
         # path validity 0x2720a0; `groundOf`'s full)
         full_n = None
-        if zoc:
+        if zoc or stand:
             me = (slots + self.POOL_LO[pre]).unsqueeze(1)
 
             def own_at(pl: torch.Tensor) -> torch.Tensor:
@@ -579,8 +581,13 @@ class SimTactics:
             cst = torch.where(a6, cst + moves, cst)
             moves = torch.where(a6, 0, moves)
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6) & (turns <= max_turns)
-            if full_n is not None:
+            if zoc:
                 ok = ok & ~(full_n.gather(1, b1) & (turns > bt))
+            if stand:
+                # the danger map's search: an attack is struck from a plot
+                # the unit may stand on, its own or one none of its own
+                # stacking units holds
+                ok = ok & ~(a6 & full_n.gather(1, b1) & (best != start).unsqueeze(1))
             if cliff6 is not None:
                 ok = ok & ~cliff6
             if link is not None:
@@ -3150,7 +3157,7 @@ class SimTactics:
                     mm = m[(u_i[m] >= lo) & (u_i[m] < hi)]
                     if not mm.numel():
                         continue
-                    res = self._tac_search(b_i[mm], u_i[mm] - lo, int(sv), 1, False, pre=pre, full=True)
+                    res = self._tac_search(b_i[mm], u_i[mm] - lo, int(sv), 1, False, pre=pre, full=True, stand=True)
                     reach = res["closed"] >= 1
                     # a ship's strike onto land is no plot of its reach
                     ship = self.unit_naval[ut[b_i[mm], u_i[mm]]]

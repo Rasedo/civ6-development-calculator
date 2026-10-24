@@ -218,6 +218,9 @@ class SimMinors:
             vis = vis & ~(stealthy & self._stealth_hidden(seat).gather(1, tile) & (self.unit_seat != seat))
         if self._spy_idx >= 0:
             vis = vis & ~((self.unit_type == self._spy_idx) & (self.unit_seat != seat))
+        # the barbarians' look reads the map's layer 0: no Trader
+        if seat == BARB_SEAT:
+            vis = vis & (self.unit_type != self._trader_idx)
         if not bool(vis.count_nonzero()):
             return
         U = vis.shape[1]
