@@ -105,6 +105,18 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
   const bk = bank(s);
+  const inc = stockpileIncome(state, seat);
+  for (let k = 0; k < bk.length; k++) {
+    bk[k] += inc[k];
+    logStockWrite(state.turn, seat, k, 'ac', bk[k]);
+  }
+}
+
+/** One turn's strategic income of a seat by slot (Player_Resources +0x350,
+ *  0x4aa700): every source `accrueStockpiles` pays */
+export function stockpileIncome(state: GameState, seat: number): number[] {
+  const s = seatOf(state, seat)!;
+  const bk = emptyStockpile();
   const rate = getModifiers(state, seat).stockpileRate;
   const perSource = getModifiers(state, seat).stockpilePerSource;
   // CIV6 (Resources.PrereqTech): a strategic resource the seat cannot see
@@ -197,7 +209,7 @@ export function accrueStockpiles(state: GameState, seat: number): void {
       if (!hidden.has(id) && !improved.has(id)) bk[k] += HATTUSA_FREE_STRATEGIC * hattusa;
     });
   }
-  for (let k = 0; k < bk.length; k++) logStockWrite(state.turn, seat, k, 'ac', bk[k]);
+  return bk;
 }
 
 /**
@@ -216,12 +228,44 @@ export function capStockpiles(state: GameState, seat: number): boolean {
   const cap = stockpileCap(state, seat);
   let over = false;
   for (let k = 0; k < bk.length; k++) {
-    if (bk[k] <= cap) continue;
-    bk[k] = cap;
+    // the bank less the seat's reservations against the cap (0x4a8f10)
+    const held = stockReserved(state, seat, k);
+    if (bk[k] - held <= cap) continue;
+    bk[k] = cap + held;
     over = true;
     logStockWrite(state.turn, seat, k, 'cp', bk[k]);
   }
   return over;
+}
+
+/** the seat's reservations of a strategic slot (Player_Resources +0x528,
+ *  0x4aa530): a city-state's, the cost its unit in hand reserved at the
+ *  queue's front check (`CityState.prodReserved`); a major's none here */
+export function stockReserved(state: GameState, seat: number, k: number): number {
+  if (!isCityStateSeat(seat)) return 0;
+  const cs = state.cityStates.find((c) => c.seat === seat);
+  if (!cs?.prodReserved || !cs.prodItem?.startsWith('unit:')) return 0;
+  return strategicSlot(UNITS[cs.prodItem.slice(5)]?.requiresResource) === k ? cs.prodReserved : 0;
+}
+
+/** the seat's stock of a resource less its reservations (0x4aa790,
+ *  ownership 0, the reservations off) */
+export function stockFree(state: GameState, seat: number, resourceId: string): number {
+  const k = strategicSlot(resourceId);
+  return k < 0 ? 0 : stockOf(state, seat, resourceId) - stockReserved(state, seat, k);
+}
+
+/** the seat's units' fuel bill a turn by slot (`chargeUnitUpkeep`'s, the
+ *  player's +0x12e8 +0x1168) */
+export function unitUpkeepBill(state: GameState, seat: number): number[] {
+  const bill = emptyStockpile();
+  for (const u of state.units) {
+    if (u.seat !== seat || u.noResourceUpkeep) continue;
+    const def = UNITS[u.type];
+    const k = strategicSlot(def?.requiresResource);
+    if (k >= 0 && def?.resourceUpkeep) bill[k] += def.resourceUpkeep;
+  }
+  return bill;
 }
 
 /** Put `n` of a strategic resource straight into the bank, under the same

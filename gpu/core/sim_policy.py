@@ -31,6 +31,7 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_GREAT_PERSON_POINTS", "EFFECT_ADJUST_POLICY_AMENITY", "EFFECT_ADJUST_POLICY_HOUSING",
     "EFFECT_ADJUST_CITY_OUTER_DEFENSE", "EFFECT_ADJUST_CITY_RANGED_STRIKE", "EFFECT_ADJUST_UNIT_PRODUCTION",
     "EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT", "EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION",
+    "EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER",
 }
 # worth 0 in a minor's policy context: the context's own city (none), the
 # Influence a minor may not give, its tributaries and placed envoys (none)
@@ -372,6 +373,28 @@ class SimPolicy:
             for f, alive, _cap in ctx["cities"]:
                 v = self._cv_unit_prod_value(f, unit, pct, t0, hh)
                 acc = acc + torch.where(alive, v, zero)
+            return acc
+        if eff == "EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER":
+            # the named resource, else every accumulating one: its stock less
+            # its reservations x Amount through the resource value (0x6b8930);
+            # a city-state's alone (the Free Cities' resource facts not
+            # ported, `resourceValueOf`)
+            s = ctx["s"]
+            if s == self.FR or not self._n_strategic:
+                return zero
+            eng = self._cv_tables()["engine"]["resource"]
+            inv = {int(ri): n for n, ri in eng.items()}
+            names = [a["ResourceType"]] if a.get("ResourceType") else [inv[r] for r in self._strat_rid if r in inv]
+            row = self._CITY_MINOR0 + s
+            free = self.citystate_stockpile[:, s] - self._stock_reserved(row)
+            bb = torch.arange(B, device=dev)
+            acc = zero
+            for name in names:
+                ri = self._cv_tables()["engine"]["resource"].get(name, -1)
+                if ri < 0 or ri not in self._strat_rid:
+                    continue
+                cnt = free[:, self._strat_rid.index(ri)] * amount
+                acc = acc + (self._cv_resource_value(s, f0, name, cnt, t0, hh, bb) >> 8)
             return acc
         if eff == "EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION":
             # the owner's era the EraType; its strongest unit of the class

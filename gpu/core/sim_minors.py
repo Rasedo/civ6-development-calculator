@@ -32,6 +32,8 @@ class SimMinors:
                 continue
             self._minor_levy_return(s)
             self._seat_accrue_stockpile(self._CITY_MINOR0 + s)
+            # its units' fuel, out of the same bank, before its grid
+            self._seat_charge_upkeep(self._CITY_MINOR0 + s)
             self._minor_power(s)
             gained = self._minor_economy(s)
             self._store_unit_strength(s, alive)
@@ -1113,6 +1115,8 @@ class SimMinors:
         ch = mask & (cur != k_all)
         if not bool(ch.count_nonzero()):
             return
+        self.citystate_prod_reserved[:, s] = torch.where(ch, torch.full_like(self.citystate_prod_reserved[:, s], -1),
+                                                         self.citystate_prod_reserved[:, s])
         rr = ch.nonzero(as_tuple=True)[0]
         old = cur[rr]
         prog = self.citystate_prod[rr, s]
@@ -1441,6 +1445,22 @@ class SimMinors:
         item = torch.where(first, rep_key, torch.where(held >= 0, held, rep_key))
         site = torch.where(item == cur, self.citystate_prod_site[:, s], torch.full_like(item, -1))
         self._minor_set_item(s, alive, item, site)
+        # the queue's front check (0x17f070 -> 0x17f3a0): a unit with a
+        # strategic cost and no progress reserves its cost where the stock
+        # less the reservations covers it, else leaves the front
+        if self._n_strategic:
+            ui = item.clamp(min=0, max=self.NU - 1)
+            slot = self._type_res_slot.take(ui)
+            need = self._type_res_cost.take(ui)
+            fresh = (alive & (item >= 0) & (item < self._mk_b0) & (slot >= 0) & (need > 0)
+                     & (self.citystate_prod[:, s] <= 0) & (self.citystate_prod_reserved[:, s] < 0))
+            if bool(fresh.count_nonzero()):
+                free = (self.citystate_stockpile[:, s] - self._stock_reserved(row)).gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
+                drop = fresh & (free < need)
+                self.citystate_prod_reserved[:, s] = torch.where(fresh & ~drop, need, self.citystate_prod_reserved[:, s])
+                if bool(drop.count_nonzero()):
+                    self._minor_set_item(s, drop, -1)
+                    item = torch.where(drop, torch.full_like(item, -1), item)
         none = alive & (item < 0)
         self.citystate_ovf[:, s] += torch.where(none, made, zero_b)
         act = alive & (item >= 0)
@@ -1508,18 +1528,19 @@ class SimMinors:
             uid = torch.where(landed, self.POOL_LO["major"] + slot0, uid)
             u_row = torch.where(landed, T["engine_row"].to(dev).take(ui), u_row)
             fin = fin | landed
-            # its strategic resource, where the stockpile covers it (the
-            # queue's reservation 0x17f3a0, charged at the completion; a
-            # city-state trains the unit without it)
+            # its reservation released and its strategic cost charged
+            # together (0x1856b3 / 0x185a2a)
             if self._n_strategic:
                 slot = self._type_res_slot.take(ui)
-                cost = self._type_res_cost.take(ui)
+                held = self.citystate_prod_reserved[:, s]
                 bank = self.citystate_stockpile[:, s]
-                have = bank.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
-                pay = landed & (slot >= 0) & (cost > 0) & (have >= cost)
+                pay = landed & (slot >= 0) & (held >= 0)
                 if bool(pay.count_nonzero()):
-                    bank.scatter_add_(1, slot.clamp(min=0).unsqueeze(1), -(pay.long() * cost).unsqueeze(1))
+                    have = bank.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    take = torch.minimum(held, have).clamp(min=0)
+                    bank.scatter_add_(1, slot.clamp(min=0).unsqueeze(1), -(pay.long() * take).unsqueeze(1))
                     self._log_stock(pay.nonzero(as_tuple=True)[0], row, slot[pay], "mu")
+                self.citystate_prod_reserved[:, s] = torch.where(landed, torch.full_like(held, -1), held)
         m = done & is_b
         if bool(m.any()):
             bi = (item - self._mk_b0).clamp(min=0, max=int(rd.b_cost.shape[0]) - 1)
@@ -1597,8 +1618,8 @@ class SimMinors:
         the turn's completions (`gained`, [B]) upgrades the first unit in slot
         order whose chassis' upgrade the minor's research unlocks, standing on
         the minor's ground with Movement left, while the treasury covers the
-        price; the minor asks no strategic resource. The upgrade spends the
-        unit's turn."""
+        price; the minor asks no strategic resource, paying the new chassis'
+        cost where its stock covers it. The upgrade spends the unit's turn."""
         alive = self.citystate_alive[:, s]
         top = int((gained * alive.long()).max())
         if top <= 0:
@@ -1626,6 +1647,19 @@ class SimMinors:
             rr = go.nonzero(as_tuple=True)[0]
             u = first[rr]
             self.citystate_treasury[rr, s] -= self._mb_upgrade_gold
+            # the new chassis' strategic cost where its stock covers it, none
+            # where both rungs ask the same resource (a city-state upgrades
+            # without it)
+            if self._n_strategic:
+                was, to = ut[rr, u], nxt[rr, u].clamp(min=0)
+                k = self._type_res_slot.take(to)
+                n_res = self._type_res_cost.take(to)
+                bank = self.citystate_stockpile[rr, s]
+                have = bank.gather(1, k.clamp(min=0).unsqueeze(1)).squeeze(1)
+                pay = (k >= 0) & (n_res > 0) & (k != self._type_res_slot.take(was)) & (have >= n_res)
+                if bool(pay.count_nonzero()):
+                    bank.scatter_add_(1, k.clamp(min=0).unsqueeze(1), -(pay.long() * n_res).unsqueeze(1))
+                    self.citystate_stockpile[rr, s] = bank
             self.major_unit_type[rr, u] = nxt[rr, u]
             self.major_unit_mp[rr, u] = 0
             self._gen_ver += 1

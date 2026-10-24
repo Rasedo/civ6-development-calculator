@@ -4143,12 +4143,37 @@ the tables `AI_RESOURCES` / `AI_IMPROVEMENTS` in `cpu/data/aiBuildTables.ts`
   have, at least 0; with a unit asking it, each copy is worth the era's
   chronology x 25.0 over the need (x2 with none had), discounted to T
   (0x7a1240), times the copies. At most 800.0. ARTIFACT and LEY_LINE 0.
-- PARTLY READ: the strategic stockpile terms — Player_Resources +0x350
-  (0x4aa700) against 0x4ab270 (the player's +0x12e8 +0x1168) where their
-  difference is negative, the cap 0x4aabe0 less the stockpile 0x4aa790 at T
-  = H, +50.0 for a resource with a +0xd0 list — and 0x79ea80's sort order;
-  a city-state's held / have read as its owned plots that hand the resource
-  over (`extractsResource`).
+- READ, the strategic stockpile terms (0x7a2850..0x7a2d61): with the need
+  and have computed, where Player_Resources +0x350 (0x4aa700, fx) less the
+  player's +0x12e8 +0x1168 (0x4ab270, << 8) is below 0 and 0.5 (@d20458) x
+  the need is above have, the resource counts as asked and the need is at
+  least the whole part of the shortfall (+0x1168 less +0x350); then, with a
+  unit asking it, after the era's worth and the x2 of none had: at T = H
+  (or H = 0) a positive count is held to the cap (0x4aabe0) less the stock
+  less its reservations (0x4aa790, ownership 0, the reservations off),
+  which may leave it below 0; a resource whose row holds a +0xd0 list
+  (Resources +0xd0..+0xd8) adds 50.0 to the worth; the x1.5 reads the count
+  held there. +0x350 is read as the turn's income and +0x1168 as the
+  units' fuel bill (`stockpileIncome`, `unitUpkeepBill`); ASK: what fills
+  Resources +0xd0 (the 50.0 term is not ported). Port: `resourceValue`
+  (`income`, `upkeep`, `room`), `_cv_resource_value`.
+- A minor's strategic queue (City_BuildQueue 0x17f3a0, the front check
+  0x17f070 the queue process 0x178250 runs where the queue changed, +0x3ac):
+  the front unit not CanTrain leaves the front; a unit with a Units_XP2 row
+  (+0x198 / +0x1a0), no progress (0x17d1a0) and a StrategicResource
+  (+0x2c8) reserves its cost (0x17c2e0, its formation's) where the stock
+  less the reservations (0x4aa790) covers it (0x4a7400), else leaves the
+  front — no civilization level is read here, so a city-state, which
+  CanTrain lets ignore the resource, still needs it to start the unit. The
+  completion releases and charges together; the turn end's cap tests the
+  stock less the reservations. Port: `CityState.prodReserved` /
+  `citystate_prod_reserved`, `stockReserved` / `_stock_reserved`, `minorBuild`
+  / `_minor_build`. A minor's units burn their fuel as a major's do
+  (`chargeUnitUpkeep` / `_seat_charge_upkeep` on its row, `Seat.fuelShort` /
+  `citystate_fuel_short`, the -20 on its units). Its upgrades pay the new
+  chassis' strategic cost where the stock covers it, none where both rungs
+  ask the same resource (the completion's rule, LAB: the upgrade's resource
+  charge for a city-state not read).
 - MEASURED: the replay's research tallies (`cpu/harness/replay.ts`, "The
   research AI"), the five seeds before and after (AUDIT C-96).
 

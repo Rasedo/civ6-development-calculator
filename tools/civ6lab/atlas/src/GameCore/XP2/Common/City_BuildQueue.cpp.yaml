@@ -220,6 +220,15 @@
     - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (t..."
   review: imported
+- addr: 0x178250
+  final: 0xfc5d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+  context:
+    - "...s strategic queue (City_BuildQueue 0x17f3a0, the front check 0x17f070 the queue process 0x178250 runs where the queue changed, +0x3ac): the front unit not CanTrain leaves the front; a..."
+  review: imported
 - addr: 0x178c50
   kind: function
   status: PARTLY
@@ -450,6 +459,15 @@
   context:
     - "...EndEra, the Amount onto the city's per-unit production modifier (0xc6f950; read back by 0x17c1c0: city +0x2c0[unit] + player +0x12e8 +0x4a0[unit]) — support units too (runs/h1_duelv112..."
   review: imported
+- addr: 0x17c2e0
+  final: 0xfec80
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+  context:
+    - ...8 / +0x1a0), no progress (0x17d1a0) and a StrategicResource (+0x2c8) reserves its cost (0x17c2e0, its formation's) where the stock less the reservations (0x4aa790) covers it (0x4a7400)...
+  review: imported
 - addr: 0x17c790
   final: 0xff1b0
   kind: function
@@ -483,6 +501,7 @@
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "...t check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it..."
   review: imported
@@ -528,7 +547,10 @@
   final: 0x100e80
   kind: function
   status: PARTLY
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  impl: [cpu/core/minorBuild.ts:minorBuild, gpu/core/sim_minors.py:_minor_build]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserv..."
   review: imported
@@ -541,7 +563,12 @@
     - cpu/harness/import.ts:reserved
     - cpu/core/minorBuild.ts:cost
     - gpu/core/sim_minors.py:_minor_finish
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+    - cpu/core/minorBuild.ts:minorBuild
+    - cpu/core/types.ts:CityState
+    - gpu/core/sim_minors.py:_minor_build
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070): a unit at the queue's front with a strategic cost and n..."
   review: imported
@@ -620,6 +647,8 @@
     - cpu/core/phase.ts:banked
     - cpu/core/phase.ts:q
     - gpu/core/sim_phase.py:_seat_city_produce
+    - cpu/core/minorBuild.ts:cost
+    - gpu/core/sim_minors.py:_minor_finish
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: a completion's overflow and the item multiplier — READ"

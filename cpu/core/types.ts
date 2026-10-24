@@ -1189,6 +1189,11 @@ export interface CityState extends Seat {
   prodRetained?: Record<string, number>;
   prodOverflow?: number;
   prodSite?: number;
+  /** the strategic resource its unit in hand reserved at the queue's front
+   *  check (0x17f3a0: the unit's cost, reserved where its stock less its
+   *  reservations covers it), released and charged at the completion;
+   *  absent none */
+  prodReserved?: number;
   prodSetValue?: number;
   /** its city's Food favored by its city AI (`minorFoodFocus`, 0x5cdae0):
    *  the citizen manager's yield flag */

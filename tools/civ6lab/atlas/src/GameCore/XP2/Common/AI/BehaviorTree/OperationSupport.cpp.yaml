@@ -133,6 +133,7 @@
     - cpu/core/operations/nodes.ts:operationMove
     - cpu/core/tactical.ts:passMoveUpdate
     - gpu/core/sim_minorops.py:_u_move
+    - cpu/core/tactical.ts:list
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

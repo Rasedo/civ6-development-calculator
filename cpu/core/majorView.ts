@@ -50,8 +50,10 @@ import { computeUnlocks } from './effects';
 import type { ContractCity } from './aiContracts';
 import { civicAnalysis } from './aiCivics';
 import { AI_UNIT_INDEX, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
-import { AI_UNITS } from '../data/aiBuildTables';
-import { minorUnitExpected, minorItemTurns, minorUnitVersion } from './minorBuild';
+import { AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
+import { resourceValue } from './aiResource';
+import { stockFree } from './stockpile';
+import { minorItemTurns, minorResourceFacts, minorUnitExpected, minorUnitVersion } from './minorBuild';
 import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './majorCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, hasMet, minorCity, minorWarGate, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
@@ -415,6 +417,15 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const id = engineId('district', type, 'DISTRICT_', DISTRICTS) as DistrictId | null;
       if (!id) return 0;
       return isCityStateSeat(i) ? districtScaledBase(seat(i).research, id) : districtCost(state, i, id);
+    },
+    resourceStockFree: (i, type) => {
+      const id = engineId('resource', type, 'RESOURCE_', RESOURCES);
+      return id ? stockFree(state, i, id) : 0;
+    },
+    resourceValueOf: (i, type, count, t, h) => {
+      const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      const row = AI_RESOURCES.find((r) => r.type === type);
+      return cs && cs.centerIndex >= 0 && row ? resourceValue(minorResourceFacts(state, cs), row, count, t, h) : 0;
     },
     buildingsBuilt: (type) => {
       const id = engineId('building', type, 'BUILDING_', BUILDINGS);

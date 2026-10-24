@@ -23,7 +23,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { engineId } from '../data/aliases';
-import { COMBAT_POWER_SCALING } from '../data/constants';
+import { COMBAT_POWER_SCALING, STRATEGIC_IDS } from '../data/constants';
 import { AI_BUILDINGS, AI_DISTRICTS, AI_UNITS } from '../data/aiBuildTables';
 import {
   FX, discounted, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, whole, yieldValue, type AiPlotView, type AiValueView,
@@ -269,6 +269,9 @@ export function unitEraIndex(row: { tech: string | null; civic: string | null })
   if (te < 0 && ce < 0) return START_ERA + 1;
   return ce > te ? ce : te;
 }
+/** the accumulating resources (Resource_Consumption Accumulate), in the
+ *  Resources' order */
+const ACCUMULATING: readonly string[] = STRATEGIC_IDS.map((id) => `RESOURCE_${id}`);
 /** the game's start era (an Eras index) */
 const START_ERA = 0;
 /** the records' age the barbarian-combat analyzer reads (0x5eb0f0's fifth
@@ -818,6 +821,17 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
       const v = Math.floor((a * per) / FX);
       sum += whole(yieldValue(null, null, presentValue(v, t.rate, end) - presentValue(v, t.rate, t.start), 'YIELD_PRODUCTION'));
     }
+    return sum;
+  },
+  // 0x6b8930 (Amount +8, ResourceType +0xc): with the player, the named
+  // resource, else every accumulating one: its stock less its reservations
+  // (0x4aa790, ownership 0) x Amount through the resource value (0x7a21e0)
+  // from the start to the horizon, each whole
+  EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER: (t, args) => {
+    const a = Number(args.Amount ?? 0) | 0;
+    const list = args.ResourceType ? [args.ResourceType] : ACCUMULATING;
+    let sum = 0;
+    for (const res of list) sum += whole(t.view.resourceValueOf(t.seat, res, t.view.resourceStockFree(t.seat, res) * a, t.start, t.horizon));
     return sum;
   },
   // 0x6c4650: a city subject whose centre's outer defence stands (its

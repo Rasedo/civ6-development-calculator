@@ -4169,14 +4169,15 @@ class SimSeats:
         `_fuel_short_cs` is the penalty."""
         if not self._upkeep_units or not self._n_strategic:
             return
-        stock = self.civ_stockpile[:, row]
+        stock = self._stock_bank(row)
         bill = torch.zeros_like(stock)
+        code = int(self._ROW_SEAT[row])
         for pre in ("barb", "major"):
             alive = getattr(self, f"{pre}_unit_alive")
             seat = getattr(self, f"{pre}_unit_seat")
             typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
             # a Meteor Site's grant burns nothing (`unit_no_res_upkeep`)
-            mine = alive & (seat == row) & ~getattr(self, f"{pre}_unit_no_res_upkeep")
+            mine = alive & (seat == code) & ~getattr(self, f"{pre}_unit_no_res_upkeep")
             if not bool(mine.count_nonzero()):
                 continue
             for u_idx, slot, rate in self._upkeep_units:
@@ -4193,7 +4194,7 @@ class SimSeats:
                                       * self._carbon_per_resource[slot]
                                       * self._carbon_unit_share
                                       * self._power_cells(row))
-        self.civ_fuel_short[:, row] = bill > stock
+        self._fuel_short_bank(row).copy_(bill > stock)
         stock.copy_((stock - bill).clamp(min=0))
         if self._log_diff:
             for _k in range(stock.shape[1]):
@@ -4802,10 +4803,14 @@ class SimSeats:
         ty = self.unit_type.gather(1, s).squeeze(1).clamp(min=0, max=self.NU - 1)
         seat = self.unit_seat.gather(1, s).squeeze(1)
         k = self._type_res_slot.take(ty)
+        bidx = torch.arange(self.B, device=self.device)
         major = (seat >= 0) & (seat < self.n_majors)
-        short = self.civ_fuel_short[torch.arange(self.B, device=self.device),
-                                    seat.clamp(min=0, max=self.n_majors - 1), k.clamp(min=0)]
-        hit = (major & (k >= 0) & (self._type_res_upkeep.take(ty) > 0) & short
+        minor = (seat >= 100) & (seat < 100 + self.citystate_fuel_short.shape[1])
+        short = torch.where(
+            major, self.civ_fuel_short[bidx, seat.clamp(min=0, max=self.n_majors - 1), k.clamp(min=0)],
+            self.citystate_fuel_short[bidx, (seat - 100).clamp(min=0, max=self.citystate_fuel_short.shape[1] - 1), k.clamp(min=0)]
+            & minor)
+        hit = ((major | minor) & (k >= 0) & (self._type_res_upkeep.take(ty) > 0) & short
                & ~self.unit_no_res_upkeep.gather(1, s).squeeze(1))
         return hit.long() * self._fuel_short_cs_val
 
@@ -10244,11 +10249,21 @@ class SimSeats:
         from it, and the cap holds at the turn's end (`_seat_cap_stockpile`)."""
         if self._n_strategic == 0:
             return
+        bank = self._stock_bank(row)
+        bank += self._seat_stock_income(row)
+        if self._log_diff:
+            for _k in range(bank.shape[1]):
+                self._log_stock(range(self.B), row, _k, "ac")
+
+    def _seat_stock_income(self, row: int) -> torch.Tensor:
+        """[B, K] one turn's strategic income of seat row `row` by slot
+        (`stockpileIncome`, Player_Resources +0x350): every source
+        `_seat_accrue_stockpile` pays"""
         # CIV6 (Resources.PrereqTech): a strategic the seat cannot see yet
         # accrues nothing, whatever stands on its tile
         owned = ((self.tile_seat == int(self._ROW_SEAT[row])) & self._res_extracting()
                  & ~self._res_hidden(row))
-        bank = self._stock_bank(row)
+        bank = torch.zeros_like(self._stock_bank(row))
         # a city-state's row holds none of the majors' dedications, governors,
         # Great People or suzerain rows
         maj = row < self.n_majors
@@ -10365,9 +10380,47 @@ class SimSeats:
                         seen = seen | (self._gp_perm(row, self._gp_perm_names[_pk]) > 0)
                 improved = (owned & (self.res_id == rid)).any(dim=1)
                 bank[:, k] += (seen & ~improved).long() * _hat * self._suz_free_strat
-        if self._log_diff:
-            for _k in range(bank.shape[1]):
-                self._log_stock(range(self.B), row, _k, "ac")
+        return bank
+
+    def _fuel_short_bank(self, row: int) -> torch.Tensor:
+        """[B, K] — the slots short at seat row `row`'s last fuel bill, a
+        view: a major's (`civ_fuel_short`), a city-state's
+        (`citystate_fuel_short`)"""
+        if row < self.n_majors:
+            return self.civ_fuel_short[:, row]
+        return self.citystate_fuel_short[:, row - self._CITY_MINOR0]
+
+    def _stock_reserved(self, row: int) -> torch.Tensor:
+        """[B, K] `stockReserved` — seat row `row`'s reservations by slot: a
+        city-state's unit in hand's reserved cost on its resource's slot; a
+        major's none here"""
+        out = torch.zeros_like(self._stock_bank(row))
+        if row < self.n_majors or row >= self._CITY_MINOR0 + self.citystate_prod_reserved.shape[1]:
+            return out
+        s = row - self._CITY_MINOR0
+        item = self.citystate_item[:, s]
+        res = self.citystate_prod_reserved[:, s]
+        is_u = (item >= 0) & (item < self._mk_b0)
+        slot = self._type_res_slot.take(item.clamp(min=0, max=self.NU - 1))
+        on = is_u & (res >= 0) & (slot >= 0)
+        out.scatter_add_(1, slot.clamp(min=0).unsqueeze(1), torch.where(on, res, torch.zeros_like(res)).unsqueeze(1))
+        return out
+
+    def _unit_upkeep_bill(self, row: int) -> torch.Tensor:
+        """[B, K] `unitUpkeepBill` — seat row `row`'s units' fuel bill a
+        turn by slot"""
+        bill = torch.zeros_like(self._stock_bank(row))
+        if not self._upkeep_units:
+            return bill
+        code = int(self._ROW_SEAT[row])
+        for pre in ("barb", "major"):
+            alive = getattr(self, f"{pre}_unit_alive")
+            seat = getattr(self, f"{pre}_unit_seat")
+            typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+            mine = alive & (seat == code) & ~getattr(self, f"{pre}_unit_no_res_upkeep")
+            for u_idx, slot, rate in self._upkeep_units:
+                bill[:, slot] += (mine & (typ == u_idx)).sum(dim=1) * rate
+        return bill
 
     def _stock_bank(self, row: int) -> torch.Tensor:
         """[B, K] — the strategic banks of seat row `row`, a view: a major's
@@ -10383,7 +10436,8 @@ class SimSeats:
         bank = self._stock_bank(row)
         if self._n_strategic == 0:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        cap = self._stockpile_cap(row).unsqueeze(1)
+        # the bank less the seat's reservations against the cap (0x4a8f10)
+        cap = self._stockpile_cap(row).unsqueeze(1) + self._stock_reserved(row)
         over = bank > cap
         bank.copy_(torch.minimum(bank, cap))
         if self._log_diff and bool(over.count_nonzero()):

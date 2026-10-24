@@ -770,6 +770,16 @@ class SimMinorAi:
             intab = R["e_ver"].unsqueeze(0) & (~obs | (owned > 0)) & (R["e_res"] == ri).unsqueeze(0)
             need = torch.where(intab, R["e_need"].unsqueeze(0), torch.zeros_like(owned)).max(dim=1).values
             used = intab.any(dim=1)
+        # a turn's income (Player_Resources +0x350) short of the units' fuel
+        # bill (+0x12e8 +0x1168) with half the need above what it has: the
+        # need at least the shortfall
+        k_s = self._strat_rid.index(ri) if ri in self._strat_rid and s < self.S else -1
+        row_s = self._CITY_MINOR0 + s
+        if k_s >= 0:
+            gap = (self._unit_upkeep_bill(row_s)[:, k_s] - self._seat_stock_income(row_s)[:, k_s])
+            raise_ = (gap > 0) & ((need.double() * 0.5) > self.citystate_stockpile[:, s, k_s].double())
+            used = used | raise_
+            need = torch.where(raise_, torch.maximum(need, gap), need)
         nd, us = need.take(bb), used.take(bb)
         late = (t != h) & (h != 0)
         short = (have < 2 * nd) & ~late & (n <= 0)
@@ -778,6 +788,11 @@ class SimMinorAi:
         w = chrono * _fx_const(25.0)
         w = torch.where(nd > 0, torch.div(w * _FX, (nd * _FX).clamp(min=1), rounding_mode="trunc"), w)
         w = torch.where(have == 0, _fmul(w, torch.full_like(w, 2 * _FX)), w)
+        # at T = H (or H 0), the copies held to the room its cap leaves (the
+        # cap 0x4aabe0 less its stock less its reservations, 0x4aa790)
+        if k_s >= 0:
+            room = (self._stockpile_cap(row_s) - (self.citystate_stockpile[:, s, k_s] - self._stock_reserved(row_s)[:, k_s])).take(bb)
+            n = torch.where(~late & (n > 0), torch.minimum(n, room), n)
         w = torch.where((have > nd) & (n + have < nd), _fmul(w, torch.full_like(w, _fx_const(1.5))), w)
         v = _fmul(_discounted(w, rate, t), n * _FX)
         v = torch.where(us & ~short, v, torch.where(short, torch.full_like(v, _FX_MIN), zero))

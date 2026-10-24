@@ -65,7 +65,9 @@
 - addr: 0x4a7400
   kind: function
   status: PARTLY
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - ...t the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it (0x4aa790), else leaves the...
   review: imported
@@ -150,6 +152,7 @@
     - cpu/core/stockpile.ts:capStockpiles
     - cpu/harness/import.ts:importPower
     - cpu/core/minorBuild.ts:minorPhase
+    - gpu/core/sim_seats.py:_seat_cap_stockpile
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - "...::Processor::DoTurnDeactivate 0x7eb60 -> 0x4e4ad0, which tail-jumps to Player_Resources 0x4a8f10): for each accumulated resource, the stockpile less the player's reserved amount (0x4..."
@@ -212,7 +215,7 @@
 - addr: 0x4aa530
   kind: function
   status: PARTLY
-  impl: [cpu/harness/import.ts:reserved]
+  impl: [cpu/harness/import.ts:reserved, cpu/core/stockpile.ts:stockReserved]
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
@@ -222,6 +225,7 @@
 - addr: 0x4aa700
   kind: function
   status: PARTLY
+  impl: [cpu/core/stockpile.ts:stockpileIncome]
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
@@ -252,6 +256,11 @@
     - cpu/core/operations/unitRows.ts:seatUnitRows
     - cpu/core/majorCityBuild.ts:seatResearchTurns
     - cpu/core/minorBuild.ts:amenity
+    - cpu/core/aiResource.ts:ResourceFacts
+    - cpu/core/aiResource.ts:take
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/stockpile.ts:stockFree
+    - gpu/core/sim_minorai.py:_cv_resource_value
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the goody hut's other gates and the Relic — READ"
@@ -319,7 +328,12 @@
     - recording: 1123
       turn: 168
       value: 1123 t168 over 24).
-  impl: [cpu/core/goodyHuts.ts:goodyEligible, cpu/data/constants.ts:STOCKPILE_CAP_BASE]
+  impl:
+    - cpu/core/goodyHuts.ts:goodyEligible
+    - cpu/data/constants.ts:STOCKPILE_CAP_BASE
+    - cpu/core/aiResource.ts:ResourceFacts
+    - cpu/core/aiResource.ts:take
+    - gpu/core/sim_minorai.py:_cv_resource_value
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the goody hut's other gates and the Relic — READ"

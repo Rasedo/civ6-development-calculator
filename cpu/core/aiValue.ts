@@ -196,6 +196,13 @@ export interface AiValueView {
   unitCost(seat: number, unitType: string): number;
   /** the seat's cost of its next district of a DistrictType (0x4088a0) */
   districtCost(seat: number, district: string): number;
+  /** the seat's stock of a strategic ResourceType less its reservations
+   *  (0x4aa790, ownership 0) */
+  resourceStockFree(seat: number, resource: string): number;
+  /** the resource value (0x7a21e0) of `count` more of a ResourceType to the
+   *  seat from `t` to `h`, raw; a city-state's (`minorResourceFacts`), 0
+   *  for a seat whose resource facts are not ported */
+  resourceValueOf(seat: number, resource: string, count: number, t: number, h: number): number;
   /** the copies of a BuildingType standing in the world (0x1e7b70) */
   buildingsBuilt(building: string): number;
   /** the barbarian camps on plots the seat has revealed, in plot order */

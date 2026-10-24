@@ -19,7 +19,10 @@
  *    ResourceMaintenanceAmount); with no unit asking it 0; else the copies
  *    worth taking, `count` up to twice the need less what the player has
  *    (0x4a93c0), each worth 25.0 per era chronology step over the need (x2
- *    where it has none), discounted to `t`.
+ *    where it has none), discounted to `t`; a turn's income short of the
+ *    units' fuel bill with half the need above what it has raises the need
+ *    to the shortfall; at `t` = `h` the copies are held to the room the
+ *    cap leaves.
  *  - At most 800.0.
  */
 import { FX, FX_MIN, discounted, fdiv, fmul, fxConst, AI_RATE } from './aiValue';
@@ -85,6 +88,13 @@ export interface ResourceFacts {
   held(res: string): boolean;
   /** 0x4a93c0(res, 1): the copies the player has */
   have(res: string): number;
+  /** a turn's income of an accumulating resource (Player_Resources +0x350) */
+  income(res: string): number;
+  /** the units' fuel bill a turn of it (the player's +0x12e8 +0x1168) */
+  upkeep(res: string): number;
+  /** the stock the cap still takes: the cap (0x4aabe0) less the stock less
+   *  the reservations (0x4aa790) */
+  room(res: string): number;
   /** the player's cities' amenity balances in 0x79ea80's order, and one
    *  Amenity more in the i-th's value from `t` to `h` (0x79f7c0) */
   cities: number;
@@ -136,6 +146,14 @@ export function resourceValue(f: ResourceFacts, r: AiResourceRow, count: number,
       if (c) need = Math.max(need, c.cost + 10 * c.maintenance);
     }
     const have = f.have(r.type);
+    // a turn's income (Player_Resources +0x350) short of the units' bill
+    // (+0x12e8 +0x1168) with half the need above what it has: the need at
+    // least the shortfall
+    const short = f.upkeep(r.type) - f.income(r.type);
+    if (short > 0 && Math.fround(need * Math.fround(0.5)) > have) {
+      used = true;
+      need = Math.max(need, short);
+    }
     const late = t !== h && h !== 0;
     let n = count;
     let take = used;
@@ -147,6 +165,9 @@ export function resourceValue(f: ResourceFacts, r: AiResourceRow, count: number,
       let w = f.eraChronology * fxConst(25);
       if (need > 0) w = fdiv(w, need * FX);
       if (have === 0) w = fmul(w, 2 * FX);
+      // at T = H (or H 0), the copies held to the room its cap leaves (the
+      // cap 0x4aabe0 less its stock less its reservations, 0x4aa790)
+      if (!late && n > 0) n = Math.min(n, f.room(r.type));
       if (have > need && n + have < need) w = fmul(w, fxConst(1.5));
       v = fmul(discounted(w, rate, t), n * FX);
     }

@@ -123,6 +123,8 @@
     - cpu/core/aiPlotValue.ts:PlotValueFacts
     - gpu/core/sim_minorai.py:_cv_resource_value
     - cpu/core/aiPlotValue.ts:resourceCopies
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"

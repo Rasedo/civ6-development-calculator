@@ -770,6 +770,7 @@
   kind: function
   name: EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:full]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]

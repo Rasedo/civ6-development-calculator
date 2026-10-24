@@ -67,7 +67,7 @@ import { RESOURCES, extractsResource } from '../../world/resources';
 import { unitProductionTable } from './aiUnitProduction';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, unitTable, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
-import { accrueStockpiles, canPayStockpile, capStockpiles, spendStockpile, stockOf, strategicSlot, unitResourceCost, upgradeGoldCost } from './stockpile';
+import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { cityGrowth, majorView, storeUnitStrength } from './majorView';
 import { governmentValues } from './aiPolicyValue';
@@ -102,6 +102,9 @@ export function minorPhase(state: GameState): void {
     // (Player_Resources is every player's; runs/h1_duelw1121 Hunza's one
     // Horses Pasture from t20)
     accrueStockpiles(state, cityState.seat);
+    // its units' fuel, out of the same bank, before its grid (a major's
+    // order: `chargeUnitUpkeep`)
+    chargeUnitUpkeep(state, cityState.seat);
     minorPower(state, cityState);
     const gained = minorEconomy(state, cityState);
     storeUnitStrength(state, cityState.seat);
@@ -489,7 +492,7 @@ function takeCivic(r: ResearchState, civic: string | null): void {
  * (CIV6, Unit: "in friendly territory", "more than 0 Movement"), the treasury
  * covering the price. A minor ignores the strategic resource the new chassis
  * asks (`CivilizationLevels.IgnoresUnitStrategicResourceRequirements`,
- * CITY_STATE true). Which unit goes first is unmeasured. The upgrade spends
+ * CITY_STATE true), paying its cost where its stock covers it. Which unit goes first is unmeasured. The upgrade spends
  * the unit's turn, as every upgrade here does.
  */
 export function minorUpgrades(state: GameState, cityState: CityState, gained: number): void {
@@ -505,7 +508,15 @@ export function minorUpgrades(state: GameState, cityState: CityState, gained: nu
 export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit): boolean {
   if (!goldAffordable(cityState.treasury, MINOR_UPGRADE_GOLD) || !minorCanUpgrade(state, cityState, u)) return false;
   cityState.treasury -= MINOR_UPGRADE_GOLD;
-  u.type = UNITS[u.type].upgradesTo!;
+  // the new chassis' strategic cost where its stock covers it, none where
+  // both rungs ask the same resource (`upgradeResourceCost`'s rule; a
+  // city-state upgrades without it)
+  const next = UNITS[u.type].upgradesTo!;
+  const res = unitResourceCost(next);
+  if (res && res.id !== UNITS[u.type].requiresResource && canPayStockpile(state, cityState.seat, res.id, res.n)) {
+    spendStockpile(state, cityState.seat, res.id, res.n, 'ug');
+  }
+  u.type = next;
   u.movesLeft = 0;
   raiseBestTrained(state, cityState.seat, u.type, u.formation ?? 0);
   return true;
@@ -767,6 +778,20 @@ export function minorBuild(state: GameState, cityState: CityState, production: n
     cityState.prodOverflow = (cityState.prodOverflow ?? 0) + made;
     return;
   }
+  // the queue's front check (0x17f070 -> 0x17f3a0): a unit with a
+  // strategic cost and no progress reserves its cost where the stock less
+  // the reservations covers it, else leaves the front
+  if ('unit' in item && !(cityState.prodProgress ?? 0) && cityState.prodReserved === undefined) {
+    const res = unitResourceCost(item.unit);
+    if (res) {
+      if (stockFree(state, cityState.seat, res.id) < res.n) {
+        minorSetItem(state, cityState, null);
+        cityState.prodOverflow = (cityState.prodOverflow ?? 0) + made;
+        return;
+      }
+      cityState.prodReserved = res.n;
+    }
+  }
   const pct = minorItemPct(state, cityState, item);
   const cost = minorItemCost(state, cityState, item);
   const before = cityState.prodProgress ?? 0;
@@ -822,6 +847,7 @@ export function minorSetItem(state: GameState, cityState: CityState, item: Exclu
     minorPlaceDistrict(state, cityState, item.district, item.site);
   } else delete cityState.prodSite;
   if (key === (cityState.prodItem ?? '')) return;
+  delete cityState.prodReserved;
   const kept = { ...cityState.prodRetained };
   if (cityState.prodItem && (cityState.prodProgress ?? 0) > 0) kept[cityState.prodItem] = cityState.prodProgress!;
   cityState.prodProgress = kept[key] ?? 0;
@@ -1132,6 +1158,13 @@ export function minorResourceFacts(state: GameState, cityState: CityState): Reso
   }
   const table = minorUnitProduction(state, cityState, minorKnownUnits(cityState));
   const luxury = pseudoYieldValue(view, cityState.seat, FX, 'PSEUDOYIELD_RESOURCE_LUXURY');
+  const income = stockpileIncome(state, cityState.seat);
+  const bill = unitUpkeepBill(state, cityState.seat);
+  const slotOf = (res: string, by: readonly number[]): number => {
+    const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
+    const k = id ? strategicSlot(id) : -1;
+    return k >= 0 ? by[k] : 0;
+  };
   return {
     amenityParty: true,
     eraChronology: era + 1,
@@ -1144,6 +1177,12 @@ export function minorResourceFacts(state: GameState, cityState: CityState): Reso
     have: (res) => {
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
       return id && strategicSlot(id) >= 0 ? stockOf(state, cityState.seat, id) : extracted.get(res) ?? 0;
+    },
+    income: (res) => slotOf(res, income),
+    upkeep: (res) => slotOf(res, bill),
+    room: (res) => {
+      const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
+      return id && strategicSlot(id) >= 0 ? stockpileCap(state, cityState.seat) - stockFree(state, cityState.seat, id) : 0;
     },
     cities: 1,
     amenityValue: (_i, t, h) => valueBetween(amenityPerTurn({ view, seat: cityState.seat }, amenity), t, h),
@@ -1513,11 +1552,11 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
     built = unit.id;
     applyTrainingGrants(state, minorCity(cityState), unit);
     if (item.unit === 'BUILDER') cityState.buildersTrained += 1;
-    // its strategic resource, where the stockpile covers it (the queue's
-    // reservation 0x17f3a0, charged at the completion; a city-state trains
-    // the unit without it)
+    // its reservation released and its strategic cost charged together
+    // (0x1856b3 / 0x185a2a)
     const cost = unitResourceCost(item.unit);
-    if (cost && canPayStockpile(state, cityState.seat, cost.id, cost.n)) spendStockpile(state, cityState.seat, cost.id, cost.n, 'mu');
+    if (cost && cityState.prodReserved !== undefined) spendStockpile(state, cityState.seat, cost.id, cityState.prodReserved, 'mu');
+    delete cityState.prodReserved;
   } else if ('building' in item) {
     const b = BUILDINGS[item.building];
     cityState.buildings = [...(cityState.buildings ?? []), item.building];
