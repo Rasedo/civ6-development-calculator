@@ -190,6 +190,11 @@ interface Ctx {
    *  fighting those battles in its pass; each with its record key, which a
    *  unit the pair killed has left the replay's map by */
   minorBlows: Map<Unit, { snap: Unit; key: string }>;
+  /** the record's units this pair's upgrade orders make, keyed as the
+   *  record keys them, until the order is applied: each is the upgraded
+   *  unit, so no unit the engine's turn made stands for one
+   *  (`matchNewUnits`) */
+  upgradeInto: Set<string>;
   /** the barbarian units' plots of this pair the record's steps entered,
    *  in their order, for their scouts' looks at the end of the barbarians'
    *  turn (`barbarianTurn`) */
@@ -2407,6 +2412,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       case 'upgrade': {
         // the order is the player's, through the engine's verb; the game's
         // new id names the same unit from here on
+        ctx.upgradeInto.delete(d.into);
         const u = unitOf(ctx, d.unit);
         if (!u) {
           // a unit trained and upgraded within the turn, which no record
@@ -2647,13 +2653,16 @@ function killBoosts(ctx: Ctx, read: Imported): void {
 }
 
 /** the engine's units the turn made, matched to the record's new units of the
- *  same seat and type, nearest first */
+ *  same seat and type, nearest first; a record unit a pending upgrade order
+ *  makes is the upgraded unit's, never another's (runs/h1_duelw1127 t94:
+ *  Mexico City's Archer upgraded to a Crossbowman, which the Crossbowman the
+ *  engine's City Defense bought must not stand for) */
 function matchNewUnits(ctx: Ctx, b: TurnRecord): void {
   const mapped = new Set([...ctx.units.values()]);
   const free = ctx.state.units.filter((u) => !mapped.has(u));
   for (const r of b.units) {
     const key = `${r.owner}:${r.id}`;
-    if (unitOf(ctx, key)) continue;
+    if (unitOf(ctx, key) || ctx.upgradeInto.has(key)) continue;
     const seat = seatOfP(ctx, r.owner);
     const type = engineRowOf(ctx.cat, 'unit', r.type);
     const at = r.y * ctx.W + r.x;
@@ -3586,7 +3595,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), minorBlows: new Map(), barbSteps: [], envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
@@ -3663,6 +3672,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.researchBefore = new Map(holders.map((s) => [s.seat, s.research.tech]));
     ctx.civicBefore = new Map(holders.map((s) => [s.seat, s.research.civic]));
     const ds = source.decisions(a, b, cat);
+    ctx.upgradeInto = new Set(ds.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
     // the AI majors' governor turns, on the state their AI turn t reads:
     // the active player's as the pair opens
     ctx.governorAi.clear();
