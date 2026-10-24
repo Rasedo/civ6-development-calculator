@@ -467,7 +467,8 @@
             "citystate_cai_score",
             "citystate_cai_owned",
             "citystate_gov_values",
-            "citystate_gov_valid"
+            "citystate_gov_valid",
+            "citystate_civic_pol_best"
           ],
           "note": "the Free Cities' research (`minorResearch` on `freeSeat.research`; the research row `FR`): its techs and civics, progress, items in hand, goal, overflows, turns left, kept progress, the catch-up's counts and the two AIs' last analyses; empty until its first turn makes the seat."
         },
@@ -2182,13 +2183,15 @@
           "name": "minorCivicGovValues",
           "compare": "exact",
           "covers": [
-            "ResearchState.civicGovValues"
+            "ResearchState.civicGovValues",
+            "ResearchState.civicPolicyBest"
           ],
           "planes": [
             "citystate_gov_values",
-            "citystate_gov_valid"
+            "citystate_gov_valid",
+            "citystate_civic_pol_best"
           ],
-          "note": "the civics AI's government values (+0xb38) its last turn wrote, in the governments' database order; empty before the first"
+          "note": "the civics AI's government values (+0xb38) its last turn wrote, in the governments' database order, then its best card per civic (0x623b90) in table order; empty before the first"
         },
         {
           "name": "minorCurrentCivic",

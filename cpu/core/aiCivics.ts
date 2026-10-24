@@ -131,9 +131,13 @@ const UNLOCKS = new Map(Object.values(CIVICS).map((c) => {
  * district a share at PSEUDOYIELD_DISTRICT, each from landing to the
  * horizon; PSEUDOYIELD_UNIT_COMBAT of 100 per land formation the civic
  * unlocks for the seat (its Corps' and its Armies' civic, the units manager's
- * +0xaa8 / +0xb08 through 0x4f2ac0); its policies at least
- * `CIVIC_AI_POLICY_FLOOR` (the best new card's score over the weakest
- * slotted one's is not read: the floor); its modifiers (CivicModifiers)
+ * +0xaa8 / +0xb08 through 0x4f2ac0); its policies: the best score of its
+ * cards as the civics AI's last turn wrote it (`ResearchState.
+ * civicPolicyBest`, 0x623b90) less the weakest slotted card's — none for a
+ * minor, which slots none — at least `CIVIC_AI_POLICY_FLOOR`
+ * (runs/h1_duelv1121 Hunza t44-46: Military Training 98.9 -> 115.9 on
+ * Equestrian Orders' 37.0, Civil Service 29.5 -> 71.5 on Civil Prestige's
+ * 62.0, as logged; a seat that writes none, the floor); its modifiers (CivicModifiers)
  * analysed from landing to the horizon (0x7a4b20) on `view` (the
  * state's `majorView` where none is given). The governments it unlocks
  * add, bare, max(v - v(current), v / 2) of the government values its civics
@@ -168,7 +172,7 @@ export function civicValue(state: GameState, seat: number, id: string, turns: nu
     + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns)
     + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
     + formations * pseudoYield(PSEUDOYIELD_UNIT_COMBAT, fxConst(CIVIC_AI_FORMATION_UNITS), w('PSEUDOYIELD_UNIT_COMBAT'))
-    + fxConst(CIVIC_AI_POLICY_FLOOR)
+    + Math.max(fxConst(CIVIC_AI_POLICY_FLOOR), researchOf(state, seat).civicPolicyBest?.[gameTypeOf('civic', id, 'CIVIC_')] ?? 0)
     + (mods.length ? modifiersValue({ view: view ?? majorView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0);
 }
 

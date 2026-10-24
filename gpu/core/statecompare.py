@@ -329,8 +329,11 @@ def _research_record(sim, b: int, s: int) -> list:
 
 def _gov_values_row(sim, b: int, s: int) -> list:
     """`govValuesRow`: the civics AI's government values in the
-    governments' database order, none before its first turn"""
-    return [int(x) for x in sim.citystate_gov_values[b, s].tolist()] if bool(sim.citystate_gov_valid[b, s]) else []
+    governments' database order, then its best card per civic in table
+    order, none before its first turn"""
+    if not bool(sim.citystate_gov_valid[b, s]):
+        return []
+    return [int(x) for x in sim.citystate_gov_values[b, s].tolist()] + [int(x) for x in sim.citystate_civic_pol_best[b, s].tolist()]
 
 
 def _barb_tribes_row(sim, b: int) -> list[int]:

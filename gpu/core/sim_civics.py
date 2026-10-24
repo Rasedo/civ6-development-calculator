@@ -118,8 +118,8 @@ class SimCivics:
         its era is before the game's; a share per building, a wonder's and a
         district's at their pseudo-yields (the district's at the minor's
         weight, `_ai_district_share`), each from landing to the horizon;
-        PSEUDOYIELD_UNIT_COMBAT of 100 per land formation it unlocks; the
-        policy floor; its modifiers, each its whole part: the envoys granted
+        PSEUDOYIELD_UNIT_COMBAT of 100 per land formation it unlocks; its
+        cards' best score its last turn wrote, at least the policy floor; its modifiers, each its whole part: the envoys granted
         (their points as PSEUDOYIELD_INFLUENCE discounted from landing), the
         spies (PSEUDOYIELD_UNIT_SPY) and the combat adjacency (the minor's
         strength, `_cai_strength`) from landing to the horizon. At the
@@ -152,8 +152,12 @@ class SimCivics:
         desire = self.citystate_combat_desire[:, s]
         formation = _fmul(torch.full_like(desire, T["formation"]),
                           _fmul(_FX + desire, torch.full_like(desire, T["formation_def"])))
+        # its cards: the best as the civics AI's last turn wrote it (a minor
+        # slots none), at least the floor; the floor before its first turn
+        valid = self.citystate_gov_valid[:, s].unsqueeze(1)
+        cards = torch.where(valid, self.citystate_civic_pol_best[:, s].clamp(min=T["floor"]), torch.full_like(turns, T["floor"]))
         val = (own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * district
-               + m[:, :, 3] * formation.unsqueeze(1) + T["floor"] + tokens + spies + adjacency)
+               + m[:, :, 3] * formation.unsqueeze(1) + cards + tokens + spies + adjacency)
         return torch.where(turns >= T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
 
     def _cai_gov_term(self, s: int, B: int, NC: int) -> torch.Tensor:
@@ -274,23 +278,27 @@ class SimCivics:
 
     def _cai_turn(self, s: int, alive: torch.Tensor, cul: torch.Tensor) -> None:
         """the AI's turn (0x620110): the analysis on the government values
-        its last turn wrote, kept for the next completion, this turn's
-        government values kept for the next analysis (`governmentValues`),
-        and with nothing in hand the choice"""
-        # its government values on the policy scores its last analysis lists
-        # (0x620110), which the next turn's analysis reads
-        gov = self._pol_gov_values(s)
+        and cards its last turn wrote, kept for the next completion; then the
+        policy jobs on the civics this analysis lists, and on their scores
+        the government values (`governmentValues`) and the best card per
+        civic (`civicPolicyBest`, 0x623b90) kept for the next analysis; with
+        nothing in hand the choice"""
         ent = self._cai_analysis(s, cul)
         turns, nxt, base, score, owned = ent
         m = alive.unsqueeze(1)
-        self.citystate_gov_values[:, s] = torch.where(m, gov, self.citystate_gov_values[:, s])
-        self.citystate_gov_valid[:, s] = self.citystate_gov_valid[:, s] | alive
         self.citystate_cai_turns[:, s] = torch.where(m, turns, self.citystate_cai_turns[:, s])
         self.citystate_cai_next[:, s] = torch.where(m, nxt, self.citystate_cai_next[:, s])
         self.citystate_cai_base[:, s] = torch.where(m, base, self.citystate_cai_base[:, s])
         self.citystate_cai_score[:, s] = torch.where(m, score, self.citystate_cai_score[:, s])
         self.citystate_cai_owned[:, s] = torch.where(m, owned, self.citystate_cai_owned[:, s])
         self.citystate_cai_valid[:, s] = self.citystate_cai_valid[:, s] | alive
+        ctx = self._pol_ctx(s)
+        sc = self._pol_scores(s, ctx)
+        gov = self._pol_gov_values(s, ctx, sc)
+        cards = self._pol_civic_best(sc, self.citystate_civic_pol_best.shape[2])
+        self.citystate_gov_values[:, s] = torch.where(m, gov, self.citystate_gov_values[:, s])
+        self.citystate_civic_pol_best[:, s] = torch.where(m, cards, self.citystate_civic_pol_best[:, s])
+        self.citystate_gov_valid[:, s] = self.citystate_gov_valid[:, s] | alive
         go = alive & (self.citystate_cur_civic[:, s] < 0)
         if bool(go.count_nonzero()):
             self._cai_take(s, self._cai_choice(s, go, ent, torch.full_like(self.citystate_cur_civic[:, s], -1)))

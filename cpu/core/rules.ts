@@ -542,7 +542,7 @@ export function canPlaceDistrictIn(
   city: City,
   type: DistrictId,
   tileIndex: number,
-  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean },
+  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean; anyCount?: boolean },
 ): RuleResult {
   const map = state.map;
   const def = DISTRICTS[type];
@@ -644,7 +644,9 @@ export function canPlaceDistrictIn(
       }
     }
   }
-  if (def.countsTowardLimit) {
+  // `anyCount`: the population's district limit not asked (the city build
+  // AI's plot analysis, which values a district past it)
+  if (def.countsTowardLimit && !opts.anyCount) {
     const specialty = others.filter((d) => DISTRICTS[d.type].countsTowardLimit).length;
     // CIV6 (Bi Sheng, Ada Lovelace): "Lets this city build one more district
     // than the Population limit allows" — a permanent per-city raise.

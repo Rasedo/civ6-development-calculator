@@ -682,10 +682,12 @@ function researchRecord(r: ResearchState | undefined): number[] {
 }
 
 /** the civics AI's government values in the governments' database order,
- *  none before its first turn */
+ *  then its best card per civic in table order, none before its first turn */
 function govValuesRow(r: ResearchState | undefined): number[] {
   const g = r?.civicGovValues;
-  return g ? AI_GOVERNMENTS.map((x) => g[x.type] ?? 0) : [];
+  if (!g) return [];
+  const best = r?.civicPolicyBest ?? {};
+  return [...AI_GOVERNMENTS.map((x) => g[x.type] ?? 0), ...[...CIVIC_IDX.keys()].map((id) => best[installType('civic', id, 'CIVIC_')] ?? 0)];
 }
 
 const wwPairs = (rec: Record<number, number>, live: (v: number) => boolean): number[] => {

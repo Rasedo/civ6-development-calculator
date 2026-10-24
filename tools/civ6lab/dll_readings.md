@@ -4225,7 +4225,11 @@ Site 181 of 402; Theater 124 and Encampment 21 of ~5,000 each).
   Encampment at (15,10) logs 59.93, our unscaled value 63.05 — no x1.5,
   the two lists summing to 0). The other
   districts 0x7aaf80 sets against the row (0x406c00, 0x1aec20, 0x35f2d0)
-  do not read the verdict.
+  do not read the verdict. The plot test asks no population limit: the
+  value's chronology term reads it (runs/h1_duelv1124 Bologna t20, its
+  Campus at the limit of 3 citizens: its Harbor rows 33-41 and its tree's
+  Celestial Navigation contract 50.0, as logged; `anyCount`, the GPU
+  plane's `limit=False`).
 
 - 0x7a51f0 (out, district, &rate, T, H, plot, city, ...): T past H
   FX(-9999). A plot without an owner pays its price: the city's Gold price
@@ -4930,7 +4934,12 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   PSEUDOYIELD_WONDER of 0.5; per district the player may have (0x406c00)
   PSEUDOYIELD_DISTRICT of 0.5 — each paid from landing to the horizon; its
   policies: the best of its cards' scores (0x623b90, 0 at least) less the
-  weakest slotted card's (0 with none), at least 20.0 (0x7aacb1); and the
+  weakest slotted card's (0 with none), at least 20.0 (0x7aacb1) — the
+  scores the policy jobs of the civics AI's last turn wrote, on the civics
+  that turn's analysis listed (runs/h1_duelv1121 Hunza: Military Training
+  115.9 at t44-46 on Equestrian Orders' 37.0, Civil Service 71.5 at t46 on
+  Civil Prestige's 62.0, first scored at t45 as Civil Service first valued
+  above 0 that turn; `civicPolicyBest` / `citystate_civic_pol_best`); and the
   civic's modifiers analysed (0x7a4b20) from landing to the horizon. The
   discount and H are the research value's (4.0, 50). The CivicModifiers'
   analyzers: EFFECT_GRANT_INFLUENCE_TOKEN 0x6a3780 (Amount x the player's

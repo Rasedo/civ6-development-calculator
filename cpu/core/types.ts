@@ -236,6 +236,10 @@ export interface ResearchState {
    *  written by its turn (0x620110) after the propagation and read by the
    *  next turn's analysis (`civicAnalysis`); absent before its first */
   civicGovValues?: Record<string, number>;
+  /** the civics AI's best card per civic (0x623b90, raw, by CIVIC_ type,
+   *  those above 0), written with `civicGovValues` and read by the next
+   *  turn's civic value (`civicValue`); absent before its first */
+  civicPolicyBest?: Record<string, number>;
   /** the research AI's turns left on its research as its last choice set
    *  them (research AI +0x528: its turn 0x760980 and a completion's choice
    *  0x762d60 write it), and the value its city build analysis of this turn

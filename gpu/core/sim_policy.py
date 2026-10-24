@@ -687,17 +687,29 @@ class SimPolicy:
             out[st] = sc.gather(1, bi.unsqueeze(1)).squeeze(1)
         return out
 
-    def _pol_gov_values(self, s: int) -> torch.Tensor:
+    def _pol_civic_best(self, sc: torch.Tensor, nc: int) -> torch.Tensor:
+        """[B, NC] `civicPolicyBest` (0x623b90): per civic (engine order)
+        the highest score of the cards it unlocks, at least 0"""
+        Tp = self._pol_tables()
+        out = torch.zeros(sc.shape[0], nc, dtype=torch.long, device=sc.device)
+        for k, p in enumerate(Tp["P"]):
+            c = p["civic"]
+            if c >= 0:
+                out[:, c] = torch.maximum(out[:, c], sc[:, k].clamp(min=0))
+        return out
+
+    def _pol_gov_values(self, s: int, ctx: dict | None = None, sc: torch.Tensor | None = None) -> torch.Tensor:
         """`governmentValues` [B, NG] raw: per government (database order)
         its value (0x7b0330, start 0, valueHorizons[1]) on the best card per
         slot type of the minor's scores — per slot row the type's best / 10
         over each slot's place (a type allowing any by 1, 1, 2, 3, 3...), its
         Favor as PSEUDOYIELD_DIPLOMATIC_FAVOR from the start to the horizon,
-        its modifiers' sum. A minor has held no government but its own"""
+        its modifiers' sum (`sc` the scores, `_pol_scores`, where given). A
+        minor has held no government but its own"""
         Tp = self._pol_tables()
         T = self._cv_tables()
-        ctx = self._pol_ctx(s)
-        best = self._pol_slot_best(self._pol_scores(s, ctx))
+        ctx = ctx or self._pol_ctx(s)
+        best = self._pol_slot_best(sc if sc is not None else self._pol_scores(s, ctx))
         B, dev = ctx["B"], ctx["dev"]
         h = int(self.rules.ai_value["horizon"])
         hh = torch.full((B,), h, dtype=torch.long, device=dev)

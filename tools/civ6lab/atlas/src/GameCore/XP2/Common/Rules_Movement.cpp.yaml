@@ -79,6 +79,21 @@
   context:
     - "...ted on the unit's `m_bEligibleToHeal` (+0x1590) and its plot's relation to the owner (0x530880: 1 own or allied, 2 unowned, 3 another's; the owner's no-neutral / no-foreign flags +0x..."
   review: imported
+- addr: 0x530f50
+  final: 0x378a70
+  kind: function
+  name: Rules_Movement
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1
+      value: "runs/h1_duelw1124 t1-60 planning rows (the replay's classifier):   855 -> 1,061 of 1,276 equal, the extra plots 609 -> 98, no new miss (65   revealed, 30 unrevealed as before);"
+  impl: [cpu/core/tactical.ts:Ground]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - ...nit's own plot and lies in the unit's enemy zone of control (0x26f980 -> Rules_Movement 0x530f50, the mover's owner, its stacking count 0x585eb0) is refused unless it is an attack (r14...
+  review: imported
 - addr: 0x531510
   final: 0x379000
   kind: function

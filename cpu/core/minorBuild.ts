@@ -72,7 +72,7 @@ import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { cityGrowth, majorView, storeUnitStrength } from './majorView';
-import { governmentValues } from './aiPolicyValue';
+import { civicPolicyBest, governmentValues, policyScores } from './aiPolicyValue';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
 import { minorTradeValue } from './aiTrade';
@@ -365,7 +365,8 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
  * THE AIS' TURNS (list B, after the city's production and growth): the
  * research AI analyses the tree on the Science the city now makes and makes
  * its turn's choice (0x760980); the civics AI analyses its tree on the
- * government values its last turn wrote, keeps this turn's (`governmentValues`)
+ * government values and cards its last turn wrote, keeps this turn's (`governmentValues`,
+ * `civicPolicyBest`, on the policy scores of the civics this analysis lists)
  * for the next and, with nothing in hand, chooses (0x620110). runs/h1_duelw1124 t5 Granada: grown
  * to two citizens that turn, every row at 3.0 Science (Animal Husbandry 4
  * turns where 2.5 gives 5).
@@ -378,11 +379,17 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   r.aiLeftSeen = r.aiLeft ?? 0;
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
   r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
-  // its government values on the policy scores its last analysis lists
-  // (0x620110), which the next turn's analysis reads
-  const govs = governmentValues(majorView(state), seat);
+  // the analysis on the government values and cards its last turn wrote,
+  // then the policy jobs on the civics this analysis lists, and on their
+  // scores the government values and the best card per civic (0x620110,
+  // 0x623b90) the next turn's analysis reads (runs/h1_duelv1121 Hunza t45:
+  // Civil Service first valued above 0 that turn, its Civil Prestige scored
+  // that turn, 62.0 as logged)
   r.civicAiEntries = civicAnalysis(state, seat, culture, {}, city()?.civic);
-  r.civicGovValues = govs;
+  const view = majorView(state);
+  const scores = policyScores(view, seat);
+  r.civicGovValues = governmentValues(view, seat, scores);
+  r.civicPolicyBest = civicPolicyBest(scores);
   if (!r.civic) takeCivic(r, civicChoice(state, seat, r.civicAiEntries, null, civicDraw(state)));
 }
 

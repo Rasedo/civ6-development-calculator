@@ -282,11 +282,15 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       if (v === undefined) adjOf.set(id, (v = baseAdjacency(yctx, tile, id)));
       return v;
     };
+    // the plot test (0x35f2d0) asks no population limit: the value's own
+    // term reads it (runs/h1_duelv1124 Bologna t20: its Campus at the
+    // limit of 3 citizens, its Harbor rows valued 33-41 and its tree's
+    // Celestial Navigation contract at 50.0, as logged)
     const placed = new Map<DistrictId, boolean>();
     let others: string[] | undefined;
     const placeable = (id: DistrictId): boolean => {
       let ok = placed.get(id);
-      if (ok === undefined) placed.set(id, (ok = canPlaceDistrictIn(state, city, id, plot, { unlocks: null, ownsTile: () => true }).ok));
+      if (ok === undefined) placed.set(id, (ok = canPlaceDistrictIn(state, city, id, plot, { unlocks: null, ownsTile: () => true, anyCount: true }).ok));
       return ok;
     };
     const df: DistrictValueFacts = {

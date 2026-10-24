@@ -551,6 +551,7 @@
     - cpu/core/minorBuild.ts:minorUnitTerm
     - cpu/data/aiCivics.ts:CIVIC_AI_FORMATION_UNITS
     - gpu/core/sim_civics.py:_cai_gov_term
+    - cpu/core/aiPolicyValue.ts:civicPolicyBest
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:

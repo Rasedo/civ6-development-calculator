@@ -46,6 +46,8 @@
     - cpu/core/tactical.ts:minor
     - gpu/core/sim_tactics.py:_tac_attack_planes
     - cpu/core/tactical.ts:moves
+    - cpu/core/tactical.ts:before
+    - gpu/core/sim_tactics.py:_tac_search
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -120,7 +122,10 @@
   final: 0x1a7e90
   kind: function
   status: PARTLY
-  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  impl: [cpu/core/tactical.ts:Ground]
+  readings:
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."

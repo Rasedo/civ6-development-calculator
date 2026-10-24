@@ -41,9 +41,6 @@
     - gpu/core/sim_civics.py:_cai_turn
     - cpu/core/aiPolicyValue.ts:slotTypeBest
     - cpu/core/minorBuild.ts:minorResearchTurn
-    - cpu/core/aiPolicyValue.ts:slotTypeBest
-    - cpu/core/aiPolicyValue.ts:governmentValues
-    - cpu/core/minorBuild.ts:govs
     - cpu/core/types.ts:ResearchState
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
@@ -162,7 +159,17 @@
   final: 0x416600
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:ValueTerms, ai/major/congress.ts:bestPolicy]
+  impl:
+    - cpu/core/aiModifiers.ts:ValueTerms
+    - ai/major/congress.ts:bestPolicy
+    - cpu/core/aiCivics.ts:civicValue
+    - cpu/core/aiPolicyValue.ts:civicPolicyBest
+    - cpu/core/minorBuild.ts:minorResearchTurn
+    - cpu/core/types.ts:ResearchState
+    - gpu/core/sim_civics.py:_cai_turn
+    - gpu/core/sim_init.py:__init__
+    - gpu/core/sim_policy.py:_pol_civic_best
+    - gpu/core/simbase.py:_MUTABLE
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"

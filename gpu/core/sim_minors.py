@@ -1202,7 +1202,7 @@ class SimMinors:
             ok = ok & ((u0 != self._archaeologist_idx) | has)
         return ok
 
-    def _minor_district_plane(self, s: int, dv: int, own: bool, research: bool) -> torch.Tensor:
+    def _minor_district_plane(self, s: int, dv: int, own: bool, research: bool, limit: bool = True) -> torch.Tensor:
         """[B, T] — `canPlaceDistrictIn` of district `dv` in minor `s`'s city
         on each plot: with `own` the minor's own plots alone, else any; with
         `research` its research unlocks the district and clears the plot's
@@ -1210,7 +1210,8 @@ class SimMinors:
         on it, no district, centre or wonder there, a bonus resource at most
         (an unseen one plain ground), the district's surface and placement
         (`_district_elig`), one of a type to the city (a repeatable one
-        aside), a specialty district under the population's limit — and the
+        aside), a specialty district under the population's limit (`limit`; the
+        plot analysis asks none, `anyCount`) — and the
         plot holding this district the city placed and is building (no
         resource asked, the city's count without it)."""
         row = self._CITY_MINOR0 + s
@@ -1241,7 +1242,7 @@ class SimMinors:
         held = (self.city_dist_tile[:, row, 0, dv] >= 0) & ~self._is_repeatable[dv]
         ok = (~held).unsqueeze(1)
         ok_h = held_p
-        if bool(self._is_specialty[dv]):
+        if limit and bool(self._is_specialty[dv]):
             spec = ((self.city_dist_tile[:, row, 0] >= 0) & self._is_specialty).sum(dim=1)
             cap = torch.div(self.city_pop[:, row, 0].long() - 1, 3, rounding_mode="floor") + 1
             ok = ok & (spec < cap).unsqueeze(1)

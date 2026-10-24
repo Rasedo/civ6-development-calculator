@@ -897,7 +897,8 @@ class SimMinorAi:
             dv = int(E["district"][i])
             if r["trait"] or r["type"] in ("DISTRICT_CITY_CENTER", "DISTRICT_WONDER") or dv < 0:
                 continue
-            pl = self._minor_district_plane(s, dv, False, False).gather(1, p0) & ev & (held[:, dv] < 0).unsqueeze(1)
+            # the plot test (0x35f2d0) asks no population limit
+            pl = self._minor_district_plane(s, dv, False, False, limit=False).gather(1, p0) & ev & (held[:, dv] < 0).unsqueeze(1)
             if bool(pl.count_nonzero()):
                 # the minor's type's verdict: a district it disfavours is
                 # valued at none of its plots (it stays among the others)

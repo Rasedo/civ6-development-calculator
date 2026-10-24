@@ -136,7 +136,20 @@ export function governmentValue(view: MajorView, seat: number, gov: string, best
  *  +0xb38 [gov] = 0x7b0330(gov, the rate, start 0, valueHorizons[1])): every
  *  government's value on the best card per slot type of the seat's policy
  *  scores, by GOVERNMENT_ type */
-export function governmentValues(view: MajorView, seat: number): Record<string, number> {
-  const best = slotTypeBest(policyScores(view, seat));
+export function governmentValues(view: MajorView, seat: number, scores: PolicyScores = policyScores(view, seat)): Record<string, number> {
+  const best = slotTypeBest(scores);
   return Object.fromEntries(AI_GOVERNMENTS.map((g) => [g.type, governmentValue(view, seat, g.type, best, AI_VALUE_HORIZON)]));
+}
+
+/** THE BEST CARD PER CIVIC (0x623b90, read by the civic value 0x7a9a10):
+ *  per install civic the highest score of the cards it unlocks, at least 0,
+ *  by CIVIC_ type; civics whose cards score nothing above 0 left out */
+export function civicPolicyBest(scores: PolicyScores): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const p of AI_POLICIES) {
+    const v = scores.get(p.type) ?? NO_SCORE;
+    if (!p.civic || v <= 0) continue;
+    out[p.civic] = Math.max(out[p.civic] ?? 0, v);
+  }
+  return out;
 }
