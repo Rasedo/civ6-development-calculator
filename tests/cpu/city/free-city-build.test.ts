@@ -57,8 +57,10 @@ describe("the Free City's production", () => {
     const bt = buildingTable(f).filter((v) => v !== FX_MIN);
     const ut = unitTable(f).filter((v): v is number => v !== null && v !== FX_MIN);
     // the Warrior Monk, Warrior and Slinger each with half its one city over
-    // the strongest melee it has trained (none: the revolt's grants train nothing)
-    expect([bt.length, bt.reduce((a, b) => a + b, 0), ut.length, ut.reduce((a, b) => a + b, 0)]).toEqual([1, 7728, 6, 32712]);
+    // the strongest melee it has trained (none: the revolt's grants train nothing);
+    // the Scout at 0 under the Free Cities' PSEUDOYIELD_UNIT_EXPLORER of -1.0, and
+    // PSEUDOYIELD_UNIT_COMBAT their Combat Desire, 0 before their first military turn
+    expect([bt.length, bt.reduce((a, b) => a + b, 0), ut.length, ut.reduce((a, b) => a + b, 0)]).toEqual([1, 7728, 6, 28262]);
     const seq: unknown[] = [];
     for (let k = 0; k < 8; k++) {
       freeCityBuild(state, city, 5);

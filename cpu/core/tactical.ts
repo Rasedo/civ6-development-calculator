@@ -249,7 +249,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
  * search stops where it answers true. `onLink` sees each link the search
  * prices (the cost callback 0x26d6f0): the plot, the plot it is linked from,
  * the turn and Movement the step reaches it with, and whether it attacks —
- * the start first, linked from itself. `standToAttack` (the danger map's
+ * the start first, linked from itself. Standing to attack (the danger map's
  * search): an attack is struck only from the unit's own plot or one none of
  * its own stacking units holds.
  */
