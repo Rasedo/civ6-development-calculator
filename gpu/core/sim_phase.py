@@ -114,7 +114,9 @@ class SimPhase:
         def_promo = self._promo_cs(
             d_type, self.unit_promos[bidx, ds0],
             attacking=~_t, ranged=_t, vs_city=_t, tile=tt)
+        # the target's fortification stands under the shot (`cityStrikeDefenderCS`)
         def_cs = (self._type_combat.take(d_type) + self._tdef_i(bidx, tt) + def_promo
+                  + self.unit_fortify[bidx, ds0] * 3
                   + self._formation_cs.take(self.unit_formation[bidx, ds0].clamp(min=0, max=self._form_max)))
         # An embarked target (military or civilian; barbs never embark) → the
         # era's normalized CS, no terrain and no support.

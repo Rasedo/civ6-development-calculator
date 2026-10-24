@@ -62,6 +62,18 @@ describe('the defender under a city strike', () => {
     expect(own(ngao)).toBe(plain + 10);
   });
 
+  it('keeps its fortification under the shot', () => {
+    // runs/h1_duelw1117 t76: a barbarian Warrior two turns dug in on Hills,
+    // CombatLog DefenderStrMod +9 against Xi'an's strike
+    const state = scene();
+    const t = tileAtCoords(state.map, 6, 6);
+    t.elevation = 'HILLS';
+    const u = spawnUnit(state, 'WARRIOR', t.index, 1)!;
+    const plain = cityStrikeDefenderCS(state, u, t, 0);
+    u.fortifyTurns = 2;
+    expect(cityStrikeDefenderCS(state, u, t, 0)).toBe(plain + 6);
+  });
+
   it('carries the diplomatic-visibility bonus against the striking seat', () => {
     const state = scene();
     state.seats.push(emptySeat(1));

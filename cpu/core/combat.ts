@@ -1253,8 +1253,12 @@ export function barbarianCombatCS(state: GameState, own: number, foe: number): n
 export function cityStrikeDefenderCS(state: GameState, defender: Unit, tile: Tile, striker: number): number {
   const base = defender.embarked
     ? embarkedDefenseCS(state, defender.seat) - woundPenalty(defender)
+    // its fortification stands under the shot (runs/h1_duelw1117 t76: a
+    // barbarian Warrior two turns dug in on Hills, CombatLog +9 against
+    // Xi'an's strike; 1121 t229 one turn +3, 1128 t119 two turns +8 at 8
+    // damage)
     : (UNITS[defender.type]?.combat ?? 0) + formationCS(defender) + terrainDefense(tile)
-      - woundPenalty(defender)
+      + fortifyBonus(defender) - woundPenalty(defender)
       + promoCS(defender, { attacking: false, ranged: true, vsCity: true, tile })
       + chassisAbilityCS(state, defender, tile.index, { defendingRanged: true });
   // CIV6 (Military Advisory / Oligarchy / Fascism): a flat unit adder is the

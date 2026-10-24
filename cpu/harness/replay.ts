@@ -152,6 +152,9 @@ interface Ctx {
   /** the pair's Fortify orders: unit -> the order's place in the log and the
    *  fortification record t+1 shows (`dugIn`) */
   fortified: Map<string, { ord: number; turns: number }>;
+  /** the units that moved in the pair dug in: unit -> its first step's place
+   *  in the log and the fortification it held before it (`dugIn`) */
+  undug: Map<string, { ord: number; turns: number }>;
   cat: Catalog;
   W: number;
   seatOfPlayer: Map<number, number>;
@@ -1565,6 +1568,8 @@ function fortifiedIn(b: TurnRecord): Map<string, { ord: number; turns: number }>
 function dugIn(ctx: Ctx, d: BattleDecision, def: Unit): void {
   const f = ctx.fortified.get(d.defender);
   if (f && d.ord > f.ord && f.turns > (def.fortifyTurns ?? 0)) def.fortifyTurns = f.turns;
+  const m = ctx.undug.get(d.defender);
+  if (m && d.ord < m.ord && m.turns > (def.fortifyTurns ?? 0)) def.fortifyTurns = m.turns;
 }
 
 /** A UNIT'S ATTACK ON A CITY the log names (`battle` with no defender: a
@@ -2766,12 +2771,29 @@ function recordCityName(ctx: Ctx, seat: number, id: number): string {
  *  record t+1 holds undug gave no order, so the engine's dig-in for standing
  *  does not land on it; a unit the pair killed, which record t+1 does not
  *  hold, digs in no further than record t had it (runs/h1_duelw1120 t13:
- *  Rome's Warrior 327683, undug at t13, struck twice by barbarians at +0). */
+ *  Rome's Warrior 327683, undug at t13, struck twice by barbarians at +0).
+ *  A unit that moved in the pair lost its fortification at its first step:
+ *  a blow before that step in the log still finds it dug in (`undug`,
+ *  `dugIn`; runs/h1_duelw1117 t76: barbarian Warrior 3211267, two turns dug
+ *  in at 38:14, took Xi'an's shot and a Heavy Chariot's blow at +9 and +6
+ *  before its own turn's move to 37:14). */
 function fortifyOrders(ctx: Ctx, a: TurnRecord, b: TurnRecord): void {
   const held = new Set(b.units.map((r) => `${r.owner}:${r.id}`));
+  const stepped = new Map<string, number>();
+  const rows = (b as { actions?: unknown }).actions;
+  if (Array.isArray(rows)) {
+    for (const x of rows as unknown[][]) {
+      const k = `${x[3]}:${x[4]}`;
+      if (x[2] === 'UnitMoved' && !stepped.has(k)) stepped.set(k, x[0] as number);
+    }
+  }
+  ctx.undug = new Map();
   for (const r of b.units) {
-    const u = unitOf(ctx, `${r.owner}:${r.id}`);
+    const key = `${r.owner}:${r.id}`;
+    const u = unitOf(ctx, key);
     if (!u || num(r.fortify) > 0 || !(u.fortifyTurns ?? 0)) continue;
+    const ord = stepped.get(key);
+    if (ord !== undefined) ctx.undug.set(key, { ord, turns: u.fortifyTurns ?? 0 });
     u.fortifyTurns = 0;
     count(ctx, 'fortify', 'applied');
   }
@@ -3623,7 +3645,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
