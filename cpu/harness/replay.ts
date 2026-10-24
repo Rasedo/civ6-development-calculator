@@ -85,7 +85,7 @@ import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, mi
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
-import { holdMinorClears, minorAiTurn, minorMilitaryTurn, traceMinorAi } from '../core/minorCityAi';
+import { holdMinorClears, minorAiTurn, minorGreatPersonClass, minorMilitaryTurn, traceMinorAi } from '../core/minorCityAi';
 import { cityStateMilitary, traceMinorOps } from '../core/minorOps';
 import { traceBarbOps } from '../core/barbarianOps';
 import { opsOf } from '../core/operations/manager';
@@ -1756,7 +1756,10 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     ctx.pendingMinors.delete(d.player);
     // a city-state's founding (`placeCityStateAt`, the engine's setup step)
     const placed = placeCityStateAt(state, minor.id, minor.name, minor.type, d.plot);
-    Object.assign(placed, { envoys: minor.envoys, met: minor.met, suzerain: minor.suzerain, research: minor.research });
+    // its purse as the record's player held it before its city (runs/h1_duelw1124
+    // t1: every city-state's 5 Gold at no yield)
+    Object.assign(placed, { envoys: minor.envoys, met: minor.met, suzerain: minor.suzerain, research: minor.research,
+      treasury: minor.treasury, faith: minor.faith });
     state.cityStates.sort((a, b) => a.id - b.id);
     if (settler) disbandUnit(state, settler.id);
     // the game's minor took its first turn the turn the city was founded:
@@ -3655,7 +3658,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       if (cs.centerIndex < 0) continue;
       cs.cityAi = newCityAi();
       cs.economy = newEconomicMemory();
-      savingsTurn(cs.economy, Math.trunc(cs.treasury * FX), false);
+      savingsTurn(cs.economy, Math.trunc(cs.treasury * FX), minorGreatPersonClass(state));
     }
   }
   // their knowledge bases hold the look of the import's turn, which their

@@ -701,7 +701,7 @@ class SimCityValue:
         spend; whether it bought"""
         c = cost * _FX
         s0, s1 = savings[..., _SLOT_SLUSH], savings[..., _SLOT_UNITS]
-        threatened = (threat & 0xFF) != 0
+        threatened = threat >= 0
         saved = (s0 + s1 > c) & ((s1 > (c >> 1)) | (s0 > 2 * c))
         buy = (cost >= 0) & can & (saved | (threatened & (balance >= c)))
         plain = buy & ~threatened

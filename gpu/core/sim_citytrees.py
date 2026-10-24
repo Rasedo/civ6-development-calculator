@@ -246,6 +246,9 @@ class CityAi:
         # the contract is in its tree's list; the seat's city lists it
         self.c_in_tree = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
         self.c_listed = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
+        # the economic AI's purchase list holds it (`ContractBook.purchase`;
+        # its order the contracts' ids)
+        self.c_purchase = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
         self.in_hand = torch.full((B, S), -1, dtype=L, device=dev)
         # the plot reservations
         R = N_RESERVATIONS
@@ -311,7 +314,7 @@ def new_contract(ai: CityAi, s: int, mask: torch.Tensor, **f) -> torch.Tensor:
     for k, d in defaults.items():
         v = f.get(k, d)
         _cset(getattr(ai, "c_" + k), s, j, _l(v, cid), mask)
-    for k in ("assign", "queued", "in_tree", "listed"):
+    for k in ("assign", "queued", "in_tree", "listed", "purchase"):
         _cset(getattr(ai, "c_" + k), s, j, _b(f.get(k, False), mask), mask)
     return j
 
@@ -390,11 +393,13 @@ def submit_contract(ai: CityAi, s: int, j: torch.Tensor, w, turn: int, mask: tor
     """`submitContract` where `mask`: SUBMITTED; the seat's city lists it
     where it may take it, clearing its production where the contract's value
     passes the item's in a city founded this turn or the one before; any taker (the
-    city, the economic AI's gold purchase, the religious AI's faith purchase)
-    makes it ACCEPTED"""
+    city, the economic AI's gold purchase — onto its purchase list —, the
+    religious AI's faith purchase) makes it ACCEPTED"""
     _cset(ai.c_progress, s, j, CP_SUBMITTED, mask)
     unit, bld, dist = _cget(ai.c_unit, s, j), _cget(ai.c_building, s, j), _cget(ai.c_district, s, j)
-    taken = gold_purchasable(ai, unit, bld, dist) | faith_purchasable(ai, unit, bld, dist)
+    gold = gold_purchasable(ai, unit, bld, dist)
+    _cset(ai.c_purchase, s, j, True, mask & gold)
+    taken = gold | faith_purchasable(ai, unit, bld, dist)
     el = mask & contract_eligible(ai, s, j, w)
     _cset(ai.c_listed, s, j, True, el)
     clear = el & (_cget(ai.c_value, s, j) > _l(w.current_value(), j)) & (_l(w.founded_turn(), j) + 1 >= turn)
@@ -405,10 +410,11 @@ def submit_contract(ai: CityAi, s: int, j: torch.Tensor, w, turn: int, mask: tor
 
 
 def city_contracts(ai: CityAi, s: int, w, mask: torch.Tensor) -> torch.Tensor:
-    """`cityContracts` where `mask`: each contract the city lists, in
-    arrival order — an ACCEPTED one it may still take valued and the one in
-    hand the higher valued; any other leaves the list. [B] the slot of the
-    contract in hand after, -1 none"""
+    """`cityContracts` where `mask`: the hand released first; each contract
+    the city lists, in arrival order — an ACCEPTED one it may still take
+    valued and the one in hand the higher valued; any other leaves the list.
+    [B] the slot of the contract in hand after, -1 none"""
+    ai.in_hand[:, s] = torch.where(mask, torch.full_like(ai.in_hand[:, s], -1), ai.in_hand[:, s])
     order = torch.where(ai.c_listed[:, s] & (ai.c_id[:, s] >= 0), ai.c_id[:, s], torch.full_like(ai.c_id[:, s], 1 << 40))
     idx = order.argsort(dim=1)
     for r in range(N_CONTRACTS):
@@ -519,6 +525,7 @@ def reap_contracts(ai: CityAi, s: int, w) -> None:
     gone = (ai.c_id[:, s] >= 0) & ~keep
     ai.c_id[:, s] = torch.where(gone, torch.full_like(ai.c_id[:, s], -1), ai.c_id[:, s])
     ai.c_listed[:, s] &= ~gone
+    ai.c_purchase[:, s] &= ~gone
     ai.c_in_tree[:, s] &= ~gone
     ai.c_queued[:, s] &= ~gone
 

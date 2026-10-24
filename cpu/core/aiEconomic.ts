@@ -17,6 +17,10 @@
  * asks the slot for the price x (1 - frac) and slot 0 + the slot for the
  * price.
  *
+ * THE CONTRACT PURCHASES (0x687bf0, after the savings): the gold-bought
+ * contracts its listener listed, each tried through TryPurchaseUnits
+ * (`purchaseContracts`).
+ *
  * THE PURCHASES (the city's second hook 0x5ce5b0, after the Default
  * Specialization): a threatened city (CityBuildAI +0x1b8 above -1) of a
  * player no human drives buys, while TryPurchaseUnits (0x68be60) succeeds,
@@ -24,6 +28,7 @@
  */
 import { AI_DEFAULT_SAVINGS } from '../data/aiTables';
 import { FX } from './aiValue';
+import { CP_ACCEPTED, CP_COMPLETED, contractById, goldPurchasable, type AiContract, type ContractBook } from './aiContracts';
 
 /** the savings slots by SavingTypes order */
 export const SLOT_SLUSH = 0;
@@ -85,7 +90,8 @@ export interface PurchaseCity {
   /** the city's Gold price of the unit (city +0x1688, 0x1b22d0), whole
    *  Gold, below 0 where it may not buy it */
   goldCost(unit: string): number;
-  /** the city's threat byte (CityBuildAI +0x1b8's low byte) */
+  /** the city's threat (CityBuildAI +0x1b8): threatened at or above 0 (its
+   *  sign bit clear, 0x68c02e) */
   threat: number;
   /** the game lets the purchase through (0x977570, the purchase request) */
   canPurchase(unit: string): boolean;
@@ -107,11 +113,11 @@ export function tryPurchaseUnits(e: EconomicMemory, cities: readonly PurchaseCit
     const s0 = e.savings[SLOT_SLUSH];
     const s1 = e.savings[SLOT_UNITS];
     const fromSavings = s0 + s1 > cost && (s1 > (cost >> 1) || s0 > 2 * cost);
-    const emergency = !fromSavings && (c.threat & 0xff) !== 0 && e.balance >= cost;
+    const emergency = !fromSavings && c.threat > -1 && e.balance >= cost;
     if (!fromSavings && !emergency) continue;
     if (!c.canPurchase(unit)) continue;
     buy(c);
-    if ((c.threat & 0xff) === 0) {
+    if (c.threat <= -1) {
       e.savings[SLOT_SLUSH] -= Math.max(0, cost - s1);
       e.savings[SLOT_UNITS] = Math.max(0, s1 - cost);
     } else {
@@ -128,6 +134,37 @@ export function tryPurchaseUnits(e: EconomicMemory, cities: readonly PurchaseCit
   return null;
 }
 
+/** THE CONTRACT PURCHASES (0x687bf0 after the savings, 0x688920): the
+ *  purchase list (AI::Economic +0x5d0, the contracts its listener 0x68ab40
+ *  took at their submission) keeps the contracts still alive, ACCEPTED and
+ *  goldPurchasable (vt +0x80), in arrival order (0x684bf0, a stable sort on
+ *  contract +0x160, which no read writer sets); then, for a player no human
+ *  drives, each tries its purchase (vt +0x50 true, vt +0x20 0x5f3c40): a
+ *  unit's through TryPurchaseUnits in the city the contract binds (every
+ *  city of the player where it binds none), COMPLETED where it buys — its
+ *  "PURCHASE" line; a building's (0x68afe0's value test) buys none here (runs/h1_duelw1124 t27 Granada: the Builder of contract
+ *  58, submitted at t26, bought at the start of its turn). `cities` the
+ *  cities a contract may buy in. The contracts bought. */
+export function purchaseContracts(e: EconomicMemory, book: ContractBook, human: boolean,
+                                  cities: (c: AiContract) => readonly PurchaseCity[],
+                                  buy: (city: PurchaseCity, unit: string) => void): AiContract[] {
+  book.purchase = book.purchase.filter((id) => {
+    const c = contractById(book, id);
+    return !!c && c.progress === CP_ACCEPTED && goldPurchasable(c);
+  });
+  const bought: AiContract[] = [];
+  if (human) return bought;
+  for (const id of book.purchase) {
+    const c = contractById(book, id)!;
+    if (c.unit === null) continue;
+    const unit = c.unit;
+    if (!tryPurchaseUnits(e, cities(c), unit, (city) => buy(city, unit))) continue;
+    c.progress = CP_COMPLETED;
+    bought.push(c);
+  }
+  return bought;
+}
+
 /** One entry of the city's unit list (CityBuildAI +0x650, 0x168 bytes each,
  *  in its order) */
 export interface PurchaseEntry {
@@ -142,14 +179,17 @@ export interface PurchaseEntry {
 /** 0x5d2810: the first entry of the list the city may train (CanTrain),
  *  whose unit's +0x1b9 byte is below 0x80 and whose domain is `domain`
  *  (null any); the entries are ranked, so the first is the best of its rank
- *  — null where none */
+ *  — null where none, or where that entry's ranks fall below 0 (the walk
+ *  starts its bests at 0 and stops on an entry ranked below them,
+ *  0x5d2941: runs/h1_duelw1124 Granada t19-t23, threatened under City
+ *  Defense with 95 Gold, bought nothing) */
 export function purchasePick(entries: readonly PurchaseEntry[], canTrain: (unit: string) => boolean,
                              eligible: (unit: string) => boolean, domainOf: (unit: string) => string | null,
                              domain: string | null): string | null {
   for (const e of entries) {
     if (!e.valid || !canTrain(e.unit) || !eligible(e.unit)) continue;
     if (domain !== null && domainOf(e.unit) !== domain) continue;
-    return e.unit;
+    return e.rank >= 0 && e.subRank >= 0 ? e.unit : null;
   }
   return null;
 }

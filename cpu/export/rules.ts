@@ -37,7 +37,7 @@ import {
   PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
 } from '../data/aiValue';
 import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
-import { AI_GOVERNMENTS, AI_POLICIES, AI_SLOT_TYPES } from '../../ai/major/tables';
+import { AI_GOVERNMENTS, AI_GREAT_PERSON_CLASSES, AI_POLICIES, AI_SLOT_TYPES } from '../../ai/major/tables';
 import { CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
 import { techUnlocks } from '../core/aiResearch';
 import { civicUnlocks } from '../core/aiCivics';
@@ -1061,6 +1061,9 @@ export function buildRules() {
       districts: AI_DISTRICTS,
       projects: AI_PROJECTS,
       savings: AI_DEFAULT_SAVINGS.map((s) => s.weight),
+      // per AI Great Person class its engine class (`GP_CLASSES`), -1 none:
+      // the savings' class availability (`minorGreatPersonClass`)
+      gpClasses: AI_GREAT_PERSON_CLASSES.map((c) => GP_CLASSES.indexOf(c.replace(/^GREAT_PERSON_CLASS_/, '') as (typeof GP_CLASSES)[number])),
       buildings: AI_BUILDINGS,
       modifierReads: AI_MODIFIER_READS,
       units: AI_UNITS,

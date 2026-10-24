@@ -1045,6 +1045,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorAiSlots: overCityStates((cityState) => cityAiSlots(cityState)),
   minorAiTrees: overCityStates((cityState, state) => cityAiTrees(cityState, state)),
   minorContracts: overCityStates((cityState) => cityAiContracts(cityState)),
+  minorPurchaseList: overCityStates((cityState) => [...(cityState.cityAi?.purchase ?? [])].sort((a, b) => a - b)),
   minorReservations: overCityStates((cityState) => [...(cityState.cityAi?.reservations ?? [])].sort((a, b) => a.plot - b.plot)
     .flatMap((r) => [r.plot, r.tree, r.value])),
   minorAiHand: overCityStates((cityState) => [cityState.cityAi?.inHand[-1] ?? -1, cityState.cityAi?.nextContract ?? 1, cityState.cityAi?.nextTree ?? 100,

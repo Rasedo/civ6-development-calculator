@@ -105,9 +105,12 @@ export interface ContractBook {
   city: Record<number, number[]>;
   /** per city id, the contract in hand (CityBuildAI +0x398), -1 none */
   inHand: Record<number, number>;
+  /** the economic AI's purchase list (AI::Economic +0x5d0): the ids of the
+   *  contracts its listener took, in arrival order */
+  purchase: number[];
 }
 
-export const newContractBook = (): ContractBook => ({ contracts: [], city: {}, inHand: {} });
+export const newContractBook = (): ContractBook => ({ contracts: [], city: {}, inHand: {}, purchase: [] });
 
 export function contractById(book: ContractBook, id: number): AiContract | undefined {
   return book.contracts.find((c) => c.id === id);
@@ -207,14 +210,16 @@ export function faithPurchasable(c: ContractItem): boolean {
  *  passes the value of the item the city produces in a city founded this
  *  turn or the one before (city +0x2600, runs/h1_duelw1117 Caguana t34: its
  *  Warrior kept under the Harbor contract), clears the city's production; the economic AI's
- *  (goldPurchasable; a city-state's too: AI_CityBuild.csv's PURCHASE lines
- *  of players 2+) and the religious AI's (faithPurchasable); any taker makes
- *  it ACCEPTED */
+ *  (goldPurchasable, into its purchase list `ContractBook.purchase`; a
+ *  city-state's too: AI_CityBuild.csv's PURCHASE lines of players 2+) and
+ *  the religious AI's (faithPurchasable); any taker makes it ACCEPTED */
 export function submitContract(book: ContractBook, c: AiContract, cities: readonly ContractCity[], turn: number,
   clearProduction: (city: ContractCity) => void, line: (city: ContractCity, c: AiContract) => void): void {
   c.progress = CP_SUBMITTED;
   book.contracts.push(c);
-  let taken = goldPurchasable(c) || faithPurchasable(c);
+  const gold = goldPurchasable(c);
+  if (gold) book.purchase.push(c.id);
+  let taken = gold || faithPurchasable(c);
   for (const city of cities) {
     if (!contractEligible(c, city)) continue;
     (book.city[city.id] ??= []).push(c.id);
@@ -225,12 +230,16 @@ export function submitContract(book: ContractBook, c: AiContract, cities: readon
   if (taken) c.progress = CP_ACCEPTED;
 }
 
-/** THE DEFAULT SPECIALIZATION'S CONTRACTS (0x5d4d70's head): each contract
- *  the city lists, in order — an ACCEPTED one it may still take is valued
- *  (vt +0x68) and the one in hand becomes the higher valued; any other logs
- *  its line and leaves the list, one no holder keeps any more leaves it
- *  without a line. The contract in hand after. */
+/** THE DEFAULT SPECIALIZATION'S CONTRACTS (0x5d4d70's head): the hand
+ *  released first (0x600b00 on +0x340), so a contract its item's completion
+ *  left in hand takes no turn (a district's: vt +0x68 holds it "producing";
+ *  runs/h1_duelw1124 Bologna t19, its Library queued the turn its Campus
+ *  completed); then each contract the city lists, in order — an ACCEPTED one
+ *  it may still take is valued (vt +0x68) and the one in hand becomes the
+ *  higher valued; any other logs its line and leaves the list, one no holder
+ *  keeps any more leaves it without a line. The contract in hand after. */
 export function cityContracts(book: ContractBook, city: ContractCity, line: (c: AiContract) => void): AiContract | null {
+  book.inHand[city.id] = -1;
   const ids = book.city[city.id] ?? [];
   const kept: number[] = [];
   for (const id of ids) {
@@ -334,6 +343,8 @@ export function reapContracts(book: ContractBook, held: ReadonlySet<number>): nu
   for (const id of Object.values(book.inHand)) keep.add(id);
   const gone = book.contracts.filter((c) => !keep.has(c.id)).map((c) => c.id);
   book.contracts = book.contracts.filter((c) => keep.has(c.id));
+  // the purchase list's handles empty with them
+  book.purchase = book.purchase.filter((id) => keep.has(id));
   return gone;
 }
 

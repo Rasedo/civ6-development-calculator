@@ -1044,6 +1044,9 @@ CITY_STATE = {
     "minorAiSlots": lambda sim, b, rows: [[int(x) for x in sim.cai_slots[b, s].tolist()] for s in rows],
     "minorAiTrees": lambda sim, b, rows: [_ai_trees(sim, b, s) for s in rows],
     "minorContracts": lambda sim, b, rows: [_ai_contracts(sim, b, s) for s in rows],
+    "minorPurchaseList": lambda sim, b, rows: [
+        sorted(int(c) for c, on in zip(sim.cai_c_id[b, s].tolist(), sim.cai_c_purchase[b, s].tolist()) if on and c >= 0)
+        for s in rows],
     "minorReservations": lambda sim, b, rows: [
         [x for r in sorted((int(p), int(t), int(v)) for p, t, v in zip(sim.cai_r_plot[b, s].tolist(), sim.cai_r_tree[b, s].tolist(),
                                                                         sim.cai_r_value[b, s].tolist()) if p >= 0) for x in r]

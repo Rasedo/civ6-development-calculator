@@ -1913,8 +1913,10 @@
   final: 0x3f8850
   kind: function
   status: PARTLY
-  impl: [cpu/harness/cityBuildLog.ts:BuildLine]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  impl: [cpu/harness/cityBuildLog.ts:BuildLine, cpu/core/aiEconomic.ts:purchaseContracts]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...PRODUCTION] (0x5d83c0 per yield), weights printed from r14+0x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCHASE 0x5f3ee0; queued '... CONTRACT %d' 0x5f3710. YIELD globals: f2f974 FOOD f2f978 PROD..."
   context:
@@ -1997,6 +1999,7 @@
   final: 0x3fda30
   kind: function
   status: PARTLY
+  impl: [cpu/core/aiContracts.ts:cityContracts]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
@@ -2309,6 +2312,64 @@
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
+- addr: 0x6839c0
+  final: 0x454200
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 15
+      value: "Measured (city-states, the   PURCHASE lines of runs/h1_duelw1117-1128, 38, the savings on the record's Gold):   27 bought the turn the test first passes with the GREAT_PEOPLE slot   apart, 26 with it "
+    - recording: 1127
+      turn: 46
+      value: 1127 p4 t46, p2 t210);
+    - recording: 1124
+      turn: 27
+      value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  context:
+    - ...nd vt +0x80 true (a remove-if, 0x688961 / 0x6889b0); a stable merge sort (0x684bf0 -> 0x6839c0 -> 0x6846d0) orders it by contract +0x160, the larger first (the constructor's 0; no wr...
+  review: imported
+- addr: 0x6846d0
+  final: 0x454f10
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 15
+      value: "Measured (city-states, the   PURCHASE lines of runs/h1_duelw1117-1128, 38, the savings on the record's Gold):   27 bought the turn the test first passes with the GREAT_PEOPLE slot   apart, 26 with it "
+    - recording: 1127
+      turn: 46
+      value: 1127 p4 t46, p2 t210);
+    - recording: 1124
+      turn: 27
+      value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  context:
+    - ...true (a remove-if, 0x688961 / 0x6889b0); a stable merge sort (0x684bf0 -> 0x6839c0 -> 0x6846d0) orders it by contract +0x160, the larger first (the constructor's 0; no writer read);...
+  review: imported
+- addr: 0x684bf0
+  final: 0x455430
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 15
+      value: "Measured (city-states, the   PURCHASE lines of runs/h1_duelw1117-1128, 38, the savings on the record's Gold):   27 bought the turn the test first passes with the GREAT_PEOPLE slot   apart, 26 with it "
+    - recording: 1127
+      turn: 46
+      value: 1127 p4 t46, p2 t210);
+    - recording: 1124
+      turn: 27
+      value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
+  impl: [cpu/core/aiEconomic.ts:purchaseContracts]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  context:
+    - ...ve, ACCEPTED and vt +0x80 true (a remove-if, 0x688961 / 0x6889b0); a stable merge sort (0x684bf0 -> 0x6839c0 -> 0x6846d0) orders it by contract +0x160, the larger first (the construc...
+  review: imported
 - addr: 0x68d090
   final: 0x4599d0
   kind: function
@@ -5374,6 +5435,7 @@
   impl: [cpu/core/aiModifiers.ts:NONE_ANALYZERS]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - ...adds each ability modifier's analysis. Where no subject passes, the analyzer's slot 2 (0xbe4aa0, nothing, but for EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4750).
   review: imported

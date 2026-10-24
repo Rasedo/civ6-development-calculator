@@ -715,6 +715,7 @@
   impl: [cpu/core/aiContracts.ts:ContractCity]
   readings:
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x5d4a20
@@ -785,6 +786,7 @@
     - gpu/core/sim_cityvalue.py:_cv_pick
     - ai/major/cityBuild.ts:cityPick
     - cpu/core/minorBuild.ts:minorUnderThreat
+    - cpu/core/minorCityAi.ts:list
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

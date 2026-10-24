@@ -54,10 +54,11 @@ import {
   type CityAi, type CityTreeCity, type CityTreeWorld, type PlotEval, type TreeUnit,
 } from './aiCityTrees';
 import { cityContracts, contractBuilt, inHandCheck, queueContract, takesTurn, type AiContract, type ContractItem } from './aiContracts';
-import { newEconomicMemory, purchaseTurn, purchasePick, savingsTurn, type PurchaseCity, type PurchaseEntry } from './aiEconomic';
+import { newEconomicMemory, purchaseContracts, purchaseTurn, purchasePick, savingsTurn, type PurchaseCity, type PurchaseEntry } from './aiEconomic';
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat, type CityThreat } from './operations/cityThreat';
 import { majorView } from './majorView';
+import { AI_GREAT_PERSON_CLASSES } from '../../ai/major/tables';
 import { minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
 import { freeOpNear } from './freeOps';
 import { ARMY_READ_AGE } from './operations/knowledge';
@@ -67,7 +68,7 @@ import { FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor, isCiv, sea
 import { cityAppealResolver } from './governors';
 import { canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
 import { borderCandidates, computeCityStats } from './city';
-import { tilePurchaseCost } from './game';
+import { goldAffordable, tilePurchaseCost } from './game';
 import { computeUnlocksIn, makeYieldCtx } from './effects';
 import { eruptionHazardTurns, floodHazardTurns } from './disasters';
 import { baseAdjacency, improvementAdjacency } from './yields';
@@ -745,8 +746,52 @@ export function traceMinorAi(fn: ((line: string) => void) | null): void {
 export function minorMilitaryTurn(state: GameState, cs: CityState): void {
   if (cs.centerIndex < 0) return;
   const eco = (cs.economy ??= newEconomicMemory());
-  savingsTurn(eco, Math.trunc(cs.treasury * FX), false);
+  // its GREAT_PEOPLE slot stands apart while the game has a class available
+  // (0x2f7eb0 reads the game's classes, not the player's; runs/h1_duelw1124
+  // Bologna's Warrior contract of t15 bought at t18, at 101 + 6 Gold, the
+  // folded slot's savings passing from t16; 1127 p4's Builder at t46, p2's
+  // at t210, as logged)
+  savingsTurn(eco, Math.trunc(cs.treasury * FX), minorGreatPersonClass(state));
+  // its contract purchases, in its city on the threat its last update stored
+  if (cs.cityAi) {
+    const pcity = minorPurchaseCity(state, cs, cs.threat ?? -1);
+    purchaseContracts(eco, cs.cityAi, false, (c) => (c.city === -1 || c.city === pcity.id ? [pcity] : []),
+      (_c, u) => minorBuyInstall(state, cs, u));
+  }
   minorOpsEvaluate(state, cs);
+}
+
+/** a Great Person class is available in the game (0x2f7eb0, the majors'
+ *  `greatPersonClassAvailable` over the AI's classes) */
+export function minorGreatPersonClass(state: GameState): boolean {
+  const view = majorView(state);
+  return AI_GREAT_PERSON_CLASSES.some((c) => view.greatPersonClassAvailable(c));
+}
+
+/** the minor's city as TryPurchaseUnits reads it: its Gold price of the
+ *  unit; the purchase request lets it through where the purse covers the
+ *  price and the centre or a plot beside it takes the unit */
+function minorPurchaseCity(state: GameState, cs: CityState, threat: number): PurchaseCity {
+  const price = (u: string): number => {
+    const id = engineId('unit', u, 'UNIT_', UNITS);
+    return id ? minorUnitPrice(state, cs, id, 'gold') : -1;
+  };
+  return {
+    id: minorCity(cs).id,
+    goldCost: price,
+    threat,
+    canPurchase: (u) => {
+      if (!goldAffordable(cs.treasury, price(u))) return false;
+      const near = state.map.tiles[cs.centerIndex];
+      return [near, ...neighbors(state.map, near)].some((t) => tileFreeForUnit(state, t.index, cs.seat, { type: 'WARRIOR', seat: cs.seat }));
+    },
+  };
+}
+
+/** the minor buys the install's unit `u` in Gold (`minorBuyUnit`) */
+function minorBuyInstall(state: GameState, cs: CityState, u: string): void {
+  const id = engineId('unit', u, 'UNIT_', UNITS);
+  if (id) minorBuyUnit(state, cs, id, 'gold');
 }
 
 /**
@@ -815,13 +860,13 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
   if (!cs.prodItem) {
     const hand = cityContracts(ai, city, () => undefined);
     const bests = specializationBests(tables, pf);
-    if (hand && takesTurn(hand, bests.unit.value, bests.project.value)) {
-      const item = contractItemOf(hand);
-      const queued = queueContract(hand, city, () => !!item && minorQueueOk(state, cs, item), () => undefined);
-      if (queued && item) {
-        minorSetItem(state, cs, item);
-        cs.prodSetValue = hand.value;
-      }
+    const item = hand ? contractItemOf(hand) : null;
+    // the queue's refusal FAILS the contract and the turn falls to the pick
+    // (0x5d5162 -> 0x5d516a)
+    if (hand && takesTurn(hand, bests.unit.value, bests.project.value)
+      && queueContract(hand, city, () => !!item && minorQueueOk(state, cs, item), () => undefined) && item) {
+      minorSetItem(state, cs, item);
+      cs.prodSetValue = hand.value;
     } else {
       ai.inHand[city.id] = -1;
       const pick = defaultSpecialization(tables, pf);
@@ -835,25 +880,10 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
     city.currentValue = cs.prodSetValue ?? FX_MIN;
   }
   // the purchases: a threatened city buys its list's first unit while it may
-  const pcity: PurchaseCity = {
-    id: city.id,
-    goldCost: (u) => {
-      const id = engineId('unit', u, 'UNIT_', UNITS);
-      return id ? minorUnitPrice(state, cs, id, 'gold') : -1;
-    },
-    threat,
-    canPurchase: () => {
-      const near = state.map.tiles[cs.centerIndex];
-      return [near, ...neighbors(state.map, near)].some((t) => tileFreeForUnit(state, t.index, cs.seat, { type: 'WARRIOR', seat: cs.seat }));
-    },
-  };
   if (threat > -1) {
     const entries = purchaseEntries(state, cs);
-    purchaseTurn(eco, pcity, false, () => purchasePick(entries, (u) => pf.canTrain(u), (u) => !AI_UNITS[AI_UNIT_INDEX.get(u)!].mustPurchase,
-      () => null, null), (_c, u) => {
-      const id = engineId('unit', u, 'UNIT_', UNITS);
-      if (id) minorBuyUnit(state, cs, id, 'gold');
-    });
+    purchaseTurn(eco, minorPurchaseCity(state, cs, threat), false, () => purchasePick(entries, (u) => pf.canTrain(u),
+      (u) => !AI_UNITS[AI_UNIT_INDEX.get(u)!].mustPurchase, () => null, null), (_c, u) => minorBuyInstall(state, cs, u));
   }
   // the trees' tick
   tickCityTrees(ai, w);

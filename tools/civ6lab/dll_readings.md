@@ -4424,6 +4424,47 @@ operations' contracts, the improvement values below, the purchases).
   completion signals 0x5f5650 / 0x5f35d0 / 0x5f3610 connected; the queue's
   refusal FAILED, no line). The in-hand check 0x5d7e00: not eligible
   CANCELLED and the production cleared, not producing FAILED.
+- 0x5d4d70's head RELEASES the hand first (0x5d4e0e: 0x600b00 on the handle
+  +0x340, whose object +0x398 reads), so a contract its item's completion
+  left in hand — a district's, which vt +0x68 holds "producing" — takes no
+  turn (runs/h1_duelw1124 Bologna t18: the Campus completed, its Library
+  the Default Specialization's that turn); the queue's refusal of the hand
+  (vt +0x38 false, 0x5d5162) falls to 0x5d516a, the hand released and the
+  pick made.
+- THE ECONOMIC AI'S CONTRACT PURCHASES (0x687bf0 after the savings and the
+  balance assert, 0x688920): its purchase list (+0x5d0, filled by the
+  listener 0x68ab40) keeps the handles alive, ACCEPTED and vt +0x80 true
+  (a remove-if, 0x688961 / 0x6889b0); a stable merge sort (0x684bf0 ->
+  0x6839c0 -> 0x6846d0) orders it by contract +0x160, the larger first
+  (the constructor's 0; no writer read); for a player no human drives each
+  entry with vt +0x50 (0xbe4aa0, true) runs vt +0x20 (0x5f3c40): a unit's
+  (+0x408) TryPurchaseUnits(economic, the city +0x588 binds or null — every
+  city —, unit, 0), on success progress 7 COMPLETED through the holder
+  +0xa8 and "%d, %d, PURCHASE, , , %s, %s, CONTRACT %d"; a building's
+  (+0x468) 0x68afe0 (MustPurchase +0x159 & 0x10 refused, CanConstruct
+  0x1714d0, a value test against the city's analysis 0x5d4920; not
+  ported). Then goldPatronage 0x6898b0, 0x68a100, 0x689610. The purchased
+  unit binds to no tree (the completion signals are a queued contract's);
+  the tree's Find Available Unit takes it. Measured (city-states, the
+  PURCHASE lines of runs/h1_duelw1117-1128, 38, the savings on the record's Gold):
+  27 bought the turn the test first passes with the GREAT_PEOPLE slot
+  apart, 26 with it folded into the SLUSH_FUND (runs/h1_duelw1124 p4's
+  Warrior of contract 36, submitted t15, bought t18 at 101 + 6 Gold;
+  1127 p4 t46, p2 t210); 0x2f7eb0 reads the game's classes (a class's
+  three timeline entries set), so a city-state keeps the slot apart while
+  any class stands. 1124 p3 t27 and t72 (Granada's Builder and Heavy
+  Chariot) pass only folded.
+- TryPurchaseUnits' threatened city (0x68c027): CityBuildAI +0x1b8's sign
+  bit clear — a threat at or above 0.
+- 0x5d2810's walk starts its bests (+0x30, then +0x2c) at 0 (0x5d286c /
+  0x5d2876) and stops at the first entry it may train ranked below them
+  (0x5d2941 / 0x5d2947): an eligible first entry whose sums fall below 0
+  yields none.
+- A city-state's district is priced on the research its turn opened on:
+  runs/h1_duelw1124 Granada t44, its Harbor done at 39 + 18 = 57 where the
+  price before that turn's civic (8 civics, the tree further through) is
+  53 and after it 58 (the queue cache's costs, Cache_City_BuildQueue, not
+  read further).
 - The nodes (registration 0x7cbca0, names 0x7db850): Decode Trigger
   0x7f2970; Contract Manager 0x7f17a0 (parent 0x7f1500; a counter +0x50
   over the turn limit, reset when every contract it holds is alive);

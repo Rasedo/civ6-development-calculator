@@ -35,7 +35,8 @@ from __future__ import annotations
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .sim_citytrees import (
     building_event, city_contracts, defense_event, district_event, free_slots, goals_reached,
-    improvement_event, in_hand_check, pick_improvement, queue_contract, takes_turn, tick_city_trees, _cget,
+    improvement_event, in_hand_check, pick_improvement, queue_contract, takes_turn, tick_city_trees, _cget, _cset,
+    gold_purchasable, CP_ACCEPTED, CP_COMPLETED,
 )
 from .sim_cityvalue import _FX_MIN, _MinorFacts, _t
 from .sim_research import _FX, _discounted, _fmul, _fx_const, _present_value
@@ -102,11 +103,63 @@ class SimMinorAi:
         if not bool(alive.count_nonzero()):
             return
         tre = torch.trunc(self.citystate_treasury[:, s] * _FX).long()
+        # its GREAT_PEOPLE slot stands apart while the game has a class available
         sav, bal = self._cv_savings_turn(self.citystate_savings[:, s], self.citystate_balance[:, s], tre,
-                                         torch.zeros_like(alive))
+                                         self._minor_gp_class())
         self.citystate_savings[:, s] = torch.where(alive.unsqueeze(1), sav, self.citystate_savings[:, s])
         self.citystate_balance[:, s] = torch.where(alive, bal, self.citystate_balance[:, s])
+        # its contract purchases, in its city on the threat its last update stored
+        self._minor_contract_purchases(s, alive)
         self._mops_evaluate(s)
+
+    def _minor_gp_class(self) -> torch.Tensor:
+        """[B] `minorGreatPersonClass` (0x2f7eb0): a class of the AI's list
+        the engine keeps no offer for, or one whose offer is not exhausted"""
+        idx = list(self.rules.ai_city_build["gpClasses"])
+        if any(i < 0 for i in idx):
+            return torch.ones(self.B, dtype=torch.bool, device=self.device)
+        cols = torch.tensor(idx, dtype=torch.long, device=self.device)
+        return (self.gp_offer[:, cols] != -2).any(dim=1)
+
+    def _minor_contract_purchases(self, s: int, act: torch.Tensor) -> None:
+        """`purchaseContracts` where `act` (0x687bf0 after the savings): the
+        purchase list keeps the contracts alive, ACCEPTED and gold-bought;
+        each unit's, in id order, tries TryPurchaseUnits in the minor's city
+        (its price, the purse covering it, a free plot on or beside the
+        centre) and is COMPLETED where it buys (`minorBuyUnit`)"""
+        ai = self.cityai
+        cs = (slice(None), s)
+        live = ai.c_id[cs] >= 0
+        gold = gold_purchasable(ai, ai.c_unit[cs], ai.c_building[cs], ai.c_district[cs])
+        keep = ai.c_purchase[cs] & live & (ai.c_progress[cs] == CP_ACCEPTED) & gold
+        ai.c_purchase[cs] = torch.where(act.unsqueeze(1), keep, ai.c_purchase[cs])
+        units = act.unsqueeze(1) & ai.c_purchase[cs] & (ai.c_unit[cs] >= 0)
+        if not bool(units.any()):
+            return
+        E = self._cv_tables()["engine"]
+        eu = torch.tensor(E["unit"] or [-1], dtype=torch.long, device=self.device)
+        order = torch.where(units, ai.c_id[cs], torch.full_like(ai.c_id[cs], 1 << 40)).argsort(dim=1)
+        seat = 100 + s
+        ctr = self.citystate_center[:, s].clamp(min=0)
+        warrior = self._warrior_idx if getattr(self, "_warrior_idx", -1) >= 0 else 0
+        for r in range(order.shape[1]):
+            j = order[:, r]
+            on = units.gather(1, j.unsqueeze(1)).squeeze(1)
+            if not bool(on.any()):
+                break
+            ui = torch.where(on, eu.take(_cget(ai.c_unit, s, j).clamp(min=0)), torch.full_like(j, -1))
+            on = on & (ui >= 0)
+            price = self._minor_gold_price(s, ui.clamp(min=0))
+            found, _spot = self._first_free_spot(ctr, seat, civ_mask=torch.zeros_like(on), naval_mask=torch.zeros_like(on),
+                                                 utype=torch.full_like(ui, warrior))
+            can = on & found & self._afford(self.citystate_treasury[:, s], price)
+            sav, bal, bought = self._cv_try_purchase(self.citystate_savings[:, s], self.citystate_balance[:, s],
+                                                     price.long(), self.citystate_threat[:, s], can)
+            bought = bought & on
+            self.citystate_savings[:, s] = torch.where(bought.unsqueeze(1), sav, self.citystate_savings[:, s])
+            self.citystate_balance[:, s] = torch.where(bought, bal, self.citystate_balance[:, s])
+            self._minor_buy_unit(s, bought, ui, price)
+            _cset(ai.c_progress, s, j, CP_COMPLETED, bought)
 
     def _minor_ai_turn(self, s: int) -> None:
         """`minorAiTurn` — THE MINOR'S CITY AI TURN (the order above, after
@@ -167,7 +220,8 @@ class SimMinorAi:
             if bool(q.count_nonzero()):
                 self._minor_set_item(s, q, key, site)
                 self.citystate_prod_set_value[:, s] = torch.where(q, _cget(ai.c_value, s, hand), self.citystate_prod_set_value[:, s])
-            rest = idle & ~take
+            # the queue's refusal FAILS the contract and the turn falls to the pick
+            rest = idle & ~q
             ai.in_hand[:, s] = torch.where(rest, -1, ai.in_hand[:, s])
             if bool(rest.count_nonzero()):
                 kind, row, val = self._cv_pick(b_tab, u_tab, p_tab, f, bests)
@@ -1078,12 +1132,13 @@ class SimMinorAi:
 
     # -- the purchases ---------------------------------------------------------
 
-    def _minor_purchase_rows(self, s: int, f: _MinorFacts) -> tuple[torch.Tensor, torch.Tensor]:
+    def _minor_purchase_rows(self, s: int, f: _MinorFacts) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """the minor's unit list (CityBuildAI +0x650: the military AI's unit
         production table copied to the city, 0x79a320) in 0x79d3a0's order —
         the buildable first, then by the at-war players' sums, every
         player's sums and the strength, each the larger first (equal entries
-        in database order): [B, R] the AI unit rows, [B, R] the entries"""
+        in database order): [B, R] the AI unit rows, [B, R] the entries, [B, R]
+        the entries ranked at or above 0"""
         T = self._cv_tables()
         rows = T["unit_rows"]
         E = T["engine"]
@@ -1135,21 +1190,24 @@ class SimMinorAi:
             kk = keyv.gather(1, order)
             idx = torch.sort(kk, dim=1, descending=True, stable=True).indices
             order = order.gather(1, idx)
-        return order, entry.gather(1, order)
+        # an entry ranked at or above 0 (+0x30 every player's sums, +0x2c the
+        # at-war players')
+        ranked = (all_s >= 0) & (war_s >= 0)
+        return order, entry.gather(1, order), ranked.gather(1, order)
 
     def _minor_purchases(self, s: int, f: _MinorFacts, threat: torch.Tensor, act: torch.Tensor) -> None:
         """the purchases (`purchaseTurn`, 0x5ce5b0's tail): where `act` (a
         threatened city) the first unit of the list the minor may train and
         need not buy (0x5d2810), bought while TryPurchaseUnits (0x68be60)
         succeeds on its savings or, threatened, its balance — the Gold price
-        a minor pays, the game letting the purchase through where the centre
-        or a plot beside it takes a unit; the minor's treasury pays where it
-        covers the price (`minorBuyUnit`)"""
+        a minor pays, the game letting the purchase through where its purse
+        covers the price and the centre or a plot beside it takes a unit; the
+        minor's treasury pays (`minorBuyUnit`)"""
         T = self._cv_tables()
         E = T["engine"]
         rows = T["unit_rows"]
         dev = self.device
-        order, entry = self._minor_purchase_rows(s, f)
+        order, entry, ranked = self._minor_purchase_rows(s, f)
         eu = torch.tensor(E["unit"] or [-1], dtype=torch.long, device=dev)
         must = torch.tensor([bool(r["mustPurchase"]) for r in rows], dtype=torch.bool, device=dev)
         go = act.clone()
@@ -1159,23 +1217,28 @@ class SimMinorAi:
         for _ in range(64):
             if not bool(go.count_nonzero()):
                 return
+            # the first entry it may train decides: its unit where ranked at
+            # or above 0, else none (0x5d2941)
             pick = torch.full_like(threat, -1)
+            seen = torch.zeros_like(go)
             for c in range(order.shape[1]):
                 k = order[:, c]
                 ui = eu.take(k)
-                cand = go & (pick < 0) & entry[:, c] & (ui >= 0) & ~must.take(k)
+                cand = go & ~seen & entry[:, c] & (ui >= 0) & ~must.take(k)
                 if not bool(cand.count_nonzero()):
                     continue
                 cand = cand & self._minor_can_train(s, ui)
-                pick = torch.where(cand, ui, pick)
+                pick = torch.where(cand & ranked[:, c], ui, pick)
+                seen = seen | cand
             go = go & (pick >= 0)
             if not bool(go.count_nonzero()):
                 return
             price = self._minor_gold_price(s, pick)
             found, _spot = self._first_free_spot(ctr, seat, civ_mask=torch.zeros_like(go), naval_mask=torch.zeros_like(go),
                                                  utype=torch.full_like(pick, warrior))
+            can = found & self._afford(self.citystate_treasury[:, s], price)
             sav, bal, bought = self._cv_try_purchase(self.citystate_savings[:, s], self.citystate_balance[:, s],
-                                                     price.long(), threat, found)
+                                                     price.long(), threat, can)
             bought = bought & go
             self.citystate_savings[:, s] = torch.where(bought.unsqueeze(1), sav, self.citystate_savings[:, s])
             self.citystate_balance[:, s] = torch.where(bought, bal, self.citystate_balance[:, s])

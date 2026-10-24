@@ -160,7 +160,9 @@
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
   impl: [cpu/core/minorBuild.ts:home, gpu/core/sim_minors.py:_minor_building_ok]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...0x5ca5a0 / 0x5ca450; with none, or the queue refusing it (0x5c9ea0's queue CanConstruct 0x1714d0, which the pick's 0x170450 is not: a building of a pillaged district refused, its byte..."
   review: imported

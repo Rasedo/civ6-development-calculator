@@ -36,6 +36,8 @@
     - cpu/core/aiWeights.ts:strategies
     - cpu/core/aiEconomic.ts:SLOT_GREAT_PEOPLE
     - gpu/core/sim_cityvalue.py:_cv_savings_turn
+    - cpu/core/aiEconomic.ts:purchaseContracts
+    - gpu/core/sim_minorai.py:_minor_contract_purchases
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
@@ -63,6 +65,25 @@
   context:
     - "...bmission's signal +0x270 also runs the economic AI's listener (0x68ab40, connected in 0x6892d0): a contract for a unit or a building — no district — whose PurchaseYield is YIELD_GOLD..."
   review: imported
+- addr: 0x689610
+  final: 0x457ec0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 15
+      value: "Measured (city-states, the   PURCHASE lines of runs/h1_duelw1117-1128, 38, the savings on the record's Gold):   27 bought the turn the test first passes with the GREAT_PEOPLE slot   apart, 26 with it "
+    - recording: 1127
+      turn: 46
+      value: 1127 p4 t46, p2 t210);
+    - recording: 1124
+      turn: 27
+      value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  context:
+    - ...ainst the city's analysis 0x5d4920; not ported). Then goldPatronage 0x6898b0, 0x68a100, 0x689610. The purchased unit binds to no tree (the completion signals are a queued contract's);...
+  review: imported
 - addr: 0x6898b0
   kind: function
   name: goldPatronage
@@ -75,7 +96,27 @@
   impl: [ai/major/greatPeople.ts:goldPatronage, ai/major/greatPeople.ts:GOLD_PATRONAGE_SAVED]
   readings:
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   review: reviewed
+- addr: 0x68a100
+  final: 0x458530
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 15
+      value: "Measured (city-states, the   PURCHASE lines of runs/h1_duelw1117-1128, 38, the savings on the record's Gold):   27 bought the turn the test first passes with the GREAT_PEOPLE slot   apart, 26 with it "
+    - recording: 1127
+      turn: 46
+      value: 1127 p4 t46, p2 t210);
+    - recording: 1124
+      turn: 27
+      value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  context:
+    - ...ue test against the city's analysis 0x5d4920; not ported). Then goldPatronage 0x6898b0, 0x68a100, 0x689610. The purchased unit binds to no tree (the completion signals are a queued con...
+  review: imported
 - addr: 0x68ab40
   final: 0x458ac0
   kind: function
@@ -88,7 +129,10 @@
     - recording: h1_duelv1128
       turn: 13
       value: Settle New City's contract, no city's SUBMITTED line, failed at its turn limit
-  impl: [cpu/core/aiContracts.ts:goldPurchasable, cpu/core/aiContracts.ts:submitContract]
+  impl:
+    - cpu/core/aiContracts.ts:goldPurchasable
+    - cpu/core/aiContracts.ts:submitContract
+    - cpu/core/aiEconomic.ts:purchaseContracts
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -120,6 +164,26 @@
     - "...the action (\"Processing Action From AI to AI\") and spends the cost from savings slot 1 (0x68acd0)."
     - ...1 of 9), a slot below 0 cleared, slot 2 capped at 150 (the excess to slot 0); a spend (0x68acd0) takes its slot, the overflow from slot 0, and lowers the balance by the amount.
   review: reviewed
+- addr: 0x68afe0
+  final: 0x458d00
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 15
+      value: "Measured (city-states, the   PURCHASE lines of runs/h1_duelw1117-1128, 38, the savings on the record's Gold):   27 bought the turn the test first passes with the GREAT_PEOPLE slot   apart, 26 with it "
+    - recording: 1127
+      turn: 46
+      value: 1127 p4 t46, p2 t210);
+    - recording: 1124
+      turn: 27
+      value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
+  impl: [cpu/core/aiEconomic.ts:purchaseContracts]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  context:
+    - "...e holder +0xa8 and \"%d, %d, PURCHASE, , , %s, %s, CONTRACT %d\"; a building's (+0x468) 0x68afe0 (MustPurchase +0x159 & 0x10 refused, CanConstruct 0x1714d0, a value test against the ci..."
+  review: imported
 - addr: 0x68be60
   final: 0x459320
   kind: function
@@ -129,6 +193,7 @@
     - cpu/core/aiEconomic.ts:tryPurchaseUnits
     - gpu/core/sim_cityvalue.py:_cv_try_purchase
     - gpu/core/sim_minorai.py:_minor_purchases
+    - cpu/core/aiEconomic.ts:PurchaseCity
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
