@@ -5184,6 +5184,20 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   beside city-state 2's Warrior at 10:16 and moves no further but onto it.
   The engines: `groundOf`'s seenZoc in `search` (no zone of control, not
   the danger map's) / `_tac_search`'s zs (`_tac_zoc` with seen and naval).
+- THE PLANNING'S ATTACK PLOT (0x26e570 at 0x26e5cd, READ): no step leaves a
+  node whose +0x51 bit 0x40 is set — 0x5861f0's out-flag on a seen plot,
+  0x585fc0 -> 0x523520: a unit at war that fights stands there (0x5237e0
+  the religious units' twin). An attack on a city centre or an Encampment
+  with no such unit is no path's end: the reach goes on past it. The cities
+  and Encampments exert the zone of control on the land beside them
+  (Civ 6's rule; Rules_Movement 0x530f50 unread). runs/h1_duelw1124 t7-t52:
+  city-state 4's city at 32:8 — the barbarian Scouts beside it list 31:7
+  and 33:8 at 2/2 past it; with both, the planning rows of t1-60: 1,061 ->
+  1,068 of 1,276 equal, the revealed misses 65 -> 1, the unrevealed 30 ->
+  22, no new miss (27 new extra plots in 11 rows round major cities). The
+  engines: `groundOf`'s foughtOn and seenZoc's town term / `_tac_search`'s
+  fought_n and `_tac_zoc`'s town plane; the danger map's search and the
+  paths keep an attack plot as their end.
 - A plot the player never revealed is the reach's leaf (READ): the
   validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose
   parent is not revealed (node +0x51 bit 0) unless the parent is the unit's

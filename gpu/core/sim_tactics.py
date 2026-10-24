@@ -293,7 +293,8 @@ class SimTactics:
         (no Ranged or Siege class without SUPPRESSION, none embarked, none of a
         chassis that exerts none), none across a river. With `seen` [B, T]
         and `naval` (`groundOf`'s seenZoc) only an exerter on a plot it sees
-        and of the mover's domain. The mover's own ignoring is the caller's."""
+        and of the mover's domain, and for a land mover a hostile city or
+        Encampment too. The mover's own ignoring is the caller's."""
         mil = self.military_at
         here = mil >= 0
         ms = mil.clamp(min=0)
@@ -307,6 +308,12 @@ class SimTactics:
         ex = ex & self._seats_hostile(seat, mseat)
         if seen is not None:
             ex = ex & seen & (self.unit_naval.take(mtype) == naval)
+            if not naval:
+                # a hostile city or Encampment exerts one on the land beside it
+                town = self._centre_plane() & self._seats_hostile(seat, self.tile_seat)
+                if self._encamp_didx >= 0:
+                    town = town | self._encamp_block_plane(seat)
+                ex = ex | (town & seen)
         nb = self.neigh.clamp(min=0)
         bits = torch.arange(6, device=self.device).view(1, 1, 6)
         riv = (self.river_mask.unsqueeze(2) >> bits) & 1
@@ -466,8 +473,20 @@ class SimTactics:
         # own; an attack it strikes from there all the same (`groundOf`'s
         # seenZoc)
         zs = None
+        fought_n = None
         if not zoc and not stand:
             sn = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
+            # an attack's plot ends the planning's path where a seen unit at
+            # war that fights holds it (the parent's +0x51 bit 0x40): an
+            # attack on a city or Encampment alone goes on
+            fought = torch.zeros(self.B, self.T, dtype=torch.bool, device=dev)
+            for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+                pc = pl.clamp(min=0)
+                ut_ = self.unit_type.gather(1, pc).clamp(min=0, max=self.NU - 1)
+                st_ = (self._type_combat.take(ut_) > 0) | (self._type_ranged_strength.take(ut_) > 0) | (self._type_bombard.take(ut_) > 0)
+                sv_ = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, -1))
+                fought |= (pl >= 0) & st_ & self._seats_hostile(seat, sv_)
+            fought_n = (fought & sn)[rows]
             zs = torch.where(naval.unsqueeze(1), self._tac_zoc(seat, sn, True)[rows], self._tac_zoc(seat, sn, False)[rows])
             zs = zs & ~self._tac_zoc_ignored(utype).unsqueeze(1)
         # a path's turn may not end on a plot its own stacking unit holds (the
@@ -540,7 +559,10 @@ class SimTactics:
             run &= act
             # an attack's plot is the path's end: no step leaves it; nor one
             # the player never revealed but the unit's own
-            act = act & ~atk_n.gather(1, b1).squeeze(1) & (kn_n.gather(1, b1).squeeze(1) | (best == start))
+            stop = atk_n.gather(1, b1).squeeze(1)
+            if fought_n is not None:
+                stop = stop & fought_n.gather(1, b1).squeeze(1)
+            act = act & ~stop & (kn_n.gather(1, b1).squeeze(1) | (best == start))
             if not bool(act.count_nonzero()):
                 continue
             bg, bm, bt = g.gather(1, b1), mv.gather(1, b1), tn.gather(1, b1)  # [N, 1]

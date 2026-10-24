@@ -128,15 +128,18 @@ interface Ground {
   enter: (t: Tile) => boolean;
   zoc: (t: Tile) => boolean;
   attack: (t: Tile) => boolean;
+  /** a unit at war that fights stands on the plot, on a plot the player
+   *  sees now (the node's +0x51 bit 0x40, 0x5861f0 -> 0x523520) */
+  foughtOn: (i: number) => boolean;
   known: (i: number) => boolean;
   stand: (i: number) => boolean;
   /** a unit of its own that stacks with it holds the plot (0x585eb0, the
    *  unit itself not counted: the path node's +0x54) */
   full: (i: number) => boolean;
   /** the plot lies in a zone of control the player sees: a hostile unit of
-   *  the mover's domain that exerts one beside it, on a plot the player sees
-   *  now, none across a river (the planning validity's 0x26f980 ->
-   *  Rules_Movement 0x530f50) */
+   *  the mover's domain that exerts one beside it, or for a land mover a
+   *  hostile city or Encampment, on a plot the player sees now, none across a
+   *  river (the planning validity's 0x26f980 -> Rules_Movement 0x530f50) */
   seenZoc: (i: number) => boolean;
 }
 
@@ -178,6 +181,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     known,
     stand: (i) => !held.has(i),
     full: (i) => own.has(i),
+    foughtOn: (i) => {
+      if (!fighters.has(i)) return false;
+      seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+      return seenNow[i] === 1;
+    },
     seenZoc: (i) => {
       let v = seenZocs.get(i);
       if (v !== undefined) return v;
@@ -188,6 +196,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
         const t = state.map.tiles[i];
         for (const n of neighbors(state.map, t)) {
           if (!sn[n.index] || crossesRiver(state.map, t, n)) continue;
+          // a hostile city or Encampment exerts one on the land beside it
+          if (!naval && (n.district === 'CITY_CENTER' || encampmentIntact(n)) && unitsHostile(state, unit, { seat: tileSeat(n) })) { v = true; break; }
           if (state.units.some((x) => x.tileIndex === n.index && onMap(x) && !unitReligious(x.type) && unitExertsZoc(x)
             && !!UNITS[x.type]?.naval === naval && unitsHostile(state, x, unit))) { v = true; break; }
         }
@@ -288,10 +298,13 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     }
     best.closed = true;
     if (onClose(best, ground)) break;
-    // an attack's plot is the path's end: no step leaves it; nor one the
-    // player never revealed but the unit's own (0x2720a0 under the search's
-    // flag 1: the parent unrevealed)
-    if (best.attack || (best !== start && !ground.known(best.tile))) continue;
+    // an attack's plot is the path's end: no step leaves it — in the
+    // planning's search one a seen unit at war that fights holds (0x26e570
+    // at 0x26e5cd: the parent's +0x51 bit 0x40), so an attack on a city or
+    // Encampment alone goes on; nor one the player never revealed but the
+    // unit's own (0x2720a0 under the search's flag 1: the parent unrevealed)
+    const planningSearch = !zoc && !standToAttack;
+    if ((best.attack && (!planningSearch || ground.foughtOn(best.tile))) || (best !== start && !ground.known(best.tile))) continue;
     // the planning's search (no flag 0x200: 0x26e570 at 0x26e83e) moves on
     // from no plot of a zone of control the player sees but the unit's own;
     // an attack it strikes from there all the same
