@@ -62,9 +62,12 @@
     - cpu/data/seats.ts:FREE_CITY_GRANT_CLASSES
     - cpu/core/phase.ts:pillagedNear
     - cpu/data/seats.ts:FREE_CITY_BUILDER
+    - cpu/core/freeOps.ts:freeRaidCheck
+    - gpu/core/sim_minorai.py:_free_raid_check
   readings:
     - "H-1: draws with no game site"
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
   context:
     - "...theon pick (`_seat_pantheon_race`) and the Free Cities' grant (\"Free Cities Unit Choice\", 0x274010, one weighted pick: the engines' `freeCityGrantType` / `_free_grant_type` take it as the..."
   review: reviewed

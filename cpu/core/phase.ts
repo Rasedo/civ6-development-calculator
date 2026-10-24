@@ -34,7 +34,8 @@ import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_ST
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorResearch, trainableIn } from './minorBuild';
 import { storeUnitStrength } from './majorView';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
-import { freeCityTactics, plotDistance, tacticalTargets } from './tactical';
+import { plotDistance, tacticalTargets } from './tactical';
+import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
 import { plotsSeenNow } from './barbarians';
 import { POLICY_LIST } from '../data/policies';
 import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
@@ -885,7 +886,8 @@ function grantFreeCityUnit(state: GameState, city: City, unitType: string): void
 
 /**
  * A FREE CITY'S GRANT, each Free Cities turn (0x274010, the city's record):
- * its count of turns (`City.freeGrantTurns`) rises by one, the flip turn's
+ * first its raid's tree, gone, leaves the record (`freeRaidCheck`); its
+ * count of turns (`City.freeGrantTurns`) rises by one, the flip turn's
  * the first, and at `FREE_CITY_GRANT_PERIOD` a grant falls due. None while
  * `FREE_CITY_GRANT_CAP` of the units the city granted stand (its Builder,
  * a unit with build charges, not counted), the count held so it falls due
@@ -897,6 +899,8 @@ function grantFreeCityUnit(state: GameState, city: City, unitType: string): void
  * no unit). The count back to 0.
  */
 function freeCityGrant(state: GameState, city: City): void {
+  // the record's raid tree, gone, is cleared first (0x274010's head)
+  freeRaidCheck(state, city);
   city.freeGrantTurns = (city.freeGrantTurns ?? 0) + 1;
   if (city.freeGrantTurns < FREE_CITY_GRANT_PERIOD) return;
   const own = state.units.filter((u) => u.seat === FREE_SEAT && u.freeCity === city.id);
@@ -991,7 +995,8 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  `freeCityLoyaltyDelta` (its heal is the turn's end's, `healCities`) — its
  *  cities press a religion they follow on that religion's founder's turn
  *  (`spreadReligiousPressure`). Then the Free Cities' units take their
- *  tactical turn (`freeCityTactics`), their knowledge base looks again; the
+ *  tactical turn with their operations' (`freeCitiesMilitary`), their
+ *  knowledge base looks again; the
  *  cities that reached 0 join their race's winner, in array order, after it. */
 export function freeCitiesPhase(state: GameState): void {
   const free = freeSeatOf(state);
@@ -1050,7 +1055,7 @@ export function freeCitiesPhase(state: GameState): void {
     city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
     if (city.loyalty <= 0) joiners.push(city);
   });
-  freeCityTactics(state);
+  freeCitiesMilitary(state);
   // its knowledge base's look at its turn's end
   freeKnowledge(state, false);
   for (const city of joiners) joinFromFreeCity(state, city);
@@ -2246,8 +2251,12 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           here.pillaged = true;
           pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as keyof typeof IMPROVEMENTS]?.plunder, false, here.improvement ?? undefined, tileSeat(here));
           spendPillage();
+          // a Free City's improvement or district pillaged by the unit on
+          // it starts the Free City's raid (0x276ff0, 0x276e70)
+          freeRaidSignal(state, here.index, unit.seat);
         } else if (hereOwned && districtWreckable(here)) {
           wreckDistrict(here);
+          freeRaidSignal(state, here.index, unit.seat);
         } else if ((UNITS[unit.type]?.raider || (leaderOf(state, unit.seat) === 'HARDRADA' && navalMelee(UNITS[unit.type])))
           // CIV6 (Barbary Corsair): "It costs no Movement to coastal raid" —
           // the three-point reserve goes with the spend.

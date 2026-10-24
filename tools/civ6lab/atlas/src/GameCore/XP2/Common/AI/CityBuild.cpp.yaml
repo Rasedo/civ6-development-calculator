@@ -130,6 +130,7 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
+    - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
   context:
     - "...m the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights; logged by 0x5cdd70: Food Adv. / Prod. Adv. are adv..."
   review: reviewed
@@ -217,6 +218,9 @@
     - cpu/harness/operationsAi.ts:cityDefense
     - cpu/core/operations/manager.ts:operationsRun
     - cpu/harness/operationsAi.ts:cityDefense
+    - cpu/core/aiCityTrees.ts:defensiveCancel
+    - cpu/core/minorCityAi.ts:list
+    - gpu/core/sim_minorai.py:_minor_ai_turn
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
@@ -224,6 +228,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...does not replay\"). Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150 (tree \"Build City Building\"), the district event 0..."
@@ -293,11 +298,12 @@
     - gpu/core/sim_minorai.py:_minor_under_threat
     - cpu/core/aiContracts.ts:ContractCity
     - cpu/core/minorBuild.ts:inHand
-    - gpu/core/sim_cityvalue.py:_FreeFacts
+    - cpu/core/aiCityTrees.ts:defensiveCancel
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
     - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
+    - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
   review: reviewed
 - addr: 0x5cdce0
   final: 0x3e1fa0
@@ -451,7 +457,9 @@
     - cpu/core/minorCityAi.ts:eventBuilding
     - gpu/core/sim_cityvalue.py:_cv_bests
     - gpu/core/sim_minorai.py:event_building
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...in gnames.json (value = string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick building if bv>=uv &&..."
   context:
@@ -535,7 +543,9 @@
     - cpu/core/minorCityAi.ts:eventUnit
     - gpu/core/sim_cityvalue.py:_cv_bests
     - gpu/core/sim_minorai.py:event_unit
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...e previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick building if bv>=uv && bv>=pv; else unit if uv>=pv; else project..."
   context:
@@ -709,6 +719,7 @@
   impl: [cpu/core/aiContracts.ts:ContractCity]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
   context:
     - ...tween), EFFECT_ADJUST_ALL_DISTRICTS_PRODUCTION 0x6a9e80 (CityBuildAI's district value 0x5d4a20 per district it reserves a plot for), EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR 0x...
   review: imported
@@ -718,6 +729,15 @@
   status: PARTLY
   impl: [cpu/core/aiCityTrees.ts:wholeValue]
   notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x5d4c30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...onder, Buildings +0x158 bit 64, 0), a district's at its plot (0x5d4a20), a project's (0x5d4c30). An empty queue (+0x2350 == 0) returns.
   review: imported
 - addr: 0x5d4cd0
   kind: function
@@ -801,11 +821,26 @@
 - addr: 0x5d7640
   kind: function
   name: the defensive cancel
-  status: PARTLY
+  semantics: |
+    the City Defense event's opening (0x5cced0): under 0x5cdc50's test, the item in hand (the contract in hand +0x398, else the queue's head) not defensive (a unit with Combat +0x48 0 or Bombard +0x40, a building with no DefenseModifier +0x28, a district without hit points, any project), or a listed ACCEPTED contract valued at OLD + max(OLD, AI_CURRENT_TASK_BIAS) or above, or the plain pick's best building (0x5d0860) at that bar, or the defensive pick's best unit (0x5d2600) above it: the contract in hand FAILED, "Canceling current build, OLD VALUE", the production cleared. OLD the contract's value raised to the head's table value (a queued unit with no contract, PseudoYieldType none or PSEUDOYIELD_UNIT_COMBAT, keeps its task; a wonder 0); an empty queue keeps its task
+  status: READ
+  cases:
+    - recording: h1_duelw1105
+      turn: 63
+      value: "Bandar Brunei's Walls contract FAILED, OLD VALUE 468.4, re-picked each turn to t69"
+    - recording: h1_duelw1103
+      turn: 46
+      value: "Hattusa's Granary (OLD 33.1) cancelled for a Heavy Chariot"
+  impl:
+    - cpu/core/aiCityTrees.ts:defensiveCancel
+    - gpu/core/sim_minorai.py:_minor_defensive_cancel
+    - gpu/core/sim_minorai.py:_defensive_cancel
+    - gpu/core/sim_minorai.py:_free_defensive_cancel
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
+    - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
   context:
     - "...e queued line 0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancellation 0x5d7640 (\"Canceling current build\"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970."
   review: reviewed

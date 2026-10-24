@@ -333,6 +333,11 @@ import { promotionWeight } from '../core/minorBuild';
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS, AI_CITY_EVENT_TYPES, AI_CITY_TREES } from '../data/aiCityTrees';
 import { AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_TEAMS, AI_TEAM_REQS, AI_TREES, AI_UNIT_AI, AI_UNIT_AI_PRIORITY } from '../data/aiOperations';
 import { MINOR_OP_DEFS } from '../core/minorOps';
+import { FREE_RAID_DEF } from '../core/freeOps';
+
+/** the operations the GPU twin runs, by index: the city-states', then the
+ *  Free Cities' */
+const OP_DEFS = [...MINOR_OP_DEFS, FREE_RAID_DEF];
 import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS, AI_UNIT_EFFICIENCY } from '../data/aiBuildTables';
 import { minorDistrictVerdict } from '../core/minorCityAi';
 import { AI_YIELDS } from '../core/aiWeights';
@@ -1110,16 +1115,18 @@ export function buildRules() {
       cityEventLists: Object.fromEntries(Object.entries(AI_CITY_EVENT_LISTS).map(([t, l]) => [t, AI_CITY_EVENTS[l]])),
       cityTrees: AI_CITY_TREES,
     },
-    // the city-states' operations (`minorOps.ts`, cpu/core/operations): the
-    // definitions they run, their teams, the teams' requirements and the
-    // trees, each AI unit row's unit AI types, the UnitAiTypes of Priority,
-    // the operation limits of their trait (AiOperationTypes)
+    // the city-states' operations (`minorOps.ts`) and the Free Cities'
+    // (`freeOps.ts`) on cpu/core/operations: the definitions they run (the
+    // city-states', then the Free Cities Raid), their teams, the teams'
+    // requirements and the trees, each AI unit row's unit AI types, the
+    // UnitAiTypes of Priority, the operation limits of the city-states'
+    // trait (AiOperationTypes)
     aiOperations: {
-      defs: MINOR_OP_DEFS.map((n) => AI_OP_DEFS[n]),
-      teams: Object.fromEntries(MINOR_OP_DEFS.map((n) => [n, AI_OP_TEAMS[n] ?? []])),
-      reqs: Object.fromEntries([...new Set(MINOR_OP_DEFS.flatMap((n) => (AI_OP_TEAMS[n] ?? []).map((t) => t.team)))]
+      defs: OP_DEFS.map((n) => AI_OP_DEFS[n]),
+      teams: Object.fromEntries(OP_DEFS.map((n) => [n, AI_OP_TEAMS[n] ?? []])),
+      reqs: Object.fromEntries([...new Set(OP_DEFS.flatMap((n) => (AI_OP_TEAMS[n] ?? []).map((t) => t.team)))]
         .map((t) => [t, AI_TEAM_REQS[t] ?? []])),
-      trees: Object.fromEntries([...new Set(MINOR_OP_DEFS.map((n) => AI_OP_DEFS[n].tree ?? ''))].filter(Boolean).map((t) => [t, AI_TREES[t]])),
+      trees: Object.fromEntries([...new Set(OP_DEFS.map((n) => AI_OP_DEFS[n].tree ?? ''))].filter(Boolean).map((t) => [t, AI_TREES[t]])),
       unitAi: AI_UNITS.map((u) => AI_UNIT_AI[u.type] ?? []),
       priority: AI_UNIT_AI_PRIORITY,
       // the odds' decay term (0x746920) by its exponent: 0.97 ^ e in single

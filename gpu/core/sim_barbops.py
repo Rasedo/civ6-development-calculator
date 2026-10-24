@@ -1054,28 +1054,37 @@ class SimBarbOps:
 
     def _bop_pillage(self, on: torch.Tensor, k: int, ctx: dict) -> None:
         """OPERATION PILLAGE's execution (0x811390, `pillageExecute`) for tribe
-        `k`'s team in the games `on`: per IMPROVEMENT, PASSIVE_DISTRICT or
-        GOODY entry of the list in its order on the ground of the target's
-        owner, of the living members with Movement left and no bombard
-        strength (a ship's not for a water plot; a goody hut any, else one
-        that fights): each on it pillages there; else the nearest whose
-        planning reaches it within two turns with Movement left there (none
-        of its domain and kind on it) and within twice its Movement (a goody
-        hut at any distance), the first of equals in join order, goes and
-        pillages on arrival"""
+        `k`'s team in the games `on` (`_op_pillage`, every kind)"""
+        self._op_pillage(on, self._bop_members(k), self.barb_unit_join, self.tribe_op_plot[:, k], ctx, True, True, True,
+                         BARB_SEAT)
+
+    def _op_pillage(self, on: torch.Tensor, mem: torch.Tensor, join: torch.Tensor, tplot: torch.Tensor, ctx: dict,
+                    districts: bool, improvements: bool, goodies: bool, seat: int) -> None:
+        """OPERATION PILLAGE's execution (0x811390, `pillageExecute`) for an
+        operation's members `mem` [B, P] of the hostile pool (their order
+        `join`, player `seat`) against the target `tplot` in the games `on`:
+        per IMPROVEMENT, PASSIVE_DISTRICT or GOODY entry of the list (each
+        kind unless the node's flag says false) in its order on the ground of
+        the target's owner, of the living members with Movement left and no
+        bombard strength (a ship's not for a water plot; a goody hut any,
+        else one that fights): each on it pillages there; else the nearest
+        whose planning reaches it within two turns with Movement left there
+        (none of its domain and kind on it) and within twice its Movement (a
+        goody hut at any distance), the first of equals in that order, goes
+        and pillages on arrival"""
         if not bool(on.count_nonzero()):
             return
         B = self.B
         dev = self.device
         bidx = torch.arange(B, device=dev)
         rowof, res, tg, done = ctx["rowof"], ctx["res"], ctx["tg"], ctx["done"]
-        tplot = self.tribe_op_plot[:, k]
         owner = torch.where(tplot >= 0, self.tile_seat.gather(1, tplot.clamp(min=0).unsqueeze(1)).squeeze(1),
                             torch.full_like(tplot, -1))
         ground = (owner.unsqueeze(1) < 0) | (self.tile_seat == owner.unsqueeze(1))
-        imp = (tg["ok"] == 9) & ground
-        dis = (tg["dk"] == 2) & ground
-        goody = (tg["ok"] == 5) & ground
+        nil = torch.zeros_like(ground)
+        imp = (tg["ok"] == 9) & ground if improvements else nil
+        dis = (tg["dk"] == 2) & ground if districts else nil
+        goody = (tg["ok"] == 5) & ground if goodies else nil
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
         mp_whole = torch.div(self.barb_unit_mp, self._mp_scale, rounding_mode="floor")
         P = self.barb_unit_op.shape[1]
@@ -1086,9 +1095,8 @@ class SimBarbOps:
                 g = on & kindm
                 if not bool(g.any()):
                     continue
-                mem = self._bop_members(k)
-                el = (mem & (self.barb_unit_mp > 0) & (self._type_bombard.take(ut) <= 0) & g.unsqueeze(1)
-                      & ~(naval & water[:, p].unsqueeze(1)))
+                el = (mem & self.barb_unit_alive & (self.barb_unit_seat == seat) & (self.barb_unit_mp > 0)
+                      & (self._type_bombard.take(ut) <= 0) & g.unsqueeze(1) & ~(naval & water[:, p].unsqueeze(1)))
                 if not is_goody:
                     el &= self._type_combat.take(ut) > 0
                 here = el & (self.barb_unit_tile == p)
@@ -1108,18 +1116,18 @@ class SimBarbOps:
                 spot_ok = torch.zeros_like(cand)
                 cb, cs = cand.nonzero(as_tuple=True)
                 pp = torch.full_like(cb, p)
-                sp = self._op_reach_at(cb, cs, pp, 2, True, torch.zeros_like(cb), rowof, res)
+                sp = self._op_reach_at(cb, cs, pp, 2, True, torch.zeros_like(cb), rowof, res, "barb", seat)
                 blocked = self._bop_spot_held(cb, cs, pp)
                 spot_ok[cb, cs] = (sp >= 0) & ~blocked
                 d = self.pair_dist[self.barb_unit_tile.clamp(min=0), torch.full_like(self.barb_unit_tile, p)].to(torch.long)
-                key = torch.where(spot_ok, d * (P + 1) + self.barb_unit_join.clamp(min=0), torch.full_like(d, 1 << 40))
+                key = torch.where(spot_ok, d * (P + 1) + join.clamp(min=0), torch.full_like(d, 1 << 40))
                 best = key.min(dim=1)
                 go = best.values < (1 << 40)
                 if not bool(go.any()):
                     continue
                 us = best.indices
                 dest = torch.full((B,), p, dtype=torch.long, device=dev)
-                self._tac_move_to(go, us, dest, strike=False)
+                self._tac_move_to(go, us, dest, "barb", seat, strike=False)
                 there = go & self.barb_unit_alive[bidx, us] & (self.barb_unit_tile[bidx, us] == p)
                 self._barb_pillage_here(there, us)
                 done[bidx[there], us[there]] = True
@@ -1188,9 +1196,11 @@ class SimBarbOps:
         passable = (nbh >= 0) & (self.passable.gather(1, nbc) | self.wpass.gather(1, nbc))
         return (tgt >= 0) & (ctr >= 0) & passable.any(dim=1) & ~(passable & ~held).any(dim=1)
 
-    def _op_siege(self, on: torch.Tensor, mem: torch.Tensor, target: torch.Tensor, join: torch.Tensor, ctx: dict) -> None:
+    def _op_siege(self, on: torch.Tensor, mem: torch.Tensor, target: torch.Tensor, join: torch.Tensor, ctx: dict,
+                  seat: int = BARB_SEAT) -> None:
         """OPERATION SIEGE CITY's execution (0x811e80, `siegeCityExecute`) for
-        a barbarian team `mem` [B, P] (its join order `join`) in the games
+        an operation's members `mem` [B, P] of the hostile pool (their order
+        `join`, player `seat`) in the games
         `on`: the city encircled, each member in join order with Movement left
         and a range strikes it; else the six plots about it shared out by the
         generalized assignment (three passes) — a unit on one starts there; a
@@ -1224,7 +1234,7 @@ class SimBarbOps:
                 fire = m & inr & (self.barb_unit_attacks[bidx, us] > 0)
                 for u in torch.unique(us[fire]).tolist():
                     self._hostile_ranged_strike(fire & (us == u), target.clamp(min=0), "barb", u)
-                self._tac_move_to(m & ~inr, us, target.clamp(min=0), strike=True)
+                self._tac_move_to(m & ~inr, us, target.clamp(min=0), "barb", seat, strike=True)
         go = on & ~enc
         if not bool(go.any()):
             return
@@ -1264,7 +1274,7 @@ class SimBarbOps:
             rows = (go & uv[:, i]).nonzero(as_tuple=True)[0]
             if not rows.numel():
                 continue
-            res = self._tac_search(rows, uslot[rows, i], BARB_SEAT, 2, False, pre="barb")
+            res = self._tac_search(rows, uslot[rows, i], seat, 2, False, pre="barb")
             t6 = res["turns"].gather(1, slc[rows])
             m6 = res["moves"].gather(1, slc[rows])
             naval = self.unit_naval.take(ut[rows, uslot[rows, i]])
@@ -1389,7 +1399,7 @@ class SimBarbOps:
                 m = alive & (now != sl[:, j]) & ~on_slot & valid[:, j]
                 if not bool(m.any()):
                     continue
-                self._tac_move_to(m, us, slc[:, j], strike=False)
+                self._tac_move_to(m, us, slc[:, j], "barb", seat, strike=False)
                 after = self.barb_unit_tile[bidx, us]
                 again |= m & (after != now)
 

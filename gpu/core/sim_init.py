@@ -363,16 +363,18 @@ class SimInit:
         self.citystate_unit_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         self.citystate_res_counts = torch.zeros(B, s_pad, len(rules.res_ai), dtype=torch.long, device=device)
         # the events' slots, the trees, the contracts and the reservations of
-        # each minor's city (`CityAi`, gpu/core/sim_citytrees.py): its planes
-        # are the sim's `cai_*`
+        # each minor's city (`CityAi`, gpu/core/sim_citytrees.py), then the
+        # Free Cities' (the row `FR`: the ids their operations' trees take):
+        # its planes are the sim's `cai_*`
         from .sim_citytrees import CityAi, city_tree_tables
         _ctt = city_tree_tables(rules)
-        self.cityai = CityAi(_ctt, _ctt.trees_of("MINOR_CIV_DEFAULT_TRAIT"), B, s_pad, device)
+        self.cityai = CityAi(_ctt, _ctt.trees_of("MINOR_CIV_DEFAULT_TRAIT"), B, r_pad, device)
         for _n, _v in vars(self.cityai).items():
             if torch.is_tensor(_v):
                 setattr(self, "cai_" + _n, _v)
-        # each minor's operation manager (`OpsAi`, gpu/core/sim_minorops.py)
-        self._init_minor_ops(rules, B, s_pad, device)
+        # each minor's operation manager, then the Free Cities' (the row `FR`)
+        # (`OpsAi`, gpu/core/sim_minorops.py)
+        self._init_minor_ops(rules, B, r_pad, device)
         # the strongest melee Combat Strength the minor has trained or bought — the base
         # its centre stands on (`holderStrength`, the Seat's `bestMeleeCS`)
         self.citystate_best_melee = torch.zeros(B, s_pad, dtype=torch.long, device=device)
@@ -3992,6 +3994,9 @@ class SimInit:
         self.city_free_grant = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
         # a FREE CITY's threat as its city AI's last update left it (`City.aiThreat`), -1 none
         self.city_ai_threat = torch.full((B, self.CITY_ROWS, self.RC), -1, dtype=torch.long, device=device)
+        # a FREE CITY's raid record (`City.freeRaid`): the player it raided
+        # and its operation's tree id (-1 once gone); -1 never raided
+        self.city_free_raid = torch.full((B, self.CITY_ROWS, self.RC, 2), -1, dtype=torch.long, device=device)
         # a FREE CITY's allowed units (`City.freeAllowed`), its grants' chassis
         self.city_free_allowed = torch.zeros(B, self.CITY_ROWS, self.RC, len(rules.units) or 1, dtype=torch.bool,
                                              device=device)

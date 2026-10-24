@@ -57,7 +57,8 @@ import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GO
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
-import { barbarianTactics, dangerPlane, freeCityTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
+import { freeCitiesMilitary } from '../core/freeOps';
+import { barbarianTactics, dangerPlane, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
 import { barbSlots, barbSlotsDying, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
@@ -848,7 +849,7 @@ const minorAiSeat = (seat: number) => isCityStateSeat(seat) || seat === FREE_SEA
 
 /**
  * THE CITY-STATES' AND THE FREE CITIES' UNIT AI (`cityStateTactics`,
- * `freeCityTactics`) on a copy of the state, in the game's player order,
+ * `freeCitiesMilitary`) on a copy of the state, in the game's player order,
  * after the majors' actions of the pair and before the barbarians' turn:
  * their units back where the pair's first record holds them, each in the
  * pool slot its ID names, with its Movement whole; the barbarians' units
@@ -990,7 +991,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
     for (const cs of [...copy.cityStates].sort((x, y) => playerOf(x.seat) - playerOf(y.seat))) {
       if (cs.centerIndex >= 0 && founded.has(playerOf(cs.seat))) cityStateMilitary(copy, cs);
     }
-    freeCityTactics(copy);
+    freeCitiesMilitary(copy);
   } finally {
     traceTactics(null);
     holdRng(held);

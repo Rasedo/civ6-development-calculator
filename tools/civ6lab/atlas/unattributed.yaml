@@ -825,6 +825,75 @@
   context:
     - ...der of its own, no HIGH_PRIORITY_UNIT target of the player's list within 5 of the city (0x272fa0) and a pillaged improvement (+0x44 set, +0x4d bit 0) on a plot within 2 of it, CLASS_BU...
   review: imported
+- addr: 0x274ea0
+  final: 0x1ac590
+  kind: function
+  name: freeRaidStart
+  semantics: |
+    a Free City's record (+0x20 the player raided, +0x24 the raid's tree, both -1: never raided) and the player: "Free Cities Raid" started by name (0x7265b0), the target the player's first city's plot (+0x12f0's first, its +0x158; -9999 none), 0x73e7d0 setting target, rally (the Free City's plot +0x0c) and the teams' goals; +0x24 the tree's id, +0x20 the player
+  status: READ
+  cases:
+    - recording: h1_duelw1123
+      turn: 205
+      value: "Rome's Warrior pillages Chen's improvement: Free Cities Raid Started, TARGET 11:13, Contract for UNIT_ARCHER"
+  impl: [cpu/core/freeOps.ts:freeRaidStart, gpu/core/sim_minorai.py:_free_raid_start]
+  readings:
+    - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "## C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0..."
+    - "...record by the plot (0x277470: the records' +0x0c / +0x10 plot, +0x14 live) and calls 0x274ea0."
+    - "- THE START 0x274ea0: where the record's +0x24 (the operation's tree) and +0x20 (the player) are both -1 — a..."
+  review: imported
+- addr: 0x2765f0
+  final: 0x1ad4a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE SIGNALS (FreeCities_Manager, the listeners 0x2765f0 connects): a combat on a Free City's district (0x276d90: the attacker, +0x70); a Free..."
+  review: imported
+- addr: 0x276a40
+  final: 0x1ad8f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ..., the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported
+    - "...improvement of a Free City pillaged (0x276ff0: the owner of the last unit on the plot); 0x276a40 (a Free City with a flag, the plot's last unit's owner; its event unread). Each finds t..."
+    - "...in the Free Cities' tactical pass once each unit's planning is taken. LAB: the signal 0x276a40's event; the last unit on a pillaged plot read as the pillager (a coastal raid's and an..."
+  review: imported
+- addr: 0x276e70
+  final: 0x1adc20
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/phase.ts:impWreckable
+    - gpu/core/sim_minorai.py:_free_raid_plot
+    - gpu/core/sim_orders.py:_arms
+  readings:
+    - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "...Free City's district (0x276d90: the attacker, +0x70); a Free City's district pillaged (0x276e70: the owner of the last unit on the plot); an improvement of a Free City pillaged (0x276..."
+  review: imported
+- addr: 0x277470
+  final: 0x1ae160
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/freeOps.ts:freeRaidSignal]
+  readings:
+    - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "## C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal..."
+    - "...last unit's owner; its event unread). Each finds the Free City's record by the plot (0x277470: the records' +0x0c / +0x10 plot, +0x14 live) and calls 0x274ea0."
+  review: imported
 - addr: 0x27a680
   final: 0x1b05e0
   kind: function
@@ -2705,10 +2774,14 @@
     - cpu/core/operations/cityThreat.ts:cityThreat
     - cpu/core/minorOps.ts:minorOpNear
     - gpu/core/sim_minorai.py:_minor_threat
+    - cpu/core/freeOps.ts:freeOpNear
+    - gpu/core/sim_minorai.py:op_near
+    - gpu/core/sim_minorai.py:_known_threat
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
+    - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
   review: reviewed
 - addr: 0x723db0
   kind: function
@@ -2781,6 +2854,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's flag any, el..."

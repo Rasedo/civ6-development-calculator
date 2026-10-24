@@ -2448,9 +2448,10 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
  * Attack High Priority, Attack Medium Priority, Move to Safety, Attack Low
  * Priority, Wander Near Camp — the camp their signals answer (0x771250,
  * unread for them) read as the unit's Free City, else the nearest — and the
- * homeland's End Turn.
+ * homeland's End Turn; `operations` runs once the pass has each unit's
+ * planning (their operations' trees, `freeCitiesMilitary`).
  */
-export function freeCityTactics(state: GameState): void {
+export function freeCityTactics(state: GameState, operations: (pass: Pass) => void): void {
   const free = state.freeSeat;
   if (!free) return;
   const pool = (free.unitPool ??= { size: 0, free: [], dying: [] });
@@ -2458,6 +2459,7 @@ export function freeCityTactics(state: GameState): void {
   costsHeld = new Map();
   try {
     const pass = openPass(state, FREE_SEAT, militaryAiTypeOf);
+    operations(pass);
     attackUnits(state, pass, 'HIGH');
     attackUnits(state, pass, 'MEDIUM');
     moveToSafety(state, pass);

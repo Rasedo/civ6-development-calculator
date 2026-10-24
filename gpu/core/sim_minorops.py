@@ -1,8 +1,10 @@
-"""THE CITY-STATES' OPERATIONS on the GPU (cpu/core/minorOps.ts over the one
-operation manager cpu/core/operations; `tools/civ6lab/dll_readings.md`
-"C-97: the operations", "C-96: the city-states' operations"): each minor's
-manager state as `mops_*` planes ([B, S, ...]), its turn in three parts as
-the game's Control Manager runs a player's lists —
+"""THE CITY-STATES' AND THE FREE CITIES' OPERATIONS on the GPU
+(cpu/core/minorOps.ts and cpu/core/freeOps.ts over the one operation manager
+cpu/core/operations; `tools/civ6lab/dll_readings.md` "C-97: the operations",
+"C-96: the city-states' operations", "C-60: the Free Cities Raid"): each
+holder's manager state as `mops_*` planes ([B, S + 1, ...]: a row per minor,
+then the Free Cities' `FR`), a minor's turn in three parts as the game's
+Control Manager runs a player's lists —
 
  - B: the military AI's turn (`_mops_evaluate`, from `_minor_military_turn`,
    before the turn's knowledge base look): the
@@ -22,9 +24,12 @@ the game's Control Manager runs a player's lists —
 
 A minor runs Attack Barb Camp, Barb Camp Tech Boost (never started),
 Civilian Builder Capture (never started), City Defense and Naval Superiority
-(`MINOR_OP_DEFS`). A unit is its slot in the majors' pool; an operation's tree id is the minor's city AI's tree serial;
-its contracts are the city AI's book's (`cai_*`), held in the operation's
-tree.
+(`MINOR_OP_DEFS`); the Free Cities the Free Cities Raid, started by a Free
+City's signal (`_free_raid_start`) and run in their tactical pass. A unit is
+its slot in its holder's pool (a minor's the majors' pool, the Free Cities'
+the hostile pool); an operation's tree id is the holder's city AI's tree
+serial; its contracts are the city AI's book's (`cai_*`, the holder's row),
+held in the operation's tree.
 """
 
 from __future__ import annotations
@@ -32,7 +37,7 @@ from __future__ import annotations
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from . import simbase
 from .sim_citytrees import (
-    BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SKIPPED, BT_SUCCESS, CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED,
+    BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SKIPPED, BT_SUCCESS, CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED,
     CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, NONE, SHAPE_SELECTOR, _NEXT_MEM, _Tree, _cget, _cset,
     _propagate, _u_contract_manager, new_contract, submit_contract,
 )
@@ -66,9 +71,9 @@ def _f(x: torch.Tensor) -> torch.Tensor:
 
 
 class MinorOpsTables:
-    """the static tables of the city-states' operations: the definitions
-    (by index: Attack Barb Camp, Barb Camp Tech Boost, Civilian Builder
-    Capture, City Defense, Naval Superiority), their teams and requirements,
+    """the static tables of the operations: the definitions (by index:
+    Attack Barb Camp, Barb Camp Tech Boost, Civilian Builder Capture, City
+    Defense, Naval Superiority, the Free Cities Raid), their teams and requirements,
     the trees compiled, the unit AI types of each AI unit row, the Priority
     types, the trait's limits"""
 
@@ -80,6 +85,7 @@ class MinorOpsTables:
         self.d_abc = self.names.index("Attack Barb Camp")
         self.d_cd = self.names.index("City Defense")
         self.d_nav = self.names.index("Naval Superiority")
+        self.d_raid = self.names.index("Free Cities Raid")
         self.teams = {k: list(ao["teams"][d["name"]]) for k, d in enumerate(self.defs)}
         self.reqs = {t: list(r) for t, r in ao["reqs"].items()}
         self.trees = {k: _Tree(d["tree"], ao["trees"][d["tree"]]) for k, d in enumerate(self.defs) if d.get("tree")}
@@ -181,13 +187,45 @@ class _OpCtx:
 
 
 class SimMinorOps:
+    # -- the holder: a minor's row `s`, else the Free Cities' `FR` ----------
+
+    def _mops_pre(self, s: int) -> str:
+        """the pool of the holder's units"""
+        return "barb" if s == self.FR else "major"
+
+    def _mops_seat(self, s: int) -> int:
+        return FREE_SEAT if s == self.FR else 100 + s
+
+    def _mops_kb(self, s: int) -> int:
+        """the holder's knowledge base row"""
+        return self.FK if s == self.FR else s
+
+    def _mops_u(self, s: int, name: str) -> torch.Tensor:
+        """the holder's pool plane `name` [B, P]"""
+        return getattr(self, f"{self._mops_pre(s)}_unit_{name}")
+
+    def _mops_best(self, s: int) -> torch.Tensor:
+        """[B] the holder's best melee Combat Strength (`bestCombatStrength`)"""
+        return self.free_best_melee.long() if s == self.FR else self.citystate_best_melee[:, s].long()
+
+    def _mops_fights(self, s: int, owner: torch.Tensor) -> torch.Tensor:
+        """the holder at war with each player of `owner` [B, N] (the Free
+        Cities with every full civ, `freeFights`)"""
+        seat = self._mops_seat(s)
+        orow = self._seat_row.take(owner.clamp(min=0, max=self._seat_row.numel() - 1))
+        war = (owner >= 0) & self.war[:, int(self._seat_row[seat])].gather(1, orow)
+        if s == self.FR:
+            war = war | ((owner >= 0) & (owner < self.n_majors))
+        return war
+
     # -- the state --------------------------------------------------------
 
     def _mops_tables(self) -> MinorOpsTables:
         return minor_ops_tables(self.rules)
 
     def _init_minor_ops(self, rules, B: int, s_pad: int, device) -> None:
-        """the planes of each minor's operation manager (`OpsAi`)"""
+        """the planes of each holder's operation manager (`OpsAi`), `s_pad`
+        rows: the minors', then the Free Cities'"""
         T = minor_ops_tables(rules)
         L = torch.long
         NO, NTM, NM = N_OPS, N_TEAMS, N_MEMBERS
@@ -203,6 +241,8 @@ class SimMinorOps:
         self.mops_bk_target = torch.full((B, S, NO), -1, dtype=L, device=device)
         self.mops_bk_rally = torch.full((B, S, NO), -1, dtype=L, device=device)
         self.mops_started = torch.full((B, S, NO), -1, dtype=L, device=device)
+        # the player it is against (op +0x2a0, -1 none)
+        self.mops_enemy = torch.full((B, S, NO), -1, dtype=L, device=device)
         self.mops_estr = torch.zeros(B, S, NO, dtype=L, device=device)
         self.mops_str = torch.zeros(B, S, NO, dtype=L, device=device)
         # the tree's run: node statuses, the two memories, the tagged data
@@ -227,7 +267,8 @@ class SimMinorOps:
         # the units each team has taken in (its join's second list, team +0x58)
         self.mops_join = torch.zeros(B, S, NO, NTM, dtype=L, device=device)
         # Operation Move's stores: per move node per team the members held out
-        # and the goal they are held for (-1 none: no store yet)
+        # (over the holder's pool, its first slots) and the goal they are held
+        # for (-1 none: no store yet)
         self.mops_mvs = torch.zeros(B, S, NO, N_MOVES, NTM, P, dtype=torch.bool, device=device)
         self.mops_mvg = torch.full((B, S, NO, N_MOVES, NTM), -1, dtype=L, device=device)
         # the pool's free slots, the last freed on top; its size
@@ -250,24 +291,25 @@ class SimMinorOps:
     # -- the minor's units --------------------------------------------------
 
     def _mops_units(self, s: int) -> dict:
-        """minor `s`'s units as its operations read them (`MajorUnitView`),
-        over the majors' pool [B, P]: alive and its own, the pool order's key
+        """holder `s`'s units as its operations read them (`MajorUnitView`),
+        over its pool [B, P]: alive and its own, the pool order's key
         (its pool slot, an unslotted unit as slot 0, the pool's order among
         equals), its AI unit row, plot, combat, ranged and bombard strengths,
         base range, damage, Movement left (in the pool's scale and whole),
         base Movement"""
-        seat = 100 + s
-        P = self.major_unit_alive.shape[1]
+        seat = self._mops_seat(s)
+        pu = lambda n: self._mops_u(s, n)  # noqa: E731
+        P = pu("alive").shape[1]
         dev = self.device
-        own = self.major_unit_alive & (self.major_unit_seat == seat)
-        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        key = self.major_unit_pslot.clamp(min=0) * P + torch.arange(P, device=dev).unsqueeze(0)
+        own = pu("alive") & (pu("seat") == seat)
+        ut = pu("type").clamp(min=0, max=self.NU - 1)
+        key = pu("pslot").clamp(min=0) * P + torch.arange(P, device=dev).unsqueeze(0)
         er = self._cv_tables()["engine_row"].to(dev)
         row = er.take(ut)
         hp_max = int(self.rules.combat["unitHp"])
         naval = self.unit_naval.take(ut)
         base = self._type_moves.take(ut)
-        emb = self.major_unit_emb & ~naval
+        emb = pu("emb") & ~naval
         if bool(emb.any()):
             techs = self.citystate_techs[:, s]
             extra = torch.zeros(self.B, dtype=torch.long, device=dev)
@@ -275,12 +317,12 @@ class SimMinorOps:
                 if t >= 0:
                     extra = extra + techs[:, t].long() * v
             base = torch.where(emb, self._embark_moves + extra.unsqueeze(1), base)
-        mp = self.major_unit_mp
+        mp = pu("mp")
         return {
-            "own": own, "key": key, "row": row, "tile": self.major_unit_tile,
-            "combat": self._ai_combat("major"), "ranged": self._type_ranged_strength.take(ut),
+            "own": own, "key": key, "row": row, "tile": pu("tile"),
+            "combat": self._ai_combat(self._mops_pre(s)), "ranged": self._type_ranged_strength.take(ut),
             "bombard": self._type_bombard.take(ut), "range": self._type_ranged_range.take(ut),
-            "dmg": hp_max - self.major_unit_hp, "mp": mp, "mp_whole": torch.div(mp, self._mp_scale, rounding_mode="floor"),
+            "dmg": hp_max - pu("hp"), "mp": mp, "mp_whole": torch.div(mp, self._mp_scale, rounding_mode="floor"),
             "base_moves": base,
         }
 
@@ -380,7 +422,7 @@ class SimMinorOps:
     # -- the unit production entries ----------------------------------------
 
     def _mops_unit_rows(self, s: int, u: dict) -> dict:
-        """`seatUnitRows` for minor `s` (the military AI's unit production
+        """`seatUnitRows` for holder `s` (the military AI's unit production
         entries as the unit choice reads them, `unitProductionEntries`): per
         AI unit row [B, NU] the entry, obsolete, buildable, the at-war and
         every player's sums (24.8), the strength"""
@@ -421,7 +463,7 @@ class SimMinorOps:
         # a StrategicResource the minor owns a plot of
         res = cache["res"]
         if bool((res >= 0).any()):
-            seat = 100 + s
+            seat = self._mops_seat(s)
             mine = self.tile_seat == seat
             for k in (res >= 0).nonzero(as_tuple=True)[0].tolist():
                 buildable[:, k] &= (mine & (self.res_id == int(res[k]))).any(dim=1)
@@ -431,14 +473,12 @@ class SimMinorOps:
         own.scatter_add_(1, torch.where(u["own"] & (u["row"] >= 0), u["row"], torch.full_like(u["row"], nu)), u["own"].long())
         own = own[:, :nu]
         entry = cache["version"].unsqueeze(0) & ~(obsolete & (own <= 0))
-        rec = self._mops_records(s)
+        rec = self._mops_records(self._mops_kb(s))
         live = rec["live"] & (rec["row"] >= 0)
         n_all = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
         n_all.scatter_add_(1, torch.where(live, rec["row"], torch.full_like(rec["row"], nu)), live.long())
         n_all = n_all[:, :nu]
-        row = self._CITY_MINOR0 + s
-        orow = self._seat_row.take(rec["owner"].clamp(min=0, max=self._seat_row.numel() - 1))
-        war = live & (rec["owner"] >= 0) & self.war[:, row].gather(1, orow)
+        war = live & self._mops_fights(s, rec["owner"])
         n_war = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
         n_war.scatter_add_(1, torch.where(war, rec["row"], torch.full_like(rec["row"], nu)), war.long())
         n_war = n_war[:, :nu]
@@ -504,7 +544,7 @@ class SimMinorOps:
 
     def _mops_member_mask(self, s: int, k: int, ti: int) -> torch.Tensor:
         """[B, P] the team's listed members"""
-        P = self.major_unit_alive.shape[1]
+        P = self._mops_u(s, "alive").shape[1]
         m = self.mops_mem[:, s, k, ti]
         out = torch.zeros(self.B, P + 1, dtype=torch.bool, device=self.device)
         out.scatter_(1, torch.where(m >= 0, m, P), True)
@@ -512,7 +552,7 @@ class SimMinorOps:
 
     def _mops_member_rank(self, s: int, k: int, ti: int) -> torch.Tensor:
         """[B, P] each listed member's place in the team's list, -1 none"""
-        P = self.major_unit_alive.shape[1]
+        P = self._mops_u(s, "alive").shape[1]
         m = self.mops_mem[:, s, k, ti]
         out = torch.full((self.B, P + 1), -1, dtype=torch.long, device=self.device)
         pos = torch.arange(m.shape[1], device=self.device).unsqueeze(0).expand_as(m)
@@ -520,8 +560,8 @@ class SimMinorOps:
         return out[:, :P]
 
     def _mops_held(self, s: int) -> torch.Tensor:
-        """[B, P] the units any of minor `s`'s operations' teams list"""
-        P = self.major_unit_alive.shape[1]
+        """[B, P] the units any of holder `s`'s operations' teams list"""
+        P = self._mops_u(s, "alive").shape[1]
         m = self.mops_mem[:, s].reshape(self.B, -1)
         out = torch.zeros(self.B, P + 1, dtype=torch.bool, device=self.device)
         out.scatter_(1, torch.where(m >= 0, m, P), True)
@@ -548,7 +588,7 @@ class SimMinorOps:
         d = self.mops_def[:, s, k]
         tm = self.mops_tm[:, s, k, ti]
         er = self._cv_tables()["engine_row"].to(self.device)
-        urow = er.take(self.major_unit_type.gather(1, uid.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1))
+        urow = er.take(self._mops_u(s, "type").gather(1, uid.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1))
         ua = Tm.unit_ai.to(self.device)
         for dd, ts in Tm.team_reqs.items():
             for tj, tr in enumerate(ts):
@@ -578,7 +618,7 @@ class SimMinorOps:
         urow = u["row"].clamp(min=0)
         strength = torch.where(alive, self._mops_strength(u), torch.zeros_like(u["combat"])).sum(dim=1)
         estr = self.mops_estr[:, s, k]
-        ours = self.citystate_best_melee[:, s].long()
+        ours = self._mops_best(s)
         NAT = len(Tm.ai_types)
         for dd, ts in Tm.team_reqs.items():
             for tj, tr in enumerate(ts):
@@ -782,7 +822,8 @@ class SimMinorOps:
         if not bool(on.any()):
             return
         tgt = self.mops_target[:, s, k]
-        self.mops_estr[:, s, k] = torch.where(on, self._ops_enemy_str(100 + s, s, tgt, torch.full_like(tgt, -1)), self.mops_estr[:, s, k])
+        estr = self._ops_enemy_str(self._mops_seat(s), self._mops_kb(s), tgt, self.mops_enemy[:, s, k])
+        self.mops_estr[:, s, k] = torch.where(on, estr, self.mops_estr[:, s, k])
         for ti in range(N_TEAMS):
             self._mops_team_update(s, k, ti, on, u, rows)
             self._mops_update_team(s, k, ti, on, u, tg)
@@ -791,11 +832,13 @@ class SimMinorOps:
 
     # -- the pool -------------------------------------------------------------
 
-    def _mops_start(self, s: int, d: int, target: torch.Tensor, rally: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def _mops_start(self, s: int, d: int, target: torch.Tensor, rally: torch.Tensor, mask: torch.Tensor,
+                    enemy: torch.Tensor | None = None) -> torch.Tensor:
         """`startOperation` (0x73a120) of definition `d` where `mask`: a pool
         slot (the one freed last, else a new one), its tree's id the city AI's
         next, its teams (a team's Condition: IsCoastalTarget, water within 1
-        of the target), target and rally, its tree fresh. [B] its id (-1 none)"""
+        of the target), target, rally and the player it is against (`enemy`,
+        none: -1), its tree fresh. [B] its id (-1 none)"""
         B, dev = self.B, self.device
         m = mask.clone()
         if not bool(m.any()):
@@ -813,6 +856,7 @@ class SimMinorOps:
         assert int(self.mops_size[:, s].max()) <= N_OPS, "minor operations: raise N_OPS"
         tgt = target if torch.is_tensor(target) else torch.full((B,), int(target), dtype=torch.long, device=dev)
         ral = rally if torch.is_tensor(rally) else torch.full((B,), int(rally), dtype=torch.long, device=dev)
+        ene = enemy if enemy is not None else torch.full((B,), -1, dtype=torch.long, device=dev)
         coastal = (self.water & (self.pair_dist[tgt.clamp(min=0)] <= 1)).any(dim=1) & (tgt >= 0)
         for kk in range(N_OPS):
             g = m & (k == kk)
@@ -826,6 +870,7 @@ class SimMinorOps:
             self.mops_bk_target[rows, s, kk] = -1
             self.mops_bk_rally[rows, s, kk] = -1
             self.mops_started[rows, s, kk] = int(self.turn)
+            self.mops_enemy[rows, s, kk] = ene[rows]
             self.mops_estr[rows, s, kk] = 0
             self.mops_str[rows, s, kk] = 0
             self.mops_st[rows, s, kk] = BT_FRESH
@@ -872,6 +917,7 @@ class SimMinorOps:
         rows = mask.nonzero(as_tuple=True)[0]
         self.mops_def[rows, s, k] = -1
         self.mops_id[rows, s, k] = -1
+        self.mops_enemy[rows, s, k] = -1
         self.mops_tm[rows, s, k] = -1
         self.mops_mem[rows, s, k] = -1
         nf = self.mops_nfree[rows, s]
@@ -887,8 +933,8 @@ class SimMinorOps:
         return hit.any(-1).reshape(ids.shape)
 
     def _mops_busy(self, s: int) -> torch.Tensor:
-        """[B, P] the units listed in any running operation of minor `s`"""
-        P = self.major_unit_alive.shape[1]
+        """[B, P] the units listed in any running operation of holder `s`"""
+        P = self._mops_u(s, "alive").shape[1]
         m = torch.where((self.mops_def[:, s] >= 0).unsqueeze(2).unsqueeze(3), self.mops_mem[:, s], torch.full_like(self.mops_mem[:, s], -1))
         flat = m.reshape(self.B, -1)
         out = torch.zeros(self.B, P + 1, dtype=torch.bool, device=self.device)
@@ -1082,7 +1128,7 @@ class SimMinorOps:
     # -- the operations' run (C) ------------------------------------------------
 
     def _mops_run(self, s: int, act: torch.Tensor, op: dict, done: torch.Tensor) -> None:
-        """`operationsRun` for minor `s` in its pass (`op` the pass's opening,
+        """`operationsRun` for holder `s` in its pass (`op` the pass's opening,
         `done` its units' turns): each running operation refreshed, the pick
         started, the trees by priority (the highest first, of equals in slot
         order); the operations' units' turns end"""
@@ -1090,7 +1136,7 @@ class SimMinorOps:
         on = act & ((self.mops_def[:, s] >= 0).any(dim=1) | (self.mops_pick[:, s] >= 0))
         if not bool(on.any()):
             return
-        tg = op["tg"] if op["tg"] is not None else self._tac_targets(100 + s, s)
+        tg = op["tg"] if op["tg"] is not None else self._tac_targets(self._mops_seat(s), self._mops_kb(s))
         view = {"op": op, "done": done, "tg": tg, "rows": None, "world": None}
         u = self._mops_units(s)
         rows = view["rows"] = self._mops_unit_rows(s, u)
@@ -1111,7 +1157,7 @@ class SimMinorOps:
                     m = on & (self.mops_def[:, s, k] == d)
                     if bool(m.any()):
                         self._mops_tick(s, k, d, m, view)
-        busy = self._mops_busy(s) & self.major_unit_alive & (self.major_unit_seat == 100 + s)
+        busy = self._mops_busy(s) & self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
         done |= busy & on.unsqueeze(1) & (op["rowof"] >= 0)
 
     def _mops_tick(self, s: int, k: int, d: int, act: torch.Tensor, view: dict) -> None:
@@ -1224,7 +1270,7 @@ class SimMinorOps:
         ustr = torch.maximum(u["combat"], u["ranged"])
         ostr = ustr.gather(1, oc)
         estr = self.mops_estr[:, s, k]
-        ours = self.citystate_best_melee[:, s].long()
+        ours = self._mops_best(s)
         members = (self.mops_mem[:, s, k, ti] >= 0).sum(dim=1)
         memm = self._mops_member_mask(s, k, ti) & u["own"]
         cur_mem = torch.where(memm, ustr, torch.zeros_like(ustr)).sum(dim=1)
@@ -1359,7 +1405,7 @@ class SimMinorOps:
                       mask: torch.Tensor) -> torch.Tensor:
         """`recruitOperation` (0x738050): each team in turn takes from the
         offer [B, L], the units it takes leaving it. [B, P] the units taken"""
-        P = self.major_unit_alive.shape[1]
+        P = self._mops_u(s, "alive").shape[1]
         got = torch.zeros(self.B, P + 1, dtype=torch.bool, device=self.device)
         for ti in range(N_TEAMS):
             t = self._mops_recruit_team(s, k, ti, offer, in_prog, rng, u, mask)
@@ -1410,20 +1456,22 @@ class SimMinorOps:
         B, dev = self.B, self.device
         b = torch.arange(B, device=dev)
         jc = j.clamp(min=0)
-        seat = 100 + s
+        seat = self._mops_seat(s)
+        pre = self._mops_pre(s)
+        pu = lambda n: self._mops_u(s, n)  # noqa: E731
         tg, op = view["tg"], view["op"]
         danger = op["danger"]
-        ut = self.major_unit_type[b, jc].clamp(min=0, max=self.NU - 1)
+        ut = pu("type")[b, jc].clamp(min=0, max=self.NU - 1)
         cb_all = self._ai_combat()
-        mcb = cb_all[:, self.POOL_LO["major"]:self.POOL_HI["major"]][b, jc]
+        mcb = cb_all[:, self.POOL_LO[pre]:self.POOL_HI[pre]][b, jc]
         fights = (mcb > 0) | (self._type_ranged_strength.take(ut) > 0) | (self._type_bombard.take(ut) > 0)
-        plot = self.major_unit_tile[b, jc].clamp(min=0)
+        plot = pu("tile")[b, jc].clamp(min=0)
         near = 2 * self._type_moves.take(ut)
         d = self.pair_dist[plot].to(torch.long)  # [B, T]
-        own = self.major_unit_alive & (self.major_unit_seat == seat)
-        own_d = self.pair_dist[plot.unsqueeze(1), self.major_unit_tile.clamp(min=0)].to(torch.long)
+        own = pu("alive") & (pu("seat") == seat)
+        own_d = self.pair_dist[plot.unsqueeze(1), pu("tile").clamp(min=0)].to(torch.long)
         others = torch.arange(own.shape[1], device=dev).unsqueeze(0) != jc.unsqueeze(1)
-        beside = (own & others & (own_d == 1) & (self.major_unit_tile >= 0)).any(dim=1)
+        beside = (own & others & (own_d == 1) & (pu("tile") >= 0)).any(dim=1)
         here = danger.gather(1, plot.unsqueeze(1)).squeeze(1)
         # the unit entries, each at its plot
         uk, uu = tg["uk"], tg["uu"]
@@ -1467,18 +1515,18 @@ class SimMinorOps:
                     hit = self._damage_expected(str_ - mcb.to(torch.float64))
                     total = total + torch.where(ok, n * hit, torch.zeros_like(hit))
         hp_max = int(self.rules.combat["unitHp"])
-        dmg_now = hp_max - self.major_unit_hp[b, jc].long()
+        dmg_now = hp_max - pu("hp")[b, jc].long()
         weak = (total > 0) & ~fights
         land = ~self.water[b, plot]
         return on & ((weak & land) | (~weak & (dmg_now + total > hp_max)))
 
-    def _mops_hurt(self, j: torch.Tensor, pct: int) -> torch.Tensor:
-        """[B] bool — the unit at pool slot `j` hurt to `pct` percent of its
-        hit points (single precision)"""
+    def _mops_hurt(self, s: int, j: torch.Tensor, pct: int) -> torch.Tensor:
+        """[B] bool — holder `s`'s unit at pool slot `j` hurt to `pct` percent
+        of its hit points (single precision)"""
         b = torch.arange(self.B, device=self.device)
         hp_max = int(self.rules.combat["unitHp"])
         bar = float(torch.tensor(hp_max, dtype=_F32) * torch.tensor(float(torch.tensor(pct, dtype=_F32) * torch.tensor(0.01, dtype=_F32)), dtype=_F32))
-        return (hp_max - self.major_unit_hp[b, j.clamp(min=0)].long()).to(torch.float64) >= bar
+        return (hp_max - self._mops_u(s, "hp")[b, j.clamp(min=0)].long()).to(torch.float64) >= bar
 
     def _mops_move(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor) -> None:
         """a member's move order to `dest` (tactical `moveTo`, no strike):
@@ -1488,8 +1536,8 @@ class SimMinorOps:
             return
         b = torch.arange(self.B, device=self.device)
         uc = us.clamp(min=0)
-        m &= (self.major_unit_tile[b, uc] != dest) & (self.major_unit_mp[b, uc] > 0) & (dest >= 0)
-        self._tac_move_to(m, uc, dest, "major", 100 + s, strike=False)
+        m &= (self._mops_u(s, "tile")[b, uc] != dest) & (self._mops_u(s, "mp")[b, uc] > 0) & (dest >= 0)
+        self._tac_move_to(m, uc, dest, self._mops_pre(s), self._mops_seat(s), strike=False)
 
     def _mops_strike(self, s: int, us: torch.Tensor, plot: torch.Tensor, mask: torch.Tensor) -> None:
         """a member's blow on `plot` (`passOrders.strike`): a ranged unit within
@@ -1500,15 +1548,16 @@ class SimMinorOps:
             return
         b = torch.arange(self.B, device=self.device)
         uc = us.clamp(min=0)
-        ut = self.major_unit_type[b, uc].clamp(min=0, max=self.NU - 1)
+        pre = self._mops_pre(s)
+        ut = self._mops_u(s, "type")[b, uc].clamp(min=0, max=self.NU - 1)
         ranged = self._type_ranged_strength.take(ut) > 0
-        rng = self._tac_range(b, uc, "major")
-        here = self.major_unit_tile[b, uc].clamp(min=0)
+        rng = self._tac_range(b, uc, pre)
+        here = self._mops_u(s, "tile")[b, uc].clamp(min=0)
         inr = ranged & (self.pair_dist[here, plot.clamp(min=0)].to(torch.long) <= rng)
-        fire = m & inr & (self.major_unit_mp[b, uc] > 0) & (self.major_unit_attacks[b, uc] > 0)
+        fire = m & inr & (self._mops_u(s, "mp")[b, uc] > 0) & (self._mops_u(s, "attacks")[b, uc] > 0)
         for u in torch.unique(uc[fire]).tolist():
-            self._hostile_ranged_strike(fire & (uc == u), plot.clamp(min=0), "major", u)
-        self._tac_move_to(m & ~inr, uc, plot, "major", 100 + s, strike=True)
+            self._hostile_ranged_strike(fire & (uc == u), plot.clamp(min=0), pre, u)
+        self._tac_move_to(m & ~inr, uc, plot, pre, self._mops_seat(s), strike=True)
 
     def _mops_plan_spot(self, s: int, view: dict, us: torch.Tensor, p: torch.Tensor, turns: int, need_moves: bool,
                         rng: torch.Tensor) -> torch.Tensor:
@@ -1526,8 +1575,8 @@ class SimMinorOps:
         nn = n.clamp(min=0)
         rt, rk, mv = res["turns"][nn], res["rank"][nn], res["moves"][nn]
         dq = self.pair_dist[p.clamp(min=0)].to(torch.long)
-        here = self.major_unit_tile[b, uc]
-        g = uc + self.POOL_LO["major"]
+        here = self._mops_u(s, "tile")[b, uc]
+        g = uc + self.POOL_LO[self._mops_pre(s)]
         ut = self.unit_type.gather(1, g.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
         fights = self._type_combat.take(ut) > 0
         block = torch.zeros(B, T, dtype=torch.bool, device=dev)
@@ -1553,7 +1602,7 @@ class SimMinorOps:
         rt = op["res"]["turns"][n.clamp(min=0), p.clamp(min=0)]
         return (n >= 0) & (us >= 0) & (p >= 0) & (rt >= 1) & (rt <= 1)
 
-    def _mops_attack_spot(self, view: dict, us: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
+    def _mops_attack_spot(self, s: int, view: dict, us: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
         """`attackSpots`'s pick (Operation Attack's second pass): [B] the plan
         entry's spot for `p` of the fewest turns (the first of equals), -1
         none or where one is the unit's own plot"""
@@ -1575,7 +1624,7 @@ class SimMinorOps:
         sp = res["spot"][nn, e]                                               # [B, 6]
         st = res["spot_turns"][nn, e]
         sn = res["spot_n"][nn, e]
-        here = self.major_unit_tile[b, uc]
+        here = self._mops_u(s, "tile")[b, uc]
         k6 = torch.arange(6, device=dev).unsqueeze(0)
         val = k6 < sn.unsqueeze(1)
         own = (val & (sp == here.unsqueeze(1))).any(dim=1)
@@ -1624,10 +1673,25 @@ def _camp_gone(sim, c: _OpCtx) -> torch.Tensor:
 
 
 def _gone(sim, c: _OpCtx) -> torch.Tensor:
-    """`targetGone` (0x73a8e0) of the operation's target"""
-    if c.T.defs[c.d]["targetType"] == "TARGET_BARBARIAN_CAMP":
+    """`targetGone` (0x73a8e0) of the operation's target: a camp target no
+    camp the knowledge base holds stands on; a district target no city
+    stands on"""
+    tt = c.T.defs[c.d]["targetType"]
+    if tt == "TARGET_BARBARIAN_CAMP":
         return _camp_gone(sim, c)
+    if tt in ("TARGET_ENEMY_COMBAT_DISTRICT", "TARGET_ENEMY_PASSIVE_DISTRICT"):
+        t = sim.mops_target[:, c.s, c.k]
+        return (t < 0) | ~sim._centre_plane().gather(1, t.clamp(min=0).unsqueeze(1)).squeeze(1)
     return torch.zeros_like(c.ref, dtype=torch.bool)
+
+
+def _n_live(sim, c: _OpCtx) -> torch.Tensor:
+    """[B] the operation's living members (`holdsUnits`)"""
+    u = sim._mops_units(c.s)
+    n = torch.zeros_like(c.ref)
+    for ti in range(N_TEAMS):
+        n = n + (sim._mops_member_mask(c.s, c.k, ti) & u["own"]).sum(dim=1)
+    return n
 
 
 def _switch_backup(sim, c: _OpCtx, m: torch.Tensor) -> None:
@@ -1690,14 +1754,17 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """OPERATION ATTACK UNITS' EXECUTION (0x80ceb0): per team engaged or with a unit
     taken in (team +0x90, +0x58) its members alive
     with Movement left (a bombard unit only against an enemy city), the list's
-    unit targets not its own within max(2, a member's Movement left) of one,
+    unit targets not its own within max(2, a member's Movement left) of one
+    (with an enemy named, its units or a civilian),
     the assignment (the exchange filter where unequal attacks are not allowed
     and one unit goes, the survival filter always) carried out"""
     s, k = c.s, c.k
     tree = c.tree
-    seat = 100 + s
+    seat = sim._mops_seat(s)
     assert tree.flag(i, "Attack Nearby Units"), "minor operations: Attack Units without Attack Nearby Units"
     unequal = bool(tree.flag(i, "Allow Unequal Attacks"))
+    pre = sim._mops_pre(s)
+    enemy = sim.mops_enemy[:, s, k]
     view = c.view
     op, tg, done = view["op"], view["tg"], view["done"]
     dev = sim.device
@@ -1725,20 +1792,21 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         # each unit entry's unit still on its plot
         standing = (uu >= 0) & sim.unit_alive.gather(1, sl) & (sim.unit_tile.gather(1, sl) == sim._arange_bt.repeat(1, L)) \
             & (sim.unit_seat.gather(1, sl) == us_)
-        near = near.repeat(1, L) & (uk > 0) & (us_ != seat) & standing
+        theirs = (enemy.unsqueeze(1) < 0) | (us_ == enemy.unsqueeze(1)) | (uk == 7)
+        near = near.repeat(1, L) & (uk > 0) & (us_ != seat) & standing & theirs
         cand = mem & (op["rowof"] >= 0)
         if not bool((cand.any(dim=1) & near.any(dim=1)).any()):
             continue
-        ai = torch.where(op["units"], torch.where(sim.major_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
+        ai = torch.where(op["units"], torch.where(sim._mops_u(s, "defender"), _AI_DEFENDER, _AI_COMBAT), -1)
         one = mem.sum(dim=1) == 1
         exch = (~torch.full((B,), unequal, dtype=torch.bool, device=dev)) & one
         # the operation's units (its job), every team's
         held = torch.zeros_like(memm)
         for t in range(N_TEAMS):
             held |= sim._mops_member_mask(s, k, t)
-        peers = sim._tac_peers(held & u["own"], "major")
-        out = sim._tac_assign(cand, op["order"], ai, near, op["res"], op["rowof"], uu, exch, True, uk, tg["uo"], peers, "major", seat)
-        sim._tac_carry_out(out, done, op["rowof"], op["res"], "major", seat)
+        peers = sim._tac_peers(held & u["own"], pre)
+        out = sim._tac_assign(cand, op["order"], ai, near, op["res"], op["rowof"], uu, exch, True, uk, tg["uo"], peers, pre, seat)
+        sim._tac_carry_out(out, done, op["rowof"], op["res"], pre, seat)
 
 
 def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
@@ -1788,9 +1856,10 @@ def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
                     sim._mops_compact(s, kk, ti, keep, at)
     # the operation's units (the player's walk 0x6092c0) each take their
     # type's own AI type (unit +0x168, 0x79b9c0): a DEFENDER turns COMBAT
+    dfd = sim._mops_u(s, "defender")
     for ti in range(N_TEAMS):
         mine = sim._mops_member_mask(s, k, ti) & at.unsqueeze(1)
-        sim.major_unit_defender &= ~mine
+        dfd &= ~mine
     rows = view["rows"]
     sim._mops_refresh(s, k, at, sim._mops_units(s), rows, view["tg"])
     after = _n_units(sim, c)
@@ -1834,6 +1903,8 @@ def _x_recruit(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     tag = tree.tag(i, "Contract ID")
     if tag is None:
         return
+    if s == sim.FR:
+        raise NotImplementedError("operations: the Free Cities' trees make no contract")
     unit = c.mb[:, i]
     m = on & (unit != NONE) & (unit >= 0)
     if not bool(m.any()):
@@ -1892,14 +1963,15 @@ def _u_move(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
         fail |= nog
         on &= ~nog
         mem = sim._mops_member_mask(s, k, ti) & u["own"]
-        store = sim.mops_mvs[:, s, k, j, ti].clone()
+        P = mem.shape[1]
+        store = sim.mops_mvs[:, s, k, j, ti, :P].clone()
         sg = sim.mops_mvg[:, s, k, j, ti].clone()
         st, arr, rest = sim._op_move_update(on, mem, sim._mops_member_rank(s, k, ti), store, sg, goal, slot == 1, rng, spread,
                                             op["rowof"], op["res"],
-                                            "major", 100 + s)
+                                            sim._mops_pre(s), sim._mops_seat(s))
         rr = rest.nonzero(as_tuple=True)[0]
         if rr.numel():
-            sim.mops_mvs[rr, s, k, j, ti] = store[rr]
+            sim.mops_mvs[rr, s, k, j, ti, :P] = store[rr]
             sim.mops_mvg[rr, s, k, j, ti] = sg[rr]
         all_ok &= ~on | (st == BT_SUCCESS)
         arrived_bits = torch.where(on & arr, arrived_bits | (1 << ti), arrived_bits)
@@ -1932,7 +2004,8 @@ def _x_move(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         u = sim._mops_units(s)
         mem = sim._mops_member_mask(s, k, ti) & u["own"]
         arrived = (bits & (1 << ti)) != 0
-        sim._op_move_exec(g, mem, sim._mops_member_rank(s, k, ti), goal, rng, arrived, ready, c.view["done"], op["rowof"], op["res"], "major", 100 + s)
+        sim._op_move_exec(g, mem, sim._mops_member_rank(s, k, ti), goal, rng, arrived, ready, c.view["done"], op["rowof"], op["res"],
+                          sim._mops_pre(s), sim._mops_seat(s))
 
 
 def _u_operation_attack(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
@@ -1985,7 +2058,7 @@ def _x_operation_attack(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             us, uc, ok = member(j)
             if not bool(ok.any()):
                 continue
-            best = sim._mops_attack_spot(view, us, target)
+            best = sim._mops_attack_spot(s, view, us, target)
             sim._mops_move(s, us, best, ok & (best >= 0))
         t_c = target.clamp(min=0)
         occupied = (sim.unit_alive & (sim.unit_tile == t_c.unsqueeze(1)) & (sim.unit_hp > 0)).any(dim=1)
@@ -2029,10 +2102,17 @@ def _hostile_at(sim, s: int, plot: torch.Tensor) -> torch.Tensor:
 
 
 def _u_city_threatened(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
-    """IS CITY THREATENED (0x813050): the city on the target threatened"""
+    """IS CITY THREATENED (0x813050): the target gone, or the city on it
+    threatened (its city AI's threat above -1: a minor's own city, a Free
+    City): SUCCESS; else FAILURE"""
     t = sim.mops_target[:, c.s, c.k]
-    thr = torch.where(t == sim.citystate_center[:, c.s], sim.citystate_threat[:, c.s], torch.full_like(t, -1))
-    return torch.where((t >= 0) & (thr > -1), BT_SUCCESS, BT_FAILURE)
+    if c.s == sim.FR:
+        row = sim.FREE_ROW
+        hit = (sim.city_alive[:, row] & (sim.city_center[:, row] == t.unsqueeze(1)) & (t >= 0).unsqueeze(1))
+        thr = torch.where(hit, sim.city_ai_threat[:, row], torch.full_like(sim.city_ai_threat[:, row], -1)).max(dim=1).values
+    else:
+        thr = torch.where(t == sim.citystate_center[:, c.s], sim.citystate_threat[:, c.s], torch.full_like(t, -1))
+    return torch.where(_gone(sim, c) | ((t >= 0) & (thr > -1)), BT_SUCCESS, BT_FAILURE)
 
 
 def _u_can_alpha(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
@@ -2046,9 +2126,87 @@ def _u_can_alpha(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 
 def _u_running_units(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
-    """GARRISON CITY (0x8133c0), OPERATION ATTACK CITY (0x813250) on the
-    minor's own city: RUNNING while the operation holds units, else FAILURE"""
+    """GARRISON CITY (0x8133c0) on the minor's own city: RUNNING while the
+    operation holds units, else FAILURE"""
     return torch.where(_n_units(sim, c) > 0, BT_RUNNING, BT_FAILURE)
+
+
+def _u_attack_city(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """OPERATION ATTACK CITY (0x813250): SUCCESS once the target is gone; a
+    target that is no city nor a district FAILS; RUNNING while the operation
+    holds a living unit, else FAILURE"""
+    t = sim.mops_target[:, c.s, c.k]
+    tc = t.clamp(min=0).unsqueeze(1)
+    place = (t >= 0) & (sim._centre_plane().gather(1, tc).squeeze(1) | (sim.district.gather(1, tc).squeeze(1) >= 0))
+    run = torch.where(_n_live(sim, c) > 0, BT_RUNNING, BT_FAILURE)
+    return torch.where(_gone(sim, c), BT_SUCCESS, torch.where(place, run, BT_FAILURE))
+
+
+def _u_pillage(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """OPERATION PILLAGE (0x8134a0): ERROR where its three data are all
+    present and false; SUCCESS once the target is gone or while the
+    operation holds a living unit, else FAILURE"""
+    if not any(_pillage_flag(c, i, n) for n in ("Pillage Districts", "Pillage Improvements", "Get Goody Huts")):
+        return _status(c, BT_ERROR)
+    return torch.where(_gone(sim, c) | (_n_live(sim, c) > 0), BT_SUCCESS, BT_FAILURE)
+
+
+def _u_siege(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
+    """OPERATION SIEGE CITY (0x8136a0): SUCCESS once the target is gone;
+    ERROR with no enemy; SUCCESS while the operation holds a living unit,
+    else FAILURE"""
+    enemy = sim.mops_enemy[:, c.s, c.k]
+    out = torch.where(_n_live(sim, c) > 0, BT_SUCCESS, BT_FAILURE)
+    return torch.where(_gone(sim, c), BT_SUCCESS, torch.where(enemy < 0, BT_ERROR, out))
+
+
+def _pillage_flag(c: _OpCtx, i: int, name: str) -> bool:
+    v = c.tree.flag(i, name)
+    return True if v is None else bool(v)
+
+
+def _team_members(sim, c: _OpCtx) -> tuple[torch.Tensor, torch.Tensor]:
+    """the operation's members [B, P] of the holder's pool, alive, and
+    each one's place in the teams' order (team then join, `op.teams`'
+    members) [B, P]"""
+    u = sim._mops_units(c.s)
+    mem = torch.zeros_like(u["own"])
+    rank = torch.full(u["own"].shape, 1 << 30, dtype=torch.long, device=sim.device)
+    for ti in range(N_TEAMS):
+        m = sim._mops_member_mask(c.s, c.k, ti) & u["own"]
+        r = sim._mops_member_rank(c.s, c.k, ti)
+        rank = torch.where(m & ~mem, ti * N_MEMBERS + r, rank)
+        mem |= m
+    return mem, rank
+
+
+def _x_pillage(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
+    """OPERATION PILLAGE's execution (0x811390, `pillageExecute`) of the Free
+    Cities' operation over the holder's pool (`_op_pillage`)"""
+    if c.s != sim.FR:
+        raise NotImplementedError("operations: Operation Pillage over the majors' pool")
+    view = c.view
+    op = view["op"]
+    if op["tg"] is None:
+        return
+    mem, rank = _team_members(sim, c)
+    t = sim.mops_target[:, c.s, c.k]
+    ctx = {"rowof": op["rowof"], "res": op["res"], "tg": op["tg"], "done": view["done"]}
+    sim._op_pillage(on, mem, rank, t, ctx, _pillage_flag(c, i, "Pillage Districts"),
+                    _pillage_flag(c, i, "Pillage Improvements"), _pillage_flag(c, i, "Get Goody Huts"), FREE_SEAT)
+
+
+def _x_siege(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
+    """OPERATION SIEGE CITY's execution (0x811e80, `siegeCityExecute`) of the
+    Free Cities' operation over the holder's pool (`_op_siege`)"""
+    if c.s != sim.FR:
+        raise NotImplementedError("operations: Operation Siege City over the majors' pool")
+    view = c.view
+    op = view["op"]
+    mem, rank = _team_members(sim, c)
+    ctx = {"done": view["done"], "order": op["order"], "rowof": op["rowof"], "res": op["res"], "tg": op["tg"],
+           "danger": op["danger"]}
+    sim._op_siege(on, mem, sim.mops_target[:, c.s, c.k], rank, ctx, seat=FREE_SEAT)
 
 
 def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
@@ -2124,30 +2282,32 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
 
 def _x_attack_city(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """OPERATION ATTACK CITY's execution (0x8109e0, `attackCityExecute`): per
-    team its members alive with Movement left, the list's COMBAT_DISTRICT
-    targets within 3 of the operation's target, the assignment over them (no
-    exchange filter, the survival filter on) carried out"""
+    team its members alive with Movement left; the list's COMBAT_DISTRICT
+    targets within 3 of the operation's target; the assignment over them
+    (no exchange filter, the survival filter on) carried out"""
     s, k = c.s, c.k
     view = c.view
     op, tg, done = view["op"], view["tg"], view["done"]
-    if op["tg"] is None:
+    t = sim.mops_target[:, s, k]
+    on = on & (t >= 0)
+    if not bool(on.any()) or op["tg"] is None:
         return
-    seat = 100 + s
-    tgt = sim.mops_target[:, s, k]
-    near = (tg["dk"] == 1) & (sim.pair_dist[tgt.clamp(min=0)] <= 3) & (on & (tgt >= 0)).unsqueeze(1)
-    if not bool(near.any()):
-        return
-    ai = torch.where(op["units"], torch.where(sim.major_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
+    pre, seat = sim._mops_pre(s), sim._mops_seat(s)
+    near = (tg["dk"] == 1) & (sim.pair_dist[t.clamp(min=0)].to(torch.long) <= 3) & on.unsqueeze(1)
+    held = torch.zeros_like(op["units"])
+    for ti in range(N_TEAMS):
+        held |= sim._mops_member_mask(s, k, ti)
     for ti in range(N_TEAMS):
         u = sim._mops_units(s)
-        mem = sim._mops_member_mask(s, k, ti) & u["own"]
-        units = mem & (u["mp"] > 0) & on.unsqueeze(1) & (op["rowof"] >= 0)
+        g = on & (sim.mops_tm[:, s, k, ti] >= 0)
+        units = sim._mops_member_mask(s, k, ti) & u["own"] & (u["mp"] > 0) & g.unsqueeze(1) & (op["rowof"] >= 0)
         if not bool((units.any(dim=1) & near.any(dim=1)).any()):
             continue
+        ai = torch.where(op["units"], torch.where(sim._mops_u(s, "defender"), _AI_DEFENDER, _AI_COMBAT), -1)
         out = sim._tac_assign(units, op["order"], ai, near, op["res"], op["rowof"], tg["uu"], torch.zeros_like(on), True,
-                              torch.zeros_like(tg["dk"]), sim._arange_bt, sim._tac_peers(mem, "major"), "major", seat,
+                              torch.zeros_like(tg["dk"]), sim._arange_bt, sim._tac_peers(held & u["own"], pre), pre, seat,
                               district=True)
-        sim._tac_carry_out(out, done, op["rowof"], op["res"], "major", seat)
+        sim._tac_carry_out(out, done, op["rowof"], op["res"], pre, seat)
 
 
 def _defend_pct(c: _OpCtx, i: int) -> int:
@@ -2175,7 +2335,7 @@ def _u_defend(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
             uc = us.clamp(min=0)
             plot = sim.major_unit_tile[b, uc].clamp(min=0)
             fort = sim.major_unit_fortify[b, uc] >= 2
-            marked |= ok & (sim._mops_endangered(s, us, ok, view) | sim._mops_hurt(us, pct)
+            marked |= ok & (sim._mops_endangered(s, us, ok, view) | sim._mops_hurt(s, us, pct)
                             | (fort & (danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0)))
     c.ma[:, i] = torch.where(at, marked.long(), c.ma[:, i])
     return _status(c, BT_SUCCESS)
@@ -2317,7 +2477,7 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             wat = sim.water[b, plot]
             dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
             afloat = (fort >= 2) & wat & dang
-            ok &= sim._mops_hurt(us, pct) | afloat
+            ok &= sim._mops_hurt(s, us, pct) | afloat
             ut = sim.major_unit_type[b, uc].clamp(min=0, max=sim.NU - 1)
             # a promotion due: the AI's pick, its turn done
             _promote_due(sim, ok, uc)
@@ -2508,7 +2668,9 @@ _UPDATE = {
     "Is City Threatened": _u_city_threatened,
     "Can Alpha City": _u_can_alpha,
     "Garrison City": _u_running_units,
-    "Operation Attack City": _u_running_units,
+    "Operation Attack City": _u_attack_city,
+    "Operation Pillage": _u_pillage,
+    "Operation Siege City": _u_siege,
     "Naval Choose Target": _u_naval_choose,
     "Naval Pillage": _u_naval_units,
     "Naval Patrol": _u_naval_units,
@@ -2522,6 +2684,8 @@ _EXECUTE = {
     "Operation Attack": _x_operation_attack,
     "Garrison City": _x_garrison,
     "Operation Attack City": _x_attack_city,
+    "Operation Pillage": _x_pillage,
+    "Operation Siege City": _x_siege,
     "Naval Pillage": _x_naval_pillage,
     "Naval Patrol": _x_naval_patrol,
 }

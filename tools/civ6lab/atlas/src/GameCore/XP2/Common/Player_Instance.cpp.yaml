@@ -127,6 +127,7 @@
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiUnitProduction.ts:UnitProductionFacts
     - cpu/core/minorCityAi.ts:freeCityThreat
+    - cpu/core/freeOps.ts:freeFights
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

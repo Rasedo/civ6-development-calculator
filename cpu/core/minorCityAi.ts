@@ -35,7 +35,7 @@ import { CIVICS as CIVICS_KNOWN } from '../data/civics';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import { GAME_COST_ESCALATION, gameProgressPct, scaleByGameSpeed } from '../data/constants';
-import { AI_BUILDINGS, AI_DISTRICT_LISTS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
+import { AI_BUILDINGS, AI_DISTRICT_LISTS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS } from '../data/aiCityTrees';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
@@ -50,7 +50,7 @@ import { resourceValue } from './aiResource';
 import { accumulationPct } from './stockpile';
 import { FX, FX_MIN, fmul, pseudoYieldValue } from './aiValue';
 import {
-  buildingEvent, defenseEvent, districtEvent, freeSlots, goalsReached, improvementEvent, newCityAi, pickImprovement, tickCityTrees,
+  buildingEvent, defenseEvent, defensiveCancel, districtEvent, freeSlots, goalsReached, improvementEvent, newCityAi, pickImprovement, tickCityTrees,
   type CityAi, type CityTreeCity, type CityTreeWorld, type PlotEval, type TreeUnit,
 } from './aiCityTrees';
 import { cityContracts, contractBuilt, inHandCheck, queueContract, takesTurn, type AiContract, type ContractItem } from './aiContracts';
@@ -59,6 +59,7 @@ import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat } from './operations/cityThreat';
 import { majorView } from './majorView';
 import { minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
+import { freeOpNear } from './freeOps';
 import { ARMY_READ_AGE } from './operations/knowledge';
 import { joinBuilt } from './operations/manager';
 import { minorCity, minorFoodFocus } from './cityStates';
@@ -664,6 +665,34 @@ export function minorThreat(state: GameState, cs: CityState): number {
     (p, plot, dist) => minorOpNear(state, cs, p, plot, dist));
 }
 
+/** the minor's defensive cancel (`defensiveCancel`): its queue's head, the
+ *  item in hand (a repair its building's), its city AI's tables, the
+ *  district's value at its plot off the plot analysis */
+function minorDefensiveCancel(state: GameState, cs: CityState, ai: CityAi, city: CityTreeCity, tables: CityBuildTables,
+  pf: PickFacts): boolean {
+  const k = cs.prodItem ?? '';
+  const [kind, id] = k.split(':');
+  const head = {
+    unit: kind === 'unit' ? installType('unit', id, 'UNIT_') : null,
+    building: kind === 'building' || kind === 'repair' ? installType('building', id, 'BUILDING_') : null,
+    district: kind === 'district' ? installType('district', id, 'DISTRICT_') : null,
+    project: kind === 'project' ? installType('project', id, 'PROJECT_') : null,
+  };
+  return defensiveCancel(ai, city.id, city.underThreat, {
+    head,
+    unitValue: (u) => tables.units[AI_UNIT_INDEX.get(u) ?? -1] ?? FX_MIN,
+    buildingValue: (b) => tables.buildings[AI_BUILDING_INDEX.get(b) ?? -1] ?? FX_MIN,
+    districtValue: (d) => {
+      const e = city.evals.find((x) => x.plot === cs.prodSite);
+      const row = AI_DISTRICTS.findIndex((r) => r.type === d);
+      return e && row >= 0 ? e.districts[row] : 0;
+    },
+    projectValue: (p) => tables.projects[AI_PROJECTS.findIndex((r) => r.type === p)] ?? FX_MIN,
+    bestPlainBuilding: () => specializationBests(tables, { ...pf, defense: false }).building.value,
+    bestDefensiveUnit: () => specializationBests(tables, { ...pf, defense: true }).unit.value,
+  }, () => minorSetItem(state, cs, null));
+}
+
 /** a city's threat (0x5cbd10) on its holder's knowledge base's records aged
  *  at most ARMY_READ_AGE */
 function knownThreat(view: Parameters<typeof cityThreat>[0], holder: Seat, seat: number, centre: number,
@@ -682,13 +711,13 @@ function knownThreat(view: Parameters<typeof cityThreat>[0], holder: Seat, seat:
  *  Cities' knowledge base (`freeKnowledge`): the full civs are the players
  *  it fights (0x469cd0 — the military AI's floor counts each major at war:
  *  runs/h1_duelw1123 t200-t201, no Free City, desire 0.5 = -0.5 + 0.5 x 2),
- *  the city-states not; no operation of its own against a player is read
- *  (the Free Cities Raid's target unread) */
+ *  the city-states not; the Free Cities' running operations against a
+ *  player (their raids, `freeOpNear`) */
 export function freeCityThreat(state: GameState, city: City): number {
   const view = majorView(state) as unknown as Parameters<typeof cityThreat>[0];
   const fights = (i: number, j: number): boolean => (i === FREE_SEAT && isCiv(j)) || (j === FREE_SEAT && isCiv(i));
   const free: typeof view = Object.assign(Object.create(view), { atWar: (i: number, j: number) => fights(i, j) || view.atWar(i, j) });
-  return knownThreat(free, freeSeatOf(state), FREE_SEAT, city.centerIndex, () => false);
+  return knownThreat(free, freeSeatOf(state), FREE_SEAT, city.centerIndex, (p, plot, dist) => freeOpNear(state, p, plot, dist));
 }
 
 let tracer: ((line: string) => void) | null = null;
@@ -762,6 +791,8 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
     // its Food focus (0x5cdae0), set before the events
     const st = computeCityStats(state, minorCity(cs));
     minorFoodFocus(state, cs, st.foodSurplus, st.housing);
+    // the City Defense event (0x5cced0) opens with the defensive cancel
+    if (minorDefensiveCancel(state, cs, ai, city, tables, pf)) city.current = currentItem(cs);
     defenseEvent(ai, w, city, list.CITY_UNDER_THREAT ?? null);
     buildingEvent(ai, w, city, list.CITY_EVENT_UNIT_OR_BUILDING);
     districtEvent(ai, w, city, list.CITY_EVENT_DISTRICT);

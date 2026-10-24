@@ -41,7 +41,7 @@ import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost, selectResearch } from './economy';
-import { CP_CLAIMED, CP_IN_PROGRESS, contractById } from './aiContracts';
+import { CP_CLAIMED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw } from './aiCivics';
 import { minorCity, minorPlaceCitizens, minorReplaceCitizens, suzerainOf } from './cityStates';
@@ -61,12 +61,13 @@ import { tilesWithin } from '../../world/hex';
 import { hasRiver } from '../../world/query';
 import { aliases, engineId, gameTypeOf } from '../data/aliases';
 import { DISTRICTS } from '../data/districts';
-import { AI_BUILDINGS, AI_PROMOTION_CLASS_LISTS, AI_UNITS } from '../data/aiBuildTables';
+import { AI_BUILDINGS, AI_PROJECTS, AI_PROMOTION_CLASS_LISTS, AI_UNITS } from '../data/aiBuildTables';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { TECH_IMPROVEMENT_RESOURCES, resourceValue, type ResourceFacts } from './aiResource';
 import { RESOURCES, extractsResource } from '../../world/resources';
 import { unitProductionTable } from './aiUnitProduction';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, unitTable, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, specializationBests, unitTable, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
+import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
@@ -1770,18 +1771,50 @@ export function freeCityBuild(state: GameState, city: City, production: number):
       city.productionBank = Math.max(0, production - Math.max(0, cost - before));
     }
   }
-  // its city AI's update: the city's threat (`freeCityThreat`)
+  // its city AI's update: the city's threat (`freeCityThreat`); under
+  // threat the City Defense event's defensive cancel on the item queued
+  // (the Free Cities hold no contract: their one tree, Free Cities Assault,
+  // names no Contract ID); on an empty queue the Default Specialization
   city.aiThreat = freeCityThreat(state, city);
-  if (city.queue.length) return;
+  const under = (city.aiThreat ?? -1) > -1 && city.hp < CITY_MAX_HP;
+  if (city.queue.length && !under) return;
   const facts = freeCityBuildFacts(state, city);
   const tables: CityBuildTables = {
     buildings: buildingTable(facts),
     units: unitTable(facts).map((v) => v ?? FX_MIN),
     projects: projectTable(freeCityProjectFacts(state, city, facts)),
   };
-  const pick = defaultSpecialization(tables, freeCityPickFacts(state, city, facts));
+  const pf = freeCityPickFacts(state, city, facts);
+  if (city.queue.length) freeDefensiveCancel(city, tables, pf);
+  if (city.queue.length) return;
+  const pick = defaultSpecialization(tables, pf);
   const item = pick ? majorQueueItem(state, FREE_SEAT, city, pick.type) : null;
   if (item) city.queue = [item];
+}
+
+/** a Free City's defensive cancel (`defensiveCancel`) on its queue's head
+ *  over an empty book (no contract in hand, none listed), the city's
+ *  tables; a Free City holds no district item */
+function freeDefensiveCancel(city: City, tables: CityBuildTables, pf: PickFacts): boolean {
+  const q = city.queue[0];
+  const head = {
+    unit: q?.kind === 'unit' ? installType('unit', q.unit, 'UNIT_') : null,
+    building: q?.kind === 'building' ? installType('building', q.building, 'BUILDING_')
+      : q?.kind === 'wonder' ? installType('building', q.wonder, 'BUILDING_') : null,
+    district: null,
+    project: q?.kind === 'project' ? installType('project', q.project, 'PROJECT_') : null,
+  };
+  return defensiveCancel(newContractBook(), city.id, true, {
+    head,
+    unitValue: (u) => tables.units[AI_UNIT_INDEX.get(u) ?? -1] ?? FX_MIN,
+    buildingValue: (b) => tables.buildings[AI_BUILDING_INDEX.get(b) ?? -1] ?? FX_MIN,
+    districtValue: () => 0,
+    projectValue: (p) => tables.projects[AI_PROJECTS.findIndex((r) => r.type === p)] ?? FX_MIN,
+    bestPlainBuilding: () => specializationBests(tables, { ...pf, defense: false }).building.value,
+    bestDefensiveUnit: () => specializationBests(tables, { ...pf, defense: true }).unit.value,
+  }, () => {
+    city.queue = [];
+  });
 }
 
 /** a Free City's price of its item in hand */

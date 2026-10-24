@@ -22,9 +22,12 @@ city events, trees and contracts"). Each city-state's turn after its step
    (`_mops_run`).
 
 The city AI's state is the sim's `cai_*` planes (`CityAi`, sim_citytrees.py);
-a unit's id is its slot in the majors' pool. A Free City's AI is its Default
-Specialization alone (the Free Cities' event list names "Simple City Tree",
-which the install defines no nodes for).
+a unit's id is its slot in the majors' pool. A Free City's AI runs no event
+(the Free Cities' event list names "Simple City Tree", which the install
+defines no nodes for) and holds no contract (their one operation tree names
+no Contract ID): its update's threat, under threat the defensive cancel, on
+an empty queue the Default Specialization. A Free City's signals start its
+raid (`_free_raid_start`, sim_minorops.py's operations on the row `FR`).
 """
 
 from __future__ import annotations
@@ -49,6 +52,9 @@ CITY_PLOT_OFFSETS = (
 # the range a full civ's units threaten from, and a city-state's or the
 # barbarians'; the margins over the city's defense (0x5cbd10)
 _RANGE_CIV, _RANGE_OTHER = 5, 3
+# the distance of the holder's operation's target within which an undamaged
+# city's threat passes over the operation's enemy (`OWN_OPERATION_RANGE`)
+_OWN_OPERATION_RANGE = 5
 _MARGIN_HOSTILE, _MARGIN_OTHER = 5 * _FX, 20 * _FX
 _YIELDS = ["YIELD_FOOD", "YIELD_PRODUCTION", "YIELD_GOLD", "YIELD_SCIENCE", "YIELD_CULTURE", "YIELD_FAITH"]
 
@@ -138,6 +144,8 @@ class SimMinorAi:
             lst = self.rules.ai_city_build["cityEventLists"].get("MINOR_CIV_DEFAULT_TRAIT", {})
             # its Food focus (0x5cdae0), set before the events
             self._minor_food_focus(s, ev)
+            # the City Defense event (0x5cced0) opens with the defensive cancel
+            self._minor_defensive_cancel(s, w, f, (b_tab, u_tab, p_tab), evals, ev)
             defense_event(ai, s, w, lst.get("CITY_UNDER_THREAT"), ev)
             building_event(ai, s, w, ev)
             district_event(ai, s, w, ev)
@@ -169,6 +177,120 @@ class SimMinorAi:
             self._minor_purchases(s, f, threat, buy)
         # the trees' tick
         tick_city_trees(ai, s, w, int(self.turn), alive)
+
+    def _minor_defensive_cancel(self, s: int, w, f, tables, evals: dict, mask: torch.Tensor) -> None:
+        """`defensiveCancel` (0x5d7640) of minor `s`'s city where `mask` and
+        it is under threat (`w.under_threat()`, `_defensive_cancel`): its
+        queue's head the minor's item (a repair its building's, a district
+        valued at its plot by the plot analysis)"""
+        go = mask & _t(w.under_threat(), f.like()).bool()
+        if not bool(go.count_nonzero()):
+            return
+        B, dev = self.B, self.device
+        T = self._cv_tables()
+        nd = len(self.rules.ai_city_build["districts"])
+        key = self.citystate_item[:, s]
+        is_u, is_b, is_d, is_p, is_r = self._mk_kinds(key)
+        hu = torch.where(is_u, T["engine_row"].to(dev).take(key.clamp(min=0, max=T["engine_row"].numel() - 1)), torch.full_like(key, -1))
+        br = T["building_row"].to(dev)
+        bkey = torch.where(is_r, key - self._mk_r0, key - self._mk_b0).clamp(min=0, max=br.numel() - 1)
+        hb = torch.where(is_b | is_r, br.take(bkey), torch.full_like(key, -1))
+        dr = T["district_row"].to(dev)
+        hd = torch.where(is_d, dr.take((key - self._mk_d0).clamp(min=0, max=dr.numel() - 1)), torch.full_like(key, -1))
+        p_row = self._ai_project_rows()
+        hp = torch.where(is_p, p_row.take((key - self._mk_p0).clamp(min=0, max=p_row.numel() - 1)), torch.full_like(key, -1))
+        site = self.citystate_prod_site[:, s]
+        at = (evals["plot"] == site.unsqueeze(1)) & (site >= 0).unsqueeze(1) & (hd >= 0).unsqueeze(1)
+        dsel = evals["dists"].gather(2, hd.clamp(min=0, max=max(nd - 1, 0)).view(B, 1, 1).expand(-1, at.shape[1], 1)).squeeze(2)
+        dv = torch.where(at.any(dim=1), (dsel * at.long()).sum(dim=1), torch.zeros_like(key))
+        heads = (is_u, is_b | is_r, is_d, is_p, torch.zeros_like(is_u), hu, hb, hd, hp, dv)
+        self._defensive_cancel(s, f, tables, go, heads, lambda m: self._minor_set_item(s, m, -1))
+
+    def _ai_project_rows(self) -> torch.Tensor:
+        """[engine projects] each engine project's AI project row, -1 none"""
+        T = self._cv_tables()
+        p_eng = list(T["engine"]["project"])
+        p_row = torch.full((max(max(p_eng, default=-1) + 1, 1),), -1, dtype=torch.long, device=self.device)
+        for i, e in enumerate(p_eng):
+            if e >= 0 and int(p_row[e]) < 0:
+                p_row[e] = i
+        return p_row
+
+    def _defensive_cancel(self, s: int, f, tables, go: torch.Tensor, heads: tuple, clear) -> None:
+        """`defensiveCancel` (0x5d7640) over the book's row `s` (its city's
+        hand and list in the row's `in_hand` / `c_listed`) where `go` (the
+        city under threat): the item in hand — the contract in hand, else the
+        queue's head (`heads`: its kind — unit, building, district, project,
+        wonder — its AI rows and a district's value at its plot) — not
+        defensive (a unit without Combat or with a Bombard, a building
+        without a DefenseModifier, a district without hit points, any
+        project, a wonder); its OLD VALUE the contract's (else 0) raised to
+        the head's table value (a queued unit with no contract whose
+        PseudoYieldType is none or PSEUDOYIELD_UNIT_COMBAT keeps its task; a
+        wonder 0); an empty queue keeps its task; the bar OLD + max(OLD,
+        AI_CURRENT_TASK_BIAS); it cancels where a listed contract stands
+        ACCEPTED at the bar or above, the item is not defensive, the plain
+        pick's best building reaches the bar or the defensive pick's best
+        unit passes it: the contract in hand FAILED, the production cleared
+        (`clear(mask)`)"""
+        from .sim_citytrees import CP_ACCEPTED, CP_FAILED, N_CONTRACTS, contract_at, _cset
+        B, dev = self.B, self.device
+        ai = self.cityai
+        T = self._cv_tables()
+        b_tab, u_tab, p_tab = tables
+        urows, brows = T["unit_rows"], T["bld_rows"]
+        drows = self.rules.ai_city_build["districts"]
+        u_off_t = torch.tensor([int(r["combat"]) == 0 or int(r["bombard"]) > 0 for r in urows] + [True], dtype=torch.bool, device=dev)
+        u_keep_t = torch.tensor([r["pseudo"] in (None, "PSEUDOYIELD_UNIT_COMBAT") for r in urows] + [True], dtype=torch.bool, device=dev)
+        b_off_t = torch.tensor([int(r["defenseModifier"]) == 0 for r in brows] + [True], dtype=torch.bool, device=dev)
+        b_won_t = torch.tensor([bool(r["wonder"]) for r in brows] + [False], dtype=torch.bool, device=dev)
+        d_off_t = torch.tensor([not ((r["hitPoints"] or 0) > 0) for r in drows] + [True], dtype=torch.bool, device=dev)
+        nu, nb, nd = len(urows), len(brows), len(drows)
+        ku, kb, kd, kp, kw, hu, hb, hd, hp, dv = heads
+        # the contract in hand
+        hand = contract_at(ai, s, ai.in_hand[:, s])
+        has = go & (hand >= 0)
+        cu, cb_, cd = _cget(ai.c_unit, s, hand), _cget(ai.c_building, s, hand), _cget(ai.c_district, s, hand)
+        c_off = torch.where(cu >= 0, u_off_t[torch.where(cu >= 0, cu, nu)],
+                            torch.where(cb_ >= 0, b_off_t[torch.where(cb_ >= 0, cb_, nb)],
+                                        torch.where(cd >= 0, d_off_t[torch.where(cd >= 0, cd, nd)], torch.zeros_like(go))))
+        # a head with no AI row: not defensive, valued FX(-9999) (a district 0)
+        q_off = torch.where(ku, u_off_t[torch.where(hu >= 0, hu, nu)],
+                            torch.where(kb, b_off_t[torch.where(hb >= 0, hb, nb)],
+                                        torch.where(kd, d_off_t[torch.where(hd >= 0, hd, nd)], kp | kw)))
+        off = torch.where(has, c_off, q_off)
+        # the OLD VALUE
+        like = hu
+        old = torch.where(has, _cget(ai.c_value, s, hand), torch.zeros_like(like))
+        ut = torch.stack(u_tab, dim=1) if u_tab else torch.zeros(B, 1, dtype=torch.long, device=dev)
+        bt = torch.stack(b_tab, dim=1) if b_tab else torch.zeros(B, 1, dtype=torch.long, device=dev)
+        pt = torch.stack(p_tab, dim=1) if p_tab else torch.zeros(B, 1, dtype=torch.long, device=dev)
+        fxmin = torch.full_like(like, _FX_MIN)
+        uv = torch.where(hu >= 0, ut.gather(1, hu.clamp(min=0, max=ut.shape[1] - 1).unsqueeze(1)).squeeze(1), fxmin)
+        bv = torch.where(hb >= 0, torch.where(b_won_t[torch.where(hb >= 0, hb, nb)], torch.zeros_like(like),
+                                              bt.gather(1, hb.clamp(min=0, max=bt.shape[1] - 1).unsqueeze(1)).squeeze(1)), fxmin)
+        bv = torch.where(kw, torch.zeros_like(like), bv)
+        pv = torch.where(hp >= 0, pt.gather(1, hp.clamp(min=0, max=pt.shape[1] - 1).unsqueeze(1)).squeeze(1), fxmin)
+        head_v = torch.where(ku, uv, torch.where(kb | kw, bv, torch.where(kd, dv, pv)))
+        any_head = ku | kb | kd | kp | kw
+        old = torch.where(any_head, torch.maximum(old, head_v), old)
+        keep = ku & ~has & u_keep_t[torch.where(hu >= 0, hu, nu)]
+        go = go & any_head & ~keep
+        if not bool(go.count_nonzero()):
+            return
+        bar = old + torch.maximum(old, torch.full_like(old, 80 * _FX))
+        listed = torch.zeros_like(go)
+        for j in range(N_CONTRACTS):
+            jj = torch.full((B,), j, dtype=torch.long, device=dev)
+            listed |= (ai.c_listed[:, s, j] & (ai.c_id[:, s, j] >= 0) & (_cget(ai.c_progress, s, jj) == CP_ACCEPTED)
+                       & (_cget(ai.c_value, s, jj) >= bar))
+        bests_plain = self._cv_bests(b_tab, u_tab, p_tab, _DefenseAs(f, 0))
+        bests_def = self._cv_bests(b_tab, u_tab, p_tab, _DefenseAs(f, 1))
+        cancel = go & (listed | off | (bests_plain[0][1] >= bar) | (bests_def[1][1] > bar))
+        if not bool(cancel.count_nonzero()):
+            return
+        _cset(ai.c_progress, s, hand, CP_FAILED, cancel & has)
+        clear(cancel)
 
     def _minor_contract_item(self, s: int, hand: torch.Tensor):
         """the contract in hand's item as the minor's item key and its plot
@@ -237,10 +359,11 @@ class SimMinorAi:
 
     def _free_city_threat(self, j: int) -> torch.Tensor:
         """[B] long — `freeCityThreat` (0x5cbd10) of the Free City in column
-        `j` on the Free Cities' knowledge base (the row `FK`), no operation of
-        theirs read: the full civs are the players it fights, the city-states
-        not; its level 2, 3 above two districts the centre included, +1 with a
-        wonder complete, + its citizens / 5 (no capital)."""
+        `j` on the Free Cities' knowledge base (the row `FK`) and their
+        running operations against a player (their raids, the row `FR`): the
+        full civs are the players it fights, the city-states not; its level
+        2, 3 above two districts the centre included, +1 with a wonder
+        complete, + its citizens / 5 (no capital)."""
         B, dev = self.B, self.device
         row = self.FREE_ROW
         nd = (self.city_dist_tile[:, row, j] >= 0).sum(dim=1)
@@ -251,12 +374,22 @@ class SimMinorAi:
         seats = list(range(self.n_majors)) + [100 + k for k in range(self.S)] + [BARB_SEAT]
         full = torch.ones(B, dtype=torch.bool, device=dev)
         none = torch.zeros(B, dtype=torch.bool, device=dev)
-        return self._known_threat(self.FK, self.city_center[:, row, j], torch.full((B,), row, dtype=torch.long, device=dev),
+        centre = self.city_center[:, row, j]
+        damaged = self.city_hp[:, row, j] < int(self.rules.combat["cityMaxHp"])
+
+        def op_near(p: int) -> torch.Tensor:
+            # `freeOpNear` (0x723cf0): a raid against the player whose target
+            # lies within 5 of the city
+            t = self.mops_target[:, self.FR]
+            d = self.pair_dist[t.clamp(min=0), centre.clamp(min=0).unsqueeze(1)].to(torch.long)
+            return ((self.mops_def[:, self.FR] >= 0) & (self.mops_enemy[:, self.FR] == p) & (t >= 0)
+                    & (d <= _OWN_OPERATION_RANGE)).any(dim=1)
+        return self._known_threat(self.FK, centre, torch.full((B,), row, dtype=torch.long, device=dev),
                                   torch.full((B,), j, dtype=torch.long, device=dev), level, seats,
-                                  lambda p: full if p < self.n_majors else none)
+                                  lambda p: full if p < self.n_majors else none, op_near, damaged)
 
     def _known_threat(self, r: int, centre: torch.Tensor, hrow: torch.Tensor, hcol: torch.Tensor, level: torch.Tensor,
-                      seats: list, war_of) -> torch.Tensor:
+                      seats: list, war_of, op_near=None, damaged: torch.Tensor | None = None) -> torch.Tensor:
         """[B] long — 0x5cbd10 on the knowledge base row `r`'s records aged at
         most ARMY_READ_AGE (all where the row never aged), the city at
         `centre` held by (`hrow`, `hcol`): per player of `seats` in order —
@@ -268,7 +401,9 @@ class SimMinorAi:
         defense less 15, any above the defense less 5; never an explorer nor
         a barbarian camp defender); at the city's defense plus the margin
         (5.0 hostile, else 20.0 or the city's strength) the city is
-        threatened at `level`, at most 1 not hostile. The first such player
+        threatened at `level`, at most 1 not hostile; a player the holder runs
+        an operation against near the city (`op_near(p)`, 0x723cf0) passed
+        over while the city is whole (not `damaged`). The first such player
         decides; -1 none."""
         B, dev = self.B, self.device
         T = self._cv_tables()
@@ -315,6 +450,8 @@ class SimMinorAi:
             sums = mine & ~acav.take(a0) if barb else mine
             tot = torch.where(sums, strength, torch.zeros_like(strength)).sum(dim=1)
             hit = (out < 0) & anyu & (tot.double() >= d + margin) & (centre >= 0)
+            if op_near is not None:
+                hit = hit & ~(op_near(p) & ~damaged)
             if not full and not barb:
                 hit = hit & war
             out = torch.where(hit, torch.where(hostile, level, level.clamp(max=1)), out)
@@ -1234,21 +1371,157 @@ class SimMinorAi:
                 self._q_pop(row, jc, fin)
                 left = (prod - (cost - before).clamp(min=0)).clamp(min=0)
                 self.city_prod_bank[:, row, j] = torch.where(fin, left.to(self.city_prod_bank.dtype), self.city_prod_bank[:, row, j])
-        # its city AI's update: the city's threat (`_free_city_threat`)
-        self.city_ai_threat[:, row, j] = torch.where(act, self._free_city_threat(j), self.city_ai_threat[:, row, j])
-        idle = act & (self.city_current[:, row, j, 0] < 0)
-        if not bool(idle.count_nonzero()):
+        # its city AI's update: the city's threat (`_free_city_threat`); under
+        # threat the City Defense event's defensive cancel on the item queued;
+        # on an empty queue the Default Specialization
+        threat = self._free_city_threat(j)
+        self.city_ai_threat[:, row, j] = torch.where(act, threat, self.city_ai_threat[:, row, j])
+        under = act & (threat > -1) & (self.city_hp[:, row, j] < int(self.rules.combat["cityMaxHp"]))
+        go = act & ((self.city_current[:, row, j, 0] < 0) | under)
+        if not bool(go.count_nonzero()):
             return
         f = _FreeFacts(self, j)
         b_tab = self._cv_building_table(f)
         u_tab = [torch.where(read, v, torch.full_like(v, _FX_MIN)) for v, read in self._cv_unit_table(f)]
         p_tab = self._cv_project_table(f)
+        self._free_defensive_cancel(j, f, (b_tab, u_tab, p_tab), go & under & (self.city_current[:, row, j, 0] >= 0))
+        idle = go & (self.city_current[:, row, j, 0] < 0)
+        if not bool(idle.count_nonzero()):
+            return
         kind, prow, _val = self._cv_pick(b_tab, u_tab, p_tab, f)
         code, cost = f.queue_item(kind, prow)
-        go = idle & (code >= 0)
-        if bool(go.count_nonzero()):
-            self._q_push(row, jc, go, code, cost)
+        ok = idle & (code >= 0)
+        if bool(ok.count_nonzero()):
+            self._q_push(row, jc, ok, code, cost)
         _ = bidx
+
+    def _free_defensive_cancel(self, j: int, f, tables, go: torch.Tensor) -> None:
+        """`defensiveCancel` (0x5d7640, `_defensive_cancel`) of the Free City
+        in column `j` where `go` (under threat, its queue holding an item),
+        over the row `FR`'s empty book (no contract in hand, none listed):
+        its queue's head (a unit, a building, a wonder, a project — the walls'
+        repair); a Free City holds no district item; the production cleared
+        empties its queue"""
+        if not bool(go.count_nonzero()):
+            return
+        dev = self.device
+        row = self.FREE_ROW
+        T = self._cv_tables()
+        code = self.city_current[:, row, j, 0]
+        ku = (code >= self.UNIT_BASE) & (code < self.UNIT_BASE + self.NU)
+        kb = (code >= 0) & (code < self.NB)
+        kw = (code >= self.WONDER_BASE) & (code < self.PROJECT_BASE)
+        kp = (code >= self.PROJECT_BASE) & (code < self.FORM_BASE)
+        kd = torch.zeros_like(ku)
+        neg = torch.full_like(code, -1)
+        er = T["engine_row"].to(dev)
+        hu = torch.where(ku, er.take((code - self.UNIT_BASE).clamp(min=0, max=er.numel() - 1)), neg)
+        br = T["building_row"].to(dev)
+        hb = torch.where(kb, br.take(code.clamp(min=0, max=br.numel() - 1)), neg)
+        p_row = self._ai_project_rows()
+        hp = torch.where(kp, p_row.take((code - self.PROJECT_BASE).clamp(min=0, max=p_row.numel() - 1)), neg)
+        heads = (ku, kb, kd, kp, kw, hu, hb, neg, hp, torch.zeros_like(code))
+
+        def clear(m: torch.Tensor) -> None:
+            rows = m.nonzero(as_tuple=True)[0]
+            if rows.numel():
+                self._q_clear(rows, row, j)
+        self._defensive_cancel(self.FR, f, tables, go, heads, clear)
+
+    # -- the Free Cities' raid -------------------------------------------------
+
+    def _first_city_centre(self, player: torch.Tensor) -> torch.Tensor:
+        """[B] the centre of `player`'s first city (a major's first in its
+        order, a city-state's one), -1 none"""
+        out = torch.full_like(player, -1)
+        for p in sorted(set(player.tolist())):
+            m = player == p
+            if 0 <= p < self.n_majors:
+                al = self.city_alive[:, p, :self.RC] & (self.city_center[:, p, :self.RC] >= 0)
+                first = al.long().argmax(dim=1, keepdim=True)
+                c = torch.where(al.any(dim=1), self.city_center[:, p].gather(1, first).squeeze(1), out)
+            elif 100 <= p < 100 + self.S:
+                c = torch.where(self.citystate_alive[:, p - 100], self.citystate_center[:, p - 100], out)
+            else:
+                continue
+            out = torch.where(m, c, out)
+        return out
+
+    def _free_raid_start(self, m: torch.Tensor, j: int, player: torch.Tensor) -> None:
+        """`freeRaidStart` (0x274ea0) for the Free City in column `j` where
+        `m`, against `player` [B]: where the city never raided, "Free Cities
+        Raid" on the operations' row `FR` — the target the player's first
+        city's centre (none: no start), the rally the Free City's centre —
+        and its record the player and the operation's tree id"""
+        row = self.FREE_ROW
+        m = m & self.city_alive[:, row, j] & (self.city_free_raid[:, row, j, 0] < 0)
+        if not bool(m.count_nonzero()):
+            return
+        target = self._first_city_centre(player)
+        m = m & (target >= 0)
+        if not bool(m.count_nonzero()):
+            return
+        T = self._mops_tables()
+        tid = self._mops_start(self.FR, T.d_raid, target, self.city_center[:, row, j], m, enemy=player)
+        rec = self.city_free_raid[:, row, j]
+        rec[:, 0] = torch.where(m, player, rec[:, 0])
+        rec[:, 1] = torch.where(m, tid, rec[:, 1])
+
+    def _free_raid_signal(self, mask: torch.Tensor, hrow: torch.Tensor, hcol: torch.Tensor, player: torch.Tensor) -> None:
+        """`freeRaidSignal` for a blow on a city's district (0x276d90) where
+        `mask`: the city held at (`hrow`, `hcol`) [B] a Free City, the
+        attacker's player `player` [B] (none, the Free Cities: none) starts
+        its raid"""
+        m = mask & (hrow == self.FREE_ROW) & (player >= 0) & (player != FREE_SEAT)
+        if not bool(m.count_nonzero()):
+            return
+        for j in range(self.RC):
+            g = m & (hcol == j)
+            if bool(g.count_nonzero()):
+                self._free_raid_start(g, j, player)
+
+    def _free_raid_plot(self, mask: torch.Tensor, plot: torch.Tensor, player: torch.Tensor) -> None:
+        """`freeRaidSignal` for a Free City's plot `plot` [B] (its centre, a
+        district or an improvement of its pillaged, 0x276e70 / 0x276ff0) by
+        `player`'s unit on it: the Free City holding the plot starts its
+        raid"""
+        m = mask & (plot >= 0) & (player >= 0) & (player != FREE_SEAT)
+        if not bool(m.count_nonzero()):
+            return
+        row = self.FREE_ROW
+        pc = plot.clamp(min=0).unsqueeze(1)
+        al = self.city_alive[:, row, :self.RC]
+        owned = (self.tile_seat.gather(1, pc).squeeze(1) == FREE_SEAT)
+        tcity = self.tile_city.gather(1, pc).squeeze(1)
+        for j in range(self.RC):
+            at = al[:, j] & ((self.city_center[:, row, j] == plot)
+                             | (owned & (tcity == self.city_id[:, row, j])))
+            g = m & at
+            if bool(g.count_nonzero()):
+                self._free_raid_start(g, j, player)
+                m = m & ~g
+
+    def _free_raid_check(self, act: torch.Tensor, j: int) -> None:
+        """`freeRaidCheck` (0x274010's head): the Free City in column `j`'s
+        raid's tree gone, its record's tree cleared, the player kept"""
+        rec = self.city_free_raid[:, self.FREE_ROW, j]
+        op = rec[:, 1]
+        gone = act & (op >= 0) & ~self._mops_live(self.FR, op)
+        rec[:, 1] = torch.where(gone, -1, op)
+
+
+class _DefenseAs:
+    """a city's pick facts with the defensive pick's flag set as given
+    (the defensive cancel's plain building and defensive unit)"""
+
+    def __init__(self, f, on: int):
+        self._f, self._on = f, on
+
+    def __getattr__(self, name):
+        return getattr(self._f, name)
+
+    def defense(self):
+        return self._on
 
 
 class _PlotCtx:

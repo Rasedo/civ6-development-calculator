@@ -550,6 +550,15 @@
   context:
     - "...0x691f0 is the ring walk: from the plot's cube coordinates, the six steps of the table at 0xf0bf40 — (0, 1), (-1, 0), (1, -1), (0, -1), (1, 0), (-1, 1) in (x - y // 2, y) — this grid's SOU..."
   review: imported
+- addr: 0xf28c80
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE BAR: OLD + max(OLD, AI_CURRENT_TASK_BIAS) (GlobalParameters 80, read at 0x00f28c80 + 0xc). The city cancels where a contract it lists stands ACCEPTED (3) with a value at..."
+  review: imported
 - addr: 0xf2dc70
   kind: global
   status: PARTLY

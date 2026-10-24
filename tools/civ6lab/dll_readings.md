@@ -8976,10 +8976,8 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   runs/h1_duelw1127 Muscat t160-t165, its centre damaged (38, 18, 43, 23, 3)
   under major 0's army: NO BUILDS AT ALL each turn (Walls, Castle and Star
   Fort held: the defensive pick finds nothing), PROJECT_REPAIR_OUTER_DEFENSES
-  at t166 once healed. LAB: +0x218's writer; the defensive cancel's body
-  (0x5d7640: the contract in hand or the item queued cancelled unless a
-  combat unit with no +0x40, a DefenseModifier building or a district with
-  hit points) unported — it acts only on a damaged centre.
+  at t166 once healed. LAB: +0x218's writer. The defensive cancel's body
+  in its own section below ("C-96 / C-60: the defensive cancel").
 - A PILLAGED DISTRICT'S REPAIR (PARTLY READ): 0x7a51f0's own-district term
   (the repair x2, +12500.0 at the centre) is reached by the plot analysis on
   the plot holding the city's own pillaged district, which values that row
@@ -9100,12 +9098,14 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   `_free_city_threat` (the majors fought, the city-states not, no
   operation of theirs read) stored per city (`City.aiThreat` /
   `city_ai_threat`), the defensive pick on it; the Free Cities' tactical
-  target list takes the knowledge base's entries. LAB: +0x4b8's writer
-  (the only displacement writes are the military AI's constructor
-  0x71a960 at 0x71b68a and 0x264296); the Free Cities Raid's target as an
-  operation near the city (0x723cf0); the desire's unit values against the
-  recorded picks (the free runs diverge before every Free City: 1123's
-  Chen still China's at t203).
+  target list takes the knowledge base's entries; the threat passes over a
+  player the Free Cities run a raid against whose target lies within 5 of
+  the undamaged city (0x723cf0, `freeOpNear` / `_known_threat`'s
+  `op_near`, "C-60: the Free Cities Raid"). LAB: +0x4b8's writer (the only
+  displacement writes are the military AI's constructor 0x71a960 at
+  0x71b68a and 0x264296); the desire's unit values against the recorded
+  picks (the free runs diverge before every Free City: 1123's Chen still
+  China's at t203).
 
 ## C-96: an event's civilian kill spares a Trader — PARTLY READ
 
@@ -9214,6 +9214,106 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   logged (AI_Research.csv Tech Contracts 16 / 17); the district trees on
   the full replay start t2, t12, t22, t34 as the log's District Choice
   draws do.
+
+## C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities
+
+`defensiveCancel` (cpu/core/aiCityTrees.ts), the city-states' in
+`minorAiTurn` (cpu/core/minorCityAi.ts), the Free Cities' in
+`freeCityBuild` (cpu/core/minorBuild.ts); `_defensive_cancel`,
+`_minor_defensive_cancel`, `_free_defensive_cancel`
+(gpu/core/sim_minorai.py).
+
+- 0x5d7640 is the City Defense event's opening (0x5cced0 calls it first,
+  unconditionally). Its gate is 0x5cdc50's test inline: the war footing,
+  or the city's threat (+0x1b8) above -1 with the centre's GetDamage
+  (0x5e97d629) above 0 or +0x218 set.
+- THE ITEM IN HAND: the contract in hand (+0x398) where the city holds
+  one, else the queue's head. It is NOT DEFENSIVE where a unit with Combat
+  (+0x48) 0 or a Bombard (+0x40) above 0, a building with no
+  DefenseModifier (+0x28; the Walls carry none, their defense is the outer
+  pool), a district without hit points (Districts +0x58 / +0x5c), any
+  project.
+- THE OLD VALUE: the contract's value (else 0), raised to the head's table
+  value — a unit's (a queued unit with no contract and PseudoYieldType null
+  or PSEUDOYIELD_UNIT_COMBAT returns: the task kept), a building's (a wonder,
+  Buildings +0x158 bit 64, 0), a district's at its plot (0x5d4a20), a
+  project's (0x5d4c30). An empty queue (+0x2350 == 0) returns.
+- THE BAR: OLD + max(OLD, AI_CURRENT_TASK_BIAS) (GlobalParameters 80, read
+  at 0x00f28c80 + 0xc). The city cancels where a contract it lists stands
+  ACCEPTED (3) with a value at the bar or above, or the item is not
+  defensive, or the plain pick's best building (0x5d0860 flags 1, 0) reaches
+  the bar, or the defensive pick's best unit (0x5d2600 flags 1, 1) passes
+  it; under the gate the contract in hand is FAILED (4), the log line
+  "Canceling current build, OLD VALUE v", the production cleared.
+- Recorded (AI_CityBuild.csv, 98 city-state cancels over the 29 duels):
+  runs/h1_duelw1105 Bandar Brunei t63-t69, its Walls contract FAILED and
+  re-picked each turn (OLD VALUE 468.4, 495.9, ... the Walls' own value);
+  runs/h1_duelw1103 Hattusa t46, its Granary (OLD 33.1) cancelled for a
+  Heavy Chariot. No Free City cancel is recorded (their centres whole).
+- The engines: a city-state's head its item (a repair its building's, a
+  district valued at its plot by the plot analysis); a Free City's its
+  queue's head (a unit, a building, a wonder, a project: the walls'
+  repair) over an empty book (the Free Cities make no contract: "C-60: the
+  Free Cities Raid"), the production cleared emptying its queue. LAB:
+  whether a Free City's cleared production keeps the item's progress (the
+  engines' queue drops it).
+
+## C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported
+
+`freeRaidSignal`, `freeRaidStart`, `freeRaidCheck`, `freeCitiesMilitary`,
+`freeOpNear` (cpu/core/freeOps.ts) on the one operation manager;
+`_free_raid_signal`, `_free_raid_plot`, `_free_raid_start`,
+`_free_raid_check` (gpu/core/sim_minorai.py) and the operations' row `FR`
+(gpu/core/sim_minorops.py).
+
+- THE SIGNALS (FreeCities_Manager, the listeners 0x2765f0 connects): a
+  combat on a Free City's district (0x276d90: the attacker, +0x70); a Free
+  City's district pillaged (0x276e70: the owner of the last unit on the
+  plot); an improvement of a Free City pillaged (0x276ff0: the owner of the
+  last unit on the plot); 0x276a40 (a Free City with a flag, the plot's last
+  unit's owner; its event unread). Each finds the Free City's record by the
+  plot (0x277470: the records' +0x0c / +0x10 plot, +0x14 live) and calls
+  0x274ea0.
+- THE START 0x274ea0: where the record's +0x24 (the operation's tree) and
+  +0x20 (the player) are both -1 — a Free City raids ONCE in its life —
+  "Free Cities Raid" is started by name (0x7265b0) with the target the
+  raided player's first city's plot (the player's +0x12f0 city list, its
+  first's +0x158; with none -9999, no target), then 0x73e7d0 sets the
+  target, the rally the Free City's plot (+0x0c) and each team's goals;
+  +0x24 takes the tree's id, +0x20 the player.
+- THE CLEAR: 0x274010 (a Free City's turn) opens with: +0x24 set and its
+  tree gone, +0x24 = -1 (+0x20 kept).
+- THE OPERATION (AiOperationDefs): TARGET_ENEMY_COMBAT_DISTRICT, enemy
+  WAR, CITY_ASSAULT, priority 3, SelfStart false; its team "Free Cities
+  Assault Force" (UNITAI_COMBAT 2-6, initial strength advantage -40); its
+  tree "Free Cities Assault": Sequence [Recruit Units, Priority [Not [Is
+  City Threatened], Operation Attack Units], Concurrent [Operation Attack
+  Units, Operation Move (range 2, unit distance 2)], Concurrent [Operation
+  Pillage (districts), Operation Attack Units (along march), Operation
+  Siege City, Operation Attack City, Operation Pillage (improvements),
+  Operation Move (range 2)]]. The Free Cities weigh no candidate: no
+  AI_Operation_Eval.csv line of player 62.
+- THE THREAT: 0x5cbd10 asks 0x723cf0 per player — a running operation of
+  the city's owner against that player (op +0x2a0) whose target lies within
+  5 of the city — and passes the player over while the city is undamaged:
+  a Free City's raid holds back its threat from the raided player near it.
+- Recorded: runs/h1_duelw1123 t205, Rome's Warrior pillaging the Free City
+  Chen's improvement ("Pillage Improvement"): AI_Operation.csv player 62
+  "Free Cities Raid, Started", TARGET 11:13 (Rome's capital), its recruit's
+  "Contract for: UNIT_ARCHER" (the team's unit to build: the Recruit Units
+  node names no Contract ID, so no contract is made, nor is any by the Free
+  Cities: their CityEvents list's "Simple City Tree" has no nodes); the
+  operation complete t213.
+- The engines: the signals at a melee or ranged blow on a Free City's centre
+  or Encampment and at a pillage on a Free City's ground by the unit on it
+  (the majors' PILLAGE; the barbarians hold no city to raid), the raided
+  player's first
+  city its cities' first; the operations' tree ids the Free Cities' city
+  AI's serial (`freeSeat.cityAi`, the row `FR`); the run in the Free
+  Cities' tactical pass once each unit's planning is taken. LAB: the
+  signal 0x276a40's event; the last unit on a pillaged plot read as the
+  pillager (a coastal raid's and an air pillage's plot holds none of
+  theirs: no signal there).
 
 ## DLL rules the engines contradict
 

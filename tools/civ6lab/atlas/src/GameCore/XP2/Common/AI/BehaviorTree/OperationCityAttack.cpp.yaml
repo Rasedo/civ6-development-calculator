@@ -68,6 +68,8 @@
     - cpu/core/operations/assault.ts:pillageHere
     - cpu/core/operations/assault.ts:pillageExecute
     - gpu/core/sim_barbops.py:_bop_pillage
+    - gpu/core/sim_barbops.py:_op_pillage
+    - gpu/core/sim_minorops.py:_x_pillage
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -87,6 +89,7 @@
     - cpu/core/operations/assault.ts:siegeCityExecute
     - gpu/core/sim_barbops.py:_bop_siege
     - gpu/core/sim_barbops.py:_op_siege
+    - gpu/core/sim_minorops.py:_x_siege
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -159,6 +162,7 @@
     - cpu/core/operations/assault.ts:ASSAULT_NODES
     - cpu/core/operations/assault.ts:operationAttackCity
     - gpu/core/sim_minorops.py:_u_running_units
+    - gpu/core/sim_minorops.py:_u_attack_city
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -195,6 +199,7 @@
     - cpu/core/operations/assault.ts:operationPillage
     - cpu/core/barbarianOps.ts:barbarianTrees
     - gpu/core/sim_barbops.py:_barb_trees
+    - gpu/core/sim_minorops.py:_u_pillage
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -211,6 +216,7 @@
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES
     - cpu/core/operations/assault.ts:operationSiegeCity
+    - gpu/core/sim_minorops.py:_u_siege
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"

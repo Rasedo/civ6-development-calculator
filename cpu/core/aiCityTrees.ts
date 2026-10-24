@@ -21,7 +21,7 @@ import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES,
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX } from './aiCityBuild';
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataTag, tick,
   type BtHandler, type BtNode, type BtRun } from './behaviorTree';
-import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_IN_PROGRESS, buildUnitNode, contractManagerNode, prereqsOf, reapContracts,
+import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, buildUnitNode, contractById, contractManagerNode, prereqsOf, reapContracts,
   treeContractOf, type AiContract, type ContractBook, type ContractCity, type ContractNodeWorld } from './aiContracts';
 import { FX, FX_MIN } from './aiValue';
 
@@ -269,6 +269,89 @@ export function defenseEvent(ai: CityAi, w: CityTreeWorld, city: CityTreeCity, o
   if (city.threat <= -1 || !operation || !slotFree(ai, city.id, SLOT_DEFENSE)) return;
   const tree = w.startOperation(operation, city.plot);
   if (tree !== null) (ai.slots[city.id] ??= [-1, -1, -1, -1, -1, -1])[SLOT_DEFENSE] = tree;
+}
+
+/** what the defensive cancel reads of a city: the item at its queue's head
+ *  (install types, null none, at most one set), the table values of a
+ *  unit, a building, a project and of a district at the head's plot, the
+ *  Default Specialization's best building of the plain pick and best unit
+ *  of the defensive pick */
+export interface DefensiveCancelFacts {
+  head: { unit: string | null; building: string | null; district: string | null; project: string | null };
+  unitValue(unit: string): number;
+  buildingValue(building: string): number;
+  districtValue(district: string): number;
+  projectValue(project: string): number;
+  bestPlainBuilding(): number;
+  bestDefensiveUnit(): number;
+}
+
+/** AI_CURRENT_TASK_BIAS (GlobalParameters, 80): the defensive cancel's floor
+ *  over the value of the city's current task */
+export const CURRENT_TASK_BIAS = 80 * FX;
+
+/**
+ * 0x5d7640, THE DEFENSIVE CANCEL, the City Defense event's opening (0x5cced0),
+ * in a city under threat (0x5cdc50: its threat above -1 with its centre's hit
+ * points damaged; the caller's `underThreat`). The item in hand is the
+ * contract in hand where the city holds one (+0x398), else its queue's
+ * head; it is NOT DEFENSIVE where a unit without Combat (+0x48) or with a
+ * Bombard (+0x40), a building without a DefenseModifier (+0x28 — the Walls
+ * carry none), a district without hit points, any project. Its OLD VALUE:
+ * the contract's value (else 0), raised to the head's table value — a
+ * unit's (a queued unit with no contract and no PseudoYieldType, or the
+ * PSEUDOYIELD_UNIT_COMBAT one, leaves the cancel there), a building's (a
+ * wonder's 0), a district's at its plot, a project's. An empty queue keeps
+ * its task. The bar: OLD + max(OLD, AI_CURRENT_TASK_BIAS). The city cancels
+ * where a contract it lists stands ACCEPTED at the bar or above, or its item
+ * is not defensive, or the plain pick's best building reaches the bar or
+ * the defensive pick's best unit passes it: the contract in hand FAILED,
+ * the production cleared ("Canceling current build, OLD VALUE v"). Recorded
+ * (AI_CityBuild.csv, 98 city-state cancels over the 29 duels):
+ * runs/h1_duelw1105 Bandar Brunei t63-t69, its Walls contract FAILED and
+ * re-picked each turn (OLD VALUE 468.4, 495.9, ... the Walls' value);
+ * runs/h1_duelw1103 Hattusa t46 its Granary (OLD 33.1) for a Heavy Chariot.
+ * Returns whether it cancelled.
+ */
+export function defensiveCancel(ai: ContractBook, cityId: number, underThreat: boolean, f: DefensiveCancelFacts,
+  clearProduction: () => void): boolean {
+  if (!underThreat) return false;
+  const hand = contractById(ai, ai.inHand[cityId] ?? -1) ?? null;
+  const unitOff = (u: string): boolean => {
+    const r = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
+    return !r || r.combat === 0 || r.bombard > 0;
+  };
+  const buildingOff = (b: string): boolean => (AI_BUILDINGS[AI_BUILDING_INDEX.get(b) ?? -1]?.defenseModifier ?? 0) === 0;
+  const districtOff = (d: string): boolean => !((AI_DISTRICTS.find((r) => r.type === d)?.hitPoints ?? 0) > 0);
+  const h = f.head;
+  let off: boolean;
+  if (hand) {
+    off = hand.unit ? unitOff(hand.unit) : hand.building ? buildingOff(hand.building) : hand.district ? districtOff(hand.district) : false;
+  } else {
+    off = h.unit ? unitOff(h.unit) : h.building ? buildingOff(h.building) : h.district ? districtOff(h.district) : h.project !== null;
+  }
+  let old = hand ? hand.value : 0;
+  if (h.unit) {
+    old = Math.max(old, f.unitValue(h.unit));
+    if (!hand) {
+      const pseudo = AI_UNITS[AI_UNIT_INDEX.get(h.unit) ?? -1]?.pseudo ?? null;
+      if (pseudo === null || pseudo === 'PSEUDOYIELD_UNIT_COMBAT') return false;
+    }
+  } else if (h.building) {
+    const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(h.building) ?? -1];
+    old = Math.max(old, row?.wonder ? 0 : f.buildingValue(h.building));
+  } else if (h.district) old = Math.max(old, f.districtValue(h.district));
+  else if (h.project) old = Math.max(old, f.projectValue(h.project));
+  if (!h.unit && !h.building && !h.district && !h.project) return false;
+  const bar = old + Math.max(old, CURRENT_TASK_BIAS);
+  const listed = (ai.city[cityId] ?? []).some((id) => {
+    const c = contractById(ai, id);
+    return !!c && c.progress === CP_ACCEPTED && c.value >= bar;
+  });
+  if (!listed && !off && f.bestPlainBuilding() < bar && f.bestDefensiveUnit() <= bar) return false;
+  if (hand) hand.progress = CP_FAILED;
+  clearProduction();
+  return true;
 }
 
 /** the city's event slot holds no running tree */

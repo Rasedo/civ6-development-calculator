@@ -87,7 +87,8 @@ import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { MINOR_OP_DEFS } from './minorOps';
 import { barbHomingRecord, barbOpRecord } from './barbarianOps';
-import { opsOf } from './operations/manager';
+import { opsOf, type OpsAi } from './operations/manager';
+import { FREE_RAID_DEF } from './freeOps';
 import { AI_OP_TEAMS } from '../data/aiOperations';
 import { AI_DISTRICTS, AI_IMPROVEMENTS } from '../data/aiBuildTables';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX } from './aiCityBuild';
@@ -226,16 +227,22 @@ function cityAiTrees(cs: CityState, state: GameState): number[] {
  *  requirements' counts behind their number, the six goals, engaged,
  *  minimums met, ready, ongoing, the unit to build (AI row), strength] */
 function minorOpsRecord(cs: CityState, state: GameState): number[] {
-  const ai = cs.ops;
+  return opsRecord(cs.ops, cs.seat, MINOR_OP_DEFS, state);
+}
+
+/** a seat's operations (a city-state's, the Free Cities'): the pool, the
+ *  pick, per slot its definition (its index in `defs`), target, rally,
+ *  backup, strengths and teams */
+function opsRecord(ai: OpsAi | undefined, seat: number, defs: readonly string[], state: GameState): number[] {
   if (!ai) return [0, 0, -1, -1, -1];
   const out: number[] = [ai.slots.length, ai.free.length, ...ai.free];
-  out.push(ai.pick ? MINOR_OP_DEFS.indexOf(ai.pick.def) : -1, ai.pick?.target ?? -1, ai.pick?.rally ?? -1);
+  out.push(ai.pick ? defs.indexOf(ai.pick.def) : -1, ai.pick?.target ?? -1, ai.pick?.rally ?? -1);
   for (const op of ai.slots) {
     if (!op) {
       out.push(-1);
       continue;
     }
-    out.push(MINOR_OP_DEFS.indexOf(op.def), op.id, op.target, op.rally, op.backup?.target ?? -1, op.backup?.rally ?? -1,
+    out.push(defs.indexOf(op.def), op.id, op.target, op.rally, op.backup?.target ?? -1, op.backup?.rally ?? -1,
       op.enemyStrength, op.strength);
     for (let k = 0; k < 2; k++) {
       const t = op.teams[k];
@@ -244,7 +251,7 @@ function minorOpsRecord(cs: CityState, state: GameState): number[] {
         continue;
       }
       const slots = t.members.map((id) => {
-        const u = state.units.find((x) => x.id === id && x.seat === cs.seat);
+        const u = state.units.find((x) => x.id === id && x.seat === seat);
         return u ? u.slot ?? -1 : -2;
       });
       out.push((AI_OP_TEAMS[op.def] ?? []).findIndex((x) => x.team === t.team), slots.length, ...slots, t.counts.length, ...t.counts,
@@ -626,6 +633,10 @@ const GAME: Record<string, Extractor> = {
     .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()],
   freeArmyAged: (s) => [s.freeSeat?.armyAged ?? -1],
   freeCombatDesire: (s) => [s.freeSeat?.combatDesire ?? 0],
+  // the Free Cities' operations (the Free Cities Raid) and the ids their
+  // next contract and tree take
+  freeOps: (s) => [opsRecord(s.freeSeat?.ops, FREE_SEAT, [...MINOR_OP_DEFS, FREE_RAID_DEF], s)],
+  freeAiSerials: (s) => [[s.freeSeat?.cityAi?.nextContract ?? 1, s.freeSeat?.cityAi?.nextTree ?? 100]],
   // the live storms in the order they began: the last serial, then per
   // record its serial, row, centre, turns left, and its struck plots sorted
   // behind their count
@@ -1128,6 +1139,7 @@ const CITY: Record<string, Extractor> = {
   foundedTurn: overCities((r) => r.city.foundedTurn),
   freeGrantTurns: overCities((r) => r.city.freeGrantTurns ?? 0),
   freeCityThreat: overCities((r) => r.city.aiThreat ?? -1),
+  freeCityRaid: overCities((r) => [r.city.freeRaid?.player ?? -1, r.city.freeRaid?.op ?? -1]),
   // a FREE CITY's allowed units (`freeCityAllowed`), as unit rows
   freeAllowed: overCities((r) => (r.city.freeAllowed ?? []).map((x) => idx(UNIT_IDX, x)).sort((a, b) => a - b)),
   // every layout slot's work — object, maker, era, civilization; -1s for an

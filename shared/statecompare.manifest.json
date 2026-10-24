@@ -559,6 +559,56 @@
           ]
         },
         {
+          "name": "freeOps",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "mops_def",
+            "mops_id",
+            "mops_target",
+            "mops_rally",
+            "mops_bk_target",
+            "mops_bk_rally",
+            "mops_started",
+            "mops_estr",
+            "mops_str",
+            "mops_st",
+            "mops_ma",
+            "mops_mb",
+            "mops_bb",
+            "mops_tm",
+            "mops_mem",
+            "mops_cnt",
+            "mops_goal",
+            "mops_eng",
+            "mops_mins",
+            "mops_ready",
+            "mops_ong",
+            "mops_unit",
+            "mops_tstr",
+            "mops_mvs",
+            "mops_mvg",
+            "mops_free",
+            "mops_nfree",
+            "mops_size",
+            "mops_pick",
+            "mops_pick_target",
+            "mops_pick_rally",
+            "mops_enemy"
+          ],
+          "note": "the Free Cities' operations (`opsRecord` on `freeSeat.ops` / `_minor_ops` on the row `FR`): the Free Cities Raid's pool, pick, slots and teams, as minorOps; the player each runs against (`mops_enemy`) is its Free City's raid record's (freeCityRaid)"
+        },
+        {
+          "name": "freeAiSerials",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "cai_c_serial",
+            "cai_t_serial"
+          ],
+          "note": "the ids the Free Cities' next contract and next operation tree take (`freeSeat.cityAi`; the row `FR`; they make no contract: the Free Cities Assault names no Contract ID)"
+        },
+        {
           "name": "storms",
           "compare": "exact",
           "covers": [
@@ -2823,7 +2873,7 @@
           "name": "minorAiSlots",
           "compare": "exact",
           "covers": [
-            "CityState.cityAi"
+            "Seat.cityAi"
           ],
           "planes": [
             "cai_slots"
@@ -3340,6 +3390,17 @@
             "city_ai_threat"
           ],
           "note": "a FREE CITY's threat (CityBuildAI +0x1b8, `freeCityThreat`) as its city AI's last update left it, -1 none; -1 for any other city."
+        },
+        {
+          "name": "freeCityRaid",
+          "compare": "exact",
+          "covers": [
+            "City.freeRaid"
+          ],
+          "planes": [
+            "city_free_raid"
+          ],
+          "note": "a FREE CITY's raid record (`freeRaidStart`, +0x20 / +0x24): the player it raided and its operation's id, -1 once gone; [-1, -1] none"
         },
         {
           "name": "freeAllowed",

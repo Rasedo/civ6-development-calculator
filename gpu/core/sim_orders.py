@@ -1284,11 +1284,14 @@ class SimOrders:
             if _rk_pillage[n]:
                 _ts = self.tile_seat.gather(1, hc.unsqueeze(1)).squeeze(1)
                 # a WAR with the tile's owner, city-state owners included —
-                # the mask's own clause, and `phase.ts`' replay arm
+                # the mask's own clause, and `phase.ts`' replay arm; the Free
+                # Cities' ground any player's (`isTerritorial`, their
+                # `alwaysHostile`)
                 _en = (
-                    ((_ts >= 0) & (_ts < BARB_SEAT))
-                    & self.war[:, row].gather(
-                        1, self._seat_row[_ts.clamp(min=0)].unsqueeze(1)).squeeze(1)
+                    (((_ts >= 0) & (_ts < BARB_SEAT))
+                     & self.war[:, row].gather(
+                        1, self._seat_row[_ts.clamp(min=0)].unsqueeze(1)).squeeze(1))
+                    | (_ts == FREE_SEAT)
                 )
                 # CIV6 (Mountain Tunnel, Qhapaq Ñan): "Cannot be pillaged or
                 # removed" — the verb refuses a `noPillage` row outright rather
@@ -1332,7 +1335,7 @@ class SimOrders:
                         _cts = self.tile_seat[_ri, _cc]
                         _cown = (_cts >= 0) & (_cts < BARB_SEAT)
                         _csr = self._seat_row[torch.where(_cown, _cts, torch.zeros_like(_cts))]
-                        _cwar = _cown & self.war[:, row][_ri, _csr]
+                        _cwar = (_cown & self.war[:, row][_ri, _csr]) | (_cts == FREE_SEAT)
                         _ok0 = (_cand >= 0) & ~self.water[_ri, _cc] & _cwar
                         _cimp = (_ok0 & (self.improvement[_ri, _cc] >= 0) & ~self.pillaged[_ri, _cc]
                                  & ~self._imp_no_pillage[self.improvement[_ri, _cc].clamp(min=0)])
@@ -1361,6 +1364,15 @@ class SimOrders:
                     self.pillaged[_r[_pi], _tt[_pi]] = True
                     self.district_pillaged[_r[_pd], _tt[_pd]] = True
                     self._air_scatter_from(_r[_pd], _tt[_pd])
+                    # a Free City's improvement or district pillaged by the
+                    # unit on it starts the Free City's raid (0x276ff0, 0x276e70)
+                    _und = ~_rd[_r]
+                    if bool(_und.count_nonzero()):
+                        _fm = torch.zeros(B, dtype=torch.bool, device=dev)
+                        _fp = torch.full((B,), -1, dtype=torch.long, device=dev)
+                        _fm[_r[_und]] = True
+                        _fp[_r[_und]] = _tt[_und]
+                        self._free_raid_plot(_fm, _fp, torch.full_like(_fp, row))
                     # ---- the plunder rows (`pillagePlunder`) ----
                     _kind = torch.zeros(len(_r), dtype=torch.long, device=self.device)
                     _amt = torch.zeros_like(_kind)

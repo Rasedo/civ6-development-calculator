@@ -53,7 +53,8 @@ import { congressPromoClassCs, congressReligiousCs } from './congress';
 import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS , classBitOf } from '../data/promotions';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
-import { civOf, isFreeSeat, seatsAllied } from './seats';
+import { FREE_SEAT, civOf, isFreeSeat, seatsAllied } from './seats';
+import { freeRaidSignal } from './freeOps';
 import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent, majorityReligionOf } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
@@ -1598,6 +1599,8 @@ function cityAssault(
   if (split.wall > 0) city.outerHp = outer - split.wall;
   city.hp -= split.centre;
   city.lastHitTurn = state.turn;
+  // a combat on a Free City's district starts its raid (0x276d90)
+  if (city.seat === FREE_SEAT) freeRaidSignal(state, city.centerIndex, attacker.seat);
   attacker.hp -= dmgToAttacker;
   spendAttack(attacker, true);
   warWearinessBattle(state, attacker.seat, city.seat, city.centerIndex,
@@ -1657,6 +1660,7 @@ function encampSplit(state: GameState, tile: Tile, attacker: Unit, diff: number,
     ranged ? 0 : siegeAssist(state, attacker, tile.index, wallsTier(state, held)), k, tile.index);
   if (split.wall > 0) tile.encampOuterHp = outer - split.wall;
   held.lastHitTurn = state.turn;
+  if (held.seat === FREE_SEAT) freeRaidSignal(state, tile.index, attacker.seat);
   return split.centre;
 }
 
@@ -2443,6 +2447,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     if (split.wall > 0) civCity.city.outerHp = outer - split.wall;
     civCity.city.hp = Math.max(1, civCity.city.hp - split.centre);
     civCity.city.lastHitTurn = state.turn;
+    if (civCity.city.seat === FREE_SEAT) freeRaidSignal(state, civCity.city.centerIndex, attacker.seat);
     warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true });
     spendAttack(attacker, true);
     awardCityXp(state, attacker, civCity.city.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);
@@ -2550,6 +2555,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     if (split.wall > 0) enemyCity.outerHp = outer - split.wall;
     enemyCity.hp = Math.max(1, enemyCity.hp - split.centre);
     enemyCity.lastHitTurn = state.turn;
+    if (enemyCity.seat === FREE_SEAT) freeRaidSignal(state, enemyCity.centerIndex, attacker.seat);
     warWearinessBattle(state, attacker.seat, enemyCity.seat, targetIndex, { city: true });
     spendAttack(attacker, true);
     awardCityXp(state, attacker, enemyCity.hp <= 1 ? XP_CITY_FELLED : XP_CITY_ATTACK);

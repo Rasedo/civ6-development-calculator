@@ -149,6 +149,10 @@ export interface City {
    *  Cities' knowledge base) as its city AI's last update left it, -1 none;
    *  absent, none */
   aiThreat?: number;
+  /** A FREE CITY's raid (its manager record +0x20 / +0x24, `freeRaidSignal`):
+   *  the player it raids once in its life, and the id of the Free Cities
+   *  Raid running for it, -1 once that operation is gone; absent, none */
+  freeRaid?: { player: number; op: number };
   /** A FREE CITY's race: the loyalty pressure each major seat has exerted on
    *  it "since the Free City became independent", dense over seats. CIV6:
    *  at 0 loyalty "it will join the Civilization that has exerted the most
@@ -844,9 +848,13 @@ export interface Seat {
   /** the barbarians' knowledge base's camps (`barbCampsLook`), in its
    *  order. Absent = none. */
   campsKnown?: number[];
-  /** the operation manager of a city-state (`minorOps.ts`) or the
-   *  barbarians (`barbarianOps.ts`), and the id the barbarians' next
-   *  operation's tree takes */
+  /** the city AI of a city-state (`minorAiTurn`: the events' slots, the
+   *  trees, the contracts and reservations) or the Free Cities (the ids their
+   *  operations' trees take, `freeOps.ts`) (`CityAi`) */
+  cityAi?: CityAi;
+  /** the operation manager of a city-state (`minorOps.ts`), the Free Cities
+   *  (`freeOps.ts`) or the barbarians (`barbarianOps.ts`), and the id the
+   *  barbarians' next operation's tree takes */
   ops?: OpsAi;
   opsNext?: number;
   /**
@@ -1218,10 +1226,6 @@ export interface CityState extends Seat {
   /** the turn its city was founded (city +0x2600, m_iTurnFounded); absent
    *  for a city a record's import finds standing */
   foundedTurn?: number;
-  /** its city AI (`minorAiTurn`): the events' slots, the trees, the
-   *  contracts and reservations (`CityAi`), the Economic AI's savings
-   *  (`EconomicMemory`), the city's threat (CityBuildAI +0x1b8, -1 none) */
-  cityAi?: CityAi;
   /** its city's trade list (CityBuildAI +0x870, `minorTradeList`): the
    *  destination centres a trade path reaches, and the ones it did not */
   tradeCities?: number[];

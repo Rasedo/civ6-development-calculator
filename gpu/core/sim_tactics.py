@@ -3053,10 +3053,12 @@ class SimTactics:
         m, i = key.min(dim=1)
         return torch.where(m < (1 << 40), cc.gather(1, i.unsqueeze(1)).squeeze(1), torch.full_like(m, -1))
 
-    def _seat_pass_open(self, pre: str, seat: int, act: torch.Tensor) -> dict:
+    def _seat_pass_open(self, pre: str, seat: int, act: torch.Tensor, full: bool = False) -> dict:
         """a player's tactical pass as it opens (`openPass`): its military
         units of pool `pre` in pool-slot order, their planning reach (two
-        turns, no zones of control) and its tactical target list"""
+        turns, no zones of control) and its tactical target list — built
+        where a foe stands near, or with `full` (an operation's nodes take a
+        city, a district or an improvement as a target)"""
         dev = self.device
         B, T = self.B, self.T
         BIG = 1 << 40
@@ -3072,7 +3074,7 @@ class SimTactics:
         # reach of a unit (no move of the pass takes a target farther)
         # (the knowledge base's entries a city-state's row or the Free Cities' `FK`)
         kb = seat - 100 if 100 <= seat < 100 + self.S else (self.FK if seat == FREE_SEAT else -1)
-        tg = self._tac_targets(seat, kb) if self._tac_foe_near(units, pre, seat, _ATTACK_SIGHT) else None
+        tg = self._tac_targets(seat, kb) if full or self._tac_foe_near(units, pre, seat, _ATTACK_SIGHT) else None
         rows, slots = units.nonzero(as_tuple=True)
         rowof = torch.full((B, P), -1, dtype=torch.long, device=dev)
         if rows.numel():
@@ -3688,10 +3690,12 @@ class SimTactics:
 
     def _free_tactics(self, act: torch.Tensor) -> None:
         """THE FREE CITIES' TACTICAL TURN (`freeCityTactics`) in the games of
-        `act`: their unit pool (row S), each unit's planning reach, then
-        Attack High and Medium Priority, Move to Safety, Attack Low Priority,
-        Wander Near Camp round each unit's home (`freeHome`) in pool order;
-        the rest end their turn."""
+        `act`: their unit pool (row S), each unit's planning reach, their
+        operations' run (`_mops_run` on the row `FR`, `freeCitiesMilitary`:
+        their units theirs), then Attack High and Medium
+        Priority, Move to Safety, Attack Low Priority, Wander Near Camp round
+        each unit's home (`freeHome`) in pool order; the rest end their
+        turn."""
         dev = self.device
         B, T = self.B, self.T
         bidx = torch.arange(B, device=dev)
@@ -3706,9 +3710,11 @@ class SimTactics:
         self._tac_cost_held = None
         self._tac_full_held = None
         try:
-            op = self._seat_pass_open(pre, seat, act)
+            ops_on = bool((act & (self.mops_def[:, self.FR] >= 0).any(dim=1)).any())
+            op = self._seat_pass_open(pre, seat, act, full=ops_on)
             units, order, npass = op["units"], op["order"], op["npass"]
             done = torch.zeros_like(units)
+            self._mops_run(self.FR, act, op, done)
             homes = self._free_homes()
             # the pass's own units (its job)
             peers = self._tac_peers(units, pre)

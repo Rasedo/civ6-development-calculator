@@ -450,6 +450,8 @@ GAME = {
             sim.citystate_kb_plot[b, sim.FK].tolist(), sim.citystate_kb_damage[b, sim.FK].tolist()) if k != -2) for x in r]],
     "freeArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.FK])],
     "freeCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, sim.FR])],
+    "freeOps": lambda sim, b, rows: [_minor_ops(sim, b, sim.FR)],
+    "freeAiSerials": lambda sim, b, rows: [[int(sim.cai_c_serial[b, sim.FR]), int(sim.cai_t_serial[b, sim.FR])]],
     "storms": lambda sim, b, rows: [_storm_table(sim, b)],
     "droughts": lambda sim, b, rows: [_drought_table(sim, b)],
 }
@@ -1081,7 +1083,8 @@ def _ai_trees(sim, b: int, s: int) -> list[int]:
 
 
 def _minor_ops(sim, b: int, s: int) -> list[int]:
-    """the minor's operations as `minorOpsRecord` reads them: the pool's
+    """holder `s`'s operations (a minor's, the Free Cities' row `FR`) as
+    `opsRecord` reads them: the pool's
     size, its free slots, the pick, per slot its definition (-1 free), id,
     target, rally, backup, strengths, per team its team, its members' pool
     slots (-1 unslotted, -2 gone), its requirements' counts, goals, flags,
@@ -1093,7 +1096,8 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
     out = [size, nf] + [int(x) for x in sim.mops_free[b, s, :nf].tolist()]
     pk = int(sim.mops_pick[b, s])
     out += [pk, int(sim.mops_pick_target[b, s]) if pk >= 0 else -1, int(sim.mops_pick_rally[b, s]) if pk >= 0 else -1]
-    lo = sim.POOL_LO["major"]
+    lo = sim.POOL_LO[sim._mops_pre(s)]
+    seat = sim._mops_seat(s)
     for k in range(size):
         d = int(sim.mops_def[b, s, k])
         if d < 0:
@@ -1111,7 +1115,7 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
             slots = []
             for u in mem:
                 g = u + lo
-                alive = bool(sim.unit_alive[b, g]) and int(sim.unit_seat[b, g]) == 100 + s
+                alive = bool(sim.unit_alive[b, g]) and int(sim.unit_seat[b, g]) == seat
                 slots.append(int(sim.unit_pslot[b, g]) if alive else -2)
             R = T.team_reqs[d][tm]["n"]
             out += [tm, len(slots)] + slots + [R] + [int(x) for x in sim.mops_cnt[b, s, k, ti, :R].tolist()]
@@ -1277,6 +1281,7 @@ CITY = {
     "foundedTurn": _cty("city_founded_turn"),
     "freeGrantTurns": _cty("city_free_grant"),
     "freeCityThreat": _cty("city_ai_threat"),
+    "freeCityRaid": _cty("city_free_raid"),
     "freeAllowed": lambda sim, b, rows: [[i for i, on in enumerate(sim.city_free_allowed[b, c, s].tolist()) if on]
                                          for c, s in rows],
     # every layout slot's work — object, maker, era, civilization; -1s for an

@@ -754,7 +754,9 @@ class SimPhase:
         Cities' list within `_free_builder_threat` of it, the Builder; else ONE
         draw ("Free Cities Unit Choice") over the classes alike and the
         class's chassis of the city's allowed units (`_free_chassis`, -1
-        none). The count back to 0."""
+        none). The count back to 0. Its turn first clears its raid's record
+        of a tree gone (`_free_raid_check`)."""
+        self._free_raid_check(act, j)
         row = self.FREE_ROW
         B, dev = self.B, self.device
         cnt = self.city_free_grant[:, row, j] + act.long()

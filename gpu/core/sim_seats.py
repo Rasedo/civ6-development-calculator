@@ -11089,6 +11089,7 @@ class SimSeats:
         self.city_proj_yield[b, row, col] = -1
         self.city_free_grant[b, row, col] = 0
         self.city_ai_threat[b, row, col] = -1
+        self.city_free_raid[b, row, col] = -1
         self.city_free_allowed[b, row, col] = False
         self.city_lasers[b, row, col] = 0
         self.city_powered[b, row, col] = False
@@ -11561,6 +11562,7 @@ class SimSeats:
         self.city_free_press[b, dst_row, col, :] = 0
         self.city_free_grant[b, dst_row, col] = 0
         self.city_ai_threat[b, dst_row, col] = -1
+        self.city_free_raid[b, dst_row, col] = -1
         self.city_free_allowed[b, dst_row, col] = False
         # ...and the turn its new owner took it
         self.city_founded_turn[b, dst_row, col] = int(self.turn)
@@ -13611,6 +13613,8 @@ class SimSeats:
         hr3 = rows[hm[rows]]
         if hr3.numel() > 0:
             self.city_last_hit[hr3, hrow[hr3], _hc0[hr3]] = self.turn
+        # a blow on a Free City's district starts its raid (0x276d90)
+        self._free_raid_signal(m & hm, hrow, hcol, useat)
 
     def _conquer_encampment(self, m: torch.Tensor, tc: torch.Tensor, captor: torch.Tensor) -> None:
         """`conquerEncampment`'s twin. CIV6 (Combat): the Encampment "cannot be
@@ -14583,6 +14587,8 @@ class SimSeats:
         self.city_outer_hp[rows, hr, sl] = outer - wall[rows]
         self.city_hp[rows, hr, sl] -= centre[rows]
         self.city_last_hit[rows, hr, sl] = self.turn
+        # a combat on a Free City's district starts its raid (0x276d90)
+        self._free_raid_signal(att, hrow, slot, a_seat[:, u])
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
         self._ww_battle(att, self._row_of(a_seat[:, u]), hrow, tgt, a_died=died, city=True)
@@ -15066,6 +15072,7 @@ class SimSeats:
             self.city_outer_hp[rows, hr_, hc_] = outer - wall.take(rows)
             self.city_hp[rows, hr_, hc_] = (self.city_hp[rows, hr_, hc_] - centre.take(rows)).clamp(min=1)
             self.city_last_hit[rows, hr_, hc_] = self.turn
+            self._free_raid_signal(city_att, hrow, hcol, a_seat)
             _chp = self.city_hp[_bidx, hrow, hcol]
             self._award_city_xp(city_att, atk_kind, u, _type_p[:, u], a_seat,
                                 torch.where(_chp <= 1,
@@ -15266,6 +15273,7 @@ class SimSeats:
             self.city_outer_hp[rr, hr, sl] = outer - wall[rr]
             self.city_hp[rr, hr, sl] = (self.city_hp[rr, hr, sl] - centre[rr]).clamp(min=1)  # ranged never captures
             self.city_last_hit[rr, hr, sl] = self.turn
+            self._free_raid_signal(city_att, hrow, slot, aseat)
             _chp = self.city_hp[bidx, hrow, slot]
             self._award_city_xp(city_att, atk_kind, u, a_type[:, u], aseat,
                                 torch.where(_chp <= 1,
