@@ -2764,8 +2764,9 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   const targets = tacticalTargets(state, BARB_SEAT, seen, ex.length ? ex : null, state.barbSeat.armyKnown ?? []);
   const reach = new Map<number, Reach[]>();
   const plan = new Map<number, Planner>();
+  // the planning runs for every unit of the player (0x792c90), its
+  // civilians and support units among them: their safe plot reads it
   for (const u of all) {
-    if (ai.get(u.id)! < AI_EXPLORE) continue;
     const p = planUnit(state, u, targets);
     plan.set(u.id, p);
     reach.set(u.id, p.reach);

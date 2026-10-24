@@ -2538,8 +2538,9 @@ class SimTactics:
         tg = self._tac_targets(BARB_SEAT, self.BK)
         treg = self._tac_seen_regions(BARB_SEAT)
         # the planning: the reach of two turns, no zones of control, and the
-        # targets' spots and predicted blows
-        want = live() & (ai >= _AI_EXPLORE)
+        # targets' spots and predicted blows, for every unit of the player
+        # (0x792c90): its civilians and support units read it for their safe plot
+        want = live()
         rows, slots = want.nonzero(as_tuple=True)
         rowof = torch.full((B, P), -1, dtype=torch.long, device=dev)
         if rows.numel():
