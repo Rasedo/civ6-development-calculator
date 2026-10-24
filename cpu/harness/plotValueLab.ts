@@ -36,7 +36,7 @@ import { minorCity } from '../core/cityStates';
 import { civicAnalysis } from '../core/aiCivics';
 import { borderCandidates, computeCityStats } from '../core/city';
 import { resourceValue } from '../core/aiResource';
-import { housingValue } from '../core/aiCityBuild';
+import { growthForecast, housingValue } from '../core/aiCityBuild';
 import { accumulationPct } from '../core/stockpile';
 import { makeYieldCtx } from '../core/effects';
 import { improvementAdjacency } from '../core/yields';
@@ -135,7 +135,13 @@ for (const rec of recs) {
     cs.research.civicAiEntries = civicAnalysis(state, cs.seat, computeCityStats(state, minorCity(cs)).total.culture);
     const facts = minorBuildFacts(state, cs, () => 0);
     const resFacts = minorResourceFacts(state, cs);
-    const forecast = facts.forecast;
+    // the growth's surplus as the city stood at its turn: the record's
+    // (its plots can lag its city's yields a builder's action:
+    // runs/h1_duelv1117 Caguana's Farm on plot 571 off in the t51 record its
+    // Food counts, the surplus 5 where the plots give 4 from t51; the Farm
+    // rows' 15.03 a Food of housing value)
+    if (dc?.foodSurplus !== undefined) facts.growth.surplus = Math.round(Number(dc.foodSurplus) * 256);
+    const forecast = growthForecast(facts.growth);
     const yctx = makeYieldCtx(state, cs.seat);
     const r = cs.research;
     // the research AI's turns as the game's log gives them: the entry of the

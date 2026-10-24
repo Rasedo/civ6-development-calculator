@@ -8983,18 +8983,19 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   first pushes the candidate onto the context's list (0x7b8bd0, its one
   caller 0x7adc88: the plot's x, y, index and the district), then walks
   radius 1 (0x6b1b0) with a functor (vtable @0xd71be8, invoke 0x7b8a20 ->
-  0x79ed40): a neighbour holding a district (+0x1e) adds
-  valueConstructible 0x7a7590 of its district with the context's list less
-  with a fresh one (one placeholder entry, x and y -9999, so the nested
-  value walks no neighbours); else one holding an improvement (+0x44) the
-  improvement yields value 0x7b1320 likewise; T and H the candidate's. A
-  port of the improvement half (each neighbour improvement's yields value
-  with the district complete on the plot less as the map stands) moved no
-  row of the five duels' DISTRICTS (a city-state's improvements take no
-  district adjacency before the Industrial Zone's rows); the district half
-  (0x7a7590 on a district) unread. Not ported. (An earlier port of the same
-  for an improvement's own value — no such term exists — lowered 1127's
-  Farms 10,904 -> 9,376.)
+  0x79ed40): a neighbour holding a WONDER (the plot's +0x30 object's
+  +0x1e, the building 0x5ce970's wonder loop tests there) adds the
+  building value 0x7a7590 of its wonder with the context's list less with
+  a fresh one (one placeholder entry, x and y -9999, so the nested value
+  walks no neighbours); else one holding an improvement (+0x44) the
+  improvement yields value 0x7b1320 likewise; T and H the candidate's. No
+  neighbour district is revalued. A port of the improvement half (each
+  neighbour improvement's yields value with the district complete on the
+  plot less as the map stands) moved no row of the five duels' DISTRICTS
+  (a city-state's improvements take no district adjacency before the
+  Industrial Zone's rows); the wonder half not ported (a city-state builds
+  none). (An earlier port of the same for an improvement's own value — no
+  such term exists — lowered 1127's Farms 10,904 -> 9,376.)
 - LAB: THE DISTRICT'S BUILDINGS — every logged DISTRICTS row stands above
   0x7aaf80's terms by the most the city's analysis values a building of
   the district (the centre's BUILDINGS row; max, not the sum, where two are
@@ -9124,6 +9125,32 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   exact, Harbor 786 -> 1,338). The engine keeps the store itself.
 - Not drawn: the name itself (0xa292a0, one draw over the namer's names
   left; AUDIT C-74).
+
+## C-100: the plot values' residuals traced — the Farm rows' Food, the Neighbourhood's T, a Campus lump (MEASURED)
+
+- THE FARM ROWS' 15.03 (runs/h1_duelv1117 Caguana, player 3, from t51):
+  one Food of housing value. The city's surplus the lab reads off the
+  record's plots is a Food short of the record's own (`foodSurplus` 5
+  where the plots give 4 from t51): Caguana's builder takes a Farm off
+  plot 571 and lays it back a turn later (ImprovementRemovedFromMap t50,
+  ImprovementAddedToMap t51), and the record's city yields count the Farm
+  its plots do not hold yet. The lab now reads the record's surplus
+  (`plotValueLab.ts`); the five duels' IMPROVEMENTS rows within 0.01
+  113,836 -> 115,629, DISTRICTS 29,598 -> 29,805. The engine computes its
+  own surplus; nothing to port.
+- THE NEIGHBOURHOOD: its T, not its housing value. Its landing reads the
+  civic's turns (Urbanization), which the city-states' civics analysis
+  gives far longer than the game: runs/h1_duelv1121 Hunza (player 2)
+  AI_GovtPolicies.csv Urbanization 117 at t120, 102 at t121-122, 3 at
+  t123-125, 2, 1, 1 — the lab's 271, 270, 269, 186, 102, 101 over t123-
+  t128 (the minors' civics turns; the research and civics AI's). The rows
+  past it (t130-t250) stand off by a constant per turn, owned and unowned
+  plots apart (runs/h1_duelv1121 t130 -16.87 / +34.27), not by the Appeal
+  band.
+- 1128 Bologna's Campus +7.12 a row from t34 to t62 above the Library's
+  term, whatever the T (2 or 3), not a building's or project's of the
+  centre's rows; unread.
+- 1117 player 4's Theater from t99: not traced.
 
 ## DLL rules the engines contradict
 

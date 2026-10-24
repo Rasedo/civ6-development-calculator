@@ -352,7 +352,7 @@
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   notes:
-    - "per neighbour: a district (+0x1e) valueConstructible 0x7a7590 with the context's plot list less a fresh one, else an improvement (+0x44) 0x7b1320 likewise; not ported"
+    - "per neighbour: a WONDER (the plot object +0x1e) its building value 0x7a7590 with the context's plot list less a fresh one, else an improvement (+0x44) 0x7b1320 likewise; no district revalued; not ported"
   context:
     - "...0x7a4b20; at the top level its neighbours' improvements and districts revalued with it (0x79ed40). Unported: the tourism, defence, claims, modifiers and neighbours terms; the 1127 Farm..."
   review: reviewed
