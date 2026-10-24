@@ -25,7 +25,7 @@ import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
 import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, type FloodDamageRow, warmedWeight, RANDOM_EVENT_START_TURN, FLOODPLAIN_MIN, FLOODPLAIN_MAX } from '../data/disasters';
-import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_TURNS, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtGround, SOIL_REPLACES } from '../data/disasters';
+import { ERUPTION_WEIGHT, volcanoRow, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_TURNS, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtGround, SOIL_REPLACES } from '../data/disasters';
 import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P } from '../data/disasters';
 import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE } from '../data/disasters';
 import { TURN_LIMIT } from './game';
@@ -687,6 +687,25 @@ export function floodHazardTurns(state: GameState, plot: number): number | null 
     }
   }
   return sum > 0 ? fxDiv(fxOf(100), sum) : -fxOf(1);
+}
+
+/**
+ * THE TURNS THE AI EXPECTS TO AN ERUPTION beside a plot (the feature
+ * manager's +0x98, raw fixed point; the improvement and district values cut
+ * their horizon there): a plot beside a volcano reads 100 over the volcano
+ * rows' sum of 100 / (N / OccurrencesPerGame) — gentle, catastrophic and
+ * megacolossal, 31.29 turns; null elsewhere. LAB (its reader unread): the
+ * logged values of the plots beside a volcano fit it (runs/h1_duelv1127's
+ * improvements at 31; runs/h1_duelv1121 Antioch t2's Commercial Hub at
+ * (32,22), Forest and Deer beside its volcano, 0.59 as logged, 8.21 read
+ * whole).
+ */
+export function eruptionHazardTurns(state: GameState, plot: number): number | null {
+  const t = state.map.tiles[plot];
+  if (!neighbors(state.map, t).some((n) => n.volcano)) return null;
+  let sum = 0;
+  for (let sev = 0; sev < 3; sev++) sum += fxDiv(fxOf(100), fxDiv(fxOf(TURN_LIMIT), fxOf(ERUPTION_WEIGHT[volcanoRow(sev)])));
+  return fxDiv(fxOf(100), sum);
 }
 
 /**

@@ -623,6 +623,27 @@ class SimMinorAi:
         self.major_unit_defender[mine] = flag[mine]
         return torch.where(act, quota - n, torch.zeros_like(n))
 
+    def _minor_eruption_turns(self) -> torch.Tensor:
+        """[B, T] `eruptionHazardTurns` — the turns the AI expects to an
+        eruption beside each plot (raw fixed point): a plot beside a volcano
+        reads 100 over the volcano rows' sum of 100 / (N /
+        OccurrencesPerGame); raw -1 (none) elsewhere."""
+        def fx_of(x: float) -> int:
+            return (math.floor(x) << 8) | int((x - math.floor(x)) * 256)
+
+        def fx_div(a: int, b: int) -> int:
+            q = abs(a) * 256 // abs(b)
+            return q if (a >= 0) == (b >= 0) else -q
+        tot = 0
+        for occ, on in zip(self._eruption_weight, self._er_on_volcano):
+            if on:
+                tot += fx_div(fx_of(100), fx_div(fx_of(self._event_turns), fx_of(occ)))
+        turns = fx_div(fx_of(100), tot) if tot > 0 else -1
+        nb = self.neigh
+        beside = (self.volcano_at[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).any(dim=2)
+        return torch.where(beside, torch.full_like(beside, turns, dtype=torch.long),
+                           torch.full_like(beside, -1, dtype=torch.long))
+
     def _minor_flood_turns(self) -> torch.Tensor:
         """[B, T] `floodHazardTurns` — THE TURNS THE AI EXPECTS TO A FLOOD of
         each plot (0xa2af70 at severity 1, raw fixed point): over the flood
@@ -666,7 +687,8 @@ class SimMinorAi:
         The centre and a district's plot stand unanalysed (0). T: an
         improvement's the research and civics AIs' turns to its technology
         and civic (the larger), a district's its build turns plus those. The
-        hazards' turns (flood, eruption) read none; an inland city-state on a
+        hazards' turns (flood `_minor_flood_turns`, eruption
+        `_minor_eruption_turns`); an inland city-state on a
         river trains ships."""
         B, dev = self.B, self.device
         T = self._cv_tables()
@@ -1326,7 +1348,7 @@ class _PlotFacts:
         return self.ctx.get("flood", self.sim._minor_flood_turns)[self.bb, self.tiles]
 
     def eruption_turns(self):
-        return -1
+        return self.ctx.get("erupt", self.sim._minor_eruption_turns)[self.bb, self.tiles]
 
     def appeal(self):
         return self.sim._tile_appeal()[self.bb, self.tiles].long()

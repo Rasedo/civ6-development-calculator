@@ -9190,6 +9190,31 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   centre's rows; unread.
 - 1117 player 4's Theater from t99: not traced.
 
+## C-99: the district and improvement events on one plot — the eruption's turns (a LAB, both twins)
+
+- The events do not share plots by rule: a tree is made by its event and
+  only ticks in the tree manager's tick (0x7ffdd0, list C), so both events
+  read the turn's analysis as it stands and either may name the same plot;
+  Reserve Plot (0x7f7da0) then hands the plot to the higher value (another
+  tree's reservation yields only to a value 20.0 above it), and the
+  district tree whose Reserve Plot fails ends.
+- runs/h1_duelw1121 Antioch t2: ours chose the Commercial Hub at (32,22)
+  (plot 1000, Forest and Deer beside its volcano) at 8.21 — the game's row
+  there is 0.59 (runs/h1_duelv1121's DISTRICTS) — and the Camp tree's
+  48.0 on the same plot took it at t3, the district event firing again t4
+  with three District Choice draws the game does not make. The game's row
+  is the eruption's cut: the plot lies beside a volcano, and the analysis
+  ends the horizon at the eruption's expected turns (the feature manager's
+  +0x98, its reader unread). `eruptionHazardTurns` (disasters.ts) /
+  `_minor_eruption_turns` (sim_minorai.py): 100 over the volcano rows' sum
+  of 100 / (N / OccurrencesPerGame), 31.29 turns, on every plot beside a
+  volcano (the plot values lab's fit at 31, now the engine's). With it
+  Antioch's t2 district tree takes the Commercial Hub at a 5.25 plot (999)
+  and posts Currency at 5.0, the Camp tree Animal Husbandry at 48.0, as
+  logged (AI_Research.csv Tech Contracts 16 / 17); the district trees on
+  the full replay start t2, t12, t22, t34 as the log's District Choice
+  draws do.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

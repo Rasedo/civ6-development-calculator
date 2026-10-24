@@ -68,7 +68,7 @@ import { canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsI
 import { borderCandidates, computeCityStats } from './city';
 import { tilePurchaseCost } from './game';
 import { computeUnlocksIn, makeYieldCtx } from './effects';
-import { floodHazardTurns } from './disasters';
+import { eruptionHazardTurns, floodHazardTurns } from './disasters';
 import { baseAdjacency, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
 import { builderHarvest, builderRemoveFeature, tileFreeForUnit } from './units';
@@ -204,8 +204,8 @@ export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1
  * runs/h1_duelw1127 Muscat t160: the Commercial Hub pillaged, "Build City
  * District" submitted on it at 5469.0). T: an improvement's the research and civics AIs' turns to
  * its technology and civic (the larger), a district's its build turns plus
- * those. A flood's turns as the AI expects them (`floodHazardTurns`); LAB: the
- * eruption's turns unread, none; an inland
+ * those. A flood's and an eruption's turns as the AI expects them
+ * (`floodHazardTurns`, `eruptionHazardTurns`); an inland
  * city-state on a river trains ships (0x1c77c0's sea test unread).
  */
 export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuildFacts, buildings: readonly number[]): PlotEval[] {
@@ -244,7 +244,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       resource: tile.resource && !hidden(tile.resource) ? gameTypeOf('resource', tile.resource, 'RESOURCE_') : null,
       feature: tile.feature ? installFeature(tile.feature) : null,
       floodTurns: floodHazardTurns(state, plot),
-      eruptionTurns: null,
+      eruptionTurns: eruptionHazardTurns(state, plot),
       appeal: tileAppeal(map, tile, camps, gp),
       besideHousingDistrict: neighbors(map, tile).some((n) => n.district !== null && (DISTRICTS[n.district]?.housing ?? 0) > 0),
       unitCost: (u) => (u === 'UNIT_BUILDER' ? UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * cs.buildersTrained

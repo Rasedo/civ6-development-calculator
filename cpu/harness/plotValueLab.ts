@@ -48,7 +48,7 @@ import { GAME_COST_ESCALATION, gameProgressPct, scaleByGameSpeed } from '../data
 import { neighbors } from '../../world/hex';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from '../core/appeal';
-import { floodHazardTurns } from '../core/disasters';
+import { eruptionHazardTurns, floodHazardTurns } from '../core/disasters';
 import { loadCityBuildCentre, loadCityBuildPlots } from './cityBuildLog';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
 
@@ -175,11 +175,8 @@ for (const rec of recs) {
         resource: tile.resource && (!RESOURCES[tile.resource]?.revealTech || r.techs.includes(RESOURCES[tile.resource].revealTech!))
           ? gameTypeOf('resource', tile.resource, 'RESOURCE_') : null,
         feature: tile.feature ? installFeature(tile.feature) : null,
-        // LAB: the eruption's turns as the logged values give them (an
-        // improvement's beside a volcano at 31 in runs/h1_duelv1127); its
-        // computation is unread
         floodTurns: floodHazardTurns(state, tile.index),
-        eruptionTurns: neighbors(state.map, tile).some((n) => (n as unknown as { volcano?: boolean }).volcano) ? 31 * FX : null,
+        eruptionTurns: eruptionHazardTurns(state, tile.index),
         appeal: tileAppeal(state.map, tile),
         besideHousingDistrict: neighbors(state.map, tile).some((n) => n.district !== null && (DISTRICTS[n.district]?.housing ?? 0) > 0),
         unitCost: (u) => (u === 'UNIT_BUILDER' ? UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * builders
