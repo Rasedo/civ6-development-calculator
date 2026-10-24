@@ -65,6 +65,7 @@ import { AGE_GOLDEN } from '../data/seats';
 import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, MINOR_CATCHUP_PCT } from '../data/cityStates';
 import { researchCost } from '../core/economy';
 import { PROMO_CLASSES } from '../data/promotions';
+import { unitPromoRows } from '../core/promotions';
 import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { hexDistance, neighborTile } from '../../world/hex';
@@ -2615,7 +2616,14 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       level: num(u.level),
       ...(num(u.formation) > 0 ? { formation: num(u.formation) } : {}),
       ...(bool(u.embarked) ? { embarked: true } : {}),
+      ...(num(u.fortify) > 0 ? { fortifyTurns: num(u.fortify) } : {}),
     };
+    // the promotions it holds, as its own class list's bits
+    const rows = unitPromoRows(unit);
+    for (const p of u.promotions ?? []) {
+      const k = rows.findIndex((r) => r.id === cat.unitPromotions?.[p]?.replace(/^PROMOTION_/, ''));
+      if (k >= 0) unit.promos = (unit.promos ?? 0) | (1 << k);
+    }
     const levy = history?.levied.get(`${u.owner}:${u.id}`);
     if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
     state.units.push(unit);
@@ -2682,8 +2690,10 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const stockOverCap = history ? importPower(ctx, rec, state, seatOfGame, history) : new Set<number>();
   // a boosted item neither held nor current holds its boost as parked
   // progress (`markBoost`); the record shows no item's progress but the
-  // current one's, so any research parked on it before is unread
-  for (const s of state.seats) {
+  // current one's, so any research parked on it before is unread — a
+  // major's, a city-state's and the Free Cities' alike (runs/h1_duelw1121
+  // Ayutthaya t2: Sailing boosted, its 9 parked, 7 turns as logged)
+  for (const s of [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
     const r = s.research;
     for (const id of r.boosted) {
       if (r.techs.includes(id) || r.civics.includes(id) || r.tech === id || r.civic === id || !BOOSTS[id]) continue;

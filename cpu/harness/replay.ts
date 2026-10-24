@@ -83,7 +83,7 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -124,6 +124,9 @@ import { StrategyProbe, recordMilitary, strategyMarkdown, type ContactTally, typ
 import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsAi';
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
+import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
+import { MemoryLogs, readMemory } from './aiMemory';
+import { NO_SCORE } from '../core/aiPolicyValue';
 
 /** what became of one decision */
 type Outcome = 'applied' | 'fallback' | 'refused';
@@ -255,6 +258,17 @@ interface Ctx {
   civicAi: Record<ResearchParty, ResearchAiTally>;
   civicBefore: Map<number, string | null>;
   aiCivicLog: Map<string, Map<string, { score: number; turns: number }>>;
+  /** the same log's Policies rows: per `${turn}:${player}` each card's score */
+  aiPolicyLog: Map<string, Map<string, number>>;
+  /** the AI's decisions scored against the game's (`scoreDecision`), and the
+   *  turn the pair's AI plays (record t's) */
+  scores: DecisionScores;
+  turn: number;
+  /** the game's logs of the AI's memory (`aiMemory.ts`), and per minor or
+   *  barbarian player whether its memory at the end of its turn before
+   *  equalled them, which this pair's decisions read */
+  memoryLogs: MemoryLogs;
+  memoryClean: Map<number, boolean>;
   civicScores: Record<ResearchParty, ResearchScoreTally>;
   majorCivicEntries: Map<number, CivicEntry[]>;
   /** the game's city build value tables (`<dump>.logs/AI_CityBuild.csv`'s
@@ -334,26 +348,48 @@ export interface ResearchScoreTally {
   first?: { turn: number; player: number; tech: string; log: [number, number]; ours: [number, number] };
 }
 
-/** the game's AI log of civics beside the dump, or an empty map */
-function loadAiCivicLog(dumpPath: string): Map<string, Map<string, { score: number; turns: number }>> {
-  const out = new Map<string, Map<string, { score: number; turns: number }>>();
+/** the game's AI log of civics and policies beside the dump (empty maps
+ *  without one): per `${turn}:${player}` every Civic row it scored, and every
+ *  Policies row (the card's score, those above 0) */
+function loadAiCivicLog(dumpPath: string): { civics: Map<string, Map<string, { score: number; turns: number }>>; policies: Map<string, Map<string, number>> } {
+  const civics = new Map<string, Map<string, { score: number; turns: number }>>();
+  const policies = new Map<string, Map<string, number>>();
   let text = '';
   try {
     text = readFileSync(dumpPath.replace(/\.jsonl$/, '.logs/AI_GovtPolicies.csv'), 'utf8');
   } catch {
-    return out;
+    return { civics, policies };
   }
   for (const line of text.split('\n').slice(1)) {
     const p = line.split(',').map((x) => x.trim());
+    const k = `${p[0]}:${p[1]}`;
+    if (p[2] === 'Policies') {
+      (policies.get(k) ?? (policies.set(k, new Map()), policies.get(k)!)).set(p[3], Number(p[4]));
+      continue;
+    }
     if (p[2] !== 'Civic') continue;
     const eid = engineId('civic', p[3], 'CIVIC_', CIVICS);
     if (!eid) continue;
-    const k = `${p[0]}:${p[1]}`;
-    const rows = out.get(k) ?? new Map();
+    const rows = civics.get(k) ?? new Map();
     rows.set(eid, { score: Number(p[4]), turns: Number(p[5]) });
-    out.set(k, rows);
+    civics.set(k, rows);
   }
-  return out;
+  return { civics, policies };
+}
+
+/** a minor's policy scores of its civics AI's turn against the log's
+ *  Policies rows of the turn: every row logged, and every score of ours above
+ *  0 the log leaves out */
+function policyScoreAgainstLog(ctx: Ctx, kind: ResearchParty, turn: number, player: number, scores: ReadonlyMap<string, number>): void {
+  const logged = ctx.aiPolicyLog.get(`${turn}:${player}`);
+  if (!logged) return;
+  for (const [policy, g] of logged) {
+    const ours = (scores.get(policy) ?? NO_SCORE) / 256;
+    score(ctx, `policyScore.${kind}`, turn, player, `p${player} ${policy}`, Math.abs(ours - g) <= 0.051, r3(ours), g);
+  }
+  for (const [policy, v] of scores) {
+    if (v > 0 && !logged.has(policy)) score(ctx, `policyScore.${kind}`, turn, player, `p${player} ${policy}`, false, r3(v / 256), 'unlogged');
+  }
 }
 
 /** the research and civics AIs' parties: the majors, the city-states, the
@@ -373,8 +409,10 @@ function civicScoreAgainstLog(ctx: Ctx, kind: ResearchParty, turn: number, playe
     t.rows += 1;
     const sc = e.score / 256;
     if (e.turns === g.turns) t.turns += 1;
-    if (Math.abs(sc - g.score) <= 0.051) t.score += 1;
+    const same = Math.abs(sc - g.score) <= 0.051;
+    if (same) t.score += 1;
     else if (!t.first) t.first = { turn, player, tech: civic, log: [g.score, g.turns], ours: [Math.round(sc * 10) / 10, e.turns] };
+    score(ctx, `civicScore.${kind}`, turn, player, `p${player} ${civic}`, same, r3(sc), g.score);
     if (TRACE.has('civicScores')) console.error(`t${turn} civic score ${kind} p${player} ${civic} log ${g.score}@${g.turns} ours ${sc.toFixed(1)}@${e.turns}`);
   }
 }
@@ -385,6 +423,7 @@ function tallyCivicAi(ctx: Ctx, kind: ResearchParty, turn: number, player: numbe
   t.choices += 1;
   if (ours === record) t.record += 1;
   if (!t.first && ours !== record) t.first = { turn, player, ours, record, log: null };
+  score(ctx, `civic.${kind}`, turn, player, `p${player}`, ours === record, ours, record);
   if (TRACE.has('civicAi')) console.error(`t${turn} civic ${kind} p${player} ours ${ours} record ${record}`);
 }
 
@@ -401,8 +440,10 @@ function scoreAgainstLog(ctx: Ctx, kind: ResearchParty, turn: number, player: nu
     t.rows += 1;
     const sc = e.score / 256;
     if (e.turns === g.turns) t.turns += 1;
-    if (Math.abs(sc - g.score) <= 0.051) t.score += 1;
+    const same = Math.abs(sc - g.score) <= 0.051;
+    if (same) t.score += 1;
     else if (!t.first) t.first = { turn, player, tech, log: [g.score, g.turns], ours: [Math.round(sc * 10) / 10, e.turns] };
+    score(ctx, `researchScore.${kind}`, turn, player, `p${player} ${tech}`, same, r3(sc), g.score);
     if (TRACE.has('researchScores')) console.error(`t${turn} research score ${kind} p${player} ${tech} log ${g.score}@${g.turns} ours ${sc.toFixed(1)}@${e.turns}`);
   }
 }
@@ -423,8 +464,10 @@ function tallyResearchAi(ctx: Ctx, kind: ResearchParty, turn: number, player: nu
   if (logged) {
     t.logged += 1;
     if (ours === logged.tech) t.log += 1;
+    score(ctx, `research.${kind}.log`, turn, player, `p${player}`, ours === logged.tech, ours, logged.tech);
   }
   if (!t.first && ours !== record) t.first = { turn, player, ours, record, log: logged?.tech ?? null };
+  score(ctx, `research.${kind}`, turn, player, `p${player}`, ours === record, ours, record);
   if (TRACE.has('researchAi')) console.error(`t${turn} research ${kind} p${player} ours ${ours} record ${record} log ${logged?.tech ?? '-'} goal ${logged?.goal ?? '-'}`);
 }
 
@@ -434,38 +477,27 @@ function tallyResearchAi(ctx: Ctx, kind: ResearchParty, turn: number, player: nu
 const TRACE = new Set((process.env.REPLAY_TRACE ?? '').split(',').filter(Boolean));
 let traceTurn = 0;
 let unitsLog: Map<string, Record<string, number[]>> | undefined;
-let armyLog: Map<string, string[]> | undefined;
-
-/** AI_Knowledge.csv's ARMY lines by `${turn}:${player}`: per line (the
- *  players in the game's list, the line's index the player) and type
- *  `${player}|${type} ${count} ${oldest age}` */
-function loadArmyLog(dumpPath: string): Map<string, string[]> {
-  const out = new Map<string, string[]>();
-  const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_Knowledge.csv');
-  if (!existsSync(path)) return out;
-  const index = new Map<string, number>();
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
-    const c = line.split(',');
-    if (c[2]?.trim() !== 'ARMY') continue;
-    const key = `${c[0].trim()}:${c[1].trim()}`;
-    const k = index.get(key) ?? 0;
-    index.set(key, k + 1);
-    const list = out.get(key) ?? (out.set(key, []), out.get(key)!);
-    for (const cell of c.slice(4)) {
-      const m = /^\s*UNIT_(\S+) (\d+) (\d+)/.exec(cell);
-      if (m) list.push(`${k}|${m[1]} ${m[2]} ${m[3]}`);
-    }
-  }
-  // the last two lines are the Free Cities' and the barbarians'
-  for (const [key, list] of out) {
-    const n = index.get(key)!;
-    out.set(key, list.map((x) => { const k = Number(x.slice(0, x.indexOf("|"))); return `${k === n - 1 ? 63 : k === n - 2 ? 62 : k}${x.slice(x.indexOf("|"))}`; }));
-  }
-  return out;
+/** a decision of `player` scored, beside whether its memory was clean as
+ *  the pair opened (`ctx.memoryClean`) */
+function score(ctx: Ctx, kind: string, turn: number, player: number | undefined, subject: string, equal: boolean,
+  ours: unknown, game: unknown): void {
+  scoreDecision(ctx.scores, kind, turn, subject, equal, ours, game, player === undefined ? undefined : ctx.memoryClean.get(player));
 }
+
+/** a record unit key's owner (`owner:id`) */
+const ownerOf = (key: string) => Number(key.split(':')[0]);
+
+/** the minors' and the barbarians' decisions a count scores (`scoreDecision`):
+ *  applied the game's, a fallback another */
+const COUNT_SCORES: Record<string, string> = {
+  'minorAi:improve': 'builder.improve', 'minorAi:unitNew': 'unit.trained', 'minorAi:unit': 'unit.trained', 'minorAi:buy': 'unit.bought',
+  'minorAi:promote': 'unit.promote', 'barb:unitNew': 'barb.unit', 'barb:unit': 'barb.unit',
+};
 
 function count(ctx: Ctx, kind: string, out: Outcome, player?: number, why?: string): Outcome {
   if (out !== 'applied' && (TRACE.has(kind) || TRACE.has(kind.split(':')[0]))) console.error(`t${traceTurn} ${kind} ${out} p${player ?? '-'} ${why ?? ''}`);
+  const scored = COUNT_SCORES[kind];
+  if (scored && out !== 'refused') score(ctx, scored, ctx.turn, player, `p${player ?? '-'} ${kind}`, out === 'applied', why ?? '', undefined);
   const t = ctx.tally.get(kind) ?? { applied: 0, fallback: 0, refused: 0 };
   t[out] += 1;
   ctx.tally.set(kind, t);
@@ -641,16 +673,19 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   for (const [u, at] of moved) u.tileIndex = at;
   matchNewUnits(ctx, b);
   for (const key of ctx.barbNew) {
-    if (unitOf(ctx, key)) continue;
+    if (unitOf(ctx, key)) {
+      count(ctx, 'barb:unitNew', 'applied', ctx.playerOfSeat.get(BARB_SEAT));
+      continue;
+    }
     const made = spawnRecorded(ctx, b, key);
     if (made) adoptByTribe(state, made);
-    count(ctx, 'barb:unitNew', 'fallback', ctx.playerOfSeat.get(BARB_SEAT));
+    count(ctx, 'barb:unitNew', 'fallback', ctx.playerOfSeat.get(BARB_SEAT), `${key} ${made?.type ?? ''}: no tribe raised it`);
   }
   const mapped = new Set(ctx.units.values());
   for (const u of [...state.units]) {
     if (!isBarbSeat(u.seat) || before.has(u) || mapped.has(u)) continue;
     disbandUnit(state, u.id);
-    count(ctx, 'barb:unit', 'fallback', ctx.playerOfSeat.get(BARB_SEAT));
+    count(ctx, 'barb:unit', 'fallback', ctx.playerOfSeat.get(BARB_SEAT), `${u.type}: the game raised none`);
   }
   for (const [key, u] of ctx.units) {
     if (isBarbSeat(u.seat) && !before.has(u) && state.units.includes(u)) u.slot = slotOfKey(key);
@@ -833,10 +868,12 @@ function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<
     const same = game === undefined || game === tacticalCategory(m.move);
     if (same) t.move += 1;
     if (!same && t.firstMove === undefined) t.firstMove = turn;
+    if (game !== undefined) score(ctx, 'barb.move.family', turn, ownerOf(key), `${key} ${u.type}`, same, tacticalCategory(m.move), game);
     const want = at.get(key);
     const end = ended.get(u);
     if (want === undefined || end === undefined) continue;
     t.plotOf += 1;
+    score(ctx, 'barb.move.plot', turn, ownerOf(key), `${key} ${u.type} (${game ?? m.move})`, end === want, end, want);
     if (end === want) {
       t.plot += 1;
       count(ctx, 'barb:move', 'applied');
@@ -1044,10 +1081,13 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: Readonl
     const same = game === undefined || game === tacticalCategory(m.move);
     if (same) t.move += 1;
     if (!same && t.firstMove === undefined) t.firstMove = turn;
+    const party = u.seat === FREE_SEAT ? 'freeCities' : 'cityState';
+    if (game !== undefined) score(ctx, `${party}.move.family`, turn, ownerOf(key), `${key} ${u.type}`, same, tacticalCategory(m.move), game);
     const want = at.get(key);
     const end = ended.get(u);
     if (want === undefined || end === undefined) continue;
     t.plotOf += 1;
+    score(ctx, `${party}.move.plot`, turn, ownerOf(key), `${key} ${u.type} (${game ?? m.move})`, end === want, end, want);
     if (end === want) {
       t.plot += 1;
       count(ctx, 'minorAi:move', 'applied');
@@ -3126,6 +3166,7 @@ function minorBuilds(ctx: Ctx, b: TurnRecord, tally: MinorBuildTally): void {
     const k = (tally.byKind[kind] ??= { turns: 0, same: 0 });
     tally.turns += 1;
     k.turns += 1;
+    score(ctx, 'cityState.build', b.turn - 1, ctx.playerOfSeat.get(cs.seat), `p${ctx.playerOfSeat.get(cs.seat)} ${cs.name}`, ours === record, ours || 'none', record || 'none');
     if (ours === record) {
       tally.same += 1;
       k.same += 1;
@@ -3133,6 +3174,19 @@ function minorBuilds(ctx: Ctx, b: TurnRecord, tally: MinorBuildTally): void {
       tally.first ??= { turn: b.turn, player: ctx.playerOfSeat.get(cs.seat) ?? -1, ours, record };
       if (tally.samples.length < 60) tally.samples.push(`t${b.turn} p${ctx.playerOfSeat.get(cs.seat)} ${ours || "none"} / ${record || "none"} (progress ${Math.round(cs.prodProgress ?? 0)})`);
     }
+  }
+}
+
+/** THE FREE CITIES' BUILDS: each Free City's queue head after its turn (its
+ *  city AI's pick) against record t+1's as the importer reads it; nothing
+ *  imposed */
+function freeBuilds(ctx: Ctx, b: TurnRecord): void {
+  for (const c of ctx.state.freeSeat?.cities ?? []) {
+    const r = ctx.next.state.freeSeat?.cities.find((x) => x.centerIndex === c.centerIndex);
+    if (!r) continue;
+    const ours = c.queue[0] ? itemKey(c.queue[0]) : 'none';
+    const game = r.queue[0] ? itemKey(r.queue[0]) : 'none';
+    score(ctx, 'freeCities.build', b.turn - 1, ctx.playerOfSeat.get(FREE_SEAT), recordCityName(ctx, FREE_SEAT, c.id), ours === game, ours, game);
   }
 }
 
@@ -3580,6 +3634,15 @@ export interface ReplayReport {
   settleAi?: SettleTallies;
   /** the majors' operations beside the game's operation log */
   operationsAi?: OperationsTally;
+  /** the AI's decisions one by one against the game's, by decision kind
+   *  (`aiScore.ts`) */
+  scores: DecisionScores;
+  /** the AI's memory against the game's logs, per memory kind: the
+   *  player-turns compared, those equal (`aiMemory.ts`) */
+  memory: DecisionScores;
+  /** the pairs started from the record's world, the AI's memory carried
+   *  (`aiScore`) */
+  perTurnWorld?: boolean;
 }
 
 /** one game move's tally (`tallyTactics`): the unit-turns, those the AI
@@ -3715,7 +3778,153 @@ function turnSeed(rec: TurnRecord): number | undefined {
   return Number.isFinite(s) ? s >>> 0 : undefined;
 }
 
+/**
+ * THE AI'S MEMORY: what the AI keeps across turns that no record holds,
+ * carried from our own turn into the next pair's world (`perTurnWorld`).
+ * Per seat (the majors', the city-states', the Free Cities', the
+ * barbarians'): the unit pool, the knowledge base (army records and their
+ * ageing, the camps), the Combat Desire, the city AI (events' slots, trees,
+ * contracts, reservations), the operation manager and its next id, the
+ * strength its turn start stored. Per research: the research AI's goal, its
+ * analyses, its turns left, the civics AI's government values and best cards,
+ * the minors' catch-up counts. Per city-state: its city AI's item value, its
+ * Food focus, trade list and value, UNITS table, resource counts, economic
+ * memory (savings), threat, enemy at the gates, growth forecast, revealed
+ * plots, standing army's lack. Per Free City: its threat, enemy at the gates
+ * and raid. Per unit: its id, its pool slot, its DEFENDER type. The
+ * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
+ * step's start and scout throttle. The non-majors' explored plots.
+ */
+const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'unitStrength'] as const;
+const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'aiLeft', 'aiLeftSeen',
+  'techCatchUp', 'civicCatchUp'] as const;
+const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'unitValues', 'resourceCounts',
+  'economy', 'threat', 'threatNear', 'aiGrowth', 'revealed', 'standingArmyShort', 'explored'] as const;
+const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid'] as const;
+const UNIT_MEMORY = ['slot', 'aiDefender'] as const;
+const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;
+/** THE RULES' STORES NO RECORD SHOWS, carried the same way: the research
+ *  and culture overflow a completion left for the next turn's yield
+ *  (runs/h1_duelw1121 Hunza t7: Pottery's 1.5 over, Astrology 7 turns as
+ *  logged), the barbarian kills a boost counts, the wars' clocks; a
+ *  city-state's production overflow, its powered project and repair waits,
+ *  its fuel shortfall, the trade routes the record's routes laid (the
+ *  importer reads a city-state's none), the turn its city was founded */
+const GAME_STORES = ['warTurns'] as const;
+const SEAT_STORES = ['barbKills'] as const;
+const RESEARCH_STORES = ['techOverflow', 'civicOverflow'] as const;
+const MINOR_STORES = ['prodOverflow', 'fullyPowered', 'repairWait', 'fuelShort', 'tradeRoutes', 'foundedTurn'] as const;
+
+/** the named fields of `from` onto `to`, a field `from` lacks dropped */
+function carryFields(from: object, to: object, keys: readonly string[]): void {
+  const f = from as Record<string, unknown>;
+  const t = to as Record<string, unknown>;
+  for (const k of keys) {
+    if (f[k] === undefined) delete t[k];
+    else t[k] = f[k];
+  }
+}
+
+/** each seat starts on the plots the record says it revealed
+ *  (`TurnRecord.revealed`), else on what its own plots, cities and units
+ *  reveal (`initFog`); the players' handicaps; the moments the history
+ *  holds */
+function importedWorld(state: GameState, imp: Imported, rec: TurnRecord, history: History): void {
+  const read = state.seats.map((s) => s.explored);
+  initFog(state);
+  state.seats.forEach((s, i) => { if (read[i]?.length) s.explored = read[i]; });
+  for (const p of rec.players) {
+    const seat = imp.seatOfPlayer.get(p.id);
+    if (seat !== undefined && state.seats[seat]) state.seats[seat].handicap = LAB_HANDICAP;
+  }
+  seedMoments(state, imp, history);
+}
+
+/**
+ * THE PAIR'S WORLD IS THE RECORD'S (`--aiscore`): record t as the importer
+ * read it (`imp`, the import the pair before compared with) replaces the
+ * engine's state, and the AI's memory (`SEAT_MEMORY` ...) comes over from
+ * the engine's own last turn. A unit the record and the engine both hold
+ * keeps the engine's id (the memory names units by id) and its memory; the
+ * others take fresh ids. The rules' stores no record shows (`SEAT_STORES`,
+ * `RESEARCH_STORES`, `MINOR_STORES`) come over too. A Free City both hold keeps the engine's city id,
+ * its plots and its grants with it. The replay's own carry-overs of the
+ * world (the production banked on items switched away from) start empty.
+ */
+function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, fromLog: boolean): void {
+  const { state } = ctx;
+  const world = deserialize(serialize(imp.state));
+  const live = new Set(state.units);
+  const was = new Map(ctx.units);
+  ctx.units = new Map();
+  const kept = new Set<Unit>();
+  let k = 0;
+  for (const r of a.units) {
+    if (!imp.seatOfPlayer.has(r.owner) || !engineRowOf(ctx.cat, 'unit', r.type)) continue;
+    const u = world.units[k++];
+    const key = `${r.owner}:${r.id}`;
+    const old = was.get(key);
+    if (old && live.has(old) && old.seat === u.seat) {
+      u.id = old.id;
+      carryFields(old, u, UNIT_MEMORY);
+      kept.add(u);
+    }
+    ctx.units.set(key, u);
+  }
+  let nextId = state.nextUnitId;
+  for (const u of world.units) if (!kept.has(u)) u.id = nextId++;
+  world.nextUnitId = nextId;
+  const seatPair = (from: Seat, to: Seat, minor: boolean) => {
+    carryFields(from, to, [...SEAT_MEMORY, ...SEAT_STORES]);
+    carryFields(from.research, to.research, [...RESEARCH_MEMORY, ...RESEARCH_STORES]);
+    if (minor) carryFields(from, to, [...MINOR_MEMORY, ...MINOR_STORES]);
+    for (const c of to.cities ?? []) {
+      const o = from.cities?.find((x) => x.centerIndex === c.centerIndex);
+      if (o) carryFields(o, c, CITY_MEMORY);
+    }
+  };
+  world.seats.forEach((s, i) => { if (state.seats[i]) seatPair(state.seats[i], s, false); });
+  for (const cs of world.cityStates) {
+    const o = state.cityStates.find((x) => x.id === cs.id);
+    if (o) seatPair(o, cs, true);
+  }
+  seatPair(state.barbSeat, world.barbSeat, true);
+  if (world.freeSeat && state.freeSeat) {
+    const free = world.freeSeat;
+    const idOf = new Map<number, number>();
+    let nextCity = Math.max(state.freeSeat.nextCityId, free.nextCityId);
+    for (const c of free.cities) idOf.set(c.id, state.freeSeat.cities.find((x) => x.centerIndex === c.centerIndex)?.id ?? nextCity++);
+    for (const c of free.cities) c.id = idOf.get(c.id)!;
+    free.nextCityId = nextCity;
+    for (const t of world.map.tiles) if (t.ownerSeat === FREE_SEAT && idOf.has(t.ownerCity)) t.ownerCity = idOf.get(t.ownerCity)!;
+    for (const u of world.units) if (u.freeCity !== undefined && idOf.has(u.freeCity)) u.freeCity = idOf.get(u.freeCity)!;
+    seatPair(state.freeSeat, free, true);
+  }
+  // the memory the game's logs hold whole taken from them instead: the
+  // knowledge bases' camps as the turn before ended (`--memory log`)
+  if (fromLog) {
+    for (const s of [...world.cityStates, ...(world.freeSeat ? [world.freeSeat] : []), world.barbSeat]) {
+      const pid = imp.playerOfSeat.get(s.seat);
+      const camps = pid === undefined ? undefined : ctx.memoryLogs.camps.get(`${a.turn - 1}:${pid}`);
+      const plots = (camps ?? []).map((xy) => { const [x, y] = xy.split(':').map(Number); return y * ctx.W + x; });
+      if (plots.length) s.campsKnown = plots;
+      else delete s.campsKnown;
+    }
+  }
+  carryFields(state, world, [...GAME_MEMORY, ...GAME_STORES]);
+  for (const key of Object.keys(state)) if (!(key in world)) delete (state as unknown as Record<string, unknown>)[key];
+  Object.assign(state, world);
+  importedWorld(state, imp, a, history);
+  ctx.retained = new Map();
+}
+
 export function runReplay(dumpPath: string, opts: { from?: number; to?: number; source?: ActionSource;
+  /** each pair from the record's world, the AI's memory carried
+   *  (`perTurnWorld`): the AI scored turn by turn */
+  aiScore?: boolean;
+  /** with `aiScore`, the memory the game's logs hold whole (the knowledge
+   *  bases' camps) taken from them each pair instead of carried */
+  memoryFromLog?: boolean;
   /** called after each pair is compared, with the engine state and record t+1 */
   onPair?: (state: GameState, b: TurnRecord, decisions: Decision[]) => void } = {}): ReplayReport {
   const { cat, recs } = loadRecords(dumpPath, opts.from ?? -Infinity, opts.to ?? Infinity);
@@ -3736,7 +3945,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     researchScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } },
     civicAi: { major: newResearchTally(), minor: newResearchTally(), free: newResearchTally() },
     civicScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } }, barbTactics: {},
-    minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 }, minorBuilds: { turns: 0, same: 0, byKind: {}, samples: [] }, minorResearch: { rows: [], majors: [], food: [] } };
+    minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 }, minorBuilds: { turns: 0, same: 0, byKind: {}, samples: [] }, minorResearch: { rows: [], majors: [], food: [] },
+    scores: newScores(), memory: newScores(), ...(opts.aiScore ? { perTurnWorld: true } : {}) };
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
   const first = importTurn(recs[0], cat, history);
@@ -3761,17 +3971,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const minorBought = new Map<Unit, { cityState: CityState; price: number }>();
   traceMinorPurchases((cityState, u, price) => minorBought.set(u, { cityState, price }));
   const state = first.state;
-  // each seat starts on the plots the record says it revealed
-  // (`TurnRecord.revealed`), else on what its own plots, cities and units
-  // reveal (`initFog`); its moments read them
-  const read = state.seats.map((s) => s.explored);
-  initFog(state);
-  state.seats.forEach((s, i) => { if (read[i]?.length) s.explored = read[i]; });
-  for (const p of recs[0].players) {
-    const seat = first.seatOfPlayer.get(p.id);
-    if (seat !== undefined && state.seats[seat]) state.seats[seat].handicap = LAB_HANDICAP;
-  }
-  seedMoments(state, first, history);
+  importedWorld(state, first, recs[0], history);
   // the city-states' city AI ran on the game's turns before the import's:
   // its first look ran no events (none contracted), its savings took the
   // treasury; it stands as that turn left it
@@ -3817,6 +4017,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const freePlayer = first.playerOfSeat.get(FREE_SEAT);
   if (freePlayer !== undefined) opsSeats.set(FREE_SEAT, freePlayer);
   const operationsAi = new OperationsProbe(dumpPath, opsSeats, cat, first.seatOfPlayer, aiInputs);
+  const govtLog = loadAiCivicLog(dumpPath);
   // the wars of the AI majors' diplomatic sending read their operations' AI
   if (operationsAi.active) sender.war = operationsAi.warHooks();
   const ctx: Ctx = {
@@ -3825,7 +4026,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
-    civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
+    civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies, majorCivicEntries: new Map(),
+    scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath),
+    // a game from its first turn opens on no memory, the game's as well
+    memoryClean: new Map([...first.playerOfSeat].filter(([seat]) => minorAiSeat(seat) || isBarbSeat(seat)).map(([, p]) => [p, recs[0].turn <= 1] as const)),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
     governorAi: new GovernorProbe(dumpPath, aiSeats, () => strategies.followedNow()),
     cityBuildAi: new CityBuildProbe(dumpPath, aiSeats, aiInputs),
@@ -3839,6 +4043,18 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     let e = ctx.minorOps.get(seat);
     if (!e) ctx.minorOps.set(seat, (e = { lines: [], evals: [] }));
     (candidate ? e.evals : e.lines).push(line);
+  });
+  // the operations each AI party started, against the log's
+  operationsAi.onStarts = (turn, player, log, ours) => {
+    const seat = ctx.seatOfPlayer.get(player) ?? NO_SEAT;
+    const party = isCityStateSeat(seat) ? 'cityState' : seat === FREE_SEAT ? 'freeCities' : isBarbSeat(seat) ? 'barbarians' : 'major';
+    const same = log.length === ours.length && log.every((l, k) => l === ours[k]);
+    score(ctx, `op.start.${party}`, turn, player, `p${player}`, same, ours.join('; ') || 'none', log.join('; ') || 'none');
+  };
+  // the minors' policy scores of their civics AI's turn, against the log's
+  traceMinorPolicyScores((seat, scores) => {
+    const player = ctx.playerOfSeat.get(seat);
+    if (player !== undefined) policyScoreAgainstLog(ctx, seat === FREE_SEAT ? 'free' : 'minor', ctx.turn, player, scores);
   });
   // ...and the Free Cities': their raid's start in the pair's actions, its
   // run in their units' turn
@@ -3881,10 +4097,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       report.stopped = `no record of turn ${a.turn + 1}`;
       break;
     }
+    if (opts.aiScore && i > 0) perTurnWorld(ctx, a, ctx.next, history, opts.memoryFromLog ?? false);
     if (state.turn !== a.turn) {
       report.stopped = `engine at turn ${state.turn}, record at ${a.turn}`;
       break;
     }
+    ctx.turn = a.turn;
     const baseStep = transitionChecks(a, b, cat, history, prev);
     advanceHistory(history, b, cat);
     const recordA = ctx.next;
@@ -4137,6 +4355,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     }
     undoMinorPlots(ctx, improvements, charges);
     minorBuilds(ctx, b, report.minorBuilds);
+    freeBuilds(ctx, b);
     scoreMinorResearch(ctx, b, report.minorResearch);
     // REPLAY_TRACE=minorProd: each city-state's item, purse, units and research after the engine's turn
     if (TRACE.has('minorProd')) {
@@ -4269,26 +4488,25 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
             .filter(([, g, o]) => (g > -9000 || o > -9000) && Math.abs(g - o) > 0.0051).map(([u, g, o]) => `${u} ${g}/${o.toFixed(2)}`);
           if (off.length) console.error(`t${a.turn} minorUnits p${pid} ${off.join(' ')}`);
         }
-        // REPLAY_TRACE=minorKb: its knowledge base's army records (per player
-        // and type the count and the oldest's age) against AI_Knowledge.csv's
-        // ARMY lines of the turn
-        if (TRACE.has('minorKb') && pid !== undefined) {
-          armyLog ??= loadArmyLog(dumpPath);
-          const logged = armyLog.get(`${a.turn}:${pid}`) ?? [];
-          const by = new Map<string, { n: number; age: number }>();
-          for (const r of cs.armyKnown ?? []) {
-            const k = `${ctx.playerOfSeat.get(r.owner) ?? r.owner}|${r.type}`;
-            const e = by.get(k) ?? (by.set(k, { n: 0, age: 0 }), by.get(k)!);
-            e.n += 1;
-            e.age = Math.max(e.age, a.turn - r.seen);
-          }
-          const ours = [...by].map(([k, e]) => `${k} ${e.n} ${e.age}`).sort();
-          const theirs = logged.filter((x) => !x.includes("|SETTLER ")).sort();
-          if (ours.join(',') !== theirs.join(',')) {
-            console.error(`t${a.turn} minorKb p${pid} ours ${ours.filter((x) => !theirs.includes(x)).join(',')} log ${theirs.filter((x) => !ours.includes(x)).join(',')}`);
-          }
-        }
       }
+    }
+    // THE AI'S MEMORY at its turn's end against the game's logs of the turn:
+    // per kind agreed or not, and per player whether all agreed, which the
+    // next pair's decisions read
+    {
+      const clean = new Map<number, boolean>();
+      for (const s of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : []), state.barbSeat]) {
+        const pid = ctx.playerOfSeat.get(s.seat);
+        if (pid === undefined) continue;
+        const reads = readMemory(ctx.memoryLogs, s, pid, a.turn, ctx.W, (seat) => ctx.playerOfSeat.get(seat) ?? seat);
+        for (const m of reads) {
+          scoreDecision(report.memory, m.kind, a.turn, `p${pid}`, m.equal, m.ours, m.game);
+          // REPLAY_TRACE=memory: each kind that differs
+          if (!m.equal && TRACE.has('memory')) console.error(`t${a.turn} memory p${pid} ${m.kind} ours ${m.ours} | log ${m.game}`);
+        }
+        clean.set(pid, reads.every((m) => m.equal));
+      }
+      ctx.memoryClean = clean;
     }
     // the city-states' research AI: each choice its turn made, against the
     // research record t+1 shows
@@ -4399,6 +4617,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdLevies(false);
   holdEraOpening(false);
   traceMinorPurchases(null);
+  traceMinorPolicyScores(null);
   holdBarbarians(null);
   holdCongressBallots(null);
   if (strategies.active) {
@@ -4510,6 +4729,8 @@ export function replayMarkdown(r: ReplayReport): string {
     const f = x.first;
     out.push(`| ${k} | ${x.rows} | ${x.turns} | ${x.score} | ${f ? `t${f.turn} p${f.player} ${f.tech} ${JSON.stringify(f.log)} / ${JSON.stringify(f.ours)}` : '-'} |`);
   }
+  out.push('', '## The AI\'s decisions against the game\'s', '', ...scoreTable(r.scores));
+  out.push('', '## The AI\'s memory against the game\'s logs', '', ...memoryTable(r.memory));
   out.push('', '## Decisions', '',
     '| kind | applied | imposed (fell back to the record) | refused |', '|---|---:|---:|---:|');
   for (const [k, d] of Object.entries(r.decisions)) out.push(`| ${k} | ${d.applied} | ${d.fallback} | ${d.refused} |`);

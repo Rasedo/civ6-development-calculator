@@ -5,6 +5,7 @@
  *
  *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> [--out <report.json>] [--from T] [--to T]
  *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --replay <replay.json> [--from T] [--to T]
+ *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --aiscore <out> [--memory log] [--from T] [--to T]
  *
  * Writes `<dump>.report.json` (or `--out`) and its Markdown digest
  * (`.report.md`): per check the counts (pass, fail, skip by reason, and how
@@ -14,7 +15,12 @@
  * the per-check table. A record whose counter moved during its dump is not
  * read. `--replay` runs the action replay instead (`replay.ts`): the engine
  * free from the first record on the recorded decisions, its report and
- * Markdown summary written to the named file.
+ * Markdown summary written to the named file. `--aiscore` runs the replay
+ * with each pair from the record's world and the AI's memory carried
+ * (`perTurnWorld`): the city-states', Free Cities' and barbarians' AI scored
+ * turn by turn, decision by decision (`aiScore.ts`), into `<out>.json` and
+ * `<out>.md`; `--memory log` takes the memory the game's logs hold whole
+ * from them each pair instead.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
@@ -26,6 +32,7 @@ import { turnDraws, type DrawLedger } from './drawLedger';
 import { lastStreamLedger } from './streamHold';
 import { replayMarkdown, runReplay } from './replay';
 import { EventPicks } from './eventPick';
+import { aiScoreMarkdown, memoryTable, scoreTable } from './aiScore';
 
 interface Tally {
   pass: number;
@@ -199,6 +206,17 @@ function main() {
   const { pos, opt } = args(process.argv.slice(2));
   const dump = pos[0];
   if (!dump) throw new Error('usage: run.ts <dump.jsonl> [--out file | --replay file] [--from T] [--to T]');
+  if (opt.aiscore) {
+    const r = runReplay(dump, { from: opt.from ? Number(opt.from) : undefined, to: opt.to ? Number(opt.to) : undefined, aiScore: true,
+      memoryFromLog: opt.memory === 'log' });
+    const stem = opt.aiscore.replace(/\.(json|md)$/, '');
+    const { perTurn, ...rest } = r;
+    writeFileSync(`${stem}.json`, JSON.stringify({ ...rest, pairs: perTurn.length }, null, 1) + '\n');
+    writeFileSync(`${stem}.md`, aiScoreMarkdown(r, perTurn.length));
+    console.log(`aiscore: ${perTurn.length} pairs, turns ${r.turns.join('-')}${r.stopped ? `; stopped: ${r.stopped}` : ''} -> ${stem}.json, ${stem}.md`);
+    console.log([...scoreTable(r.scores), '', ...memoryTable(r.memory)].join('\n'));
+    return;
+  }
   if (opt.replay) {
     const r = runReplay(dump, { from: opt.from ? Number(opt.from) : undefined, to: opt.to ? Number(opt.to) : undefined });
     // the engine's draws against the game's log, label by label

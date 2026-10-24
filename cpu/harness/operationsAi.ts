@@ -181,6 +181,9 @@ export class OperationsProbe {
   /** the plots the operation units ended on, by record key, awaiting t+1 */
   private ends: { family: string; player: number; turn: number; key: string; plot: number; type: string }[] = [];
   readonly tally = newTally();
+  /** each player-turn with an operation started, the log's Started lines
+   *  beside ours */
+  onStarts: ((turn: number, player: number, log: readonly string[], ours: readonly string[]) => void) | null = null;
 
   constructor(dumpPath: string, private readonly seats: ReadonlyMap<number, number>, private readonly cat: Catalog,
               private readonly seatOfPlayer: ReadonlyMap<number, number>,
@@ -440,6 +443,9 @@ export class OperationsProbe {
 
   private compare(turn: number, player: number, ours: string[]): void {
     const all = this.log.get(`${turn}:${player}`) ?? [];
+    const started = (ls: readonly string[]) => ls.filter((l) => kindOf(l) === 'started');
+    const [logStarts, ourStarts] = [started(all), started(ours)];
+    if (logStarts.length || ourStarts.length) this.onStarts?.(turn, player, logStarts, ourStarts);
     for (const family of FAMILIES) {
       const t = this.tally.families[family];
       const logs = all.filter((l) => inFamily(family, l));

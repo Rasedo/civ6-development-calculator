@@ -388,9 +388,19 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   r.civicAiEntries = civicAnalysis(state, seat, culture, {}, city()?.civic);
   const view = majorView(state);
   const scores = policyScores(view, seat);
+  policyTracer?.(seat, scores);
   r.civicGovValues = governmentValues(view, seat, scores);
   r.civicPolicyBest = civicPolicyBest(scores);
   if (!r.civic) takeCivic(r, civicChoice(state, seat, r.civicAiEntries, null, civicDraw(state)));
+}
+
+let policyTracer: ((seat: number, scores: ReadonlyMap<string, number>) => void) | null = null;
+
+/** The action replay's view of a minor's policy scores of its civics AI's
+ *  turn (the AI turn's policy jobs), scored against the game's log. Null
+ *  outside a replay. */
+export function traceMinorPolicyScores(fn: ((seat: number, scores: ReadonlyMap<string, number>) => void) | null): void {
+  policyTracer = fn;
 }
 
 /** Urban Defenses on a city-state: its centre's perimeter and its
