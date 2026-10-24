@@ -3171,12 +3171,13 @@
 - addr: 0x79f280
   kind: function
   name: the neighbours walk
-  status: READ
+  status: PARTLY
   readings:
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes:
     - radius 1 (0x6b1b0) with the functor @0xd71be8 (invoke 0x7b8a20 -> 0x79ed40), at the top level only
+    - "PARTLY: the walk and functor read; what the context's plot list changes is unread, and a port of the improvement half lowered the plot values lab's Farms (runs/h1_duelv1127 10,904 -> 9,376), so no confirming case"
   context:
     - ...the plot lacks the district; the modifiers (0x7a4b20); at the top level the neighbours (0x79f280).
   review: reviewed

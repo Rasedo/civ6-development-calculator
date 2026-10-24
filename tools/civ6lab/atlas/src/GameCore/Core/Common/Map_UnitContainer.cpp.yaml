@@ -3,6 +3,20 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x75800
+  final: 0x566c0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 74
+      value: "- The barbarians' look (Targets.cpp 0x7877e0) walks each seen plot's   units of the map's layer 0 (0x75800(map, 0) -> 0x75ce0): no Trader is   one of them — none of the barbarians' AI_Knowledge.csv AR"
+  impl: [cpu/core/tactical.ts:barb]
+  readings:
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
+  context:
+    - "...barians' look (Targets.cpp 0x7877e0) walks each seen plot's units of the map's layer 0 (0x75800(map, 0) -> 0x75ce0): no Trader is one of them — none of the barbarians' AI_Knowledge.cs..."
+  review: imported
 - addr: 0x75c50
   final: 0x56a20
   kind: function
@@ -17,8 +31,10 @@
     - recording: 1124
       turn: 1
       value: With them   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->   758 of 1,241, the game's plots within ours 862 -> 1,192.
+  impl: [cpu/core/disasters.ts:strikeUnits]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-96: an event's civilian kill spares a Trader — PARTLY READ"
   context:
     - "...x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0: combat, ranged or bombard above 0) — no doma..."
   review: imported
@@ -29,6 +45,7 @@
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   context:
     - "...0 — a city -> the known cities (0x5f0280), a district -> 0x5f0490 — each unit on it (0x75ce0's list), one hidden (+0x15f0, not +0x1650) only where 0x5033a0 lets the player see it,..."
   review: reviewed

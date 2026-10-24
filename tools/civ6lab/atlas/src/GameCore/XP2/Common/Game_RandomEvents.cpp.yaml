@@ -244,8 +244,8 @@
   final: 0x23f040
   kind: function
   name: UNIT_KILLED_CIVILIAN
+  semantics: the plot's units of the unit container's layer 0 (0x75c50 with r9d 0) not dead (+0x770), of formation class CIVILIAN (GetFormationClass 2), without CanRetreatWhenCaptured (unit info +0x1b8 bit 8), whose owner is not immune to the event (0x468100, m_aRandomEventNoUnitDamage) are collected and killed; a Trader (its own layer) is not among them; the layers' assignment unread
   status: PARTLY
-  semantics: "the plot's units of the unit container's layer 0 (0x75c50 with r9d 0) not dead (+0x770), of formation class CIVILIAN (GetFormationClass 2), without CanRetreatWhenCaptured (unit info +0x1b8 bit 8), whose owner is not immune to the event (0x468100, m_aRandomEventNoUnitDamage) are collected and killed; a Trader (its own layer) is not among them; the layers' assignment unread"
   cases:
     - recording: h1_duelw1127
       turn: 160

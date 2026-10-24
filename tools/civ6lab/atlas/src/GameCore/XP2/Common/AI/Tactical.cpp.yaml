@@ -404,7 +404,7 @@
     - gpu/core/sim_tactics.py:_ATTACK_TARGETS_RANGE
     - gpu/core/sim_tactics.py:_tac_assign
     - cpu/core/tactical.ts:spots
-
+    - cpu/core/tactical.ts:passNavalPillage
   readings:
     - "C-95: Attack Units — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

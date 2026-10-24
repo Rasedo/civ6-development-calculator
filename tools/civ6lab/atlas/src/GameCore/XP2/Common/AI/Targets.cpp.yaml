@@ -212,6 +212,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   context:
     - "- THE LOOK (0x7877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785..."
   review: reviewed

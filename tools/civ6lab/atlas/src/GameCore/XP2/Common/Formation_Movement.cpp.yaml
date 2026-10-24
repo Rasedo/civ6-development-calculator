@@ -15,7 +15,10 @@
 - addr: 0x26df90
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:dangerPlane, cpu/core/tactical.ts:exploreTarget]
+  impl:
+    - cpu/core/tactical.ts:dangerPlane
+    - cpu/core/tactical.ts:exploreTarget
+    - cpu/core/tactical.ts:from
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"

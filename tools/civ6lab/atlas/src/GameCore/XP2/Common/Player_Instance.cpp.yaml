@@ -52,7 +52,9 @@
   final: 0x2f80a0
   kind: function
   status: PARTLY
-  readings: ["C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"]
+  readings:
+    - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
+    - "C-96: an event's civilian kill spares a Trader — PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...BEFORE any immunity: the owner's damage percent (0x468060), the player's event immunity (0x468100), the unit's own counter (+0x1110) and its ability list each zero the damage after the dr..."
