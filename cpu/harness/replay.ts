@@ -1760,13 +1760,15 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
   const id = engineRowOf(ctx.cat, 'unit', d.type);
   // a city-state's purchase is its AI's, made in its turn (`minorAiTurn`):
   // the unit it bought stands for the record's (`matchNewUnits`); where it
-  // bought none the record's is imposed at the record's price
+  // bought none the record's is imposed at its price, paid from what the
+  // treasury holds: the game buys only what it can pay for, so where the
+  // engine holds less the shortfall is the engine's own drift, never a debt
   const minor = state.cityStates.find((c) => c.centerIndex === d.city && c.seat === seat);
   if (minor) {
     if (unitOf(ctx, d.unit)) return void count(ctx, 'minorAi:buy', 'applied', d.player);
     const price = id ? minorUnitPrice(state, minor, id, d.currency) : 0;
-    if (d.currency === 'gold') minor.treasury -= price;
-    else minor.faith -= price;
+    if (d.currency === 'gold') minor.treasury -= Math.min(price, Math.max(0, minor.treasury));
+    else minor.faith -= Math.min(price, Math.max(0, minor.faith));
     spawnRecorded(ctx, rec, d.unit);
     return void count(ctx, 'minorAi:buy', 'fallback', d.player, `${id}: the engine bought none (threat ${minor.threat ?? -1}, gold ${minor.treasury})`);
   }
