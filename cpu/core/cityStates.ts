@@ -19,7 +19,7 @@ import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { CIV_LEVELS } from '../data/civLevels';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_MAX_HP, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, JOHANNESBURG_LATE_TECH, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, FIRST_MEET_ENVOYS } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_MAX_HP, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, ANTANANARIVO_GP_CULTURE_PCT, HONG_KONG_PROJECT_PCT, JOHANNESBURG_LATE_TECH, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, FIRST_MEET_ENVOYS } from '../data/cityStates';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
@@ -128,18 +128,19 @@ export function envoysOf(cityState: CityState, seat: number): number {
 }
 
 /** Every envoy this minor holds, the store summed over every seat that sent
- *  one — a posted governor is not an envoy received. The GPU twin is
+ *  one, an established Amani's included. The GPU twin is
  *  `_minor_envoys_received`. */
 export function envoysReceived(cityState: CityState): number {
   return Object.values(cityState.envoys).reduce((n, e) => n + e, 0);
 }
 
 /**
- * The envoys `seat` effectively holds here — the store plus whatever governor
- * it has posted at this minor. CIV6 (Amani, Messenger): "Can be assigned to a
- * City-state, where she acts as 2 Envoys"; (Puppeteer) "While established in a
- * city-state, doubles the number of Envoys you have there" — she is part of
- * the number she doubles.
+ * The envoys `seat` effectively holds here — the store, doubled where its
+ * governor established at this minor holds Puppeteer ("While established in
+ * a city-state, doubles the number of Envoys you have there"). Amani's
+ * Messenger envoys are in the store: her establishment adds them and her
+ * leaving takes them back (`governorClocks`, `leaveMinor`), so she is part
+ * of the number she doubles.
  *
  * `envoysOf` stays the STORE. This is the count every question about who
  * LEADS and what a seat has EARNED here asks: the suzerain contest both ways,
@@ -149,22 +150,16 @@ export function envoysReceived(cityState: CityState): number {
  * Congress's own envoy-count context.
  */
 export function envoysWith(state: GameState, cityState: CityState, seat: number, raw: number): number {
-  let n = raw;
-  let dbl = false;
-  for (const e of minorGovernorEffects(state, seat, cityState.id)) {
-    n += e.envoysAtMinor ?? 0;
-    dbl = dbl || e.envoyDoubleAtMinor === true;
-  }
-  return dbl ? n * 2 : n;
+  const dbl = minorGovernorEffects(state, seat, cityState.id).some((e) => e.envoyDoubleAtMinor === true);
+  return dbl ? raw * 2 : raw;
 }
 
 export function envoysHere(state: GameState, cityState: CityState, seat: number): number {
   return envoysWith(state, cityState, seat, envoysOf(cityState, seat));
 }
 
-/** Everyone the contest has to weigh: every seat in the world, since a posted
- *  governor counts here without an envoy in the ledger, plus every ledger
- *  entry, since that is the store the contest was always over. */
+/** Everyone the contest has to weigh: every seat in the world, plus every
+ *  ledger entry, the store the contest is over. */
 function contenders(state: GameState, cityState: CityState): number[] {
   const out = new Set<number>(Object.keys(cityState.envoys).map(Number));
   for (const sx of state.seats) out.add(sx.seat);
@@ -488,6 +483,16 @@ export function suzerainSciencePct(state: GameState, seat: number): number {
   if (!suzerainEffect(state, seat, 'sciencePeace')) return 0;
   if (state.seats.some((s) => s.seat !== seat && civsAtWar(state, seat, s.seat))) return 0;
   return GENEVA_SCIENCE_PCT;
+}
+
+/** CIV6 (Antananarivo): the suzerain's multiplier on its whole Culture
+ *  income, `ANTANANARIVO_GP_CULTURE_PCT` percent per Great Person it has
+ *  earned, while it is at war with no civilization (REQUIREMENT_PLAYER_IS_AT
+ *  _PEACE) — the player's, on no city's own yield. */
+export function suzerainGpCultureMult(state: GameState, seat: number): number {
+  if (!suzerainEffect(state, seat, 'gpCulturePct')) return 1;
+  if (state.seats.some((s) => s.seat !== seat && civsAtWar(state, seat, s.seat))) return 1;
+  return 1 + (ANTANANARIVO_GP_CULTURE_PCT * (seatOf(state, seat)?.gpEarned?.length ?? 0)) / 100;
 }
 
 /** CIV6 (Johannesburg): a city's Production per distinct resource its owner

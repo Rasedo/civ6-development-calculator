@@ -360,9 +360,15 @@ export function earliestBoostEra(rsr: ResearchState, kind: 'tech' | 'civic'): nu
 }
 
 /** `n` draws over `pool`, each removing its pick, the picks landed on
- *  `seat` (`markBoost`); the count drawn (none from an empty pool). */
+ *  `seat` (`markBoost`), each with its dedication as any boost lands
+ *  (runs/h1_duelw1117 t44: China's Dynastic Cycle Writing at its wonder,
+ *  Free Inquiry's +1 beside the wonder's 3); the count drawn (none from an
+ *  empty pool). */
 export function drawBoosts(state: GameState, seat: number, kind: 'tech' | 'civic', pool: string[], n: number): number {
   let k = 0;
-  for (; k < n && pool.length > 0; k++) markBoost(state, seat, pool.splice(randRange(state, pool.length, kind === 'tech' ? 'Choosing random tech boost to grant based on era' : 'Choosing random civic boost to grant based on era'), 1)[0]);
+  for (; k < n && pool.length > 0; k++) {
+    const id = pool.splice(randRange(state, pool.length, kind === 'tech' ? 'Choosing random tech boost to grant based on era' : 'Choosing random civic boost to grant based on era'), 1)[0];
+    if (markBoost(state, seat, id)) dedicationEvent(state, seat, kind === 'tech' ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE);
+  }
   return k;
 }

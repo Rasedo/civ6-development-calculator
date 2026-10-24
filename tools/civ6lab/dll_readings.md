@@ -1857,7 +1857,7 @@ Horseman 851980 (whole) displaces 655369 (20 damage) beside 720906.
   danger map on the scout's plot (`dangerPlane` / `_danger_plane`; "C-95:
   the scout's tree").
 
-## H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB
+## H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ
 
 0x58b1d0 (Unit_Sight; callers the unit sight update 0x58f3f0 / 0x58f170,
 the explore counts 0x70a6c0 / 0x70a8b0, two range-attack previews) builds
@@ -1903,15 +1903,20 @@ leaves the Mountain (34,14) dark, 1127 t30 China's Settler (12,7) sees
 the Grassland (13,10) past the Forest (12,9), 1117 t2 Rome leaves plot 716
 dark — each as recorded, each misread by the former two-line rule.
 
-A city's look is not this walk (no city caller). A city founded or taken
-looks two plots round its centre whole and three by the walk from an eye
-at the centre's terrain height (`cityLook`, `cityEye`): at every major's
-founding on 1126–1131 no plot two from the centre is left dark, and the
-founding turn's fog holds on 1117, 1121 and 1127, where the city centre's
-raised eye would show plots the records leave dark (1127 Xi'an (13,9),
-1121 Rome (33,11), (34,11)). A major meeting a city-state sees its centre
-and ring revealed (32 of 32 meetings; plots past the ring dark on 8;
-`meetCityState`).
+A city's look is not this walk (no city caller): it is its plots' owner
+writes (READ). SetOwner 0x84760 calls the visibility count change 0x508d50
+for the new owner on the plot and, through the plot's neighbour walk
+(vtable +0x58), on each of the six beside it — no line of sight. A city
+founded owns its centre and first ring, so it reveals the plots two round
+its centre and nothing three out; a city taken, its plots and their ring
+(`cityLook`, `_city_look`). Case: the records' foundings on a plot the
+Settler already stood on (runs/h1_duelw1103–1131): of the 193 plots three
+from the centre no unit had revealed, none revealed, the line clear or not
+(1117 t1 Rome at (12,19): (12,16) across flat ground dark to t3; 1127
+Xi'an (13,9), 1121 Rome (33,11), (34,11)); the ring-3 plots a founding after
+a step shows are the Settler's own look (BaseSightRange 3) from the centre.
+A major meeting a city-state sees its centre and ring revealed (32 of 32
+meetings; plots past the ring dark on 8; `meetCityState`).
 
 ## H-1: the draw log's labels (RandCalls.csv) — READ
 

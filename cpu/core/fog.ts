@@ -75,11 +75,11 @@ const LINE_TIE = 12;
  * two lie within 0.05 of each other — then the lower carries and the plot
  * is marked split when the higher stood above it; a split parent gives way
  * to the other. The plot shows when the parent's carried height is below
- * its own or no higher than the eye (`eyeHeight`, unless the caller names
- * the eye's height). Sentry (`seeThrough`)
+ * its own or no higher than the eye (`eyeHeight`). Sentry (`seeThrough`)
  * drops every feature's height, the plot's own included.
  */
-export function losDisk(map: GameMap, from: Tile, radius: number, seeThrough: boolean, eye = eyeHeight(from)): Set<number> {
+export function losDisk(map: GameMap, from: Tile, radius: number, seeThrough: boolean): Set<number> {
+  const eye = eyeHeight(from);
   const ox = from.col, oy = from.row;
   const carried = new Map<number, number>([[from.index, 0]]);
   const out = new Set<number>([from.index]);
@@ -153,11 +153,9 @@ export function losDisk(map: GameMap, from: Tile, radius: number, seeThrough: bo
   return out;
 }
 
-/** A look cut by the line of sight (`losDisk`): Sentry's `seeThrough`, and
- *  the eye's height where it is not its plot's (`eyeHeight`). */
+/** A look cut by the line of sight (`losDisk`): Sentry's `seeThrough`. */
 export interface Look {
   seeThrough: boolean;
-  eye?: number;
 }
 
 /** Can an eye standing on `from` see `to` (`losDisk` out to `to`'s ring)?
@@ -186,7 +184,7 @@ function minorLookMeets(state: GameState, seat: number, tileIndex: number, radiu
   const majorUnits = new Set<string>();
   for (const u of state.units) if (isCiv(u.seat)) majorUnits.add(`${u.tileIndex}:${u.seat}`);
   const seen = new Set<number>();
-  const sees = los ? losDisk(state.map, t, radius, los.seeThrough, los.eye) : null;
+  const sees = los ? losDisk(state.map, t, radius, los.seeThrough) : null;
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
     if (sees && !sees.has(n.index)) continue;
     const owner = tileSeat(n);
@@ -237,7 +235,7 @@ function majorLookMeets(state: GameState, seat: number, tileIndex: number, radiu
   const units = new Set<string>();
   for (const u of state.units) if (isCiv(u.seat) && u.seat !== seat) units.add(`${u.tileIndex}:${u.seat}`);
   const seen = new Set<number>();
-  const sees = los ? losDisk(state.map, t, radius, los.seeThrough, los.eye) : null;
+  const sees = los ? losDisk(state.map, t, radius, los.seeThrough) : null;
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
     if (sees && !sees.has(n.index)) continue;
     const owner = tileSeat(n);
@@ -376,7 +374,7 @@ function majorLook(state: GameState, seat: number, tileIndex: number, radius: nu
     const t = state.map.tiles[tileIndex];
     const minorUnits = new Map<number, number>();
     for (const u of state.units) if (isCityStateSeat(u.seat) && !minorUnits.has(u.tileIndex)) minorUnits.set(u.tileIndex, u.seat);
-    const sees = los ? losDisk(state.map, t, radius, los.seeThrough, los.eye) : null;
+    const sees = los ? losDisk(state.map, t, radius, los.seeThrough) : null;
     for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
       const owner = tileSeat(n);
       const unitOwner = minorUnits.get(n.index);
@@ -411,24 +409,22 @@ function majorLook(state: GameState, seat: number, tileIndex: number, radius: nu
   }
 }
 
-/** A CITY'S LOOK where it is founded or changes hands: the plots two round
- *  its centre whole and those three round it that an eye on the centre at
- *  its terrain's height sees (`losDisk`, `cityEye`). LAB (the city's sight
- *  routine unread; the walk 0x58b1d0 is the units'): the records' revealed
- *  plots at every major's founding (runs/h1_duelw1126-1131) leave no plot
- *  two from the new centre dark; the founding turn's fog holds on
- *  runs/h1_duelw1117, 1121 and 1127, where the city centre's raised eye
- *  would show plots the records leave dark (1127 Xi'an (13,9), 1121 Rome
- *  (33,11) and (34,11)). */
+/** A CITY'S LOOK where it is founded or changes hands, once its plots are
+ *  its own: each plot of the city and the six beside it (the plot owner's
+ *  write SetOwner 0x84760 raises the new owner's visibility of the plot and
+ *  of each plot beside it, no line of sight) — a founding's centre and first
+ *  ring give the plots two round the centre. Nothing three out: the records'
+ *  foundings on a plot the Settler already stood on (runs/h1_duelw1103-1131,
+ *  193 plots three from the centre that no unit revealed) leave every one
+ *  dark, the line clear or not (1117 t1 Rome at (12,19): (12,16) across flat
+ *  ground; 1127 Xi'an (13,9), 1121 Rome (33,11) and (34,11)); the plots three
+ *  out a founding shows after a step are the Settler's own look
+ *  (BaseSightRange 3) from the centre. */
 export function cityLook(state: GameState, seat: number, centre: number): void {
-  revealAround(state, seat, centre, 2);
-  revealAround(state, seat, centre, 3, cityEye(state.map.tiles[centre]));
-}
-
-/** a city's look over its third ring: the line of sight from an eye at
- *  its centre's terrain height (the city centre's raise is a unit's) */
-export function cityEye(t: Tile): Look {
-  return { seeThrough: false, eye: ELEVATION_SIGHT[t.elevation] ?? 0 };
+  const city = state.map.tiles[centre].ownerCity;
+  for (const t of state.map.tiles) {
+    if (t.ownerSeat === seat && t.ownerCity === city) revealAround(state, seat, t.index, 1);
+  }
 }
 
 /** Does this seat's roster row make its ALLIANCES share map visibility?
@@ -453,7 +449,7 @@ function liftFog(state: GameState, seat: number, tileIndex: number, radius: numb
   let found = 0;
   const fresh = new Set<string>();
   const seen: Tile[] = [];
-  const sees = los ? losDisk(state.map, t, radius, los.seeThrough, los.eye) : null;
+  const sees = los ? losDisk(state.map, t, radius, los.seeThrough) : null;
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
     if (sees && !sees.has(n.index)) continue;
     seen.push(n);
@@ -483,13 +479,9 @@ export function initFog(state: GameState): void {
   for (const s of state.seats) {
     s.explored = new Array(state.map.tiles.length).fill(0);
     if (!state.fogOfWar || !isCiv(s.seat)) continue;
+    // each plot it owns and the six beside it (its cities' look, `cityLook`)
     for (const t of state.map.tiles) {
       if (tileSeat(t) === s.seat) liftFog(state, s.seat, t.index, 1);
-    }
-    // each city's look (`cityLook`)
-    for (const c of citiesOf(state, s.seat)) {
-      liftFog(state, s.seat, c.centerIndex, 2);
-      liftFog(state, s.seat, c.centerIndex, 3, cityEye(state.map.tiles[c.centerIndex]));
     }
     for (const u of unitsOf(state, s.seat)) liftFog(state, s.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
   }

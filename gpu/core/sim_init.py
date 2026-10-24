@@ -573,6 +573,7 @@ class SimInit:
         self._suz_c_faith_bldg = _sfx.index("faithBuildings") if "faithBuildings" in _sfx else -1
         self._suz_c_route_post = _sfx.index("routePostGold") if "routePostGold" in _sfx else -1
         self._suz_c_sci_peace = _sfx.index("sciencePeace") if "sciencePeace" in _sfx else -1
+        self._suz_c_gp_cul = _sfx.index("gpCulturePct") if "gpCulturePct" in _sfx else -1
         self._suz_c_dist_gpp = _sfx.index("districtGpp") if "districtGpp" in _sfx else -1
         self._suz_c_water_cul = _sfx.index("waterDistrictCulture") if "waterDistrictCulture" in _sfx else -1
         self._suz_c_dest_lux = _sfx.index("routeLuxuryGold") if "routeLuxuryGold" in _sfx else -1
@@ -591,6 +592,7 @@ class SimInit:
         # Geneva / Bologna / Nan Madol / Amsterdam / Zanzibar / Hunza / Hong Kong /
         # Ngazargamu / Buenos Aires — nine rows, each its own rule.
         self._suz_sci_pct = float(_suz["sciencePct"])
+        self._suz_gp_cul_pct = float(_suz["gpCulturePct"])
         self._suz_dist_gpp = float(_suz["districtGpp"])
         _gb = _suz["gppBuildingIdx"]
         _gbw = max(max((len(x) for x in _gb), default=1), 1)

@@ -666,10 +666,7 @@ class SimGp:
             return
         lo = era + self._gp_fx(cls, at, "eurekaLo").long()
         hi = era + self._gp_fx(cls, at, "eurekaHi").long()
-        got = self._draw_boosts(row, is_civic, self._boost_pool(row, is_civic, lo, hi), n)
-        for k in range(int(n.max())):
-            self._dedication_event(
-                row, self._ded_pen_brush if is_civic else self._ded_free_inquiry, (got > k).long())
+        self._draw_boosts(row, is_civic, self._boost_pool(row, is_civic, lo, hi), n)
 
     # ---------------------------------------------------------------- the city
     def _gp_instant_buildings(self, row: int, m: torch.Tensor, cls: torch.Tensor,

@@ -5657,6 +5657,18 @@ class SimSeats:
         peace = ~self.war[:, row, : self.n_majors].any(dim=1)
         return (self._suz_effect(row, self._suz_c_sci_peace) & peace).double() * self._suz_sci_pct
 
+    def _suz_gp_culture_mult(self, row: int) -> torch.Tensor:
+        """`suzerainGpCultureMult`'s twin, [B] f64. CIV6 (Antananarivo): the
+        suzerain's whole Culture income, `_suz_gp_cul_pct` percent per Great
+        Person it has earned, while at war with no civilization."""
+        out = torch.ones(self.B, dtype=torch.float64, device=self.device)
+        if self._suz_c_gp_cul < 0 or row >= self.n_majors:
+            return out
+        peace = ~self.war[:, row, : self.n_majors].any(dim=1)
+        on = self._suz_effect(row, self._suz_c_gp_cul) & peace
+        n = self.civ_gp_earned[:, row].sum(dim=1).double()
+        return torch.where(on, 1.0 + self._suz_gp_cul_pct * n / 100.0, out)
+
     def _suz_land_buy_off(self, row: int, cols: slice | None = None) -> torch.Tensor:
         """`suzerainLandPurchaseOffPct`'s twin, [B, RC] f64. CIV6 (Ngazargamu):
         a land unit is `purchasePct` percent cheaper per Encampment building
@@ -7247,8 +7259,9 @@ class SimSeats:
         """`drawBoosts`'s twin: `n` [B] draws over `pool` [B, k] in the pool's
         order — era by era, each era's rows in the install table's order
         (`_tech_rank` / `_civic_rank`) —, each removing
-        its pick, the picks boosted. Returns the draws taken [B]; a game with
-        nothing left takes none."""
+        its pick, the picks boosted, each with its dedication (Free Inquiry
+        for a eureka, Pen, Brush and Voice for an inspiration). Returns the
+        draws taken [B]; a game with nothing left takes none."""
         drawn = torch.zeros(self.B, dtype=torch.long, device=self.device)
         if int(n.max()) <= 0 or not bool(pool.any()):
             return drawn
@@ -7269,6 +7282,7 @@ class SimSeats:
             r = want.nonzero(as_tuple=True)[0]
             land[r, col[r]] = True
             self._land_boosts(row, land, is_civic)
+            self._dedication_event(row, self._ded_pen_brush if is_civic else self._ded_free_inquiry, want.long())
             drawn = drawn + want.long()
         return drawn
 
@@ -7704,9 +7718,7 @@ class SimSeats:
             return
         lo_t = torch.full((self.B,), lo, dtype=torch.long, device=self.device)
         hi_t = torch.full((self.B,), hi, dtype=torch.long, device=self.device)
-        got = self._draw_boosts(row, True, self._boost_pool(row, True, lo_t, hi_t), hit.long() * n)
-        for i in range(n):
-            self._dedication_event(row, self._ded_pen_brush, (got > i).long())
+        self._draw_boosts(row, True, self._boost_pool(row, True, lo_t, hi_t), hit.long() * n)
 
     def _competition_podium(self, done: torch.Tensor) -> None:
         """CIV6 (Competition): the Gold Tier goes to the best score and to every
@@ -8180,8 +8192,7 @@ class SimSeats:
             hit = self._suz_effect(row, self._suz_c_era) & adv
             if not bool(hit.count_nonzero()):
                 continue
-            got = self._draw_boosts(row, True, self._boost_pool(row, True, self.game_era, self.game_era), hit.long())
-            self._dedication_event(row, self._ded_pen_brush, got)
+            self._draw_boosts(row, True, self._boost_pool(row, True, self.game_era, self.game_era), hit.long())
             self._eff_version += 1
 
     def _add_era_score(self, row: int, per: int, count: torch.Tensor) -> None:
@@ -12070,7 +12081,6 @@ class SimSeats:
         slot = (torch.where(alive_row[rows], occ_idx, torch.full_like(occ_idx, -1)).max(dim=1).values + 1)
         assert int(slot.max()) < self.RC, "city slots exhausted — the step-end reclaim must have compacted"
         s_idx = tile[rows]
-        self._city_look(rows, seat, s_idx)  # foundCityAt's cityLook
         # isCapital = seat.cities.length === 0: a total-collapse refound
         # re-crowns and updates capitalTiles[row]; every other settle founds a
         # non-capital.
@@ -12094,7 +12104,6 @@ class SimSeats:
         self.city_founder[rows, row, slot] = row
         self.civ_cap_tile[rows, row] = torch.where(new_cap, s_idx, self.civ_cap_tile[rows, row])
         self.city_center[rows, row, slot] = s_idx
-        self._founding_moments(row, rows, slot, s_idx)
         self.city_pop[rows, row, slot] = 1
         self._log_pop(rows, row, slot, "fd")
         self.city_growth[rows, row, slot] = 0
@@ -12215,6 +12224,9 @@ class SimSeats:
             self.tile_seat[rows[_r], _t] = seat
             self.tile_city[rows[_r], _t] = _new_cid[_r]
             self._tile_owner_ver += 1
+        # foundCityAt's cityLook over the plots just claimed, then its moments
+        self._city_look(rows, seat, s_idx)
+        self._founding_moments(row, rows, slot, s_idx)
         self._all_roads_lead_to_rome(rows, row, s_idx)
         self._trajans_column(rows, row, slot)
         # CIV6 (Kupe's Voyage): the FIRST city's Population (its Builder is a

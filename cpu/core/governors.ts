@@ -8,6 +8,7 @@ import type { GpAppeal } from './appeal';
 import { seatBuildingSum, cityHasPark, growthDetachResidue } from './city';
 import { cityDistrictSum, darkBuildings } from './yields';
 import { getModifiers } from './effects';
+import { addEnvoys, resolveSuzerains } from './cityStates';
 import {
   GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS,
   GOV_ACTIONS_MAX, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit, promotionBitValue, type GovernorEffects,
@@ -30,6 +31,30 @@ export function emptyGovernors(): Governor[] {
 export function governorsOf(seat: Seat): Governor[] {
   if (!seat.governors || seat.governors.length !== GOVERNORS.length) seat.governors = emptyGovernors();
   return seat.governors;
+}
+
+/** The envoys governor `i` grants the city-state she is established at:
+ *  her default ability's and her titles' `envoysAtMinor` (CIV6, Messenger:
+ *  MESSENGER_GRANT_FREE_ENVOYS, MODIFIER_GOVERNOR_ADJUST_CITY_ENVOYS, 2). */
+function postingEnvoys(i: number, g: Governor): number {
+  let n = GOVERNOR_PROMOTIONS[GOVERNOR_DEFAULT_PROMOTION[i]].effects.envoysAtMinor ?? 0;
+  for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
+    if (p !== GOVERNOR_DEFAULT_PROMOTION[i] && hasPromotion(g, p)) n += GOVERNOR_PROMOTIONS[p].effects.envoysAtMinor ?? 0;
+  }
+  return n;
+}
+
+/** A governor ESTABLISHED at a city-state leaves it: the envoys her posting
+ *  granted leave the minor's count from the seat, and the contest is read
+ *  again (runs/h1_duelw1103 t100: Amani leaves the minor 4 for 3, its envoys
+ *  from China 6 -> 4; 1105 t92, 1106 t97, 1113 t56 alike). */
+function leaveMinor(state: GameState, seat: number, i: number, g: Governor): void {
+  if (g.minorId < 0 || (g.establishTurns ?? 0) > 0) return;
+  const cs = (state.cityStates ?? []).find((m) => m.id === g.minorId);
+  const n = postingEnvoys(i, g);
+  if (!cs || n <= 0) return;
+  cs.envoys[seat] = Math.max(0, (cs.envoys[seat] ?? 0) - n);
+  resolveSuzerains(state);
 }
 
 /** The ids of the seat's cities an appointed governor holds, seated and not
@@ -289,11 +314,13 @@ export function assignGovernor(state: GameState, seat: number, i: number, to: { 
   if (!s || !g || !g.appointed || g.outTurns > 0) return false;
   if (to.minorId !== undefined) {
     if (!GOVERNORS[i].cityStates || !(state.cityStates ?? []).some((m) => m.id === to.minorId)) return false;
+    leaveMinor(state, seat, i, g);
     g.cityId = -1;
     g.minorId = to.minorId;
   } else {
     if (!citiesOf(state, seat).some((c) => c.id === to.cityId)) return false;
     if (roster.some((o, k) => k !== i && o.appointed && o.cityId === to.cityId)) return false;
+    leaveMinor(state, seat, i, g);
     g.cityId = to.cityId!;
     g.minorId = -1;
   }
@@ -345,7 +372,8 @@ export function governorClocks(state: GameState, seat: number): void {
   if (!s) return;
   const roster = governorsOf(s);
   const cities = citiesOf(state, seat);
-  for (const g of roster) {
+  for (let i = 0; i < roster.length; i++) {
+    const g = roster[i];
     if (!g.appointed) continue;
     if (g.outTurns > 0) g.outTurns -= 1;
     // a governor whose city is gone goes back to the Palace
@@ -359,7 +387,17 @@ export function governorClocks(state: GameState, seat: number): void {
       g.minorId = -1;
       g.establishTurns = 0;
     }
-    if ((g.cityId >= 0 || g.minorId >= 0) && g.establishTurns > 0) g.establishTurns -= 1;
+    if ((g.cityId >= 0 || g.minorId >= 0) && g.establishTurns > 0) {
+      g.establishTurns -= 1;
+      // established at a city-state, she grants it her envoys from the seat,
+      // which it receives as any (`addEnvoys`: the contest, the ground it
+      // annexes) — runs/h1_duelw1117 t29: Amani established at Caguana in
+      // China's start, its envoys from China 2 -> 4, two plots annexed, China
+      // its suzerain (1103 t35, 1104 t29, 1105 t39 alike)
+      const cs = g.establishTurns === 0 && g.minorId >= 0 ? (state.cityStates ?? []).find((m) => m.id === g.minorId) : undefined;
+      const n = cs ? postingEnvoys(i, g) : 0;
+      if (cs && n > 0) addEnvoys(state, cs, seat, n);
+    }
   }
 }
 
@@ -511,6 +549,7 @@ export function neutralizeGovernor(state: GameState, seat: number, i: number, tu
       if (e.growthMult !== undefined) city.growthDrift = (city.growthDrift ?? 0) + growthDetachResidue(e.growthMult);
     }
   }
+  leaveMinor(state, seat, i, g);
   g.cityId = -1;
   g.minorId = -1;
   g.establishTurns = 0;

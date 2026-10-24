@@ -965,8 +965,8 @@ class SimMinors:
 
     def _minor_envoys_received(self) -> torch.Tensor:
         """[B, S] long — `envoysReceived`: every envoy each minor holds, the
-        raw store summed over the majors that sent them. A posted governor is
-        not an envoy received."""
+        raw store summed over the majors that sent them, an established
+        Amani's included."""
         return self.seat_citystate_envoys[:, : self.n_majors, : self.S].sum(dim=1).long()
 
     def _init_minor_build(self, rules) -> None:

@@ -29,7 +29,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, suzerainGpCultureMult, meetCityState } from './cityStates';
 import { LEVY_TURNS, govInfluence, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { storeUnitStrength } from './majorView';
@@ -2967,7 +2967,13 @@ export function seatPhase(state: GameState): void {
       const perEnvoy = sm.seatYieldPerEnvoy[key as YieldKey] ?? 0;
       if (perEnvoy) sum += perEnvoy * state.cityStates.reduce((n, cs) => n + envoysOf(cs, actor.seat), 0);
       // then the player's percent per suzerainty, on all of the above
-      return sum * seatYieldMultPerSuzerain(state, actor.seat, sm, key as YieldKey);
+      // ...and (Antananarivo) its Culture's per Great Person earned, added;
+      // the income truncated to the 1/256 step (runs/h1_duelw1117 t46:
+      // China's Culture 8.352 x 1.02 reads 8.516, 2180/256; 1105 t214:
+      // 150.762 x 1.15 reads 173.375)
+      const m = seatYieldMultPerSuzerain(state, actor.seat, sm, key as YieldKey)
+        + (key === 'culture' ? suzerainGpCultureMult(state, actor.seat) - 1 : 0);
+      return m === 1 ? sum : Math.floor(sum * m * 256 + 1e-6) / 256;
     };
     let yields = readYields();
     const rsr = actor.research;

@@ -10,7 +10,8 @@ import { SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
 import type { CityState, GameState } from '../../../cpu/core/types';
 
 // CIV6 (Amani, the Diplomat): "Can be assigned to a City-state, where she acts
-// as 2 Envoys" (Messenger); "While established in a city-state, provides a copy
+// as 2 Envoys" (Messenger: two envoys in the minor's store from her
+// establishment until she leaves); "While established in a city-state, provides a copy
 // of its Luxury resources to you" (Affluence); "While established in a
 // city-state, doubles the number of Envoys you have there" (Puppeteer). She is
 // the only governor the catalog sends abroad.
@@ -85,17 +86,24 @@ describe('the governor at a city-state', () => {
     expect(envoysHere(state, cs, 0)).toBe(3);
   });
 
-  it('Messenger is worth two envoys and Puppeteer doubles what she is part of', () => {
+  it('Messenger brings two envoys to the store at her establishment, and takes them when she leaves', () => {
     const state = world();
     const cs = addCs(state, 10, 10, { envoys: { 0: 1 } });
     const g = post(state, cs);
-    expect(envoysOf(cs, 0)).toBe(1);            // the STORE is untouched
-    expect(envoysHere(state, cs, 0)).toBe(3);   // 1 + her 2
+    g.establishTurns = 1;
+    expect(envoysOf(cs, 0)).toBe(1);
+    governorClocks(state, 0);
+    expect(envoysOf(cs, 0)).toBe(3);            // the store, 1 + her 2
+    expect(envoysHere(state, cs, 0)).toBe(3);
     g.promotions = promotionBitValue(P_PUPPETEER);
     expect(envoysHere(state, cs, 0)).toBe(6);   // (1 + 2) doubled
     // and nowhere else
     const other = addCs(state, 16, 14, { envoys: { 0: 1 } });
     expect(envoysHere(state, other, 0)).toBe(1);
+    // posted elsewhere, she takes her two back
+    governorPhase(state, 0, [[GOV_ASSIGN_MINOR, AMANI, other.id]]);
+    expect(envoysOf(cs, 0)).toBe(1);
+    expect(envoysOf(other, 0)).toBe(1);         // not established there yet
   });
 
   it('her envoys win a suzerainty the ledger alone would not', () => {
@@ -105,8 +113,9 @@ describe('the governor at a city-state', () => {
     resolveSuzerain(state, cs);
     expect(suzerainOf(cs)).toBe(-1);             // 2 leads but is under the bar
     expect(isSuzerain(state, cs, 0)).toBe(false);
-    post(state, cs);
-    resolveSuzerain(state, cs);
+    const g = post(state, cs);
+    g.establishTurns = 1;
+    governorClocks(state, 0);
     expect(envoysHere(state, cs, 0)).toBe(1 + 2);
     expect(isSuzerain(state, cs, 0)).toBe(true); // 3 >= the bar, and beats 2
     expect(suzerainOf(cs)).toBe(0);

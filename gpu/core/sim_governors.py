@@ -141,6 +141,8 @@ class SimGovernors:
             others = ap & (city == cid.unsqueeze(1)) & (torch.arange(NG, device=dev).reshape(1, -1) != gi.unsqueeze(1))
             m = on & (verb == 2) & free & (cid >= 0) & ~others.any(dim=1)
             if bool(m.count_nonzero()):
+                for _g in torch.unique(gi[m]).tolist():
+                    self._leave_minor(m & (gi == _g), row, int(_g))
                 rows = m.nonzero(as_tuple=True)[0]
                 city[rows, gi[rows]] = cid[rows]
                 minor[rows, gi[rows]] = -1
@@ -151,6 +153,8 @@ class SimGovernors:
                 cs_alive = self.citystate_alive[bidx, arg.clamp(0, self.S - 1)] & s_ok
                 m = on & (verb == 3) & free & self._gov_minor_ok[gi] & cs_alive
                 if bool(m.count_nonzero()):
+                    for _g in torch.unique(gi[m]).tolist():
+                        self._leave_minor(m & (gi == _g), row, int(_g))
                     rows = m.nonzero(as_tuple=True)[0]
                     city[rows, gi[rows]] = -1
                     minor[rows, gi[rows]] = arg[rows]
@@ -182,14 +186,42 @@ class SimGovernors:
         return out
 
     def _envoys_with(self, row: int, raw: torch.Tensor) -> torch.Tensor:
-        """[B, S] long — `envoysWith`'s twin: a raw envoy count plus whatever a
-        posted governor is worth. CIV6 (Messenger): she "acts as 2 Envoys";
-        (Puppeteer) "doubles the number of Envoys you have there" — she is part
-        of the number she doubles."""
+        """[B, S] long — `envoysWith`'s twin: a raw envoy count, doubled where
+        the seat's governor established at the minor holds Puppeteer. Amani's
+        Messenger envoys are in the store (`_governor_clocks`, `_leave_minor`),
+        so she is part of the number she doubles."""
         if self.S == 0 or self.n_governors == 0:
             return raw
-        n = raw + self._minor_gov_row(row, "envoysAtMinor").long()
-        return torch.where(self._minor_gov_row(row, "envoyDoubleAtMinor") > 0, n * 2, n)
+        return torch.where(self._minor_gov_row(row, "envoyDoubleAtMinor") > 0, raw * 2, raw)
+
+    def _posting_envoys(self, row: int, g: int) -> torch.Tensor:
+        """[B] long — `postingEnvoys`: the envoys governor `g` of major row
+        `row` grants the city-state she is established at, her default
+        ability's and her titles' `envoysAtMinor`."""
+        if "envoysAtMinor" not in self._gpromo or self.n_gov_promos == 0:
+            return torch.zeros(self.B, dtype=torch.long, device=self.device)
+        tab = self._gpromo["envoysAtMinor"]
+        base = int(self._gov_base_promo[g])
+        pidx = torch.arange(self.n_gov_promos, device=self.device)
+        held = ((self.civ_gov_promos[:, row, g].unsqueeze(1) >> pidx.reshape(1, -1)) & 1).bool() & (pidx != base).reshape(1, -1)
+        return ((tab.reshape(1, -1) * held.double()).sum(dim=1) + tab[base]).long()
+
+    def _leave_minor(self, leaving: torch.Tensor, row: int, g: int) -> None:
+        """`leaveMinor`: in the games `leaving` [B], governor `g` of major row
+        `row`, established at a city-state, leaves it — the envoys her posting
+        granted leave its count from the seat, and the contest is read again."""
+        if self.S == 0:
+            return
+        at = self.civ_gov_minor[:, row, g]
+        n = self._posting_envoys(row, g)
+        m = leaving & self.civ_gov_appointed[:, row, g] & (at >= 0) & (self.civ_gov_establish[:, row, g] <= 0) & (n > 0)
+        if not bool(m.count_nonzero()):
+            return
+        r = m.nonzero(as_tuple=True)[0]
+        s = at[r]
+        env = self.seat_citystate_envoys
+        env[r, row, s] = (env[r, row, s] - n[r].to(env.dtype)).clamp(min=0)
+        self._cs_resolve_suzerain()
 
     def _envoys_here(self, row: int) -> torch.Tensor:
         """[B, S] long — `envoysHere`'s twin, the count every question about who
@@ -274,7 +306,21 @@ class SimGovernors:
             minor[:, g] = torch.where(mgone, torch.full_like(minor[:, g], -1), minor[:, g])
             est[:, g] = torch.where(mgone, torch.zeros_like(est[:, g]), est[:, g])
             held = live_g & ((city[:, g] >= 0) | (minor[:, g] >= 0))
-            est[:, g] = torch.where(held & (est[:, g] > 0), est[:, g] - 1, est[:, g])
+            ticks = held & (est[:, g] > 0)
+            est[:, g] = torch.where(ticks, est[:, g] - 1, est[:, g])
+            # established at a city-state, she grants it her envoys from the
+            # seat, which it receives as any (`addEnvoys`)
+            if S > 0:
+                n = self._posting_envoys(row, g)
+                landed = ticks & (est[:, g] == 0) & (minor[:, g] >= 0) & (n > 0)
+                if bool(landed.count_nonzero()):
+                    r = landed.nonzero(as_tuple=True)[0]
+                    s = minor[r, g]
+                    env = self.seat_citystate_envoys
+                    env[r, row, s] = env[r, row, s] + n[r].to(env.dtype)
+                    self._cs_resolve_suzerain()
+                    self._minor_envoy_tiles(landed)
+                    self._eff_version += 1
 
     def neutralize_governor(self, b: int, row: int, g: int, turns: int) -> None:
         """CIV6 (Neutralize Governor / Governance Doctrine B): the governor
@@ -290,6 +336,9 @@ class SimGovernors:
             resid = torch.floor((col - 1.0) * 256.0) + torch.floor((1.0 - col) * 256.0)
             res = torch.where(mask, resid.reshape(1, -1), torch.zeros_like(resid).reshape(1, -1)).sum(dim=1)
             self.city_growth_drift[b, row, :RC] += torch.where(at == g, res.long(), torch.zeros_like(at))
+        one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        one[b] = True
+        self._leave_minor(one, row, g)
         self.civ_gov_city[b, row, g] = -1
         self.civ_gov_minor[b, row, g] = -1
         self.civ_gov_establish[b, row, g] = 0

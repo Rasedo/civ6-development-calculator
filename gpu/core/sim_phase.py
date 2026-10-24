@@ -2346,7 +2346,12 @@ class SimPhase:
                 s = s + _pe * _placed
             # then the player's percent per suzerainty, on all of the above
             # (`seatYieldMultPerSuzerain`)
-            return s * self._seat_ymult_per_suz(row, k)
+            # ...and (Antananarivo) its Culture's per Great Person earned,
+            # added; the income truncated to the 1/256 step
+            m = self._seat_ymult_per_suz(row, k)
+            if k == 4:
+                m = m + (self._suz_gp_culture_mult(row) - 1.0)
+            return torch.where(m == 1.0, s, torch.floor(s * m * 256.0 + 1e-6) / 256.0)
 
         total = self._seat_city_stats(row, record=False)[0]
 

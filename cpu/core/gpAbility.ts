@@ -28,7 +28,7 @@ import { ERAS, TECHS } from '../data/techs';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { scaleByGameSpeed } from '../data/constants';
 import { isSpaceProject } from '../data/projects';
-import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
+import { DED_FREE_INQUIRY } from '../data/seats';
 import { dedicationEvent } from './eras';
 import { randRange } from './rand';
 import { spawnUnit, disbandUnit, bestUnlockedOfClass, unitFullMoves, unitsAt, unitStackSlot } from './units';
@@ -197,8 +197,7 @@ export function boostRandom(
 ): void {
   const owner = seatOf(state, seat);
   if (!owner) return;
-  const k = drawBoosts(state, seat, kind, boostPool(owner.research, kind, lo, hi), n);
-  for (let i = 0; i < k; i++) dedicationEvent(state, seat, kind === 'tech' ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE, 1);
+  drawBoosts(state, seat, kind, boostPool(owner.research, kind, lo, hi), n);
 }
 
 /** N technologies COMPLETED outright — the free-tech picker

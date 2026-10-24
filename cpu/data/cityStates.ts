@@ -65,6 +65,7 @@ export type SuzEffect =
   | 'routePostGold'      // Jakarta
   | 'suzImprovement'     // Caguana / La Venta / Armagh / Nalanda / Granada
   | 'sciencePeace'       // Geneva
+  | 'gpCulturePct'       // Antananarivo
   | 'districtGpp'        // Bologna
   | 'waterDistrictCulture' // Nan Madol
   | 'routeLuxuryGold'    // Amsterdam
@@ -96,6 +97,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'spiceLuxuries', 'routeLengthGold', 'projectProduction', 'landPurchaseDiscount',
   'bonusAmenities', 'shallowWaterProd', 'resourceTypeProduction', 'hubAmenities', 'relicFaith',
   'partnerProduction', 'wonderProduction', 'freshWaterHousing', 'gpActivatedPressure', 'freeStrategic',
+  'gpCulturePct',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -140,6 +142,16 @@ export const KUMASI_ROUTE_GOLD = 1;
  *  under the requirement set PLAYER_IS_AT_PEACE_WITH_ALL_MAJORS — a PERCENT on every city's
  *  science, not a flat capital yield. */
 export const GENEVA_SCIENCE_PCT = 15;
+
+/** CIV6 (VikingsLandmarks_CityStates.xml, MINOR_CIV_ANTANANARIVO_UNIQUE_INFLUENCE
+ *  _BONUS attaching MINOR_CIV_ANTANANARIVO_CULTURE_FROM_EARNED_GREAT_PEOPLE_BONUS
+ *  to the suzerain at peace: EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_EARNED
+ *  _GREAT_PERSON, YIELD_CULTURE Amount 2) — the PLAYER's Culture, a percent
+ *  per Great Person it has earned, on its whole income and on no city's own
+ *  (runs/h1_duelw1117 t46: China, suzerain with one Prophet earned, reads
+ *  Culture 8.516 of its cities' 8.352, Xi'an's own 8.082 unscaled). */
+export const ANTANANARIVO_GP_CULTURE_PCT = srcConst('cityStates.antananarivoGpCulturePct', 2,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_ANTANANARIVO_CULTURE_FROM_EARNED_GREAT_PEOPLE_BONUS&Name=Amount', 'Value'));
 
 /** CIV6 (Expansion2_Leaders.xml, the nine MINOR_CIV_BOLOGNA_GREAT_*_POINTS
  *  _BONUS rows): `MODIFIER_PLAYER_CITIES_ADJUST_GREAT_PERSON_POINT` Amount 1
@@ -353,6 +365,7 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   // attaching MINOR_CIV_VATICAN_CITY_GREAT_PERSON_RELIGIOUS_PRESSURE to the
   // suzerain: MODIFIER_PLAYER_GRANT_RELIGIOUS_PRESSURE_GREAT_PERSON_ACTIVATED)
   'Vatican City': { name: 'Vatican City', type: 'religious', bonus: 'When you activate a Great Person they spread 400 Religious pressure of your founded (or majority) religion to cities within 10 tiles.', suz: 'gpActivatedPressure' },
+  Antananarivo: { name: 'Antananarivo', type: 'cultural', bonus: '+2% Culture for each Great Person your civilization has earned.', suz: 'gpCulturePct' },
   Hattusa: { name: 'Hattusa', type: 'scientific', bonus: 'Receive 2 of each Strategic resource you have revealed but do not have an improved source of.', suz: 'freeStrategic' },
 };
 

@@ -1058,12 +1058,18 @@ export class RecordedActions implements ActionSource {
       const by = d.kind === 'clear' ? clearer.get(`${d.player}:${d.plot}:${d.what}`) : undefined;
       if (d.kind === 'clear' && by) d.unit = by;
     }
-    // ...and the steps a unit the pair lost took before it fell
+    // ...the steps a unit the pair lost took before it fell, and those a unit
+    // the pair made took from where it arrived (runs/h1_duelw1117 t6: China's
+    // new Scout walks (33,13), (34,14), (33,15) and sees the mountain (36,14)
+    // from (34,14))
     const moved = new Set(inferred.flatMap((d) => (d.kind === 'move' ? [d.unit] : [])));
     for (const [k, path] of paths) {
+      if (moved.has(k) || !path.length) continue;
       const u0 = a.units.find((x) => unitKey(x) === k);
-      if (!u0 || moved.has(k) || units1.has(k) || !path.length) continue;
-      out.push({ kind: 'move', phase: phaseOf(u0.owner), player: u0.owner, unit: k, plot: path[path.length - 1], path });
+      const u1 = units1.get(k);
+      const owner = u0 && !u1 ? u0.owner : !u0 && u1 ? u1.owner : null;
+      if (owner === null) continue;
+      out.push({ kind: 'move', phase: phaseOf(owner), player: owner, unit: k, plot: path[path.length - 1], path });
     }
     const settledKinds = new Set(['found', 'buyBuilding', 'buyPlot', 'improve', 'pantheon', 'unitOrigin', 'research', 'civic', 'queueHead']);
     const inferredBy = new Map<string, Keyed>();

@@ -28,7 +28,7 @@ import { commitProduction, domesticTourists, visitingTourists } from './seatTurn
 import { completedWonders, seatWonderFlag, seatWonderSum } from './wonders';
 import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
-import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, COMPETITIONS } from '../data/seats';
+import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, COMPETITIONS } from '../data/seats';
 import { recordMoments } from './moments';
 import { foundingMoments, religionMoment, gameEraTurn, buildingDedications, dedicationEvent, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
@@ -1788,9 +1788,7 @@ function eraInspirations(state: GameState): void {
   for (let seat = 0; seat < state.seats.length; seat++) {
     const sx = seatOf(state, seat);
     if (!sx || !suzerainEffect(state, seat, 'eraInspiration')) continue;
-    if (drawBoosts(state, seat, 'civic', boostPool(sx.research, 'civic', era, era), 1)) {
-      dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
-    }
+    drawBoosts(state, seat, 'civic', boostPool(sx.research, 'civic', era, era), 1);
   }
 }
 
