@@ -275,10 +275,18 @@
   kind: function
   name: the city under threat
   status: PARTLY
-  impl: [cpu/core/aiContracts.ts:ContractCity]
+  semantics: "true where the player AI's +0x12a0 +0x4b8 (war footing) is set, or CityBuildAI +0x1b8 (the threat) is above -1 and either the centre's GetDamage(0x5e97d629, its hit points) is above 0 or CityBuildAI +0x218 is set; +0x218's writer unread"
+  cases:
+    - recording: h1_duelw1124
+      turn: 43
+      value: "Granada's City Defense started t42 (threat above -1) with its centre whole: its Harbor contract kept, complete t45 (Gold 6 -> 10)"
+    - recording: h1_duelw1127
+      turn: 161
+      value: "Muscat's centre damaged t160-t165 under threat: NO BUILDS AT ALL each turn (its walls held: the defensive pick finds none), its Commercial Hub contract taken at t167 once healed"
+  impl: [cpu/core/minorBuild.ts:minorUnderThreat, gpu/core/sim_minorai.py:_minor_under_threat]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
-  notes: ["imported: cited by the code, in no dll_readings section"]
+    - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
   review: reviewed
 - addr: 0x5cdce0
   final: 0x3e1fa0

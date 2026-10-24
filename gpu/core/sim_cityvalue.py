@@ -2029,9 +2029,10 @@ class _MinorFacts:
             return 0
         return self._item_cost(u).long() if ui in (self.sim._builder_idx, self.sim._trader_idx) else int(self.sim._type_cost[ui])
 
-    # the pick's facts: no favoured items, the plain pick
+    # the pick's facts: no favoured items; the defensive pick where the city
+    # is under threat on the threat its city AI stored (`minorUnderThreat`)
     def defense(self):
-        return 0
+        return self.sim._minor_under_threat(self.s, self.sim.citystate_threat[:, self.s])
 
     def favored(self, item):
         return 0

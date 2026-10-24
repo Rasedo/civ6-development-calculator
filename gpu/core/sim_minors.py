@@ -1058,7 +1058,14 @@ class SimMinors:
         pct = self._progress_pct_of(self.citystate_techs[:, s].sum(dim=1), self.citystate_civics[:, s].sum(dim=1))
         if bool(is_d.any()):
             dv = (key - self._mk_d0).clamp(min=0, max=int(self._mb_d_base.shape[0]) - 1)
-            out = torch.where(is_d, self._progress_cost(self._mb_d_base.take(dv), self._mb_d_k.take(dv), pct).double(), out)
+            dfull = self._progress_cost(self._mb_d_base.take(dv), self._mb_d_k.take(dv), pct).double()
+            # a district's repair: the rest past the repair's resume percent
+            site = self.citystate_prod_site[:, s]
+            rep = torch.zeros_like(is_d)
+            for d in sorted({int(x) for x in dv[is_d].tolist()}):
+                rep = rep | (is_d & (dv == d) & self._minor_repairs_district_at(s, d, site))
+            dfull = torch.where(rep, dfull - torch.floor(dfull * self._mb_repair_resume_pct / 100), dfull)
+            out = torch.where(is_d, dfull, out)
         if bool(is_p.any()):
             P = self._mb_proj()
             pi = (key - self._mk_p0).clamp(min=0, max=int(P["pgb"].shape[0]) - 1)
@@ -1231,12 +1238,20 @@ class SimMinors:
             ok_h = ok_h & (spec - 1 < cap).unsqueeze(1)
         return elig & (ok | ok_h)
 
+    def _minor_repairs_district_at(self, s: int, dv: int, site: torch.Tensor) -> torch.Tensor:
+        """[B] — `minorRepairsDistrictAt` for engine district `dv`: the plot
+        `site` holds the minor's own `dv`, pillaged"""
+        row = self._CITY_MINOR0 + s
+        sc = site.clamp(min=0)
+        return ((site >= 0) & (self.district[self._bidx, sc] == dv) & self.district_pillaged[self._bidx, sc]
+                & (self.tile_seat[self._bidx, sc] == 100 + s) & (self.city_dist_tile[:, row, 0, dv] == site))
+
     def _minor_queue_ok(self, s: int, key: torch.Tensor, site: torch.Tensor) -> torch.Tensor:
         """[B] — `minorQueueOk`: may the minor's queue take the item now? A
         building it may raise (a worship building only the one its religion
         offers), a district its plot takes (the one it placed there among
-        them), a unit it may train, a project it may run (the walls' repair
-        while available)"""
+        them, the repair of its own pillaged one there), a unit it may train,
+        a project it may run (the walls' repair while available)"""
         row = self._CITY_MINOR0 + s
         is_u, is_b, is_d, is_p, _is_r = self._mk_kinds(key)
         ok = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -1254,6 +1269,8 @@ class SimMinors:
                 if bool(m.any()):
                     pl = self._minor_district_plane(s, dv, True, True)
                     ok = ok | (m & pl.gather(1, site.clamp(min=0).unsqueeze(1)).squeeze(1))
+                    # the repair of its own pillaged district there
+                    ok = ok | (m & self._minor_repairs_district_at(s, dv, site))
         if bool(is_p.any()):
             P = self._mb_proj()
             for pi in sorted({int(x) - self._mk_p0 for x in key[is_p].tolist()}):
@@ -1534,6 +1551,9 @@ class SimMinors:
                 dv = (item - self._mk_d0)[rr]
                 tt = site[rr]
                 self.district_complete[rr, tt] = True
+                # a repair stands the district unpillaged; its pillaged
+                # buildings wait for their own repairs
+                self.district_pillaged[rr, tt] = False
                 for d in sorted(set(dv.tolist())):
                     k = dv == d
                     r_d, t_d = rr[k], tt[k]

@@ -23,7 +23,7 @@ import { CIVICS } from '../data/civics';
 import {
   CITY_STATE_TYPE_DISTRICT, MINOR_BUILDER_PROD_PCT, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_HARBOR_PROD_PCT,
   MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD,
-  MINOR_WALLS_PROD_PCT, MINOR_REPAIR_RESUME_PCT, MINOR_CATCHUP_PCT,
+  MINOR_WALLS_PROD_PCT, MINOR_REPAIR_RESUME_PCT, MINOR_CATCHUP_PCT, CITY_STATE_MAX_HP,
 } from '../data/cityStates';
 import { ENCAMPMENT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
@@ -847,9 +847,20 @@ function minorPlaceDistrict(state: GameState, cityState: CityState, district: Di
   minorReplaceCitizens(state, cityState);
 }
 
+/** THE PLOT HOLDS THE MINOR'S OWN DISTRICT, PILLAGED: the district item at
+ *  its plot is that district's repair (runs/h1_duelw1127 Muscat t167-t168:
+ *  the pillaged Commercial Hub queued through "Build City District" and
+ *  standing repaired at t169) */
+export function minorRepairsDistrictAt(state: GameState, cityState: CityState, plot: number): boolean {
+  const t = state.map.tiles[plot];
+  return !!t.district && !!t.districtPillaged && tileSeat(t) === cityState.seat
+    && (cityState.districts ?? []).some((d) => d.tileIndex === plot && d.type === t.district);
+}
+
 /** May the minor's queue take the item now (0x5c9ea0 / 0x5ca170 / 0x5ca5a0 /
  *  0x5ca450)? A building it may raise, a district its plot takes (the one it
- *  placed there among them), a unit it may train, a project it may run. */
+ *  placed there among them, the repair of its own pillaged one there), a
+ *  unit it may train, a project it may run. */
 export function minorQueueOk(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): boolean {
   const unlocks = computeUnlocksIn(cityState.research, []); // a MINOR carries no roster row
   if ('building' in item) {
@@ -858,6 +869,7 @@ export function minorQueueOk(state: GameState, cityState: CityState, item: Exclu
   }
   if ('district' in item) {
     if (item.site < 0) return false;
+    if (state.map.tiles[item.site].district === item.district && minorRepairsDistrictAt(state, cityState, item.site)) return true;
     const owns = (t: Tile) => tileSeat(t) === cityState.seat;
     return canPlaceDistrictIn(state, minorCity(cityState), item.district, item.site, { unlocks, ownsTile: owns }).ok;
   }
@@ -1395,8 +1407,8 @@ export function minorTables(state: GameState, cityState: CityState, known: (unit
  *  a coastal centre, an air unit beside a complete Aerodrome, a Trader below
  *  the trade capacity, the Archaeologist with an Archaeological Museum; a
  *  city-state ignores the strategic resources), the district projects; no
- *  favoured items; the plain pick (the defensive one's inputs, the military
- *  AI's +0x4b8 and the city's threat, are not read). */
+ *  favoured items; the defensive pick where the city is under threat
+ *  (`minorUnderThreat`, on the threat its city AI stored). */
 export function minorPickFacts(state: GameState, cityState: CityState, facts: CityBuildFacts): PickFacts {
   return {
     buildingHeld: (b) => {
@@ -1419,8 +1431,23 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
       return !!id && minorProjectOk(state, cityState, id);
     },
     favored: () => 0,
-    defense: false,
+    defense: minorUnderThreat(cityState, cityState.threat ?? -1),
   };
+}
+
+/**
+ * 0x5cdc50, THE CITY UNDER THREAT — the test the contracts' eligibility
+ * (0x5f6050) and the defensive pick (0x5d4d70) read: the military AI's war
+ * footing (+0x4b8, a city-state's held clear as its combat desire holds
+ * it), or the city's threat (CityBuildAI +0x1b8) above -1 with its
+ * centre's hit points damaged (GetDamage 0x5e97d629 above 0). CityBuildAI
+ * +0x218, its other clause, has no writer read and stands clear. A threat
+ * alone does not make the city one under threat (runs/h1_duelw1124 Granada
+ * t42-t44: City Defense started at t42 with its centre whole, its Harbor
+ * kept and complete at t45).
+ */
+export function minorUnderThreat(cityState: CityState, threat: number): boolean {
+  return threat > -1 && (cityState.hp ?? CITY_STATE_MAX_HP) < CITY_STATE_MAX_HP;
 }
 
 /** The percent a minor's step pays toward the item on top of its Production:
@@ -1446,9 +1473,20 @@ export function minorItemPct(state: GameState, cityState: CityState, item: Minor
   return 0;
 }
 
+/** A minor's district's price: the row's own base; its repair, the
+ *  district standing pillaged on the plot, the rest past
+ *  `MINOR_REPAIR_RESUME_PCT` as a building's (runs/h1_duelw1127 Muscat t168:
+ *  the Commercial Hub resumed at 85 of 114) */
+function minorDistrictCost(state: GameState, cityState: CityState, district: DistrictId, site: number): number {
+  const full = districtScaledBase(cityState.research, district);
+  if (site < 0 || state.map.tiles[site].district !== district || !minorRepairsDistrictAt(state, cityState, site)) return full;
+  return full - Math.floor((full * MINOR_REPAIR_RESUME_PCT) / 100);
+}
+
 /** A minor's item's price: a unit's Production cost (a Builder's and a
- *  Trader's climbing), a building's (`minorBuildingCost`), a district's own
- *  base, a project's, a repair's rest past `MINOR_REPAIR_RESUME_PCT`. */
+ *  Trader's climbing), a building's (`minorBuildingCost`), a district's
+ *  (`minorDistrictCost`), a project's, a repair's rest past
+ *  `MINOR_REPAIR_RESUME_PCT`. */
 export function minorItemCost(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): number {
   return 'unit' in item
     ? (item.unit === 'BUILDER' ? builderCost(state, cityState.seat)
@@ -1456,7 +1494,7 @@ export function minorItemCost(state: GameState, cityState: CityState, item: Excl
     : 'building' in item ? minorBuildingCost(state, cityState, item.building)
       // the row's OWN base, not the specialty one: a minor builds real
       // districts too and the install prices an Aqueduct at 36
-      : 'district' in item ? districtScaledBase(cityState.research, item.district)
+      : 'district' in item ? minorDistrictCost(state, cityState, item.district, item.site)
         : 'project' in item ? projectCost(state, cityState.seat, item.project, minorCity(cityState))
           : minorBuildingCost(state, cityState, item.repair)
             - Math.floor((minorBuildingCost(state, cityState, item.repair) * MINOR_REPAIR_RESUME_PCT) / 100);
@@ -1502,6 +1540,9 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
     minorPlaceDistrict(state, cityState, item.district, item.site);
     const t = state.map.tiles[item.site];
     t.districtComplete = true;
+    // a repair stands the district unpillaged; its pillaged buildings wait
+    // for their own repairs (`minorRepairTarget`)
+    t.districtPillaged = false;
     if (item.district === 'ENCAMPMENT') {
       t.encampHp = ENCAMPMENT_HP;
       t.encampOuterHp = wallsMax(state, { buildings: cityState.buildings ?? [], seat: cityState.seat });

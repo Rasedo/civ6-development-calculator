@@ -210,6 +210,12 @@ class SimMinorAi:
 
     # -- the threat ---------------------------------------------------------
 
+    def _minor_under_threat(self, s: int, threat: torch.Tensor) -> torch.Tensor:
+        """[B] bool — `minorUnderThreat` (0x5cdc50): minor `s`'s threat above
+        -1 with its centre's hit points damaged (the war footing a
+        city-state's held clear, CityBuildAI +0x218 clear)"""
+        return (threat > -1) & (self.citystate_hp[:, s] < self._cs_max_hp)
+
     def _minor_threat(self, s: int) -> torch.Tensor:
         """[B] long — `minorThreat` (0x5cbd10) on minor `s`'s knowledge base's
         records, with no operation of its own: per player of the game in its
@@ -597,9 +603,29 @@ class SimMinorAi:
         # 0x5ce970's +0x54: an improvement the plot test takes, a plot
         # holding one among them, its own valued 0
         improvable = owned & ev & g.any(-1)
+        # the plot of the city's own pillaged district values that district
+        # alone, its repair (`minorRepairsDistrictAt`): per district row its
+        # plots, each other value FX(-9999)
+        held = self.city_dist_tile[:, row, 0]
+        repairs = []
+        rep_any = torch.zeros_like(valid)
+        for i, r in enumerate(dist_rows):
+            dv = int(E["district"][i])
+            if r["trait"] or r["type"] in ("DISTRICT_CITY_CENTER", "DISTRICT_WONDER") or dv < 0:
+                continue
+            tt = held[:, dv]
+            t0 = tt.clamp(min=0)
+            rep = (alive & (tt >= 0) & self.district_pillaged[self._bidx, t0] & (self.district[self._bidx, t0] == dv)
+                   & (self.tile_seat[self._bidx, t0] == seat))
+            hit = valid & (plots == tt.unsqueeze(1)) & rep.unsqueeze(1)
+            if bool(hit.count_nonzero()):
+                imps[hit] = _FX_MIN
+                dists[hit] = _FX_MIN
+                rep_any = rep_any | hit
+                repairs.append((i, r["type"], hit))
         out = {"plot": plots, "valid": valid, "owned": owned, "improvable": improvable, "near_owned": near,
                "imps": imps, "dists": dists}
-        if not bool(ev.count_nonzero()):
+        if not bool(ev.count_nonzero()) and not repairs:
             out["district_ok"] = torch.zeros_like(valid)
             return out
         hz = int(T["horizon"])
@@ -610,7 +636,6 @@ class SimMinorAi:
         # the districts the analysis values: no civilization's, no centre or
         # wonder, an engine row the city does not hold, the plot taking it
         # (research waived, any owner)
-        held = self.city_dist_tile[:, row, 0]
         cand_rows = []
         for i, r in enumerate(dist_rows):
             dv = int(E["district"][i])
@@ -663,7 +688,27 @@ class SimMinorAi:
                     continue
                 v = self._cv_district(pf, name, ti, torch.full_like(bb, hz))
                 dists[bb, pp, i] = torch.where(ci, v, torch.full_like(v, _FX_MIN))
-        out["district_ok"] = ev & ((dists > _FX_MIN) & (dists != 0)).any(-1)
+        # the repairs' values
+        for (i, dname, hit) in repairs:
+            ok_t = T["minor_dverdict"].to(dev)[self.citystate_type[:, s].clamp(min=0), i] >= 0
+            hk = torch.where(hit, ((imp + 1) * NR + (rid + 1)) * NF + (fid + 1), torch.full_like(plots, -1))
+            for k in torch.unique(hk[hit]).tolist():
+                bb, pp = (hk == k).nonzero(as_tuple=True)
+                ii = int(imp[bb[0], pp[0]])
+                ri = int(rid[bb[0], pp[0]])
+                fi = int(fid[bb[0], pp[0]])
+                pf = _PlotFacts(ctx, bb, pp,
+                                PN["improvement"][ii] if ii >= 0 else None,
+                                PN["resourceType"][ri] if ri >= 0 else None,
+                                PN["feature"][fi] if fi >= 0 else None,
+                                [(name, torch.zeros_like(bb, dtype=torch.bool)) for (_i, name, _dv, _pl, _ok) in cand_rows])
+                pf.repair_of = dname
+                ti = distT[i][bb]
+                if bool((ti > hz).all()):
+                    continue
+                v = self._cv_district(pf, dname, ti, torch.full_like(bb, hz))
+                dists[bb, pp, i] = torch.where(ok_t[bb], v, torch.full_like(v, _FX_MIN))
+        out["district_ok"] = (ev | rep_any) & ((dists > _FX_MIN) & (dists != 0)).any(-1)
         return out
 
     # -- the resource value --------------------------------------------------
@@ -1132,6 +1177,8 @@ class _PlotFacts:
         self._cand = cand
         # a district's rows value, once per plot group (`_cv_rows_value`)
         self.rows_memo = {}
+        # the plots' own pillaged district whose repair is valued, None none
+        self.repair_of = None
 
     def _at(self, x):
         """a [B] fact at the elements' games, or a number as is"""
@@ -1241,10 +1288,10 @@ class _PlotFacts:
         return not (row and row["removable"])
 
     def plot_district(self):
-        return None
+        return self.repair_of
 
     def plot_district_pillaged(self):
-        return 0
+        return 1 if self.repair_of is not None else 0
 
     def is_city(self):
         return 0
@@ -1378,7 +1425,7 @@ class _MinorWorld:
         return self.sim.citystate_center[:, self.s]
 
     def under_threat(self):
-        return self._threat > -1
+        return self.sim._minor_under_threat(self.s, self._threat)
 
     def _current_rows(self):
         sim = self.sim
@@ -1425,7 +1472,9 @@ class _MinorWorld:
             dv = int(self.E["district"][r])
             if dv < 0:
                 return torch.ones(sim.B, dtype=torch.bool, device=sim.device)
-            return ((sim.district == dv) & sim.district_complete & (sim.tile_seat == self.seat)).any(dim=1)
+            # held complete and unpillaged (a pillaged one's repair it takes)
+            return ((sim.district == dv) & sim.district_complete & ~sim.district_pillaged
+                    & (sim.tile_seat == self.seat)).any(dim=1)
         return self._rows_apply(row, one) | (row < 0)
 
     def can_train(self, row):
@@ -1581,6 +1630,11 @@ class _MinorWorld:
             pl = one(int(r))
             flat = plot.reshape(sim.B, -1)
             v = pl.gather(1, flat.clamp(min=0)).reshape(plot.shape)
+            # the plot of its own pillaged district takes that district's repair
+            dv = int(self.E["district"][int(r)]) if int(r) < len(self.E["district"]) else -1
+            if dv >= 0 and flat.shape[1] > 0:
+                rep = torch.stack([sim._minor_repairs_district_at(self.s, dv, flat[:, k]) for k in range(flat.shape[1])], dim=1)
+                v = v | rep.reshape(plot.shape)
             out = out | ((d == r) & v & (plot >= 0))
         return out
 

@@ -153,7 +153,9 @@ class CityTreeTables:
         self.b_faith = torch.tensor([bool(r["faithPurchase"]) for r in b], dtype=torch.bool)
         self.b_defensive = torch.tensor([r["defenseModifier"] > 0 or r["outerDefenseStrength"] > 0 for r in b], dtype=torch.bool)
         self.b_must_purchase = torch.zeros(len(b), dtype=torch.bool)
-        self.d_defensive = torch.zeros(len(self.district_rows), dtype=torch.bool)
+        # a district with hit points: the City Center, the Encampment and its
+        # replacements
+        self.d_defensive = torch.tensor([(r["hitPoints"] or 0) > 0 for r in self.district_rows], dtype=torch.bool)
         # ADD GOAL TECH's Goal Plot to work: per engine feature and resource
         # its AI row (-1 none); per improvement row the features it stands
         # on, the resources it works and those whose feature it keeps; per

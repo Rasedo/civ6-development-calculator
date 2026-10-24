@@ -8824,6 +8824,51 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   — beside the Barracks' and Stable's General point (ASK in "C-96 / C-97:
   the city build AI"). `pseudoYieldWeights`, `_MinorFacts.pseudo_w`.
 
+## C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ
+
+- THE CITY UNDER THREAT 0x5cdc50 (READ but +0x218's writer): true where
+  the player AI's [+0x12a0] +0x4b8 (the war footing) is set, else where
+  CityBuildAI +0x1b8 (the city's threat) is above -1 AND either the centre
+  district's GetDamage(0x5e97d629) — its hit points' damage — is above 0 or
+  CityBuildAI +0x218 is set. A threat alone is not enough. Its readers: the
+  contract eligibility 0x5f6050 (at 0x5f60c0, 0x5f62a1, 0x5f64a6) and the
+  Default Specialization's defensive pick; the defensive cancel 0x5d7640
+  opens with the same test inline (0x5d766a..0x5d76ac). Under threat
+  0x5f6050 passes a district only where its Districts row has +0x58 set and
+  +0x5c non-zero (0x5f62d3, 0x5f6304) — the hit points: the City Center,
+  the Encampment and its replacements (Ikanda, Oppidum, Thanh). The
+  engines: `minorUnderThreat` / `_minor_under_threat` (a city-state's war
+  footing held clear as `combatDesire`'s; +0x218 clear), the contracts'
+  `underThreat`, the pick's `defense`, `districtDefensive` / `d_defensive`.
+  Recorded: runs/h1_duelw1124 Granada t42 "City Defense, Started" with its
+  centre whole — its Harbor contract (Build City District, CONTRACT 90)
+  kept, complete t45 (AI_CityBuild.csv COMPLETED, VALUE 734.1), its Gold
+  6 -> 10 (the Harbor's +4) where the engine cancelled it for an Archer;
+  runs/h1_duelw1127 Muscat t160-t165, its centre damaged (38, 18, 43, 23, 3)
+  under major 0's army: NO BUILDS AT ALL each turn (Walls, Castle and Star
+  Fort held: the defensive pick finds nothing), PROJECT_REPAIR_OUTER_DEFENSES
+  at t166 once healed. LAB: +0x218's writer; the defensive cancel's body
+  (0x5d7640: the contract in hand or the item queued cancelled unless a
+  combat unit with no +0x40, a DefenseModifier building or a district with
+  hit points) unported — it acts only on a damaged centre.
+- A PILLAGED DISTRICT'S REPAIR (PARTLY READ): 0x7a51f0's own-district term
+  (the repair x2, +12500.0 at the centre) is reached by the plot analysis on
+  the plot holding the city's own pillaged district, which values that row
+  alone; CanConstruct takes it there. Recorded: runs/h1_duelw1127 Muscat
+  t160 its Commercial Hub pillaged (with its Market), "Build City District"
+  SUBMITTED on DISTRICT_COMMERCIAL_HUB at 5469.0; queued t167 (CONTRACT
+  660) once the centre healed; City_BuildQueue t168 the Hub at 85 of 114 —
+  the repair resumes at 100 - PILLAGE_BUILDING_REPAIR_PERCENT 25 of the
+  district's cost, as a building's — then the Market's repair (100 of 60,
+  resumed at 45) the same turn; Gold 6 -> 12.4 at t170. The engines:
+  `minorRepairsDistrictAt` / `_minor_repairs_district_at`, the plot
+  analysis, `districtBlocked` / `district_blocked` (complete and
+  unpillaged), the queue, `minorDistrictCost`, the completion unpillaging
+  it. LAB: the repair's T in the analysis (the district's build turns
+  taken), the game's two repairs completing in one step (the engines one a
+  step), the Market's own repair contract (SUBMITTED t165, the engines'
+  automatic building repair after the district).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

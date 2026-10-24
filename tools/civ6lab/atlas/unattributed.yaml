@@ -1826,10 +1826,14 @@
     - recording: h1_duelv1124
       turn: 51
       value: Muscat's Walls contract printed ACCEPTED once its Walls stood
-  impl: [cpu/core/aiContracts.ts:contractEligible]
+    - recording: h1_duelw1124
+      turn: 43
+      value: "Granada's Harbor contract kept under a threat with its centre whole (0x5cdc50 false), complete t45"
+  semantics: "under threat (0x5cdc50) a district only where its Districts row has hit points: +0x58 set and +0x5c non-zero (the City Center, the Encampment and its replacements)"
+  impl: [cpu/core/aiContracts.ts:contractEligible, cpu/core/minorCityAi.ts:minorTreeCity, gpu/core/sim_citytrees.py:contract_eligible]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
   context:
     - "...0 runs each city's listener 0x5d6050 in city order: a city that may take it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where..."
   review: reviewed

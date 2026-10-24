@@ -76,7 +76,7 @@ import { aiStrengths, moveTo, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import { minorTradeList } from './aiTrade';
 import {
-  installType, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts,
+  installType, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
   minorProjectFacts, minorResourceCounts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
 } from './minorBuild';
 
@@ -199,7 +199,10 @@ export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1
  * improvement the ground does not take, a district the plot cannot hold or
  * the city has, one the minor's type disfavours (`minorDistrictVerdict`):
  * FX(-9999). The centre and a district's plot stand
- * unanalysed (0). T: an improvement's the research and civics AIs' turns to
+ * unanalysed (0), but the plot of the city's own pillaged district, which
+ * values that district alone, its repair (`districtValue`: x2;
+ * runs/h1_duelw1127 Muscat t160: the Commercial Hub pillaged, "Build City
+ * District" submitted on it at 5469.0). T: an improvement's the research and civics AIs' turns to
  * its technology and civic (the larger), a district's its build turns plus
  * those. A flood's turns as the AI expects them (`floodHazardTurns`); LAB: the
  * eruption's turns unread, none; an inland
@@ -227,7 +230,9 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     const tile = map.tiles[plot];
     const owned = tileSeat(tile) === cs.seat;
     const nearOwned = !owned && neighbors(map, tile).some((n) => tileSeat(n) === cs.seat);
-    if (plot === cs.centerIndex || tile.district) {
+    // the plot of the city's own pillaged district: its repair is valued
+    const repair = minorRepairsDistrictAt(state, cs, plot);
+    if (plot === cs.centerIndex || (tile.district && !repair)) {
       out.push({ plot, owned, improvable: false, districtOk: false, nearOwned,
         improvements: AI_IMPROVEMENTS.map(() => 0), districts: AI_DISTRICTS.map(() => 0) });
       continue;
@@ -261,7 +266,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       },
       accumulationPct: accumulationPct(state, cs.seat, tile.terrain),
     };
-    const ground = owned ? groundImprovements(state, cs, tile) : new Set<string>();
+    const ground = owned && !repair ? groundImprovements(state, cs, tile) : new Set<string>();
     const improvements = AI_IMPROVEMENTS.map((row, i) => {
       const id = IMPROVEMENT_ENGINE.get(row.type);
       if (!id || !ground.has(id)) return FX_MIN;
@@ -289,8 +294,8 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       purchaseCost: tile.ownerSeat >= 0 ? 0 : candidates.has(plot) ? tilePurchaseCost(state, city, plot) : -1,
       lake: tile.terrain === 'LAKE',
       keepsFeature: () => !!f.feature && !FEATURE_ROW.get(f.feature)?.removable,
-      district: null,
-      districtPillaged: false,
+      district: repair ? districtType(tile.district!) : null,
+      districtPillaged: repair,
       isCity: false,
       districtAdjacency: districtAdj,
       rowsAdjacency: districtAdj,
@@ -317,7 +322,10 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
     const districts = AI_DISTRICTS.map((row, i) => {
       if (row.trait !== null || row.type === 'DISTRICT_CITY_CENTER' || row.type === 'DISTRICT_WONDER') return FX_MIN;
       const id = DISTRICT_ENGINE.get(row.type) ?? null;
-      if (!id || (cs.districts ?? []).some((c) => c.type === id) || !placeable(id)) return FX_MIN;
+      if (repair) {
+        // the pillaged district's plot values its own row alone
+        if (!id || id !== tile.district) return FX_MIN;
+      } else if (!id || (cs.districts ?? []).some((c) => c.type === id) || !placeable(id)) return FX_MIN;
       if (minorDistrictVerdict(cs.type, row.type) < 0) return FX_MIN;
       return districtValue(df, row.type, distT[i], AI_VALUE_HORIZON);
     });
@@ -378,19 +386,20 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
   evals: PlotEval[], threat: number): CityTreeCity {
   const city = minorCity(cs);
   return {
-    id: city.id, name: cs.name, underThreat: threat > -1,
+    id: city.id, name: cs.name, underThreat: minorUnderThreat(cs, threat),
     current: currentItem(cs),
     foundedTurn: cs.foundedTurn ?? -99,
     currentValue: cs.prodSetValue ?? FX_MIN,
     // CanConstruct refuses for good a building the city holds, a district it
-    // holds complete
+    // holds complete and unpillaged (a pillaged one's repair it takes)
     buildingBlocked: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !id || (cs.buildings ?? []).includes(id);
     },
     districtBlocked: (d) => {
       const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
-      return !id || (cs.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete);
+      return !id || (cs.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete
+        && !state.map.tiles[x.tileIndex].districtPillaged);
     },
     canTrain: (u) => pf.canTrain(u),
     trainsSea: facts.trainsDomain('DOMAIN_SEA'),
@@ -405,7 +414,9 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
       const r = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
       return { defensive: r.defenseModifier > 0 || r.outerDefenseStrength > 0, mustPurchase: false };
     },
-    districtDefensive: () => false,
+    // a district with hit points (DistrictInfo +0x58 set, +0x5c above 0):
+    // the City Center, the Encampment and its replacements
+    districtDefensive: (d) => (AI_DISTRICTS.find((r) => r.type === d)?.hitPoints ?? 0) > 0,
     evals, bestImprovement: -1, buildings: tables.buildings, units: tables.units,
     eventBuilding: eventBuilding(tables, pf), eventUnit: eventUnit(tables),
     buildingHeld: (b) => pf.buildingHeld(b),
@@ -464,7 +475,10 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     },
     canPlaceDistrict: (plot, d) => {
       const id = engineId('district', d, 'DISTRICT_', DISTRICTS) as DistrictId | null;
-      return !!id && canPlaceDistrictIn(state, minorCity(cs), id, plot, { unlocks: null, ownsTile: (t) => tileSeat(t) === cs.seat }).ok;
+      if (!id) return false;
+      // the plot of its own pillaged district takes that district's repair
+      if (state.map.tiles[plot].district === id && minorRepairsDistrictAt(state, cs, plot)) return true;
+      return canPlaceDistrictIn(state, minorCity(cs), id, plot, { unlocks: null, ownsTile: (t) => tileSeat(t) === cs.seat }).ok;
     },
     plotOwner: (plot) => tileSeat(state.map.tiles[plot]),
     plotGround: (plot) => plotGroundOf(state, cs.seat, plot),
@@ -702,9 +716,9 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
   };
   cs.unitValues = tables.units;
   if (!fresh) cs.resourceCounts = Object.fromEntries(minorResourceCounts(state, cs));
-  const pf = minorPickFacts(state, cs, facts);
   const threat = minorThreat(state, cs);
   cs.threat = threat;
+  const pf = minorPickFacts(state, cs, facts);
   cs.standingArmyShort = minorStandingArmy(state, cs);
   const evals = minorPlotEvals(state, cs, facts);
   const city = minorTreeCity(state, cs, facts, tables, pf, evals, threat);
