@@ -13320,14 +13320,10 @@ class SimSeats:
             trans_step = torch.where(
                 to_water, torch.full_like(land_cost, self._mp_scale),
                 self._mp_scale + terr)
-            w_end = torch.where(to_water, dc1.squeeze(1), hc)
-            l_end = torch.where(to_water, hc, dc1.squeeze(1))
-            easy_dock = (
-                (self.district.gather(1, w_end.unsqueeze(1)).squeeze(1) == self._harbor_didx)
-                # any city's centre, a city-state's included (`markCityCentre`)
-                | (self._centre_plane().gather(1, l_end.unsqueeze(1)).squeeze(1)
-                   & self.coastal_land.gather(1, l_end.unsqueeze(1)).squeeze(1))
-            )
+            # `stepCost`'s waiver (0x530420 / 0x530240): a FreeEmbark district
+            # (a city's centre, a city-state's included, or a Harbor) at the
+            # FROM or TO plot, the FROM plot's district complete
+            easy_dock = self._embark_waived(hc.unsqueeze(1), dc1).squeeze(1)
             cost = torch.where(
                 transition,
                 # CIV6 (EFFECT_ADJUST_UNIT_IGNORE_SHORES): the Knarr's units, the

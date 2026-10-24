@@ -11,7 +11,6 @@ class SimOrders:
         heal and the turn."""
         self.unit_promos[pr, ps] |= torch.ones_like(ps) << pk
         self.unit_level[pr, ps] += 1
-        self.unit_xp[pr, ps] = 0
         # "Upon selecting a promotion, a unit recovers 50 HP and its turn ends."
         _cap = int(self.rules.combat["unitHp"])
         self.unit_hp[pr, ps] = (self.unit_hp[pr, ps] + PROMOTE_HEAL).clamp(max=_cap)

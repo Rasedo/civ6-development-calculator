@@ -291,10 +291,7 @@
   impl:
     - cpu/core/minorBuild.ts:minorUnderThreat
     - gpu/core/sim_minorai.py:_minor_under_threat
-    - cpu/core/minorBuild.ts:freeCityPickFacts
-    - gpu/core/sim_cityvalue.py:_FreeFacts
     - cpu/core/aiContracts.ts:ContractCity
-    - cpu/core/minorBuild.ts:inHand
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"

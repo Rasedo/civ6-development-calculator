@@ -3110,6 +3110,19 @@ export function hostilePillage(state: GameState, unit: Unit): boolean {
   return false;
 }
 
+/** the plunder amount of what `hostilePillage` would wreck where the unit
+ *  stands (the improvement's, else the district's; 0 nothing), the Protect
+ *  Units execution's test (0x51a160 / 0x51a080 above 0) */
+export function hostilePillageAmount(state: GameState, unit: Unit): number {
+  const here = state.map.tiles[unit.tileIndex];
+  const hereOwned = isTerritorial(tileSeat(here)) && unitsHostile(state, unit, { seat: tileSeat(here) });
+  if (!hereOwned) return 0;
+  if (here.improvement && !here.pillaged) return IMPROVEMENTS[here.improvement as ImprovementId]?.plunder?.amount ?? 0;
+  if (here.district !== null && here.district !== 'CITY_CENTER' && here.district !== 'ENCAMPMENT' && here.districtComplete
+    && !here.districtPillaged) return DISTRICTS[here.district].plunder?.amount ?? 0;
+  return 0;
+}
+
 /** A BARBARIAN'S COASTAL RAID (the raid mission 0x95b7c0, its test
  *  0x95b100) on a land plot beside its ship: a raider with 3 Movement left
  *  (none for a raider that raids free) wrecks the plot's unpillaged

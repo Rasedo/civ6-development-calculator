@@ -26,6 +26,7 @@
   final: 0x367320
   kind: function
   status: PARTLY
+  impl: [cpu/core/combat.ts:hostilePillageAmount]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
@@ -37,6 +38,7 @@
   final: 0x367400
   kind: function
   status: PARTLY
+  impl: [cpu/core/combat.ts:hostilePillageAmount]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"

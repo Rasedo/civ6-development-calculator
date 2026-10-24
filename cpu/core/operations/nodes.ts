@@ -43,8 +43,10 @@ export interface DiplomacyRequest {
  *  members in the seat's units' turn: `flagged` the update's test — a
  *  member endangered (the team update's list, 0x738f20), hurt to the
  *  percentage or fortified in danger; `execute` the execution's — the
- *  endangered to their safe plots, the hurt released off friendly ground,
- *  moved off a plot of danger, fortified — its lines, the units released */
+ *  endangered to their safe plots; the hurt promoted where a promotion is
+ *  due, released off friendly ground, pillaging where the plot pays a plunder,
+ *  moved off a plot of danger (a barbarian not), fortified — its lines, the
+ *  units released */
 export interface DefendOrders {
   flagged(members: readonly number[], pct: number): boolean;
   execute(members: readonly number[], target: number, pct: number, range: number):

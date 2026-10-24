@@ -141,10 +141,16 @@ export function unitLevel(unit: { level?: number }): number {
   return unit.level ?? 1;
 }
 
-/** the XP this unit still owes for its next level; 0 once it is maxed. */
+/** the experience a unit's next level needs, counted from its first: a
+ *  unit's experience is never spent, so each level adds 15 x the level the
+ *  unit stands on — 15 for level 2, 45 for level 3, 90 for level 4; 0 once
+ *  it is maxed. The records hold it so: runs/h1_duelw1121, a unit at level 2
+ *  keeps the 15 it was promoted on (t6 1:131073, t72 2:1441793 15 -> 16),
+ *  a level-2 unit with 45 is promoted to level 3 (t122 2:1900545), and
+ *  2:2883584, level 3 with 54 from t194, takes no promotion. */
 export function xpToNextLevel(unit: { level?: number }): number {
   const lvl = unitLevel(unit);
-  return lvl >= MAX_LEVEL ? 0 : XP_PER_LEVEL * lvl;
+  return lvl >= MAX_LEVEL ? 0 : (XP_PER_LEVEL * lvl * (lvl + 1)) / 2;
 }
 
 /** has the unit banked its next level and not yet spent it? */
@@ -391,7 +397,6 @@ export function takePromotion(unit: Unit, k: number): boolean {
   if (!promoReady(unit) || !promoAvailable(unit, k)) return false;
   unit.promos = (unit.promos ?? 0) | (1 << k);
   unit.level = unitLevel(unit) + 1;
-  unit.xp = 0;
   unit.hp = Math.min(UNIT_HP, unit.hp + PROMOTE_HEAL);
   unit.movesLeft = 0;
   // CIV6 (Orator): "Can spread Religion 2 extra times." An Apostle picks its

@@ -1219,9 +1219,11 @@ class SimMasks:
     # and no float ever touches the result.
 
     def _xp_to_next(self, level: torch.Tensor) -> torch.Tensor:
-        """`xpToNextLevel` — the XP this unit still owes; 0 once it is maxed."""
+        """`xpToNextLevel` — the experience the next level needs, counted from
+        the first (15 x L(L+1)/2 at level L: experience is never spent); 0
+        once it is maxed."""
         mx, per = self._promo_max_level, self._promo_xp_per_level
-        return torch.where(level >= mx, torch.zeros_like(level), per * level)
+        return torch.where(level >= mx, torch.zeros_like(level), torch.div(per * level * (level + 1), 2, rounding_mode="floor"))
 
     def _bank_xp(self, xp: torch.Tensor, level: torch.Tensor, gain: torch.Tensor) -> torch.Tensor:
         """the new xp pool: it clamps at the level's requirement and stops.

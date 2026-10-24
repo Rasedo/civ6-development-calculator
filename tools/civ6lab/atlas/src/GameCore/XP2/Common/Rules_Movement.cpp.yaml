@@ -23,6 +23,10 @@
       value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
     - recording: 1117
       value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+  impl:
+    - cpu/core/units.ts:stepCost
+    - gpu/core/sim_seats.py:_step_verb
+    - gpu/core/sim_tactics.py:_embark_waived
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes:
@@ -40,6 +44,10 @@
       value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
     - recording: 1117
       value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+  impl:
+    - cpu/core/units.ts:stepCost
+    - gpu/core/sim_seats.py:_step_verb
+    - gpu/core/sim_tactics.py:_embark_waived
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes:

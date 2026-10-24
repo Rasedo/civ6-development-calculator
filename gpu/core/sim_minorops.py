@@ -2123,19 +2123,31 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
 
 
 def _x_attack_city(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
-    """OPERATION ATTACK CITY's execution (0x8109e0): the list's COMBAT_DISTRICT
-    targets within 3 of the target — about a city-state's own city one only
-    at war with a city's owner beside it; the assignment over a district
-    target is the TS twin's alone"""
-    tg = c.view["tg"]
-    t = sim.mops_target[:, c.s, c.k].clamp(min=0)
-    near = (tg["dk"] == 1) & (sim.pair_dist[t] <= 3)
-    u = sim._mops_units(c.s)
-    any_m = torch.zeros_like(on)
+    """OPERATION ATTACK CITY's execution (0x8109e0, `attackCityExecute`): per
+    team its members alive with Movement left, the list's COMBAT_DISTRICT
+    targets within 3 of the operation's target, the assignment over them (no
+    exchange filter, the survival filter on) carried out"""
+    s, k = c.s, c.k
+    view = c.view
+    op, tg, done = view["op"], view["tg"], view["done"]
+    if op["tg"] is None:
+        return
+    seat = 100 + s
+    tgt = sim.mops_target[:, s, k]
+    near = (tg["dk"] == 1) & (sim.pair_dist[tgt.clamp(min=0)] <= 3) & (on & (tgt >= 0)).unsqueeze(1)
+    if not bool(near.any()):
+        return
+    ai = torch.where(op["units"], torch.where(sim.major_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
     for ti in range(N_TEAMS):
-        any_m |= (sim._mops_member_mask(c.s, c.k, ti) & u["own"] & (u["mp"] > 0)).any(dim=1)
-    if bool((on & any_m & near.any(dim=1)).any()):
-        raise NotImplementedError("minor operations: Operation Attack City over a district target (the TS twin's assignment)")
+        u = sim._mops_units(s)
+        mem = sim._mops_member_mask(s, k, ti) & u["own"]
+        units = mem & (u["mp"] > 0) & on.unsqueeze(1) & (op["rowof"] >= 0)
+        if not bool((units.any(dim=1) & near.any(dim=1)).any()):
+            continue
+        out = sim._tac_assign(units, op["order"], ai, near, op["res"], op["rowof"], tg["uu"], torch.zeros_like(on), True,
+                              torch.zeros_like(tg["dk"]), sim._arange_bt, sim._tac_peers(mem, "major"), "major", seat,
+                              district=True)
+        sim._tac_carry_out(out, done, op["rowof"], op["res"], "major", seat)
 
 
 def _defend_pct(c: _OpCtx, i: int) -> int:
@@ -2169,15 +2181,76 @@ def _u_defend(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     return _status(c, BT_SUCCESS)
 
 
+def _promote_due(sim, m: torch.Tensor, uc: torch.Tensor) -> None:
+    """a promotion due taken where `m` by the minor's unit at the major
+    pool's slot `uc` [B]: the AI's pick (`aiPromotionPick`, the first row of
+    the highest Level it may take), `takePromotion` (its turn spent)"""
+    if not bool(m.any()):
+        return
+    rd = sim.rules_dev
+    B, dev = sim.B, sim.device
+    g = (uc + sim.POOL_LO["major"]).unsqueeze(1)
+    utp = sim.unit_type.gather(1, g)
+    ok = sim._promo_offer_mask(g, utp) & m.view(B, 1, 1)
+    has = ok.any(dim=2).squeeze(1)
+    if not bool(has.any()):
+        return
+    P = rd.promo_cols
+    tier = rd.promo_tier[rd.u_promo_class.take(utp.clamp(min=0)).clamp(min=0)]
+    col = torch.arange(P, device=dev).view(1, 1, -1)
+    key = torch.where(ok, tier * P + (P - 1 - col), torch.full_like(tier, -1))
+    pick = key.argmax(dim=2).squeeze(1)
+    r = has.nonzero(as_tuple=True)[0]
+    sim._take_promotion(r, g[r, 0], pick[r], utp[r, 0])
+    sim._gen_ver += 1
+
+
+def _plunder(sim, m: torch.Tensor, uc: torch.Tensor, plot: torch.Tensor) -> None:
+    """`hostilePillageAmount` above 0, then `hostilePillage`, where `m` (the
+    plot's owner one the minor fights) for its unit at the major pool's slot
+    `uc` [B] on `plot` [B]: an unpillaged improvement's plunder, else a
+    complete district's (no centre, no Encampment); the wreck, its turn
+    spent; a minor banks no purse, a HEAL plunder heals the unit"""
+    if not bool(m.any()):
+        return
+    b = torch.arange(sim.B, device=sim.device)
+    imp = sim.improvement[b, plot]
+    i_on = (imp >= 0) & ~sim.pillaged[b, plot]
+    iv = imp.clamp(min=0)
+    pi = m & i_on & (sim._imp_plun_amt[iv] > 0)
+    dv_raw = sim.district[b, plot]
+    dv = dv_raw.clamp(min=0)
+    pd = (m & ~i_on & (dv_raw >= 0) & (dv_raw != sim._encamp_didx) & sim.district_complete[b, plot]
+          & ~sim.district_pillaged[b, plot] & (sim.centre_slot_at[b, plot] < 0) & (sim._d_plun_amt[dv] > 0))
+    if not bool((pi | pd).any()):
+        return
+    kind = torch.where(pi, sim._imp_plun_kind[iv], sim._d_plun_kind[dv])
+    amt = torch.where(pi, sim._imp_plun_amt[iv], sim._d_plun_amt[dv])
+    sim.pillaged[b[pi], plot[pi]] = True
+    sim.district_pillaged[b[pd], plot[pd]] = True
+    if bool(pd.any()):
+        sim._air_scatter_from(b[pd], plot[pd])
+    did = pi | pd
+    cap = int(sim.rules.combat["unitHp"])
+    heal = did & (kind == 1) & (amt > 0)
+    hp = sim.major_unit_hp[b, uc]
+    sim.major_unit_hp[b, uc] = torch.where(heal, (hp + amt.to(hp.dtype)).clamp(max=cap), hp)
+    sim.major_unit_mp[b, uc] = torch.where(did, torch.zeros_like(sim.major_unit_mp[b, uc]), sim.major_unit_mp[b, uc])
+    sim._eff_version += 1
+    sim._tac_cost_held = None
+
+
 def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """OPERATION DEFEND UNITS' execution (0x80d790) where marked, per team
     over its members outside Protect Outside Range of the target: the
     endangered — not bombard, with Movement, out of a city — to their safe
-    plots (0x716b90); then the hurt (or fortified afloat in danger), not
-    bombard: one not dug in off friendly ground released from the team; one
-    fortified afloat to its safe plot; one with Movement on the ground of a
-    player it is at war with or a plot of danger to its safe plot; each fortified (its turn
-    ends where it stands)"""
+    plots (0x716b90); then the hurt (or fortified afloat in danger): a
+    promotion due taken (`_promote_due`); not bombard: one not dug in off
+    friendly ground released from the team; one fortified afloat to its safe
+    plot; one with Movement on a plot paying a plunder pillages it
+    (`_plunder`); one with Movement on the ground of a player it is at war
+    with or a plot of danger to its safe plot; each fortified (its turn ends
+    where it stands)"""
     s, k = c.s, c.k
     g = on & (c.ma[:, i] == 1)
     if not bool(g.any()):
@@ -2246,6 +2319,9 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             afloat = (fort >= 2) & wat & dang
             ok &= sim._mops_hurt(us, pct) | afloat
             ut = sim.major_unit_type[b, uc].clamp(min=0, max=sim.NU - 1)
+            # a promotion due: the AI's pick, its turn done
+            _promote_due(sim, ok, uc)
+            done[b, uc] = torch.where(ok & (sim.major_unit_mp[b, uc] <= 0), True, done[b, uc])
             ok &= sim._type_bombard.take(ut) <= 0
             if not bool(ok.any()):
                 continue
@@ -2259,6 +2335,8 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             owner = sim.tile_seat[b, plot]
             orow = sim._seat_row.take(owner.clamp(min=0, max=sim._seat_row.numel() - 1))
             war = (owner >= 0) & (owner != seat) & sim.war[b, int(sim._seat_row[seat])].gather(1, orow.unsqueeze(1)).squeeze(1)
+            # with Movement, a pillage where the plot pays a plunder
+            _plunder(sim, ok & (sim.major_unit_mp[b, uc] > 0) & war, uc, plot)
             dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
             to_safe(us, ok & (sim.major_unit_mp[b, uc] > 0) & (war | dang), False)
             ok &= live(us)

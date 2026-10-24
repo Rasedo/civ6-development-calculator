@@ -5703,6 +5703,12 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   player it fights (0x469cd0) or of danger, to its safe plot ("Move", then
   its turn ends 0x56d6f0); then, still on the map, fortified (0x56ef30's
   mission, "Fortify"). Each order sets the unit's turn done (0x570b40).
+  The promotion ("Operation Protect Units, %s, Promote") and the plunder
+  ("Plunder %d %d": the pillage mission 0x963190 where it may, the plot's
+  district (0x51a080) or improvement (0x51a160, the row's +0x48 scaled by
+  the player's progress) paying above 0) are ported (`passDefend`,
+  `hostilePillageAmount`; `_promote_due`, `_plunder`); the danger move skips
+  a barbarian (0x469ce0).
 - THE TEAM UPDATE'S ENDANGERED (0x738f20, +0xa0, cleared each tick): per
   live member, each entry of the player's target list (+0x370, 40 bytes)
   within twice its base Movement (0x56d9f0): an entry's unit (kind 1) that
@@ -6266,7 +6272,7 @@ gpu/core/sim_tactics.py.
   the Royal Navy Dockyard) stands at the FROM plot, or at the TO plot — the
   completion (0x811b0) read off the FROM plot's district in both cases (t72:
   2's Swordsman embarking from (15,6) onto its complete Harbor (14,7) plans
-  (1/0), the embarking paid). Mathematics' MODIFIER_PLAYER_UNITS_ADJUST_SEA_
+  (1/0), the embarking paid; ported: `stepCost`, `_embark_waived`). Mathematics' MODIFIER_PLAYER_UNITS_ADJUST_SEA_
   MOVEMENT reaches a hull alone (t78: 2's embarked Swordsman plans on 2
   Movement with Mathematics).
 - Measured (the action replay on 1117, 1121, 1124, 1127, 1128: each turn's
@@ -9078,3 +9084,18 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   Harness section's Moments BUILD line).
 
 Every other rule read above ships on both engines.
+
+## C-99: a unit's experience is never spent — LAB on the records, ported
+
+The records' unit rows (`xp`, `level`): the experience a unit holds counts
+from its first, kept through its promotions; the next level needs 15 x
+L(L+1)/2 at level L (15, 45, 90, ...). runs/h1_duelw1121: 1:131073 promoted
+to level 2 at t6 keeps its 15; 2:1441793 at t72 holds 16 at level 2 the turn
+after its promotion on 15; 2:1900545 at level 2 with 45 is promoted to level
+3 at t122 (46); 2:1966080 goes from level 1 with 3 to level 3 with 49 in one
+turn; 2:2883584, an Infantry at level 3 with 54 from t194, takes no promotion
+(the engines, spending a level's experience at each promotion, read 54 above
+level 3's 45 and promoted it every turn: 48 of 56 of its turns off). The
+promotion flag (+0x1bc0 +8, read by 0x116f80) and its writer are unread.
+Ported: `xpToNextLevel` / `_xp_to_next` the cumulative threshold,
+`takePromotion` / `_take_promotion` keep the experience.

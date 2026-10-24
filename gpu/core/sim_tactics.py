@@ -453,7 +453,6 @@ class SimTactics:
         if any_embark:
             entry_n = self._tac_entry()[rows]
             ctr_n = self._centre_plane()[rows]
-            coastal_n = self.coastal_land[rows]
             ut_pool = getattr(self, f"{pre}_unit_type")
             ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, slots]
             cliffs_b = self._tac_cliffs(seat)
@@ -545,10 +544,7 @@ class SimTactics:
                 # one Movement at most into a city
                 tw = water_n.gather(1, nbc)
                 tr = (fw != tw) & (nb >= 0)
-                w_end = torch.where(tw, nbc, best.unsqueeze(1).expand(-1, 6))
-                l_end = torch.where(tw, best.unsqueeze(1).expand(-1, 6), nbc)
-                dock = (self.district[rows].gather(1, w_end) == self._harbor_didx) | (
-                    ctr_n.gather(1, l_end) & coastal_n.gather(1, l_end))
+                dock = self._embark_waived(best.unsqueeze(1).expand(-1, 6), nbc, rows)
                 tcost = torch.where(tw, torch.full_like(cst, self._mp_scale), entry_n.gather(1, nbc))
                 tcost = tcost + torch.where(dock | ign_shore.unsqueeze(1), 0, self._embark_transition_mp)
                 tcost = torch.where(ctr_n.gather(1, nbc), tcost.clamp(max=self._mp_scale), tcost)
@@ -792,10 +788,8 @@ class SimTactics:
         tw = self.water[rows, to]
         mp1 = torch.full_like(frm, self._mp_scale)
         land = self._tac_cost()[rows, frm, dcol]
-        w_end = torch.where(tw, to, frm)
-        l_end = torch.where(tw, frm, to)
         ctr = self._centre_plane()
-        dock = (self.district[rows, w_end] == self._harbor_didx) | (ctr[rows, l_end] & self.coastal_land[rows, l_end])
+        dock = self._embark_waived(frm.unsqueeze(1), to.unsqueeze(1), rows).squeeze(1)
         trans = torch.where(tw, mp1, self._tac_entry()[rows, to])
         trans = trans + torch.where(dock | ign_shore, torch.zeros_like(trans),
                                     torch.full_like(trans, self._embark_transition_mp))
@@ -3086,6 +3080,20 @@ class SimTactics:
                 cs = self._embarked_def_cs(torch.full((self.B,), int(sv), dtype=torch.long, device=self.device))
                 out = torch.where(emb & (seat == sv), cs.unsqueeze(1).to(out.dtype), out)
         return out
+
+    def _embark_waived(self, frm: torch.Tensor, to: torch.Tensor, rows: torch.Tensor | None = None) -> torch.Tensor:
+        """`stepCost`'s embark waiver (the embark rule 0x530420, the
+        disembark 0x530240) for the steps `frm` -> `to` ([N, K] plots of the
+        games `rows`, every game where None): a district with FreeEmbark —
+        a city's centre or a Harbor — at either plot, the FROM plot's
+        district complete (0x811b0 read off the FROM plot)"""
+        dist = self.district if rows is None else self.district[rows]
+        comp = self.district_complete if rows is None else self.district_complete[rows]
+        ctr = self._centre_plane() if rows is None else self._centre_plane()[rows]
+        f_d, t_d = dist.gather(1, frm), dist.gather(1, to)
+        f_c, t_c = ctr.gather(1, frm), ctr.gather(1, to)
+        fe = (f_d == self._harbor_didx) | f_c | (t_d == self._harbor_didx) | t_c
+        return fe & (f_c | ((f_d >= 0) & comp.gather(1, frm)))
 
     def _danger_plane(self, seat: int, need: torch.Tensor) -> torch.Tensor:
         """[B, T] long — `dangerPlane`, `seat`'s danger map, on the plots of

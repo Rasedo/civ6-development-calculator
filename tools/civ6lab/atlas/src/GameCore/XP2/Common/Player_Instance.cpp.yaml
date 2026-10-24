@@ -178,6 +178,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ..., +0x1b9 bit 0x40 MakeTradeRoute, bit 2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDENAGE_POINT, f2e214..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...plot reads no danger. - THE NON-BARBARIAN PRIORITIES (TacticalAI +0xa8 = 0x787000 for any player   0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a   district of the player's own: its cit..."

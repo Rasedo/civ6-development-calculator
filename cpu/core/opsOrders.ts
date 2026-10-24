@@ -10,15 +10,15 @@
 import type { GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
-import { attacksLeftOf } from './promotions';
-import { cityStrikeStrength, damageExpected, hostileRangedStrike, unitAttackRange } from './combat';
+import { aiPromotionPick, attacksLeftOf, takePromotion } from './promotions';
+import { cityStrikeStrength, damageExpected, hostilePillage, hostilePillageAmount, hostileRangedStrike, unitAttackRange } from './combat';
 import { aiStrengths, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passNavalPillage, passPatrol, passSafePlot, plotDistance, rangeOf,
   type Pass } from './tactical';
 import type { OpsEnv } from './operations/manager';
 import type { DefendOrders } from './operations/nodes';
 import { unitDomain } from './units';
 import { CITY_STRIKE_RANGE } from './phase';
-import { allianceTypeWith, cityAtTile, cityStateOfSeat, civsAtWar, isCityStateSeat, tileSeat } from './seats';
+import { allianceTypeWith, cityAtTile, cityStateOfSeat, civsAtWar, isBarbSeat, isCityStateSeat, tileSeat } from './seats';
 import { NO_SEAT, type City } from './types';
 import { cityStateAt, minorCity } from './cityStates';
 import { COMBAT_MAX_HIT_POINTS } from '../data/constants';
@@ -171,6 +171,13 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
         if (!state.units.includes(u) || u.movesLeft <= 0 || !off(u, target, range)) continue;
         const afloat = fortified(u) && isWater(state.map.tiles[u.tileIndex]) && pass.danger[u.tileIndex] > 0;
         if (!hurt(u, pct) && !afloat) continue;
+        // a promotion due: the AI's pick, its turn done
+        const k = aiPromotionPick(u);
+        if (k >= 0 && takePromotion(u, k)) {
+          passFinish(pass, u, 'Operation', u.tileIndex);
+          lines.push({ type: type(u), what: 'Promote' });
+          changed();
+        }
         if (aiStrengths(state, u).bombard > 0) continue;
         if ((u.fortifyTurns ?? 0) === 0 && groundOf(state, seat, u.tileIndex) !== 1) {
           released.push(u.id);
@@ -186,7 +193,14 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
           }
           if (!state.units.includes(u)) continue;
         }
-        if (u.movesLeft > 0) {
+        // with Movement, a pillage where the plot pays a plunder
+        if (u.movesLeft > 0 && hostilePillageAmount(state, u) > 0) {
+          const at = u.tileIndex;
+          hostilePillage(state, u);
+          lines.push({ type: type(u), what: `Plunder ${xy(at)}` });
+          changed();
+        }
+        if (u.movesLeft > 0 && !isBarbSeat(seat)) {
           const owner = tileSeat(state.map.tiles[u.tileIndex]);
           if ((owner !== NO_SEAT && owner >= 0 && civsAtWar(state, seat, owner)) || pass.danger[u.tileIndex] > 0) {
             const to = passSafePlot(state, pass, u);

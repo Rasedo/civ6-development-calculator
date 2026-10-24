@@ -21,7 +21,7 @@ export function formationCS(unit: Unit): number {
 const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, directionTo, DIR_E, DIR_W } from '../../world/hex';
-import { isWater, isImpassable, isMountain, isCoastalLand, canalPassage, hullTile, naturalWonderAt } from '../../world/query';
+import { isWater, isImpassable, isMountain, canalPassage, hullTile, naturalWonderAt } from '../../world/query';
 import { canRemoveFeature, portalAt, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
@@ -946,11 +946,16 @@ export function stepCost(state: GameState, unit: { type: string; seat: number; p
   let cost: number;
   if (!transition) cost = moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
   else {
-    const wEnd = isWater(to) ? to : from;
-    const lEnd = isWater(to) ? from : to;
-    const easyDock = wEnd.district === 'HARBOR'
-      || (lEnd.district === 'CITY_CENTER' && isCoastalLand(state.map, lEnd))
-      || ignoresShores(state, unit);
+    // the embark rule 0x530420 (land to water) and the disembark 0x530240
+    // waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (the City
+    // Center, the Harbor and its replacements) stands at the step's FROM or
+    // TO plot, its completion (0x811b0) read off the FROM plot's district
+    // in both cases: a land unit embarking from a plot of no district onto
+    // a complete Harbor pays (runs/h1_duelw1121 t72, city-state 2's
+    // Swordsman from (15,6) onto (14,7) plans (1/0))
+    const freeEmbark = (t: Tile) => t.district === 'HARBOR' || t.district === 'CITY_CENTER';
+    const fromComplete = from.district === 'CITY_CENTER' || (from.district !== null && !!from.districtComplete);
+    const easyDock = ((freeEmbark(from) || freeEmbark(to)) && fromComplete) || ignoresShores(state, unit);
     cost = moveCostInto(state, from, to, unit) + (easyDock ? 0 : EMBARK_TRANSITION_MP);
   }
   // CIV6 (GlobalParameters CITY_MOVEMENT_COST 1; the movement cost's city
