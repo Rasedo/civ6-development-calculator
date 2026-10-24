@@ -1,6 +1,7 @@
 
 import type { City, CityState, CityStateType, GameState, QueueItem, Yields } from './types';
 import { giveQuest } from './quests';
+import { suzerainSight } from './fog';
 import { NO_SEAT, cityStateOfSeat, isCiv, civsAtWar, emptySeat, isCityStateSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileBelongsTo, tileSeat, hiddenResourcesFor, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
 import { cancelRoutes } from './trade';
 import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
@@ -331,7 +332,13 @@ export function resolveSuzerain(state: GameState, cityState: CityState): void {
       tied = true;
     }
   }
+  const was = cityState.suzerain ?? -1;
   cityState.suzerain = bestN >= SUZERAIN_ENVOYS && !tied ? best : -1;
+  // a new suzerain sees what the minor has revealed and sees (runs/h1_duelw11*: every major
+  // made suzerain holds the minor's territory and the plots beside it
+  // revealed in the record it is first suzerain in — 1121 China of Hunza,
+  // t42, 34 of the 35 plots it reveals the minor's revealed ones)
+  if (cityState.suzerain !== was && isCiv(cityState.suzerain)) suzerainSight(state, cityState.seat, cityState.suzerain);
 }
 
 /**

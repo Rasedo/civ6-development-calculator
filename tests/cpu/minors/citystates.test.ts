@@ -13,7 +13,8 @@ import { borderCandidates, computeCityStats } from '../../../cpu/core/city';
 import { tilesWithin, hexDistance } from '../../../world/hex';
 import { assignEnvoy, cityStateEnvoyBonuses, cityStateItemProduction, envoysOf, isSuzerain, suzerainSciencePct } from '../../../cpu/core/cityStates';
 import { tradeCapacity, addCsTradeRoute, cityTradeYields } from '../../../cpu/core/trade';
-import { ENVOY_COST, GENEVA_SCIENCE_PCT } from '../../../cpu/data/cityStates';
+import { GENEVA_SCIENCE_PCT } from '../../../cpu/data/cityStates';
+import { envoyThreshold } from '../../../cpu/core/phase';
 import { type CityState, type CityStateType, type GameState } from '../../../cpu/core/types';
 
 function addCs(
@@ -140,14 +141,14 @@ describe('envoys', () => {
     expect(assignEnvoy(state, met.id, 0).ok).toBe(false); // pool empty
   });
 
-  it('influence accrues into envoys once someone is met', () => {
+  it('influence accrues into envoys, met or not', () => {
     const state = makeState();
     foundCity(state, tileAtCoords(state.map, 4, 4).index, 0); // the seat loop skips cityless seats
-    addCs(state, 9, 9);
-    seatOf(state, 0)!.influencePoints = ENVOY_COST - 2;
+    const cost = envoyThreshold(state, 0);
+    seatOf(state, 0)!.influencePoints = cost - 1;
     seatPhase(state); // influence accrues in the SEAT phase, per actor
     expect(seatOf(state, 0)!.envoysAvailable).toBe(1);
-    expect(seatOf(state, 0)!.influencePoints).toBeLessThan(ENVOY_COST);
+    expect(seatOf(state, 0)!.influencePoints).toBeLessThan(cost);
   });
 
   it('aggregates bonuses across several city-states', () => {

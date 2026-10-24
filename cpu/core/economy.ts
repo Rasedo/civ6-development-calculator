@@ -242,9 +242,14 @@ export function applyLumpYield(
     lumpFood(city, amount, state.turn);
     return;
   }
+  // CIV6 (the harvest's AddProgress 0x16f6e0 → City_BuildQueue 0x16f050):
+  // the lump is a queue step of its own, paying the overflow store in with
+  // it (runs/h1_duelw1121 Xi'an t11: the Monument's 8 overflow and the
+  // Woods' 11 put the Great Bath at 19 before the turn's step)
   if (city.queue.length > 0) {
     const before = city.queue[0].progress;
-    city.queue[0].progress += amount;
+    city.queue[0].progress += amount + (city.productionBank ?? 0);
+    city.productionBank = 0;
     repairDrip(state, city, before);
   } else {
     city.productionBank = (city.productionBank ?? 0) + amount;

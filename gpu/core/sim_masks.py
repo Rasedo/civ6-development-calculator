@@ -2977,13 +2977,14 @@ class SimMasks:
         WIRED — the full TS reveal-site set: t0 fixture load (r2/unit), the
         three major spawn bodies (r2), both founding bodies (`_city_look`),
         every walk hop through _step_verb's one tile write (r2 — all movers
-        route there), tile acquisition r1 at both sites (border growth on
+        route there), the melee victor's advance onto the plot it emptied
+        (`_unit_look`), tile acquisition r1 at both sites (border growth on
         every seat row, the driven tile buy), and the captor's `_city_look`
         at every capture body (`_transfer_city` for city captures and transfers,
         `_capture_city_state` for both CS conquests). NOT reveals on either
-        engine: the melee advance-into-freed-tile and unit capture/transfers
-        (TS writes tileIndex directly — no stepUnit, no reveal), and a goody
-        hut, whose reward table in the install carries no maps arm.
+        engine: unit capture/transfers (TS writes tileIndex directly — no
+        stepUnit, no reveal), and a goody hut, whose reward table in the
+        install carries no maps arm.
         `placed` (`majorLook`'s): the look is the seat's own unit's stepping
         there — a unit's look (`see_through` given) unless a city-state's it
         is suzerain of lends it (`_suzerain_look`)."""

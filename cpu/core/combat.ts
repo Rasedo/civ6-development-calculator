@@ -38,7 +38,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
 import { ATHEISM_PRESSURE_PER_POP, ENHANCER_BELIEFS, JUST_WAR_RANGE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
-import { cityLook, isExplored } from './fog';
+import { cityLook, isExplored, revealAround, unitSight, unitSeesThrough } from './fog';
 import { wipeConstruction } from './production';
 import {
   XP_BARB_VETERAN, XP_CITY_ATTACK, XP_CITY_DEFEND, XP_CITY_FELLED,
@@ -2110,6 +2110,11 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     if (!def.naval && !waterWalks(attacker.type)) {
       attacker.embarked = isWater(state.map.tiles[targetIndex]);
     }
+    // ...and looks from the plot it entered, as a step does
+    // (runs/h1_duelw1121 t33: Rome's Warrior kills the barbarians' Scout on
+    // the wooded hill at (38,13), and record t34 holds the plots beside it
+    // revealed)
+    revealAround(state, attacker.seat, targetIndex, unitSight(attacker, state), { seeThrough: unitSeesThrough(attacker) });
     clearCampFor(state, attacker, targetIndex); // every seat clears it
   }
   return ok;

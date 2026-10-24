@@ -86,6 +86,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.1.building': xml('Buildings', 'BuildingType=BUILDING_GROVE', 'PrereqCivic', { expect: 'CIVIC_MYSTICISM' }),
     'effects.2.policy': xml('Policies', 'PolicyType=POLICY_INSPIRATION', 'PrereqCivic', { expect: 'CIVIC_MYSTICISM' }),
     'effects.3.policy': xml('Policies', 'PolicyType=POLICY_REVELATION', 'PrereqCivic', { expect: 'CIVIC_MYSTICISM' }),
+    'effects.4.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_ONE_INFLUENCE_TOKEN&Name=Amount', 'Value'),
   },
   GAMES_AND_RECREATION: {
     era: xml('Civics', 'CivicType=CIVIC_GAMES_RECREATION', 'EraType', { expect: 'ERA_CLASSICAL' }),
@@ -120,6 +121,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_THEOLOGY, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_THEOLOGY&PrereqCivic=CIVIC_DRAMA_POETRY', 'PrereqCivic', { expect: 'CIVIC_DRAMA_POETRY' }), xml('CivicPrereqs', 'Civic=CIVIC_THEOLOGY&PrereqCivic=CIVIC_MYSTICISM', 'PrereqCivic', { expect: 'CIVIC_MYSTICISM' })] },
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_TEMPLE', 'PrereqCivic', { expect: 'CIVIC_THEOLOGY' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_SCRIPTURE', 'PrereqCivic', { expect: 'CIVIC_THEOLOGY' }),
+    'effects.2.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_ONE_INFLUENCE_TOKEN&Name=Amount', 'Value'),
   },
   RECORDED_HISTORY: {
     era: xml('Civics', 'CivicType=CIVIC_RECORDED_HISTORY', 'EraType', { expect: 'ERA_CLASSICAL' }),
@@ -133,6 +135,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_NAVAL_TRADITION&PrereqCivic=CIVIC_DEFENSIVE_TACTICS', 'PrereqCivic', { expect: 'CIVIC_DEFENSIVE_TACTICS' }),
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_NAVAL_INFRASTRUCTURE', 'PrereqCivic', { expect: 'CIVIC_NAVAL_TRADITION' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_NAVIGATION', 'PrereqCivic', { expect: 'CIVIC_NAVAL_TRADITION' }),
+    'effects.2.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_ONE_INFLUENCE_TOKEN&Name=Amount', 'Value'),
   },
   FEUDALISM: {
     era: xml('Civics', 'CivicType=CIVIC_FEUDALISM', 'EraType', { expect: 'ERA_MEDIEVAL' }),
@@ -232,6 +235,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.4.yields.culture': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_SPHINX&YieldType=YIELD_CULTURE&PrereqCivic=CIVIC_NATURAL_HISTORY', 'BonusYieldChange'),
     'effects.5.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_ZIGGURAT&YieldType=YIELD_CULTURE&PrereqCivic=CIVIC_NATURAL_HISTORY', 'ImprovementType', { expect: 'IMPROVEMENT_ZIGGURAT' }),
     'effects.5.yields.culture': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_ZIGGURAT&YieldType=YIELD_CULTURE&PrereqCivic=CIVIC_NATURAL_HISTORY', 'BonusYieldChange'),
+    'effects.6.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_TWO_INFLUENCE_TOKENS&Name=Amount', 'Value'),
   },
   URBANIZATION: {
     era: xml('Civics', 'CivicType=CIVIC_URBANIZATION', 'EraType', { expect: 'ERA_INDUSTRIAL' }),
@@ -283,6 +287,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_MILITARY_TRAINING, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_MILITARY_TRAINING&PrereqCivic=CIVIC_MILITARY_TRADITION', 'PrereqCivic', { expect: 'CIVIC_MILITARY_TRADITION' }), xml('CivicPrereqs', 'Civic=CIVIC_MILITARY_TRAINING&PrereqCivic=CIVIC_GAMES_RECREATION', 'PrereqCivic', { expect: 'CIVIC_GAMES_RECREATION' })] },
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_VETERANCY', 'PrereqCivic', { expect: 'CIVIC_MILITARY_TRAINING' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_EQUESTRIAN_ORDERS', 'PrereqCivic', { expect: 'CIVIC_MILITARY_TRAINING' }),
+    'effects.2.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_ONE_INFLUENCE_TOKEN&Name=Amount', 'Value'),
   },
   DEFENSIVE_TACTICS: {
     era: xml('Civics', 'CivicType=CIVIC_DEFENSIVE_TACTICS', 'EraType', { expect: 'ERA_CLASSICAL' }),
@@ -298,6 +303,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_TRADE_CONFEDERATION', 'PrereqCivic', { expect: 'CIVIC_MERCENARIES' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_PROFESSIONAL_ARMY', 'PrereqCivic', { expect: 'CIVIC_MERCENARIES' }),
     'effects.2.policy': xml('Policies', 'PolicyType=POLICY_RETINUES', 'PrereqCivic', { expect: 'CIVIC_MERCENARIES' }),
+    'effects.3.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_ONE_INFLUENCE_TOKEN&Name=Amount', 'Value'),
   },
   MERCANTILISM: {
     era: xml('Civics', 'CivicType=CIVIC_MERCANTILISM', 'EraType', { expect: 'ERA_RENAISSANCE' }),
@@ -324,6 +330,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_OPERA_BALLET&PrereqCivic=CIVIC_THE_ENLIGHTENMENT', 'PrereqCivic', { expect: 'CIVIC_THE_ENLIGHTENMENT' }),
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_GRAND_OPERA', 'PrereqCivic', { expect: 'CIVIC_OPERA_BALLET' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_SYMPHONIES', 'PrereqCivic', { expect: 'CIVIC_OPERA_BALLET' }),
+    'effects.2.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_TWO_INFLUENCE_TOKENS&Name=Amount', 'Value'),
   },
   COLONIALISM: {
     era: xml('Civics', 'CivicType=CIVIC_COLONIALISM', 'EraType', { expect: 'ERA_INDUSTRIAL' }),
@@ -332,6 +339,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.1.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_FISHING_BOATS&YieldType=YIELD_PRODUCTION&PrereqCivic=CIVIC_COLONIALISM', 'ImprovementType', { expect: 'IMPROVEMENT_FISHING_BOATS' }),
     'effects.1.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_FISHING_BOATS&YieldType=YIELD_PRODUCTION&PrereqCivic=CIVIC_COLONIALISM', 'BonusYieldChange'),
     'effects.2.policy': xml('Policies', 'PolicyType=POLICY_RAJ', 'PrereqCivic', { expect: 'CIVIC_COLONIALISM' }),
+    'effects.3.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_TWO_INFLUENCE_TOKENS&Name=Amount', 'Value'),
   },
   CONSERVATION: {
     era: xml('Civics', 'CivicType=CIVIC_CONSERVATION', 'EraType', { expect: 'ERA_MODERN' }),
@@ -339,6 +347,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_CONSERVATION&PrereqCivic=CIVIC_NATURAL_HISTORY', 'PrereqCivic', { expect: 'CIVIC_NATURAL_HISTORY' }),
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_SANCTUARY', 'PrereqCivic', { expect: 'CIVIC_CONSERVATION' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_RESOURCE_MANAGEMENT', 'PrereqCivic', { expect: 'CIVIC_CONSERVATION' }),
+    'effects.2.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_THREE_INFLUENCE_TOKENS&Name=Amount', 'Value'),
   },
   SCORCHED_EARTH: {
     era: xml('Civics', 'CivicType=CIVIC_SCORCHED_EARTH', 'EraType', { expect: 'ERA_INDUSTRIAL' }),
@@ -347,6 +356,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_TOTAL_WAR', 'PrereqCivic', { expect: 'CIVIC_SCORCHED_EARTH' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_EXPROPRIATION', 'PrereqCivic', { expect: 'CIVIC_SCORCHED_EARTH' }),
     'effects.2.policy': xml('Policies', 'PolicyType=POLICY_MILITARY_ORGANIZATION', 'PrereqCivic', { expect: 'CIVIC_SCORCHED_EARTH' }),
+    'effects.3.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_TWO_INFLUENCE_TOKENS&Name=Amount', 'Value'),
   },
   MOBILIZATION: {
     era: xml('Civics', 'CivicType=CIVIC_MOBILIZATION', 'EraType', { expect: 'ERA_MODERN' }),
@@ -380,6 +390,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     cost: xml('Civics', 'CivicType=CIVIC_CULTURAL_HERITAGE', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_CULTURAL_HERITAGE&PrereqCivic=CIVIC_CONSERVATION', 'PrereqCivic', { expect: 'CIVIC_CONSERVATION' }),
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_HERITAGE_TOURISM', 'PrereqCivic', { expect: 'CIVIC_CULTURAL_HERITAGE' }),
+    'effects.1.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_THREE_INFLUENCE_TOKENS&Name=Amount', 'Value'),
   },
   COLD_WAR: {
     era: xml('Civics', 'CivicType=CIVIC_COLD_WAR', 'EraType', { expect: 'ERA_ATOMIC' }),
@@ -428,6 +439,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Civics', 'CivicType=CIVIC_NEAR_FUTURE_GOVERNANCE', 'EraType', { expect: 'ERA_INFORMATION' }),
     cost: xml('Civics', 'CivicType=CIVIC_NEAR_FUTURE_GOVERNANCE', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_NEAR_FUTURE_GOVERNANCE, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_NEAR_FUTURE_GOVERNANCE&PrereqCivic=CIVIC_ENVIRONMENTALISM', 'PrereqCivic', { expect: 'CIVIC_ENVIRONMENTALISM' }), xml('CivicPrereqs', 'Civic=CIVIC_NEAR_FUTURE_GOVERNANCE&PrereqCivic=CIVIC_GLOBALIZATION', 'PrereqCivic', { expect: 'CIVIC_GLOBALIZATION' })] },
+    'effects.0.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_THREE_INFLUENCE_TOKENS&Name=Amount', 'Value'),
   },
   INFORMATION_WARFARE: {
     era: xml('Civics', 'CivicType=CIVIC_INFORMATION_WARFARE', 'EraType', { expect: 'ERA_FUTURE' }),
@@ -535,6 +547,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'GROVE' },
       { kind: 'unlockPolicy', policy: 'INSPIRATION' },
       { kind: 'unlockPolicy', policy: 'REVELATION' },
+      // CIV6 (CivicModifiers CIVIC_AWARD_ONE_INFLUENCE_TOKEN): 1 envoy at completion
+      { kind: 'award', envoys: 1 },
     ]),
 
     C('GAMES_AND_RECREATION', 'Games and Recreation', 'Classical', 110, ['STATE_WORKFORCE'], [
@@ -560,6 +574,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('THEOLOGY', 'Theology', 'Classical', 120, ['DRAMA_AND_POETRY', 'MYSTICISM'], [
       { kind: 'unlockBuilding', building: 'TEMPLE' },
       { kind: 'unlockPolicy', policy: 'SCRIPTURE' },
+      // CIV6 (CivicModifiers CIVIC_AWARD_ONE_INFLUENCE_TOKEN): 1 envoy at completion
+      { kind: 'award', envoys: 1 },
     ]),
     C('RECORDED_HISTORY', 'Recorded History', 'Classical', 175, ['POLITICAL_PHILOSOPHY', 'DRAMA_AND_POETRY'], [
       { kind: 'unlockPolicy', policy: 'NATURAL_PHILOSOPHY' },
@@ -567,6 +583,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('NAVAL_TRADITION', 'Naval Tradition', 'Medieval', 220, ['DEFENSIVE_TACTICS'], [
       { kind: 'unlockPolicy', policy: 'NAVAL_INFRASTRUCTURE' },
       { kind: 'unlockPolicy', policy: 'NAVIGATION' },
+      // CIV6 (CivicModifiers CIVIC_AWARD_ONE_INFLUENCE_TOKEN): 1 envoy at completion
+      { kind: 'award', envoys: 1 },
     ]),
 
     C('FEUDALISM', 'Feudalism', 'Medieval', 300, ['DEFENSIVE_TACTICS'], [
@@ -643,6 +661,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       // each gain +1 Culture at Natural History.
       { kind: 'improvementYields', improvement: 'SPHINX', yields: { culture: 1 } },
       { kind: 'improvementYields', improvement: 'ZIGGURAT', yields: { culture: 1 } },
+      // CIV6 (CivicModifiers CIVIC_AWARD_TWO_INFLUENCE_TOKENS): 2 envoys at completion
+      { kind: 'award', envoys: 2 },
     ]),
     C('URBANIZATION', 'Urbanization', 'Industrial', 1210, ['CIVIL_ENGINEERING', 'NATIONALISM'], [
       { kind: 'unlockDistrict', district: 'NEIGHBORHOOD' },
@@ -675,6 +695,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('MILITARY_TRAINING', 'Military Training', 'Classical', 120, ['MILITARY_TRADITION', 'GAMES_AND_RECREATION'], [
       { kind: 'unlockPolicy', policy: 'VETERANCY' },
       { kind: 'unlockPolicy', policy: 'EQUESTRIAN_ORDERS' },
+      // CIV6 (CivicModifiers CIVIC_AWARD_ONE_INFLUENCE_TOKEN): 1 envoy at completion
+      { kind: 'award', envoys: 1 },
     ]),
     C('DEFENSIVE_TACTICS', 'Defensive Tactics', 'Classical', 175, ['GAMES_AND_RECREATION', 'POLITICAL_PHILOSOPHY'], [
       { kind: 'unlockPolicy', policy: 'BASTIONS' },
@@ -685,6 +707,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'TRADE_CONFEDERATION' },
       { kind: 'unlockPolicy', policy: 'PROFESSIONAL_ARMY' },
       { kind: 'unlockPolicy', policy: 'RETINUES' },
+      // CIV6 (CivicModifiers CIVIC_AWARD_ONE_INFLUENCE_TOKEN): 1 envoy at completion
+      { kind: 'award', envoys: 1 },
     ]),
 
     C('MERCANTILISM', 'Mercantilism', 'Renaissance', 720, ['HUMANISM'], [
@@ -704,22 +728,30 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('OPERA_AND_BALLET', 'Opera and Ballet', 'Industrial', 800, ['ENLIGHTENMENT'], [
       { kind: 'unlockPolicy', policy: 'GRAND_OPERA' },
       { kind: 'unlockPolicy', policy: 'SYMPHONIES' },
+      // CIV6 (CivicModifiers CIVIC_AWARD_TWO_INFLUENCE_TOKENS): 2 envoys at completion
+      { kind: 'award', envoys: 2 },
     ]),
     C('COLONIALISM', 'Colonialism', 'Industrial', 800, ['MERCANTILISM'], [
       { kind: 'unlockImprovement', improvement: 'ICE_HOCKEY_RINK' }, // CIV6 (Ice Hockey Rink): PrereqCivic
       // CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 225)
       { kind: 'improvementYields', improvement: 'FISHING_BOATS', yields: { production: 1 } },
       { kind: 'unlockPolicy', policy: 'RAJ' },
+      // CIV6 (CivicModifiers CIVIC_AWARD_TWO_INFLUENCE_TOKENS): 2 envoys at completion
+      { kind: 'award', envoys: 2 },
     ]),
     C('CONSERVATION', 'Conservation', 'Modern', 1540, ['NATURAL_HISTORY'], [
       { kind: 'unlockBuilding', building: 'SANCTUARY' },
       { kind: 'unlockPolicy', policy: 'RESOURCE_MANAGEMENT' },
+      // CIV6 (CivicModifiers CIVIC_AWARD_THREE_INFLUENCE_TOKENS): 3 envoys at completion
+      { kind: 'award', envoys: 3 },
     ]),
 
     C('SCORCHED_EARTH', 'Scorched Earth', 'Industrial', 1210, ['NATIONALISM'], [
       { kind: 'unlockPolicy', policy: 'TOTAL_WAR' },
       { kind: 'unlockPolicy', policy: 'EXPROPRIATION' },
       { kind: 'unlockPolicy', policy: 'MILITARY_ORGANIZATION' },
+      // CIV6 (CivicModifiers CIVIC_AWARD_TWO_INFLUENCE_TOKENS): 2 envoys at completion
+      { kind: 'award', envoys: 2 },
     ]),
     C('MOBILIZATION', 'Mobilization', 'Modern', 1540, ['URBANIZATION', 'SCORCHED_EARTH'], [
       { kind: 'unlockPolicy', policy: 'LEVEE_EN_MASSE' },
@@ -740,6 +772,8 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('CULTURAL_HERITAGE', 'Cultural Heritage', 'Atomic', 1955, ['CONSERVATION'], [
       { kind: 'unlockPolicy', policy: 'HERITAGE_TOURISM' },
+      // CIV6 (CivicModifiers CIVIC_AWARD_THREE_INFLUENCE_TOKENS): 3 envoys at completion
+      { kind: 'award', envoys: 3 },
     ]),
 
     C('COLD_WAR', 'Cold War', 'Atomic', 2185, ['IDEOLOGY'], [
@@ -775,7 +809,10 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockGovernment', government: 'DIGITAL_DEMOCRACY' },
     ]),
     C('SYNTHETIC_TECHNOCRACY', 'Synthetic Technocracy', 'Information', 3000, ['GLOBALIZATION', 'SOCIAL_MEDIA']),
-    C('NEAR_FUTURE_GOVERNANCE', 'Near Future Governance', 'Information', 3100, ['ENVIRONMENTALISM', 'GLOBALIZATION']),
+    C('NEAR_FUTURE_GOVERNANCE', 'Near Future Governance', 'Information', 3100, ['ENVIRONMENTALISM', 'GLOBALIZATION'], [
+      // CIV6 (CivicModifiers CIVIC_AWARD_THREE_INFLUENCE_TOKENS): 3 envoys at completion
+      { kind: 'award', envoys: 3 },
+    ]),
     // CIV6: Information Warfare's only published gate is the Future ERA; its
     // real parents are Future civics this tree does not carry, so the deepest
     // Information-era civic stands in as the prereq.

@@ -2868,6 +2868,8 @@ class SimInit:
         self.civ_policy_lapsed = torch.zeros_like(self.civ_policies)
         if self._ngov:
             self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
+            # its Influence Points a turn, the fill and the envoys a fill grants (`govInfluence`)
+            self._gov_influence = torch.tensor([list(g["influence"]) for g in _govs], dtype=torch.float64, device=device)
             # the government a city-state is in (`CITY_STATE_GOVERNMENT`)
             self._gov_city_state = next(i for i, g in enumerate(_govs) if g["id"] == rules.citystate["government"])
             self._gov_intol = torch.tensor([int(g["intolerance"]) for g in _govs], dtype=torch.long, device=device)
@@ -4792,8 +4794,9 @@ class SimInit:
              int(r["unit"]), str(r["promoClass"]))
             for r in _gh["subTypes"]
         ]
-        # 0x42c980's other gates per subtype: (CityState, StrategicResources, Relic)
-        self._goody_gates = [(int(r["cityState"]), int(r["strategic"]), int(r["relic"])) for r in _gh["subTypes"]]
+        # 0x42c980's other gates per subtype: (CityState, StrategicResources, Relic, Trader)
+        self._goody_gates = [(int(r["cityState"]), int(r["strategic"]), int(r["relic"]), int(r["trader"]))
+                             for r in _gh["subTypes"]]
         # every channel the wire names must have an arm, or a reward silently
         # pays nothing (the disjoint-arms class)
         self._goody_ch = {k: i for i, k in enumerate(self._goody_payload_kinds)}
@@ -4979,6 +4982,7 @@ class SimInit:
         self._driven_government: dict[int, torch.Tensor] = {}
         self._driven_civic: dict = {}
         self._driven_envoys: dict = {}
+        self._staged_envoys: dict = {}
         self._driven_picks: dict = {}
         self._driven_war: dict = {}
         self._driven_war_kind: dict = {}

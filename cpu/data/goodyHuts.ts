@@ -103,6 +103,9 @@ export interface GoodySubType {
   strategic?: boolean;
   /** Relic: a city of the claimer has a slot a Relic takes */
   relic?: boolean;
+  /** Trader: the claimer's trade route capacity stands above the routes its
+   *  cities hold */
+  trader?: boolean;
   /** the install scales this row's amount by the game speed (`Scale: true`,
    *  or an `Amount` typed `ScaleByGameSpeed`) */
   scale?: boolean;
@@ -156,7 +159,7 @@ export const GOODY_SUBTYPES: readonly GoodySubType[] = [
     payload: { kind: 'population', amount: 1 } },
   { id: 'GRANT_BUILDER', hut: 'SURVIVORS', weight: 35, minOneCity: true,
     payload: { kind: 'unitInCity', unit: 'BUILDER' } },
-  { id: 'GRANT_TRADER', hut: 'SURVIVORS', weight: 25, turn: 15, minOneCity: true,
+  { id: 'GRANT_TRADER', hut: 'SURVIVORS', weight: 25, turn: 15, minOneCity: true, trader: true,
     payload: { kind: 'unitInCity', unit: 'TRADER' } },
   // OFF in this ruleset (Weight 0)
   { id: 'GRANT_SETTLER', hut: 'SURVIVORS', weight: 0, minOneCity: true,

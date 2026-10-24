@@ -75,10 +75,18 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   s.tourismReligious = (s.tourismReligious ?? 0) + natReligious;
   bankTourismPerRival(state, s, natGeneral, natReligious, late);
   updateCulturalDominance(state.seats, s);
+}
+
+/** THE FAVOR AND GRIEVANCE TALLIES, after the civics the seat's start
+ *  completed and the government and cards it slotted: the Favor's rate is
+ *  the government the seat is in now (runs/h1_duelw11*: of 141 government
+ *  changes the turn banks the new rate on 129 — 1121 China t32, Chiefdom to
+ *  Autocracy, Favor 0 -> 1), unless the caller banks it later
+ *  (`holdFavor`); then the GRIEVANCE ledger's own turn: what this seat is
+ *  still owed decays pairwise (once per pair, on its lower seat), and every
+ *  original capital it sits in keeps charging while that war is over. */
+export function seatTallies(state: GameState, seat: number): void {
   if (!favorHeld?.(seat)) seatFavor(state, seat);
-  // The GRIEVANCE ledger's own turn: what this seat is still owed decays
-  // pairwise (once per pair, on its lower seat), and every original capital it
-  // sits in keeps charging while that war is over.
   grievanceHeldCapitals(state, seat);
   decayGrievances(state, seat);
 }

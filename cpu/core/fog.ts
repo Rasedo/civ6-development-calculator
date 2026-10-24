@@ -233,6 +233,19 @@ export function cityStateSight(state: GameState, seat: number): Uint8Array {
   return out;
 }
 
+/** A NEW SUZERAIN'S LOOK: the plots city-state `minor` has revealed
+ *  (`CityState.revealed`) and those it sees now (`cityStateSight`) revealed
+ *  to major `seat`. */
+export function suzerainSight(state: GameState, minor: number, seat: number): void {
+  if (!state.fogOfWar) return;
+  const s = seatOf(state, seat);
+  if (!s) return;
+  if (s.explored.length === 0) s.explored = new Array(state.map.tiles.length).fill(0);
+  const seen = cityStateSight(state, minor);
+  const known = state.cityStates.find((c) => c.seat === minor)?.revealed;
+  for (let i = 0; i < seen.length; i++) if (seen[i] || known?.[i] === 1) s.explored[i] = 1;
+}
+
 export function fogActive(state: GameState): boolean {
   return state.unitsMode && state.fogOfWar;
 }

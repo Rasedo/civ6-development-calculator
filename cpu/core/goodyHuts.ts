@@ -8,6 +8,7 @@ import { stockOf, stockpileCap } from './stockpile';
 import { STRATEGIC_IDS } from '../data/constants';
 import { gwHasRoom } from './greatWorks';
 import { GWO_RELIC } from '../data/greatWorks';
+import { tradeCapacity } from './trade';
 
 /**
  * THE TRIBAL VILLAGE DRAW (0x42bdd0, dll_readings "H-1: the goody hut's
@@ -36,6 +37,10 @@ export function goodyEligible(state: GameState, sub: GoodySubType, claimer: Seat
   // a strategic resource it sees below its stockpile's ceiling
   // (StrategicResources: 0x4ac140, 0x4aa790 against 0x4aabe0)
   if (sub.relic && !claimer.cities.some((c) => gwHasRoom(state, c, GWO_RELIC))) return false;
+  // the row's Trader flag (+0x50 bit 4): the claimer's trade route capacity
+  // above the routes its cities hold (0x54fe20; runs/h1_duelw1121 t30: Rome,
+  // with no Foreign Trade, draws its Survivors over 75, the Trader out)
+  if (sub.trader && tradeCapacity(state, claimer.seat) <= (claimer.tradeRoutes?.length ?? 0)) return false;
   if (sub.cityState && !state.cityStates.some((cs) => hasMet(cs, claimer.seat))) return false;
   if (sub.strategic) {
     const hidden = hiddenResourcesFor(state, claimer.seat);

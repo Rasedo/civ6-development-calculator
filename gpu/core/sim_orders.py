@@ -552,7 +552,9 @@ class SimOrders:
                         if _k == 0:        # FOOD lands in the city's own box (`lumpFood`)
                             self._lump_food(_b, row, _j, _v)
                         elif int(self.city_current[_b, row, _j, 0]) >= 0:
-                            self.city_progress[_b, row, _j, 0] += _v
+                            # a queue step of its own: the overflow store paid in with it
+                            self.city_progress[_b, row, _j, 0] += _v + self.city_prod_bank[_b, row, _j].double()
+                            self.city_prod_bank[_b, row, _j] = 0
                         else:
                             self.city_prod_bank[_b, row, _j] += _v
                     self._repair_drip(row, _drip_h)
@@ -1031,8 +1033,12 @@ class SimOrders:
                             continue
                         if f_amt > 0:
                             self._lump_food(b2, row, j2, f_amt)
+                        if p_amt <= 0:
+                            continue
                         if int(self.city_current[b2, row, j2, 0]) >= 0:
-                            self.city_progress[b2, row, j2, 0] += p_amt
+                            # a queue step of its own: the overflow store paid in with it
+                            self.city_progress[b2, row, j2, 0] += p_amt + self.city_prod_bank[b2, row, j2].double()
+                            self.city_prod_bank[b2, row, j2] = 0
                         else:
                             self.city_prod_bank[b2, row, j2] += p_amt
                     self._repair_drip(row, _drip_c)

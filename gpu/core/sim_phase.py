@@ -1567,6 +1567,10 @@ class SimPhase:
             _sw = made_s.nonzero(as_tuple=True)[0]
             if _sw.numel():
                 self._log_pop(_sw, row, col[_sw], "se")
+            # CIV6 (the citizen manager, 0x194fb0 with a negative count): a
+            # citizen lost unassigns them all and places them all again
+            if row < self.n_majors:
+                self._place_citizens(row, col, made_s & ~_free, None, full=True)
             if self._settler_idx >= 0:
                 landed = self._spawn_unit(row, made_s, ctr, self._settler_idx)
                 self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed.long()
@@ -2420,8 +2424,9 @@ class SimPhase:
                 self._spawn_unit(row, _gm, self.civ_cap_tile[:, row].clamp(min=0),
                                  torch.full((B,), _gu, dtype=torch.long, device=dev))
 
-        # CULTURE, off the cities as the shortfall left them; the tourism,
-        # favor and grievance tallies; then the civics it completes.
+        # CULTURE, off the cities as the shortfall left them; the tourism
+        # tallies; then the civics it completes, the government and cards, and
+        # the favor and grievance tallies.
         total = read(self.seat_shortfall[:, row] != short0, total)
         cul_sum = foreign_followers(4, alliance_route(4, city_sum(total, 4)))
         self.civ_cul_rate[:, row] = torch.where(active, cul_sum, self.civ_cul_rate[:, row])
@@ -2459,38 +2464,6 @@ class SimPhase:
         bank(self.civ_tourism_rel, _rel_t)
         self._bank_tourism_per_rival(row, active, _nat_gen, _rel_t, _late)
         self._update_cultural_dominance(row, active)
-        # The government tier, the suzerain term and CIV6 (Alliance): "In
-        # Gathering Storm, each Alliance gives you +1 Diplomatic Favor per
-        # turn per level". Each ORIGINAL
-        # CAPITAL this row sits in costs it. The rate can go negative, and the
-        # bank floors at zero.
-        bank(self.civ_diplo_favor,
-             self._adopted_gov_tier(row)
-             + self._favor_per_suz * self._suzerains_held(row)
-             + self._favor_per_alliance * self._alliance_levels_of(row).sum(dim=1)
-             # CIV6 (Foreign Ministry, GS): "+3 Diplomatic Favor per turn."
-             + self._seat_building_sum(row, self._b_favor)
-             + self._card_favor_per_building(row)
-             # CIV6 (Losing Favor): "-1/turn for every 3 pollution points
-             # higher than average", capped at 20.
-             - self._pollution_favor_penalty(row)
-             # CIV6 (Losing Favor): "200 Grievance = -1 Diplomatic Favor.
-             # Every 50 Grievance = -1", to a floor of -10.
-             - self._grievance_favor_penalty(row).double()
-             - self._favor_occ_capital * self._occupied_capitals(row)
-             # CIV6 (Faces of Peace): "For every 100 Tourism per turn earn 1
-             # Diplomatic Favor per turn" — this turn's OWN rate, the number
-             # stored just above (`TOURISM_FAVOR_ROWS`)
-             + self._tourism_favor_of(row).double()
-             # CIV6 (Founding Fathers): "+1 Diplomatic Favor per turn for every
-             # Wildcard slot in their government" (`SLOT_FAVOR_ROWS`)
-             + self._slot_favor_of(row).double())
-        self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row].clamp(min=0)
-        # The GRIEVANCE ledger's own turn: every original capital this row
-        # sits in keeps charging while that war is over, and each pair decays
-        # once, on its lower seat.
-        self._grievance_held_capitals(row, active)
-        self._grievance_decay(row, active)
         bank(self.civ_civic_prog, cul_sum + self.civ_civic_ovf[:, row])
         self.civ_civic_ovf[:, row] = torch.where(active, torch.zeros_like(cul_sum), self.civ_civic_ovf[:, row])
         bank(self.civ_culture, cul_sum)
@@ -2532,6 +2505,44 @@ class SimPhase:
         # THE PENDING POLICIES: the record's government and slotted cards,
         # after the civics the turn completed (`applySeatPolicies`).
         carried = self._seat_policy_apply(row, active)
+        # the turn's Influence on the government it is in now, then the envoys
+        # its record sends (`accrueInfluence`, `applySeatEnvoys`)
+        self._seat_influence_accrue(row, active)
+        self._seat_envoy_apply(row, active)
+        # THE FAVOR AND GRIEVANCE TALLIES, on the government and cards the
+        # seat is in now (`seatFavor`)
+        # The government tier, the suzerain term and CIV6 (Alliance): "In
+        # Gathering Storm, each Alliance gives you +1 Diplomatic Favor per
+        # turn per level". Each ORIGINAL
+        # CAPITAL this row sits in costs it. The rate can go negative, and the
+        # bank floors at zero.
+        bank(self.civ_diplo_favor,
+             self._adopted_gov_tier(row)
+             + self._favor_per_suz * self._suzerains_held(row)
+             + self._favor_per_alliance * self._alliance_levels_of(row).sum(dim=1)
+             # CIV6 (Foreign Ministry, GS): "+3 Diplomatic Favor per turn."
+             + self._seat_building_sum(row, self._b_favor)
+             + self._card_favor_per_building(row)
+             # CIV6 (Losing Favor): "-1/turn for every 3 pollution points
+             # higher than average", capped at 20.
+             - self._pollution_favor_penalty(row)
+             # CIV6 (Losing Favor): "200 Grievance = -1 Diplomatic Favor.
+             # Every 50 Grievance = -1", to a floor of -10.
+             - self._grievance_favor_penalty(row).double()
+             - self._favor_occ_capital * self._occupied_capitals(row)
+             # CIV6 (Faces of Peace): "For every 100 Tourism per turn earn 1
+             # Diplomatic Favor per turn" — this turn's OWN rate, the number
+             # stored just above (`TOURISM_FAVOR_ROWS`)
+             + self._tourism_favor_of(row).double()
+             # CIV6 (Founding Fathers): "+1 Diplomatic Favor per turn for every
+             # Wildcard slot in their government" (`SLOT_FAVOR_ROWS`)
+             + self._slot_favor_of(row).double())
+        self.civ_diplo_favor[:, row] = self.civ_diplo_favor[:, row].clamp(min=0)
+        # The GRIEVANCE ledger's own turn: every original capital this row
+        # sits in keeps charging while that war is over, and each pair decays
+        # once, on its lower seat.
+        self._grievance_held_capitals(row, active)
+        self._grievance_decay(row, active)
         # every district type's count of completed specialty districts, taken
         # when a technology or civic completes — before the cities produce
         _disc_at = tech_done | civic_done

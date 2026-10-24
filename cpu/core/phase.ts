@@ -13,7 +13,7 @@ import { isFloodplains } from '../../world/features';
 import type { FeatureId } from '../../world/types';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { atRngPoint, randRange } from './rand';
-import { emergencyEnvoyIncome, seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
+import { emergencyEnvoyIncome, seatAccumulators, seatTallies, seatGrowth, commitProduction } from './seatTurn';
 import { cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
 import { nukeOffers } from './nuclear';
@@ -30,7 +30,7 @@ import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
-import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MAX_HP } from '../data/cityStates';
+import { LEVY_TURNS, govInfluence, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { storeUnitStrength } from './majorView';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
@@ -1743,6 +1743,76 @@ export function applySeatPolicies(state: GameState, actor: Seat, rec: SeatAction
   }
 }
 
+/** The Influence Points a seat's turn adds toward its envoys: its
+ *  government's (`govInfluence`), its cards' and buildings', and CIV6
+ *  (Economic alliance 2) an Envoy point per turn "for every City-State with
+ *  your Ally as Suzerain"; CIV6 (Monarchy, GOVERNMENTBONUS_ENVOYS): "+50%
+ *  Influence Points" toward more Envoys — a percentage of the WHOLE sum. */
+export function startInfluence(state: GameState, seat: number): number {
+  const mods = getModifiers(state, seat);
+  return (govInfluence(seatGovernment(state, seat)).points
+    + mods.influencePerTurn
+    + seatBuildingSum(state, seat, 'influencePerTurn')
+    + ALLIANCE_E2_INFLUENCE * allianceSuzInfluence(state, seat)) * mods.influenceMult;
+}
+
+/** The points one fill of the seat's government takes, through the speed. */
+export function envoyThreshold(state: GameState, seat: number): number {
+  return scaleByGameSpeed(govInfluence(seatGovernment(state, seat)).threshold);
+}
+
+/**
+ * THE TURN'S INFLUENCE, after the civics the start completed and the
+ * government and cards it slotted, before the envoys it sends: every major
+ * accrues from its first turn, met or not, at its government's rate
+ * (runs/h1_duelw1121: China 19 at t21, its first meeting at t29; +3 in the
+ * start its Autocracy is enacted, t31), and each fill grants the
+ * government's envoys (China 47 + 3 at t37: an envoy, 0 left). CIV6 (Rogue
+ * State): "Earn no influence toward new Envoys." Conversion is a rule: the
+ * envoy lands the moment the meter fills; where it goes is the decision.
+ */
+export function accrueInfluence(state: GameState, actor: Seat): void {
+  if (getModifiers(state, actor.seat).noEnvoyInfluence) return;
+  actor.influencePoints = (actor.influencePoints ?? 0) + startInfluence(state, actor.seat);
+  const cost = envoyThreshold(state, actor.seat);
+  const tokens = govInfluence(seatGovernment(state, actor.seat)).tokens;
+  while (cost > 0 && actor.influencePoints >= cost) {
+    actor.influencePoints -= cost;
+    actor.envoysAvailable = (actor.envoysAvailable ?? 0) + tokens;
+  }
+}
+
+/** The envoys a seat holds at its start's sending: its tokens and those its
+ *  start's Influence fills (`accrueInfluence`). */
+export function envoysAtStart(state: GameState, seat: number): number {
+  const s = seatOf(state, seat);
+  if (!s) return 0;
+  const have = s.envoysAvailable ?? 0;
+  if (getModifiers(state, seat).noEnvoyInfluence) return have;
+  const cost = envoyThreshold(state, seat);
+  const fills = cost > 0 ? Math.floor(((s.influencePoints ?? 0) + startInfluence(state, seat)) / cost) : 0;
+  return have + fills * govInfluence(seatGovernment(state, seat)).tokens;
+}
+
+/** THE ENVOY verb: the recorded picks land after the turn's Influence
+ *  (`accrueInfluence`), ALIVE + met + availability re-validated — a razed
+ *  city-state takes no envoy (real Civ 6, and the GPU mask's own term). */
+export function applySeatEnvoys(state: GameState, actor: Seat, rec: SeatActionRecord): void {
+  for (const cityStateId of rec.envoys ?? []) {
+    // a razed/captured city-state leaves the roster entirely, so existence IS
+    // the alive test
+    const cityState = cityStateById(state, cityStateId);
+    if (!cityState) continue;
+    if (!hasMet(cityState, actor.seat)) continue;
+    if ((actor.envoysAvailable ?? 0) <= 0) continue;
+    actor.envoysAvailable = (actor.envoysAvailable ?? 0) - 1;
+    const first = envoysOf(cityState, actor.seat) === 0
+      && getModifiers(state, actor.seat).firstEnvoyDouble;
+    addEnvoys(state, cityState, actor.seat, (first ? 2 : 1) + containmentBonus(state, cityState, actor)
+      + sameReligionToken(state, cityState, actor.seat));
+  }
+}
+
 /** apply ONE recorded turn for a driven seat. Touches no policy — if this
  * ever needed to consult the ladder, the file would not be a complete record of
  * the decisions and TS could not reproduce a GPU trajectory from it. Mirrors
@@ -1779,24 +1849,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // re-validates: peace needs `WAR_MIN_TURNS` at war and pays the
   // `PEACE_GOLD_COST` schedule, or refuses. Whether to sue is the driver's
   // call, so neither engine's rule stream moves.
-  // The ENVOY verb: the recorded picks land here, ALIVE + met + availability
-  // re-validated. BANK ONLY — conversion is an eager RULE at the CS phase for
-  // every seat, so a decide-time pick can never exceed the bank. A razed
-  // city-state takes no envoy (real Civ 6, and the GPU mask's own term).
-  for (const cityStateId of rec.envoys ?? []) {
-    // a razed/captured city-state leaves the roster entirely, so existence IS
-    // the alive test — its city lives in the CityState's own flat fields,
-    // never in the seat-idiom `cities` list, which stays empty for a minor.
-    const cityState = cityStateById(state, cityStateId);
-    if (!cityState) continue;
-    if (!hasMet(cityState, actor.seat)) continue;
-    if ((actor.envoysAvailable ?? 0) <= 0) continue;
-    actor.envoysAvailable = (actor.envoysAvailable ?? 0) - 1;
-    const first = envoysOf(cityState, actor.seat) === 0
-      && getModifiers(state, actor.seat).firstEnvoyDouble;
-    addEnvoys(state, cityState, actor.seat, (first ? 2 : 1) + containmentBonus(state, cityState, actor)
-      + sameReligionToken(state, cityState, actor.seat));
-  }
+  // the ENVOYS land after the turn's Influence (`applySeatEnvoys`)
   const warCol = rec.war;
   if (warCol !== null && warCol !== undefined && warCol >= 0) {
     const targets = warTargets(state, actor.seat);
@@ -2804,31 +2857,6 @@ export function seatPhase(state: GameState): void {
       // with no fog every look takes in every major: the seat meets them all
       // (`meetMajors`, seat order); with fog the looks meet them
       if (!fogActive(state)) for (const o of state.seats) if (isCiv(o.seat) && o.seat !== actor.seat) meetMajors(state, actor.seat, o.seat);
-      if (state.cityStates.some((cityState) => hasMet(cityState, actor.seat))) {
-        const gov = seatGovernment(state, actor.seat);
-        const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
-        // CIV6 (Rogue State): "Earn no influence toward new Envoys."
-        if (!getModifiers(state, actor.seat).noEnvoyInfluence) {
-          // CIV6 (Monarchy, GOVERNMENTBONUS_ENVOYS): "+50% Influence Points" toward
-          // more Envoys — a percentage of the WHOLE per-turn sum, which is
-          // why it multiplies here and not inside any one term.
-          const _infl = INFLUENCE_PER_TURN + tier
-            + getModifiers(state, actor.seat).influencePerTurn
-            + seatBuildingSum(state, actor.seat, 'influencePerTurn')
-            // CIV6 (Economic alliance 2): an Envoy point per turn "for every
-            // City-State with your Ally as Suzerain".
-            + ALLIANCE_E2_INFLUENCE * allianceSuzInfluence(state, actor.seat);
-          actor.influencePoints = (actor.influencePoints ?? 0)
-            + _infl * getModifiers(state, actor.seat).influenceMult;
-        }
-        // CONVERSION IS A RULE, for every seat. Real Civ 6 grants the
-        // envoy the moment the meter fills, assigned or not. WHERE it is spent
-        // is the decision, and that arrives on the wire.
-        while (actor.influencePoints >= ENVOY_COST) {
-          actor.influencePoints -= ENVOY_COST;
-          actor.envoysAvailable = (actor.envoysAvailable ?? 0) + 1;
-        }
-      }
     }
 
     let unitCount = seatUnitList.length;
@@ -3021,8 +3049,9 @@ export function seatPhase(state: GameState): void {
       if (cap) spawnUnit(state, id, cap.centerIndex, actor.seat);
     }
 
-    // CULTURE, off the cities as the shortfall left them;
-    // the tourism, favor and grievance tallies; then the civics it completes.
+    // CULTURE, off the cities as the shortfall left them; the tourism
+    // tallies; then the civics it completes, the government and cards, and
+    // the favor and grievance tallies.
     if ((actor.goldShortfall ?? 0) !== shortfallBefore) yields = readYields();
     let culSum = foreignFollowers('culture', allianceRoute('culture', citySum(yields, 'culture')));
     actor.culRate = culSum;
@@ -3077,6 +3106,11 @@ export function seatPhase(state: GameState): void {
     // the civics the turn completed (`applySeatPolicies`).
     const policiesMoved = !!rec && ((rec.government !== null && rec.government !== undefined) || !!rec.policies);
     if (rec) applySeatPolicies(state, actor, rec);
+    // the turn's Influence on the government it is in now, then the envoys
+    // its record sends, then the favor and grievance tallies
+    accrueInfluence(state, actor);
+    if (rec) applySeatEnvoys(state, actor, rec);
+    seatTallies(state, actor.seat);
 
     // every district type's count of completed specialty districts, taken
     // when a technology or civic completes — before the cities produce

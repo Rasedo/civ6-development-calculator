@@ -374,8 +374,6 @@ export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
   religious: ['Jerusalem', 'La Venta', 'Yerevan', 'Armagh'],
 };
 
-export const ENVOY_COST = 100;
-export const INFLUENCE_PER_TURN = 3;
 /** the envoys a city-state takes from the first major to meet it
  *  (runs/h1_duelw1117-1124: the first meeting of every minor, by either
  *  major, adds one to its count that record; no later meeting does) */
@@ -651,16 +649,30 @@ export const LEVY_TURNS = srcConst('cityState.levyTurns', scaleByGameSpeed(30), 
   inputs: [xml('GlobalParameters', 'Name=LEVY_MILITARY_TURN_DURATION', 'Value', { expect: 30 })],
 });
 
-export const GOV_INFLUENCE_TIER: Record<string, number> = {
-  CHIEFDOM: 0,
-  AUTOCRACY: 1,
-  OLIGARCHY: 1,
-  CLASSICAL_REPUBLIC: 1,
-  MONARCHY: 2,
-  THEOCRACY: 2,
-  MERCHANT_REPUBLIC: 2,
-  DEMOCRACY: 3,
-  COMMUNISM: 3,
-  FASCISM: 3,
-  DIGITAL_DEMOCRACY: 4,
+/** CIV6 (Governments.xml InfluencePointsPerTurn / InfluencePointsThreshold /
+ *  InfluenceTokensPerThreshold; Expansion2_Governments.xml the Tier 4 rows):
+ *  a government's Influence Points a turn, the points a fill takes (through
+ *  the speed's CostMultiplier: 50 online) and the envoys a fill grants. A seat
+ *  in no government accrues as Chiefdom (runs/h1_duelw1121: Rome +1 a turn
+ *  from t1, before Code of Laws). */
+export interface GovInfluence { points: number; threshold: number; tokens: number }
+export const GOV_INFLUENCE: Record<string, GovInfluence> = {
+  CHIEFDOM: { points: 1, threshold: 100, tokens: 1 },
+  AUTOCRACY: { points: 3, threshold: 100, tokens: 1 },
+  OLIGARCHY: { points: 3, threshold: 100, tokens: 1 },
+  CLASSICAL_REPUBLIC: { points: 3, threshold: 100, tokens: 1 },
+  MONARCHY: { points: 5, threshold: 150, tokens: 2 },
+  THEOCRACY: { points: 5, threshold: 150, tokens: 2 },
+  MERCHANT_REPUBLIC: { points: 5, threshold: 150, tokens: 2 },
+  FASCISM: { points: 7, threshold: 200, tokens: 3 },
+  COMMUNISM: { points: 7, threshold: 200, tokens: 3 },
+  DEMOCRACY: { points: 7, threshold: 200, tokens: 3 },
+  CORPORATE_LIBERTARIANISM: { points: 9, threshold: 250, tokens: 4 },
+  DIGITAL_DEMOCRACY: { points: 9, threshold: 250, tokens: 4 },
+  SYNTHETIC_TECHNOCRACY: { points: 9, threshold: 250, tokens: 4 },
 };
+
+/** the influence row of government `gov` (`GOV_INFLUENCE`), Chiefdom's for none */
+export function govInfluence(gov: string | null): GovInfluence {
+  return (gov ? GOV_INFLUENCE[gov] : undefined) ?? GOV_INFLUENCE.CHIEFDOM;
+}

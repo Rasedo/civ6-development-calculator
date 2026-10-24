@@ -1029,49 +1029,14 @@ class SimSeats:
         if production is not None or pref is not None:
             self._driven_picks[row] = (production, pref, dtile)
 
-    def _seat_record_apply(self, row: int, active: torch.Tensor) -> None:
-        """applySeatActionRecord for seat row `row` — ONE body every seat runs,
-        at the TS record position (after the CS/quest block, before the
-        economy), in the TS arm order: tech, civic, envoys, war, production;
-        the government and the cards wait for the economy
-        (`_seat_policy_apply`).
-
-        `active` is the eliminated-actor `continue`: TS's `continue` precedes
-        the record apply, so a cityless seat applies NOTHING — but the stash is
-        drained either way, because an intent is for THIS turn and a refused one
-        must not survive into the next.
-
-        The WAR arm drains here and not at decide time: the walkers drain later
-        in the phase, so a same-turn declaration still legalizes this turn's
-        own unit orders — and every earlier seat's diplomacy has already landed
-        at its own tail, so the declare's alliance gate reads that axis, as
-        TS's does.
-
-        Every arm re-validates against the LIVE state here; nothing chooses."""
-        tech = self._driven_tech.pop(row, None)
-        civic = self._driven_civic.pop(row, None)
-        envoys = self._driven_envoys.pop(row, None)
-        war = self._driven_war.pop(row, None)
-        war_kind = self._driven_war_kind.pop(row, None)
-        citizens = self._driven_citizens.pop(row, None)
-        vote = self._driven_vote.pop(row, None)
-        gp_pass = self._driven_gp_pass.pop(row, None)
-        beliefs = self._driven_beliefs.pop(row, None)
-        religion = self._driven_religion.pop(row, None)
-        production, pref, dtile = self._driven_picks.pop(row, (None, None, None))
-        if not bool(active.count_nonzero()):
+    def _seat_envoy_apply(self, row: int, active: torch.Tensor) -> None:
+        """`applySeatEnvoys`: the envoys the record sends, after the turn's
+        Influence (`_seat_influence_accrue`), each re-validated (alive, met,
+        a token in hand)."""
+        envoys = self._staged_envoys.pop(row, None)
+        if envoys is None or not bool(active.count_nonzero()):
             return
         ext = self.seat_ext[:, row]
-        if tech is not None:
-            t_act = tech.to(torch.long)
-            ok = active & ext & (t_act >= 0) \
-                & self._available_mask(self.civ_techs[:, row], self._prereq_t, self._t_repeat).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self._select_research(row, t_act, ok)
-        if civic is not None:
-            c_act = civic.to(torch.long)
-            ok = active & ext & (c_act >= 0) \
-                & self._available_mask(self.civ_civics[:, row], self._prereq_c, self._c_repeat).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self._select_research(row, c_act, ok, is_civic=True)
         if envoys is not None and self.S > 0:
             e_seq = envoys.to(torch.long)
             if e_seq.dim() == 1:
@@ -1119,6 +1084,54 @@ class SimSeats:
                     self._minor_envoy_tiles(ok)  # the influence LANDS: a plot per envoy (`addEnvoys`)
                     self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] - ok.long()
                     self._eff_version += 1
+
+    def _seat_record_apply(self, row: int, active: torch.Tensor) -> None:
+        """applySeatActionRecord for seat row `row` — ONE body every seat runs,
+        at the TS record position (after the CS/quest block, before the
+        economy), in the TS arm order: tech, civic, war, production (the envoys
+        wait for the turn's Influence, `_seat_envoy_apply`);
+        the government and the cards wait for the economy
+        (`_seat_policy_apply`).
+
+        `active` is the eliminated-actor `continue`: TS's `continue` precedes
+        the record apply, so a cityless seat applies NOTHING — but the stash is
+        drained either way, because an intent is for THIS turn and a refused one
+        must not survive into the next.
+
+        The WAR arm drains here and not at decide time: the walkers drain later
+        in the phase, so a same-turn declaration still legalizes this turn's
+        own unit orders — and every earlier seat's diplomacy has already landed
+        at its own tail, so the declare's alliance gate reads that axis, as
+        TS's does.
+
+        Every arm re-validates against the LIVE state here; nothing chooses."""
+        tech = self._driven_tech.pop(row, None)
+        civic = self._driven_civic.pop(row, None)
+        envoys = self._driven_envoys.pop(row, None)
+        self._staged_envoys.pop(row, None)
+        war = self._driven_war.pop(row, None)
+        war_kind = self._driven_war_kind.pop(row, None)
+        citizens = self._driven_citizens.pop(row, None)
+        vote = self._driven_vote.pop(row, None)
+        gp_pass = self._driven_gp_pass.pop(row, None)
+        beliefs = self._driven_beliefs.pop(row, None)
+        religion = self._driven_religion.pop(row, None)
+        production, pref, dtile = self._driven_picks.pop(row, (None, None, None))
+        if not bool(active.count_nonzero()):
+            return
+        ext = self.seat_ext[:, row]
+        if tech is not None:
+            t_act = tech.to(torch.long)
+            ok = active & ext & (t_act >= 0) \
+                & self._available_mask(self.civ_techs[:, row], self._prereq_t, self._t_repeat).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+            self._select_research(row, t_act, ok)
+        if civic is not None:
+            c_act = civic.to(torch.long)
+            ok = active & ext & (c_act >= 0) \
+                & self._available_mask(self.civ_civics[:, row], self._prereq_c, self._c_repeat).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+            self._select_research(row, c_act, ok, is_civic=True)
+        # the ENVOYS land after the turn's Influence (`_seat_envoy_apply`)
+        self._staged_envoys[row] = envoys
         if war is not None:
             w_act = war.to(torch.long)
             self._apply_war_column(row, torch.where(active, w_act, torch.full_like(w_act, -1)), war_kind)
@@ -5407,7 +5420,20 @@ class SimSeats:
         best, arg = env.max(dim=1)
         tied = ((env == best.unsqueeze(1)) & (best.unsqueeze(1) > 0)).sum(dim=1) > 1
         ok = (best >= suz_min) & ~tied
+        was = self.citystate_suzerain[:, : self.S].clone()
         self.citystate_suzerain[:, : self.S] = torch.where(ok, arg, torch.full_like(arg, -1))
+        # a new suzerain sees what the minor has revealed and sees
+        # (`suzerainSight`)
+        if self.fog_of_war:
+            now = self.citystate_suzerain[:, : self.S]
+            new = (now != was) & (now >= 0) & (now < self.n_majors)
+            for s in range(self.S):
+                if not bool(new[:, s].count_nonzero()):
+                    continue
+                rows = new[:, s].nonzero(as_tuple=True)[0]
+                sight = self._minor_sight(s)[rows] | self.mops_revealed[rows, s]
+                g = now[rows, s]
+                self.seat_explored[rows, g] = self.seat_explored[rows, g] | sight
 
     def _suzerain_masks_all(self, env: torch.Tensor | None = None) -> torch.Tensor:
         """[B, n_majors, S] — `_suzerain_mask` for every major row at once
@@ -6856,7 +6882,7 @@ class SimSeats:
         met_cs = bool((self.seat_citystate_met[b, row, : self.S] & self.citystate_alive[b, : self.S]).any())
         out = []
         for i, (_id, _hut, w, turn, moc, _p, _a, _u, _pc) in enumerate(self._goody_sub):
-            cs, strat, relic = self._goody_gates[i]
+            cs, strat, relic, trader = self._goody_gates[i]
             if w <= 0:
                 continue
             if turn and self.turn < turn:
@@ -6868,6 +6894,8 @@ class SimSeats:
             if strat and not self._strategic_room(b, row):
                 continue
             if relic and not self._relic_room(b, row):
+                continue
+            if trader and not self._trader_room(b, row):
                 continue
             out.append(i)
         return out
@@ -6885,6 +6913,12 @@ class SimSeats:
             if seen and int(self.civ_stockpile[b, row, k]) < cap:
                 return True
         return False
+
+    def _trader_room(self, b: int, row: int) -> bool:
+        """Major `row` of game `b` holds trade route capacity above the routes
+        its cities hold (the village's Trader flag, 0x54fe20)."""
+        held = int((self.seat_routes[b, row, :, 0] >= 0).sum())
+        return int(self._trade_capacity(row)[b]) > held
 
     def _relic_room(self, b: int, row: int) -> bool:
         """A live city of major `row` of game `b` has a slot a Relic takes."""
@@ -12545,6 +12579,9 @@ class SimSeats:
                 a_emb[vr, u] = self.water[vr, ttc[vr]] & ~self.unit_naval[
                     a_type[vr, u].clamp(min=0, max=self.NU - 1)]
                 self._occ_set(vr, ttc[vr], _gs)
+                # ...and looks from the plot it entered, as a step does
+                self._unit_look(vr, a_seat[vr, u], ttc[vr], a_type[vr, u].clamp(min=0, max=self.NU - 1),
+                                self._promo_pool(atk_kind)[0][vr, u])
                 if major:
                     self._clear_camp_at(adv, ttc, a_seat[:, u], self._row_of(a_seat[:, u]))
         if bool(civ_att.count_nonzero()):
@@ -14155,6 +14192,24 @@ class SimSeats:
                 f":{int(self.unit_tile[_b, _u])}:{int(self.unit_type[_b, _u])}"
                 f":{tag} {int(self.unit_xp[_b, _u])}")
 
+    def _unit_look(self, rows: torch.Tensor, seat: torch.Tensor, tile: torch.Tensor,
+                   u_type: torch.Tensor, u_promos: torch.Tensor) -> None:
+        """`revealAround` of a unit's look from `tile` ([K] each, `rows`
+        unique): the barbarians' revealed plots, a major's fog (its meetings
+        with it), a city-state's meetings and its suzerain's look."""
+        sight = self._unit_sight(u_type, u_promos, seat, rows)
+        thr = self._sees_through(u_type, u_promos)
+        brb = seat == BARB_SEAT
+        if bool(brb.count_nonzero()):
+            self._barb_reveal(rows[brb], tile[brb], self._unit_sight(u_type[brb], u_promos[brb]), see_through=thr[brb])
+        major = (seat >= 0) & (seat < self.n_majors)
+        if bool(major.count_nonzero()):
+            self._reveal_around(rows[major], seat[major], tile[major], sight[major], see_through=thr[major])
+        mnr = (seat >= 100) & (seat < 100 + self.S)
+        if bool(mnr.count_nonzero()):
+            self._minor_look_meets(rows[mnr], seat[mnr] - 100, tile[mnr], sight[mnr], thr[mnr])
+            self._suzerain_look(rows[mnr], seat[mnr] - 100, tile[mnr], sight[mnr], thr[mnr])
+
     def _pool_of(self, atk_kind: str):
         return tuple(getattr(self, f"{atk_kind}_unit_{f}")
                      for f in ("hp", "tile", "type", "xp", "emb", "alive", "seat"))
@@ -15414,15 +15469,11 @@ class SimSeats:
         return city_att | enc_att | cs_att | unit_att
 
     def _seat_influence_phase(self, row: int, active: torch.Tensor) -> None:
-        """Meet + influence → envoy conversion for ONE seat row — the
-        seatPhase CS-diplomacy accrual, one body for every
-        seat. Meet is by EXPLORATION (isExplored at the CS centre — fog is
+        """The meetings for ONE seat row — the seatPhase CS-diplomacy block,
+        one body for every seat. Meet is by EXPLORATION (isExplored at the CS centre — fog is
         live; the proximity surrogate is deleted, scouting is what meets, the
-        real Civ 6 rule). The accrual is influencePerTurn + this seat's own
-        adopted-government tier (`_adopted_gov`). CONVERSION
-        IS A RULE: Civ 6 grants the envoy the moment the meter fills,
-        assigned or not — WHERE it goes is the wire's decision, applied at
-        each row's own pick position."""
+        real Civ 6 rule). The Influence waits for the civics and the
+        government (`_seat_influence_accrue`)."""
         if self.S > 0:
             self._meet_citystates(active.nonzero(as_tuple=True)[0], row)
         # with no fog every look takes in every major: the seat meets them
@@ -15431,42 +15482,45 @@ class SimSeats:
             for o in range(self.n_majors):
                 if o != row:
                     self._meet_majors(active, row, o)
-        if self.S == 0:
-            return
-        B, S, dev = self.B, self.S, self.device
-        rr = self.rules.citystate
-        met_live = self.seat_citystate_met[:, row, :S] & self.citystate_alive[:, :S]
-        any_met = active & met_live.any(dim=1)
-        if not bool(any_met.count_nonzero()):
-            return
-        pt = torch.full((B,), float(rr["influencePerTurn"]), dtype=torch.float64, device=dev)
-        pt = pt + self._adopted_gov_tier(row).double()
+
+    def _seat_influence_accrue(self, row: int, active: torch.Tensor) -> None:
+        """`accrueInfluence`: after the civics and the government and cards
+        the start slotted, the row's Influence Points — its government's
+        (`_gov_influence`, a seat in none as Chiefdom), its cards' and
+        buildings', CIV6 (Economic alliance 2) an Envoy point per turn "for
+        every City-State with your Ally as Suzerain", the whole under CIV6
+        (Monarchy) "+50% Influence Points" — met or not, and each fill of the
+        government's threshold grants its envoys. CIV6 (Rogue State): "Earn no
+        influence toward new Envoys." """
+        B, dev = self.B, self.device
+        nog = torch.tensor(list(self.rules.citystate["noGovInfluence"]), dtype=torch.float64, device=dev)
+        if self._ngov:
+            adopted, has_gov = self._adopted_gov(row)
+            gi = torch.where(has_gov.unsqueeze(1), self._gov_influence[adopted.clamp(min=0)], nog.unsqueeze(0).expand(B, -1))
+        else:
+            gi = nog.unsqueeze(0).expand(B, -1)
+        pt = gi[:, 0].clone()
         pt = pt + self._gov_mods(row)[12]["infl"].double()
         # CIV6 (Consulate, Chancery): "+2/+3 Influence Points per turn."
         if bool(self._b_influence.count_nonzero()):
             pt = pt + self._seat_building_sum(row, self._b_influence).double()
-        # CIV6 (Economic alliance 2): an Envoy point per turn "for every
-        # City-State with your Ally as Suzerain".
         if self._al_e2_influence and self.S:
             _e2 = self._allied_type(row, 2, 2)
             for _o in range(self.n_majors):
                 if _o != row and bool(_e2[:, _o].count_nonzero()):
                     pt = pt + (self._al_e2_influence
                                * _e2[:, _o].double() * self._suzerain_mask(_o)[:, : self.S].sum(dim=1).double())
-        # CIV6 (Monarchy, GOVERNMENTBONUS_ENVOYS): "+50% Influence Points" toward more
-        # Envoys — a percentage of the WHOLE per-turn sum, so it multiplies
-        # here rather than inside any one term.
         pt = pt * self._gov_mods(row)[12]["inflmult"].double()
-        # CIV6 (Rogue State): "Earn no influence toward new Envoys."
-        any_met = any_met & ~self._gov_mods(row)[12]["noenvoy"]
-        self.civ_influence[:, row] = self.civ_influence[:, row] + torch.where(any_met, pt, torch.zeros_like(pt)).to(self.civ_influence.dtype)
-        cost = float(rr["envoyCost"])
-        for _ in range(3):
-            earn = any_met & (self.civ_influence[:, row] >= cost)
+        on = active & ~self._gov_mods(row)[12]["noenvoy"]
+        self.civ_influence[:, row] = self.civ_influence[:, row] + torch.where(on, pt, torch.zeros_like(pt)).to(self.civ_influence.dtype)
+        cost = gi[:, 1].to(self.civ_influence.dtype)
+        tokens = gi[:, 2].long()
+        for _ in range(4):
+            earn = on & (cost > 0) & (self.civ_influence[:, row] >= cost)
             if not bool(earn.count_nonzero()):
                 break
             self.civ_influence[:, row] = torch.where(earn, self.civ_influence[:, row] - cost, self.civ_influence[:, row])
-            self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + earn.long()
+            self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + earn.long() * tokens
 
     # THE CITY-STATES' QUESTS — `cpu/core/quests.ts`'s twin. A pair's quest
     # is `seat_citystate_quest` (its type's code: 1 Convert, 2 Trade, 3 Camp,

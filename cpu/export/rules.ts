@@ -22,7 +22,7 @@ import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_BUILDING_LOYALTY, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, BUENOS_AIRES_AMENITIES, AUCKLAND_PLOT_ROWS, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, JOHANNESBURG_LATE_TECH, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, HATTUSA_FREE_STRATEGIC } from '../data/cityStates';
-import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_ENVOY_ROWS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, CITY_STATE_MAX_HP, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_UPGRADE_GOLD, FIRST_MEET_ENVOYS, MINOR_CATCHUP_PCT } from '../data/cityStates';
+import { CITY_STATE_TYPES, govInfluence, CITY_STATE_ENVOY_ROWS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, CITY_STATE_MAX_HP, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_UPGRADE_GOLD, FIRST_MEET_ENVOYS, MINOR_CATCHUP_PCT } from '../data/cityStates';
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FREE_EXTRACTION, GP_CITY_PERM, GP_FREE_EXTRACTION, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_RESOURCE_REVEAL, GP_SITES, GP_UNIT_PROD_CLASSES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpNoMilitaryOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { gpSiteArgOf } from '../core/targetSites';
 import { strategicSlot } from '../core/stockpile';
@@ -724,6 +724,7 @@ export function buildRules() {
           cityState: g.cityState ? 1 : 0,
           strategic: g.strategic ? 1 : 0,
           relic: g.relic ? 1 : 0,
+          trader: g.trader ? 1 : 0,
           payload: GOODY_PAYLOAD_KINDS.indexOf(pl.kind),
           amount: goodyAmount(g),
           // a unit row names its chassis by roster index, -1 for a CLASS row
@@ -1169,8 +1170,8 @@ export function buildRules() {
     },
     cityState: {
       government: CITY_STATE_GOVERNMENT,
-      envoyCost: ENVOY_COST,
-      influencePerTurn: INFLUENCE_PER_TURN,
+      // a seat in no government accrues as Chiefdom (`govInfluence`)
+      noGovInfluence: [govInfluence(null).points, scaleByGameSpeed(govInfluence(null).threshold), govInfluence(null).tokens],
       firstMeetEnvoys: FIRST_MEET_ENVOYS,
       catchUpPct: MINOR_CATCHUP_PCT,
       // the envoy ladder (`CITY_STATE_ENVOY_ROWS`): `t` the type index, `e`
@@ -3106,6 +3107,9 @@ export function buildRules() {
     governments: Object.values(GOVERNMENTS).map((g) => ({
       id: g.id,
       tier: g.tier,
+      // its Influence Points a turn, the fill (through the speed) and the
+      // envoys a fill grants (`govInfluence`)
+      influence: [govInfluence(g.id).points, scaleByGameSpeed(govInfluence(g.id).threshold), govInfluence(g.id).tokens],
       intolerance: GOV_INTOLERANCE[g.id] ?? 0,
       unlockCivic: civicList.findIndex((c) =>
         c.effects.some((e) => e.kind === 'unlockGovernment' && e.government === g.id),

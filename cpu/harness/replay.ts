@@ -38,8 +38,8 @@ import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, uni
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
   serialize, deserialize, itemCost, holdEraOpening, eraOpeningDue, openHeldEra } from '../core/game';
 import { completeQueueItem } from '../core/production';
-import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
-  placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
+import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
+  placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, FORTIFY_MAX_TURNS } from '../core/units';
@@ -1179,7 +1179,7 @@ function settleEnvoys(ctx: Ctx, b: TurnRecord): void {
     const short = want - (cs.envoys[seat] ?? 0);
     if (short <= 0) { count(ctx, 'envoy', 'applied'); continue; }
     const was = cs.envoys[seat] ?? 0;
-    applySeatActionRecord(state, s, { production: [], tech: null, civic: null, units: [], envoys: new Array(short).fill(cs.id) });
+    applySeatEnvoys(state, s, { production: [], tech: null, civic: null, units: [], envoys: new Array(short).fill(cs.id) });
     const got = (cs.envoys[seat] ?? 0) - was;
     // the envoys the engine's purse could not send land as the engine
     // receives any (`addEnvoys`): the stored contest, and the ground the
@@ -1732,6 +1732,16 @@ function startSeeds(b: TurnRecord, player: number): { pre?: number; post?: numbe
  *  picks than its cities (one each) — the minors' annexes — by the game's
  *  log; with no log, the start (the DLL's reading) */
 function envoysInStart(log: RandLog | undefined, a: TurnRecord, b: TurnRecord, player: number): boolean {
+  // an InfluenceGiven row between the player before's deactivation and its
+  // own activation is its start's (runs/h1_duelw1121 t41: China's envoy to
+  // Hunza, its Mysticism token, the minor annexing no plot for it)
+  const rows = ((b as { actions?: unknown }).actions ?? []) as unknown[][];
+  const on = rows.findIndex((r) => r[2] === 'PlayerTurnActivated' && r[3] === player && r[1] === a.turn);
+  if (on > 0) {
+    let k = on - 1;
+    while (k >= 0 && rows[k][2] !== 'PlayerTurnDeactivated') k--;
+    if (rows.slice(k + 1, on).some((r) => r[2] === 'InfluenceGiven')) return true;
+  }
   const { pre, post } = startSeeds(b, player);
   const draws = log && pre !== undefined && post !== undefined ? log.between(pre, post) : undefined;
   if (!draws) return true;
@@ -1756,6 +1766,8 @@ function stageEnvoys(ctx: Ctx, ds: Decision[], a: TurnRecord, b: TurnRecord, log
   const { state } = ctx;
   ctx.envoys = [];
   const purse = new Map<number, number>();
+  // the civics each start completes (`turnStartCompletions`)
+  const starts = turnStartCompletions(ctx, b, a.turn);
   for (const d of ds) {
     if (d.kind !== 'envoy' || d.phase !== 'after' || !envoysInStart(log, a, b, d.player)) continue;
     const seat = seatOfP(ctx, d.player);
@@ -1763,7 +1775,13 @@ function stageEnvoys(ctx: Ctx, ds: Decision[], a: TurnRecord, b: TurnRecord, log
     const ms = seatOfP(ctx, d.minor);
     const cs = isCityStateSeat(ms) ? state.cityStates.find((c) => c.id === cityStateOfSeat(ms)) : undefined;
     if (!s || !cs || seat >= state.seats.length || !cs.met.includes(seat)) continue;
-    const left = purse.get(seat) ?? (s.envoysAvailable ?? 0);
+    // the tokens its start's Influence fills, and those the civics its start
+    // completes award, land before the start sends (runs/h1_duelw1121 t37:
+    // China's token filled and its envoy sent to Hunza in its start; t41:
+    // Mysticism's token sent there, before its Favor)
+    const awarded = (starts.get(seat)?.civics ?? []).filter((c) => !s.research.civics.includes(c))
+      .reduce((m, c) => m + (CIVICS[c]?.effects ?? []).reduce((k, e) => k + (e.kind === 'award' ? e.envoys ?? 0 : 0), 0), 0);
+    const left = purse.get(seat) ?? envoysAtStart(state, seat) + awarded;
     const n = Math.min(d.n, left);
     purse.set(seat, left - n);
     if (n > 0) ctx.envoys.push({ ...d, n });
@@ -2493,8 +2511,12 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       }
       case 'camp': {
         const u = unitOf(ctx, d.unit);
-        if (!u || !state.barbSeat.camps.includes(d.plot)) { count(ctx, 'camp', 'refused', d.player); break; }
-        clearCampFor(state, u, d.plot);
+        // a camp the engine's battle cleared already (its victor advanced
+        // onto it: runs/h1_duelw1121 t35, Rome's Warrior at (33,7)) paid the
+        // engine's dispersal there
+        const cleared = !!u && u.tileIndex === d.plot && !state.barbSeat.camps.includes(d.plot);
+        if (!u || (!cleared && !state.barbSeat.camps.includes(d.plot))) { count(ctx, 'camp', 'refused', d.player); break; }
+        if (!cleared) clearCampFor(state, u, d.plot);
         // the lab's HUMAN seat holds the install's BARBARIAN_CAMP_GOLD_SCALING
         // (Leaders.xml, TRAIT_LEADER_MAJOR_CIV on PLAYER_IS_HUMAN): its
         // dispersal change before the speed, which no engine seat holds
@@ -2950,6 +2972,19 @@ function inTurn(state: GameState, turn: number, fn: () => void): void {
   } finally {
     state.turn = now;
   }
+}
+
+/** what a unit's turn-end heal reads of its plot: its owner and whether it
+ *  is a city's centre */
+function healPlot(state: GameState, u: Unit): string {
+  const t = state.map.tiles[u.tileIndex];
+  return `${tileSeat(t)}:${t.district === 'CITY_CENTER' ? 1 : 0}`;
+}
+
+/** the record's key of an engine unit, '' for none */
+function unitKeyOf(ctx: Ctx, u: Unit): string {
+  for (const [k, x] of ctx.units) if (x === u) return k;
+  return '';
 }
 
 function syncUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
@@ -4030,6 +4065,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // (`seatFavor`, below), not at the start the engine's turn stands for
     const favorAfter = state.seats.filter((s) => s !== active && isCiv(s.seat)).map((s) => s.seat);
     holdFavor((seat) => favorAfter.includes(seat));
+    // each unit's health before the engine's turn heals it, beside the plot
+    // the heal reads (`healedOn`)
+    const hpPre = new Map(state.units.map((u) => [u, u.hp]));
     try {
       endTurn(state);
     } catch (e) {
@@ -4048,6 +4086,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // whole when a barbarian Warrior struck it for 24, read 86): its rest
     // heal is taken at the health the blows left
     for (const [u, hp] of struckHp) u.hp = Math.min(u.hp, hp);
+    const healedOn = new Map(state.units.map((u) => [u, healPlot(state, u)]));
     state.units.push(...barbs);
     verifyPolicies(ctx, staged);
     settleAi.postTurn(b);
@@ -4144,6 +4183,19 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     for (const u of struckHp.keys()) {
       if (!state.units.includes(u) || u.hp >= UNIT_HP) continue;
       const rest = { ...u };
+      restUnit(state, rest, true);
+      u.hp = rest.hp;
+    }
+    // the game heals every unit at the turn's end, after every player's
+    // actions: a rested unit of another major whose plot those actions
+    // changed (a city founded on it, a plot bought under it) heals on the
+    // plot as they left it (runs/h1_duelw1121 t36: China's Warrior escorting
+    // the Settler that founds Taiyuan under it heals 20 in the new city)
+    for (const [u, was] of healedOn) {
+      const hp = hpPre.get(u);
+      if (hp === undefined || spent.has(u) || struckHp.has(u) || ctx.battled.has(unitKeyOf(ctx, u)) || !isCiv(u.seat)
+        || !state.units.includes(u) || u.seat === seatOfP(ctx, activePlayer(a)) || healPlot(state, u) === was) continue;
+      const rest = { ...u, hp };
       restUnit(state, rest, true);
       u.hp = rest.hp;
     }
