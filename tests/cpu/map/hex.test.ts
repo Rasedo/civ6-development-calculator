@@ -3,7 +3,7 @@ import {
   neighborOffset, neighborTile, oppositeDir, offsetToAxial, axialToOffset, hexDistance, hexRingWalk, tilesWithin,
   vertexNeighbors, vertexTouchingTiles, vertexKey, DIR_E, DIR_W, type MapShape, type Vertex,
 } from '../../../world/hex';
-import { hexLineBetween, canSee } from '../../../cpu/core/fog';
+import { canSee } from '../../../cpu/core/fog';
 import { crossesRiver } from '../../../cpu/core/units';
 import { makeMap } from '../helpers';
 
@@ -126,7 +126,6 @@ describe('a map that wraps in x', () => {
   it('a line of sight runs across the seam', () => {
     const m = makeMap(12, 8, 'GRASSLAND', true);
     const t = (c: number, r: number) => m.tiles[r * 12 + c];
-    expect(hexLineBetween(m, t(1, 3), t(10, 3))).toEqual([t(0, 3), t(11, 3)]);
     expect(canSee(m, t(1, 3), t(10, 3), false)).toBe(true);
     t(11, 3).elevation = 'MOUNTAIN';
     expect(canSee(m, t(1, 3), t(10, 3), false)).toBe(false);

@@ -135,77 +135,136 @@ def ring_walk_places(ctr: torch.Tensor, k: torch.Tensor, width: int, height: int
     return pos
 
 
-def los_tables(width: int, height: int, wrap_x: bool, rmax: int) -> tuple[torch.Tensor, torch.Tensor]:
-    """`hexLineBetween` for every pair within `rmax`, once per map. Returns
-    (targets [T, N], mids [T, N, 2, rmax - 1]): for each tile, the tiles at
-    distance 1..rmax (-1 padded) and, per target and side, the tiles
-    strictly BETWEEN on the hex line — a cube lerp with the (1e-6, 2e-6,
-    -3e-6) nudge (side 0) or its opposite (side 1, the plot across an edge
-    the line runs along) and cube rounding, each coordinate rounded with
-    floor(x + 0.5) exactly as the TS helper does, an off-map hex on the line
-    absent (-1). On a wrapping map a target is each plot once and the line
-    runs the shorter way round (`hex_shift`)."""
-    import math
+# the walk's axial steps, the next direction at a ring's corner and the two
+# parents per direction a plot was reached by (`losDisk`'s WALK_* tables)
+_WALK_DQ = (0, 1, 1, 0, -1, -1)
+_WALK_DR = (1, 0, -1, -1, 0, 1)
+_WALK_NEXT = (1, 2, 3, 4, 5, 0)
+_WALK_PARENTS = ((1, 2), (3, 2), (3, 4), (4, 5), (5, 0), (1, 0))
+_LINE_TIE = 12
 
-    def offset(q, r):
-        return q + ((r - (r & 1)) >> 1), r
 
-    def dist(c1, r1, c2, r2):
-        q1, s1 = _axial(c1, r1)
-        q2, s2 = _axial(c2, r2)
-        return _cube(q1 - q2, s1 - s2)
-
-    n_t = 1 + 3 * rmax * (rmax + 1) - 1
+def sight_tables(width: int, height: int, wrap_x: bool, rmax: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """`losDisk`'s walk for every eye out to `rmax`, once per map. Returns
+    (targets [T, N], parents [T, N, 2], pick [T, N]): per eye the plots of
+    rings 1..rmax in the walk's order (ring k at places 3k(k-1) ..
+    3k(k+1) - 1, -1 off the map); per plot its two parents as places in the
+    eye's carried vector (0 the eye, j + 1 the walk's place j; -1 off the map
+    or not on the ring inside); and which parent the line from the eye's
+    centre runs nearer (1 the first, 2 the second, 0 both within 0.05, in
+    24.8 fixed point on the wrapped coordinates, a row's odd plots half a
+    plot east)."""
     T = width * height
-    n_m = max(rmax - 1, 1)
-    # filled as python lists and handed to torch once: an element write into
-    # a tensor costs microseconds, and there are a few hundred thousand here
+    n_t = 3 * rmax * (rmax + 1)
+
+    def plot_at(x, y, dq, dr):
+        nx = x + dq - (y >> 1) + ((y + dr) >> 1)
+        ny = y + dr
+        if wrap_x:
+            nx %= width
+        if not (0 <= nx < width and 0 <= ny < height):
+            return None
+        return nx, ny
+
+    def dist(ax, ay, bx, by):
+        dq = (bx - (by >> 1)) - (ax - (ay >> 1))
+        dr = by - ay
+        d = _cube(dq, dr)
+        if wrap_x:
+            d = min(d, _cube(dq - width, dr), _cube(dq + width, dr))
+        return d
+
+    def fx(x, y):
+        return x * 256 + (128 if y & 1 else 0)
+
+    def fm(a, b):
+        return (a * b) >> 8
+
     tgt = [[-1] * n_t for _ in range(T)]
-    mid = [[[[-1] * n_m, [-1] * n_m] for _ in range(n_t)] for _ in range(T)]
-    for a in range(T):
-        ac, ar = a % width, a // width
-        aq, arr = _axial(ac, ar)
-        k = 0
-        seen: set[int] = set()
-        for br in range(max(0, ar - rmax), min(height, ar + rmax + 1)):
-            cols = (range(ac - rmax - 1, ac + rmax + 2) if wrap_x
-                    else range(max(0, ac - rmax - 1), min(width, ac + rmax + 2)))
-            for bc in cols:
-                if wrap_x:
-                    bc %= width
-                    b = br * width + bc
-                    if b in seen:
-                        continue
-                    seen.add(b)
-                    bc += hex_shift(width, True, ac, ar, bc, br)
-                n = dist(ac, ar, bc, br)
-                if n < 1 or n > rmax:
-                    continue
-                b = br * width + bc % width
-                tgt[a][k] = b
-                bq, brr = _axial(bc, br)
-                for side, sgn in ((0, 1), (1, -1)):
-                    mid_ak = mid[a][k][side]
-                    e1, e2, e3 = 1e-6 * sgn, 2e-6 * sgn, -3e-6 * sgn
-                    ax, az, ay = aq + e1, arr + e2, -aq - arr + e3
-                    bx, bz, by = bq + e1, brr + e2, -bq - brr + e3
-                    for i in range(1, n):
-                        t = i / n
-                        x, y, z = ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t
-                        rx, ry, rz = math.floor(x + 0.5), math.floor(y + 0.5), math.floor(z + 0.5)
-                        dx, dy, dz = abs(rx - x), abs(ry - y), abs(rz - z)
-                        if dx > dy and dx > dz:
-                            rx = -ry - rz
-                        elif dy > dz:
-                            ry = -rx - rz
-                        else:
-                            rz = -rx - ry
-                        mc, mr = offset(rx, rz)
-                        if 0 <= mr < height and (wrap_x or 0 <= mc < width):
-                            mid_ak[i - 1] = mr * width + mc % width
-                k += 1
+    par = [[[-1, -1] for _ in range(n_t)] for _ in range(T)]
+    pick = [[0] * n_t for _ in range(T)]
+    for o in range(T):
+        ox, oy = o % width, o // width
+        place = {o: 0}
+        q = r = 0
+        d = 1
+        j = 0
+        for ring in range(1, rmax + 1):
+            q += _WALK_DQ[0]
+            r += _WALK_DR[0]
+            d = 1
+            for i in range(6 * ring):
+                if i > 0:
+                    nq, nr = q + _WALK_DQ[d], r + _WALK_DR[d]
+                    if _cube(nq, nr) > ring:
+                        d = _WALK_NEXT[d]
+                        nq, nr = q + _WALK_DQ[d], r + _WALK_DR[d]
+                    q, r = nq, nr
+                cur = plot_at(ox, oy, q, r)
+                if cur is not None:
+                    cx, cy = cur
+                    ci = cy * width + cx
+                    tgt[o][j] = ci
+                    ps = []
+                    for k, dd in enumerate(_WALK_PARENTS[d]):
+                        p = plot_at(cx, cy, _WALK_DQ[dd], _WALK_DR[dd])
+                        if p is None or dist(ox, oy, p[0], p[1]) != ring - 1:
+                            ps.append(None)
+                            continue
+                        ps.append(p)
+                        par[o][j][k] = place[p[1] * width + p[0]]
+                    if ps[0] is not None and ps[1] is not None:
+                        OX, OY, CX, CY = fx(ox, oy), oy * 256, fx(cx, cy), cy * 256
+                        A, B, C = CY - OY, OX - CX, fm(CX, OY) - fm(CY, OX)
+                        d1, d2 = (abs(fm(A, fx(px, py)) + fm(B, py * 256) + C) for px, py in ps)
+                        pick[o][j] = 2 if d1 - d2 > _LINE_TIE else 1 if d2 - d1 > _LINE_TIE else 0
+                    place.setdefault(ci, j + 1)
+                j += 1
     return (torch.tensor(tgt, dtype=torch.long).reshape(T, n_t),
-            torch.tensor(mid, dtype=torch.long).reshape(T, n_t, 2, n_m))
+            torch.tensor(par, dtype=torch.long).reshape(T, n_t, 2),
+            torch.tensor(pick, dtype=torch.long).reshape(T, n_t))
+
+
+def sight_walk(par: torch.Tensor, pick: torch.Tensor, own: torch.Tensor, eye: torch.Tensor, rings: int) -> torch.Tensor:
+    """[K, N] bool — `losDisk`'s carried heights walked out to `rings` over
+    `sight_tables`' rows for K eyes: `par` [K, N, 2], `pick` [K, N], `own`
+    [K, N] each plot's own height (`sightThrough`), `eye` [K] the eye's
+    (`eyeHeight`). A plot's carried height is the higher of its own and its
+    parent's (both parents within the tie: the lower carries, the plot split
+    where the higher stood above it; a split parent gives way to the other);
+    it shows when the parent's is below its own or no higher than the eye."""
+    K, N = own.shape
+    dev = own.device
+    carried = torch.zeros(K, N + 1, dtype=torch.long, device=dev)
+    split = torch.zeros(K, N + 1, dtype=torch.bool, device=dev)
+    vis = torch.zeros(K, N, dtype=torch.bool, device=dev)
+    eye_c = eye.reshape(K, 1)
+    for k in range(1, rings + 1):
+        lo_i, hi_i = 3 * k * (k - 1), 3 * k * (k + 1)
+        p = par[:, lo_i:hi_i]
+        ok = p >= 0
+        pc = p.clamp(min=0)
+        h = torch.where(ok, carried.gather(1, pc.reshape(K, -1)).reshape(pc.shape), torch.full_like(pc, -1))
+        f = ok & split.gather(1, pc.reshape(K, -1)).reshape(pc.shape)
+        h1, h2, f1, f2 = h[..., 0], h[..., 1], f[..., 0], f[..., 1]
+        mine = own[:, lo_i:hi_i]
+        pk = pick[:, lo_i:hi_i]
+        none1 = h1 < 0
+        single = ~none1 & ((h2 < 0) | (h1 == h2))
+        rest = ~none1 & ~single
+        use2 = none1 | (single & f1) | (rest & f1) | (rest & ~f1 & ~f2 & (pk == 2))
+        use1 = (single & ~f1) | (rest & ~f1 & f2) | (rest & ~f1 & ~f2 & (pk == 1))
+        both = rest & ~f1 & ~f2 & (pk == 0)
+        x2 = torch.where((h2 >= 0) & ~f2, h2, torch.where(h1 >= 0, h1, h2))
+        lo = torch.minimum(h1, h2)
+        hi = torch.maximum(h1, h2)
+        x = torch.where(use1, h1, torch.where(use2, x2, lo))
+        new_c = torch.where(both, torch.where(hi > mine, torch.maximum(lo, mine), mine),
+                            torch.where(x >= 0, torch.maximum(mine, x), mine))
+        carried[:, lo_i + 1:hi_i + 1] = new_c
+        split[:, lo_i + 1:hi_i + 1] = both & (hi > mine)
+        vis[:, lo_i:hi_i] = (x >= 0) & ((x < mine) | (x <= eye_c))
+    return vis
 
 
 def barb_ring_table(width: int, height: int, wrap_x: bool, radius: int) -> list[list[int]]:

@@ -795,23 +795,11 @@ class SimTactics:
 
     def _tac_sees(self, rows: torch.Tensor, frm: torch.Tensor, to: torch.Tensor) -> torch.Tensor:
         """[K] bool — `canSee` of the plot `to` from an eye on `frm` (no
-        Sentry), in the games `rows`: `_los_disk`'s occlusion for one pair."""
+        Sentry), in the games `rows`: `_los_disk` out to `to`'s ring."""
         K = rows.numel()
-        tl = self._los_tgt[frm]                          # [K, N]
-        hit = tl == to.unsqueeze(1)
-        has = hit.any(dim=1)
-        col = hit.long().argmax(dim=1)
-        mid = self._los_mid[frm, col]                    # [K, 2, M]
-        th = self._sight_through_plane(False)[rows]       # [K, T]
-        M = mid.shape[2]
-        mth = th.gather(1, mid.clamp(min=0).reshape(K, -1)).reshape(K, 2, M)
-        mth = torch.where(mid >= 0, mth, torch.zeros_like(mth))
-        obs_h = (self.hills[rows, frm].long() * self._sight_hills
-                 + self.tile_mountain[rows, frm].long() * self._sight_mountain)
-        tgt_h = th.gather(1, to.unsqueeze(1))
-        stops = (mth > obs_h.view(K, 1, 1)) & (mth >= tgt_h.view(K, 1, 1)) & (mid >= 0)
-        blocked = stops.any(dim=2).all(dim=1)
-        return (has & ~blocked) | (frm == to)
+        d = self.pair_dist[frm, to].long()
+        disk = self._los_disk(rows, frm, d, torch.zeros(K, dtype=torch.bool, device=self.device))
+        return disk.gather(1, to.unsqueeze(1)).squeeze(1) | (frm == to)
 
     def _tac_step(self, rows: torch.Tensor, frm: torch.Tensor, to: torch.Tensor, dcol: torch.Tensor,
                   utype: torch.Tensor, ign_shore: torch.Tensor) -> torch.Tensor:

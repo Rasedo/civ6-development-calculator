@@ -3,10 +3,10 @@ LOS scenes are the TS twin).
 
     python tests/gpu/sight_test.py
 
-A tile on the ray hides what stands behind it when its SightThroughModifier
-sum EXCEEDS the observer's SightModifier and is no less than the target's
-own; either of a ray's two lines past an edge serves; a hill adds height,
-never range; Sentry sees through features.
+The game's line-of-sight walk (`losDisk`): each plot carries the higher of
+its own SightThroughModifier sum and its parent's carried height, and shows
+when the parent's is below its own or no higher than the eye's; a hill adds
+height, never range; Sentry sees through features.
 """
 
 from __future__ import annotations
@@ -19,40 +19,34 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from core.simbase import los_tables
+from core.simbase import sight_tables
 from warmup import settle_all
 
 
 def main() -> None:
-    # -- 1: the hex line, once per map — the straight row and the line's shape
-    tgt, mid = los_tables(16, 16, False, 5)
+    # -- 1: the walk's tables, once per map — every plot within 5 once, each
+    # parent beside its plot and one ring in, a side plot's two parents
+    tgt, par, pick = sight_tables(16, 16, False, 5)
     W = 16
     a = 10 * W + 5
-    row = {int(tgt[a, k]): k for k in range(tgt.shape[1]) if int(tgt[a, k]) >= 0}
-    assert len(row) == 90, f"the disk within 5 of an inner tile holds 90 tiles, got {len(row)}"
-    k = row[10 * W + 8]
-    for s in (0, 1):
-        assert mid[a, k, s].tolist()[:2] == [10 * W + 6, 10 * W + 7] and int(mid[a, k, s, 2]) == -1, \
-            f"the straight line east from (5,10) to (8,10) passes (6,10),(7,10) on side {s}: {mid[a, k, s].tolist()}"
-    # every line: distance - 1 mids, each adjacent to the last, the first beside the eye
-    from core.simbase import neighbor_table
+    from core.simbase import neighbor_table, pair_distances
     nb = neighbor_table(16, 16, False)
-    split = 0
-    for k2 in range(tgt.shape[1]):
-        b = int(tgt[a, k2])
-        if b < 0:
-            continue
-        for s in (0, 1):
-            ms = [int(m) for m in mid[a, k2, s].tolist() if m >= 0]
-            prev = a
-            for m in ms:
-                assert m in nb[prev].tolist(), f"line {a}->{b} side {s}: mid {m} is not beside {prev}"
-                prev = m
-            assert b in nb[prev].tolist() or not ms and b in nb[a].tolist(), f"line {a}->{b} does not end beside the target"
-        split += mid[a, k2, 0].tolist() != mid[a, k2, 1].tolist()
-    # the six distance-2 targets off the straight lines pass an edge: each side takes its own plot
-    assert split >= 6, f"the lines along an edge take the same plot on both sides ({split} split)"
-    print("  1 lines OK — 90 targets within 5, the straight row exact, every line a chain of neighbours, an edge split")
+    pd = pair_distances(16, 16, False)
+    row = [int(x) for x in tgt[a].tolist()]
+    assert len([x for x in row if x >= 0]) == 90, "the walk within 5 of an inner tile holds 90 tiles"
+    assert sorted(x for x in row if x >= 0) == sorted(b for b in range(W * 16) if 1 <= int(pd[a, b]) <= 5)
+    sides = 0
+    for j, b in enumerate(row):
+        ring = int(pd[a, b])
+        assert 3 * ring * (ring - 1) <= j < 3 * ring * (ring + 1), f"place {j} is not on ring {ring}"
+        ps = [int(x) for x in par[a, j].tolist() if int(x) >= 0]
+        assert ps, f"{b} has no parent"
+        for q in ps:
+            pt = a if q == 0 else row[q - 1]
+            assert pt in nb[b].tolist() and int(pd[a, pt]) == ring - 1, f"parent {pt} of {b} is not beside it one ring in"
+        sides += len(ps) == 2 and ring == 2 and int(pick[a, j]) == 0
+    assert sides == 6, f"the six ring-2 side plots take both parents ({sides})"
+    print("  1 tables OK — 90 plots within 5 in ring order, each parent one ring in beside its plot, the side plots both")
 
     # -- 2: the look itself, on the fixture map
     rules = load_rules()

@@ -75,7 +75,7 @@ export function neighborOffset(map: MapShape, col: number, row: number, d: numbe
   return [wrapCol(map, c), rr];
 }
 
-function cubeNorm(dq: number, dr: number): number {
+export function cubeNorm(dq: number, dr: number): number {
   return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2;
 }
 

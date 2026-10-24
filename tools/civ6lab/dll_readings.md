@@ -1857,25 +1857,61 @@ Horseman 851980 (whole) displaces 655369 (20 damage) beside 720906.
   danger map on the scout's plot (`dangerPlane` / `_danger_plane`; "C-95:
   the scout's tree").
 
-## H-1: the sight rule and a city's look — LAB (records; the walk 0x58b1d0 unread)
+## H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB
 
-0x58b1d0 builds a unit's sight list in 24.8 fixed point (constants 0.5
-and 0.05) over a ring walk; unread. Fitted on the records' revealed plots
-(runs/h1_duelw1126–1131, `revealed`, every look a major's land unit took
-from its plots and steps over turns 1-250, cities' surroundings left
-out): a plot between eye and target blocks when its SightThroughModifier
-sum exceeds the eye's height and is no less than the target's own; the
-look holds when either of the line's two nudges is clear. Of the 915
-looks the candidate rules dispute it misreads 9 (1127 t1 Rome's Settler
-(36,13) over a hill to the mountain (34,14) shown, unrevealed); the rule
-letting a plot show over its equal misreads 626, the eye-height-only rule
-271. 1121 t7 (Kilimanjaro past the wooded hill (33,9), through (32,9))
-holds. A city founded or taken looks two plots round its centre whole
-and three by the line: at every major's founding on 1126–1131 no plot two
-from the centre is left dark, and of the 98 left dark three from it the
-line shows 4. A major meeting a city-state sees its centre and ring
-revealed (32 of 32 meetings; plots past the ring dark on 8) — not shipped
-(docs/AUDIT.md C-94: such a reveal names no river).
+0x58b1d0 (Unit_Sight; callers the unit sight update 0x58f3f0 / 0x58f170,
+the explore counts 0x70a6c0 / 0x70a8b0, two range-attack previews) builds
+a unit's (plot, ring) sight list; its arguments the range (edx), the
+eye's x, y, then seeThroughFeatures, seeThroughTerrain and the list. It
+zeroes a carried-height array over the map and walks rings 0 .. range + 1
+in axial steps (0xeff670 dq 0 1 1 0 -1 -1, 0xeff688 dr 1 0 -1 -1 0 1):
+each ring starts one step in direction 0 past the last ring's end with
+direction 1, and turns to the next direction (0xeff6a0) where a step
+would leave the ring. Per plot on the map:
+
+- its parents: the two neighbours the six-way switch on the walk's
+  direction names (direction 0: 1 and 2; 1: 3 and 2; 2: 3 and 4; 3: 4 and
+  5; 4: 5 and 0; 5: 1 and 0), a parent counting only on the map at hex
+  distance ring - 1 from the eye (0x58ae50, the wrap's shorter way); a
+  parent's stored value at 2^24 or more is split, the bit dropped;
+- its own height (0x58d1c0): the terrain's SightThroughModifier (+0x34)
+  unless seeThroughTerrain plus the feature's (+0x44) unless
+  seeThroughFeatures (Sentry), both 0 on ring range + 1;
+- the carrying parent: with the first missing the second; with the
+  second missing or the two equal the first unless it is split; else a
+  split first gives way to the second, a split second to the first; else
+  the line a*X + b*Y + c from the eye's centre to the plot's, in 24.8
+  fixed point on the WRAPPED coordinates (X = x * 256, plus 128 on an odd
+  row; Y = y * 256): the parent nearer it by more than 0.05 (12) carries,
+  and within that both — the lower carries, and the plot is stored
+  max(lower, own) + 2^24 when the higher exceeds its own, else its
+  own;
+- one carrying parent: stored max(own, its value); the plot is listed
+  when that value is below its own, or no higher than the eye (0x58af70:
+  the terrain's SightModifier +0x30, 1 on a city centre or a complete,
+  unpillaged district with ZOC and HitPoints — 0x24c2f0, the Encampment
+  and its replacements) and the ring is not range + 1; no carrying parent:
+  stored its own, unlisted.
+
+Checked by emulation (unicorn, the callees answered with the map's
+heights, `tools/civ6lab/dll_sight.py`):
+`losDisk` (cpu/core/fog.ts) and `sight_tables` / `sight_walk`
+(gpu/core/simbase.py) list the same plots as the DLL on every plot of
+runs/h1_duelw1127 t2 and t100, 1117 t60 and 1121 t150, ranges 1-5, Sentry
+off and on (45,760 looks). The records: 1127 t2 Rome's Settler (36,13)
+leaves the Mountain (34,14) dark, 1127 t30 China's Settler (12,7) sees
+the Grassland (13,10) past the Forest (12,9), 1117 t2 Rome leaves plot 716
+dark — each as recorded, each misread by the former two-line rule.
+
+A city's look is not this walk (no city caller). A city founded or taken
+looks two plots round its centre whole and three by the walk from an eye
+at the centre's terrain height (`cityLook`, `cityEye`): at every major's
+founding on 1126–1131 no plot two from the centre is left dark, and the
+founding turn's fog holds on 1117, 1121 and 1127, where the city centre's
+raised eye would show plots the records leave dark (1127 Xi'an (13,9),
+1121 Rome (33,11), (34,11)). A major meeting a city-state sees its centre
+and ring revealed (32 of 32 meetings; plots past the ring dark on 8;
+`meetCityState`).
 
 ## H-1: the draw log's labels (RandCalls.csv) — READ
 

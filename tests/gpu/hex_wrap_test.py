@@ -1,8 +1,8 @@
 """A MAP THAT WRAPS IN X — the GPU's hex tables (tests/cpu/map/hex.test.ts is
 the TS twin). Columns 0 and W - 1 are neighbours, a distance goes the
 shorter way round, a disk and a ring hold each plot once on a narrow map,
-and a line of sight crosses the seam. The literals marked TS are what
-`world/hex.ts` / `hexLineBetween` answer on the same maps.
+and the line-of-sight walk crosses the seam. The literals marked TS are what
+`world/hex.ts` answers on the same maps.
 
     python tests/gpu/hex_wrap_test.py
 """
@@ -16,7 +16,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
-from core.simbase import (axial_delta, hex_distance_from, los_tables, neighbor_table, pair_distances,  # noqa: E402
+from core.simbase import (axial_delta, hex_distance_from, sight_tables, neighbor_table, pair_distances,  # noqa: E402
                           ring_walk_places, tiles_from_offsets, tiles_within_offsets)
 
 
@@ -98,27 +98,18 @@ def main() -> None:
         assert len({p for p, _ in ring}) == len(ring), "two plots share a ring place"
     print("  4 rings OK — TS's walk on 4 x 9")
 
-    # -- 5: the line of sight across the seam
+    # -- 5: the line-of-sight walk across the seam
     W12 = 12
-    tgt, mid = los_tables(W12, 8, True, 5)
-    p12 = lambda c, r: r * W12 + c  # noqa: E731
-
-    def line(a: int, b: int) -> list[int]:
-        row = [int(x) for x in tgt[a].tolist()]
-        assert b in row, f"{b} is not a target of {a}"
-        return [int(m) for m in mid[a, row.index(b), 0].tolist() if int(m) >= 0]
-
-    assert line(p12(1, 3), p12(10, 3)) == [36, 47], "TS: the line (1,3) -> (10,3) passes (0,3), (11,3)"
-    assert line(p12(11, 2), p12(2, 6)) == [47, 48, 49, 61], "TS: the line (11,2) -> (2,6)"
+    tgt, _par, _pick = sight_tables(W12, 8, True, 5)
     pd12 = pair_distances(W12, 8, True)
     for a in range(W12 * 8):
         row = [int(x) for x in tgt[a].tolist() if int(x) >= 0]
         assert len(row) == len(set(row)), f"a target repeats from {a}"
         want = {b for b in range(W12 * 8) if 1 <= int(pd12[a, b]) <= 5}
         assert set(row) == want, f"the targets of {a} are not the plots within 5"
-    flat_t, flat_m = los_tables(16, 16, False, 5)
+    flat_t, _fp, _fk = sight_tables(16, 16, False, 5)
     assert len([x for x in flat_t[10 * 16 + 5].tolist() if x >= 0]) == 90
-    print("  5 lines OK — the sight lines cross the seam as TS's do, every target once")
+    print("  5 walk OK — the sight walk crosses the seam, every target once")
 
 
 if __name__ == "__main__":

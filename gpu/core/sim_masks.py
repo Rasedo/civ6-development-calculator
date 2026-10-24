@@ -2905,37 +2905,46 @@ class SimMasks:
             out = out + torch.where(live, self._feat_sight_through[self.feat_id.clamp(min=0)], torch.zeros_like(out))
         return out
 
-    def _los_disk(self, rows: torch.Tensor, tiles: torch.Tensor, radius, see_through: torch.Tensor) -> torch.Tensor:
-        """[K, T] bool — the tiles within `radius` of `tiles` an eye standing
-        THERE can see (`canSee` over `tilesWithin`): OCCLUSION BY ELEVATION —
-        a tile strictly between (`_los_mid`) blocks when it puts more in the
-        way than the observer's own height (flat 0, hills 1, mountain 2) and
-        no less than the target's own; the look holds when either of the two
-        lines (side 0 / 1, one each side of an edge the line runs along) is
-        clear. The range is the caller's; a hill adds height, never reach.
-        `see_through` [K] bool is the Sentry flag per look."""
+    def _terrain_eye(self, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
+        """[K] long — the height the terrain stands a look at (SightModifier:
+        hills, mountain) on `tiles` in the games `rows`."""
+        return (self.hills[rows, tiles].long() * self._sight_hills
+                + self.tile_mountain[rows, tiles].long() * self._sight_mountain)
+
+    def _eye_height(self, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
+        """[K] long — `eyeHeight`: the terrain's, and 1 on a city centre or a
+        complete, unpillaged Encampment (the DLL's 0x58af70 / 0x24c2f0)."""
+        raised = self._centre_plane()[rows, tiles]
+        if self._encamp_didx >= 0:
+            raised = raised | ((self.district[rows, tiles] == self._encamp_didx)
+                               & self.district_complete[rows, tiles] & ~self.district_pillaged[rows, tiles])
+        return torch.where(raised, torch.ones_like(tiles), self._terrain_eye(rows, tiles))
+
+    def _los_disk(self, rows: torch.Tensor, tiles: torch.Tensor, radius, see_through: torch.Tensor,
+                  eye: torch.Tensor | None = None) -> torch.Tensor:
+        """[K, T] bool — `losDisk`: the tiles within `radius` of `tiles` an
+        eye standing THERE sees, the game's line-of-sight walk ring by ring
+        over `sight_tables` (`sight_walk`): each plot carries the higher of
+        its own height and its parent's carried one, and shows when the
+        parent's is below its own or no higher than the eye. `see_through`
+        [K] bool is the Sentry flag per look (every feature's height
+        dropped, the plot's own included); `eye` [K] the eye's height where
+        it is not its plot's (`_eye_height`). The range is the caller's; a
+        hill adds height, never reach."""
         K = rows.numel()
         rad = radius if torch.is_tensor(radius) else torch.full((K,), int(radius), dtype=torch.long, device=self.device)
         rad = rad.reshape(-1).expand(K) if rad.numel() == 1 else rad
         tgt = self._los_tgt[tiles]            # [K, N]
-        mid = self._los_mid[tiles]            # [K, N, 2, M]
-        th_all = self._sight_through_plane(False)[rows]   # [K, T]
-        th_feat0 = self._sight_through_plane(True)[rows]
-        th = torch.where(see_through.reshape(K, 1), th_feat0, th_all)
-        N, M = tgt.shape[1], mid.shape[3]
-        mth = th.gather(1, mid.clamp(min=0).reshape(K, -1)).reshape(K, N, 2, M)
-        mth = torch.where(mid >= 0, mth, torch.zeros_like(mth))
-        obs_h = (self.hills[rows, tiles].long() * self._sight_hills
-                 + self.tile_mountain[rows, tiles].long() * self._sight_mountain)  # [K]
-        # the target's own height (its elevation's plus its feature's, the
-        # Sentry flag aside): a plot shows over a lower one, never its equal
-        tgt_h = th_all.gather(1, tgt.clamp(min=0))  # [K, N]
-        stops = (mth > obs_h.reshape(K, 1, 1, 1)) & (mth >= tgt_h.reshape(K, N, 1, 1)) & (mid >= 0)
-        blocked = stops.any(dim=3).all(dim=2)
-        d = self.pair_dist[tiles].gather(1, tgt.clamp(min=0)).to(torch.long)
-        vis = (tgt >= 0) & ~blocked & (d <= rad.reshape(K, 1))
+        th = torch.where(see_through.reshape(K, 1), self._sight_through_plane(True)[rows],
+                         self._sight_through_plane(False)[rows])   # [K, T]
+        own = torch.where(tgt >= 0, th.gather(1, tgt.clamp(min=0)), torch.zeros_like(tgt))
+        eye_k = self._eye_height(rows, tiles) if eye is None else eye
+        rings = int(rad.max()) if K else 0
+        vis = sight_walk(self._los_par[tiles], self._los_pick[tiles], own, eye_k, min(rings, self._sight_max))
+        ring = self._los_ring
+        vis = vis & (tgt >= 0) & (ring.unsqueeze(0) <= rad.reshape(K, 1))
         disk = torch.zeros(K, self.T, dtype=torch.bool, device=self.device)
-        kk = torch.arange(K, device=self.device).unsqueeze(1).expand(K, N)
+        kk = torch.arange(K, device=self.device).unsqueeze(1).expand_as(tgt)
         disk[kk[vis], tgt[vis]] = True
         disk[torch.arange(K, device=self.device), tiles] = True
         return disk
@@ -2943,9 +2952,11 @@ class SimMasks:
     def _city_look(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor) -> None:
         """`cityLook`'s twin, a city founded or changing hands: the plots two
         round its centre whole, then those three round it an eye on the
-        centre sees (`_los_disk`, no Sentry)."""
+        centre sees (`_los_disk`, no Sentry, the eye at its terrain's height:
+        `cityEye`)."""
         self._reveal_around(rows, seat_row, tiles, 2)
-        self._reveal_around(rows, seat_row, tiles, 3, see_through=torch.zeros(rows.numel(), dtype=torch.bool, device=self.device))
+        self._reveal_around(rows, seat_row, tiles, 3, see_through=torch.zeros(rows.numel(), dtype=torch.bool, device=self.device),
+                            eye=self._terrain_eye(rows, tiles))
 
     def _barb_reveal(self, rows: torch.Tensor, tiles: torch.Tensor, radius, see_through: torch.Tensor | None = None) -> None:
         """`revealAround` for the barbarians: their revealed plots
@@ -2965,7 +2976,8 @@ class SimMasks:
         self.barb_explored |= acc > 0
 
     def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius,
-                       see_through: torch.Tensor | None = None, placed: bool | None = None) -> None:
+                       see_through: torch.Tensor | None = None, placed: bool | None = None,
+                       eye: torch.Tensor | None = None) -> None:
         """revealAround's twin: lift `seat_row`'s fog within `radius` of
         `tiles`. rows [K] batch indices (UNIQUE per call — advanced-index
         assignment is last-write-wins), seat_row an int or [K] long, tiles
@@ -2990,10 +3002,11 @@ class SimMasks:
         is suzerain of lends it (`_suzerain_look`)."""
         if not self.fog_of_war or rows.numel() == 0:
             return
-        # `see_through` names a UNIT's look (revealAround's `los`): the disk is
-        # cut by occlusion; a city's or a claimed tile's reveal passes none
+        # `see_through` names a look cut by the line of sight (revealAround's
+        # `los`, `eye` its eye's height where not its plot's); a city's two
+        # rings or a claimed tile's reveal passes none
         if see_through is not None:
-            disk = self._los_disk(rows, tiles.clamp(min=0), radius, see_through)
+            disk = self._los_disk(rows, tiles.clamp(min=0), radius, see_through, eye)
         else:
             disk = self.pair_dist[tiles.clamp(min=0)] <= (
                 radius.unsqueeze(1) if torch.is_tensor(radius) else radius)

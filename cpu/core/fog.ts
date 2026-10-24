@@ -6,7 +6,7 @@ import { hasMet, meetCityState, suzerainOf } from './cityStates';
 import { boostOnEvent } from './boosts';
 import { metAllMajorsMoment } from './eras';
 import { ALLIANCE_SHARED_VIS_ROWS, rowIsFor } from '../data/civilizations';
-import { neighbors, tilesWithin, hexDistance, axialDelta, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
+import { neighbors, tilesWithin, hexDistance, cubeNorm, tileAt } from '../../world/hex';
 import { naturalWonderAt } from '../../world/query';
 import { dedicationEvent } from './eras';
 import { promoValue, promoFlag } from './promotions';
@@ -31,74 +31,140 @@ export function unitSight(u: { type: string; promos?: number; seat?: number }, s
 }
 
 /** The height a tile puts in the way of a look ACROSS it — CIV6
- *  (SightThroughModifier): its elevation's plus its feature's; `seeThrough`
- *  (Sentry's CanSee) drops the feature half. */
+ *  (SightThroughModifier, the DLL's 0x58d1c0): its terrain's plus its
+ *  feature's; `seeThrough` (Sentry's CanSee) drops the feature half. */
 export function sightThrough(t: Tile, seeThrough: boolean): number {
   const feat = seeThrough || t.feature === null ? 0 : (FEATURE_SIGHT_THROUGH[t.feature] ?? 0);
   return (ELEVATION_SIGHT[t.elevation] ?? 0) + feat;
 }
 
+/** The height an eye stands at (the DLL's 0x58af70): its terrain's
+ *  SightModifier (hills 1, mountain 2), and 1 on a city centre or on a
+ *  complete, unpillaged district with ZOC and HitPoints (the Encampment and
+ *  its replacements; District_Instance 0x24c2f0). */
+export function eyeHeight(t: Tile): number {
+  if (t.district === 'CITY_CENTER' || (t.district === 'ENCAMPMENT' && t.districtComplete && !t.districtPillaged)) return 1;
+  return ELEVATION_SIGHT[t.elevation] ?? 0;
+}
+
+/** the axial steps (dq, dr) of the walk's six directions, the next
+ *  direction at a ring's corner, and per direction a plot was reached by
+ *  the two neighbours its look is carried from (the DLL's tables at
+ *  0xeff670 / 0xeff688 / 0xeff6a0 and its six-way switch) */
+const WALK_DQ = [0, 1, 1, 0, -1, -1];
+const WALK_DR = [1, 0, -1, -1, 0, 1];
+const WALK_NEXT = [1, 2, 3, 4, 5, 0];
+const WALK_PARENTS: readonly (readonly [number, number])[] = [[1, 2], [3, 2], [3, 4], [4, 5], [5, 0], [1, 0]];
+/** a plot's carried height holds this bit when the line ran between its two
+ *  parents and the higher one stood above it */
+const SPLIT = 0x1000000;
+/** the walk's tie margin: 0.05 in 24.8 fixed point */
+const LINE_TIE = 12;
+
 /**
- * The tiles strictly BETWEEN two tiles on the hex line joining them: a cube
- * lerp with the (1e-6, 2e-6, -3e-6) nudge and cube rounding, rounding each
- * coordinate with floor(x + 0.5) so both engines land on the same hex at
- * every half; `side` -1 turns the nudge round, so a line along an edge
- * passes the plot on its other side. An off-map hex on the line is simply
- * absent. On a wrapping map the line runs the shorter way round
- * (`axialDelta`). The GPU builds the same lines once per map (`los_tables`).
+ * THE GAME'S LINE OF SIGHT (Unit_Sight 0x58b1d0): the plots an eye on
+ * `from` sees within `radius`, `from` included. The walk goes ring by ring
+ * out from the eye (each ring from one step in direction 0 past the last,
+ * along its six sides), and carries to every plot the highest height met on
+ * its way in: the plot's own (`sightThrough`) or its parent's carried one,
+ * whichever is higher. A plot's parent is one of the two neighbours on the
+ * ring inside (`WALK_PARENTS`, by the direction the walk reached it; a
+ * neighbour off the map or not on that ring is none): the one nearer the
+ * line from the eye's centre to the plot's (24.8 fixed point, a row's odd
+ * plots half a plot east, the coordinates as wrapped), and both where the
+ * two lie within 0.05 of each other — then the lower carries and the plot
+ * is marked split when the higher stood above it; a split parent gives way
+ * to the other. The plot shows when the parent's carried height is below
+ * its own or no higher than the eye (`eyeHeight`, unless the caller names
+ * the eye's height). Sentry (`seeThrough`)
+ * drops every feature's height, the plot's own included.
  */
-export function hexLineBetween(map: GameMap, a: Tile, b: Tile, side: 1 | -1 = 1): Tile[] {
-  const [aq, ar] = offsetToAxial(a.col, a.row);
-  const [dq, dr] = axialDelta(map, a.col, a.row, b.col, b.row);
-  const bq = aq + dq, br = ar + dr;
-  const n = hexDistance(map, a.col, a.row, b.col, b.row);
-  const e1 = 1e-6 * side, e2 = 2e-6 * side, e3 = -3e-6 * side;
-  const ax = aq + e1, az = ar + e2, ay = -aq - ar + e3;
-  const bx = bq + e1, bz = br + e2, by = -bq - br + e3;
-  const out: Tile[] = [];
-  for (let i = 1; i < n; i++) {
-    const t = i / n;
-    const x = ax + (bx - ax) * t;
-    const y = ay + (by - ay) * t;
-    const z = az + (bz - az) * t;
-    let rx = Math.floor(x + 0.5);
-    let ry = Math.floor(y + 0.5);
-    let rz = Math.floor(z + 0.5);
-    const dx = Math.abs(rx - x), dy = Math.abs(ry - y), dz = Math.abs(rz - z);
-    if (dx > dy && dx > dz) rx = -ry - rz;
-    else if (dy > dz) ry = -rx - rz;
-    else rz = -rx - ry;
-    const [c, r] = axialToOffset(rx, rz);
-    const m = tileAt(map, c, r);
-    if (m) out.push(m);
+export function losDisk(map: GameMap, from: Tile, radius: number, seeThrough: boolean, eye = eyeHeight(from)): Set<number> {
+  const ox = from.col, oy = from.row;
+  const carried = new Map<number, number>([[from.index, 0]]);
+  const out = new Set<number>([from.index]);
+  const plotAt = (x: number, y: number, dq: number, dr: number): Tile | null => {
+    const nx = x + dq - (y >> 1) + ((y + dr) >> 1);
+    const ny = y + dr;
+    return tileAt(map, nx, ny);
+  };
+  const fx = (t: Tile) => t.col * 256 + (t.row & 1 ? 128 : 0);
+  const fmul = (a: number, b: number) => Math.floor((a * b) / 256);
+  let q = 0, r = 0, dir = 1;
+  for (let ring = 1; ring <= radius; ring++) {
+    q += WALK_DQ[0];
+    r += WALK_DR[0];
+    dir = 1;
+    for (let i = 0; i < 6 * ring; i++) {
+      if (i > 0) {
+        let nq = q + WALK_DQ[dir], nr = r + WALK_DR[dir];
+        if (cubeNorm(nq, nr) > ring) {
+          dir = WALK_NEXT[dir];
+          nq = q + WALK_DQ[dir];
+          nr = r + WALK_DR[dir];
+        }
+        q = nq;
+        r = nr;
+      }
+      const cur = plotAt(ox, oy, q, r);
+      if (!cur) continue;
+      const par: (Tile | null)[] = [null, null];
+      const h = [-1, -1];
+      const split = [false, false];
+      for (let k = 0; k < 2; k++) {
+        const d = WALK_PARENTS[dir][k];
+        const p = plotAt(cur.col, cur.row, WALK_DQ[d], WALK_DR[d]);
+        if (!p || hexDistance(map, ox, oy, p.col, p.row) !== ring - 1) continue;
+        par[k] = p;
+        let v = carried.get(p.index) ?? 0;
+        if (v >= SPLIT) {
+          v -= SPLIT;
+          split[k] = true;
+        }
+        h[k] = v;
+      }
+      const own = sightThrough(cur, seeThrough);
+      const [h1, h2] = h;
+      // 1: the first parent carries, 2: the second (or the first, should the
+      // second be none or split), 0: both
+      let use: 0 | 1 | 2;
+      if (h1 === -1) use = 2;
+      else if (h2 === -1 || h1 === h2) use = split[0] ? 2 : 1;
+      else if (split[0]) use = 2;
+      else if (split[1]) use = 1;
+      else {
+        const OX = fx(from), OY = oy * 256, CX = fx(cur), CY = cur.row * 256;
+        const A = CY - OY, B = OX - CX, C = fmul(CX, OY) - fmul(CY, OX);
+        const d1 = Math.abs(fmul(A, fx(par[0]!)) + fmul(B, par[0]!.row * 256) + C);
+        const d2 = Math.abs(fmul(A, fx(par[1]!)) + fmul(B, par[1]!.row * 256) + C);
+        use = d1 - d2 > LINE_TIE ? 2 : d2 - d1 > LINE_TIE ? 1 : 0;
+      }
+      let x: number;
+      if (use === 0) {
+        x = Math.min(h1, h2);
+        carried.set(cur.index, Math.max(h1, h2) > own ? Math.max(x, own) + SPLIT : own);
+      } else {
+        x = use === 1 ? h1 : h2 !== -1 && !split[1] ? h2 : h1 !== -1 ? h1 : h2;
+        carried.set(cur.index, Math.max(own, x));
+      }
+      if (x !== -1 && (x < own || x <= eye)) out.add(cur.index);
+    }
   }
   return out;
 }
 
-/**
- * CIV6: can an eye standing on `from` see `to`? OCCLUSION BY ELEVATION — a
- * tile strictly between blocks when it puts more in the way than the
- * observer's own height (flat 0, hills 1, mountain 2) and no less than the
- * target's own (its elevation's plus its feature's, Sentry or not: a plot
- * shows over a lower one, never over its equal), and the look holds when
- * either of the two lines (`hexLineBetween`'s two nudges, one each side of
- * an edge the line runs along) is clear. The range is the caller's; a hill
- * adds height and never reach. LAB (the DLL's sight walk 0x58b1d0 unread):
- * the records' revealed plots (runs/h1_duelw1126-1131, every look a unit
- * took over turns 1-250 that the readings dispute: 915) — this rule
- * misreads 9 of them, the one-line rule that let a plot show over its
- * equal 626; runs/h1_duelw1121 t7: Rome's Scout on flat (33,10) finds
- * Kilimanjaro (2) past the wooded hill at (33,9) along the line through
- * (32,9).
- */
+/** A look cut by the line of sight (`losDisk`): Sentry's `seeThrough`, and
+ *  the eye's height where it is not its plot's (`eyeHeight`). */
+export interface Look {
+  seeThrough: boolean;
+  eye?: number;
+}
+
+/** Can an eye standing on `from` see `to` (`losDisk` out to `to`'s ring)?
+ *  The range is the caller's; a hill adds height and never reach. */
 export function canSee(map: GameMap, from: Tile, to: Tile, seeThrough: boolean): boolean {
-  const eye = ELEVATION_SIGHT[from.elevation] ?? 0;
-  const own = sightThrough(to, false);
-  const clear = (side: 1 | -1) => hexLineBetween(map, from, to, side).every((m) => {
-    const h = sightThrough(m, seeThrough);
-    return h <= eye || h < own;
-  });
-  return clear(1) || clear(-1);
+  if (from.index === to.index) return true;
+  return losDisk(map, from, hexDistance(map, from.col, from.row, to.col, to.row), seeThrough).has(to.index);
 }
 
 /** CIV6 (Sentry, the install's SENTRY_SEE_THROUGH_FEATURES row, CanSee): this unit's look
@@ -113,15 +179,16 @@ export function unitSeesThrough(u: { type: string; promos?: number }): boolean {
  *  so does every major that sees the plot (`seatSeesPlot`; runs/h1_duelw1124
  *  t28: Cardiff's Warrior steps two plots from China's Scout, which sees it)
  *  — `meetCityState`, the majors in seat order. */
-function minorLookMeets(state: GameState, seat: number, tileIndex: number, radius: number, los: { seeThrough: boolean }): void {
+function minorLookMeets(state: GameState, seat: number, tileIndex: number, radius: number, los: Look): void {
   const cs = state.cityStates.find((c) => c.seat === seat);
   if (!cs) return;
   const t = state.map.tiles[tileIndex];
   const majorUnits = new Set<string>();
   for (const u of state.units) if (isCiv(u.seat)) majorUnits.add(`${u.tileIndex}:${u.seat}`);
   const seen = new Set<number>();
+  const sees = los ? losDisk(state.map, t, radius, los.seeThrough, los.eye) : null;
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
-    if (los && !canSee(state.map, t, n, los.seeThrough)) continue;
+    if (sees && !sees.has(n.index)) continue;
     const owner = tileSeat(n);
     if (isCiv(owner)) seen.add(owner);
     for (const s of state.seats) if (majorUnits.has(`${n.index}:${s.seat}`)) seen.add(s.seat);
@@ -162,7 +229,7 @@ export function meetMajors(state: GameState, a: number, b: number): void {
  * placement 0x586d40 -> 0x5246f0: each player whose visibility count of the
  * plot is above 0). The majors in seat order (`meetMajors`).
  */
-function majorLookMeets(state: GameState, seat: number, tileIndex: number, radius: number, los: { seeThrough: boolean } | undefined,
+function majorLookMeets(state: GameState, seat: number, tileIndex: number, radius: number, los: Look | undefined,
                         placed: boolean): void {
   const t = state.map.tiles[tileIndex];
   const others = state.seats.filter((s) => s.seat !== seat && isCiv(s.seat) && !majorsMet(state, seat, s.seat));
@@ -170,8 +237,9 @@ function majorLookMeets(state: GameState, seat: number, tileIndex: number, radiu
   const units = new Set<string>();
   for (const u of state.units) if (isCiv(u.seat) && u.seat !== seat) units.add(`${u.tileIndex}:${u.seat}`);
   const seen = new Set<number>();
+  const sees = los ? losDisk(state.map, t, radius, los.seeThrough, los.eye) : null;
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
-    if (los && !canSee(state.map, t, n, los.seeThrough)) continue;
+    if (sees && !sees.has(n.index)) continue;
     const owner = tileSeat(n);
     if (isCiv(owner) && owner !== seat) seen.add(owner);
     for (const s of others) if (units.has(`${n.index}:${s.seat}`)) seen.add(s.seat);
@@ -208,7 +276,7 @@ function seatSeesPlot(state: GameState, seat: number, t: Tile): boolean {
  *  plots the knowledge base's update walks, 0x7877e0 over player +0x290):
  *  `seatSeesPlot`'s eyes for the minor alone — its plots and those beside
  *  them, the plots within two of its centre, and each of its units' look
- *  (`unitSight`, cut by `canSee`). */
+ *  (`unitSight`, cut by `losDisk`). */
 export function cityStateSight(state: GameState, seat: number): Uint8Array {
   const { map } = state;
   const out = new Uint8Array(map.tiles.length);
@@ -225,10 +293,7 @@ export function cityStateSight(state: GameState, seat: number): Uint8Array {
   for (const u of state.units) {
     if (u.seat !== seat) continue;
     const from = map.tiles[u.tileIndex];
-    const through = unitSeesThrough(u);
-    for (const n of tilesWithin(map, from.col, from.row, unitSight(u, state))) {
-      if (!out[n.index] && canSee(map, from, n, through)) out[n.index] = 1;
-    }
+    for (const n of losDisk(map, from, unitSight(u, state), unitSeesThrough(u))) out[n] = 1;
   }
   return out;
 }
@@ -256,7 +321,7 @@ export function isExplored(state: GameState, seat: number, tileIndex: number): b
   return !ex || ex.length === 0 || ex[tileIndex] === 1;
 }
 
-/** `los` names a UNIT's look: the disk is cut by `canSee` from `tileIndex`
+/** `los` names a UNIT's look: the disk is cut by `losDisk` from `tileIndex`
  *  (ask 11). A city's or a claimed tile's reveal passes none and lifts the
  *  whole disk — the live game was measured for units alone. */
 export function revealAround(
@@ -264,7 +329,7 @@ export function revealAround(
   seat: number,
   tileIndex: number,
   radius = SIGHT_RANGE,
-  los?: { seeThrough: boolean },
+  los?: Look,
 ): void {
   if (!state.fogOfWar) return;
   // the barbarians' revealed plots (the player's +0x2f0), which their units'
@@ -298,7 +363,7 @@ export function revealAround(
  * Bologna's suzerain, meets Rome; t90, China's revealed plots take in the
  * sight of Granada's unit at (39,17)). `placed`: its own unit stepping there.
  */
-function majorLook(state: GameState, seat: number, tileIndex: number, radius: number, los: { seeThrough: boolean } | undefined,
+function majorLook(state: GameState, seat: number, tileIndex: number, radius: number, los: Look | undefined,
                    placed: boolean): void {
   const { found, wonders } = liftFog(state, seat, tileIndex, radius, los);
   // A city-state is MET the moment this look takes in a plot of its
@@ -311,10 +376,11 @@ function majorLook(state: GameState, seat: number, tileIndex: number, radius: nu
     const t = state.map.tiles[tileIndex];
     const minorUnits = new Map<number, number>();
     for (const u of state.units) if (isCityStateSeat(u.seat) && !minorUnits.has(u.tileIndex)) minorUnits.set(u.tileIndex, u.seat);
+    const sees = los ? losDisk(state.map, t, radius, los.seeThrough, los.eye) : null;
     for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
       const owner = tileSeat(n);
       const unitOwner = minorUnits.get(n.index);
-      if ((!isCityStateSeat(owner) && unitOwner === undefined) || (los && !canSee(state.map, t, n, los.seeThrough))) continue;
+      if ((!isCityStateSeat(owner) && unitOwner === undefined) || (sees && !sees.has(n.index))) continue;
       for (const o of [owner, unitOwner]) {
         const cs = o !== undefined && isCityStateSeat(o) ? state.cityStates.find((c) => c.seat === o) : undefined;
         if (cs && !hasMet(cs, seat)) meetCityState(state, cs, seat);
@@ -346,13 +412,23 @@ function majorLook(state: GameState, seat: number, tileIndex: number, radius: nu
 }
 
 /** A CITY'S LOOK where it is founded or changes hands: the plots two round
- *  its centre whole and those three round it that an eye on the centre sees
- *  (`canSee`). LAB: the records' revealed plots at every major's founding
- *  (runs/h1_duelw1126-1131): no plot two from the new centre left dark, the
- *  98 three from it left dark all but 4 hidden from the centre. */
+ *  its centre whole and those three round it that an eye on the centre at
+ *  its terrain's height sees (`losDisk`, `cityEye`). LAB (the city's sight
+ *  routine unread; the walk 0x58b1d0 is the units'): the records' revealed
+ *  plots at every major's founding (runs/h1_duelw1126-1131) leave no plot
+ *  two from the new centre dark; the founding turn's fog holds on
+ *  runs/h1_duelw1117, 1121 and 1127, where the city centre's raised eye
+ *  would show plots the records leave dark (1127 Xi'an (13,9), 1121 Rome
+ *  (33,11) and (34,11)). */
 export function cityLook(state: GameState, seat: number, centre: number): void {
   revealAround(state, seat, centre, 2);
-  revealAround(state, seat, centre, 3, { seeThrough: false });
+  revealAround(state, seat, centre, 3, cityEye(state.map.tiles[centre]));
+}
+
+/** a city's look over its third ring: the line of sight from an eye at
+ *  its centre's terrain height (the city centre's raise is a unit's) */
+export function cityEye(t: Tile): Look {
+  return { seeThrough: false, eye: ELEVATION_SIGHT[t.elevation] ?? 0 };
 }
 
 /** Does this seat's roster row make its ALLIANCES share map visibility?
@@ -369,7 +445,7 @@ function sharesVisWithAllies(state: GameState, seat: number): boolean {
  *  plots the seat had seen (`wonders`). The write alone — the discovery
  *  event is the caller's, so a seat merely SHOWN a wonder does not score it. */
 function liftFog(state: GameState, seat: number, tileIndex: number, radius: number,
-                 los?: { seeThrough: boolean }): { found: number; wonders: number } {
+                 los?: Look): { found: number; wonders: number } {
   const s = seatOf(state, seat);
   if (!s) return { found: 0, wonders: 0 };
   if (s.explored.length === 0) s.explored = new Array(state.map.tiles.length).fill(0);
@@ -377,8 +453,9 @@ function liftFog(state: GameState, seat: number, tileIndex: number, radius: numb
   let found = 0;
   const fresh = new Set<string>();
   const seen: Tile[] = [];
+  const sees = los ? losDisk(state.map, t, radius, los.seeThrough, los.eye) : null;
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
-    if (los && !canSee(state.map, t, n, los.seeThrough)) continue;
+    if (sees && !sees.has(n.index)) continue;
     seen.push(n);
     const nw = naturalWonderAt(n);
     if (s.explored[n.index] !== 1 && nw) {
@@ -412,7 +489,7 @@ export function initFog(state: GameState): void {
     // each city's look (`cityLook`)
     for (const c of citiesOf(state, s.seat)) {
       liftFog(state, s.seat, c.centerIndex, 2);
-      liftFog(state, s.seat, c.centerIndex, 3, { seeThrough: false });
+      liftFog(state, s.seat, c.centerIndex, 3, cityEye(state.map.tiles[c.centerIndex]));
     }
     for (const u of unitsOf(state, s.seat)) liftFog(state, s.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
   }

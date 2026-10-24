@@ -3,10 +3,11 @@ import { seatOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, stepThrough, tileAtCoords } from '../helpers';
 import { canFoundCity } from '../../../cpu/core/rules';
 import { spawnUnit } from '../../../cpu/core/units';
-import { fogActive, isExplored, initFog, canSee, hexLineBetween, sightThrough, revealAround } from '../../../cpu/core/fog';
+import { fogActive, isExplored, initFog, canSee, eyeHeight, losDisk, sightThrough, revealAround } from '../../../cpu/core/fog';
 import { hexDistance, neighbors } from '../../../world/hex';
 import { claimGoodyHut } from '../../../cpu/core/units';
 import { generateMap } from '../../../world/mapgen';
+import type { Elevation, FeatureId, GameMap, Tile } from '../../../world/types';
 
 function foggyState() {
   const state = makeState(makeMap(20, 20));
@@ -68,24 +69,6 @@ describe('sight is occlusion by elevation (ask 11)', () => {
     return { state, o, e1, e2, e3 };
   }
 
-  it('the hex line between two tiles is a chain of neighbours, the straight row exact', () => {
-    const { state, o, e1, e2, e3 } = flatRow();
-    expect(hexLineBetween(state.map, o, e3).map((t) => t.index)).toEqual([e1.index, e2.index]);
-    expect(hexLineBetween(state.map, o, e1)).toEqual([]);
-    for (const b of state.map.tiles) {
-      const d = hexDistance(state.map, o.col, o.row, b.col, b.row);
-      if (d < 2 || d > 5) continue;
-      const mids = hexLineBetween(state.map, o, b);
-      expect(mids).toHaveLength(d - 1);
-      let prev = o;
-      for (const m of mids) {
-        expect(neighbors(state.map, prev).some((n) => n.index === m.index)).toBe(true);
-        prev = m;
-      }
-      expect(neighbors(state.map, prev).some((n) => n.index === b.index)).toBe(true);
-    }
-  });
-
   it('a hill or woods hides what stands behind it from a flat eye; a hill eye looks over one, not both', () => {
     const { state, o, e1, e2 } = flatRow();
     expect(canSee(state.map, o, e2, false)).toBe(true);
@@ -117,13 +100,14 @@ describe('sight is occlusion by elevation (ask 11)', () => {
     expect(canSee(state.map, o, e2, false)).toBe(false); // a mountain (2) tops a hill eye (1)
   });
 
-  it('a look along an edge holds while either plot beside the edge is clear', () => {
+  it('a look between two parents carries the lower; a split parent gives way', () => {
     const { state, o } = flatRow();
     const map = state.map;
-    const b = map.tiles.find((t) => hexDistance(map, o.col, o.row, t.col, t.row) === 2
-      && hexLineBetween(map, o, t, 1)[0].index !== hexLineBetween(map, o, t, -1)[0].index)!;
-    const [m1] = hexLineBetween(map, o, b, 1);
-    const [m2] = hexLineBetween(map, o, b, -1);
+    // a ring-2 plot on a side of the ring: the line from the eye runs between
+    // its two parents on ring 1
+    const parentsOf = (t: Tile) => neighbors(map, t).filter((n) => hexDistance(map, o.col, o.row, n.col, n.row) === 1);
+    const b = map.tiles.find((t) => hexDistance(map, o.col, o.row, t.col, t.row) === 2 && parentsOf(t).length === 2)!;
+    const [m1, m2] = parentsOf(b);
     for (const t of [b, m1, m2]) {
       t.elevation = 'FLAT';
       t.feature = null;
@@ -132,6 +116,24 @@ describe('sight is occlusion by elevation (ask 11)', () => {
     expect(canSee(map, o, b, false)).toBe(true);
     m2.elevation = 'HILLS';
     expect(canSee(map, o, b, false)).toBe(false);
+  });
+
+  it('an eye stands at 1 on a city centre or a live Encampment', () => {
+    const { o } = flatRow();
+    expect(eyeHeight(o)).toBe(0);
+    o.district = 'CITY_CENTER';
+    expect(eyeHeight(o)).toBe(1);
+    o.district = 'ENCAMPMENT';
+    o.districtComplete = false;
+    expect(eyeHeight(o)).toBe(0);
+    o.districtComplete = true;
+    expect(eyeHeight(o)).toBe(1);
+    o.districtPillaged = true;
+    expect(eyeHeight(o)).toBe(0);
+    o.district = null;
+    o.districtPillaged = false;
+    o.elevation = 'MOUNTAIN';
+    expect(eyeHeight(o)).toBe(2);
   });
 
   it('a unit reveal is the cut disk and a hill adds no range; a city reveal is whole', () => {
@@ -152,6 +154,37 @@ describe('sight is occlusion by elevation (ask 11)', () => {
     expect(isExplored(state, 0, e2.index)).toBe(false);
     revealAround(state, 0, o.index, 2);
     expect(isExplored(state, 0, e2.index)).toBe(true); // a city's disk is whole
+  });
+});
+
+/** the plots round an eye in a recorded game (col, row, elevation,
+ *  feature), laid on a flat map of the duel's size */
+function recordedPlot(plots: [number, number, Elevation, FeatureId | null][]): GameMap {
+  const map = makeMap(44, 26, 'GRASSLAND', true);
+  for (const [c, r, e, f] of plots) {
+    const t = map.tiles[r * 44 + c];
+    t.elevation = e;
+    t.feature = f;
+  }
+  return map;
+}
+
+describe("the game's line-of-sight walk (Unit_Sight 0x58b1d0, emulated)", () => {
+  const key = (m: GameMap, s: Set<number>) => [...s].map((i) => `${m.tiles[i].col},${m.tiles[i].row}`).sort();
+  it("runs/h1_duelw1127 t2: Rome's Settler on flat Rainforest (36,13) does not see the Mountain (34,14)", () => {
+    const map = recordedPlot([[34, 9, 'FLAT', 'WOODS'], [35, 9, 'HILLS', null], [36, 9, 'FLAT', 'WOODS'], [37, 9, 'FLAT', null], [38, 9, 'FLAT', null], [34, 10, 'HILLS', null], [35, 10, 'FLAT', null], [36, 10, 'FLAT', null], [37, 10, 'HILLS', 'WOODS'], [38, 10, 'FLAT', null], [39, 10, 'FLAT', null], [33, 11, 'HILLS', 'WOODS'], [34, 11, 'HILLS', null], [35, 11, 'MOUNTAIN', null], [36, 11, 'HILLS', 'RAINFOREST'], [37, 11, 'HILLS', 'WOODS'], [38, 11, 'MOUNTAIN', null], [39, 11, 'FLAT', null], [33, 12, 'FLAT', null], [34, 12, 'FLAT', null], [35, 12, 'FLAT', 'RAINFOREST'], [36, 12, 'HILLS', 'RAINFOREST'], [37, 12, 'FLAT', 'WOODS'], [38, 12, 'HILLS', null], [39, 12, 'FLAT', 'RAINFOREST'], [40, 12, 'FLAT', null], [32, 13, 'FLAT', null], [33, 13, 'FLAT', 'RAINFOREST'], [34, 13, 'MOUNTAIN', null], [35, 13, 'HILLS', null], [36, 13, 'FLAT', 'RAINFOREST'], [37, 13, 'HILLS', null], [38, 13, 'FLAT', 'WOODS'], [39, 13, 'FLAT', 'RAINFOREST'], [40, 13, 'FLAT', null], [33, 14, 'FLAT', null], [34, 14, 'MOUNTAIN', null], [35, 14, 'FLAT', null], [36, 14, 'HILLS', 'RAINFOREST'], [37, 14, 'FLAT', 'MARSH'], [38, 14, 'MOUNTAIN', null], [39, 14, 'FLAT', 'WOODS'], [40, 14, 'FLAT', 'RAINFOREST'], [33, 15, 'FLAT', null], [34, 15, 'FLAT', 'RAINFOREST'], [35, 15, 'FLAT', null], [36, 15, 'HILLS', 'RAINFOREST'], [37, 15, 'FLAT', 'WOODS'], [38, 15, 'FLAT', null], [39, 15, 'FLAT', 'RAINFOREST'], [34, 16, 'FLAT', 'MARSH'], [35, 16, 'HILLS', null], [36, 16, 'FLAT', null], [37, 16, 'FLAT', null], [38, 16, 'MOUNTAIN', null], [39, 16, 'HILLS', null], [34, 17, 'FLAT', null], [35, 17, 'FLAT', null], [36, 17, 'HILLS', null], [37, 17, 'FLAT', null], [38, 17, 'FLAT', null]]);
+    const eye = map.tiles[13 * 44 + 36];
+    expect(canSee(map, eye, map.tiles[14 * 44 + 34], false)).toBe(false);
+    expect(key(map, losDisk(map, eye, 3, false))).toEqual(['34,13', '35,13', '36,11', '36,12', '36,13', '36,14', '36,15', '37,11',
+      '37,12', '37,13', '37,14', '37,15', '38,11', '38,14', '38,16'].sort());
+  });
+
+  it("runs/h1_duelw1127 t30: China's Settler on Forest (12,7) sees the Grassland (13,10) past the Forest (12,9)", () => {
+    const map = recordedPlot([[10, 3, 'HILLS', null], [11, 3, 'FLAT', null], [12, 3, 'FLAT', null], [13, 3, 'FLAT', null], [14, 3, 'FLAT', null], [10, 4, 'FLAT', 'WOODS'], [11, 4, 'FLAT', null], [12, 4, 'FLAT', 'WOODS'], [13, 4, 'FLAT', null], [14, 4, 'FLAT', null], [15, 4, 'FLAT', null], [9, 5, 'FLAT', 'WOODS'], [10, 5, 'FLAT', null], [11, 5, 'FLAT', null], [12, 5, 'HILLS', null], [13, 5, 'HILLS', 'WOODS'], [14, 5, 'FLAT', null], [15, 5, 'FLAT', null], [9, 6, 'FLAT', 'WOODS'], [10, 6, 'FLAT', null], [11, 6, 'FLAT', null], [12, 6, 'FLAT', null], [13, 6, 'MOUNTAIN', null], [14, 6, 'FLAT', 'WOODS'], [15, 6, 'FLAT', null], [16, 6, 'FLAT', null], [8, 7, 'FLAT', null], [9, 7, 'FLAT', null], [10, 7, 'MOUNTAIN', null], [11, 7, 'FLAT', null], [12, 7, 'FLAT', 'WOODS'], [13, 7, 'FLAT', null], [14, 7, 'HILLS', null], [15, 7, 'HILLS', null], [16, 7, 'FLAT', null], [9, 8, 'FLAT', null], [10, 8, 'FLAT', null], [11, 8, 'FLAT', null], [12, 8, 'MOUNTAIN', null], [13, 8, 'FLAT', null], [14, 8, 'MOUNTAIN', null], [15, 8, 'HILLS', 'WOODS'], [16, 8, 'HILLS', null], [9, 9, 'FLAT', null], [10, 9, 'FLAT', null], [11, 9, 'FLAT', null], [12, 9, 'FLAT', 'WOODS'], [13, 9, 'FLAT', null], [14, 9, 'FLAT', 'PANTANAL'], [15, 9, 'FLAT', 'PANTANAL'], [10, 10, 'FLAT', null], [11, 10, 'FLAT', null], [12, 10, 'FLAT', 'WOODS'], [13, 10, 'FLAT', null], [14, 10, 'FLAT', 'PANTANAL'], [15, 10, 'FLAT', 'PANTANAL'], [10, 11, 'FLAT', null], [11, 11, 'FLAT', 'RAINFOREST'], [12, 11, 'HILLS', 'WOODS'], [13, 11, 'HILLS', 'RAINFOREST'], [14, 11, 'FLAT', null]]);
+    const eye = map.tiles[7 * 44 + 12];
+    expect(canSee(map, eye, map.tiles[10 * 44 + 13], false)).toBe(true);
+    expect(key(map, losDisk(map, eye, 3, false))).toEqual(['10,5', '10,6', '10,7', '11,4', '11,5', '11,6', '11,7', '11,8', '12,4', '12,5',
+      '12,6', '12,7', '12,8', '12,9', '13,6', '13,7', '13,8', '13,9', '13,10', '14,6', '14,7', '14,8', '14,10'].sort());
   });
 });
 

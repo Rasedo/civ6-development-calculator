@@ -25,7 +25,7 @@ import { isWater, isImpassable } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, allCities, campTiles, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
-import { canSee, unitSight, unitSeesThrough } from './fog';
+import { losDisk, unitSight, unitSeesThrough } from './fog';
 import { spawnUnit, tileFreeForUnit } from './units';
 import { UNITS } from '../data/units';
 import { TECHS } from '../data/techs';
@@ -61,7 +61,7 @@ export function barbarianTechs(state: GameState): void {
 
 /**
  * THE PLOTS THESE SEATS SEE NOW: each unit's sight across the plots its
- * line reaches (`canSee`), each city's centre two plots round, each
+ * line reaches (`losDisk`), each city's centre two plots round, each
  * owned plot with its ring, and — the barbarians' — each camp with its ring
  * (the improvement's owner, `CAMP_SIGHT`). A LAB reading: the camp step's exclusions fit it
  * (runs/h1_duelw1120-1124 camp draws' ranges), the game's sight rule unread.
@@ -71,11 +71,7 @@ export function plotsSeenNow(state: GameState, seats: ReadonlySet<number>): Uint
   const seen = new Uint8Array(map.tiles.length);
   for (const u of state.units) {
     if (!seats.has(u.seat)) continue;
-    const from = map.tiles[u.tileIndex];
-    const through = unitSeesThrough(u);
-    for (const t of tilesWithin(map, from.col, from.row, unitSight(u, state))) {
-      if (!seen[t.index] && canSee(map, from, t, through)) seen[t.index] = 1;
-    }
+    for (const p of losDisk(map, map.tiles[u.tileIndex], unitSight(u, state), unitSeesThrough(u))) seen[p] = 1;
   }
   const centres: number[] = [];
   for (const s of state.seats) if (seats.has(s.seat)) for (const c of s.cities) centres.push(c.centerIndex);
@@ -476,14 +472,8 @@ function othersSee(state: GameState, unit: Unit, plots: readonly number[]): Set<
   const { map } = state;
   for (const o of state.units) {
     if (o === unit || !isBarbSeat(o.seat) || o.tileIndex < 0) continue;
-    const at = map.tiles[o.tileIndex];
-    const r = unitSight(o, state);
-    const through = unitSeesThrough(o);
-    for (const p of plots) {
-      if (out.has(p)) continue;
-      const t = map.tiles[p];
-      if (hexDistance(map, at.col, at.row, t.col, t.row) <= r && canSee(map, at, t, through)) out.add(p);
-    }
+    const sees = losDisk(map, map.tiles[o.tileIndex], unitSight(o, state), unitSeesThrough(o));
+    for (const p of plots) if (sees.has(p)) out.add(p);
   }
   return out;
 }
@@ -496,8 +486,9 @@ export function barbScoutLook(state: GameState, unit: Unit): void {
   const through = unitSeesThrough(unit);
   const sight = unitSight(unit, state);
   const now: number[] = [];
+  const sees = losDisk(map, from, sight, through);
   for (const t of tilesWithin(map, from.col, from.row, sight)) {
-    if (isTerritorial(tileSeat(t)) && canSee(map, from, t, through)) now.push(t.index);
+    if (isTerritorial(tileSeat(t)) && sees.has(t.index)) now.push(t.index);
   }
   now.sort((x, y) => x - y);
   const saw = new Set((tribe.saw ??= {})[unit.id] ?? []);

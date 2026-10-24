@@ -1913,16 +1913,20 @@ class SimInit:
         self._feat_passable = torch.tensor([bool(x) for x in rules.improvements["featPassable"]], dtype=torch.bool, device=device)
         # CIV6 (SightThroughModifier / SightModifier — ask 11): the height a
         # feature puts in the way of a look, the heights the two elevations
-        # stand at and block with, and the hex lines of every pair within the
-        # farthest sight (`FEATURE_SIGHT_THROUGH`, `ELEVATION_SIGHT`, `SIGHT_MAX`)
+        # stand at and block with, and the line-of-sight walk of every eye out
+        # to the farthest sight (`FEATURE_SIGHT_THROUGH`, `ELEVATION_SIGHT`,
+        # `SIGHT_MAX`, `sight_tables`)
         self._feat_sight_through = torch.tensor([int(x) for x in rules.improvements["featSightThrough"]], dtype=torch.long, device=device)
         # each feature's DangerValue (`featureDanger`), the danger map's last term
         self._feat_danger = torch.tensor([int(x) for x in rules.improvements["featDanger"]], dtype=torch.long, device=device)
         self._sight_hills = int(rules.improvements["sightHills"])
         self._sight_mountain = int(rules.improvements["sightMountain"])
         self._sight_max = int(rules.improvements["sightMax"])
-        _lt, _lm = los_tables(self.W, self.H, self.wrap_x, self._sight_max)
-        self._los_tgt, self._los_mid = _lt.to(device), _lm.to(device)
+        _lt, _lp, _lk = sight_tables(self.W, self.H, self.wrap_x, self._sight_max)
+        self._los_tgt, self._los_par, self._los_pick = _lt.to(device), _lp.to(device), _lk.to(device)
+        # each walk place's ring (ring k at places 3k(k-1) .. 3k(k+1) - 1)
+        self._los_ring = torch.tensor([k for k in range(1, self._sight_max + 1) for _ in range(6 * k)],
+                                      dtype=torch.long, device=device)
         self._feat_cat_y = torch.tensor(rules.improvements["featCatalogY"], dtype=self.dtype, device=device)
         # `feat_id` is LIVE (`_paint_soil` writes it); `feat_id0` keeps the
         # t0 bake the per-tile `feat_yields`/chop planes were computed from.
@@ -5029,7 +5033,7 @@ class SimInit:
                         self.military_at[(b, int(u_["tile"]))] = i
                     if self.fog_of_war and seat < self.n_majors:
                         # spawnUnit's revealAround: the chassis's own sight,
-                        # cut by occlusion (ask 11) — a fresh unit sees
+                        # cut by the line of sight (`_los_disk`) — a fresh unit sees
                         # through nothing; a minor keeps no fog
                         _s0 = int(self._type_sight[ti]) or 2
                         _bb = torch.tensor([b], dtype=torch.long, device=device)

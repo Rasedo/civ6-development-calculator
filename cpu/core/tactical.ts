@@ -30,7 +30,7 @@ import { CITY_STRIKE_RANGE } from './phase';
 import { encampOuterPool, outerPool } from './rules';
 import { cityStateAt, minorCity } from './cityStates';
 import { irradiated } from './nuclear';
-import { canSee, unitSight } from './fog';
+import { canSee, losDisk, unitSight } from './fog';
 import { barbarianScouts, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, ringPlots, tribeOf } from './barbarians';
 import { barbarianCaptures, barbarianTrees } from './barbarianOps';
 import { opsOf } from './operations/manager';
@@ -2124,7 +2124,7 @@ function nearestUnrevealed(state: GameState, u: Unit, revealed: (i: number) => b
  * HL EXPLORE (0x70aa40) for one explorer: of the plots its search of this
  * turn closes (0x26df90 on its Movement left) with no danger, none chosen
  * this move and one it may go to (`exploreOk`), the one whose sight (the
- * plots within its sight it sees from there, `canSee`) holds the most plots
+ * plots within its sight it sees from there, `losDisk`) holds the most plots
  * its player never revealed (0x70a6c0, the first of equals, above 0); else,
  * on the move's first round, the nearest unrevealed plot of its region
  * where the player has not revealed all of it ("cur region", a path to it
@@ -2142,7 +2142,8 @@ function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number
   const sight = unitSight(u, state);
   const look = (p: number) => {
     const t = map.tiles[p];
-    return tilesWithin(map, t.col, t.row, sight).filter((q) => canSee(map, t, q, false)).map((q) => q.index);
+    const sees = losDisk(map, t, sight, false);
+    return tilesWithin(map, t.col, t.row, sight).filter((q) => sees.has(q.index)).map((q) => q.index);
   };
   let best1 = -1;
   let v1Best = 0;

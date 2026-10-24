@@ -6,23 +6,111 @@
 - addr: 0x58b1d0
   final: 0x3b4650
   kind: function
-  status: PARTLY
+  name: unitSightList
+  signature: "void unitSightList(?, int range, int x, int y, bool seeThroughFeatures, bool seeThroughTerrain, Vector<(int plot, int ring)>* out)"
+  semantics: |
+    A unit's line of sight: the (plot index, ring) list an eye on (x, y)
+    sees out to `range`. A per-plot int array (map width x height, zeroed)
+    holds each plot's carried height. The walk goes ring 0 .. range + 1 in
+    axial steps (dq, dr) (0,1) (1,0) (1,-1) (0,-1) (-1,0) (-1,1) (0xeff670 /
+    0xeff688): each ring from one step in direction 0 past the last ring's
+    end, direction 1, turning to the next direction (0xeff6a0) where a step
+    leaves the ring. The eye's plot is listed (ring 0, carried 0). Each
+    other plot on the map: its two parents are the neighbours in the
+    directions the six-way switch names for the direction it was reached by
+    ((1,2) (3,2) (3,4) (4,5) (5,0) (1,0)), a parent counting only on the
+    map at hex distance ring - 1 from the eye (0x58ae50); its own height is
+    0x58d1c0 (terrain SightThroughModifier +0x34 unless seeThroughTerrain,
+    feature SightThroughModifier +0x44 unless seeThroughFeatures; 0 on ring
+    range + 1). A parent's carried value >= 0x1000000 is SPLIT (the bit
+    dropped). With one parent, equal values or a split one, the unsplit
+    parent carries (the first by default); else the line from the eye's
+    centre to the plot's (24.8 fixed point, x * 256 plus 128 on an odd row,
+    y * 256, the coordinates as wrapped) picks the parent nearer by more
+    than 0.05 (12), both within it: the lower carries and the plot is
+    stored max(lower, own) + 0x1000000 when the higher exceeds its own,
+    else its own. One carrying parent: stored max(own, parent). Listed when
+    the carrying parent's value is below its own, or no higher than the
+    eye (0x58af70: the terrain's SightModifier +0x30, 1 on a city centre or
+    a complete, unpillaged district with ZOC and HitPoints, 0x24c2f0) and
+    the ring is not range + 1.
+  status: READ
   cases:
-    - recording: h1_duelw1126
-      value: "Fitted on the records' revealed plots (runs/h1_duelw1126–1131, `revealed`, every look a major's land unit took from its plots and steps over turns 1-250, cities' surroundings left out): a plot between"
-    - recording: 1127
-      turn: 1
-      value: Of the 915 looks the candidate rules dispute it misreads 9 (1127 t1 Rome's Settler (36,13) over a hill to the mountain (34,14) shown, unrevealed);
-    - recording: 1121
-      turn: 7
-      value: 1121 t7 (Kilimanjaro past the wooded hill (33,9), through (32,9)) holds.
-    - recording: 1126
-      value: "A city founded or taken looks two plots round its centre whole and three by the line: at every major's founding on 1126–1131 no plot two from the centre is left dark, and of the 98 left dark three fro"
-  impl: [cpu/core/fog.ts:canSee]
+    - recording: h1_duelw1127
+      turn: 2
+      value: "Rome's Settler (36,13), range 3: the Mountain (34,14) unlisted (the record's fog), the engines' former two-line rule showed it"
+    - recording: h1_duelw1127
+      turn: 30
+      value: "China's Settler (12,7), range 3: Grassland (13,10) past the Forest (12,9) listed (the record's fog)"
+    - recording: h1_duelw1117
+      turn: 2
+      value: "Rome's look leaves plot 716 dark, as recorded"
+    - recording: h1_duelw1127
+      value: "emulated (unicorn, the callees stubbed with the map's heights) on every plot of 1127 t2 / t100, 1117 t60, 1121 t150, ranges 1-5, Sentry off and on: losDisk and sight_walk list the same plots on all 45,760 looks"
+  impl: [cpu/core/fog.ts:losDisk, gpu/core/simbase.py:sight_walk]
   readings:
-    - "H-1: the sight rule and a city's look — LAB (records; the walk 0x58b1d0 unread)"
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
-  context:
-    - "## H-1: the sight rule and a city's look — LAB (records; the walk 0x58b1d0 unread)"
-    - 0x58b1d0 builds a unit's sight list in 24.8 fixed point (constants 0.5 and 0.05) over a ring walk;...
-  review: imported
+  review: reviewed
+- addr: 0x58af70
+  final: 0x3b4490
+  kind: function
+  name: sightEyeHeight
+  signature: "int sightEyeHeight(?, int x, int y)"
+  semantics: |
+    The height a look stands at on plot (x, y): its terrain's SightModifier
+    (+0x30), and 1 where the plot holds a district that is a city centre or
+    complete, unpillaged and of a row with ZOC and HitPoints above 0
+    (0x24c2f0).
+  status: READ
+  cases:
+    - recording: h1_duelw1127
+      turn: 2
+      value: "a city centre's raise is a unit's: the city's own look reads the terrain's (Xi'an (13,9) dark as recorded)"
+  impl: [cpu/core/fog.ts:eyeHeight, gpu/core/sim_masks.py:_eye_height]
+  readings:
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
+  review: reviewed
+- addr: 0x58d1c0
+  final: 0x3b5c00
+  kind: function
+  name: sightThroughHeight
+  signature: "int sightThroughHeight(int x, int y, bool feature, bool terrain)"
+  semantics: |
+    The height plot (x, y) puts in the way of a look: its terrain's
+    SightThroughModifier (+0x34) where `terrain`, plus its feature's
+    (DB.Features +0x44) where `feature`.
+  status: READ
+  cases:
+    - recording: h1_duelw1127
+      turn: 2
+      value: "emulated with the install's SightThroughModifier columns: the walk's lists as the records' fog"
+  impl: [cpu/core/fog.ts:sightThrough, gpu/core/sim_masks.py:_sight_through_plane]
+  readings:
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
+  review: reviewed
+- addr: 0x58ae50
+  final: 0x3b4370
+  kind: function
+  name: sightHexDistance
+  signature: "int sightHexDistance(int x0, int y0, int x1, int y1, int width, int height, bool wrapX, bool wrapY)"
+  semantics: |
+    The hex distance of two plots in odd-row offset coordinates, the
+    shorter way round a wrapping map.
+  status: READ
+  cases:
+    - recording: h1_duelw1127
+      value: "run natively under the emulated walk on every plot of 1127 t2 and t100"
+  impl: [world/hex.ts:hexDistance]
+  readings:
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
+  review: reviewed
+- addr: 0x58f170
+  final: 0x3b7040
+  kind: function
+  status: UNREAD
+  semantics: |
+    A caller of the unit sight walk 0x58b1d0.
+  readings:
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
+  review: reviewed

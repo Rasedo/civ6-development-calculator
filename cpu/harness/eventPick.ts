@@ -41,7 +41,7 @@ import { warmingDegrees } from '../core/climate';
 import { TURN_LIMIT } from '../core/game';
 import { EVENT_OCC_SCALE, FIRST_TIME_OCCURRENCE_BOOST } from '../data/disasters';
 import { ERUPTION_ROWS, STORM_EVENTS, stormFamilyAt } from '../data/disasters';
-import { canSee, initFog, unitSeesThrough, unitSight } from '../core/fog';
+import { cityEye, initFog, losDisk, unitSeesThrough, unitSight, type Look } from '../core/fog';
 import { tilesWithin } from '../../world/hex';
 import { isCiv } from '../core/seats';
 import { deforestationLevel } from '../core/climate';
@@ -84,25 +84,24 @@ const num = (v: unknown): number => (typeof v === 'number' ? v : -1);
 function sightIn(state: GameState, rec: TurnRecord, cat: Catalog, pid: number, seat: number, acc: Uint8Array): void {
   const { map } = state;
   const W = rec.head.W;
-  const look = (q: number, radius: number, seeThrough?: boolean) => {
+  const look = (q: number, radius: number, los?: Look) => {
     const t = map.tiles[q];
     if (!t) return;
-    for (const n of tilesWithin(map, t.col, t.row, radius)) {
-      if (seeThrough === undefined || canSee(map, t, n, seeThrough)) acc[n.index] = 1;
-    }
+    if (los) for (const n of losDisk(map, t, radius, los.seeThrough, los.eye)) acc[n] = 1;
+    else for (const n of tilesWithin(map, t.col, t.row, radius)) acc[n.index] = 1;
   };
   rec.map.forEach((row, y) => row.forEach((p, x) => { if (num(p[P.owner]) === pid) look(y * W + x, 1); }));
   for (const c of rec.cities) {
     if (c.owner !== pid) continue;
     look(c.y * W + c.x, 2);
-    look(c.y * W + c.x, 3, false);
+    look(c.y * W + c.x, 3, cityEye(map.tiles[c.y * W + c.x]));
   }
   for (const u of rec.units) {
     if (u.owner !== pid) continue;
     const type = engineRowOf(cat, 'unit', u.type);
     if (!type) continue;
     const unit = { type, seat };
-    look(u.y * W + u.x, unitSight(unit, state), unitSeesThrough(unit));
+    look(u.y * W + u.x, unitSight(unit, state), { seeThrough: unitSeesThrough(unit) });
   }
 }
 
