@@ -31,7 +31,8 @@ import { analysedTurns, installType, promotionWeight } from './minorBuild';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost } from './economy';
 import { getModifiers, prodBoostPct, seatGovernment } from './effects';
-import { citiesOf, seatOf } from './seats';
+import { citiesOf, isCityStateSeat, isFreeSeat, seatOf } from './seats';
+import { minorCity } from './cityStates';
 import { cityLowlands } from './climate';
 import { buildingCostIn, worshipOffered } from './rules';
 import { builderCost, cityNavalCapable, traderCost } from './units';
@@ -134,12 +135,7 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
     };
   };
   const amenity = amenityOf(city);
-  const science = stats.total.science + own.filter((c) => c !== city).reduce((n, c) => n + computeCityStats(state, c).total.science, 0);
-  const culture = stats.total.culture + own.filter((c) => c !== city).reduce((n, c) => n + computeCityStats(state, c).total.culture, 0);
-  const techEntries = researchAnalysis(state, seat, science).map((e) => ({ id: e.tech, next: e.next, turns: e.turns, owned: e.owned }));
-  const civicEntries = civicAnalysis(state, seat, culture).map((e) => ({ id: e.civic, next: e.next, turns: e.turns, owned: e.owned }));
-  const techLeft = r.tech ? turnsAt(researchCost(state, r.tech, false, seat) * FX - fxOf(r.techProgress), fxOf(science)) : -1;
-  const civicLeft = r.civic ? turnsAt(researchCost(state, r.civic, true, seat) * FX - fxOf(r.civicProgress), fxOf(culture)) : -1;
+  const turns = seatResearchTurns(state, seat);
   const has = new Set(city.buildings);
   const centre = state.map.tiles[city.centerIndex];
   const worship = worshipOffered(state, city);
@@ -218,9 +214,40 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
     growth,
     forecast: growthForecast(growth),
     current: majorItemType(city.queue[0]),
-    techTurns: (t) => analysedTurns(techEntries, t && engineId('tech', t, 'TECH_', TECHS), r.techs, r.tech, techLeft),
-    civicTurns: (c) => analysedTurns(civicEntries, c && engineId('civic', c, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft),
+    techTurns: turns,
+    civicTurns: turns,
     buildTurns: (type) => majorItemTurns(state, city, type, 0),
+  };
+}
+
+/** THE RESEARCH AND CIVICS AIS' TURNS to a TECH_ / CIVIC_ type of a seat as
+ *  its city build AI reads them (`analysedTurns`): a city-state's and the
+ *  Free Cities' over their research AIs' last analyses, the research's turns
+ *  left as its last choice set them, the civic's read live; a major's over
+ *  analyses made now on its cities' Science and Culture */
+export function seatResearchTurns(state: GameState, seat: number): (type: string | null) => number {
+  const r = seatOf(state, seat)!.research;
+  const stored = isCityStateSeat(seat) || isFreeSeat(seat);
+  const cities = isCityStateSeat(seat) ? [minorCity(seatOf(state, seat) as never)] : citiesOf(state, seat);
+  const sum = (k: YieldKey): number => cities.reduce((n, c) => n + computeCityStats(state, c).total[k], 0);
+  const culture = sum('culture');
+  let tech: { id: string; next: string; turns: number; owned: boolean }[];
+  let civic: { id: string; next: string; turns: number; owned: boolean }[];
+  let techLeft: number;
+  if (stored) {
+    tech = (r.aiEntries ?? []).map((e) => ({ id: e.tech, next: e.next, turns: e.turns, owned: e.owned }));
+    civic = (r.civicAiEntries ?? []).map((e) => ({ id: e.civic, next: e.next, turns: e.turns, owned: e.owned }));
+    techLeft = r.aiLeftSeen ?? 0;
+  } else {
+    const science = sum('science');
+    tech = researchAnalysis(state, seat, science).map((e) => ({ id: e.tech, next: e.next, turns: e.turns, owned: e.owned }));
+    civic = civicAnalysis(state, seat, culture).map((e) => ({ id: e.civic, next: e.next, turns: e.turns, owned: e.owned }));
+    techLeft = r.tech ? turnsAt(researchCost(state, r.tech, false, seat) * FX - fxOf(r.techProgress), fxOf(science)) : -1;
+  }
+  const civicLeft = r.civic ? turnsAt(researchCost(state, r.civic, true, seat) * FX - fxOf(r.civicProgress), fxOf(culture)) : -1;
+  return (type) => {
+    if (type?.startsWith('CIVIC_')) return analysedTurns(civic, engineId('civic', type, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft);
+    return analysedTurns(tech, type ? engineId('tech', type, 'TECH_', TECHS) : null, r.techs, r.tech, techLeft);
   };
 }
 
@@ -300,11 +327,6 @@ export function majorPickFacts(state: GameState, city: City, facts: CityBuildFac
  *  city-state's), no strategic stockpile, no government */
 export function freeCityBuildFacts(state: GameState, city: City): CityBuildFacts {
   const f = majorBuildFacts(state, city, () => 0);
-  const r = seatOf(state, city.seat)!.research;
-  const techEntries = (r.aiEntries ?? []).map((e) => ({ id: e.tech, next: e.next, turns: e.turns, owned: e.owned }));
-  const civicEntries = (r.civicAiEntries ?? []).map((e) => ({ id: e.civic, next: e.next, turns: e.turns, owned: e.owned }));
-  const culture = citiesOf(state, city.seat).reduce((n, c) => n + computeCityStats(state, c).total.culture, 0);
-  const civicLeft = r.civic ? turnsAt(researchCost(state, r.civic, true, city.seat) * FX - fxOf(r.civicProgress), fxOf(culture)) : -1;
   const centre = state.map.tiles[city.centerIndex];
   return {
     ...f,
@@ -315,8 +337,6 @@ export function freeCityBuildFacts(state: GameState, city: City): CityBuildFacts
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
       return !!id && tilesWithin(state.map, centre.col, centre.row, 3).some((t) => t.resource === id);
     },
-    techTurns: (t) => analysedTurns(techEntries, t && engineId('tech', t, 'TECH_', TECHS), r.techs, r.tech, r.aiLeftSeen ?? 0),
-    civicTurns: (c) => analysedTurns(civicEntries, c && engineId('civic', c, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft),
   };
 }
 

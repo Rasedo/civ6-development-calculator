@@ -66,11 +66,15 @@
       value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
     - recording: 1124
       value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
-  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts, cpu/core/minorBuild.ts:analysedTurns]
+  impl:
+    - cpu/core/aiCityBuild.ts:CityBuildFacts
+    - cpu/core/minorBuild.ts:analysedTurns
+    - cpu/core/aiValue.ts:AiValueView
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...ts.  building (non-wonder) only at city centre plot; turns r12 = max(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current !..."
   context:

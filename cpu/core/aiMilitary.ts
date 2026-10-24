@@ -8,10 +8,11 @@
  *  - The yardstick B: the player's strongest melee unit trained (PlayerUnits
  *    +0xf0) or its city strike (+0x150, at least COMBAT_MINIMUM_CITY_STRIKE_
  *    STRENGTH), at least 1.
- *  - Each player's strength: over the military AI's areas (+0x2f0, the
- *    landmasses of its cities), the knowledge base's records of that player's
- *    units last seen in the area within two turns (0x5eb430: the record's
- *    +0x1c, its plot's area; age <= 2), each
+ *  - Each player's strength: over the military AI's regions (+0x2f0, its
+ *    cities' Map_Region ids), the knowledge base's records of that player's
+ *    units last seen in the region within two turns (0x5eb430 given no area
+ *    and the region, 0x3beb0's Map_Region: the record's +0x1c, its plot's
+ *    region +0x18; age <= 2), each
  *    unit's max(Combat, RangedCombat) where it exceeds B - 20.
  *  - Regional: its own, with each city's unit in training (the head of its
  *    queue) of such strength; Enemy: the strongest of the players at war
@@ -35,15 +36,15 @@ export interface MilitaryFacts {
   /** B: max(1, best melee trained, max(best city strike, 3)) */
   best: number;
   cities: number;
-  /** the military AI's areas (+0x2f0) */
-  areas: ReadonlySet<number>;
+  /** the military AI's regions (+0x2f0, Map_Region ids) */
+  regions: ReadonlySet<number>;
   self: number;
   /** the players in the game's order: at war with the player (0x469cd0 or
    *  the +0xd18 flag), a tribe (the barbarians, 0x469ce0), flagged (+0xc58) */
   players: readonly { seat: number; atWar: boolean; tribe: boolean; flagged: boolean }[];
-  /** the knowledge base's army records, each its plot's area */
+  /** the knowledge base's army records, each its plot's region */
   records: readonly ArmyRecord[];
-  areaOf(plot: number): number;
+  regionOf(plot: number): number;
   /** max(Combat, RangedCombat) of an install unit type */
   strength(type: string): number;
   turn: number;
@@ -83,7 +84,7 @@ const RECORD_AGE = 2;
 export function combatDesire(f: MilitaryFacts): CombatDesire {
   const per = new Map<number, number>();
   for (const r of f.records) {
-    if (f.turn - r.seen > RECORD_AGE || !f.areas.has(f.areaOf(r.plot))) continue;
+    if (f.turn - r.seen > RECORD_AGE || !f.regions.has(f.regionOf(r.plot))) continue;
     const s = f.strength(r.type);
     if (s + 20 <= f.best) continue;
     per.set(r.owner, (per.get(r.owner) ?? 0) + s);

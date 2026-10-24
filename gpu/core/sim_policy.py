@@ -4,7 +4,7 @@ import math
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .sim_research import _FX, _fdiv, _fmul, _fx_const, _fx_const_t, _present_value, _discounted
-from .sim_cityvalue import _FreeFacts, _MinorFacts, _f32
+from .sim_cityvalue import _FreeFacts, _MinorFacts, _f32, _t
 
 # THE POLICY AND GOVERNMENT VALUES of a city-state and of the Free Cities
 # (`cpu/core/aiPolicyValue.ts`; tools/civ6lab/dll_readings.md "C-97: the
@@ -286,8 +286,10 @@ class SimPolicy:
             scale = _f32(float(self.rules.civic_ai["combatPowerScaling"]))
             per = between(full(_fx_const(_f32(math.exp(_f32(amount * scale)))))) >> 8
             return self._pol_barbarian_combat(ctx) * per
-        if eff in _POL_ZERO or eff == "EFFECT_ADJUST_BUILDING_PRODUCTION":
+        if eff in _POL_ZERO:
             return zero
+        if eff == "EFFECT_ADJUST_BUILDING_PRODUCTION":
+            return self._pol_building_production(ctx, a, sub, h) if city else zero
         if eff == "EFFECT_ADJUST_CITY_YIELD_CHANGE":
             if not city:
                 return zero
@@ -429,6 +431,52 @@ class SimPolicy:
             tot = (torch.clamp(m, max=amount) * mine.long()).sum(dim=1) * _FX
             return span(self._cv_yield(tot, "YIELD_GOLD")) >> 8
         raise NotImplementedError(eff)
+
+    def _pol_building_production(self, ctx: dict, a: dict, sub: dict, h: int) -> torch.Tensor:
+        """0x6c1a80 on a city subject (`EFFECT_ADJUST_BUILDING_PRODUCTION`):
+        lacking the building, the Production a turn the Amount saves on it,
+        (T0 - T1) x Cost / max(1, T0 x T1), from start + R to start + R + T1
+        (R its tech's and civic's turns, the later); holding it or naming
+        none, its district the same way with T0 / T1 each at least 1 and the
+        district's cost; bare Production, whole"""
+        B, dev = ctx["B"], ctx["dev"]
+        T = self._cv_tables()
+        r = T["rate"]
+        f = sub["f"]
+        zero = torch.zeros(B, dtype=torch.long, device=dev)
+        amount = int(float(a.get("Amount", 0) or 0))
+        extra = _fx_const(_f32(amount * _f32(0.01)))
+
+        def value(type_, tech, civic, cost, floor, live):
+            rr = torch.maximum(_t(f.tech_turns(tech), zero) if tech else zero, _t(f.civic_turns(civic), zero) if civic else zero)
+            t0 = _t(f.item_turns(type_, 0), zero)
+            t1 = _t(f.item_turns(type_, extra), zero)
+            if floor is not None:
+                t0, t1 = t0.clamp(min=floor), t1.clamp(min=floor)
+            end = torch.clamp(rr + t1, max=h)
+            num = torch.div((t0 - t1) * _FX * _t(cost, zero) * _FX, _FX, rounding_mode="floor")
+            v = _fdiv(num, (t1 * t0).clamp(min=1) * _FX)
+            out = self._cv_yield(_present_value(v, r, end) - _present_value(v, r, rr), "YIELD_PRODUCTION") >> 8
+            return torch.where(live & (rr < h), out, zero)
+
+        b = T["bld"].get(a.get("BuildingType", "")) if a.get("BuildingType") else None
+        lacks = torch.zeros(B, dtype=torch.bool, device=dev)
+        out = zero
+        if b is not None:
+            lacks = ~_t(f.city_has_building(b["type"]), zero).bool()
+            if int(b.get("maxWorldInstances", -1)) > 0 and not b["placement"]:
+                raise NotImplementedError(f"{b['type']}: a world-limited building's copies not read on the GPU")
+            if not b["placement"]:
+                ok = lacks
+                if b["district"] and b["district"] != "DISTRICT_CITY_CENTER":
+                    ok = ok & _t(f.has_district(b["district"]), zero).bool()
+                out = value(b["type"], b["tech"], b["civic"], int(b["cost"]), None, ok)
+        d = T["dist"].get(a.get("DistrictType", "")) if a.get("DistrictType") else None
+        if d is not None:
+            held = _t(f.has_district(d["type"]), zero).bool()
+            dv = value(d["type"], d["tech"], d["civic"], f._item_cost(d["type"]).long(), 1, ~held)
+            out = torch.where(lacks, out, dv)
+        return out
 
     def _pol_era_index(self, name) -> int:
         """an EraType as the parser reads it: the Eras row's index, -1 none"""

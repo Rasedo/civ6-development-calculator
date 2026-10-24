@@ -83,11 +83,15 @@
     - recording: h1_duelv1127
       turn: 2
       value: Farm 72.45, Mine 62.51 at T 4, 48.44 beside a volcano, Farm on Woods 54.34
-  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts, cpu/core/minorBuild.ts:analysedTurns]
+  impl:
+    - cpu/core/aiCityBuild.ts:CityBuildFacts
+    - cpu/core/minorBuild.ts:analysedTurns
+    - cpu/core/aiValue.ts:AiValueView
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...8 projects, +0x40 units.  building (non-wonder) only at city centre plot; turns r12 = max(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [r..."
   context:

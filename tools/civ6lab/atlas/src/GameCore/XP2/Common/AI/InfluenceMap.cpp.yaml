@@ -21,6 +21,7 @@
     - "H-1: the raids — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no   danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queue's   moves: a unit not of the sea domain (+0x650: 0 sea, 1 air,..."
     - ".claude/scratchpad/st1/reading.md: ...water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence map below, 0x716a90); the Loyalty   pressure (0x19d470 >> 8); and per ring plot revealed: one owned by another   player..."

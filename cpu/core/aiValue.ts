@@ -194,6 +194,10 @@ export interface AiValueView {
   /** the Production a unit costs the seat now (its unit manager's current
    *  cost, 0x4f2b20), whole */
   unitCost(seat: number, unitType: string): number;
+  /** the seat's cost of its next district of a DistrictType (0x4088a0) */
+  districtCost(seat: number, district: string): number;
+  /** the copies of a BuildingType standing in the world (0x1e7b70) */
+  buildingsBuilt(building: string): number;
   /** the barbarian camps on plots the seat has revealed, in plot order */
   barbarianCamps(seat: number): readonly number[];
   /** the buildings of a district type in the seat's version (its
@@ -254,9 +258,13 @@ export interface AiValueView {
   cityOuterStands(seat: number, cityId: number): boolean;
   /** a city centre's strike strength (0x249ee0), its whole part */
   cityStrike(seat: number, cityId: number): number;
-  /** the turns a city trains a UnitType in (0x17bb40) at its Production
-   *  toward it times 1 + `extra` raw (24.8) */
-  cityUnitTurns(seat: number, cityId: number, unit: string, extra: number): number;
+  /** the turns a city builds a UnitType, BuildingType or DistrictType in
+   *  (0x17bb40, 0x17b1e0, 0x17b5a0) at its Production times 1 + its percent
+   *  toward the item + `extra` raw (24.8) */
+  cityItemTurns(seat: number, cityId: number, type: string, extra: number): number;
+  /** the seat's research and civics AIs' turns to a TECH_ / CIVIC_ type
+   *  (0x7610e0, 0x621920), 0 for none or one held */
+  researchTurns(seat: number, type: string | null): number;
   /** the city's CityBuildAI's expected count of a UnitType (0x5d4750), raw */
   cityUnitExpected(seat: number, cityId: number, unit: string): number;
   /** the times the seat completed a ProjectType (player +0x1330, 0x4be7b0) */

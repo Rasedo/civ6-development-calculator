@@ -65,6 +65,7 @@
   status: PARTLY
   readings:
     - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...r the assault (+0x60); the assault's tree lists nothing but where the tribe was bribed (0x147c20's turns).

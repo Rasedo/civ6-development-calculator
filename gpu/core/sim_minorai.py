@@ -392,7 +392,7 @@ class SimMinorAi:
         """`minorCombatDesire` — THE COMBAT DESIRE of minor `s` at its
         military AI's turn (`citystate_combat_desire`, raw 24.8, its
         PSEUDOYIELD_UNIT_COMBAT weight), on the records as its last update
-        aged them (the turn before): the area of its city, its unit in
+        aged them (the turn before): the region of its city, its unit in
         training, the players in the game's order — the majors, the
         city-states, the Free Cities, the barbarians (a tribe, always at war)
         — at war where its seat is; on turn 1 it holds no city (the game's
@@ -420,9 +420,9 @@ class SimMinorAi:
         seen = self.citystate_kb_seen[:, s].long()
         plot = self.citystate_kb_plot[:, s].long()
         centre = self.citystate_center[:, s]
-        area = torch.where(centre >= 0, self.tile_area.gather(1, centre.clamp(min=0).unsqueeze(1)).squeeze(1),
+        area = torch.where(centre >= 0, self.tile_region.gather(1, centre.clamp(min=0).unsqueeze(1)).squeeze(1),
                            torch.full_like(centre, -1))
-        rec_area = self.tile_area.gather(1, plot.clamp(min=0))
+        rec_area = self.tile_region.gather(1, plot.clamp(min=0))
         turn = int(self.turn) - 1
         counted = (slot != -2) & (turn - seen <= 2) & (area >= 0).unsqueeze(1) & (rec_area == area.unsqueeze(1))
         strength = strength_of(typ)

@@ -3994,8 +3994,11 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   0x7204bc): the yardstick B = max(1, PlayerUnits +0xf0 (the best melee
   Combat made), 0x4bd030 = max(+0x150, COMBAT_MINIMUM_CITY_STRIKE_STRENGTH));
   per player in the players list (0x483b50 +0x50) the strength summed over
-  the military AI's area list (+0x1290 +0x2f0) of the records 0x5eb430
-  returns (the record's +0x1c the area's id, age at most 2), each unit's
+  the military AI's region list (+0x1290 +0x2f0) of the records 0x5eb430
+  returns — called with no area (r8 null) and the region object 0x3beb0
+  looks up by id on the map's region list (map vt +0x108, the lookup
+  0x6fa5e0's region lists take too), so the record's +0x1c, its plot's
+  region (plot +0x18), against the region's id; age at most 2 —, each unit's
   max(Combat, RangedCombat) where it plus 20 exceeds B; the player itself
   adds each city's unit at the head of its queue (0x179860 on city +0x2170)
   of such strength — Regional (+0x398); a player at war (0x469cd0) or
@@ -6411,6 +6414,28 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   parser's scaling unread), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work
   type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURISM,
   between).
+- READ, EFFECT_ADJUST_BUILDING_PRODUCTION 0x6c1a80 (Limes, Veterancy; @f03c18,
+  vtable 0xd638e0; its parser 0x6c1760: BuildingType +8, DistrictType +0xc,
+  fx(Amount x 0.01f) +0x10; for a building its PrereqTech +0x18 (+0x220),
+  PrereqCivic +0x1c (+0x210), PrereqDistrict +0x20 (+0x218),
+  RequiresPlacement +0x14 (Buildings +0x159 bit 16), +0x15 its
+  MaxWorldInstances (+0x40) reached by the world's copies (0x1e7b70); for
+  a district its PrereqTech / PrereqCivic, +0x14 set): with the player and
+  the context's city. The city lacking the building (City_Buildings
+  0x18e9f0): none where +0x15, where its district is not the city's
+  (0x1aec20), or where it needs a placement and CityBuildAI's 0x5d17b0
+  finds none (ported as none: 0x5d17b0 unread, no Limes or Veterancy row
+  needs it); R = the later of turnsToCompleteCivic 0x621920 and
+  turnsToResearchTech 0x7610e0, none where start + R reaches the horizon;
+  T0 / T1 = turnsToBuildBuilding 0x17b1e0 without and with the Amount;
+  v = (T0 - T1) x Cost (+0x24) / max(1, T0 x T1); bare Production of
+  PV(min(start + R + T1, horizon)) - PV(start + R), whole. The city holding
+  the building, or none named: the DistrictType (none where the city holds
+  it), T0 / T1 turnsToBuildDistrict 0x17b5a0 each at least 1, the cost the
+  player's (0x4088a0), the same value. The 0x5d4650 call's result is not
+  read. Port: `aiModifiers.ts` (`researchTurns`, `cityItemTurns`,
+  `districtCost`, `buildingsBuilt`), `sim_policy.py`
+  (`_pol_building_production`).
 - READ, Discipline's EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT 0x6bef40 (@f03c08,
   vtable 0xd63760; its parser 0x6bedb0 stores fx(expf(Amount x
   COMBAT_POWER_SCALING)) at +8, GlobalParameters +0x210, 0.04 under

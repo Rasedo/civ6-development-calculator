@@ -51,8 +51,8 @@ import type { ContractCity } from './aiContracts';
 import { civicAnalysis } from './aiCivics';
 import { AI_UNIT_INDEX, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
 import { AI_UNITS } from '../data/aiBuildTables';
-import { minorUnitExpected, minorUnitTurns, minorUnitVersion } from './minorBuild';
-import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion } from './majorCityBuild';
+import { minorUnitExpected, minorItemTurns, minorUnitVersion } from './minorBuild';
+import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './majorCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, hasMet, minorCity, minorWarGate, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
@@ -65,7 +65,7 @@ import { BELIEF_CATALOGS, BELIEF_SLOTS, PANTHEON_FAITH_COST, PANTHEON_IDS, RELIG
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
-import { availableProjects, beliefPicks, canFoundReligion, itemCost, projectCost, settlerCost, unitProdCost } from './game';
+import { availableProjects, beliefPicks, canFoundReligion, districtCost, districtScaledBase, itemCost, projectCost, settlerCost, unitProdCost } from './game';
 import { alliancePayable, dealItemPayable, friendshipPayable, missionOf, missionPayable } from './deals';
 import { DEAL_OPEN_BORDERS } from '../data/seats';
 import { WAR_KIND_FORMAL, WAR_KIND_SURPRISE } from '../data/warKinds';
@@ -410,6 +410,17 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     cityFoodSurplus: (i, id) => {
       const c = cityOf(i, id);
       return c ? fxOf(computeCityStats(state, c).foodSurplus) : 0;
+    },
+    districtCost: (i, type) => {
+      const id = engineId('district', type, 'DISTRICT_', DISTRICTS) as DistrictId | null;
+      if (!id) return 0;
+      return isCityStateSeat(i) ? districtScaledBase(seat(i).research, id) : districtCost(state, i, id);
+    },
+    buildingsBuilt: (type) => {
+      const id = engineId('building', type, 'BUILDING_', BUILDINGS);
+      if (!id) return 0;
+      return [...cityHolders(state).flatMap((h) => h.cities), ...state.cityStates.flatMap((cs) => (cs.centerIndex >= 0 ? [minorCity(cs)] : []))]
+        .filter((c) => c.buildings.includes(id)).length;
     },
     unitCost: (i, type) => {
       const id = engineId('unit', type, 'UNIT_', UNITS);
@@ -808,11 +819,12 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       return city ? Math.trunc(cityStrikeStrength(state, city)) : 0;
     },
     // a city-state's train turns and expected count as its city's update
-    // reads them (`minorUnitTurns`), any other city's its queue's
-    cityUnitTurns: (i, id, type, extra) => {
+    // reads them (`minorItemTurns`), any other city's its queue's
+    researchTurns: (i, type) => seatResearchTurns(state, i)(type),
+    cityItemTurns: (i, id, type, extra) => {
       if (isCityStateSeat(i)) {
         const cs = seatOf(state, i) as CityState | undefined;
-        return cs && cs.centerIndex >= 0 ? minorUnitTurns(state, cs, type, extra) : -1;
+        return cs && cs.centerIndex >= 0 ? minorItemTurns(state, cs, type, extra) : -1;
       }
       const city = cityOf(i, id);
       return city ? majorItemTurns(state, city, type, extra) : -1;

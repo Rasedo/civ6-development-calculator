@@ -134,6 +134,18 @@
   context:
     - "...0.0; the Buildings_XP2 row (0x28a940 on 0xad50d0: +0x28 > 0 -> 0x7a67f0, +0x48 bit 1 -> 0x39110); each free unit (+0x298) through 0x7b62c0; Housing (+0x34) > 0 through 0x7a3d70 (CityB..."
   review: imported
+- addr: 0x3beb0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 43
+      value: "runs/h1_duelv1124 minor 3: t43 20/30 -> 0.5 + 0.2 = 0.7, t50 20/50 -> 1.7,   t56 0/0 -> 1.0 + 0.2."
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  context:
+    - "...) of the records 0x5eb430 returns — called with no area (r8 null) and the region object 0x3beb0 looks up by id on the map's region list (map vt +0x108, the lookup 0x6fa5e0's region..."
+  review: imported
 - addr: 0x49a50
   final: 0x38990
   kind: function
@@ -1078,7 +1090,7 @@
   kind: function
   name: player valid and a full civ
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:next]
+  impl: [cpu/core/barbarians.ts:next, cpu/core/barbarians.ts:wonders]
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"

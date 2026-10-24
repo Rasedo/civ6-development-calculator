@@ -19,3 +19,13 @@
   context:
     - "...saved as m_iMaxMeleeStrengthTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0..."
   review: imported
+- addr: 0x1e7b70
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiValue.ts:AiValueView]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ings +0x159 bit 16), +0x15 its MaxWorldInstances (+0x40) reached by the world's copies (0x1e7b70); for a district its PrereqTech / PrereqCivic, +0x14 set): with the player and the co..."
+  review: imported

@@ -1010,14 +1010,26 @@
     - "...cfcd0 (+0x44) — the Water Mill 121 -> 163 of 1124's; EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 (the Trader's worth with the Amount's capacity more); EFFECT_ADJUST_PLAYER_RESOURCE_STO..."
     - ...IELD_GOVERNOR @0xf2e214, discounted from the start); EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 PARTLY (the Trader's value 0x7a7110 of Amount, start to horizon).
   review: imported
+- addr: 0x6c1760
+  final: 0x4724b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ST_BUILDING_PRODUCTION 0x6c1a80 (Limes, Veterancy; @f03c18, vtable 0xd638e0; its parser 0x6c1760: BuildingType +8, DistrictType +0xc, fx(Amount x 0.01f) +0x10; for a building its Prere..."
+  review: imported
 - addr: 0x6c1a80
   kind: function
   name: EFFECT_ADJUST_BUILDING_PRODUCTION
   semantics: 0 with neither a building nor a district named; the rest unread.
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_building_production]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   review: reviewed
 - addr: 0x6c2720
   final: 0x4732d0

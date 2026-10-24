@@ -275,6 +275,7 @@
   impl: [cpu/core/majorView.ts:borderClosed]
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...sign rebuilt), the first plot P may enter — its own, no one's, open borders / alliance (0x3dab70), or an owner not enforcing its borders (diplomacy +0x6c0) — the rally where the walk..."

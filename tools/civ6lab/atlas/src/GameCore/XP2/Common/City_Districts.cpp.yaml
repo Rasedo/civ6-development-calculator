@@ -74,6 +74,7 @@
   readings:
     - "H-1: the great person's spawn — READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...the player's cities (+0x12f0 -> +0xd8, list order); a city holding the class's district (0x1aec20 on city +0x1a48 with (district, true, 0) — completed) and of greater population (+0x588,..."
   review: imported

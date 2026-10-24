@@ -68,6 +68,21 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context: ["## H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   review: imported
+- addr: 0x151550
+  final: 0xe31a0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 11
+      value: "runs/h1_duelw1121 t11: the   Horse Archer at 34:8 for 30:7 takes the path whose turn ends on the free   33:6, not the one through 33:7 / 32:7, both held by its own units."
+    - recording: 1124
+      turn: 1
+      value: "The   planning's search (0x115 | 0x800 | 0x100) carries +4: none of them runs   there (the planning classifier, 1124 t1-60: applying the stacking test   takes 822 equal rows to 472)."
+  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  context:
+    - "...revealed child; flag 2: a child owned by a player at war refused; a clans' tribe test (0x151550, 0x147c20); under the unit's +0x1f7 byte or flag 8, a child whose danger (0x716a90) is..."
+  review: imported
 - addr: 0x151fa0
   final: 0xe32b0
   kind: function

@@ -349,8 +349,14 @@
     - recording: 1124
       turn: 3
       value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
-  impl: [cpu/core/aiContracts.ts:ContractCity]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  impl:
+    - cpu/core/aiContracts.ts:ContractCity
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/minorBuild.ts:minorItemTurns
+    - gpu/core/sim_cityvalue.py:item_turns
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current != bld) + prereq buildings...  value = 0x7a4d40(bld, turns, plot=-999..."
   context:
@@ -362,10 +368,15 @@
   kind: function
   name: turnsToBuildDistrict
   status: PARTLY
-  impl: [cpu/core/aiContracts.ts:ContractCity]
+  impl:
+    - cpu/core/aiContracts.ts:ContractCity
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/minorBuild.ts:minorItemTurns
+    - gpu/core/sim_cityvalue.py:item_turns
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - ...T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0, the queue's own es...
   review: imported
@@ -394,8 +405,10 @@
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/majorCityBuild.ts:majorItemTurns
-    - cpu/core/minorBuild.ts:minorUnitTurns
-    - gpu/core/sim_cityvalue.py:unit_turns
+    - cpu/core/minorBuild.ts:minorItemTurns
+    - gpu/core/sim_cityvalue.py:item_turns
+    - cpu/core/minorBuild.ts:minorItemTurns
+    - gpu/core/sim_cityvalue.py:item_turns
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

@@ -1345,7 +1345,7 @@ class SimCityValue:
         Production, PV(min(t + its train turns at the Production lifted by the
         Amount, h)) - PV(t)"""
         r = self._cv_tables()["rate"]
-        end = torch.minimum(t + _t(f.unit_turns(unit, pct), t), h)
+        end = torch.minimum(t + _t(f.item_turns(unit, pct), t), h)
         prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64, device=t.device) * _FX + 0.5).long()
         per = torch.div(prod.expand_as(t) * _t(f.unit_expected(unit), t), _FX, rounding_mode="floor")
         v = torch.div(per * pct, _FX, rounding_mode="floor")
@@ -1843,9 +1843,9 @@ class _MinorFacts:
         rate = torch.floor(self._total(1) * (1 + self._item_pct(item) / 100) * _FX + 0.5).long()
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
-    def unit_turns(self, u, extra):
-        """`minorUnitTurns`: the turns the unit takes (0x17bb40) at the
-        Production times 1 + its percent + `extra` raw"""
+    def item_turns(self, u, extra):
+        """`minorItemTurns`: the turns the item takes (0x17bb40, 0x17b1e0,
+        0x17b5a0) at the Production times 1 + its percent + `extra` raw"""
         sim, s = self.sim, self.s
         k = self._item_key(u)
         if k < 0:
@@ -2324,8 +2324,8 @@ class _FreeFacts(_MinorFacts):
         rate = torch.floor(self._total(1) * _FX + 0.5).long()
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
-    def unit_turns(self, u, extra):
-        """`majorItemTurns` of a unit at the Production times 1 + `extra`
+    def item_turns(self, u, extra):
+        """`majorItemTurns` of an item at the Production times 1 + `extra`
         raw"""
         sim = self.sim
         k = self._item_key(u)

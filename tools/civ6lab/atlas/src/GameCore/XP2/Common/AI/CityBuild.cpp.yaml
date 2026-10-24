@@ -455,6 +455,17 @@
   context:
     - "...ity Building\"), the district event 0x5cc910 (its \"City Build District Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"Build City Improvement\"), 0x5cd4e0; last, with the b..."
   review: reviewed
+- addr: 0x5d17b0
+  final: 0x3e52e0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...district is not the city's (0x1aec20), or where it needs a placement and CityBuildAI's 0x5d17b0 finds none (ported as none: 0x5d17b0 unread, no Limes or Veterancy row needs it); R =..."
+  review: imported
 - addr: 0x5d1cb0
   final: 0x3e5750
   kind: function
@@ -619,7 +630,8 @@
     - cpu/core/aiCityBuild.ts:CityBuildFacts
     - cpu/core/aiResearch.ts:researchAnalysis
     - cpu/core/types.ts:CityState
-    - cpu/core/minorBuild.ts:civicEntries
+    - cpu/core/majorCityBuild.ts:seatResearchTurns
+    - cpu/core/minorBuild.ts:amenity
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -632,6 +644,16 @@
     - ...yer's cities, strategics over the units needing them) with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes,...
     - ...s none of (0x4aa790 ownerships 0 and 1) and no city counts near it (CityBuildAI +0x978, 0x5d45c0) -> 0 outright; through the pseudo-yield (0x7a60d0); below handicap 3 (player +0x908)...
   review: reviewed
+- addr: 0x5d4650
+  final: 0x3e7b80
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...istrict 0x17b5a0 each at least 1, the cost the player's (0x4088a0), the same value. The 0x5d4650 call's result is not read. Port: `aiModifiers.ts` (`researchTurns`, `cityItemTurns`,..."
+  review: imported
 - addr: 0x5d4750
   final: 0x3e7c80
   kind: function

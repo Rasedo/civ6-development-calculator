@@ -34,7 +34,7 @@ import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, gameProgre
 import { detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, urbanDefensesFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
-import { freeCityBuildFacts, majorQueueItem } from './majorCityBuild';
+import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './majorCityBuild';
 import { minorAiTurn, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
 import { applyTrainingGrants, cityStrikeStrength } from './combat';
@@ -890,13 +890,14 @@ export function minorCanTrain(state: GameState, cityState: CityState, id: string
   return true;
 }
 
-/** the turns a minor's city trains the unit in (0x17bb40) at its Production
- *  times 1 + its percent toward the unit + `extra` raw (24.8), the extra added
- *  to the percent: its cost less the progress kept on it and the city's
- *  store, as `buildTurns` reads them */
-export function minorUnitTurns(state: GameState, cityState: CityState, unit: string, extra: number): number {
-  const item = minorItemOfType(unit);
-  if (!item || !('unit' in item)) return 500;
+/** the turns a minor's city builds an install type in (0x17bb40 a unit,
+ *  0x17b1e0 a building, 0x17b5a0 a district) at its Production times 1 + its
+ *  percent toward the item + `extra` raw (24.8), the extra added to the
+ *  percent: its cost less the progress kept on it and the city's store, as
+ *  `buildTurns` reads them; 500 for a type it has no item for */
+export function minorItemTurns(state: GameState, cityState: CityState, type: string, extra: number): number {
+  const item = minorItemOfType(type);
+  if (!item) return 500;
   const k = minorItemKey(item);
   const progress = (cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0) + (cityState.prodOverflow ?? 0);
   const stats = computeCityStats(state, minorCity(cityState));
@@ -1033,15 +1034,15 @@ export function minorKnowledge(state: GameState, cityState: CityState, age: bool
 }
 /** THE COMBAT DESIRE of a minor (`combatDesire`) at its military AI's turn,
  *  `turn` the one its knowledge base's records were last aged to: the
- *  area of its city, its unit in training, the players in the game's order —
+ *  region of its city, its unit in training, the players in the game's order —
  *  the majors, the city-states, the Free Cities, the barbarians (a tribe,
  *  always at war) — at war where its seat is; its city's threat and its
  *  standing army's shortfall as its last city update left them. Unread: the
  *  player flags (+0xc58 / +0xd18), taken as none. */
 export function minorCombatDesire(state: GameState, cityState: CityState, turn: number): CombatDesire {
   const centre = state.map.tiles[cityState.centerIndex];
-  const areas = new Set<number>();
-  if (centre && (centre.area ?? -1) >= 0) areas.add(centre.area!);
+  const regions = new Set<number>();
+  if (centre && (centre.region ?? -1) >= 0) regions.add(centre.region!);
   const wars = seatOf(state, cityState.seat)?.wars ?? [];
   const players = [
     ...state.seats.filter((s) => isCiv(s.seat)).map((s) => ({ seat: s.seat, atWar: wars.includes(s.seat), tribe: false, flagged: false })),
@@ -1054,11 +1055,11 @@ export function minorCombatDesire(state: GameState, cityState: CityState, turn: 
     // the game's city-states found their city on turn 1, after its military
     // AI's turn: on turn 1 it holds none
     cities: cityState.centerIndex >= 0 && state.turn > 1 ? 1 : 0,
-    areas,
+    regions,
     self: cityState.seat,
     players,
     records: cityState.armyKnown ?? [],
-    areaOf: (plot) => state.map.tiles[plot]?.area ?? -1,
+    regionOf: (plot) => state.map.tiles[plot]?.region ?? -1,
     strength: (type) => {
       const u = AI_UNITS[AI_UNIT_INDEX.get(installType('unit', type, 'UNIT_')) ?? -1];
       return u ? Math.max(u.combat, u.rangedCombat) : 0;
@@ -1249,9 +1250,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
   };
   // the research AI's turns left on its research as its last choice set
   // them; the civics AI's read live (-1 with nothing in hand, 0x39c1f0)
-  const techLeft = r.aiLeftSeen ?? 0;
-  const civicLeft = r.civic
-    ? turnsAt(researchCost(state, r.civic, true, cityState.seat) * FX - fxOf(r.civicProgress), fxOf(stats.total.culture)) : -1;
+  const turns = seatResearchTurns(state, cityState.seat);
   const has = new Set(city.buildings);
   const centre = state.map.tiles[cityState.centerIndex];
   const worship = minorWorship(state, cityState);
@@ -1259,8 +1258,6 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     balance: stats.amenities.have - stats.amenities.needed,
     yields: Object.fromEntries(Object.entries(key).map(([y, k]) => [y, stats.total[k]])),
   };
-  const techEntries = (r.aiEntries ?? []).map((e) => ({ id: e.tech, next: e.next, turns: e.turns, owned: e.owned }));
-  const civicEntries = (r.civicAiEntries ?? []).map((e) => ({ id: e.civic, next: e.next, turns: e.turns, owned: e.owned }));
   return {
     view,
     seat: cityState.seat,
@@ -1322,8 +1319,8 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     // its growth (`CityState.aiGrowth`); a city founded this turn, its own
     forecast: growthForecast(cityState.aiGrowth ?? minorCityGrowth(state, cityState)),
     current,
-    techTurns: (t) => analysedTurns(techEntries, t && engineId('tech', t, 'TECH_', TECHS), r.techs, r.tech, techLeft),
-    civicTurns: (c) => analysedTurns(civicEntries, c && engineId('civic', c, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft),
+    techTurns: turns,
+    civicTurns: turns,
     buildTurns: (type) => {
       const item = minorItemOfType(type);
       if (!item) return 500;

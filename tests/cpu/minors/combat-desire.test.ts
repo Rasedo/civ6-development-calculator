@@ -12,14 +12,14 @@ const STRENGTH: Record<string, number> = { WARRIOR: 20, SLINGER: 15, ARCHER: 25,
 /** minor 100 with its two Warriors; `recs` [owner, type] seen this turn in its area */
 function facts(recs: [number, string][], over: Partial<MilitaryFacts> = {}): MilitaryFacts {
   return {
-    best: 20, cities: 1, areas: new Set([1]), self: 100,
+    best: 20, cities: 1, regions: new Set([1]), self: 100,
     players: [
       { seat: 0, atWar: false, tribe: false, flagged: false },
       { seat: 100, atWar: false, tribe: false, flagged: false },
       { seat: 63, atWar: true, tribe: true, flagged: false },
     ],
     records: ([[100, 'WARRIOR'], [100, 'WARRIOR'], ...recs] as [number, string][]).map(([owner, type], i) => ({ id: i, owner, type, seen: 10, plot: 5, damage: 0 })),
-    areaOf: () => 1, strength: (t) => STRENGTH[t] ?? 0, turn: 10, queuedUnits: [], warFooting: false, threatened: false, standingArmy: 0,
+    regionOf: () => 1, strength: (t) => STRENGTH[t] ?? 0, turn: 10, queuedUnits: [], warFooting: false, threatened: false, standingArmy: 0,
     ...over,
   };
 }

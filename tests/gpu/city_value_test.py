@@ -695,7 +695,7 @@ class Mods:
     def unit_cost(self, u):
         return 40
 
-    def unit_turns(self, u, extra):
+    def item_turns(self, u, extra):
         return 8
 
     def unit_expected(self, u):

@@ -309,7 +309,7 @@
     - recording: 1124
       turn: 3
       value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
-  impl: [cpu/core/minorBuild.ts:techLeft]
+  impl: [cpu/core/majorCityBuild.ts:seatResearchTurns, cpu/core/minorBuild.ts:turns]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...x621920): the civics AI's entry turns plus the turns left on the civic in hand, live (0x39c1f0; -1 with none)."

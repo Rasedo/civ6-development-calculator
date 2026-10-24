@@ -24,11 +24,11 @@ import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { engineId } from '../data/aliases';
 import { COMBAT_POWER_SCALING } from '../data/constants';
-import { AI_UNITS } from '../data/aiBuildTables';
+import { AI_BUILDINGS, AI_DISTRICTS, AI_UNITS } from '../data/aiBuildTables';
 import {
   FX, discounted, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, whole, yieldValue, type AiPlotView, type AiValueView,
 } from './aiValue';
-import { AI_UNIT_INDEX, amenityPerTurn } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn } from './aiCityBuild';
 
 export interface AiRequirement {
   type: string;
@@ -486,9 +486,49 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     }
     return Math.max(n, 0) * 50;
   },
-  // 0x6c1a80 (BuildingType +8, DistrictType +0xc, Amount): with neither
-  // named, nothing (the rest of its body unread)
-  EFFECT_ADJUST_BUILDING_PRODUCTION: () => 0,
+  // 0x6c1a80 (its parser 0x6c1760: BuildingType +8, DistrictType +0xc,
+  // fx(Amount x 0.01f) +0x10; the building's PrereqTech +0x18, PrereqCivic
+  // +0x1c, PrereqDistrict +0x20, RequiresPlacement +0x14, its world copies
+  // full +0x15; a district's PrereqTech / PrereqCivic): a city subject.
+  // Lacking the building: none where its world copies are full, its
+  // district is not the city's, or it needs a placement (CityBuildAI
+  // 0x5d17b0, not read here); R the later of its tech's and civic's turns,
+  // none where start + R reaches the horizon; T0 / T1 its turns at the
+  // Production without and with the Amount; the Production a turn they save,
+  // (T0 - T1) x Cost / max(1, T0 x T1), bare Production, from start + R to
+  // start + R + T1 (at most the horizon). Holding it (or naming none): the
+  // district the same way (none where the city holds it), T0 / T1 each at
+  // least 1, the player's district cost
+  EFFECT_ADJUST_BUILDING_PRODUCTION: (t, args, s) => {
+    if (s.kind !== 'city') return 0;
+    const extra = pctOf(args);
+    const b = args.BuildingType ? AI_BUILDINGS[AI_BUILDING_INDEX.get(args.BuildingType) ?? -1] : undefined;
+    let tech: string | null;
+    let civic: string | null;
+    let type: string;
+    let cost: number;
+    let floor: number;
+    if (b && !t.view.cityHasBuilding(s.seat, s.id, b.type)) {
+      if (b.maxWorldInstances > 0 && t.view.buildingsBuilt(b.type) >= b.maxWorldInstances) return 0;
+      if (b.district && b.district !== 'DISTRICT_CITY_CENTER' && !t.view.cityHasDistrict(s.seat, s.id, b.district)) return 0;
+      if (b.placement) return 0;
+      ({ tech, civic, type, cost } = b);
+      floor = -Infinity;
+    } else {
+      const d = args.DistrictType ? AI_DISTRICTS.find((x) => x.type === args.DistrictType) : undefined;
+      if (!d || t.view.cityHasDistrict(s.seat, s.id, d.type)) return 0;
+      ({ tech, civic, type } = d);
+      cost = t.view.districtCost(s.seat, d.type);
+      floor = 1;
+    }
+    const r = Math.max(t.view.researchTurns(s.seat, tech), t.view.researchTurns(s.seat, civic));
+    if (t.start + r >= t.horizon) return 0;
+    const t0 = Math.max(floor, t.view.cityItemTurns(s.seat, s.id, type, 0));
+    const t1 = Math.max(floor, t.view.cityItemTurns(s.seat, s.id, type, extra));
+    const end = Math.min(t.start + t1 + r, t.horizon);
+    const v = fdiv(Math.floor(((t0 - t1) * FX * cost * FX) / FX), Math.max(1, t1 * t0) * FX);
+    return whole(yieldValue(null, null, presentValue(v, t.rate, end) - presentValue(v, t.rate, t.start + r), 'YIELD_PRODUCTION'));
+  },
   // 0x6b8ba0: a city subject only; the yield at the player's weight, valued
   // from the start to the horizon (0x7a2140)
   EFFECT_ADJUST_CITY_YIELD_CHANGE: (t, args, s) => {
@@ -773,7 +813,7 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const cities = t.owner ? [{ seat: t.owner.seat ?? t.seat, id: t.owner.cityId }] : t.view.cities(t.seat).map((c) => ({ seat: t.seat, id: c.id }));
     let sum = 0;
     for (const c of cities) {
-      const end = Math.min(t.start + t.view.cityUnitTurns(c.seat, c.id, unit, a), t.horizon);
+      const end = Math.min(t.start + t.view.cityItemTurns(c.seat, c.id, unit, a), t.horizon);
       const per = Math.floor((fxOf(t.view.cityYield(c.seat, c.id, 'YIELD_PRODUCTION')) * t.view.cityUnitExpected(c.seat, c.id, unit)) / FX);
       const v = Math.floor((a * per) / FX);
       sum += whole(yieldValue(null, null, presentValue(v, t.rate, end) - presentValue(v, t.rate, t.start), 'YIELD_PRODUCTION'));
