@@ -26,7 +26,7 @@
  * (the best melee a seat has trained, a city's culture expansions, a seat's
  * plot purchases) comes from a `History` folded over the earlier records.
  */
-import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, ResearchState, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
+import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, type MinorItem } from '../core/minorBuild';
 import { createGameFromMap } from '../core/game';
@@ -62,7 +62,8 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { GOVERNMENTS, POLICIES, type SlotKind } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { AGE_GOLDEN } from '../data/seats';
-import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, MINOR_CATCHUP_PCT } from '../data/cityStates';
+import { researchCost } from '../core/economy';
 import { PROMO_CLASSES } from '../data/promotions';
 import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -2697,22 +2698,32 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   state.riverNamed = history?.riverNamed ? [...history.riverNamed] : undefined;
   nameRivers(state);
   if (history && history.last === rec && state.riverNamed) history.riverNamed = [...state.riverNamed];
-  // a minor's catch-up has seen the record's majors' holdings: the progress
-  // the record shows is what their acquisitions left
+  // A MINOR'S CATCH-UP as the record leaves it: the record shows no item's
+  // progress but the one in hand, so every row the minor lacks that its
+  // catch-up has set (at least `need` of the record's majors hold it) stands
+  // at its cost less one where nothing else is shown (runs/h1_duelv1121
+  // Hunza t118: Civil Engineering and Nationalism 1 turn each, its
+  // Urbanization 117 = 115 + 1 + 1 as AI_GovtPolicies.csv logs), and the
+  // counts its catch-up has seen are the record's majors'
   const catchUpMajors = majorsAlive(state).map((s) => state.seats[s].research);
+  const catchUpNeed = Math.max(1, Math.floor((MINOR_CATCHUP_PCT * catchUpMajors.length + 50) / 100));
   for (const m of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
     const r = m.research;
-    const seen = (have: readonly string[], of: (x: ResearchState) => readonly string[], ids: readonly string[]) => {
+    const seen = (civic: boolean) => {
+      const have = civic ? r.civics : r.techs;
+      const kept = civic ? r.civicRetained : r.techRetained;
       const out: Record<string, number> = {};
-      for (const id of ids) {
+      for (const id of Object.keys(civic ? CIVICS : TECHS)) {
         if (have.includes(id)) continue;
-        const n = catchUpMajors.filter((x) => of(x).includes(id)).length;
-        if (n) out[id] = n;
+        const n = catchUpMajors.filter((x) => (civic ? x.civics : x.techs).includes(id)).length;
+        if (!n) continue;
+        out[id] = n;
+        if (n >= catchUpNeed && (civic ? r.civic : r.tech) !== id) kept[id] = Math.max(kept[id] ?? 0, researchCost(state, id, civic, m.seat) - 1);
       }
       return Object.keys(out).length ? out : undefined;
     };
-    const t = seen(r.techs, (x) => x.techs, Object.keys(TECHS));
-    const c = seen(r.civics, (x) => x.civics, Object.keys(CIVICS));
+    const t = seen(false);
+    const c = seen(true);
     if (t) r.techCatchUp = t;
     else delete r.techCatchUp;
     if (c) r.civicCatchUp = c;

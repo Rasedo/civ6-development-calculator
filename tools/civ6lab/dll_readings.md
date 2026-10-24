@@ -3200,7 +3200,11 @@ engines read it at the minor's turn (`minorCatchUp`, inline in
 the 50. The action replay counts the active major's research at the
 minors' starts as record t holds it plus what its own turn's actions
 completed that record t+1 confirms (1128 t20: Rome's Bronze Working boosted
-complete in its turn, Bologna's done at its own start of t20).
+complete in its turn, Bologna's done at its own start of t20). The record
+shows no progress but the item in hand's, so the importer stands every row
+a minor lacks that the record's majors hold enough of at its cost less one
+(1121 Hunza t118: Civil Engineering and Nationalism 1 turn each, Urbanization
+117 = 115 + 1 + 1, t121 102, t123 3, as AI_GovtPolicies.csv logs).
 
 ## C-96: the city-states' boosts — the records
 
