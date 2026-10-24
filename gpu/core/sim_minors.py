@@ -848,25 +848,28 @@ class SimMinors:
         live = self._barb_majors_alive()
         need = ((int(self.rules.citystate["catchUpPct"]) * live.sum(dim=1) + 50) // 100).clamp(min=1)
 
-        def catch_up(have, prog, cur, retain, rc, majors):
+        def catch_up(have, prog, cur, retain, rc, majors, seen):
             # THE CATCH-UP: a row the minor lacks that `need` living majors
-            # hold stands at its cost less one, never lowered
+            # hold, their count grown since its last turn (`seen`), is set at
+            # its cost less one
             n = rc.shape[1]
             col = torch.arange(n, device=self.device).unsqueeze(0)
             held = (majors[:, : self.n_majors] & live.unsqueeze(2)).sum(dim=1)
-            hit = (held >= need.unsqueeze(1)) & ~have[:, s] & alive.unsqueeze(1)
+            lack = ~have[:, s] & alive.unsqueeze(1)
+            hit = (held >= need.unsqueeze(1)) & (held > seen[:, s]) & lack
             if bool(hit.count_nonzero()):
                 c0 = cur[:, s]
                 floor = (rc - 1).to(retain.dtype)
                 on_cur = hit & (col == c0.unsqueeze(1))
-                retain[:, s] = torch.where(hit & ~on_cur, torch.maximum(retain[:, s], floor), retain[:, s])
+                retain[:, s] = torch.where(hit & ~on_cur, floor, retain[:, s])
                 cfloor = (rc - 1).gather(1, c0.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
-                prog[:, s] = torch.where(on_cur.any(dim=1), torch.maximum(prog[:, s], cfloor), prog[:, s])
+                prog[:, s] = torch.where(on_cur.any(dim=1), cfloor, prog[:, s])
+            seen[:, s] = torch.where(alive.unsqueeze(1), torch.where(lack, held, torch.zeros_like(held)), seen[:, s])
 
         # THE TECHNOLOGIES
         rc = self._research_cost(False)
         catch_up(self.citystate_techs, self.citystate_tech_prog, self.citystate_cur_tech, self.citystate_tech_retain, rc,
-                 self.civ_techs)
+                 self.civ_techs, self.citystate_tech_catch)
         prog = self.citystate_tech_prog
         prog[:, s] = torch.where(alive, prog[:, s] + sci + self.citystate_tech_ovf[:, s], prog[:, s])
         self.citystate_tech_ovf[:, s] = torch.where(alive, torch.zeros_like(self.citystate_tech_ovf[:, s]),
@@ -899,7 +902,7 @@ class SimMinors:
         retain, ovf = self.citystate_civic_retain, self.citystate_civic_ovf
         rc = self._research_cost(True)
         col = torch.arange(rc.shape[1], device=self.device).unsqueeze(0)
-        catch_up(have, prog, cur, retain, rc, self.civ_civics)
+        catch_up(have, prog, cur, retain, rc, self.civ_civics, self.citystate_civic_catch)
         # the turn's yield and the overflow
         prog[:, s] = torch.where(alive, prog[:, s] + cul + ovf[:, s], prog[:, s])
         ovf[:, s] = torch.where(alive, torch.zeros_like(ovf[:, s]), ovf[:, s])
@@ -1326,7 +1329,7 @@ class SimMinors:
 
     def _minor_building_ok(self, s: int, bi: int) -> torch.Tensor:
         """[B] — `minorBuildingOk`: the minor's own research unlocks building
-        `bi`; it is not already held; its district stands complete and clean
+        `bi`; it is not already held; its district stands complete, unpillaged and clean
         (the centre for a City Center row); the row it requires is held and
         the one it excludes is not; a Water Mill wants a river at the centre;
         a Flood Barrier wants Coastal Lowland; and CIV6: "While city defenses
@@ -1348,8 +1351,10 @@ class SimMinors:
             ok = ok & ~self._fallout()[bidx, ctr]
         else:
             home = self.city_dist_tile[:, row, 0, rq]
+            # the queue's CanConstruct (0x1714d0) refuses a building of a
+            # pillaged district (LOC_BUILDING_CONSTRUCT_DISTRICT_IS_PILLAGED)
             ok = ok & (home >= 0) & self.district_complete[bidx, home.clamp(min=0)] \
-                & ~self._fallout()[bidx, home.clamp(min=0)]
+                & ~self.district_pillaged[bidx, home.clamp(min=0)] & ~self._fallout()[bidx, home.clamp(min=0)]
         have = self.city_bldg[:, row, 0]
         reqs = self._b_req_buildings[bi]
         if reqs:
@@ -1692,8 +1697,8 @@ class SimMinors:
 
     def _free_building_ok(self, j: int, bi: int, techs: torch.Tensor, civics: torch.Tensor) -> torch.Tensor:
         """[B] — `freeCityBuildingOk`: the Free Cities' research unlocks
-        building `bi`; the city does not hold it; its district stands complete
-        and clean (the centre for a City Center row); the row it requires is
+        building `bi`; the city does not hold it; its district stands complete,
+        unpillaged and clean (the centre for a City Center row); the row it requires is
         held and the one it excludes is not; a Water Mill wants a river at the
         centre; and no higher Walls while the walls are damaged."""
         B, dev = self.B, self.device
@@ -1712,7 +1717,7 @@ class SimMinors:
         else:
             home = self.city_dist_tile[:, row, j, rq]
             ok = ok & (home >= 0) & self.district_complete[bidx, home.clamp(min=0)] \
-                & ~self._fallout()[bidx, home.clamp(min=0)]
+                & ~self.district_pillaged[bidx, home.clamp(min=0)] & ~self._fallout()[bidx, home.clamp(min=0)]
         have = self.city_bldg[:, row, j]
         reqs = self._b_req_buildings[bi]
         if reqs:

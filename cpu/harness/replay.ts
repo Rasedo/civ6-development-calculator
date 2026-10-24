@@ -93,7 +93,8 @@ import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, savingsTurn } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
 import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
-import { loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
+import { AI_UNITS } from '../data/aiBuildTables';
+import { loadCityBuildCentre, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
 import { buildingTable } from '../core/aiCityBuild';
 import { replayEvents } from './eventReplay';
 import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog';
@@ -422,6 +423,36 @@ function tallyResearchAi(ctx: Ctx, kind: ResearchParty, turn: number, player: nu
  *  to stderr */
 const TRACE = new Set((process.env.REPLAY_TRACE ?? '').split(',').filter(Boolean));
 let traceTurn = 0;
+let unitsLog: Map<string, Record<string, number[]>> | undefined;
+let armyLog: Map<string, string[]> | undefined;
+
+/** AI_Knowledge.csv's ARMY lines by `${turn}:${player}`: per line (the
+ *  players in the game's list, the line's index the player) and type
+ *  `${player}|${type} ${count} ${oldest age}` */
+function loadArmyLog(dumpPath: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_Knowledge.csv');
+  if (!existsSync(path)) return out;
+  const index = new Map<string, number>();
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const c = line.split(',');
+    if (c[2]?.trim() !== 'ARMY') continue;
+    const key = `${c[0].trim()}:${c[1].trim()}`;
+    const k = index.get(key) ?? 0;
+    index.set(key, k + 1);
+    const list = out.get(key) ?? (out.set(key, []), out.get(key)!);
+    for (const cell of c.slice(4)) {
+      const m = /^\s*UNIT_(\S+) (\d+) (\d+)/.exec(cell);
+      if (m) list.push(`${k}|${m[1]} ${m[2]} ${m[3]}`);
+    }
+  }
+  // the last two lines are the Free Cities' and the barbarians'
+  for (const [key, list] of out) {
+    const n = index.get(key)!;
+    out.set(key, list.map((x) => { const k = Number(x.slice(0, x.indexOf("|"))); return `${k === n - 1 ? 63 : k === n - 2 ? 62 : k}${x.slice(x.indexOf("|"))}`; }));
+  }
+  return out;
+}
 
 function count(ctx: Ctx, kind: string, out: Outcome, player?: number, why?: string): Outcome {
   if (out !== 'applied' && (TRACE.has(kind) || TRACE.has(kind.split(':')[0]))) console.error(`t${traceTurn} ${kind} ${out} p${player ?? '-'} ${why ?? ''}`);
@@ -3849,11 +3880,19 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // t+1 is read in its turn): theirs counts its research as record t
     // holds it (runs/h1_duelw1121: Rome's Code of Laws at its start of t4,
     // every minor's done at its own start of t4); every other major's start
-    // came before theirs, its research as record t+1 holds it
+    // came before theirs, its research as record t+1 holds it. What the
+    // active player's actions of the turn completed (a boost) it holds at
+    // their starts too: the engine's completions record t+1 confirms
+    // (runs/h1_duelv1128 t20: Rome's Bronze Working boosted complete in its
+    // turn, Bologna's done at its own start of t20)
     const active = state.seats[seatOfP(ctx, activePlayer(a))];
     holdMinorCatchUp(new Map(state.seats.map((s) => {
       const r = seatOf(s === active ? recordA.state : read.state, s.seat)?.research ?? s.research;
-      return [s.seat, { techs: [...r.techs], civics: [...r.civics] }] as const;
+      if (s !== active) return [s.seat, { techs: [...r.techs], civics: [...r.civics] }] as const;
+      const b = seatOf(read.state, s.seat)?.research;
+      const done = (have: readonly string[], ours: readonly string[], next: readonly string[] | undefined) =>
+        [...have, ...ours.filter((x) => !have.includes(x) && (next ?? []).includes(x))];
+      return [s.seat, { techs: done(r.techs, s.research.techs, b?.techs), civics: done(r.civics, s.research.civics, b?.civics) }] as const;
     })));
     // ...and the game era it opens comes after every other player's start and
     // actions of the pair: their research prices read the era before
@@ -4031,6 +4070,32 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         const name = pid === undefined ? undefined : a.cities.find((c) => c.owner === pid)?.name;
         const logged = name === undefined ? undefined : ctx.cityBuildLog.get(`${a.turn}:${pid}:${name}`);
         if (logged) tallyBuildings(ctx.cityBuild, a.turn, pid!, logged, buildingTable(minorBuildFacts(state, cs, minorKnownUnits(cs))), ctx.cityBuildPer);
+        // REPLAY_TRACE=minorUnits: the units table its update kept against the log's
+        const lu = TRACE.has('minorUnits') && name !== undefined ? (unitsLog ??= loadCityBuildCentre(dumpPath)).get(`${a.turn}:${pid}:${name}`)?.UNITS : undefined;
+        if (lu && cs.unitValues) {
+          const off = AI_UNITS.map((u, k) => [u.type.slice(5), lu[k], cs.unitValues![k] / 256] as const)
+            .filter(([, g, o]) => (g > -9000 || o > -9000) && Math.abs(g - o) > 0.0051).map(([u, g, o]) => `${u} ${g}/${o.toFixed(2)}`);
+          if (off.length) console.error(`t${a.turn} minorUnits p${pid} ${off.join(' ')}`);
+        }
+        // REPLAY_TRACE=minorKb: its knowledge base's army records (per player
+        // and type the count and the oldest's age) against AI_Knowledge.csv's
+        // ARMY lines of the turn
+        if (TRACE.has('minorKb') && pid !== undefined) {
+          armyLog ??= loadArmyLog(dumpPath);
+          const logged = armyLog.get(`${a.turn}:${pid}`) ?? [];
+          const by = new Map<string, { n: number; age: number }>();
+          for (const r of cs.armyKnown ?? []) {
+            const k = `${ctx.playerOfSeat.get(r.owner) ?? r.owner}|${r.type}`;
+            const e = by.get(k) ?? (by.set(k, { n: 0, age: 0 }), by.get(k)!);
+            e.n += 1;
+            e.age = Math.max(e.age, a.turn - r.seen);
+          }
+          const ours = [...by].map(([k, e]) => `${k} ${e.n} ${e.age}`).sort();
+          const theirs = logged.filter((x) => !x.includes("|SETTLER ")).sort();
+          if (ours.join(',') !== theirs.join(',')) {
+            console.error(`t${a.turn} minorKb p${pid} ours ${ours.filter((x) => !theirs.includes(x)).join(',')} log ${theirs.filter((x) => !ours.includes(x)).join(',')}`);
+          }
+        }
       }
     }
     // the city-states' research AI: each choice its turn made, against the

@@ -299,7 +299,8 @@ def _research_record(sim, b: int, s: int) -> list:
     """`researchRecord`'s twin for research row `s`: the techs held behind
     their count, the civics held behind theirs, each tree's progress, the
     items in hand, the goal, the overflows, the AI's turns left, the progress
-    kept per row, then each AI's last analysis behind a flag"""
+    kept per row, the catch-up's counts per row, then each AI's last analysis
+    behind a flag"""
     techs = [i for i, on in enumerate(sim.citystate_techs[b, s].tolist()) if on]
     civics = [i for i, on in enumerate(sim.citystate_civics[b, s].tolist()) if on]
     out = [len(techs), *techs, len(civics), *civics,
@@ -307,7 +308,8 @@ def _research_record(sim, b: int, s: int) -> list:
            int(sim.citystate_cur_tech[b, s]), int(sim.citystate_cur_civic[b, s]), int(sim.citystate_tech_goal[b, s]),
            float(sim.citystate_tech_ovf[b, s]), float(sim.citystate_civic_ovf[b, s]),
            int(sim.citystate_ai_left[b, s]), int(sim.citystate_ai_left_seen[b, s]),
-           *sim.citystate_tech_retain[b, s].tolist(), *sim.citystate_civic_retain[b, s].tolist()]
+           *sim.citystate_tech_retain[b, s].tolist(), *sim.citystate_civic_retain[b, s].tolist(),
+           *sim.citystate_tech_catch[b, s].tolist(), *sim.citystate_civic_catch[b, s].tolist()]
     tv = bool(sim.citystate_ai_valid[b, s])
     out.append(1 if tv else 0)
     if tv:
@@ -959,6 +961,8 @@ CITY_STATE = {
     "minorBarbKills": lambda sim, b, rows: [int(sim.citystate_barb_kills[b, s]) for s in rows],
     "minorTechRetained": lambda sim, b, rows: [sim.citystate_tech_retain[b, s].tolist() for s in rows],
     "minorCivicRetained": lambda sim, b, rows: [sim.citystate_civic_retain[b, s].tolist() for s in rows],
+    "minorTechCatchUp": lambda sim, b, rows: [sim.citystate_tech_catch[b, s].tolist() for s in rows],
+    "minorCivicCatchUp": lambda sim, b, rows: [sim.citystate_civic_catch[b, s].tolist() for s in rows],
     "prodProgress": lambda sim, b, rows: [float(sim.citystate_prod[b, s]) for s in rows],
     "minorProdItem": lambda sim, b, rows: [int(sim.citystate_item[b, s]) for s in rows],
     "minorProdOverflow": lambda sim, b, rows: [float(sim.citystate_ovf[b, s]) for s in rows],

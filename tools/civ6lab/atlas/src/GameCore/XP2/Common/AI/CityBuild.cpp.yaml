@@ -314,6 +314,7 @@
 - addr: 0x5cdd70
   kind: function
   status: PARTLY
+  impl: [cpu/core/minorBuild.ts:minorKnowledge]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"

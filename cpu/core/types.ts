@@ -209,6 +209,10 @@ export interface ResearchState {
    *  `techProgress` — so the two are a partition, never a sum. */
   techRetained: Record<string, number>;
   civicRetained: Record<string, number>;
+  /** a minor's catch-up (`minorCatchUp`): per row it lacks, how many majors
+   *  held it at its last turn */
+  techCatchUp?: Record<string, number>;
+  civicCatchUp?: Record<string, number>;
   /** CIV6 (m_xResearchOverflow / m_xCulturalOverflow): the pool a completion
    *  left with nothing current, set aside when the next item is picked and
    *  paid in with the next turn's Science / Culture (runs/h1_duelw1116 China

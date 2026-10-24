@@ -638,7 +638,8 @@ const GAME: Record<string, Extractor> = {
 
 /** a research record flat: the techs held behind their count, the civics
  *  held behind theirs, each tree's progress, the items in hand, the goal,
- *  the overflows, the AI's turns left, the progress kept per row, then each
+ *  the overflows, the AI's turns left, the progress kept per row, the
+ *  catch-up's counts per row, then each
  *  AI's last analysis behind a flag (none before the first) */
 function researchRecord(r: ResearchState | undefined): number[] {
   const techs = (r?.techs ?? []).map((x) => idx(TECH_IDX, x)).sort((a, b) => a - b);
@@ -652,6 +653,8 @@ function researchRecord(r: ResearchState | undefined): number[] {
     r?.techOverflow ?? 0, r?.civicOverflow ?? 0, r?.aiLeft ?? 0, r?.aiLeftSeen ?? 0,
     ...[...TECH_IDX.keys()].map((id) => r?.techRetained[id] ?? 0),
     ...[...CIVIC_IDX.keys()].map((id) => r?.civicRetained[id] ?? 0),
+    ...[...TECH_IDX.keys()].map((id) => r?.techCatchUp?.[id] ?? 0),
+    ...[...CIVIC_IDX.keys()].map((id) => r?.civicCatchUp?.[id] ?? 0),
     tents.size ? 1 : 0,
     ...(tents.size ? [...TECH_IDX.keys()].flatMap((id) => {
       const e = tents.get(id)!;
@@ -965,6 +968,8 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorBarbKills: overCityStates((cityState) => cityState.barbKills ?? 0),
   minorTechRetained: overCityStates((cityState) => [...TECH_IDX.keys()].map((id) => cityState.research.techRetained[id] ?? 0)),
   minorCivicRetained: overCityStates((cityState) => [...CIVIC_IDX.keys()].map((id) => cityState.research.civicRetained[id] ?? 0)),
+  minorTechCatchUp: overCityStates((cityState) => [...TECH_IDX.keys()].map((id) => cityState.research.techCatchUp?.[id] ?? 0)),
+  minorCivicCatchUp: overCityStates((cityState) => [...CIVIC_IDX.keys()].map((id) => cityState.research.civicCatchUp?.[id] ?? 0)),
   prodProgress: overCityStates((cityState) => cityState.prodProgress ?? 0),
   minorProdItem: overCityStates((cityState) => (cityState.prodItem ? minorItemIdx(cityState.prodItem) : -1)),
   minorProdOverflow: overCityStates((cityState) => cityState.prodOverflow ?? 0),

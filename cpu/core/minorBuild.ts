@@ -404,26 +404,40 @@ function minorUrbanFit(state: GameState, cityState: CityState): void {
  * next turn on it completes it (runs/h1_duelw1121: Rome's Code of Laws at t4
  * puts every minor's at 9 of 10, its Pottery at t6 theirs at 11 of 12;
  * China's Craftsmanship at t11 completes Ayutthaya's from 8.98 of 20). Read
- * at the minor's turn, after every major's of the turn, it never lowers what
- * the minor holds.
+ * at the minor's turn, after every major's of the turn: a row whose holders
+ * grew since its last turn (`ResearchState.techCatchUp`, the count it last
+ * saw) is SET at its cost less one, as each acquisition sets it — a later
+ * major's acquisition lowers what the first left where the row's cost fell
+ * between (runs/h1_duelv1128 Bologna's Iron Working: 59 of 60 from Rome's
+ * at t32, 47 of 48 from China's at t63, as recorded).
  */
 function minorCatchUp(state: GameState, r: ResearchState, civic: boolean, seat: number): void {
   const majors = majorsAlive(state).map((s) => catchUpHold?.get(s) ?? state.seats[s].research);
   const need = Math.max(1, Math.floor((MINOR_CATCHUP_PCT * majors.length + 50) / 100));
   const catalog: Record<string, { cost: number }> = civic ? CIVICS : TECHS;
   const have = civic ? r.civics : r.techs;
+  const seen: Record<string, number> = {};
+  const was = (civic ? r.civicCatchUp : r.techCatchUp) ?? {};
   for (const id of Object.keys(catalog)) {
     if (have.includes(id)) continue;
-    if (majors.filter((m) => (civic ? m.civics : m.techs).includes(id)).length < need) continue;
+    const held = majors.filter((m) => (civic ? m.civics : m.techs).includes(id)).length;
+    if (held) seen[id] = held;
+    if (held < need || held <= (was[id] ?? 0)) continue;
     const floor = researchCost(state, id, civic, seat) - 1;
     if ((civic ? r.civic : r.tech) === id) {
-      if (civic) r.civicProgress = Math.max(r.civicProgress, floor);
-      else r.techProgress = Math.max(r.techProgress, floor);
+      if (civic) r.civicProgress = floor;
+      else r.techProgress = floor;
     } else {
       const kept = civic ? r.civicRetained : r.techRetained;
-      kept[id] = Math.max(kept[id] ?? 0, floor);
+      kept[id] = floor;
     }
   }
+  const any = Object.keys(seen).length > 0;
+  if (civic) {
+    if (any) r.civicCatchUp = seen;
+    else delete r.civicCatchUp;
+  } else if (any) r.techCatchUp = seen;
+  else delete r.techCatchUp;
 }
 
 let catchUpHold: Map<number, { techs: readonly string[]; civics: readonly string[] }> | null = null;
@@ -633,7 +647,7 @@ export function minorBestOfClass(trainable: UnitDef[], cls: PromoClass): string 
 
 /** May the minor raise building `id` now? Its own research unlocks it (a
  *  worship building answers to its religion instead, `minorWorship`); it is
- *  not already held; its district stands complete and clean (the centre's
+ *  not already held; its district stands complete, unpillaged and clean (the centre's
  *  own for a City Center row); the row it requires is held and the one it
  *  excludes is not; a Water Mill wants a river at the centre; a Flood
  *  Barrier "must be built in a city with one or more Coastal Lowland tiles";
@@ -647,7 +661,9 @@ function minorBuildingOk(state: GameState, cityState: CityState, id: string, unl
   const home = def.district === 'CITY_CENTER' ? centre
     : (cityState.districts ?? []).map((d) => state.map.tiles[d.tileIndex])
       .find((t) => t.district === def.district && t.districtComplete);
-  if (!home || irradiated(home)) return false;
+  // the queue's CanConstruct (0x1714d0) refuses a building of a pillaged
+  // district (LOC_BUILDING_CONSTRUCT_DISTRICT_IS_PILLAGED)
+  if (!home || irradiated(home) || home.districtPillaged) return false;
   if (def.requiresAny?.length && !def.requiresAny.some((r) => held.includes(r))) return false;
   if (def.exclusiveWith?.some((x) => held.includes(x))) return false;
   if (def.special === 'WATER_MILL' && !hasRiver(centre)) return false;
@@ -1071,17 +1087,29 @@ export function minorKnowledge(state: GameState, cityState: CityState, age: bool
   knowledgeLook(state, cityState, cityState.seat, cityStateSight(state, cityState.seat), age);
   minorCampsLook(state, cityState);
 }
+/** A CITY'S PRIMARY REGIONS (0x700630, from the city analysis 0x5cdd70, into
+ *  the military AI's list +0x1290 +0x2f0): the region of its centre and, the
+ *  centre in a region, the region of every plot within three of it (the 37
+ *  city plots); a centre off any region adds none (runs/h1_duelv1128 t5
+ *  Bologna: its two Warriors on region 0 beside its centre's region 4 count
+ *  40 Regional Strength, as AI_Military.csv logs) */
+export function cityRegions(state: GameState, centerIndex: number): Set<number> {
+  const out = new Set<number>();
+  const c = state.map.tiles[centerIndex];
+  if (!c || (c.region ?? -1) < 0) return out;
+  for (const t of tilesWithin(state.map, c.col, c.row, 3)) if ((t.region ?? -1) >= 0) out.add(t.region!);
+  return out;
+}
+
 /** THE COMBAT DESIRE of a minor (`combatDesire`) at its military AI's turn,
- *  `turn` the one its knowledge base's records were last aged to: the
- *  region of its city, its unit in training, the players in the game's order —
- *  the majors, the city-states, the Free Cities, the barbarians (a tribe,
- *  always at war) — at war where its seat is; its city's threat and its
- *  standing army's shortfall as its last city update left them. Unread: the
- *  player flags (+0xc58 / +0xd18), taken as none. */
+ *  `turn` the one its knowledge base's records were last aged to: its
+ *  primary region list (`cityRegions`), its unit in training, the players in
+ *  the game's order — the majors, the city-states, the Free Cities, the
+ *  barbarians (a tribe, always at war) — at war where its seat is; its city's
+ *  threat and its standing army's shortfall as its last city update left
+ *  them. Unread: the player flags (+0xc58 / +0xd18), taken as none. */
 export function minorCombatDesire(state: GameState, cityState: CityState, turn: number): CombatDesire {
-  const centre = state.map.tiles[cityState.centerIndex];
-  const regions = new Set<number>();
-  if (centre && (centre.region ?? -1) >= 0) regions.add(centre.region!);
+  const regions = cityRegions(state, cityState.centerIndex);
   const wars = seatOf(state, cityState.seat)?.wars ?? [];
   const players = [
     ...state.seats.filter((s) => isCiv(s.seat)).map((s) => ({ seat: s.seat, atWar: wars.includes(s.seat), tribe: false, flagged: false })),
@@ -1692,8 +1720,8 @@ export function minorLump(state: GameState, cityState: CityState, key: 'food' | 
 }
 
 /** May the Free City raise building `id` now? The Free Cities' research
- *  unlocks it; the city does not hold it; its district stands complete and
- *  clean (the centre for a City Center row); the row it requires is held and
+ *  unlocks it; the city does not hold it; its district stands complete,
+ *  unpillaged and clean (the centre for a City Center row); the row it requires is held and
  *  the one it excludes is not; a Water Mill wants a river at the centre; and
  *  CIV6: "While city defenses are damaged, you cannot build higher levels of
  *  Walls." `minorBuildingOk`'s rule over a real city. */
@@ -1704,7 +1732,9 @@ function freeCityBuildingOk(state: GameState, city: City, id: string, unlocks: U
   const home = def.district === 'CITY_CENTER' ? centre
     : city.districts.map((d) => state.map.tiles[d.tileIndex])
       .find((t) => t.district === def.district && t.districtComplete);
-  if (!home || irradiated(home)) return false;
+  // the queue's CanConstruct (0x1714d0) refuses a building of a pillaged
+  // district (LOC_BUILDING_CONSTRUCT_DISTRICT_IS_PILLAGED)
+  if (!home || irradiated(home) || home.districtPillaged) return false;
   if (def.requiresAny?.length && !def.requiresAny.some((r) => city.buildings.includes(r))) return false;
   if (def.exclusiveWith?.some((x) => city.buildings.includes(x))) return false;
   if (def.special === 'WATER_MILL' && !hasRiver(centre)) return false;
@@ -1805,7 +1835,7 @@ function freeCityProjectFacts(state: GameState, city: City, facts: CityBuildFact
 
 /** What the Default Specialization reads of a Free City: the building held
  *  or in hand, CanConstruct (`constructibleNow` and the city's own rule:
- *  the Free Cities' research, its district complete and clean, its required
+ *  the Free Cities' research, its district complete, unpillaged and clean, its required
  *  and exclusive rows, a river for a Water Mill, intact walls below a higher
  *  wall), CanTrain (the Free Cities' research unlocks it, no civilization's
  *  unique, none faith-bought, spawned or a spy, none asking a strategic

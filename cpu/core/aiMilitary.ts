@@ -8,9 +8,10 @@
  *  - The yardstick B: the player's strongest melee unit trained (PlayerUnits
  *    +0xf0) or its city strike (+0x150, at least COMBAT_MINIMUM_CITY_STRIKE_
  *    STRENGTH), at least 1.
- *  - Each player's strength: over the military AI's regions (+0x2f0, its
- *    cities' Map_Region ids), the knowledge base's records of that player's
- *    units last seen in the region within two turns (0x5eb430 given no area
+ *  - Each player's strength: over the military AI's primary region list (+0x1290
+ *    +0x2f0: the Map_Region ids of every plot within three of its cities),
+ *    the knowledge base's records of that player's
+ *    units last seen in a region of the list within two turns (0x5eb430 given no area
  *    and the region, 0x3beb0's Map_Region: the record's +0x1c, its plot's
  *    region +0x18; age <= 2), each
  *    unit's max(Combat, RangedCombat) where it exceeds B - 20.
@@ -36,7 +37,7 @@ export interface MilitaryFacts {
   /** B: max(1, best melee trained, max(best city strike, 3)) */
   best: number;
   cities: number;
-  /** the military AI's regions (+0x2f0, Map_Region ids) */
+  /** the military AI's primary region list (+0x1290 +0x2f0, Map_Region ids) */
   regions: ReadonlySet<number>;
   self: number;
   /** the players in the game's order: at war with the player (0x469cd0 or

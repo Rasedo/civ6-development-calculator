@@ -266,6 +266,10 @@ class SimInit:
         self.citystate_cur_civic = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         self.citystate_tech_retain = torch.zeros(B, r_pad, len(rules.t_cost), dtype=torch.float64, device=device)
         self.citystate_civic_retain = torch.zeros(B, r_pad, len(rules.c_cost), dtype=torch.float64, device=device)
+        # the catch-up's count per row it lacks: the majors holding it at its last
+        # turn (`ResearchState.techCatchUp` / `civicCatchUp`)
+        self.citystate_tech_catch = torch.zeros(B, r_pad, len(rules.t_cost), dtype=torch.long, device=device)
+        self.citystate_civic_catch = torch.zeros(B, r_pad, len(rules.c_cost), dtype=torch.long, device=device)
         # the boosts each row holds and its barbarian kills (`ResearchState.boosted`,
         # `Seat.barbKills`): a city-state's own, the Free Cities' row unused
         self.citystate_tech_boosted = torch.zeros(B, r_pad, len(rules.t_cost), dtype=torch.bool, device=device)

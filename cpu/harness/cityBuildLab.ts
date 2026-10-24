@@ -34,7 +34,7 @@ import { buildingPerTurn, buildingTable, buildingTurns, buildingValue, defaultSp
 import { AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
 import { projectTable, projectValue } from '../core/aiProjectValue';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
-import { minorBuildFacts, minorCityGrowth, minorProjectFacts, minorCombatDesire, minorKnowledge, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
+import { minorBuildFacts, minorCityGrowth, minorProjectFacts, minorCombatDesire, minorKnowledge, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, minorResourceCounts, type MinorItem } from '../core/minorBuild';
 import { minorStandingArmy, minorThreat } from '../core/minorCityAi';
 import { researchAnalysis } from '../core/aiResearch';
 import { civicAnalysis } from '../core/aiCivics';
@@ -272,6 +272,8 @@ for (let i = 0; i + 1 < recs.length; i++) {
     // record before's citizens, store and surplus
     const before = prevImp!.minorOfPlayer.get(player);
     if (before && before.centerIndex >= 0) cs.aiGrowth = minorCityGrowth(prevImp!.state, before);
+    // the resource counts its last update kept (CityBuildAI +0x978)
+    if (before && before.centerIndex >= 0) cs.resourceCounts = Object.fromEntries(minorResourceCounts(prevImp!.state, before));
     const facts = minorBuildFacts(state, cs, args.includes('--enginekb') ? minorKnownUnits(cs) : (u) => kb?.get(u) ?? 0);
     // the inputs the port does not read, as the game's logs give them: the
     // trade AI's route value (AI_Knowledge.csv) and, under --zero, the

@@ -148,6 +148,22 @@
   context:
     - "...lain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not MustPurchase (Buildings +0x159 bi..."
   review: imported
+- addr: 0x1714d0
+  kind: function
+  name: CanConstruct
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1128
+      turn: 26
+      value: runs/h1_duelv1128   Nazca t26-t31, its Holy Site pillaged at t24, the pick's Shrine at 30.4   over the log's own tables, NO BUILDS AT ALL each turn;
+    - recording: h1_duelv1124
+      turn: 155
+      value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
+  impl: [cpu/core/minorBuild.ts:home, gpu/core/sim_minors.py:_minor_building_ok]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...0x5ca5a0 / 0x5ca450; with none, or the queue refusing it (0x5c9ea0's queue CanConstruct 0x1714d0, which the pick's 0x170450 is not: a building of a pillaged district refused, its byte..."
+  review: imported
 - addr: 0x172820
   final: 0xf86d0
   kind: function

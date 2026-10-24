@@ -3188,9 +3188,19 @@ CivicCompleted), its Pottery at t6 theirs at 11 of 12, Bronze Working at
 t22 Antioch's 10.5 at 39 of 40; China's Craftsmanship at t11 completes
 Ayutthaya's from 8.98 of 20 at its own start; 1124 Rome's Mining at t17
 Cardiff's at 11 of 12. A major's progress is not touched (China's Code of
-Laws 4.59 of 10 at 1121 t4). The engines read it at the minor's turn
-(`minorCatchUp`, inline in `_minor_research`) and never lower the
-progress; MINOR_CATCHUP_PCT is the 50.
+Laws 4.59 of 10 at 1121 t4). Each acquisition SETS the progress, at the
+cost of the moment: a second major's acquisition lowers what the first
+left where the row's cost fell between (runs/h1_duelv1128 Bologna's Iron
+Working: 59 of 60 from Rome's at t32, 47 of 48 at record t64 after China's
+at t63, its Engineering's 99 of 80 kept with no second acquisition). The
+engines read it at the minor's turn (`minorCatchUp`, inline in
+`_minor_research`): a row whose holders grew since the minor's last turn
+(`ResearchState.techCatchUp` / `civicCatchUp`, `citystate_tech_catch` /
+`citystate_civic_catch`) is set at its cost less one; MINOR_CATCHUP_PCT is
+the 50. The action replay counts the active major's research at the
+minors' starts as record t holds it plus what its own turn's actions
+completed that record t+1 confirms (1128 t20: Rome's Bronze Working boosted
+complete in its turn, Bologna's done at its own start of t20).
 
 ## C-96: the city-states' boosts — the records
 
@@ -3549,7 +3559,12 @@ building tables).
   (its vt +0x38). Else the building wins at least the unit's and the
   project's value, else the unit at least the project's, else the project,
   queued by 0x5c9ea0 / 0x5ca5a0 / 0x5ca450; with none, or the queue refusing
-  it, 0x5d2810's item for a full civilization ("Generic Offense"), "NO BUILDS
+  it (0x5c9ea0's queue CanConstruct 0x1714d0, which the pick's 0x170450 is
+  not: a building of a pillaged district refused, its byte [rbp-0x16] ->
+  LOC_BUILDING_CONSTRUCT_DISTRICT_IS_PILLAGED at 0x1716d2; runs/h1_duelv1128
+  Nazca t26-t31, its Holy Site pillaged at t24, the pick's Shrine at 30.4
+  over the log's own tables, NO BUILDS AT ALL each turn; `minorBuildingOk` /
+  `_minor_building_ok`, the Free Cities' alike), 0x5d2810's item for a full civilization ("Generic Offense"), "NO BUILDS
   AT ALL (maybe city was nuked?)" for any other. The log line is the pick
   and its value; the second hook 0x5ce5b0 runs it again (two NO BUILDS lines
   a turn). MEASURED (`cityBuildLab.ts`, the five verbose duels, every
@@ -3994,7 +4009,8 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   0x7204bc): the yardstick B = max(1, PlayerUnits +0xf0 (the best melee
   Combat made), 0x4bd030 = max(+0x150, COMBAT_MINIMUM_CITY_STRIKE_STRENGTH));
   per player in the players list (0x483b50 +0x50) the strength summed over
-  the military AI's region list (+0x1290 +0x2f0) of the records 0x5eb430
+  the military AI's primary region list (+0x1290 +0x2f0, "THE REGION
+  LISTS": every region within three of its cities) of the records 0x5eb430
   returns — called with no area (r8 null) and the region object 0x3beb0
   looks up by id on the map's region list (map vt +0x108, the lookup
   0x6fa5e0's region lists take too), so the record's +0x1c, its plot's
@@ -5514,8 +5530,15 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   fallback"). The unit's plot joins the chosen.
 - THE REGION LISTS (+0x1290: the double-buffered lists +0x298 -> +0x2f0,
   +0x308 -> +0x360, +0x378 -> +0x3d0). The primary: the region of a city's
-  plot and of each plot round it (0x700630 from the city analysis 0x5cdd70,
-  through 0x6fa5e0), the secondary the regions across those regions'
+  plot and, where that plot has a region (plot +0x18 set), the region of
+  each of its city plots 0..36 (0x700630 from the city analysis 0x5cdd70:
+  the count 0x5cbc0(2) + 18 = 37, f(0) = 1, f(n) = f(n-1) + 6n; each plot
+  through 0x5d1e0 -> 0x5d000, off the map or off any region skipped, one
+  equal to the centre's skipped; each added through 0x6fa5e0) — every
+  region within three of the centre (runs/h1_duelv1128 t5 / t10-12
+  Bologna: its two Warriors on region 0, its centre on region 4, Regional
+  Strength 40 as AI_Military.csv logs, the Combat Desire 0.0, its UNITS
+  table as logged; `cityRegions` / `_city_regions`), the secondary the regions across those regions'
   chokepoints (0x6fe240 / 0x6febc0) not already primary — a player with no
   city holds neither. The tertiary: the tactical target list (0x783980)
   gathers into a set every region of a plot its player sees (+0x290 count

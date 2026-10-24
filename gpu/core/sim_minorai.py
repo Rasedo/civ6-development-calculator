@@ -419,11 +419,21 @@ class SimMinorAi:
             out[:, :, k] = ok
         return out
 
+    def _city_regions(self, centre: torch.Tensor) -> torch.Tensor:
+        """[B, 37] `cityRegions` — A CITY'S PRIMARY REGIONS (0x700630): the
+        region of every plot within three of the centre `centre` ([B]), -1
+        past the map's edge, off any region, and everywhere where the centre
+        is off any region or no city stands"""
+        disk = self._cv_disk3(centre)
+        reg = torch.where(disk >= 0, self.tile_region.gather(1, disk.clamp(min=0)), torch.full_like(disk, -1))
+        own = reg[:, 0]
+        return torch.where(((centre >= 0) & (own >= 0)).unsqueeze(1), reg, torch.full_like(reg, -1))
+
     def _minor_combat_desire(self, s: int) -> None:
         """`minorCombatDesire` — THE COMBAT DESIRE of minor `s` at its
         military AI's turn (`citystate_combat_desire`, raw 24.8, its
         PSEUDOYIELD_UNIT_COMBAT weight), on the records as its last update
-        aged them (the turn before): the region of its city, its unit in
+        aged them (the turn before): its primary regions (`_city_regions`), its unit in
         training, the players in the game's order — the majors, the
         city-states, the Free Cities, the barbarians (a tribe, always at war)
         — at war where its seat is; on turn 1 it holds no city (the game's
@@ -451,11 +461,11 @@ class SimMinorAi:
         seen = self.citystate_kb_seen[:, s].long()
         plot = self.citystate_kb_plot[:, s].long()
         centre = self.citystate_center[:, s]
-        area = torch.where(centre >= 0, self.tile_region.gather(1, centre.clamp(min=0).unsqueeze(1)).squeeze(1),
-                           torch.full_like(centre, -1))
+        regions = self._city_regions(centre)
         rec_area = self.tile_region.gather(1, plot.clamp(min=0))
         turn = int(self.turn) - 1
-        counted = (slot != -2) & (turn - seen <= 2) & (area >= 0).unsqueeze(1) & (rec_area == area.unsqueeze(1))
+        in_list = ((rec_area.unsqueeze(2) == regions.unsqueeze(1)) & (regions >= 0).unsqueeze(1)).any(dim=2)
+        counted = (slot != -2) & (turn - seen <= 2) & in_list
         strength = strength_of(typ)
         best = torch.maximum(torch.maximum(torch.ones_like(centre), self.citystate_best_melee[:, s].long()),
                              self.citystate_best_ranged[:, s].long().clamp(min=self._city_min_strike))

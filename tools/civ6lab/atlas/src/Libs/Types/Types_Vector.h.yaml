@@ -337,11 +337,17 @@
   final: 0x4b5160
   kind: function
   name: settleRegionLists
-  semantics: a city's settle values, and its plot's region and its neighbours' to the primary region list (0x6fa5e0)
-  status: PARTLY
+  semantics: a city's settle values (SETTLEMENT_ADDITIONAL_VALUE_PER_CITY x cities + SETTLEMENT_MIN_VALUE_NEEDED), and the region of its plot and, that plot in a region, of each of its 37 city plots to the primary region list (0x6fa5e0)
+  status: READ
+  impl:
+    - cpu/core/minorBuild.ts:cityRegions
+    - gpu/core/sim_minorai.py:_city_regions
+  cases:
+    - recording: h1_duelv1128
+      turn: 5
+      value: "Bologna's two Warriors on region 0 beside its centre's region 4: Regional Strength 40, Combat Desire 0.0 (AI_Military.csv), its UNITS table as logged"
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...+0x378 -> +0x3d0). The primary: the region of a city's plot and of each plot round it (0x700630 from the city analysis 0x5cdd70, through 0x6fa5e0), the secondary the regions across th..."
   review: reviewed

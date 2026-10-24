@@ -26,11 +26,11 @@
  * (the best melee a seat has trained, a city's culture expansions, a seat's
  * plot purchases) comes from a `History` folded over the earlier records.
  */
-import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
+import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, ResearchState, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, type MinorItem } from '../core/minorBuild';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, setMetTurnWith } from '../core/seats';
+import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, majorsAlive, setMetTurnWith } from '../core/seats';
 import { routeOriginCenter, stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
@@ -2694,6 +2694,27 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   state.riverNamed = history?.riverNamed ? [...history.riverNamed] : undefined;
   nameRivers(state);
   if (history && history.last === rec && state.riverNamed) history.riverNamed = [...state.riverNamed];
+  // a minor's catch-up has seen the record's majors' holdings: the progress
+  // the record shows is what their acquisitions left
+  const catchUpMajors = majorsAlive(state).map((s) => state.seats[s].research);
+  for (const m of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
+    const r = m.research;
+    const seen = (have: readonly string[], of: (x: ResearchState) => readonly string[], ids: readonly string[]) => {
+      const out: Record<string, number> = {};
+      for (const id of ids) {
+        if (have.includes(id)) continue;
+        const n = catchUpMajors.filter((x) => of(x).includes(id)).length;
+        if (n) out[id] = n;
+      }
+      return Object.keys(out).length ? out : undefined;
+    };
+    const t = seen(r.techs, (x) => x.techs, Object.keys(TECHS));
+    const c = seen(r.civics, (x) => x.civics, Object.keys(CIVICS));
+    if (t) r.techCatchUp = t;
+    else delete r.techCatchUp;
+    if (c) r.civicCatchUp = c;
+    else delete r.civicCatchUp;
+  }
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
