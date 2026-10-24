@@ -1143,7 +1143,7 @@ class SimMinorOps:
             v = torch.where(skipped, BT_SKIPPED, v)
             c.st[:, i] = torch.where(at, v, c.st[:, i])
             if n["type"] == "Naval Choose Target":
-                own = torch.full_like(cur, n["end"])
+                own = torch.where(run & (c.ma[:, i] == 1), torch.full_like(cur, i + 1), torch.full_like(cur, n["end"]))
             elif n["type"] in _NEXT_MEM:
                 own = torch.where(c.ma[:, i] == NONE, n["first"], c.ma[:, i])
             elif n["type"] == "Sequence":
@@ -2277,8 +2277,7 @@ def _x_naval_patrol(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """NAVAL PATROL's execution (0x803060): over the operation's units in the
     player's unit order (pool order), each alive with Movement left takes HL
     Explore's target (`_tac_explore_pick` on a chosen list of its own, the
-    fallbacks taken), its turn done, and moves there (no line). Naval
-    Pillage's execution (0x803250) is unported."""
+    fallbacks taken), its turn done, and moves there (no line)."""
     s, k = c.s, c.k
     dev = sim.device
     B, T = sim.B, sim.T
@@ -2310,14 +2309,112 @@ def _x_naval_patrol(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         sim._mops_move(s, us, pick, ok & (pick >= 0))
 
 
+def _x_naval_pillage(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
+    """NAVAL PILLAGE's execution (0x803250, `passNavalPillage`): the operation's
+    units alive with Movement left listed (pool order); then each listed unit
+    still with Movement left and a planning takes the first of its planning's
+    targets that is a COMBAT_DISTRICT with a spot, else — a unit with a range
+    — the first LOW, MEDIUM or HIGH one; the attack assignment of the whole
+    list over that one target (no exchange filter, the survival filter on)
+    carried out"""
+    s, k = c.s, c.k
+    view = c.view
+    op, tg, done = view["op"], view["tg"], view["done"]
+    if op["tg"] is None:
+        return
+    res, rowof = op["res"], op["rowof"]
+    dev = sim.device
+    B, T = sim.B, sim.T
+    b = torch.arange(B, device=dev)
+    seat = 100 + s
+    mem = sim.mops_mem[:, s, k].reshape(B, -1)
+    mc = mem.clamp(min=0)
+    key = torch.where(mem >= 0, sim.major_unit_pslot.gather(1, mc).clamp(min=0), torch.full_like(mem, 1 << 30))
+    mem = mem.gather(1, key.argsort(dim=1, stable=True))
+
+    def live(us: torch.Tensor) -> torch.Tensor:
+        uc = us.clamp(min=0)
+        return ((us >= 0) & sim.major_unit_alive[b, uc] & (sim.major_unit_seat[b, uc] == seat)
+                & (sim.major_unit_tile[b, uc] >= 0) & (sim.major_unit_mp[b, uc] > 0))
+    listed = torch.zeros_like(sim.major_unit_alive)
+    for j in range(mem.shape[1]):
+        us = mem[:, j]
+        ok = on & live(us)
+        listed[b[ok], us[ok]] = True
+    if not bool(listed.any()):
+        return
+    uk = tg["uk"]
+    ai = torch.where(op["units"], torch.where(sim.major_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
+    peers = sim._tac_peers(listed, "major")
+    for j in range(mem.shape[1]):
+        us = mem[:, j]
+        uc = us.clamp(min=0)
+        ok = on & live(us) & listed[b, uc] & (rowof[b, uc] >= 0)
+        if not bool(ok.any()):
+            continue
+        r = rowof[b, uc].clamp(min=0)
+        tp, te, sn = res["tp"][r], res["te"][r], res["spot_n"][r]
+        dist_e = (tp >= 0) & (te < 0) & (sn > 0)
+        kd = uk.gather(1, te.clamp(min=0))
+        fighter = (tp >= 0) & (te >= 0) & (kd >= 1) & (kd <= 3)
+        d_has = ok & dist_e.any(dim=1)
+        u_has = ok & ~d_has & (sim._tac_range(b, uc, "major") > 0) & fighter.any(dim=1)
+        cand = listed & (rowof >= 0)
+        if bool(d_has.any()):
+            e = dist_e.long().argmax(dim=1)
+            plot = tp.gather(1, e.unsqueeze(1)).squeeze(1)
+            near = torch.zeros(B, T, dtype=torch.bool, device=dev)
+            near[b[d_has], plot[d_has]] = True
+            out = sim._tac_assign(cand & d_has.unsqueeze(1), op["order"], ai, near, res, rowof, tg["uu"],
+                                  torch.zeros_like(on), True, torch.zeros_like(tg["dk"]), sim._arange_bt, peers,
+                                  "major", seat, district=True)
+            sim._tac_carry_out(out, done, rowof, res, "major", seat)
+        if bool(u_has.any()):
+            e = fighter.long().argmax(dim=1)
+            ent = te.gather(1, e.unsqueeze(1)).squeeze(1)
+            near = torch.zeros_like(uk, dtype=torch.bool)
+            near[b[u_has], ent[u_has]] = True
+            out = sim._tac_assign(cand & u_has.unsqueeze(1), op["order"], ai, near, res, rowof, tg["uu"],
+                                  torch.zeros_like(on), True, uk, tg["uo"], peers, "major", seat)
+            sim._tac_carry_out(out, done, rowof, res, "major", seat)
+
+
 def _u_naval_choose(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
-    """NAVAL CHOOSE TARGET (0x803590): of the targets of its domain the
-    tactical analysis lists, the nearest the operation's target becomes the
-    target and its children run; with none the walk skips them (the tick's
-    cursor to the node's end), FAILURE where the node says Fail for no
-    target. The minor's naval targets are not listed here: none is found."""
-    v = BT_FAILURE if c.tree.flag(i, "Fail for no target") else BT_SUCCESS
-    return torch.full_like(c.ref, v)
+    """NAVAL CHOOSE TARGET (0x803590, its list 0x802ea0): of the minor's
+    tactical target list, the unit targets (civilian through high priority:
+    the list's kinds 1-3 and 7) on a plot of the node's Target Domain
+    (DOMAIN_SEA: water; any other, the default DOMAIN_LAND among them:
+    land), the nearest the operation's target, the first of equals in the
+    list's order, becomes its target and rally with each team's goals
+    (0x73e7d0) and its children run (`ma` 1: the tick's cursor to its first
+    child), SUCCESS; with none the walk skips them (the cursor to the node's
+    end), FAILURE where the node says Fail for no target (unset: it does),
+    else SUCCESS"""
+    s, k = c.s, c.k
+    B, T, dev = sim.B, sim.T, sim.device
+    tg = c.view["tg"]
+    sea = (c.tree.value(i, "Target Domain") or "DOMAIN_LAND") == "DOMAIN_SEA"
+    fl = c.tree.flag(i, "Fail for no target")
+    fail = True if fl is None else bool(fl)
+    uk, uo = tg["uk"], tg["uo"]
+    L = uk.shape[1] // T
+    kind = (uk == 1) | (uk == 2) | (uk == 3) | (uk == 7)
+    ok = kind & (sim.water.repeat(1, L) == sea)
+    tgt = sim.mops_target[:, s, k]
+    d = sim.pair_dist[tgt.clamp(min=0)].to(torch.long).repeat(1, L)
+    big = 1 << 62
+    key = torch.where(ok, (d << 32) + uo, torch.full_like(uo, big))
+    kmin, j = key.min(dim=1)
+    has = at & (kmin < big)
+    best = j % T
+    sim.mops_target[:, s, k] = torch.where(has, best, sim.mops_target[:, s, k])
+    sim.mops_rally[:, s, k] = torch.where(has, best, sim.mops_rally[:, s, k])
+    g = sim.mops_goal[:, s, k]
+    tm = sim.mops_tm[:, s, k] >= 0
+    for slot in (G_RALLY, G_TARGET):
+        g[:, :, slot] = torch.where(has.unsqueeze(1) & tm, best.unsqueeze(1), g[:, :, slot])
+    c.ma[:, i] = torch.where(at, has.long(), c.ma[:, i])
+    return torch.where(has, BT_SUCCESS, BT_FAILURE if fail else BT_SUCCESS)
 
 
 _UPDATE = {
@@ -2347,5 +2444,6 @@ _EXECUTE = {
     "Operation Attack": _x_operation_attack,
     "Garrison City": _x_garrison,
     "Operation Attack City": _x_attack_city,
+    "Naval Pillage": _x_naval_pillage,
     "Naval Patrol": _x_naval_patrol,
 }

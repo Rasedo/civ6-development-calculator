@@ -6,9 +6,13 @@
 - addr: 0x803590
   final: 0x566a50
   kind: function
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 54
+      value: "city-state 3's Galley: Operation Move from t54 under Naval Choose Target"
   impl: [cpu/core/operations/nodes.ts:navalChooseTarget, gpu/core/sim_minorops.py:_u_naval_choose]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "- PARTLY READ / unread: Naval Choose Target 0x803590 (the tactical analysis's target list by domain 0x802ea0 unread: the port finds none and..."
-  review: imported
+  review: reviewed

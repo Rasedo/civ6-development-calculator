@@ -12,7 +12,7 @@ import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { attacksLeftOf } from './promotions';
 import { cityStrikeStrength, damageExpected, hostileRangedStrike, unitAttackRange } from './combat';
-import { aiStrengths, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passPatrol, passSafePlot, plotDistance, rangeOf,
+import { aiStrengths, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passNavalPillage, passPatrol, passSafePlot, plotDistance, rangeOf,
   type Pass } from './tactical';
 import type { OpsEnv } from './operations/manager';
 import type { DefendOrders } from './operations/nodes';
@@ -223,7 +223,7 @@ export function ownAiType(state: GameState, seat: number, pass: Pass | null): Op
 
 /** the orders of `seat`'s operations in `pass`; `changed` after each */
 export function passOrders(state: GameState, seat: number, pass: Pass, changed: () => void):
-  Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend' | 'patrol'> {
+  Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend' | 'patrol' | 'pillage'> {
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id && u.seat === seat);
   return {
     move: (id, dest) => {
@@ -262,6 +262,10 @@ export function passOrders(state: GameState, seat: number, pass: Pass, changed: 
         passPatrol(state, pass, u);
         changed();
       }
+    },
+    pillage: (ids) => {
+      passNavalPillage(state, pass, ids.map(unitOf).filter((u): u is Unit => !!u).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0)));
+      changed();
     },
   };
 }

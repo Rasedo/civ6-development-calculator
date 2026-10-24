@@ -7,7 +7,7 @@
  * rows through the context's `act`, the view then read anew.
  */
 import type { OpsSettle } from './types';
-import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
+import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SKIPPED, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
   type BtHandler, type BtNode, type BtRun } from '../behaviorTree';
 import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opDef, opUnit, opUnits, targetGone, teamDef, teamReqs, unitsById, xy, type OpTeam,
   type Operation } from './operation';
@@ -87,6 +87,10 @@ export interface OpsContext {
    *  unit order: each with Movement left takes HL Explore's target and moves
    *  there, its turn done; none, the node moves no unit */
   patrol?: (ids: readonly number[]) => void;
+  /** NAVAL PILLAGE's execution for the units (0x803250), in the player's
+   *  unit order: their blows on their planning's district or unit target;
+   *  none, the node strikes nothing */
+  pillage?: (ids: readonly number[]) => void;
   /** the units take their type's own AI type (0x79b9c0: COMBAT for a
    *  fighting unit), a standing army's DEFENDER among them leaving it */
   ownAiType(ids: readonly number[]): void;
@@ -657,10 +661,16 @@ const operationAttackUnits: BtHandler<OpsContext> = {
 };
 
 // NAVAL PATROL, NAVAL PILLAGE (0x803880): RUNNING while the operation holds
-// units, else FAILURE. Naval Pillage's execution (0x803250: its units' blows
-// on the planning's district and unit targets) is unported
+// units, else FAILURE
 const navalUnitsRunning: BtHandler<OpsContext> = {
   update: (_node, _run, ctx) => (opUnits(ctx.op).length > 0 ? BT_RUNNING : BT_FAILURE),
+};
+
+// NAVAL PILLAGE's execution (0x803250): the operation's units' blows on
+// their planning's district or unit target (no line)
+const navalPillage: BtHandler<OpsContext> = {
+  ...navalUnitsRunning,
+  execute: (_node, _run, ctx) => ctx.pillage?.(opUnits(ctx.op)),
 };
 
 // NAVAL PATROL's execution (0x803060): the operation's units, each with
@@ -670,16 +680,45 @@ const navalPatrol: BtHandler<OpsContext> = {
   execute: (_node, _run, ctx) => ctx.patrol?.(opUnits(ctx.op)),
 };
 
-// NAVAL CHOOSE TARGET (0x803590): of the targets of its domain the
-// tactical analysis lists, the nearest the operation's target becomes the
-// target and its children run; with none the walk skips them, FAILURE where
-// the node says Fail for no target. The seat's naval targets are not listed
-// here: none is found.
+/** the unit targets Naval Choose Target's list takes (0x802ea0:
+ *  TARGET_CIVILIAN_UNIT through TARGET_HIGH_PRIORITY_UNIT) */
+const NAVAL_CHOOSE_TYPES = new Set(['CIVILIAN', 'LOW', 'MEDIUM', 'HIGH']);
+
+// NAVAL CHOOSE TARGET (0x803590, its list 0x802ea0): of the seat's tactical
+// target list, the unit targets (civilian through high priority) on a plot
+// of the node's Target Domain (DOMAIN_SEA: water; any other, the default
+// DOMAIN_LAND among them: land), the nearest the operation's target, the
+// first of equals, becomes its target and rally with each team's goals
+// (0x73e7d0) and its children run, SUCCESS; with none the walk skips them,
+// FAILURE where the node says Fail for no target (unset: it does), else
+// SUCCESS
 const navalChooseTarget: BtHandler<OpsContext> = {
-  update(node) {
-    return dataBool(node, 'Fail for no target') ? BT_FAILURE : BT_SUCCESS;
+  update(node, run, ctx) {
+    const v = ctx.view();
+    const P = v.plots();
+    const sea = (dataValue(node, 'Target Domain') ?? 'DOMAIN_LAND') === 'DOMAIN_SEA';
+    let best = NO_PLOT;
+    let bd = Infinity;
+    for (const t of v.attackTargets(ctx.seat)) {
+      if (!NAVAL_CHOOSE_TYPES.has(t.type) || t.plot < 0 || !!P[t.plot].water !== sea) continue;
+      const d = ctx.op.target >= 0 ? v.plotDistance(ctx.op.target, t.plot) : 0;
+      if (best !== NO_PLOT && d >= bd) continue;
+      best = t.plot;
+      bd = d;
+    }
+    const m = run.mem[node.index];
+    m.found = best !== NO_PLOT;
+    if (best === NO_PLOT) return (dataBool(node, 'Fail for no target') ?? true) ? BT_FAILURE : BT_SUCCESS;
+    const op = ctx.op;
+    op.target = best;
+    op.rally = best;
+    for (const t of op.teams) {
+      t.goals[0] = best;
+      t.goals[1] = best;
+    }
+    return BT_SUCCESS;
   },
-  next: (node) => node.end,
+  next: (node, run) => (run.mem[node.index].found && run.status[node.index] !== BT_SKIPPED ? node.index + 1 : node.end),
 };
 
 // OPERATION IS READY (0x81a090): every team's minimums met
@@ -755,7 +794,7 @@ export const OP_NODES: Readonly<Record<string, BtHandler<OpsContext>>> = {
   ...BARBARIAN_NODES,
   'Operation Attack':{ ...operationAttack, execute: operationAttackExecute },
   'Naval Patrol': navalPatrol,
-  'Naval Pillage': navalUnitsRunning,
+  'Naval Pillage': navalPillage,
   'Naval Choose Target': navalChooseTarget,
   'Operation Naval Escort': success,
   Settle: settle,

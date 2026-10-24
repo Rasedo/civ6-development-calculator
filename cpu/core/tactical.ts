@@ -2184,6 +2184,30 @@ export function passPatrol(state: GameState, pass: Pass, u: Unit): void {
   if (t) moveTo(state, u, t.plot, false);
 }
 
+/** NAVAL PILLAGE's execution (0x803250) over its operation's units (in the
+ *  player's unit order): those alive with Movement left listed; then each
+ *  listed unit still with Movement left and a planning takes the first of
+ *  its planning's targets that is a COMBAT_DISTRICT with a spot (entry
+ *  +0x18 read as the spots' count), else — a unit with a range (0x56e3d0)
+ *  — the first LOW, MEDIUM or HIGH one; the attack assignment of the whole
+ *  list over that one target (0x802cf0: the target list's entries of it;
+ *  0x776140 with no exchange filter, the survival filter on) carried out
+ *  (0x771f80) */
+export function passNavalPillage(state: GameState, pass: Pass, units: readonly Unit[]): void {
+  const list = units.filter((u) => state.units.includes(u) && u.movesLeft > 0);
+  const ids = list.map((u) => u.id);
+  for (const u of list) {
+    if (!state.units.includes(u) || u.movesLeft <= 0) continue;
+    const plan = pass.plan.get(u.id);
+    if (!plan) continue;
+    const e = plan.entries.find((x) => x.target.type === 'COMBAT_DISTRICT' && x.spots.length > 0)
+      ?? (rangeOf(u) > 0 ? plan.entries.find((x) => FIGHTER_TARGET.has(x.target.type)) : undefined);
+    if (!e) continue;
+    const k = pass.targets.indexOf(e.target);
+    passAttack(state, pass, ids, (j) => j === k, false, true, 'Operation');
+  }
+}
+
 /** WANDER NEAR CITY's radius (0x77bf50: the plots within 5 of the city) */
 const WANDER_CITY_RANGE = 5;
 /** the radius FindAlternateLocation searches round the city (0x77bf50 -> 0x585940) */

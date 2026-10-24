@@ -3029,6 +3029,14 @@
   context:
     - ...x775340; for MEDIUM / LOW a ranged unit's spot at exactly its range with Movement left, 0x78fa10), the targets of that type within 5 of it (0x76eb50), each unit's spots per target from...
   review: reviewed
+- addr: 0x790450
+  final: 0x51b650
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - "...through TARGET_HIGH_PRIORITY_UNIT; that target's entries of the player's target list (0x790450's key, 0x802cf0: +0x10 / +0x12 / +0x14 equal), the attack assignment (0x776140) of the..."
+  review: imported
 - addr: 0x793300
   final: 0x51dd50
   kind: function
@@ -3745,18 +3753,23 @@
   final: 0x5662d0
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:passNavalPillage, gpu/core/sim_minorops.py:_x_naval_pillage]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...ange (0x56e3d0) — one of TARGET_LOW_PRIORITY_UNIT .. TARGET_HIGH_PRIORITY_UNIT, through 0x802cf0 into the attack assignment 0x776140 and its execution 0x771f80; unported), Naval Escort..."
-  review: imported
+  review: reviewed
 - addr: 0x802ea0
   final: 0x566110
   kind: function
-  status: UNREAD
+  status: PARTLY
+  impl:
+    - cpu/core/operations/nodes.ts:navalChooseTarget
+    - gpu/core/sim_minorops.py:_u_naval_choose
+    - cpu/core/operations/nodes.ts:NAVAL_CHOOSE_TYPES
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...D / unread: Naval Choose Target 0x803590 (the tactical analysis's target list by domain 0x802ea0 unread: the port finds none and skips its children); the executions of Operation Attack..."
-  review: imported
+  review: reviewed
 - addr: 0x803060
   final: 0x566480
   kind: function
@@ -3779,11 +3792,15 @@
   final: 0x566670
   kind: function
   status: PARTLY
-  impl: [cpu/core/operations/nodes.ts:navalUnitsRunning, gpu/core/sim_minorops.py:_x_naval_patrol]
+  impl:
+    - cpu/core/tactical.ts:passNavalPillage
+    - gpu/core/sim_minorops.py:_x_naval_pillage
+    - cpu/core/operations/nodes.ts:OpsContext
+    - cpu/core/operations/nodes.ts:navalPillage
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...ation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the c..."
-  review: imported
+  review: reviewed
 - addr: 0x803880
   final: 0x566cd0
   kind: function
@@ -4908,6 +4925,7 @@
   readings:
     - "H-1: the great person's spawn — READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
   context:
     - "...the spawn plot: the class row (+0x70 its district, +0x98 its unit) and the unit's domain (0xadd590 on unit info +0x1c). A land unit (domain 2): walk the player's cities (+0x12f0 -> +0xd8,..."
   review: imported

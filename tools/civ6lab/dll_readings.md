@@ -7263,15 +7263,35 @@ DebugGameplay.sqlite).
   (strictly), its own plot or one with no own unit but its formation's and
   a path; none, the goal. The logged moves agree in form (1124 t17: 3:9 ->
   3:9, 3:13 -> 3:11 around a held rally 3:10).
-- PARTLY READ / unread: Naval Choose Target 0x803590 (the tactical
-  analysis's target list by domain 0x802ea0 unread: the port finds none and
-  skips its children); the executions of Defend Units 0x80d790 ("Operation Protect Units"), Naval
-  Pillage 0x803250 (per unit with Movement left, its planning's targets
-  +0x48 (0xd0 bytes): a TARGET_ENEMY_COMBAT_DISTRICT one with +0x18 above 0,
-  else — a unit with a range (0x56e3d0) — one of TARGET_LOW_PRIORITY_UNIT
-  .. TARGET_HIGH_PRIORITY_UNIT, through 0x802cf0 into the attack assignment
-  0x776140 and its execution 0x771f80; unported), Naval Escort 0x817f60;
-  Operation Move's unit tactical block (+0x1fc0, 0x791300).
+- PARTLY READ / unread: the executions of Defend Units 0x80d790
+  ("Operation Protect Units"), Naval Escort 0x817f60; Operation Move's unit
+  tactical block (+0x1fc0, 0x791300).
+- NAVAL CHOOSE TARGET (0x803590; its list 0x802ea0), READ: the tree's
+  operation (none: 4, an assert); the node's Fail for no target (TreeData
+  +0x10, unset: true) and its Target Domain (the string's hash to the
+  DomainTypes index, 0xadd590, cached at +0x20; unset: 2). The list: the
+  player's tactical target list (+0x12b8 +0x368, 0x28-byte entries) filtered
+  to the entries of type TARGET_CIVILIAN_UNIT through
+  TARGET_HIGH_PRIORITY_UNIT whose plot is water exactly where the domain is
+  0 (DOMAIN_SEA). Of those the nearest the operation's target (op +0x2a8 /
+  +0x2ac), strictly nearer replacing, the first of equals kept: the
+  operation's target and rally set to it with each team's goals (0x73e7d0),
+  the cursor to the node's first child (+0x10 <- +8), SUCCESS; none: the
+  cursor to the node's end (+0x10 <- +4), FAILURE with Fail for no target,
+  else SUCCESS. runs/h1_duelv1121 city-state 3's Galley logs Operation Move
+  from t54 (36:23 -> 0:19 ...), the move node under Naval Choose Target
+  running only on a find. Ported (`navalChooseTarget`, `_u_naval_choose`).
+- NAVAL PILLAGE's execution (0x803250), READ: the tree's job units alive
+  (+0x770 clear) with Movement left (0x56c690) listed; then each listed unit
+  still with Movement left and a planning (+0x1fc0): the first of its
+  planning's targets (+0x48, 0xd0-byte entries) of TARGET_ENEMY_COMBAT_DISTRICT
+  with +0x18 above 0 (taken as the entry's spot count: PARTLY), else — a
+  unit with a range (0x56e3d0) — the first of TARGET_LOW_PRIORITY_UNIT
+  through TARGET_HIGH_PRIORITY_UNIT; that target's entries of the player's
+  target list (0x790450's key, 0x802cf0: +0x10 / +0x12 / +0x14 equal), the
+  attack assignment (0x776140) of the whole list over them with no exchange
+  filter (byte 5 clear) and the survival filter (byte 6 set), carried out
+  (0x771f80). No line. Ported (`passNavalPillage`, `_x_naval_pillage`).
 - NAVAL PATROL's execution (0x803060), READ: over the tree's job units
   (0x6092c0 by the job +0x488, the player's unit order), each alive (+0x770
   clear) on the map with Movement left (+0xdb0): HL Explore's target

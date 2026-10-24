@@ -104,6 +104,8 @@ export interface OpsEnv {
   defend?: OpsContext['defend'];
   /** Naval Patrol's moves (`OpsContext`), where the seat's units' turn gives them */
   patrol?: OpsContext['patrol'];
+  /** Naval Pillage's blows (`OpsContext`), where the seat's units' turn gives them */
+  pillage?: OpsContext['pillage'];
   /** the units' AI type their type's own (`OpsContext`) */
   ownAiType: OpsContext['ownAiType'];
   /** the operation lines (AI_Operation.csv without its turn and player) and
@@ -431,6 +433,7 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     moveExec: env.moveExec,
     defend: env.defend,
     patrol: env.patrol,
+    pillage: env.pillage,
     ownAiType: env.ownAiType,
     op,
     assigned: () => assigned(ai),

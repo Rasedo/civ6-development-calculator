@@ -313,10 +313,15 @@
   final: 0x4e1850
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarianOps.ts:barbOpStart, cpu/core/operations/manager.ts:startOperationAt]
+  impl:
+    - cpu/core/barbarianOps.ts:barbOpStart
+    - cpu/core/operations/manager.ts:startOperationAt
+    - cpu/core/operations/nodes.ts:navalChooseTarget
+    - gpu/core/sim_minorops.py:_u_naval_choose
   readings:
     - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x73e870
