@@ -81,18 +81,19 @@ describe('the seat plays a civilization', () => {
 });
 
 describe('the chariot classes', () => {
-  it('are cavalry, but not a target of the anti-cavalry bonus', () => {
+  it('are cavalry; the anti-cavalry bonus takes those with a cavalry tag', () => {
     // CIV6 (ANTI_CAVALRY_OPPONENT_REQUIREMENTS): light, heavy and RANGED
-    // cavalry — a chariot class is not on the list.
+    // cavalry tags — the Heavy Chariot carries CLASS_HEAVY_CAVALRY, the
+    // War-Cart only the chariot's and its own
     expect(classMatchupCS('SPEARMAN', 'HORSEMAN')).toBe(10);
-    expect(classMatchupCS('SPEARMAN', 'HEAVY_CHARIOT')).toBe(0);
+    expect(classMatchupCS('SPEARMAN', 'HEAVY_CHARIOT')).toBe(10);
     expect(classMatchupCS('SPEARMAN', 'WAR_CART')).toBe(0);
     expect(classMatchupCS('SPEARMAN', 'MARYANNU_CHARIOT_ARCHER')).toBe(10);
     expect(UNITS.HEAVY_CHARIOT.cavalry).toBe(true);
     expect(UNITS.WAR_CART.cavalry).toBe(true);
   });
 
-  it('the Heavy Chariot halts in enemy ZOC; the War-Cart and the ranged chariot ignore it', () => {
+  it('the chariots ignore enemy ZOC by their cavalry and War-Cart tags', () => {
     const state = makeState(makeMap(8, 8));
     state.unitsMode = true;
     state.seats.push({ ...emptySeat(1), name: 'foe' });
@@ -100,7 +101,8 @@ describe('the chariot classes', () => {
     const foe = tileAtCoords(state.map, 3, 3);
     spawnUnit(state, 'WARRIOR', foe.index, 1);
     const dest = tileAtCoords(state.map, 4, 3);
-    expect(inEnemyZoc(state, dest.index, { seat: 0, type: 'HEAVY_CHARIOT' })).toBe(true);
+    expect(inEnemyZoc(state, dest.index, { seat: 0, type: 'HEAVY_CHARIOT' })).toBe(false); // CLASS_HEAVY_CAVALRY
+    expect(inEnemyZoc(state, dest.index, { seat: 0, type: 'WARRIOR' })).toBe(true);
     expect(inEnemyZoc(state, dest.index, { seat: 0, type: 'HORSEMAN' })).toBe(false);
     expect(inEnemyZoc(state, dest.index, { seat: 0, type: 'WAR_CART' })).toBe(false); // CLASS_WAR_CART
     expect(inEnemyZoc(state, dest.index, { seat: 0, type: 'MARYANNU_CHARIOT_ARCHER' })).toBe(false); // CLASS_RANGED_CAVALRY

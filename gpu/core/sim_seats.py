@@ -13547,8 +13547,9 @@ class SimSeats:
         riv = (self.river_mask.gather(1, dc.unsqueeze(1))
                >> torch.arange(6, device=self.device).unsqueeze(0)) & 1
         halt = ((dn >= 0) & (riv == 0) & hostmil).any(dim=1)
-        # CIV6 (ABILITY_IGNORE_ZOC): light, heavy and ranged cavalry — a chariot
-        # class is not on the list unless it carries the ability itself. The
+        # CIV6 (ABILITY_IGNORE_ZOC): the light, heavy and ranged cavalry tags —
+        # a cavalry-class unit with none of them (`chariot`, the War-Cart) only
+        # where it carries the ability itself. The
         # three catalog vectors are fixed at load, so the OR is built once.
         ign = getattr(self, "_zoc_ign_cache", None)
         if ign is None:

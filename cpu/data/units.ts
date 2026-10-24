@@ -294,10 +294,13 @@ export interface UnitDef {
    *  Victoria's Redcoat is not Eleanor's England's. */
   uniqueLeader?: string;
   replaces?: string;
-  /** CIV6 (CLASS_HEAVY_CHARIOT / CLASS_LIGHT_CHARIOT): a chariot is
-   *  cavalry for its promotion class and the production cards, but the
-   *  install's ANTI_CAVALRY_OPPONENT_REQUIREMENTS and ABILITY_IGNORE_ZOC
-   *  name only the light, heavy and ranged cavalry tags. */
+  /** CIV6 (CLASS_HEAVY_CHARIOT without CLASS_HEAVY_CAVALRY): cavalry for
+   *  its promotion class and the production cards, but none of the light,
+   *  heavy and ranged cavalry tags the install's
+   *  ANTI_CAVALRY_OPPONENT_REQUIREMENTS and ABILITY_IGNORE_ZOC name — the
+   *  War-Cart. The Heavy Chariot carries CLASS_HEAVY_CAVALRY too
+   *  (runs/h1_duelw1124 t54: a barbarian Spearman's +10 on Bologna's Heavy
+   *  Chariot). */
   chariot?: boolean;
   /** CIV6 (EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT): extra Movement
    *  when the turn starts on flat Desert, Plains, Grassland or Tundra. */
@@ -1179,7 +1182,6 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 28,
       cavalry: true,
       cavalryTag: 'heavy',
-      chariot: true,
       // CIV6 (Heavy Chariot): "+1 Movement if starting in Desert, Plains,
       // Grassland, or Tundra."
       openTerrainMoves: 1,
@@ -1193,7 +1195,6 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         combat: xml('Units', 'UnitType=UNIT_HEAVY_CHARIOT', 'Combat'),
         cavalry: xml('Units', 'UnitType=UNIT_HEAVY_CHARIOT', 'PromotionClass', { expect: 'PROMOTION_CLASS_HEAVY_CAVALRY' }),
         cavalryTag: xml('Units', 'UnitType=UNIT_HEAVY_CHARIOT', 'PromotionClass', { expect: 'PROMOTION_CLASS_HEAVY_CAVALRY' }),
-        chariot: xml('TypeTags', 'Type=UNIT_HEAVY_CHARIOT&Tag=CLASS_HEAVY_CHARIOT', 'Tag', { expect: 'CLASS_HEAVY_CHARIOT' }),
         openTerrainMoves: xml('ModifierArguments', 'ModifierId=HEAVYCHARIOT_FASTER_CLEAR_TERRAIN&Name=Amount', 'Value'),
         requiresTech: xml('Units', 'UnitType=UNIT_HEAVY_CHARIOT', 'PrereqTech', { expect: 'TECH_THE_WHEEL' }),
         upgradesTo: xml('UnitUpgrades', 'Unit=UNIT_HEAVY_CHARIOT', 'UpgradeUnit', { expect: 'UNIT_KNIGHT' }),

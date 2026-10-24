@@ -321,7 +321,7 @@ class SimTactics:
 
     def _tac_zoc_ignored(self, utype: torch.Tensor) -> torch.Tensor:
         """bool — the chassis ignores zones of control (a naval raider, the
-        cavalry classes but the chariot)."""
+        cavalry classes but one with no cavalry tag, `chariot`)."""
         ign = self._type_zoc_ignore | (self._type_cavalry & ~self._type_chariot)
         return ign.take(utype.clamp(min=0, max=self.NU - 1))
 

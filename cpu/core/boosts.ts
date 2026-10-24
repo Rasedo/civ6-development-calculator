@@ -18,6 +18,7 @@ import { completeResearchNow } from './phase';
 import { researchCost } from './economy';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { isCoastalLand, isMountain, naturalWonderAt } from '../../world/query';
+import { RESOURCES } from '../../world/resources';
 import { neighbors } from '../../world/hex';
 import { questBoosted } from './quests';
 
@@ -164,7 +165,12 @@ function stateTrigger(state: GameState, seat: number, b: BoostDef): boolean {
     case 'NUM_IMPROVED_TILES':
       return ownImprovements(state, seat, () => true) >= n;
     case 'HAVE_X_IMPROVEMENTS':
-      return ownImprovements(state, seat, (imp, res) => imp === b.improvement && (!b.requiresResource || res !== null)) >= n;
+      // RequiresResource: the improvement on a resource it improves — a Farm
+      // laid on Horses unseen stays plain ground once they show
+      // (runs/h1_duelw1124: China's Farm on Horses from t9, Animal Husbandry
+      // at t41, a resourceless Farm at t44 and no Irrigation boost to t64)
+      return ownImprovements(state, seat, (imp, res) => imp === b.improvement
+        && (!b.requiresResource || (res !== null && RESOURCES[res]?.improvement === imp))) >= n;
     case 'IMPROVE_SPECIFIC_RESOURCE':
       return ownImprovements(state, seat, (imp, res) => imp === b.improvement && res === b.resource) >= 1;
     case 'HAVE_UNIT_AND_IMPROVEMENT':

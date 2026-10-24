@@ -75,6 +75,33 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   s.tourismReligious = (s.tourismReligious ?? 0) + natReligious;
   bankTourismPerRival(state, s, natGeneral, natReligious, late);
   updateCulturalDominance(state.seats, s);
+  if (!favorHeld?.(seat)) seatFavor(state, seat);
+  // The GRIEVANCE ledger's own turn: what this seat is still owed decays
+  // pairwise (once per pair, on its lower seat), and every original capital it
+  // sits in keeps charging while that war is over.
+  grievanceHeldCapitals(state, seat);
+  decayGrievances(state, seat);
+}
+
+/** the seats whose turn's Favor `seatAccumulators` leaves to the caller
+ *  (`seatFavor`), null for none */
+let favorHeld: ((seat: number) => boolean) | null = null;
+
+/** hold the turn's Favor of the seats `held` names out of `seatAccumulators`:
+ *  the action replay, whose engine turn is the other players' turn START,
+ *  banks theirs after their actions (`seatFavor`) */
+export function holdFavor(held: ((seat: number) => boolean) | null): void {
+  favorHeld = held;
+}
+
+/** THE TURN'S DIPLOMATIC FAVOR, banked after the seat's own actions of the
+ *  turn: a government enacted, a suzerainty won pays in the same turn
+ *  (runs/h1_duelw1124: China's first tier-1 government at t40 reads Favor 1
+ *  in record t41; its suzerainty of Cardiff won at t47 reads +2 in record
+ *  t48) */
+export function seatFavor(state: GameState, seat: number): void {
+  const s = seatOf(state, seat);
+  if (!s) return;
   s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
     + diplomaticFavorPerTurn(seatGovernment(state, seat), suzerainCount(state, seat),
                              occupiedCapitals(state, seat),
@@ -89,11 +116,6 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   // CIV6 (Founding Fathers): "+1 Diplomatic Favor per turn for every Wildcard
   // slot in their government" (`SLOT_FAVOR_ROWS`)
   s.diplomaticFavor += slotFavorOf(state, seat);
-  // The GRIEVANCE ledger's own turn: what this seat is still owed decays
-  // pairwise (once per pair, on its lower seat), and every original capital it
-  // sits in keeps charging while that war is over.
-  grievanceHeldCapitals(state, seat);
-  decayGrievances(state, seat);
 }
 
 export function seatGrowth(city: City, surplus: number, growthNeeded: number, turn = 0): void {

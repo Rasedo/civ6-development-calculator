@@ -66,6 +66,8 @@ import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeD
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
+import { holdFavor, seatFavor } from '../core/seatTurn';
+import { displaceAirFrom } from '../core/air';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setDelegationWith, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
 import { activateGreatPerson, gpActivateOk, gpClassOfUnit } from '../core/gpAbility';
 import { BUILDINGS } from '../data/buildings';
@@ -2095,6 +2097,16 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       case 'clear': {
         const seat = seatOfP(ctx, d.player);
         const t = state.map.tiles[d.plot];
+        if (d.what === 'improvement') {
+          // the Builder's removal (no charge): the improvement gone, not
+          // pillaged, its based aircraft scattered
+          if (!t.improvement || tileSeat(t) !== seat) { count(ctx, 'clear:improvement', 'refused', d.player); break; }
+          t.improvement = null;
+          t.pillaged = false;
+          displaceAirFrom(state, t.index);
+          count(ctx, 'clear:improvement', 'applied');
+          break;
+        }
         if (d.what === 'feature' ? !t.feature : !t.resource) { count(ctx, `clear:${d.what}`, 'refused', d.player); break; }
         // the order is the player's, through the engine's verb with the
         // builder the log names, from the plot: the lump, the charge
@@ -2646,6 +2658,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         }
         const s0 = battleDraw(ctx, wit, b, d);
         if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); if (TRACE.has('battle')) console.error(`   ${d.attacker || 'city@' + d.from} vs ${d.defender || 'city@' + d.at} seq${d.seq}`); break; }
+        // every other unit stands where the log's steps before the battle had
+        // it (its support and flanking: runs/h1_duelw1124 t20, Cardiff's
+        // Warrior stepped beside the one a barbarian Warrior then struck);
+        // `syncUnits` walks them on from where they stood
+        const standing = bystanders(ctx, ds, d.ord, [atk, def]);
         // a unit the log's steps moved holds no fortification
         if (atk.tileIndex !== d.from) atk.fortifyTurns = 0;
         if (def.tileIndex !== d.at) def.fortifyTurns = 0;
@@ -2667,6 +2684,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         ctx.stream.placed(true);
         const r = d.ranged ? rangedAttack(state, atk.id, d.at) : meleeAttack(state, atk.id, d.at, atk.seat);
         ctx.stream.placed(false);
+        for (const [u, at] of standing) u.tileIndex = at;
         if (TRACE.has('battleHp')) console.error(`t${traceTurn} battle ${d.attacker} ${atk.type} ${hp0[0]}->${atk.hp} vs ${d.defender} ${def.type} ${hp0[1]}->${def.hp} ${d.ranged ? 'ranged' : 'melee'} seq${d.seq} game[${d.dmg}] ours[${hp0[1] - def.hp},${hp0[0] - atk.hp}] ${r.ok ? '' : r.reason} ${((globalThis as { __cbLog?: string[] }).__cbLog ?? []).join(' | ')}`);
         if (!r.ok) { count(ctx, 'battle', 'refused', d.player, r.reason); break; }
         ctx.battled.add(d.attacker);
@@ -2871,6 +2889,24 @@ function inTurn(state: GameState, turn: number, fn: () => void): void {
   } finally {
     state.turn = now;
   }
+}
+
+/** every unit but `except` the log's steps moved before the row `ord` stands
+ *  on the plot the last of those steps entered; answers each one moved with
+ *  the plot it stood on, to stand back on after the battle */
+function bystanders(ctx: Ctx, ds: readonly Decision[], ord: number, except: readonly Unit[]): [Unit, number][] {
+  const out: [Unit, number][] = [];
+  for (const d of ds) {
+    if (d.kind !== 'move' || !d.path || !d.ords) continue;
+    const u = unitOf(ctx, d.unit);
+    if (!u || except.includes(u) || !ctx.state.units.includes(u)) continue;
+    let k = -1;
+    while (k + 1 < d.ords.length && d.ords[k + 1] < ord) k++;
+    if (k < 0 || u.tileIndex === d.path[k]) continue;
+    out.push([u, u.tileIndex]);
+    u.tileIndex = d.path[k];
+  }
+  return out;
 }
 
 function syncUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
@@ -3933,11 +3969,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     holdResearchEra(new Map([...state.seats.filter((s) => s !== active).map((s) => s.seat), ...state.cityStates.map((c) => c.seat), FREE_SEAT]
       .map((seat) => [seat, eraWas] as const)));
     stream.actions(null);
+    // the other majors' Favor is banked after their actions of the turn
+    // (`seatFavor`, below), not at the start the engine's turn stands for
+    const favorAfter = state.seats.filter((s) => s !== active && isCiv(s.seat)).map((s) => s.seat);
+    holdFavor((seat) => favorAfter.includes(seat));
     try {
       endTurn(state);
     } catch (e) {
       report.stopped = `endTurn threw at turn ${a.turn}: ${(e as Error).message}`;
       break;
+    } finally {
+      holdFavor(null);
     }
     holdMinorCatchUp(null);
     stream.actions(a.turn);
@@ -4021,6 +4063,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
           .filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))));
     }
     applyPhase(ctx, ds, 'after', b, b);
+    for (const seat of favorAfter) seatFavor(state, seat);
     // the era's opening, its quests drawn on what those actions earned
     // (runs/h1_duelw1117 t30: China's kill boosts Bronze Working before the
     // Classical era's quest for Caguana, which draws over Sailing and

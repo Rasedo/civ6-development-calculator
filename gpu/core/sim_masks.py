@@ -156,9 +156,14 @@ class SimMasks:
             if cls == "NUM_IMPROVED_TILES":
                 p = mine.sum(dim=1) >= n
             elif cls == "HAVE_X_IMPROVEMENTS":
-                hit = mine & (self.improvement == int(b["improvement"]))
+                imp = int(b["improvement"])
+                hit = mine & (self.improvement == imp)
                 if b["requiresResource"]:
-                    hit = hit & has_res
+                    # on a resource it improves: a Farm laid on Horses unseen
+                    # stays plain ground once they show (runs/h1_duelw1124
+                    # China's Farm on Horses, Animal Husbandry at t41, no
+                    # Irrigation boost to t64)
+                    hit = hit & has_res & (self._res_harvest_imp.take(self.res_id.clamp(min=0)) == imp)
                 p = hit.sum(dim=1) >= n
             elif cls in ("IMPROVE_SPECIFIC_RESOURCE", "HAVE_UNIT_AND_IMPROVEMENT"):
                 p = (mine & (self.improvement == int(b["improvement"])) & has_res

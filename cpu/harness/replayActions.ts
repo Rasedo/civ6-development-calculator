@@ -50,9 +50,9 @@ export type Decision = Base & (
   | { kind: 'buyUnit'; player: number; city: number; type: number; unit: string; currency: 'gold' | 'faith' }
   /** `unit`: the unit that laid it (the log's acting unit of its owner), where named */
   | { kind: 'improve'; player: number; plot: number; improvement: number; unit?: string }
-  /** a feature or resource taken off a plot; `unit`: the unit the log names
-   *  starting the removal or harvest there */
-  | { kind: 'clear'; player: number; plot: number; what: 'feature' | 'resource'; unit?: string }
+  /** a feature, resource or improvement taken off a plot; `unit`: the unit
+   *  the log names starting the removal or harvest there */
+  | { kind: 'clear'; player: number; plot: number; what: 'feature' | 'resource' | 'improvement'; unit?: string }
   /** a Builder's charge spent on the wonder its plot holds (`UnitChargesChanged`
    *  down, standing on a wonder under construction) */
   | { kind: 'wonderCharge'; player: number; unit: string; plot: number }
@@ -76,8 +76,9 @@ export type Decision = Base & (
   | { kind: 'governors'; player: number }
   | { kind: 'war'; player: number; other: number; war: boolean }
   | { kind: 'routes'; player: number }
-  /** `path`: the plots the log's `UnitMoved` steps entered, in order */
-  | { kind: 'move'; player: number; unit: string; plot: number; path?: number[] }
+  /** `path`: the plots the log's `UnitMoved` steps entered, in order;
+   *  `ords`: each step's row sequence number in the log */
+  | { kind: 'move'; player: number; unit: string; plot: number; path?: number[]; ords?: number[] }
   | { kind: 'unitNew'; player: number; unit: string; type: number; plot: number; why: 'trained' | 'other' }
   | { kind: 'unitGone'; player: number; unit: string; why: 'founded' | 'consumed' | 'lost' }
   | { kind: 'capture'; player: number; city: number }
@@ -474,6 +475,12 @@ export class InferredActions implements ActionSource {
         out.push({ kind: 'improve', phase: phaseOf(owner), player: owner, plot: i, improvement: imp1 });
       }
       if ((p1[P.district] as number) >= 0 || (p1[P.wonder] as number) >= 0) continue;
+      // an improvement its owner's Builder removed (runs/h1_duelw1124 t47:
+      // China's Farm on Horses, taken off for the Pasture laid at t48)
+      const imp0 = p0[P.improvement] as number;
+      if (imp0 >= 0 && imp1 < 0 && !/GOODY|BARBARIAN/.test(cat.improvements[imp0] ?? '')) {
+        out.push({ kind: 'clear', phase: phaseOf(owner), player: owner, plot: i, what: 'improvement' });
+      }
       if ((p0[P.feature] as number) >= 0 && (p1[P.feature] as number) < 0) {
         out.push({ kind: 'clear', phase: phaseOf(owner), player: owner, plot: i, what: 'feature' });
       }
@@ -580,6 +587,7 @@ export class RecordedActions implements ActionSource {
     const log = new Map<string, Keyed>();
     const out0: Decision[] = [];
     const paths = new Map<string, number[]>();
+    const stepOrds = new Map<string, number[]>();
     let removed: string | null = null;
     const put = (kind: string, key: string, d: Decision) => {
       if (!log.has(kind)) log.set(kind, new Map());
@@ -666,6 +674,7 @@ export class RecordedActions implements ActionSource {
       } else if (name === 'UnitMoved') {
         const k = `${n(r, 0)}:${n(r, 1)}`;
         paths.set(k, [...(paths.get(k) ?? []), n(r, 3) * W + n(r, 2)]);
+        stepOrds.set(k, [...(stepOrds.get(k) ?? []), r[0] as number]);
       } else if (name === 'UnitKilledInCombat') {
         const typeOf = (owner: number, id: number) => {
           const u = a.units.find((x) => x.owner === owner && x.id === id) ?? b.units.find((x) => x.owner === owner && x.id === id);
@@ -1028,7 +1037,11 @@ export class RecordedActions implements ActionSource {
     inferred = inferredAll.filter((d) => !((d.kind === 'unitGone' || d.kind === 'unitNew') && upgraded.has(d.unit)));
     const out: Decision[] = [...out0];
     // the steps each moved unit took, on the inference's move
-    for (const d of inferred) if (d.kind === 'move' && paths.has(d.unit)) d.path = paths.get(d.unit);
+    for (const d of inferred) {
+      if (d.kind !== 'move' || !paths.has(d.unit)) continue;
+      d.path = paths.get(d.unit);
+      d.ords = stepOrds.get(d.unit);
+    }
     for (const d of inferred) {
       const by = d.kind === 'clear' ? clearer.get(`${d.player}:${d.plot}:${d.what}`) : undefined;
       if (d.kind === 'clear' && by) d.unit = by;
@@ -1038,7 +1051,7 @@ export class RecordedActions implements ActionSource {
     for (const [k, path] of paths) {
       const u0 = a.units.find((x) => unitKey(x) === k);
       if (!u0 || moved.has(k) || units1.has(k) || !path.length) continue;
-      out.push({ kind: 'move', phase: phaseOf(u0.owner), player: u0.owner, unit: k, plot: path[path.length - 1], path });
+      out.push({ kind: 'move', phase: phaseOf(u0.owner), player: u0.owner, unit: k, plot: path[path.length - 1], path, ords: stepOrds.get(k) });
     }
     const settledKinds = new Set(['found', 'buyBuilding', 'buyPlot', 'improve', 'pantheon', 'unitOrigin', 'research', 'civic', 'queueHead']);
     const inferredBy = new Map<string, Keyed>();
