@@ -1244,7 +1244,7 @@ _MUTABLE = [
     "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_former", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_next_plot", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_idle", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_bldg_era", "city_reactor_age",
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_gpp_turn",  # Great Person points EARNED this turn, per class (a competition reads it)
-    "civ_co2", "civ_co2_turn", "climate_idx", "sea_rise_from", "tile_flooded", "tile_flood_ct", "tile_air_bonus", "tile_gp_perm",
+    "civ_co2", "civ_co2_turn", "climate_idx", "sea_rise_from", "river_named", "tile_flooded", "tile_flood_ct", "tile_air_bonus", "tile_gp_perm",
     "volcano_active", "tile_event_fired",  # the turn's random event: waking volcanoes, first occurrences
 ]
 

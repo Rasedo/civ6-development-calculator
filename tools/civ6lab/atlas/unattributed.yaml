@@ -3177,6 +3177,7 @@
   readings:
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   notes:
     - radius 1 (0x6b1b0) with the functor @0xd71be8 (invoke 0x7b8a20 -> 0x79ed40), at the top level only
     - "PARTLY: the walk and functor read; what the context's plot list changes is unread, and a port of the improvement half lowered the plot values lab's Farms (runs/h1_duelv1127 10,904 -> 9,376), so no confirming case"
@@ -3237,6 +3238,17 @@
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "- SpaceRace (+0xe8 bit 2): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared, and 1.0 per space-race project the player has completed."
+  review: imported
+- addr: 0x7b8bd0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1127
+      value: "(An earlier port of the same   for an improvement's own value — no such term exists — lowered 1127's   Farms 10,904 -> 9,376.)"
+  readings:
+    - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+  context:
+    - "...'s plot list +0x10 empty): the body first pushes the candidate onto the context's list (0x7b8bd0, its one caller 0x7adc88: the plot's x, y, index and the district), then walks radius..."
   review: imported
 - addr: 0x7baa20
   final: 0x535f90

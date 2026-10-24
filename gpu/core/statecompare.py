@@ -427,6 +427,7 @@ GAME = {
     "climatePhase": lambda sim, b, rows: [int(sim.climate_idx[b])],
     "relicsMade": lambda sim, b, rows: [int(sim.relics_made[b])],
     "seaRiseFrom": lambda sim, b, rows: [int(sim.sea_rise_from[b])],
+    "riverNamed": lambda sim, b, rows: [int(x) for x in sim.river_named[b, :int(sim._flood_sites[1][b])].tolist()],
     "removableAtStart": lambda sim, b, rows: [int(sim._removable_at_start[b])],
     "iceAtStart": lambda sim, b, rows: [int(sim._ice_at_start[b])],
     "freeTreasury": lambda sim, b, rows: [float(sim.free_treasury[b])],

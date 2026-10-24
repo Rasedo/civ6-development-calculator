@@ -3,6 +3,15 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0xa285b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...the plot, the player): over the plot's rivers (the manager's +0x190 plot-to-rivers map, 0xa285b0 — the rivers whose edges SetXOfRiver laid on the plot or across it, the river vector's..."
+  review: imported
 - addr: 0xa28900
   final: 0x72c4c0
   kind: function
@@ -53,7 +62,11 @@
     - cpu/core/disasters.ts:riverRevealed
     - cpu/harness/drawSites.ts:DRAW_SITES
     - cpu/harness/eventPick.ts:named
-  readings: ["H-1: draws the AI takes, draws the engines lack", "H-1: the flood's river walk — READ"]
+    - cpu/core/disasters.ts:nameRivers
+  readings:
+    - "H-1: draws the AI takes, draws the engines lack"
+    - "H-1: the flood's river walk — READ"
+    - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
   context:
     - "...aled to a player (0x534950, from the sight update 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\") and its territory (0xa36ff0: \"Random Desert\", \"Sea\", \"Ocean\", \"Mountai..."
     - "...s the NAME: a plot first revealed (0x534950) names its rivers (0xa29730 -> \"Random River\" 0xa292a0, an unused name of the namer's civilization; runs/ h1_duelw1118: 7 draws, ranges 5, 4, 3..."
@@ -74,11 +87,17 @@
     - cpu/core/disasters.ts:riverRevealed
     - cpu/harness/drawSites.ts:DRAW_SITES
     - cpu/harness/eventPick.ts:named
-  readings: ["H-1: draws the AI takes, draws the engines lack", "H-1: the flood's river walk — READ"]
+    - cpu/core/disasters.ts:nameRivers
+  readings:
+    - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
+    - "H-1: draws the AI takes, draws the engines lack"
+    - "H-1: the flood's river walk — READ"
+  notes:
+    - over the plot's rivers (+0x190 plot-to-rivers, 0xa285b0) each found by ID whose namer +0x48 is 0 or name -1 takes the player and a name (0xa292a0)
   context:
     - "...first revealed to a player (0x534950, from the sight update 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\") and its territory (0xa36ff0: \"Random Desert\", \"Sea\", \"Ocean..."
     - "...l itself. The reveal gate is the NAME: a plot first revealed (0x534950) names its rivers (0xa29730 -> \"Random River\" 0xa292a0, an unused name of the namer's civilization; runs/ h1_duelw111..."
-  review: imported
+  review: reviewed
 - addr: 0xa2a4d0
   final: 0x72d400
   kind: function

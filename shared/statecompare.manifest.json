@@ -380,6 +380,17 @@
           "note": "the phase the climate step stood at before a crossing whose sea waits for the next random-event step, -2 when none waits."
         },
         {
+          "name": "riverNamed",
+          "compare": "exact",
+          "covers": [
+            "GameState.riverNamed"
+          ],
+          "planes": [
+            "river_named"
+          ],
+          "note": "per flood river whether a major's sight has named it: a river floods only once named."
+        },
+        {
           "name": "removableAtStart",
           "compare": "exact",
           "covers": [

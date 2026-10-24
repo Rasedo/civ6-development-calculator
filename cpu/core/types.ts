@@ -532,6 +532,11 @@ export interface GameState {
    *  submerged lowlands) waits for the next random-event step, which takes it
    *  as its event by force (`seaRise`); absent when none waits. */
   seaRiseFrom?: number;
+  /** per flood river (`floodRivers` order, `FloodRiver.id`) whether it has
+   *  its name — a major's sight has lain on one of its own plots
+   *  (`nameRivers`); a river floods only once named; absent before the
+   *  first naming pass */
+  riverNamed?: boolean[];
   /** how many removable features (Woods, Rainforest, Marsh) the map carried
    *  at creation, and how many Ice tiles — the denominators the deforestation
    *  level and the polar melt are measured against. */

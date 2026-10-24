@@ -56,6 +56,7 @@ import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
 import { routeOriginCenter } from './trade';
+import { floodRivers } from './disasters';
 import { GP_CITY_PERM, GP_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { laserSpeed } from './yields';
 import { scoreLines } from './score';
@@ -601,6 +602,7 @@ const GAME: Record<string, Extractor> = {
   climatePhase: (s) => [s.climateIdx ?? -1],
   relicsMade: (s) => [s.relicsMade ?? 0],
   seaRiseFrom: (s) => [s.seaRiseFrom ?? -2],
+  riverNamed: (s) => floodRivers(s.map).map((r) => (s.riverNamed?.[r.id] ? 1 : 0)),
   removableAtStart: (s) => [s.removableAtStart ?? 0],
   iceAtStart: (s) => [s.iceAtStart ?? 0],
   // the Free Cities seat's treasury: 0 until its first revolt makes the seat

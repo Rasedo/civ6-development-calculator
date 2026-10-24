@@ -1485,6 +1485,8 @@ class SimEconomy:
     def _disaster_phase(self) -> None:
         B, dev = self.B, self.device
         self._eff_version += 1
+        # the rivers the majors' sight names, before any flood reads them
+        self._name_rivers()
         self.drought.copy_((self.drought - 1).clamp(min=0))
         self.drought_left.copy_((self.drought_left - 1).clamp(min=0))
         self._compact_droughts()
@@ -1602,17 +1604,28 @@ class SimEconomy:
 
     def _flood_open(self) -> torch.Tensor:
         """[B, n_sites] `riverRevealed` over the flood sites: a river floods
-        once any major has revealed a plot of it — its component's plots
-        (`river_comp` of its start). With no fog every river is revealed."""
+        once named (`river_named`). With no fog every river is revealed."""
         idx, _n = self._flood_sites
         ok = idx >= 0
         if not self.fog_of_war:
             return ok
-        seen = self.seat_explored.any(dim=1)  # [B, T]
-        start = idx.clamp(min=0)
-        comp = self.river_comp.gather(1, start)  # [B, n_sites]
-        on = (self.river_comp.unsqueeze(1) == comp.unsqueeze(2)) & (comp >= 0).unsqueeze(2)
-        return ok & ((on & seen.unsqueeze(1)).any(dim=2) | seen.gather(1, start))
+        return ok & self.river_named
+
+    def _name_rivers(self) -> None:
+        """`nameRivers`: a flood river takes its name the first time one of
+        its own plots (`_flood_own`) lies in a major's sight
+        (`_barb_seen("majors")`), read at the turn start. With no fog none is
+        needed."""
+        if not self.fog_of_war:
+            return
+        own = self._flood_own
+        live = (self._flood_sites[0] >= 0) & ~self.river_named
+        if not bool(live.count_nonzero()):
+            return
+        seen = self._barb_seen("majors")  # [B, T]
+        B, n, k = own.shape
+        hit = seen.gather(1, own.clamp(min=0).reshape(B, n * k)).reshape(B, n, k) & (own >= 0)
+        self.river_named |= live & hit.any(dim=2)
 
     # the draw's families (`EventFamily`)
     _EV_ERUPTION, _EV_FLOOD, _EV_STORM, _EV_ACCIDENT, _EV_DROUGHT, _EV_METEOR, _EV_FIRE = range(7)

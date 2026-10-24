@@ -699,15 +699,16 @@ describe('the turn\'s one random event', () => {
     expect(sitePairWeight(eruption, 130, 2)).toBe(Math.floor(eruption.weight * 130 / 100));
   });
 
-  it('a river floods only once a major has revealed a plot of it', () => {
+  it('a river floods only once named: a major revealing its plots names none', () => {
     const { state, run } = eventBoard();
-    const a = floodRivers(state.map)[0].start;
+    const river = floodRivers(state.map)[0];
+    const a = river.start;
     const b = run.find((t) => t !== a)!;
     state.unitsMode = true;
     state.fogOfWar = true;
     const seat = state.seats[0];
     seat.explored = state.map.tiles.map(() => 0);
-    seat.explored[tileAtCoords(state.map, 14, 14).index] = 1;
+    seat.explored[b.index] = 1;
     const floodsAt = (n: number) => {
       let at = 0;
       for (let i = 0; i < n; i++) {
@@ -717,8 +718,8 @@ describe('the turn\'s one random event', () => {
       return at;
     };
     expect(floodsAt(2000)).toBe(0);
-    // the river's other plot, not the one its flood starts on
-    seat.explored[b.index] = 1;
+    // its name (`nameRivers`: a major's sight on one of its own plots)
+    state.riverNamed = floodRivers(state.map).map((r) => r.id === river.id);
     expect(floodsAt(2000)).toBeGreaterThan(0);
   });
 

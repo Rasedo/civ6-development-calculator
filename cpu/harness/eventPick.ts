@@ -35,7 +35,7 @@ import type { CheckResult } from './checks';
 import { P, type Catalog, type TurnRecord } from './record';
 import { engineRowOf, type Imported } from './import';
 import type { ClimateLog, LoggedEvent, RandLog } from './randLog';
-import { droughtStarts, eventAt, fireCandidate, eventTable, floodplainRun, laidRivers, riverPlotList, sitePairWeight, stormStarts, volcanoOrder, type EventTable } from '../core/disasters';
+import { droughtStarts, eventAt, fireCandidate, eventTable, floodRivers, floodplainRun, laidRivers, riverPlotList, sitePairWeight, stormStarts, volcanoOrder, type EventTable } from '../core/disasters';
 import type { GameMap } from '../../world/types';
 import { warmingDegrees } from '../core/climate';
 import { TURN_LIMIT } from '../core/game';
@@ -291,7 +291,8 @@ export class EventPicks {
     const order = laid.map((_r, i) => i).filter((i) => this.firstSeen.has(i))
       .sort((a, b) => this.firstSeen.get(a)! - this.firstSeen.get(b)! || a - b).slice(0, n);
     const starts = new Set(order.map((i) => floodplainRun(state.map, laid[i])[0]?.index ?? -1));
-    const flood = table.sites.flood.filter((r) => starts.has(r.start.index));
+    // the rivers this walk names, whatever the state's own names say
+    const flood = floodRivers(state.map).filter((r) => starts.has(r.start.index));
     const sites = { ...table.sites, flood };
     const degrees = warmingDegrees(state);
     const keys = table.keys.map((k, i) => (table.rows[i].family === 'flood' ? flood.map((r) => r.start) : k));

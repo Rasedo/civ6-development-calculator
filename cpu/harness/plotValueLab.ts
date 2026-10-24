@@ -98,6 +98,10 @@ const tallyOf = (k: string): Tally => tally.get(k) ?? (tally.set(k, { exact: 0, 
 const history = newHistory();
 /** the players whose city stood in an earlier record */
 const hadCity = new Set<number>();
+/** per player the production its idle city has stored (the record keeps
+ *  none: each record its city stands with an empty queue adds the turn's
+ *  production; a record with an item clears it) */
+const idleStore = new Map<number, number>();
 let held: { imp: ReturnType<typeof importTurn>; turn: number } | null = null;
 for (const rec of recs) {
   advanceHistory(history, rec, cat);
@@ -107,6 +111,10 @@ for (const rec of recs) {
   if (!cur) continue;
   const imp = cur.imp;
   const state = imp.state;
+  // the rivers named by the city-states' turn: the look over the next
+  // record's positions, the majors' actions of the turn done (the engine's
+  // turn reads them so)
+  state.riverNamed = after.state.riverNamed;
   const turn = cur.turn;
   for (const [player, cs] of imp.minorOfPlayer) {
     if (onlyPlayer !== null && player !== onlyPlayer) continue;
@@ -119,6 +127,10 @@ for (const rec of recs) {
     // turn's (the turn start's training and the Economic AI's purchases
     // come before the cities)
     const builders = after.minorOfPlayer.get(player)?.buildersTrained ?? cs.buildersTrained;
+    const dc = imp.dumpOfMinor.get(cs);
+    const idle = !!dc && (dc.queueProgress ?? []).length === 0;
+    cs.prodOverflow = idle ? idleStore.get(player) ?? 0 : 0;
+    idleStore.set(player, idle ? (idleStore.get(player) ?? 0) + Number(dc?.productionYield ?? 0) : 0);
     // the civics AI's entries as its turn would write them (cityBuildLab.ts)
     cs.research.civicAiEntries = civicAnalysis(state, cs.seat, computeCityStats(state, minorCity(cs)).total.culture);
     const facts = minorBuildFacts(state, cs, () => 0);

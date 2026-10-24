@@ -2239,6 +2239,15 @@ class SimInit:
         self._flood_home = _fh
         _fl_idx = _fl[:, :, 0]
         self._flood_sites = (_fl_idx, (_fl_idx >= 0).sum(dim=1))
+        # each flood site's own plots (`FloodRiver.own`, -1 pads), whose
+        # sight names it (`_name_rivers`), and whether it has its name
+        n_own = max(max((len(lst) for f in fixtures for lst in f["floodOwn"]), default=0), 1)
+        _fo = torch.full((B, n_fl, n_own), -1, dtype=torch.long, device=device)
+        for b, f in enumerate(fixtures):
+            for i, lst in enumerate(f["floodOwn"]):
+                _fo[b, i, :len(lst)] = torch.tensor(lst, dtype=torch.long, device=device)
+        self._flood_own = _fo
+        self.river_named = torch.zeros(B, n_fl, dtype=torch.bool, device=device)
         # CIV6 (FEATURE_VOLCANO, Expansion2_Features.xml): a volcano is its
         # plot's feature, and no Improvement_ValidFeatures row lists it
         # (`featureOk`)

@@ -37,7 +37,7 @@ import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, lux
 import { tileYields } from '../core/yields';
 import type { EventReplay } from './eventReplay';
 import { floodplainList } from './eventDraws';
-import { countFlood, eruptionRings, floodRiverIndex, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
+import { countFlood, eruptionRings, floodRiverIndex, nameRivers, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
 import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPTION_SCI_P, ERUPTION_WONDER, DROUGHT_HEXES, DROUGHT_TURNS, FLOOD_YIELD_ROWS, STORM_EVENTS, STORM_MOVEMENT, STORM_ROWS } from '../data/disasters';
 import { isWater } from '../../world/query';
 import { FEATURE_ID, TERRAIN_BASE } from '../data/aliases';
@@ -453,6 +453,9 @@ function leaderRow(leader: string): number {
  */
 export interface History {
   firstTurn: number;
+  /** the flood rivers the records' looks have named so far (`nameRivers`,
+   *  `GameState.riverNamed`) */
+  riverNamed?: boolean[];
   last: TurnRecord | null;
   /** the record folded in before `last`, and the one before that */
   before: TurnRecord | null;
@@ -2685,6 +2688,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       (civic ? r.civicRetained : r.techRetained)[id] = Math.min(cost, boostAmount(cost, BOOSTS[id].pct, boostPoints(state, s.seat, civic)));
     }
   }
+  // the rivers named so far: the history's, then this record's look — the
+  // turn start's sight over the record's positions (`nameRivers`); the
+  // history takes them as it reaches the record
+  state.riverNamed = history?.riverNamed ? [...history.riverNamed] : undefined;
+  nameRivers(state);
+  if (history && history.last === rec && state.riverNamed) history.riverNamed = [...state.riverNamed];
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,

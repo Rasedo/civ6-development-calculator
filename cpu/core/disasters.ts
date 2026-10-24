@@ -9,6 +9,7 @@ import { isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { atRngPoint, randRange, randWeighted, type DrawLabel } from './rand';
 import { fogActive, isExplored } from './fog';
+import { plotsSeenNow } from './barbarians';
 import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, isCityStateSeat, cityHolders, drawCitizenName } from './seats';
 import { raiseAidRequest } from './competition';
 import { DISTRICTS } from '../data/districts';
@@ -577,13 +578,17 @@ export function floodSeverity(state: GameState): number {
   return randWeighted(state, floodWeights(warmingDegrees(state)), 'Engine: breached dam');
 }
 
-/** A river a flood may strike: the plot its flood STARTS on, its Floodplains
- *  list in flood order (`floodplainRun`, `start` first) and every plot of its
- *  network (`riverOfPlots` of the start), which a major's sight names. */
+/** A river a flood may strike: its place in the flood rivers' order (`id`,
+ *  the `GameState.riverNamed` index), the plot its flood STARTS on, its
+ *  Floodplains list in flood order (`floodplainRun`, `start` first) and its
+ *  own plots — each of its edges' plot and the plot across (the river
+ *  vector's entry, `riverPlotList`), the plots whose sight names it
+ *  (`nameRivers`). */
 export interface FloodRiver {
+  id: number;
   start: Tile;
   list: Tile[];
-  plots: Tile[];
+  own: Tile[];
 }
 
 /**
@@ -600,18 +605,17 @@ const floodCache = new WeakMap<readonly Tile[], FloodRiver[]>();
 export function floodRivers(map: GameMap): FloodRiver[] {
   const hit = floodCache.get(map.tiles);
   if (hit) return hit;
-  const riverOf = riverOfPlots(map);
   const out: FloodRiver[] = [];
   for (const plots of map.rivers ?? laidRivers(map).map(riverPlotList)) {
     const list = floodplainRun(map, plots);
     if (!list.length) continue;
-    const r = riverOf[list[0].index];
-    out.push({ start: list[0], list, plots: r < 0 ? [list[0]] : map.tiles.filter((t) => riverOf[t.index] === r) });
+    out.push({ id: -1, start: list[0], list, own: plots.filter((p) => p >= 0).map((p) => map.tiles[p]) });
   }
   if (!map.rivers) {
     const low = (r: FloodRiver) => Math.min(...r.list.map((t) => t.index));
     out.sort((a, b) => low(a) - low(b));
   }
+  out.forEach((r, i) => { r.id = i; });
   floodCache.set(map.tiles, out);
   return out;
 }
@@ -627,17 +631,33 @@ export function volcanoOrder(map: GameMap): Tile[] {
 }
 
 /**
- * May this river flood yet? MEASURED (`runs/c74s2_turn_c74s2_duel*`: 1,806
- * of 1,806 river-turns one state per river, never falling back; 11 of 13
- * rivers turned floodable on the first turn a major revealed one of their
- * plots), and READ: 0xa2cfc0 skips a river whose name is unset, and a
- * river takes its name when a major first reveals a plot beside it (0x534950
- * -> 0xa29730 -> "Random River" 0xa292a0). With no fog every river is
- * revealed.
+ * May this river flood yet? READ: 0xa2cfc0 skips a river whose name is
+ * unset (`nameRivers` names it). With no fog every river is revealed.
  */
 export function riverRevealed(state: GameState, river: FloodRiver): boolean {
   if (!fogActive(state)) return true;
-  return state.seats.some((s) => isCiv(s.seat) && river.plots.some((t) => isExplored(state, s.seat, t.index)));
+  return !!state.riverNamed?.[river.id];
+}
+
+/**
+ * THE RIVERS' NAMES (0x534950 -> 0xa29730 -> "Random River" 0xa292a0, from
+ * the sight update 0x58aa90): a river takes its name the first time one of
+ * its own plots lies in a major's sight (`plotsSeenNow` of the majors) —
+ * read at each turn start, the look from the turn's positions. The name
+ * itself (a draw over the namer's names left) is not drawn here (AUDIT C-74).
+ * MEASURED: the five verbose duels' floodable rivers (Game_RandomEvents.csv)
+ * turn by turn — runs/h1_duelv1127 t1, t1, t3, t29, t59, t106; 1128 t1, t15,
+ * t38, t75; 1117 t1, t1, t10, t32 — all as logged, 1124 t1, t35 and t69 for
+ * t73; the plots a major's record has revealed name 1127's at t16 and t48,
+ * 1124's at t11 and t29.
+ */
+export function nameRivers(state: GameState): void {
+  if (!fogActive(state)) return;
+  const rivers = floodRivers(state.map);
+  const named = (state.riverNamed ??= rivers.map(() => false));
+  if (rivers.every((r) => named[r.id])) return;
+  const seen = plotsSeenNow(state, new Set(state.seats.filter((s) => isCiv(s.seat)).map((s) => s.seat)));
+  for (const r of rivers) if (!named[r.id] && r.own.some((t) => seen[t.index] === 1)) named[r.id] = true;
 }
 
 /** a float as the game's fixed point (raw: whole part << 8 | the fraction's 256ths) */
@@ -1480,6 +1500,8 @@ export function nuclearAccident(state: GameState, seat: number, city: City, sev:
 export function disasterPhase(state: GameState): void {
   atRngPoint(state, { kind: 'step', seat: -1, turn: state.turn });
   const map = state.map;
+  // the rivers the majors' sight names, before any flood reads them
+  nameRivers(state);
 
   for (const t of map.tiles) {
     if (t.droughtTurns > 0) t.droughtTurns -= 1;

@@ -4692,9 +4692,9 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   civics' list +0x1380 holds the improvement (0x39de20) the claimed plots
   0x7a10c0 (each neighbour within 3 of the city another owns, without a
   wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T,
-  0x79f0c0); its modifiers 0x7a4b20; at the top level its neighbours'
-  improvements and districts revalued with it (0x79ed40). Unported: the
-  tourism, claims, modifiers and neighbours terms. LAB: the
+  0x79f0c0); its modifiers 0x7a4b20. No neighbour is revalued for an
+  improvement (0x79f280's one caller is the district value body). Unported:
+  the tourism, claims and modifiers terms. LAB: the
   Housing counted a second time at its whole value (the housing value's
   whole part, as an analyzer's): runs/h1_duelv1117 Caguana's Farm rows
   each the value without it plus exactly that whole part (18.00 at t6, 30.00
@@ -8955,17 +8955,23 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   Districts row from "SELECT ModifierId from DistrictModifiers where
   DistrictType = ? ORDER BY ModifierId" (0xc7a880): the Aqueduct's, the
   Bath's, the Cothon's and the Suguba's; no specialty district carries one.
-- THE NEIGHBOURS (0x79f280, at the top level only — the analysis context's
-  plot list +0x10 empty): a walk of radius 1 (0x6b1b0) with a functor
-  (vtable @0xd71be8, invoke 0x7b8a20 -> 0x79ed40): a neighbour holding a
-  district (+0x1e) adds valueConstructible 0x7a7590 of it with the
-  context's plot list less with a fresh one; else one holding an
-  improvement (+0x44) the improvement yields value 0x7b1320 likewise; T and
-  H the item's. The same functor runs in 0x7b1320 for an improvement. A
-  port of the improvement half (each neighbour's yields value with the
-  improvement on the plot less as the map stands) lowered the plot values
-  lab's Farms on runs/h1_duelv1127 10,904 -> 9,376 exact and 1117's 7,202
-  -> 6,386: what the context's list changes is unread. Not ported.
+- THE NEIGHBOURS (0x79f280, the district value body's alone, 0x7add12, at
+  its top level — the analysis context's plot list +0x10 empty): the body
+  first pushes the candidate onto the context's list (0x7b8bd0, its one
+  caller 0x7adc88: the plot's x, y, index and the district), then walks
+  radius 1 (0x6b1b0) with a functor (vtable @0xd71be8, invoke 0x7b8a20 ->
+  0x79ed40): a neighbour holding a district (+0x1e) adds
+  valueConstructible 0x7a7590 of its district with the context's list less
+  with a fresh one (one placeholder entry, x and y -9999, so the nested
+  value walks no neighbours); else one holding an improvement (+0x44) the
+  improvement yields value 0x7b1320 likewise; T and H the candidate's. A
+  port of the improvement half (each neighbour improvement's yields value
+  with the district complete on the plot less as the map stands) moved no
+  row of the five duels' DISTRICTS (a city-state's improvements take no
+  district adjacency before the Industrial Zone's rows); the district half
+  (0x7a7590 on a district) unread. Not ported. (An earlier port of the same
+  for an improvement's own value — no such term exists — lowered 1127's
+  Farms 10,904 -> 9,376.)
 - LAB: THE DISTRICT'S BUILDINGS — every logged DISTRICTS row stands above
   0x7aaf80's terms by the most the city's analysis values a building of
   the district (the centre's BUILDINGS row; max, not the sum, where two are
@@ -9059,6 +9065,42 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   assignment (a religious unit's layer: the target list gives the plot's
   religious unit apart from its civilian; no recorded kill), whether layer
   0 holds the civilians alone.
+
+## C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)
+
+- 0x534950 (a FULL_CIV player's plot first revealed, from the sight update
+  0x58aa90): where the plot's +0x37 is above 0, 0xa29730(the river manager,
+  the plot, the player): over the plot's rivers (the manager's +0x190
+  plot-to-rivers map, 0xa285b0 — the rivers whose edges SetXOfRiver laid
+  on the plot or across it, the river vector's own plot lists) each river
+  found by ID (+0xb8..+0xc0, +4) whose namer +0x48 is 0 or name +0 is -1
+  takes the player as namer and a name (0xa292a0). A river's merged
+  network does not name it: its own plots alone.
+- MEASURED, the five verbose duels' "Floodable Rivers" column
+  (Game_RandomEvents.csv) against a major's sight (`plotsSeenNow` of the
+  majors: units' sight, cities two round, owned plots and their ring) over
+  each river's own plots at each record: runs/h1_duelv1127 t1, t1, t3, t29,
+  t59, t106; 1128 t1, t15, t38, t75; 1117 t1, t1, t10, t32 — all as
+  logged; 1124 t1, t35 and t69 for t73. The records' revealed own plots name
+  1127's at t1, t1, t3, t16, t48, t106 and 1124's at t2, t11, t29 (a plot is
+  revealed on the walk, a river named on the sight that stays).
+- `nameRivers` (disasters.ts, `GameState.riverNamed`; `_name_rivers`,
+  `river_named` on the GPU) names at the random-event step of each
+  `endTurn`, the majors' actions of the turn done; `riverRevealed` /
+  `_flood_open` read the name alone. The importer folds the names through
+  its history (the look at each record). The city-states' turn t reads the
+  look over record t+1's positions: runs/h1_duelv1127 p2 (43,15)'s Farm
+  -9.00 to t27 and 100.35 at t28 as logged (we read 98.94 from t16). The
+  plot values lab's DISTRICTS rows within 0.01 over the five duels:
+  23,881 -> 29,598 of 55,800 with the idle store below; IMPROVEMENTS
+  113,299 -> 113,836.
+- THE LAB'S IDLE STORE: a city-state with nothing to build stores its
+  production (`prodOverflow`), which its build turns read; the record keeps
+  no store, so the lab adds each idle record's production (runs/h1_duelv1121
+  Antioch, t126-t162 "NO BUILDS AT ALL": its Commercial Hub 969 -> 2,305
+  exact, Harbor 786 -> 1,338). The engine keeps the store itself.
+- Not drawn: the name itself (0xa292a0, one draw over the namer's names
+  left; AUDIT C-74).
 
 ## DLL rules the engines contradict
 

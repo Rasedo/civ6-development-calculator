@@ -16,9 +16,17 @@
       value: 1118's 152, 243, 251, 250, 12).
     - recording: 1103
       value: "1103–1124 every river edge and volcano plot as recorded);"
-  impl: [cpu/core/disasters.ts:riverRevealed, cpu/harness/drawSites.ts:DRAW_SITES]
-  readings: ["H-1: draws the AI takes, draws the engines lack", "H-1: the flood's river walk — READ"]
+  impl:
+    - cpu/core/disasters.ts:riverRevealed
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - cpu/core/disasters.ts:nameRivers
+  readings:
+    - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
+    - "H-1: draws the AI takes, draws the engines lack"
+    - "H-1: the flood's river walk — READ"
+  notes:
+    - "a FULL_CIV player's plot first revealed: territory naming, then where plot +0x37 > 0 the rivers' (0xa29730)"
   context:
     - "- A plot first revealed to a player (0x534950, from the sight update 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\")..."
     - "...f the row; it tests no reveal itself. The reveal gate is the NAME: a plot first revealed (0x534950) names its rivers (0xa29730 -> \"Random River\" 0xa292a0, an unused name of the namer's civ..."
-  review: imported
+  review: reviewed

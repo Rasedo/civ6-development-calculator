@@ -349,6 +349,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     // order (the start first) — static, so the TS rule's own answer ships
     // (`floodRivers`)
     floodLists: floodRivers(map).map((r) => r.list.map((t) => t.index)),
+    // each flood site's own plots, whose sight names it (`nameRivers`)
+    floodOwn: floodRivers(map).map((r) => r.own.map((t) => t.index)),
     maxCamps,
     // the deforestation denominator, stamped off the map as it was loaded
     // (`createGameFromMap`), before a founding clears a centre's feature
