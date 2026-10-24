@@ -1331,7 +1331,9 @@ class SimTactics:
             self._tac_cost_held = None
             self._tac_full_held = None
         ones = torch.ones(self.B, dtype=torch.bool, device=self.device)
-        self._knowledge_look(self.BK, BARB_SEAT, self._barb_seen("barbarians"), ones, False)
+        seen = self._barb_seen("barbarians")
+        self._knowledge_look(self.BK, BARB_SEAT, seen, ones, False)
+        self._barb_kb_camps(seen)
         # the turn's captures start their operations
         self._barb_captures()
 
@@ -2490,8 +2492,9 @@ class SimTactics:
 
         # the knowledge base ages and looks, then the tactical target list
         # (0x785f30), and its set of the regions the barbarians revealed
-        self._knowledge_look(self.BK, BARB_SEAT, self._barb_seen("barbarians"),
-                             torch.ones(B, dtype=torch.bool, device=dev), True)
+        seen0 = self._barb_seen("barbarians")
+        self._knowledge_look(self.BK, BARB_SEAT, seen0, torch.ones(B, dtype=torch.bool, device=dev), True)
+        self._barb_kb_camps(seen0)
         tg = self._tac_targets(BARB_SEAT, self.BK)
         treg = self._tac_seen_regions(BARB_SEAT)
         # the planning: the reach of two turns, no zones of control, and the

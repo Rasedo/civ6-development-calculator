@@ -615,6 +615,7 @@ const GAME: Record<string, Extractor> = {
     .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage])
     .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()],
   barbArmyAged: (s) => [s.barbSeat.armyAged ?? -1],
+  barbCampsKnown: (s) => [[...(s.barbSeat.campsKnown ?? [])]],
   freeUnitStrength: (s) => [s.freeSeat?.unitStrength ?? 0],
   // the live storms in the order they began: the last serial, then per
   // record its serial, row, centre, turns left, and its struck plots sorted

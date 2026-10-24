@@ -726,6 +726,8 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   });
   // ...and the knowledge base's looks: its records name the units by id
   state.barbSeat.armyKnown = copy.barbSeat.armyKnown;
+  if (copy.barbSeat.campsKnown) state.barbSeat.campsKnown = copy.barbSeat.campsKnown;
+  else delete state.barbSeat.campsKnown;
   const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c)) ended.set(u, c.tileIndex);
   tallyTactics(ctx, b, closing, moves, ended, danger);

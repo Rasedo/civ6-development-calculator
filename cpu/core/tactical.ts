@@ -22,7 +22,7 @@ import {
   unitsHostile, unitVisibleTo,
   waterEnterable,
 } from './units';
-import { BARB_SEAT, FREE_SEAT, NO_SEAT, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
 import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
@@ -34,6 +34,7 @@ import { canSee, unitSight } from './fog';
 import { barbarianScouts, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, ringPlots, tribeOf } from './barbarians';
 import { barbarianCaptures, barbarianTrees } from './barbarianOps';
 import { opsOf } from './operations/manager';
+import { lookCamps } from './operations/knowledge';
 import { opUnits } from './operations/operation';
 import { BT_RUNNING, BT_SUCCESS } from './behaviorTree';
 import { generalAuraMP } from './aura';
@@ -537,6 +538,16 @@ export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord
   }
   if (kept.length) holder.armyKnown = kept;
   else delete holder.armyKnown;
+}
+
+/** the barbarians' knowledge base's camps (its look 0x7877e0 -> 0x5f0110,
+ *  `lookCamps`) over the plots they see or have revealed (every plot where
+ *  they revealed none) */
+function barbCampsLook(state: GameState, seen: ArrayLike<number>): void {
+  const ex = state.barbSeat.explored ?? [];
+  const camps = lookCamps(state.barbSeat.campsKnown ?? [], (p) => seen[p] === 1 || ex.length === 0 || ex[p] === 1, campTiles(state));
+  if (camps.length) state.barbSeat.campsKnown = camps;
+  else delete state.barbSeat.campsKnown;
 }
 
 /** a player's place in the game's player list (0x483b50): the majors, the
@@ -2628,7 +2639,9 @@ export function barbarianTactics(state: GameState, acting: ReadonlySet<number>):
   }
   // the turn's end: the knowledge base looks again (player signal +0x228);
   // the turn's captures start their operations
-  knowledgeLook(state, state.barbSeat, BARB_SEAT, plotsSeenNow(state, new Set([BARB_SEAT])), false);
+  const seen = plotsSeenNow(state, new Set([BARB_SEAT]));
+  knowledgeLook(state, state.barbSeat, BARB_SEAT, seen, false);
+  barbCampsLook(state, seen);
   barbarianCaptures(state);
 }
 
@@ -2641,6 +2654,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   const ex = state.barbSeat.explored;
   // the knowledge base ages and looks, then the target list (0x785f30)
   knowledgeLook(state, state.barbSeat, BARB_SEAT, seen, true);
+  barbCampsLook(state, seen);
   const targets = tacticalTargets(state, BARB_SEAT, seen, ex.length ? ex : null, state.barbSeat.armyKnown ?? []);
   const reach = new Map<number, Reach[]>();
   const plan = new Map<number, Planner>();

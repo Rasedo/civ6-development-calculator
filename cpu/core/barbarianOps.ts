@@ -15,7 +15,7 @@
  * no candidate, and a member killed stays in its team.
  */
 import type { BarbHoming, BarbTarget, BarbTribe, GameState, Unit } from './types';
-import { BARB_SEAT, campTiles, isBarbSeat } from './seats';
+import { BARB_SEAT, isBarbSeat } from './seats';
 import { majorView } from './majorView';
 import { passOrders, passView } from './opsOrders';
 import { recentOf } from './minorOps';
@@ -69,7 +69,7 @@ const tribeAt = (state: GameState, k: number): BarbTribe | undefined => state.ba
 
 /** the camps the barbarians' knowledge base holds: every camp, in plot
  *  order (their own camps, each seen by its defender) */
-const campsKnown = (state: GameState): number[] => [...campTiles(state)].sort((a, b) => a - b);
+const campsKnown = (state: GameState): number[] => state.barbSeat.campsKnown ?? [];
 
 const unitOf = (state: GameState, id: number): Unit | undefined => state.units.find((u) => u.id === id && isBarbSeat(u.seat));
 

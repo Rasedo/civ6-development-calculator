@@ -824,6 +824,9 @@ export interface Seat {
   /** the turn the records last aged (`knowledgeLook` with its ageing): a
    *  record's age is this less the turn it was last seen */
   armyAged?: number;
+  /** the barbarians' knowledge base's camps (`barbCampsLook`), in its
+   *  order. Absent = none. */
+  campsKnown?: number[];
   /** the operation manager of a city-state (`minorOps.ts`) or the
    *  barbarians (`barbarianOps.ts`), and the id the barbarians' next
    *  operation's tree takes */

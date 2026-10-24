@@ -285,7 +285,7 @@ class SimBarbOps:
         InitialStrengthAdvantage 0 asks no strength — the members' strength),
         the enemy's about the target (`_ops_enemy_str`), and the running
         operation's candidate as its backup (0x73e610, `evaluate`, before
-        the strengths' refresh: of the camps, in plot order, the one of the
+        the strengths' refresh: of the knowledge base's camps in its order, the one of the
         best odds from the target at the strength the last refresh left —
         none on the turn after the start — against the walk's 6; a camp on
         the target, or off its area, none)"""
@@ -294,7 +294,7 @@ class SimBarbOps:
         bidx = self._bidx
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
         civ_ai = self._bop_civ_ai.take(ut)
-        cp = self.camp_tile
+        cp = self.barb_camps_known
         n_camps = (cp >= 0).sum(dim=1)
         best = 1  # the barbarians' best trained strength none: max(1, 0)
         for c in range(self.bcap_id.shape[1]):
@@ -312,16 +312,16 @@ class SimBarbOps:
             tgt = self.bcap_target[:, c]
             self.bcap_estr[:, c] = torch.where(on, self._ops_enemy_str(BARB_SEAT, self.BK, tgt, torch.full_like(tgt, -1)),
                                                self.bcap_estr[:, c])
-            # the backup: the camps in plot order, the last of the best
+            # the backup: the knowledge base's camps in its order, the last
+            # of the best
             rally = tgt
             rc = rally.clamp(min=0)
             value = n_camps * 50 * 256
-            order = torch.where(cp >= 0, cp, torch.full_like(cp, 1 << 30)).argsort(dim=1)
             got_t = torch.full_like(tgt, -1)
             got_v = torch.zeros_like(tgt)
             got_o = torch.zeros(B, dtype=torch.float64, device=dev)
             for j in range(cp.shape[1]):
-                camp = cp.gather(1, order[:, j:j + 1]).squeeze(1)
+                camp = cp[:, j]
                 ok = on & (rally >= 0) & (camp >= 0)
                 if not bool(ok.any()):
                     continue
@@ -383,7 +383,7 @@ class SimBarbOps:
         # Operation Change Target 2
         ct_on = start1 & (mf1 == 1)
         tgt = self.bcap_target[:, c]
-        cp = self.camp_tile
+        cp = self.barb_camps_known
         is_camp = ((cp == tgt.unsqueeze(1)) & (cp >= 0)).any(dim=1) & (tgt >= 0)
         bk_ok = self.bcap_bk_target[:, c] >= 0
         swap_inv = ct_on & ~is_camp & bk_ok

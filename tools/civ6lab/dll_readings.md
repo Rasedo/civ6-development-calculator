@@ -5870,8 +5870,15 @@ the event in `seizeCivilian` (cpu/core/combat.ts, `GameState.barbCaptures`);
   Formations), Operation Move 8 (the target, range 0). The team: one
   civilian (UNITTYPE_CIVILIAN 1..1), a UNITAI_COMBAT unit at least, no
   naval one; InitialStrengthAdvantage 0, Ongoing 0.5.
-- LAB: the barbarians' knowledge base's camps (+0x638) taken as every camp
-  in plot order.
+- The barbarians' knowledge base's camps (+0x638) are any player's: the
+  update drops a camp whose plot they see or have revealed with none there
+  (0x5ebb30), the look adds each camp on a plot they see or have revealed
+  (0x7877e0 -> 0x5f0110), in plot order behind those held — so a camp joins
+  at the look after its units revealed its plot (the pass's opening look,
+  the turn's end look), and the list keeps the order camps joined. The
+  engines: `barbSeat.campsKnown` (`barbCampsLook`, `lookCamps`) /
+  `barb_camps_known` (`_barb_kb_camps`, `_kb_camps`), read by the capture's
+  backup and its target test as the operations' camps.
 - OPERATION DEFEND UNITS (0x80ee70 / 0x80d790) runs the
   city-states' reading ("Operation Defend Units, both twins") on the
   barbarians' pool: the raid's node 20, the assault's 1, the capture's 5;

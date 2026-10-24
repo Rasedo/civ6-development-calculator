@@ -239,8 +239,10 @@ class SimMinorOps:
         self.mops_pick = torch.full((B, S), -1, dtype=L, device=device)
         self.mops_pick_target = torch.full((B, S), -1, dtype=L, device=device)
         self.mops_pick_rally = torch.full((B, S), -1, dtype=L, device=device)
-        # the camps the knowledge base holds, in its order (-1 padded)
+        # the camps the knowledge base holds, in its order (-1 padded); the
+        # barbarians' (`barbSeat.campsKnown`)
         self.mops_camps = torch.full((B, S, N_CAMPS), -1, dtype=L, device=device)
+        self.barb_camps_known = torch.full((B, N_CAMPS), -1, dtype=L, device=device)
         # the plots its knowledge base's looks have seen or a meeting revealed
         # (`CityState.revealed`)
         self.mops_revealed = torch.zeros(B, S, self.T, dtype=torch.bool, device=device)
@@ -315,15 +317,20 @@ class SimMinorOps:
         sees join its revealed ones (`mops_revealed`); a camp whose plot it
         has revealed with none there dropped, each camp on a plot it has
         revealed added in plot order (`lookCamps`)"""
+        self.mops_revealed[:, s] |= sight & alive.unsqueeze(1)
+        self.mops_camps[:, s] = torch.where(alive.unsqueeze(1), self._kb_camps(self.mops_camps[:, s], self.mops_revealed[:, s]),
+                                            self.mops_camps[:, s])
+
+    def _kb_camps(self, known: torch.Tensor, sight: torch.Tensor) -> torch.Tensor:
+        """`lookCamps`: the knowledge base's camps `known` [B, N_CAMPS] in its
+        order, a camp whose plot `sight` [B, T] holds with none there
+        dropped, each camp on a plot it holds added in plot order"""
         T = self.T
         dev = self.device
-        self.mops_revealed[:, s] |= sight & alive.unsqueeze(1)
-        sight = self.mops_revealed[:, s]
         now = torch.zeros(self.B, T + 1, dtype=torch.bool, device=dev)
         cp = self.camp_tile
         now.scatter_(1, torch.where(cp >= 0, cp, T), True)
         now = now[:, :T]
-        known = self.mops_camps[:, s]
         kc = known.clamp(min=0)
         keep = (known >= 0) & (~sight.gather(1, kc) | now.gather(1, kc))
         held = torch.zeros(self.B, T + 1, dtype=torch.bool, device=dev)
@@ -339,8 +346,15 @@ class SimMinorOps:
         n = (allk < big).sum(dim=1)
         assert int(n.max()) <= N_CAMPS, "minor operations: raise N_CAMPS"
         new = vals.gather(1, o[:, :N_CAMPS])
-        new = torch.where(ar < n.unsqueeze(1), new, torch.full_like(new, -1))
-        self.mops_camps[:, s] = torch.where(alive.unsqueeze(1), new, known)
+        return torch.where(ar < n.unsqueeze(1), new, torch.full_like(new, -1))
+
+    def _barb_kb_camps(self, seen: torch.Tensor) -> None:
+        """the barbarians' knowledge base's camps (`barbCampsLook`): over the
+        plots they see or have revealed (`barb_explored`; every plot where
+        they revealed none)"""
+        ex = self.barb_explored
+        rev = seen | ex | ~ex.any(dim=1, keepdim=True)
+        self.barb_camps_known = self._kb_camps(self.barb_camps_known, rev)
 
     def _mops_records(self, s: int) -> dict:
         """the knowledge base's army records of row `s` (a minor, the barbarians'

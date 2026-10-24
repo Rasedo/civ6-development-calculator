@@ -486,6 +486,17 @@
           ]
         },
         {
+          "name": "barbCampsKnown",
+          "compare": "exact",
+          "note": "the camps the barbarians' knowledge base holds, in its order (`barbCampsLook` on `barbSeat.campsKnown`).",
+          "covers": [
+            "Seat.campsKnown"
+          ],
+          "planes": [
+            "barb_camps_known"
+          ]
+        },
+        {
           "name": "freeUnitStrength",
           "compare": "exact",
           "note": "the Free Cities' strength over every domain as their turn start stored it (`storeUnitStrength` on `freeSeat.unitStrength`; the row `FR`); 0 until the seat is made.",
