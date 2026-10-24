@@ -553,7 +553,7 @@ type Keyed = Map<string, Decision>;
  *   - `kill`: `UnitKilledInCombat` (victim player, victim id, killer player,
  *     killer id), the types off the records' units;
  *   - the active player's `research` and `civic` where the record holds no pick:
- *     its last `ResearchChanged` / `CivicChanged`; its queues' head: its last
+ *     its last `ResearchChanged` / `CivicChanged` of the turn; its queues' head: its last
  *     `CityProductionChanged` of the turn per city (a pick its start of turn
  *     then completed leaves no trace in the record).
  * The currency of a purchase is not in the event: it is the purse that paid
@@ -695,7 +695,10 @@ export class RecordedActions implements ActionSource {
           victim: n(r, 0), victimType: typeOf(n(r, 0), n(r, 1)), victimUnit: `${n(r, 0)}:${n(r, 1)}` });
       } else if (name === 'PantheonFounded') {
         put('pantheon', `${n(r, 0)}:${n(r, 1)}`, { kind: 'pantheon', phase: phaseOf(n(r, 0)), player: n(r, 0), belief: n(r, 1) });
-      } else if ((name === 'ResearchChanged' || name === 'CivicChanged') && n(r, 0) === act && n(r, 1) >= 0) {
+      } else if ((name === 'ResearchChanged' || name === 'CivicChanged') && n(r, 0) === act && n(r, 1) >= 0 && r[1] === a.turn) {
+        // a pick of the pair's own turn: the rows of the next turn's start
+        // are its step's (runs/h1_duelw1128 t46: Rome names Animal Husbandry,
+        // which completes at its t47 start, the queue then naming Shipbuilding)
         const kind = name === 'ResearchChanged' ? 'research' : 'civic';
         const map = log.get(kind) ?? new Map();
         map.clear();
@@ -1116,7 +1119,18 @@ export class RecordedActions implements ActionSource {
           const k = d.kind === 'research' ? d.tech : d.kind === 'civic' ? d.civic : -1;
           return k >= 0 && String(p1?.[bits] ?? '')[k] === '1' && String(p0?.[bits] ?? '')[k] !== '1';
         };
-        out.push(...(theirs.size ? theirs.values() : [...mine.values()].filter(done)));
+        const picks = theirs.size ? [...theirs.values()] : [...mine.values()].filter(done);
+        // a pick the turn completed is followed by the log's last pick that
+        // record t+1 holds, made before the completion in the player's own
+        // turn (runs/h1_duelw1128 t20: Rome names Iron Working, then Bronze
+        // Working completes; record t21 holds Iron Working on the overflow)
+        const field = kind === 'research' ? 'researching' : 'civic';
+        const held = (d: Decision) => {
+          const k = d.kind === 'research' ? d.tech : d.kind === 'civic' ? d.civic : -1;
+          return k >= 0 && num(p1?.[field]) === k;
+        };
+        if (picks.some(done)) picks.push(...[...mine.values()].filter((d) => held(d) && !picks.some((x) => same(x, d))));
+        out.push(...picks);
       } else {
         // what the log names, and what the records show that it does not
         out.push(...mine.values(), ...[...theirs].filter(([k]) => !mine.has(k)).map(([, d]) => d));

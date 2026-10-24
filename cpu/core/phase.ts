@@ -1160,7 +1160,11 @@ export function districtSiteCost(
  * at (35,12) stands on its Rainforest in every record after, where the Oracle
  * (t61) and the Hanging Gardens (t75) took theirs off. */
 export function paveGround(tile: Tile, keep: readonly FeatureId[] = []): void {
+  // the improvement goes, pillaged or not, and with it its pillage
+  // (runs/h1_duelw1128 t34: China's wonder placed on the pillaged Farm at
+  // (16,12), the plot unpillaged in record t35)
   tile.improvement = null;
+  tile.pillaged = false;
   tile.feature = isFloodplains(tile.feature) || (tile.feature !== null && keep.includes(tile.feature)) ? tile.feature : null;
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
 }

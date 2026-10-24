@@ -4178,7 +4178,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // (runs/h1_duelw1127 t34: China's Slinger at 47 HP upgrades to an Archer
     // and reads no heal, 53 + 31 damage at record t+1)
     const upgraded = new Set(ds.flatMap((d) => (d.kind === 'upgrade' ? [d.unit, d.into] : [])));
-    const spent = new Map<Unit, number>();
+    const spent = new Map<Unit, { hp: number; fortify: number }>();
     const struckHp = new Map<Unit, number>();
     // a barbarian unit's rest: whether it stood the turn through and struck
     // no blow
@@ -4201,7 +4201,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // state 2's Warrior attacked the Spearman at 8:14 and fought it again
       // at t11 on 62 HP, unhealed)
       u.movesLeft = rested || minorAiSeat(u.seat) ? grantedMoves(state, u) : 0;
-      if (!rested) spent.set(u, u.hp);
+      if (!rested) spent.set(u, { hp: u.hp, fortify: u.fortifyTurns ?? 0 });
       else if (struckOnly.has(key)) struckHp.set(u, u.hp);
       if (isBarbSeat(u.seat)) barbRest.set(u, stood && !struck.has(key) && num(r.fortify) > 0);
     }
@@ -4296,7 +4296,14 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     }
     holdMinorCatchUp(null);
     stream.actions(a.turn);
-    for (const [u, hp] of spent) if (u.hp > hp) u.hp = hp;
+    // ...nor any of its fortification: the turn's dig-in is a standing
+    // unit's (runs/h1_duelw1128 t17: Rome's Warrior, two turns dug in,
+    // attacked, stepped onto 41:16 and took a barbarian Warrior's blow there
+    // unfortified)
+    for (const [u, was] of spent) {
+      if (u.hp > was.hp) u.hp = was.hp;
+      if ((u.fortifyTurns ?? 0) > was.fortify) u.fortifyTurns = was.fortify;
+    }
     // a rested unit struck in a later player's turn heals at its own next
     // turn's start, after the blow (runs/h1_duelw1118 t8: a city-state's
     // Warrior 23 damaged, fortified, took the barbarians' two attacks at 77

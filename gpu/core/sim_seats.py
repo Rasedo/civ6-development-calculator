@@ -11385,14 +11385,15 @@ class SimSeats:
 
     def _record_moments(self) -> None:
         """`recordMoments` — the turn's once moments: every major row in order
-        records the keys it holds, then the city-states' research eras join
-        the world's."""
+        records the keys it holds, then the city-states' and the barbarians'
+        research eras join the world's."""
         for row in range(self.n_majors):
             self._moment_record(row, self._moment_held(row))
         cs = torch.zeros(self.B, self._mk_n, dtype=torch.bool, device=self.device)
         for s in range(self.S):
             self._moment_research(cs, self.citystate_techs[:, s] & self.citystate_alive[:, s:s + 1],
                                   self.citystate_civics[:, s] & self.citystate_alive[:, s:s + 1])
+        self._moment_research(cs, self.barb_techs, self.barb_civics)
         self.moment_world.copy_(self.moment_world | cs)
 
     def _transfer_city(self, b: int, src_row: int, src_col: int, dst_row: int, *, conquest: bool,

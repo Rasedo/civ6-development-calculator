@@ -304,8 +304,12 @@ export function recordMoments(state: GameState): void {
     if (!isCiv(s.seat)) continue;
     for (const k of momentKeysHeld(state, s.seat)) recordMoment(state, s.seat, k);
   }
+  // the city-states' and the barbarians' research eras join the world's
+  // (runs/h1_duelw1128 t32: Rome's Iron Working, the majors' first Classical
+  // tech, pays the plain 1, the barbarians holding Shipbuilding from t2)
   const cs = new Set<number>();
   for (const c of state.cityStates) researchKeys(c.research.techs, c.research.civics, cs);
+  researchKeys(state.barbSeat.research.techs, state.barbSeat.research.civics, cs);
   const world = (state.momentsWorld ??= []);
   for (const k of cs) insertSorted(world, k);
 }

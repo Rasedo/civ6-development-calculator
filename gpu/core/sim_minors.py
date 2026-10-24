@@ -643,8 +643,9 @@ class SimMinors:
         """`paveGround` — the ground a district or a wonder takes, for every
         seat: the improvement goes, every feature but floodplains and those of
         `keep` (a wonder's required features, its `onFeat`) goes, a bonus
-        resource goes."""
+        resource goes. The improvement goes with its pillage."""
         self.improvement[rows, tiles] = -1
+        self.pillaged[rows, tiles] = False
         fid = self.feat_id[rows, tiles]
         nofp = (fid < 0) | ~self._fp_feat[fid.clamp(min=0)]
         for f in keep:
