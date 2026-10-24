@@ -459,6 +459,18 @@
     - "...plot of danger > 0 (logged \"Current Danger\"): one with no strength, or in a formation (0x8be30); a hurt one at half its health or worse whose planning holds no fight it wins (+0x60),..."
     - "...x7737c0): each unit (+0x770 clear) that has taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queu..."
   review: imported
+- addr: 0x90290
+  final: 0x67a40
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: "its parser 0x6bedb0 stores fx(expf(Amount x   COMBAT_POWER_SCALING)) at +8, GlobalParameters +0x210, 0.04 under   Expansion1's Replace: Discipline's 5 reads 1.2214, from the start to the   horizon who"
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...ION_PLAYER_UNITS (the context's unit +0x90), with the player (+0x80): a unit on a plot (0x90290) that fights (0x209dd0: GetCombat, GetRangedCombat or GetBombardCombat above 0); its kn..."
+  review: imported
 - addr: 0x9ed20
   final: 0x6e460
   kind: function

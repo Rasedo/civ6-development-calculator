@@ -203,11 +203,15 @@
     - recording: 1124
       turn: 157
       value: a military unit its city's production completes garrisons from that city's turn (1124 t157 Taiyuan grows Content).
-  impl: [cpu/core/tactical.ts:minor, gpu/core/sim_tactics.py:_tac_attack_planes]
+  impl:
+    - cpu/core/tactical.ts:minor
+    - gpu/core/sim_tactics.py:_tac_attack_planes
+    - cpu/core/aiModifiers.ts:ANALYZERS
   readings:
     - "H-1: the garrison requirement — READ"
     - "H-1: a civilian stepped on — READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a MilitaryFormation argument (+0x90), compa..."
     - ...'s units from the last to the first; for each one not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's player is at w...

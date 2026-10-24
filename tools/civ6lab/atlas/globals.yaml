@@ -216,6 +216,17 @@
   context:
     - ...6cf3c0's evaluation of it unread). The other analyzers (EFFECT_ADJUST_CITY_YIELD_MODIFIER 0xd63490 ...) are unread.
   review: imported
+- addr: 0xd63760
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: "its parser 0x6bedb0 stores fx(expf(Amount x   COMBAT_POWER_SCALING)) at +8, GlobalParameters +0x210, 0.04 under   Expansion1's Replace: Discipline's 5 reads 1.2214, from the start to the   horizon who"
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "- READ, Discipline's EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT 0x6bef40 (@f03c08, vtable 0xd63760; its parser 0x6bedb0 stores fx(expf(Amount x COMBAT_POWER_SCALING)) at +8, GlobalParame..."
+  review: imported
 - addr: 0xd63a18
   kind: global
   status: READ

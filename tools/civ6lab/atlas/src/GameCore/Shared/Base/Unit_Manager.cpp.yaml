@@ -14,3 +14,15 @@
   context:
     - ...vealed it, no other player's unit on it and none of its own that it may not stack with (0x9406e0); the nearest the target, a plot of another area (plot +8) counted three times as far;...
   review: imported
+- addr: 0x940740
+  final: 0x650050
+  kind: function
+  name: Unit_Manager
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:amountOf]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...last of the greatest max(Combat, RangedCombat), from 0); the unit's era (Unit_Manager 0x940740: of its PrereqTech's and PrereqCivic's eras the later by ChronologyIndex, with neither..."
+  review: imported

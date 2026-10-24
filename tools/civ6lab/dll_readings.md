@@ -6405,6 +6405,46 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   parser's scaling unread), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work
   type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURISM,
   between).
+- READ, Discipline's EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT 0x6bef40 (@f03c08,
+  vtable 0xd63760; its parser 0x6bedb0 stores fx(expf(Amount x
+  COMBAT_POWER_SCALING)) at +8, GlobalParameters +0x210, 0.04 under
+  Expansion1's Replace: Discipline's 5 reads 1.2214, from the start to the
+  horizon whole 17 — every minor's logged Discipline line is a multiple of
+  17, runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128: 17 to 102, one per
+  unit outnumbered). Over
+  COLLECTION_PLAYER_UNITS (the context's unit +0x90), with the player
+  (+0x80): a unit on a plot (0x90290) that fights (0x209dd0: GetCombat,
+  GetRangedCombat or GetBombardCombat above 0); its knowledge base (player
+  +0x12b8, 0x786160) summed over the game's barbarian players (0x483b50
+  +0x29f0) of 0x5eb0f0(kb, barbarian, the unit plot's area +8, no region,
+  10) against 0x5eb0f0(kb, its own player, ...); the barbarians' greater
+  adds the Amount between start and horizon (0x7a2140). 0x5eb0f0(kb,
+  player, &area, &region, maxAge): over the Units in order, the player's
+  records of the type (0x5ef870: record +0x18 the area or +0x1c the region
+  given, -1 for none — so a record on a plot of no region counts at any
+  area), each of age (+0xc) at most maxAge adding the unit's max(Combat
+  +0x48, RangedCombat +0x6c). The records' +0x18 / +0x1c are the plot's
+  +8 (the CvArea, its id +0) and +0x18 (the region; 0x5e9530). Port:
+  `aiModifiers.ts` (`COLLECTION_PLAYER_UNITS`, `knownStrength` on
+  `Seat.armyKnown` aged at `armyAged`), `sim_policy.py`
+  (`_pol_barbarian_combat` on `citystate_kb_*`); in a city's analysis
+  the GPU walks no unit (its analyzers read nothing on a unit).
+- READ, Agoge's EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION 0x6bc9e0 (EraType +8,
+  UnitPromotionClass +0xc, Amount +0x10): with the context's city and an
+  era, the city's owner in that era (GetEra); its strongest unit of the
+  class (PlayerStats 0x4bcd30: over the Units in order, its own version —
+  player +0x12e8 +0x1c0[i] = i —, not MustPurchase +0x1b9 bit 7, of the
+  PromotionClass +0x288, PrereqTech +0x280 and PrereqCivic +0x270 held, the
+  last of the greatest max(Combat, RangedCombat), from 0); the unit's era
+  (Unit_Manager 0x940740: of its PrereqTech's and PrereqCivic's eras the
+  later by ChronologyIndex, with neither the start era's ChronologyIndex
+  returned as an Eras index — Classical for an Ancient start) at least the
+  EraType's chronology; then fdiv(Combat +0x48, max(1, PlayerStats +0xf0)) x
+  fdiv(CityBuildAI's Production 0x6c8dd0, max(1, Cost +0x4c)) x Amount /
+  100 (0x51eb851f-style divide by 25600), as PSEUDOYIELD_UNIT_COMBAT at the
+  owner's weight, from the start to the horizon, whole. Port:
+  `aiModifiers.ts` (`unitEraIndex`, `bestUnitOfClass`), `sim_policy.py`
+  (`_pol_best_of_class`).
 - READ, Ilkum's EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (@f040d0, vtable
   0xd63100; its parser 0x6b1d00 stores UnitType +8 and fx(Amount x 0.01f)
   +0x10): with a player, per city of its list (+0x12f0 +0xd8; the context's

@@ -102,6 +102,19 @@ export function majorItemType(q: QueueItem | undefined): string | null {
   return null;
 }
 
+/** a major's or the Free Cities' version of a unit (player +0x12e8 +0x1c0)
+ *  under its traits `traits`: none where the database bars it or it is
+ *  another civilization's unique; a unique unit of its own in place of the
+ *  base it replaces */
+export function majorUnitVersion(traits: readonly string[], u: string): string | null {
+  const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
+  if (!row || !row.canTrain) return null;
+  if (row.trait) return traits.includes(row.trait) ? u : null;
+  const unique = AI_UNITS.find((x) => x.trait && traits.includes(x.trait)
+    && engineId('unit', x.type, 'UNIT_', UNITS) !== null && UNITS[engineId('unit', x.type, 'UNIT_', UNITS)!]?.replaces === engineId('unit', u, 'UNIT_', UNITS));
+  return unique ? unique.type : u;
+}
+
 /** THE CITY BUILD AI'S VIEW OF A MAJOR'S CITY, its knowledge base's unit
  *  counts `known` */
 export function majorBuildFacts(state: GameState, city: City, known: (unit: string) => number,
@@ -141,15 +154,7 @@ export function majorBuildFacts(state: GameState, city: City, known: (unit: stri
     const c = x.startsWith('CIVIC_') ? engineId('civic', x, 'CIVIC_', CIVICS) : null;
     return (!!t && r.techs.includes(t)) || (!!c && r.civics.includes(c));
   };
-  const unitVersion = (u: string): string | null => {
-    const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
-    if (!row || !row.canTrain) return null;
-    if (row.trait) return traits.includes(row.trait) ? u : null;
-    // a unique unit of the player's standing in place of the base
-    const unique = AI_UNITS.find((x) => x.trait && traits.includes(x.trait)
-      && engineId('unit', x.type, 'UNIT_', UNITS) !== null && UNITS[engineId('unit', x.type, 'UNIT_', UNITS)!]?.replaces === engineId('unit', u, 'UNIT_', UNITS));
-    return unique ? unique.type : u;
-  };
+  const unitVersion = (u: string): string | null => majorUnitVersion(traits, u);
   const growth = cityGrowth(state, city);
   return {
     view,

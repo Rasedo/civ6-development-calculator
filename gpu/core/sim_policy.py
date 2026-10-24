@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .sim_research import _FX, _fdiv, _fmul, _fx_const, _fx_const_t, _present_value, _discounted
 from .sim_cityvalue import _FreeFacts, _MinorFacts, _f32
@@ -28,6 +30,7 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC", "EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT", "EFFECT_ADJUST_PROJECT_PRODUCTION",
     "EFFECT_ADJUST_GREAT_PERSON_POINTS", "EFFECT_ADJUST_POLICY_AMENITY", "EFFECT_ADJUST_POLICY_HOUSING",
     "EFFECT_ADJUST_CITY_OUTER_DEFENSE", "EFFECT_ADJUST_CITY_RANGED_STRIKE", "EFFECT_ADJUST_UNIT_PRODUCTION",
+    "EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT", "EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION",
 }
 # worth 0 in a minor's policy context: the context's own city (none), the
 # Influence a minor may not give, its tributaries and placed envoys (none)
@@ -37,7 +40,13 @@ _POL_ZERO = {
     "EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_TRIBUTARY", "EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_USED_INFLUENCE_TOKEN",
 }
 _POL_COLLECTIONS = {"COLLECTION_OWNER", "COLLECTION_PLAYER_CITIES", "COLLECTION_PLAYER_CAPITAL_CITY", "COLLECTION_PLAYER_DISTRICTS",
-                    "COLLECTION_ALL_PLAYERS"}
+                    "COLLECTION_ALL_PLAYERS", "COLLECTION_PLAYER_UNITS"}
+# on a unit subject every analyzer here but the barbarian combat's reads
+# nothing (a city's, a district's or a plot's)
+_POL_UNIT_ZERO = {"EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER", "EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_PLOT_YIELD",
+                  "EFFECT_GRANT_UNIT_IN_CITY"}
+# the records' age the barbarian combat reads (0x5eb0f0's fifth argument)
+_KNOWN_AGE = 10
 # the collections of the context's own city, which a policy's context has
 # not: no subject (`subjects`' empty walks)
 _POL_NO_SUBJECTS = {"COLLECTION_CITY_DISTRICTS", "COLLECTION_CITY_TRAINED_UNITS", "COLLECTION_CITY_PLOT_YIELDS", "COLLECTION_ALL_CITIES"}
@@ -126,6 +135,8 @@ class SimPolicy:
             return
         if eff in reads["sets"] or eff in reads["none"]:
             raise NotImplementedError(f"{owner} {m.get('id')}: {eff}'s setting / slot-2 analysis not on the GPU")
+        if m.get("collection") == "COLLECTION_PLAYER_UNITS" and eff in _POL_UNIT_ZERO:
+            return
         if m.get("collection") not in _POL_COLLECTIONS:
             raise NotImplementedError(f"{owner} {m.get('id')}: collection {m.get('collection')} read in TS, not on the GPU")
         if eff not in _POL_ANALYZERS and eff not in _POL_ZERO:
@@ -175,6 +186,9 @@ class SimPolicy:
             return [{"kind": "player", "mask": one}]
         if collection in _POL_NO_SUBJECTS:
             return []
+        if collection == "COLLECTION_PLAYER_UNITS":
+            # the player's units at once (`_pol_barbarian_combat`)
+            return [{"kind": "units", "mask": one}]
         out = []
         for j, (f, alive, cap) in enumerate(ctx["cities"]):
             if collection == "COLLECTION_PLAYER_CITIES" or (collection == "COLLECTION_PLAYER_CAPITAL_CITY" and cap):
@@ -266,6 +280,12 @@ class SimPolicy:
 
         city = sub["kind"] == "city"
         y = a.get("YieldType", "")
+        if sub["kind"] == "units":
+            if eff != "EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT":
+                return zero
+            scale = _f32(float(self.rules.civic_ai["combatPowerScaling"]))
+            per = between(full(_fx_const(_f32(math.exp(_f32(amount * scale)))))) >> 8
+            return self._pol_barbarian_combat(ctx) * per
         if eff in _POL_ZERO or eff == "EFFECT_ADJUST_BUILDING_PRODUCTION":
             return zero
         if eff == "EFFECT_ADJUST_CITY_YIELD_CHANGE":
@@ -351,6 +371,27 @@ class SimPolicy:
                 v = self._cv_unit_prod_value(f, unit, pct, t0, hh)
                 acc = acc + torch.where(alive, v, zero)
             return acc
+        if eff == "EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION":
+            # the owner's era the EraType; its strongest unit of the class
+            # (`_pol_best_of_class`) of an era no earlier: Combat over the best
+            # melee made x Production over Cost x Amount / 100, as
+            # PSEUDOYIELD_UNIT_COMBAT (0x6bc9e0)
+            if not city:
+                return zero
+            era = self._pol_era_index(a.get("EraType"))
+            f = sub["f"]
+            if era < 0:
+                return zero
+            row, combat, cost, uera = self._pol_best_of_class(ctx, a.get("UnitPromotionClass", ""))
+            ok = (torch.as_tensor(f.era(), device=dev).long().expand(B) == era) & (row >= 0) & (uera >= era)
+            best = torch.as_tensor(f.best_combat_strength(), device=dev).long().expand(B).clamp(min=1)
+            strength = _fdiv(combat * _FX, best * _FX)
+            prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64, device=dev) * _FX + 0.5).long().expand(B)
+            production = _fdiv(prod, cost.clamp(min=1) * _FX)
+            v = torch.trunc(_fmul(production, strength).double() * amount / 100).long()
+            p = "PSEUDOYIELD_UNIT_COMBAT"
+            out = between(self._cv_pseudo(v, p, f0.pseudo_w(p))) >> 8
+            return torch.where(ok, out, zero)
         if eff == "EFFECT_ADJUST_CITY_OUTER_DEFENSE":
             # the centre's outer defence standing: a city-state's always
             # (`cityOuterStands`), a Free City's walls' pool above 0
@@ -388,6 +429,94 @@ class SimPolicy:
             tot = (torch.clamp(m, max=amount) * mine.long()).sum(dim=1) * _FX
             return span(self._cv_yield(tot, "YIELD_GOLD")) >> 8
         raise NotImplementedError(eff)
+
+    def _pol_era_index(self, name) -> int:
+        """an EraType as the parser reads it: the Eras row's index, -1 none"""
+        names = [str(e).upper() for e in self.rules.civic_ai["eraNames"]]
+        key = str(name or "")[len("ERA_"):] if str(name or "").startswith("ERA_") else None
+        return names.index(key) if key in names else -1
+
+    def _pol_best_of_class(self, ctx: dict, cls: str):
+        """`bestUnitOfClass` (PlayerStats 0x4bcd30) of the minor: in the
+        units' order its own version, not MustPurchase, of the class, its
+        PrereqTech and PrereqCivic held, the last of the greatest
+        max(Combat, RangedCombat): [B] its row (-1 none), Combat, Cost and
+        era (`unitEraIndex`)"""
+        B, dev = ctx["B"], ctx["dev"]
+        s = ctx["s"]
+        T = self._cv_tables()
+        E = T["engine"]
+        f0 = ctx["f0"]
+        eras = self.rules.civic_ai["unitEras"]
+        techs, civics = self.citystate_techs[:, s], self.citystate_civics[:, s]
+        row = torch.full((B,), -1, dtype=torch.long, device=dev)
+        combat = torch.zeros(B, dtype=torch.long, device=dev)
+        cost = torch.zeros(B, dtype=torch.long, device=dev)
+        uera = torch.full((B,), -1, dtype=torch.long, device=dev)
+        top = torch.zeros(B, dtype=torch.long, device=dev)
+        for k, r in enumerate(T["unit_rows"]):
+            if r["promotionClass"] != cls or r["mustPurchase"] or f0.unit_version(r["type"]) != r["type"]:
+                continue
+            ok = torch.ones(B, dtype=torch.bool, device=dev)
+            if r["tech"]:
+                ti = int(E["tech"].get(r["tech"], -1))
+                ok = ok & (techs[:, ti] if ti >= 0 else torch.zeros_like(ok))
+            if r["civic"]:
+                ci = int(E["civic"].get(r["civic"], -1))
+                ok = ok & (civics[:, ci] if ci >= 0 else torch.zeros_like(ok))
+            st = max(int(r["combat"]), int(r["rangedCombat"]))
+            take = ok & (st >= top)
+            row = torch.where(take, torch.full_like(row, k), row)
+            top = torch.where(take, torch.full_like(top, st), top)
+            combat = torch.where(take, torch.full_like(combat, int(r["combat"])), combat)
+            cost = torch.where(take, torch.full_like(cost, int(r["cost"])), cost)
+            uera = torch.where(take, torch.full_like(uera, int(eras.get(r["type"], -1))), uera)
+        return row, combat, cost, uera
+
+    def _pol_barbarian_combat(self, ctx: dict) -> torch.Tensor:
+        """[B] the minor's units (the first 51 in pool order) that fight
+        (Combat, RangedCombat or Bombard above 0) where the barbarians'
+        strength its knowledge base holds exceeds its own (0x5eb0f0: the
+        records of age at most 10 in the unit's area or in no region, each
+        max(Combat, RangedCombat)); the Free Cities keep no knowledge base"""
+        B, dev = ctx["B"], ctx["dev"]
+        s = ctx["s"]
+        if s == self.FR:
+            return torch.zeros(B, dtype=torch.long, device=dev)
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        er = T["engine_row"].to(dev)
+        st_row = torch.tensor([max(int(r["combat"]), int(r["rangedCombat"])) for r in rows] + [0], dtype=torch.long, device=dev)
+        fight_row = torch.tensor([max(int(r["combat"]), int(r["rangedCombat"]), int(r["bombard"])) > 0 for r in rows] + [False],
+                                 dtype=torch.bool, device=dev)
+
+        def row_of(typ):
+            ar = torch.where(typ >= 0, er.take(typ.clamp(min=0, max=er.numel() - 1)), torch.full_like(typ, -1))
+            return torch.where(ar >= 0, ar, torch.full_like(ar, len(rows)))
+        seat = 100 + s
+        own = self.major_unit_alive & (self.major_unit_seat == seat)
+        P = own.shape[1]
+        pslot = self.major_unit_pslot
+        key = torch.where(own, torch.where(pslot >= 0, pslot, torch.full_like(pslot, P)), torch.full_like(pslot, 1 << 40))
+        rank = key.argsort(dim=1, stable=True).argsort(dim=1)
+        tile = self.major_unit_tile.long()
+        on = own & (rank < 51) & (tile >= 0) & fight_row.take(row_of(self.major_unit_type.long()))
+        uarea = self.tile_area.gather(1, tile.clamp(min=0))
+        slot = self.citystate_kb_slot[:, s].long()
+        owner = self.citystate_kb_owner[:, s].long()
+        seen = self.citystate_kb_seen[:, s].long()
+        plot = self.citystate_kb_plot[:, s].long()
+        aged = self.citystate_kb_aged[:, s].long()
+        turn = torch.where(aged >= 0, aged, torch.full_like(aged, int(self.turn)))
+        live = (slot != -2) & (turn.unsqueeze(1) - seen <= _KNOWN_AGE)
+        rarea = self.tile_area.gather(1, plot.clamp(min=0))
+        noreg = self.tile_region.gather(1, plot.clamp(min=0)) == -1
+        strength = st_row.take(row_of(self.citystate_kb_type[:, s].long()))
+        hit = live.unsqueeze(1) & ((rarea.unsqueeze(1) == uarea.unsqueeze(2)) | noreg.unsqueeze(1))
+        w_own = (hit & (owner == seat).unsqueeze(1)).long() * strength.unsqueeze(1)
+        w_barb = (hit & (owner == BARB_SEAT).unsqueeze(1)).long() * strength.unsqueeze(1)
+        more = w_barb.sum(-1) > w_own.sum(-1)
+        return (on & more).long().sum(dim=1)
 
     def _pol_mod_value(self, ctx: dict, m: dict, h: int) -> torch.Tensor:
         """one modifier's whole value [B] (`modifierValue`), 0 where refused"""

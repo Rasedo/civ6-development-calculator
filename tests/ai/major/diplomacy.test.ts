@@ -37,7 +37,7 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     congressTargets: () => [], congressTargetsOf: () => [],
     cityStateBonus: () => null, suzerain: () => -1, greatWorksByObject: () => [], cityHousing: () => 0, greatPersonPoints: () => 0,
     greatPersonPrice: () => Infinity, religionFollowers: () => 0, cityBuildable: () => new Set(), unitPromotionClass: () => null,
-    cityAmenity: () => ({ balance: 0, yields: {} }), cityHousingValue: () => 0, cityOuterStands: () => false, cityStrike: () => 0, cityUnitTurns: () => -1, cityUnitExpected: () => 0, greatPersonPointsPerTurn: () => 0, diplomaticPoints: () => 0,
+    cityAmenity: () => ({ balance: 0, yields: {} }), cityHousingValue: () => 0, cityOuterStands: () => false, cityStrike: () => 0, cityUnitTurns: () => -1, cityUnitExpected: () => 0, playerUnits: () => [], knownStrength: () => 0, barbarianSeats: () => [], bestUnitOfClass: () => null, greatPersonPointsPerTurn: () => 0, diplomaticPoints: () => 0,
     diplomaticVictoryPoints: 20, competitionLeads: () => 0, cityCanProject: () => false,
     capturedAs: () => null, campPlots: () => [], cityDefense: () => null, cityBlowFrom: () => 0, wallsBypassed: () => false, militaryYardstick: () => 1, wmdCount: () => 0, suzerainOf: () => -1, mostEnvoys: () => 0, planSpot: () => -1, attackSpots: () => [], plotUnitCount: () => 0,
     adjacentPlot: () => -1, riverEdge: () => false, encircled: () => false, reachOf: () => null, exertsZoc: () => false, defensiveImprovements: () => [], buildCharges: () => 0, unitBuildsImprovement: () => false, airStrikeColumn: () => -1, rebaseOptions: () => [], contractCities: () => [], techsHeld: () => new Set(),

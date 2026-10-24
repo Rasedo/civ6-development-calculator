@@ -215,6 +215,19 @@ export interface AiValueView {
   tributaries(seat: number): number;
   /** each of the seat's units' Units.Maintenance */
   unitMaintenances(seat: number): readonly number[];
+  /** the seat's units in its list's order, their plot and UnitType */
+  playerUnits(seat: number): readonly { plot: number; type: string }[];
+  /** 0x5eb0f0 with no region: over `holder`'s knowledge base's records of
+   *  `player`'s units of age at most `maxAge` whose plot lies in the area of
+   *  `plot` or in no region, each unit's max(Combat, RangedCombat) summed */
+  knownStrength(holder: number, player: number, plot: number, maxAge: number): number;
+  /** the game's barbarian players (0x483b50 +0x29f0) */
+  barbarianSeats(): readonly number[];
+  /** the seat's strongest unit of a PromotionClass (PlayerStats 0x4bcd30):
+   *  in the Units' order its own version, not MustPurchase, its PrereqTech
+   *  and PrereqCivic held, the last of the greatest max(Combat,
+   *  RangedCombat); null none */
+  bestUnitOfClass(seat: number, promotionClass: string): string | null;
   /** the plots the city owns within its three rings (the
    *  COLLECTION_CITY_PLOT_YIELDS walk, 0x69feb0) */
   cityOwnedPlots(seat: number, cityId: number): readonly AiPlotView[];

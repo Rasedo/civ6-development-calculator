@@ -50,7 +50,13 @@
   final: 0x32b990
   kind: function
   status: PARTLY
-  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - gpu/core/sim_policy.py:_pol_best_of_class
+  readings:
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - ...they outnumber), the unit-tag production 0x6bc9e0 (the military AI's unit of the class 0x4bcd30, CityBuildAI's production 0x6c8dd0, PSEUDOYIELD_UNIT_COMBAT), the policy amenity 0x6b45...
   review: imported

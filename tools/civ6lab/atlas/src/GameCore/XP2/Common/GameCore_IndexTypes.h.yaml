@@ -19,7 +19,10 @@
 - addr: 0x6c8dd0
   kind: function
   status: PARTLY
-  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - ...tion 0x6bc9e0 (the military AI's unit of the class 0x4bcd30, CityBuildAI's production 0x6c8dd0, PSEUDOYIELD_UNIT_COMBAT), the policy amenity 0x6b45a0 and housing 0x6b5eb0 (C-96's eva...
   review: imported

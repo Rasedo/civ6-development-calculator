@@ -1148,6 +1148,9 @@ class SimCityValue:
         col = m.get("collection")
         if col not in reads["collections"]:
             return
+        if col == "COLLECTION_PLAYER_UNITS":
+            self._cv_check_units(m, reads, depth)
+            return
         if col not in self._CV_COLLECTIONS:
             raise NotImplementedError(f"modifier {m.get('id')}: collection {col} read in TS, not on the GPU")
         for rs in (m.get("subjectReqs"),):
@@ -1169,6 +1172,27 @@ class SimCityValue:
             self._cv_check_read(m["attach"], reads, depth + 1)
         for a in m.get("ability") or []:
             self._cv_check_read(a, reads, depth + 1)
+
+    # the analyzers worth nothing on a unit subject (they read a city's, a
+    # district's or a plot's), and the wrappers whose nested ones are checked
+    _CV_UNIT_ZERO = ("EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER", "EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_PLOT_YIELD",
+                     "EFFECT_GRANT_UNIT_IN_CITY")
+    _CV_WRAPPERS = ("EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER", "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE")
+
+    def _cv_check_units(self, m: dict, reads: dict, depth: int, nested: bool = False) -> None:
+        """COLLECTION_PLAYER_UNITS in a city's analysis: the player's units,
+        on which the analyzers here read nothing — its subjects are not
+        walked; refuse one the TS analyses to something on a unit (a nested
+        modifier analysed on its own collection, any)"""
+        if depth >= 4:
+            return
+        eff = m.get("effect")
+        if eff in reads["analyzers"] and eff not in self._CV_WRAPPERS and (nested or eff not in self._CV_UNIT_ZERO):
+            raise NotImplementedError(f"modifier {m.get('id')}: effect {eff} on COLLECTION_PLAYER_UNITS analysed in TS, not on the GPU")
+        if m.get("attach"):
+            self._cv_check_units(m["attach"], reads, depth + 1, True)
+        for x in m.get("ability") or []:
+            self._cv_check_units(x, reads, depth + 1, True)
 
     def _cv_admits(self, f, rs, sub: dict):
         """0x6cf3c0 over the subject (`sub`: kind 'city' / 'district' with
@@ -1236,6 +1260,9 @@ class SimCityValue:
             return [{"kind": "district", "type": d, "mask": _t(held, like).bool()} for d, held in f.city_districts()]
         if collection == "COLLECTION_CITY_PLOT_YIELDS":
             return [{"kind": "plots", "mask": f.plot_valid()}]
+        if collection == "COLLECTION_PLAYER_UNITS":
+            # the units read nothing here (`_cv_check_units`)
+            return []
         return None
 
     def _cv_analyze(self, f, eff: str, a: dict, sub: dict, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:

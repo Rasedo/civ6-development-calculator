@@ -24,6 +24,7 @@ import { centreStrength, cityDefenseStrength, cityStrikeStrength, encircled, pre
 import { outerPool, wallsTier } from './rules';
 import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, trainableUnits, traderCost, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
+import { TECHS } from '../data/techs';
 import { CITY_MIN_STRIKE_CS, COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
 import { snipeRing, snipeRing3 } from './unitOrders';
 import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
@@ -48,9 +49,10 @@ import type { ImprovementId } from './types';
 import { computeUnlocks } from './effects';
 import type { ContractCity } from './aiContracts';
 import { civicAnalysis } from './aiCivics';
-import { growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
-import { minorUnitExpected, minorUnitTurns } from './minorBuild';
-import { majorItemTurns, majorUnitExpected } from './majorCityBuild';
+import { AI_UNIT_INDEX, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
+import { AI_UNITS } from '../data/aiBuildTables';
+import { minorUnitExpected, minorUnitTurns, minorUnitVersion } from './minorBuild';
+import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion } from './majorCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, hasMet, minorCity, minorWarGate, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
@@ -433,6 +435,44 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     influenceTokensUsed: (i) => state.cityStates.reduce((n, cs) => n + envoysOf(cs, i), 0),
     tributaries: (i) => state.cityStates.filter((cs) => suzerainOf(cs) === i).length,
     unitMaintenances: (i) => state.units.filter((u) => u.seat === i).map((u) => UNITS[u.type]?.maintenance ?? 0),
+    playerUnits: (i) => unitsOf(state, i).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_') })),
+    barbarianSeats: () => [BARB_SEAT],
+    bestUnitOfClass: (i, cls) => {
+      const traits = isCityStateSeat(i) ? null : majorTraits(state, i);
+      const r = seat(i).research;
+      let best: string | null = null;
+      let top = 0;
+      for (const row of AI_UNITS) {
+        const version = traits ? majorUnitVersion(traits, row.type) : minorUnitVersion(row.type);
+        if (version !== row.type || row.mustPurchase || row.promotionClass !== cls) continue;
+        const tech = row.tech ? engineId('tech', row.tech, 'TECH_', TECHS) : null;
+        if (row.tech && (!tech || !r.techs.includes(tech))) continue;
+        const civic = row.civic ? engineId('civic', row.civic, 'CIVIC_', CIVICS) : null;
+        if (row.civic && (!civic || !r.civics.includes(civic))) continue;
+        const st = Math.max(row.combat, row.rangedCombat);
+        if (st >= top) {
+          top = st;
+          best = row.type;
+        }
+      }
+      return best;
+    },
+    // a record's age as its holder's last ageing left it (`armyAged`; the
+    // turn where none ran); its plot's area and region (record +0x18 / +0x1c)
+    knownStrength: (h, p, plot, maxAge) => {
+      const holder = seatOf(state, h);
+      const area = map.tiles[plot]?.area ?? -1;
+      const turn = holder?.armyAged ?? state.turn;
+      let sum = 0;
+      for (const r of holder?.armyKnown ?? []) {
+        if (r.owner !== p || turn - r.seen > maxAge) continue;
+        const t = map.tiles[r.plot];
+        if (!t || ((t.area ?? -1) !== area && (t.region ?? -1) !== -1)) continue;
+        const row = AI_UNITS[AI_UNIT_INDEX.get(gameTypeOf('unit', r.type, 'UNIT_')) ?? -1];
+        sum += row ? Math.max(row.combat, row.rangedCombat) : 0;
+      }
+      return sum;
+    },
     policyColumn: (type) => {
       const id = engineId('policy', type, 'POLICY_', POLICIES);
       return id ? POLICY_LIST.findIndex((p) => p.id === id) : -1;

@@ -20,11 +20,15 @@
  */
 import { AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD, AI_MINOR_INFLUENCE_MODIFIERS, AI_SPACE_RACE_PROJECTS } from '../data/aiTables';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { ERAS } from '../data/techs';
+import { ERAS, TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
+import { engineId } from '../data/aliases';
+import { COMBAT_POWER_SCALING } from '../data/constants';
+import { AI_UNITS } from '../data/aiBuildTables';
 import {
   FX, discounted, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, whole, yieldValue, type AiPlotView, type AiValueView,
 } from './aiValue';
-import { amenityPerTurn } from './aiCityBuild';
+import { AI_UNIT_INDEX, amenityPerTurn } from './aiCityBuild';
 
 export interface AiRequirement {
   type: string;
@@ -109,7 +113,8 @@ type Subject =
   | { kind: 'player'; other?: number }
   | { kind: 'city'; seat: number; id: number; capital: boolean }
   | { kind: 'district'; cityId: number; type: string }
-  | { kind: 'plot'; plot: AiPlotView };
+  | { kind: 'plot'; plot: AiPlotView }
+  | { kind: 'unit'; plot: number; type: string };
 
 const ownerCity = (t: ValueTerms): Subject | null =>
   t.owner ? { kind: 'city', seat: t.owner.seat ?? t.seat, id: t.owner.cityId, capital: t.owner.capital } : null;
@@ -142,6 +147,8 @@ function subjects(t: ValueTerms, collection: string): Subject[] | null {
     // 0x6a00f0: the game's majors in order, each alive one setting the
     // context's other player (+0x40)
     case 'COLLECTION_MAJOR_PLAYERS': return t.view.majors().map((m) => ({ kind: 'player', other: m }));
+    // the player's units in its list's order, each the context's unit (+0x90)
+    case 'COLLECTION_PLAYER_UNITS': return t.view.playerUnits(t.seat).map((u) => ({ kind: 'unit', plot: u.plot, type: u.type }));
     default: return null;
   }
 }
@@ -249,6 +256,24 @@ function admits(t: ValueTerms, set: AiRequirementSet | undefined, s: Subject): b
 type Analyzer = (t: ValueTerms, args: Readonly<Record<string, string>>, s: Subject) => number;
 
 const amountOf = (args: Readonly<Record<string, string>>): number => (Number(args.Amount ?? 0) | 0) * FX;
+/** a unit's era (Unit_Manager 0x940740) as an Eras index: of its PrereqTech's
+ *  and PrereqCivic's eras the later by chronology; with neither, the game's
+ *  start era's ChronologyIndex read as an index (the start era Ancient's 1:
+ *  Classical) */
+export function unitEraIndex(row: { tech: string | null; civic: string | null }): number {
+  const of = (e: string | undefined): number => (e ? ERAS.indexOf(e as never) : -1);
+  const tech = row.tech ? engineId('tech', row.tech, 'TECH_', TECHS) : null;
+  const civic = row.civic ? engineId('civic', row.civic, 'CIVIC_', CIVICS) : null;
+  const te = tech ? of(TECHS[tech]?.era) : -1;
+  const ce = civic ? of(CIVICS[civic]?.era) : -1;
+  if (te < 0 && ce < 0) return START_ERA + 1;
+  return ce > te ? ce : te;
+}
+/** the game's start era (an Eras index) */
+const START_ERA = 0;
+/** the records' age the barbarian-combat analyzer reads (0x5eb0f0's fifth
+ *  argument) */
+const KNOWN_AGE = 10;
 /** an Amount the analyzer's parser stores as fx(Amount x 0.01f) */
 const pctOf = (args: Readonly<Record<string, string>>): number =>
   fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(0.01)));
@@ -699,6 +724,42 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const v = fmul(yieldValue(t.view, t.seat, fmul(pctOf(args), culture), 'YIELD_CULTURE'), fxConst(0.5));
     return whole(span(t, v));
   },
+  // 0x6bc9e0 (EraType +8, UnitPromotionClass +0xc, Amount +0x10): a city
+  // subject whose owner's era is the EraType; the owner's strongest unit of
+  // the class (0x4bcd30), its era (`unitEraIndex`) no earlier than the
+  // EraType: its Combat over the owner's best melee Combat made (at least 1)
+  // x the city's Production (CityBuildAI, 0x6c8dd0) over its Cost (at least
+  // 1) x Amount / 100, as PSEUDOYIELD_UNIT_COMBAT at the owner's weight, from
+  // the start to the horizon
+  EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION: (t, args, s) => {
+    if (s.kind !== 'city') return 0;
+    const era = eraOf(args.EraType);
+    if (era < 0 || t.view.playerEra(s.seat) !== era) return 0;
+    const unit = t.view.bestUnitOfClass(s.seat, args.UnitPromotionClass ?? '');
+    const row = unit ? AI_UNITS[AI_UNIT_INDEX.get(unit) ?? -1] : undefined;
+    if (!row || unitEraIndex(row) + 1 < era + 1) return 0;
+    const strength = fdiv(row.combat * FX, Math.max(1, t.view.bestCombatStrength(s.seat)) * FX);
+    const production = fdiv(fxOf(t.view.cityYield(s.seat, s.id, 'YIELD_PRODUCTION')), Math.max(1, row.cost) * FX);
+    const v = Math.trunc((fmul(production, strength) * (Number(args.Amount ?? 0) | 0)) / 100);
+    return whole(valueBetween(pseudoYieldValue(t.view, s.seat, v, 'PSEUDOYIELD_UNIT_COMBAT'), t.start, t.horizon, t.rate));
+  },
+  // 0x6bef40 (Amount +8 as its parser 0x6bedb0 stores it,
+  // fx(expf(Amount x COMBAT_POWER_SCALING))): a unit subject on a plot that
+  // fights (0x209dd0: Combat, RangedCombat or Bombard above 0), where the
+  // barbarians' strength the player's knowledge base holds there (0x5eb0f0
+  // over the barbarian players, age at most 10: the unit's area, or no
+  // region) exceeds its own: the Amount from the start to the horizon
+  EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT: (t, args, s) => {
+    if (s.kind !== 'unit' || s.plot < 0) return 0;
+    const row = AI_UNITS[AI_UNIT_INDEX.get(s.type) ?? -1];
+    if (!row || Math.max(row.combat, row.rangedCombat, row.bombard) <= 0) return 0;
+    const own = t.view.knownStrength(t.seat, t.seat, s.plot, KNOWN_AGE);
+    let barb = 0;
+    for (const b of t.view.barbarianSeats()) barb += t.view.knownStrength(t.seat, b, s.plot, KNOWN_AGE);
+    if (own >= barb) return 0;
+    const a = Math.fround(Math.exp(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(COMBAT_POWER_SCALING))));
+    return whole(valueBetween(fxConst(a), t.start, t.horizon, t.rate));
+  },
   // 0x6b2350 (UnitType +8, Amount +0x10 as its parser 0x6b1d00 stores it,
   // fx(Amount x 0.01f)): per city of the player (the context's city alone
   // where it has one), the Amount x its Production (CityBuildAI +0x1008) x
@@ -898,7 +959,7 @@ export const AI_MODIFIER_READS = {
   none: Object.keys(NONE_ANALYZERS),
   collections: ['COLLECTION_OWNER', 'COLLECTION_PLAYER_CITIES', 'COLLECTION_PLAYER_CAPITAL_CITY', 'COLLECTION_PLAYER_DISTRICTS',
     'COLLECTION_CITY_DISTRICTS', 'COLLECTION_CITY_TRAINED_UNITS', 'COLLECTION_CITY_PLOT_YIELDS', 'COLLECTION_ALL_CITIES',
-    'COLLECTION_ALL_PLAYERS', 'COLLECTION_MAJOR_PLAYERS'],
+    'COLLECTION_ALL_PLAYERS', 'COLLECTION_MAJOR_PLAYERS', 'COLLECTION_PLAYER_UNITS'],
   /** the wonders CITY_HAS_BUILDING never holds outside its own city */
   wonders: Object.keys(BUILT_WONDERS),
 };

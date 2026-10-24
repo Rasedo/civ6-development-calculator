@@ -21,6 +21,7 @@
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...age, +0x10 its plot (x, y), +0x18 / +0x1c the plot's two map ids (the second its area). 0x5e9530 (from 0x5f0440) finds the unit's id in its type's list: found, age 0 and the plot rewri..."
   review: reviewed
@@ -83,7 +84,15 @@
   final: 0x3f2530
   kind: function
   status: PARTLY
-  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  impl:
+    - cpu/core/aiModifiers.ts:START_ERA
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:playerUnits
+    - gpu/core/sim_policy.py:_POL_UNIT_ZERO
+    - gpu/core/sim_policy.py:_pol_barbarian_combat
+  readings:
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...scipline's 0x6bef40 (a combat unit; the barbarians' units the AI knows within 10 of it, 0x5eb0f0 over the barbarian list, against its own: the amount from the start to the horizon wh..."
   review: imported
@@ -291,6 +300,18 @@
     - gpu/core/sim_minorops.py:_ARMY_READ_AGE
   readings: ["C-95: an operation's enemy strength — READ (0x73eb60), ported"]
   notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x5ef870
+  final: 0x3f55f0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: "its parser 0x6bedb0 stores fx(expf(Amount x   COMBAT_POWER_SCALING)) at +8, GlobalParameters +0x210, 0.04 under   Expansion1's Replace: Discipline's 5 reads 1.2214, from the start to the   horizon who"
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...er, &area, &region, maxAge): over the Units in order, the player's records of the type (0x5ef870: record +0x18 the area or +0x1c the region given, -1 for none — so a record on a plot o..."
   review: imported
 - addr: 0x5ef9a0
   final: 0x3f56e0

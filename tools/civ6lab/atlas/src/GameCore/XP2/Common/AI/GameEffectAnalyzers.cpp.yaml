@@ -860,7 +860,10 @@
   final: 0x46de60
   kind: function
   status: PARTLY
-  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:full]
+  readings:
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - ...the amount from the start to the horizon when they outnumber), the unit-tag production 0x6bc9e0 (the military AI's unit of the class 0x4bcd30, CityBuildAI's production 0x6c8dd0, PSE...
   review: imported
@@ -923,11 +926,27 @@
   context:
     - "...): the city's Culture x it, weighted, + 0.5 (0x16eb20), span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth object's surplus (0x1b5620), 2.0 with no city, x fx(Amount..."
   review: imported
+- addr: 0x6bedb0
+  final: 0x46fd70
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: "its parser 0x6bedb0 stores fx(expf(Amount x   COMBAT_POWER_SCALING)) at +8, GlobalParameters +0x210, 0.04 under   Expansion1's Replace: Discipline's 5 reads 1.2214, from the start to the   horizon who"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - ...ne's EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT 0x6bef40 (@f03c08, vtable 0xd63760; its parser 0x6bedb0 stores fx(expf(Amount x COMBAT_POWER_SCALING)) at +8, GlobalParameters +0x210, 0.04 und...
+  review: imported
 - addr: 0x6bef40
   final: 0x46ff00
   kind: function
   status: PARTLY
-  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...nfluencePointsThreshold at the speed, added on adoption 0x44eaa0). PARTLY: Discipline's 0x6bef40 (a combat unit; the barbarians' units the AI knows within 10 of it, 0x5eb0f0 over the..."
   review: imported
