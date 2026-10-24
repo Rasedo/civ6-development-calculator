@@ -295,7 +295,18 @@ describe('the danger map and Move to Safety', () => {
     const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 10, 10).index, 0)!;
     foe.movesLeft = 0;
     const d = dangerPlane(state, BARB_SEAT);
+    // the danger search takes no zone of control (flag 0x200 set): the reach
+    // with the eye off the map, its zone gone, its plot a strike the path
+    // ends on (a mountain there, the plot added back)
+    const units = state.units;
+    const eyeTile = state.map.tiles[eye.tileIndex];
+    const elevation = eyeTile.elevation;
+    state.units = units.filter((u) => u !== eye);
+    eyeTile.elevation = 'MOUNTAIN';
     const reach = new Set(reachPlots(state, { ...foe, movesLeft: grantedMoves(state, foe) }, 1).map((e) => e.tile));
+    reach.add(eye.tileIndex);
+    eyeTile.elevation = elevation;
+    state.units = units;
     expect(reach.size).toBeGreaterThan(7);
     for (const t of state.map.tiles) {
       if (plotDistance(state, t.index, eye.tileIndex) > 2 && plotDistance(state, t.index, foe.tileIndex) > 2) continue;
