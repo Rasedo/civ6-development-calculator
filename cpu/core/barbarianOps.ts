@@ -25,7 +25,7 @@ import { NO_PLOT, addMember, opDef, opUnits, type Operation } from './operations
 import type { BarbarianHooks } from './operations/barbarian';
 import { BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataFloat, dataInt, dataTag, tick, type BtHandler, type BtNode, type BtRun } from './behaviorTree';
 import { AI_OP_DEFS, AI_TREES } from '../data/aiOperations';
-import { moveTo, passEnd, passPillage, passReachAt, passSafePlot, pathTo, type Pass } from './tactical';
+import { moveTo, passEnd, passPillage, passReachAt, passSafePlot, turnsToPlot, type Pass } from './tactical';
 import { barbUnitFor, handicapOf, raidBoldness } from './barbarians';
 import { BARB_TAG_UNITS, barbForce } from '../data/barbarians';
 import { gameTypeOf } from '../data/aliases';
@@ -422,7 +422,9 @@ const SCOUT_NODES: Readonly<Record<string, BtHandler<ScoutCtx>>> = {
   // planning reaching a plot at To Range of the location this turn
   // (0x791300) SUCCESS, else RUNNING; none held, the unit whose planning
   // reaches the location itself this turn, with Movement left there first,
-  // else one with a path to it (0x272a60), is held — SUCCESS where it
+  // else the one whose path (0x272a60: the planning's path finder, no zone
+  // of control, so a camp its defender holds is a goal) takes the fewest
+  // turns, is held — SUCCESS where it
   // reaches it with Movement left, else RUNNING; none FAILS. The execution:
   // the held unit's turn ends; it goes for the plot at To Range its planning
   // reaches this turn, else the location (a plot of danger only where Allow
@@ -445,6 +447,7 @@ const SCOUT_NODES: Readonly<Record<string, BtHandler<ScoutCtx>>> = {
       }
       m.unit = -1;
       let pick: Unit | null = null;
+      let soon = Infinity;
       let moves = false;
       for (const u of us) {
         if (c.pass.plan.has(u.id) && passReachAt(c.state, c.pass, u, loc, 1, false, 0) >= 0) {
@@ -452,9 +455,14 @@ const SCOUT_NODES: Readonly<Record<string, BtHandler<ScoutCtx>>> = {
             moves = true;
             pick = u;
           } else pick ??= u;
+          soon = 1;
           continue;
         }
-        if (!pick && (u.tileIndex === loc || pathTo(c.state, u, loc).length > 0)) pick = u;
+        const turns = turnsToPlot(c.state, u, loc);
+        if (turns > 0 && turns < soon) {
+          soon = turns;
+          pick = u;
+        }
       }
       if (!pick) return BT_FAILURE;
       m.unit = pick.id;

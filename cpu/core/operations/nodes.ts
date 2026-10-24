@@ -76,7 +76,8 @@ export interface OpsContext {
    *  and Unit distance — its status, arrived, the store kept */
   moveUpdate(members: readonly number[], store: MoveStore | undefined, goal: number, target: boolean, range: number,
     spread: number): { status: number; arrived: boolean; store: MoveStore | undefined };
-  /** OPERATION MOVE's execution for a team (0x816cb0): zero: a unit whose
+  /** OPERATION MOVE's execution for a team (0x816cb0): range: the radius
+   *  cap, the node's Unit distance; zero: a unit whose
    *  radius is 0 (a formation's, the Leader Tag's), leaderNamed: the node
    *  names a Leader Tag — each mover's type, its plot before, the plot it
    *  went for and the plot it stands on */
@@ -568,8 +569,9 @@ const makeFormation: BtHandler<OpsContext> = {
 // goal its slot (Move To: 0 the rally, 1 the target), Range to goal and Unit
 // distance (default 1); SUCCESS where every team's is, else RUNNING
 // (AlwaysRunning: RUNNING); a team with no goal FAILS. The execution moves
-// each team (`moveExec`) but one arrived of an operation ready, a unit in a
-// formation or of the node's Leader Tag on its goal itself
+// each team (`moveExec`, its radius capped by the Unit distance) but one
+// arrived of an operation ready, a unit in a formation or of the node's
+// Leader Tag on its goal itself
 const operationMove: BtHandler<OpsContext> = {
   update(node, run, ctx) {
     const m = run.mem[node.index];
@@ -594,7 +596,9 @@ const operationMove: BtHandler<OpsContext> = {
   execute(node, run, ctx) {
     const m = run.mem[node.index];
     const slot = dataInt(node, 'Move To (enum)') ?? 1;
-    const range = dataInt(node, 'Range to goal') ?? 0;
+    // the execution's radius cap is the node's Unit distance (its slot 3,
+    // node +0x30; 1 where the node names none), not its Range to goal
+    const range = dataInt(node, 'Unit distance') ?? 1;
     const leader = dataValue(node, 'Leader Tag');
     const arrived = (m.arrived as boolean[] | undefined) ?? [];
     const paired = new Set(ctx.op.formations.flat());

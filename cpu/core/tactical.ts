@@ -2635,11 +2635,14 @@ export function passMoveUpdate(state: GameState, pass: Pass, members: readonly n
   return { status: arrived ? BT_SUCCESS : BT_RUNNING, arrived, store: { list, goal } };
 }
 
-/** the goal barred to the unit (0x586360, 0x5862e0, 0x585eb0): no path to
- *  it, a unit at war with it there, or one of its own that stacks with it */
+/** the goal barred to the unit (0x586360 under flag 0x40, 0x5862e0,
+ *  0x585eb0): no path to it, a plot it would attack into (a unit at war
+ *  with it, a city centre of a player at war with it — flag 0x40 bars that
+ *  to every unit —, an Encampment that bars it), or one of its own that
+ *  stacks with it */
 function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<number>): boolean {
   if (!paths.has(goal)) return true;
-  if (enemyAt(state, u, goal)) return true;
+  if (attackPlot(state, u, goal)) return true;
   return stackedAt(state, u, goal) || foreignAt(state, u, goal);
 }
 
@@ -2652,10 +2655,11 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * (0x73aa60: its units may be built, or every team ready), the update found
  * the team arrived and the node names no Leader Tag (+0x7c, its UnitAiType);
  * else each member left with Movement, nearest the goal first, takes a move
- * order (0x962030): its radius the smaller of the node's range and its
- * attack range (1 for a melee unit, 0 for a ship; runs/h1_duelw1124 t13-t15:
- * the raid's Warriors go for 35:20 and 35:19 beside its target 34:19), at
- * least 1 where the goal is barred to it
+ * order (0x962030): its radius the smaller of `range` (the node's Unit
+ * distance) and its Range (GetRange, unit +0x19f8: 0 for a melee unit; 0
+ * for a ship) — runs/h1_duelw1121 t73-t74: the raid's Archer (Range 2)
+ * under Unit distance 1 goes for 6:13 beside its target 6:12 and stays
+ * there —, at least 1 where the goal is barred to it
  * (`moveBarred`); the first plot of its planning of two turns at the radius
  * (0x791300) where it lies in the goal's region, else of the plots within
  * the radius of the goal (the ring walk 0x6aef0, the test 0x815d50) one in
@@ -2675,7 +2679,7 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
   for (const u of movers) {
     if (!canAct(state, pass, u)) continue;
     const z = zero(u);
-    let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, unitAttackRange(u));
+    let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, rangeOf(u));
     const paths = pathPlots(state, u);
     if (u.tileIndex !== goal && moveBarred(state, u, goal, paths)) r = Math.max(1, r);
     else if (range > 0 && leaderNamed && !z) r = Math.max(1, r);

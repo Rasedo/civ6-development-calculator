@@ -2370,7 +2370,7 @@ class SimTactics:
         where the operation is `ready` [B], the team arrived and the node names
         no Leader Tag (`leader`); else each living member `mem` [B, P] that
         can act, nearest the goal first: its radius (the smaller of the
-        node's range and its attack range, 1 for a melee unit; 0 for a ship or
+        node's Unit distance `rng` and its Range, `_tac_range`: 0 in melee; 0 for a ship or
         a unit of `zero` [B, P]; at least 1 where the goal is barred, and with a Leader
         Tag named), its plot (its planning's at the radius in the goal's
         region, else the ring walk's), its turn done, its move order. The
@@ -2414,11 +2414,11 @@ class SimTactics:
             ut = type_p[rows, ur].clamp(min=0, max=self.NU - 1)
             naval = self.unit_naval.take(ut)
             z = zero[rows, ur] if zero is not None else torch.zeros_like(naval)
-            r = torch.where(naval | z, torch.zeros_like(ut), torch.clamp(self._tac_range(rows, ur, pre).clamp(min=1), max=rng))
+            r = torch.where(naval | z, torch.zeros_like(ut), torch.clamp(self._tac_range(rows, ur, pre), max=rng))
             here = tile_p[rows, ur]
             path = self._tac_search(rows, ur, seat, 1 << 30, True, pre=pre)["closed"] >= 0    # [N, T]
             own = self._tac_own_mil(seat)[rows]
-            barred = ((~path.gather(1, gr.unsqueeze(1)).squeeze(1)) | hostile[rows, gr] | own[torch.arange(rows.numel(), device=dev), gr]
+            barred = ((~path.gather(1, gr.unsqueeze(1)).squeeze(1)) | atk[rows, gr] | own[torch.arange(rows.numel(), device=dev), gr]
                       | foreign[rows, gr])
             r = torch.where((here != gr) & barred, r.clamp(min=1), r)
             if leader:

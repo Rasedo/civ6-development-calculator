@@ -451,11 +451,11 @@ class SimBarbOps:
         zero[bidx[formed & esc_ok], esc_[formed & esc_ok]] = True
         ex6 = mv_on & ~no_goal & ((c6 == 1) | (c6 == 2))
         if bool(ex6.any()):
-            self._op_move_exec(ex6, mem, self._bcap_rank(c), goal, rg6, ar6, self.bcap_ready[:, c], done, rowof, res, zero=zero)
+            self._op_move_exec(ex6, mem, self._bcap_rank(c), goal, sp6, ar6, self.bcap_ready[:, c], done, rowof, res, zero=zero)
         self.bcap_form[:, c] &= ~seq7
         ex8 = on8 & ~no_goal & ((c8 == 1) | (c8 == 2))
         if bool(ex8.any()):
-            self._op_move_exec(ex8, mem, self._bcap_rank(c), goal, rg8, ar8, self.bcap_ready[:, c], done, rowof, res)
+            self._op_move_exec(ex8, mem, self._bcap_rank(c), goal, sp8, ar8, self.bcap_ready[:, c], done, rowof, res)
         end = root_ok | root_fail
         self.bcap_id[:, c] = torch.where(end, torch.full_like(self.bcap_id[:, c], -1), self.bcap_id[:, c])
         self.bcap_civ[:, c] = torch.where(end, torch.full_like(cs, -1), self.bcap_civ[:, c])
@@ -614,15 +614,15 @@ class SimBarbOps:
         # the executions in node order
         ready = self.tribe_op_ready[:, k]
         self._bop_attack_units(march, k, ctx)
-        self._bop_move_exec(march & ~no_goal, k, target, tr.raid_moves[0][1], ar11, ready, ctx)
+        self._bop_move_exec(march & ~no_goal, k, target, tr.raid_moves[0][2], ar11, ready, ctx)
         self._bop_attack_units(r14, k, ctx)
         self._bop_pillage(cont, k, ctx)
         if inside:
             self._bop_attack_city(cont, k, ctx)
         self._bop_defend(cont, mk20, k, team, pct20, rng20, ctx)
-        self._bop_move_exec(cont, k, target, tr.raid_moves[1][1], ar21, ready, ctx)
+        self._bop_move_exec(cont, k, target, tr.raid_moves[1][2], ar21, ready, ctx)
         self._bop_attack_units(home, k, ctx)
-        self._bop_move_exec(home, k, rally, tr.raid_moves[2][1], ar24, ready, ctx)
+        self._bop_move_exec(home, k, rally, tr.raid_moves[2][2], ar24, ready, ctx)
         # NOTIFY OWNER: the raid's city to the tribe's assault list
         self._barb_push(self.tribe_assq, notify, k, self.tribe_op_seat[:, k])
         self._barb_push(self.tribe_assp, notify, k, target)
@@ -688,14 +688,14 @@ class SimBarbOps:
         # the executions in node order
         ready = self.tribe_op_ready[:, k]
         self._bop_defend(m, mk1, k, team, pct1, rng1, ctx)
-        self._bop_move_exec(gather & ~no0, k, goal0, tr.ass_moves[0][1], ar13, ready, ctx)
+        self._bop_move_exec(gather & ~no0, k, goal0, tr.ass_moves[0][2], ar13, ready, ctx)
         self._bop_attack_units(march, k, ctx)
-        self._bop_move_exec(march & ~no1, k, goal1, tr.ass_moves[1][1], ar17, ready, ctx)
+        self._bop_move_exec(march & ~no1, k, goal1, tr.ass_moves[1][2], ar17, ready, ctx)
         self._bop_siege(ass & (s19 == _S), k, ctx)
         self._bop_attack_city(ass & ~fail18, k, ctx)
         self._bop_attack_units(on23, k, ctx)
         self._bop_pillage(on23, k, ctx)
-        self._bop_move_exec(on23 & (goal2 >= 0), k, goal2, tr.ass_moves[2][1], ar24, ready, ctx)
+        self._bop_move_exec(on23 & (goal2 >= 0), k, goal2, tr.ass_moves[2][2], ar24, ready, ctx)
         # the assault's Notify Owner: no city to a list (a bribed tribe's alone)
         self.tribe_op_done[:, k] |= end
 
@@ -1445,11 +1445,14 @@ class SimBarbOps:
             reach0m[rows] = self._op_reach_at(rows, su[rows], camp[rows], 1, True, torch.zeros_like(rows), rowof, res)
         reaches = fresh & planned & (reach0 >= 0)
         rest = fresh & ~reaches
+        # else the planning's path (0x272a60: no zone of control, no turn
+        # limit, stopped once the camp closes) standing on it in any turns
         path = torch.zeros_like(rest)
         rows = rest.nonzero(as_tuple=True)[0]
         if rows.numel():
-            closed = self._tac_search(rows, su[rows], BARB_SEAT, 1 << 30, True)["closed"] >= 0
-            path[rows] = closed.gather(1, camp[rows].clamp(min=0).unsqueeze(1)).squeeze(1) | (here[rows] == camp[rows])
+            cp = camp[rows].clamp(min=0)
+            turns = self._tac_search(rows, su[rows], BARB_SEAT, 1 << 30, False, cp)["turns"]
+            path[rows] = turns[torch.arange(rows.shape[0], device=dev), cp] > 0
         picked = reaches | (rest & path)
         m4 = torch.where(fresh, torch.where(picked, torch.where(reaches & (reach0m >= 0), _S, _R), _F), m4)
         self.tribe_home_mu[:, k] = torch.where(fresh, picked, self.tribe_home_mu[:, k])

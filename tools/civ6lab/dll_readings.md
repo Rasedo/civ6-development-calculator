@@ -5716,10 +5716,15 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   node fills it before the execution reads it: no recording logs
   "Operation Move Nonmoving unit", 0 of 5,577 Operation Move lines on
   1117-1128), the others with
-  Movement, nearest the goal first: the radius the smaller of Range to goal
-  and its attack range (0 in a formation or carrying the Leader Tag); at
-  least 1 where the goal is barred (0x586360 no path, 0x5862e0 a unit at
-  war, 0x585eb0 its own stacking); its planning of two turns at the radius
+  Movement, nearest the goal first: the radius the smaller of the node's
+  Unit distance (its slot 3, node +0x30 / +0x3c — the node's data slots lie
+  0x10 apart in DefnId order, as Move Unit's do; 1 where the node names
+  none) and its Range (unit +0x19f8, 0x56e3d0: 0 for a melee unit), 0
+  where the path finder's +0x738 is above 1 or the unit carries the Leader
+  Tag; at least 1 where the goal is barred (0x586360 under flag 0x40 no
+  path or a plot it would attack into — an at-war city refused to every
+  unit at 0x586724 —, 0x5862e0 a unit at war, 0x585eb0 its own stacking);
+  its planning of two turns at the radius
   (0x791300, no Movement asked; 0x78fa10: a plot exactly the radius away,
   none of its own stacking there but its own plot) where that plot lies in
   the goal's region; else the ring walk 0x6aef0 (the test 0x815d50: one in
@@ -5875,9 +5880,25 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
 - THE TURN LIMITER over a child the walk has not reached yet (FRESH) has
   not finished it: the limiter RUNS (the raid's Concurrent 15 under it
   ticks the turn it is reached).
-- THE MOVE'S RADIUS for a melee unit is its attack range 1 (runs/h1_duelv1124
-  t35: a Warrior's "Operation Move" goal 35:20 one plot short of the plot it
-  marched on); a ranged unit's its range, both capped by Range to goal.
+- THE MOVE'S RADIUS: the Unit distance caps it, not Range to goal (Raid
+  City's march node 11 names 0, its node 21 none: 1). runs/h1_duelw1121
+  t56-t76: the raid's Archer (Range 2) and Warriors log one goal each turn,
+  6:13 or 7:12 beside the target 6:12 (the barred city: radius 1); the
+  Archer from 7:14 to 6:13 at t73 and stays at t74. runs/h1_duelv1124 t35
+  (a Warrior's goal one plot short of its target) agrees. The ring test
+  0x815d50 takes a plot holding a unit of the mover's player only where
+  0x265ac0 -> 0x265af0 passes it on the mover's path finder (+0x738 0: any;
+  else formation classes, damage, the group's leader's plot — PARTLY READ);
+  the engines take none.
+- THE DESIRED STRENGTH (0x723ab0, READ): the advantage (fixed x256) at -5
+  or less asks minus the enemy strength; else the advantage times the
+  smaller of the seat's and the enemy's PlayerStats +0xf0 (the best melee
+  strength trained; the seat's own where the enemy is none). Raid City's
+  team asks -1. runs/h1_duelw1121 t57-t68: the game's raid team (Archer,
+  two Warriors, 65) Ready t59-60 and t63-66, Not Ready t57-58, t61-62,
+  t67-68 — an enemy strength about 6:12 near 65; the engines' 115-167 (the
+  city 28, its owner's best 28, the knowledge base's 86-111 of seat 1's
+  units within 3: the replay's seat-1 units round 6:12 are not the game's).
 - MEASURED: below, "C-95: the barbarians' operations on the manager".
 
 ## C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported
@@ -6215,8 +6236,15 @@ gpu/core/sim_tactics.py.
   Range of the location this turn (0x791300) SUCCESS, else RUNNING, a held
   unit with no planning FAILURE; none held, the unit whose planning reaches
   the location itself this turn — one with Movement left there first —,
-  else one with a path to it (0x272a60), is held: SUCCESS where it reaches
-  it with Movement left, else RUNNING; none FAILURE. Execution (0x7eeba0):
+  else the one whose path (0x272a60 on the unit's path finder +0x1fb8, flag
+  0x1000: the planning's search with no zone of control) takes the fewest
+  turns (above 0, fewer than the best so far), is held: SUCCESS where it
+  reaches it with Movement left, else RUNNING; none FAILURE. A camp its own
+  defender holds is such a goal (runs/h1_duelw1121 camp 12:14: its Scout
+  reports 6:12 at t64, its zone-of-control path home is none from t65, the
+  planning's 8 turns; home at t73, Notify Owner lists 6:12 under the
+  running raid, and the tribe's turn after that raid's end starts the next
+  on it — the game's t77 end, t78 start). Execution (0x7eeba0):
   the held unit's turn ends; it goes for the plot at To Range its planning
   reaches this turn, else the location (a plot of danger only where Allow
   Danger), woken (0x53e20) and moved (0x972880 / 0x962030).
@@ -7345,10 +7373,11 @@ DebugGameplay.sqlite).
   unread); Naval Patrol / Naval Pillage 0x803880 (RUNNING with units, else
   FAILURE); Operation Defend Units' update 0x80ee70 (SUCCESS; marks a
   member wounded past AutoProtect Percentage).
-- Operation Move's destination (0x816cb0): radius = min(Range to goal, the
-  unit's attack Range +0x19f8), 0 for a unit in a formation (+0x1fb8 +0x738
-  above 1) or carrying the node's Leader Tag (0x79cb30); at least 1 where
-  the goal is barred — no path (0x586360), a visible enemy unit there
+- Operation Move's destination (0x816cb0): radius = min(Unit distance (the
+  node's slot 3; 1 where it names none), the unit's Range +0x19f8), 0 where
+  the path finder's +0x1fb8 +0x738 is above 1 or the unit carries the
+  node's Leader Tag (0x79cb30); at least 1 where the goal is barred — no
+  path or an attack into it (0x586360 under flag 0x40), a visible enemy unit there
   (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the
   owner's of a stacking class, another player's not at war) — and, the
   goal open, for a unit outside the tag and any formation where the node

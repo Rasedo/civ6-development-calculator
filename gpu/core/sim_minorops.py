@@ -1993,7 +1993,9 @@ def _x_move(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     assert tree.value(i, "Leader Tag") is None, "minor operations: an Operation Move's Leader Tag"
     slot = tree.int_(i, "Move To (enum)")
     slot = 1 if slot is None else slot
-    rng = tree.int_(i, "Range to goal") or 0
+    # the radius cap: the node's Unit distance (1 where it names none)
+    rng = tree.int_(i, "Unit distance")
+    rng = 1 if rng is None else rng
     op = c.view["op"]
     ready = ((sim.mops_tm[:, s, k] < 0) | sim.mops_ready[:, s, k]).all(dim=1)
     bits = torch.where(c.mb[:, i] == NONE, 0, c.mb[:, i])
