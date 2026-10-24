@@ -245,10 +245,16 @@
   kind: function
   name: UNIT_KILLED_CIVILIAN
   status: PARTLY
-  readings: ["C-41: the eruption's soil, the ring and the gates"]
-  context:
-    - ...a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and UNIT_KILLED_CIVILIAN 0x33a070 do not (the owner only sets the damage percent). Floods (0xa2a4d0), storms (0x286530, 0...
-  review: imported
+  semantics: "the plot's units of the unit container's layer 0 (0x75c50 with r9d 0) not dead (+0x770), of formation class CIVILIAN (GetFormationClass 2), without CanRetreatWhenCaptured (unit info +0x1b8 bit 8), whose owner is not immune to the event (0x468100, m_aRandomEventNoUnitDamage) are collected and killed; a Trader (its own layer) is not among them; the layers' assignment unread"
+  cases:
+    - recording: h1_duelw1127
+      turn: 160
+      value: "the major flood at 43:13: Muscat's centre the reach's plot 5 (its CITY_GARRISON band after the 5th draw), UNIT_KILLED_CIVILIAN draw 6 < 15 on it, its Trader in the centre survives (Units Killed = 0)"
+  impl: [cpu/core/disasters.ts:strikeUnits, gpu/core/sim_economy.py:_strike_units]
+  readings:
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "C-96: an event's civilian kill spares a Trader — PARTLY READ"
+  review: reviewed
 - addr: 0x33a280
   kind: function
   status: READ

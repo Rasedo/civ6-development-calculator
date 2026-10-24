@@ -145,6 +145,10 @@ export interface City {
    *  percent, until the next step. Absent = none. */
   projectYield?: ProjectYield;
   loyalty?: number;
+  /** A FREE CITY's threat (CityBuildAI +0x1b8, `cityThreat` on the Free
+   *  Cities' knowledge base) as its city AI's last update left it, -1 none;
+   *  absent, none */
+  aiThreat?: number;
   /** A FREE CITY's race: the loyalty pressure each major seat has exerted on
    *  it "since the Free City became independent", dense over seats. CIV6:
    *  at 0 loyalty "it will join the Civilization that has exerted the most
@@ -816,14 +820,18 @@ export interface Seat {
   /** a city-state's or the Free Cities' unit pool (`poolSlots`), its slot 0
    *  the founding Settler's */
   unitPool?: UnitPool;
-  /** THE KNOWLEDGE BASE'S ARMY RECORDS (`knowledgeLook`) of a city-state or
-   *  the barbarians: one per unit the player has seen — its id, owner and
-   *  unit type, the turn and plot last seen; a record drops 22 turns after.
-   *  Absent = none. */
+  /** THE KNOWLEDGE BASE'S ARMY RECORDS (`knowledgeLook`) of a city-state,
+   *  the Free Cities or the barbarians: one per unit the player has seen —
+   *  its id, owner and unit type, the turn and plot last seen; a record
+   *  drops 22 turns after. Absent = none. */
   armyKnown?: ArmyRecord[];
   /** the turn the records last aged (`knowledgeLook` with its ageing): a
    *  record's age is this less the turn it was last seen */
   armyAged?: number;
+  /** the military AI's Combat Desire of a city-state (`minorCombatDesire`)
+   *  or the Free Cities (`freeCombatDesire`), raw 24.8: its
+   *  PSEUDOYIELD_UNIT_COMBAT weight */
+  combatDesire?: number;
   /** the barbarians' knowledge base's camps (`barbCampsLook`), in its
    *  order. Absent = none. */
   campsKnown?: number[];
@@ -1232,9 +1240,6 @@ export interface CityState extends Seat {
    *  revealed it (the player's revealed plots, visibility +0x2f0, as
    *  `minorCampsLook` and `minorTradeList` read them; `meetCityState`) */
   revealed?: number[];
-  /** its military AI's Combat Desire (`minorCombatDesire`), raw 24.8: its
-   *  PSEUDOYIELD_UNIT_COMBAT weight */
-  combatDesire?: number;
   /** the count its city's standing army lacks (CityBuildAI +0x2d8,
    *  `minorStandingArmyShort`), set in its city's update */
   standingArmyShort?: number;

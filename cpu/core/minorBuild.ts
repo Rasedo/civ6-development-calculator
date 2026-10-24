@@ -25,7 +25,7 @@ import {
   MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD,
   MINOR_WALLS_PROD_PCT, MINOR_REPAIR_RESUME_PCT, MINOR_CATCHUP_PCT, CITY_STATE_MAX_HP,
 } from '../data/cityStates';
-import { ENCAMPMENT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
+import { CITY_MAX_HP, ENCAMPMENT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
 import { PROJECTS, projectConversionRate } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
@@ -35,7 +35,7 @@ import { detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, urbanDefensesFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './majorCityBuild';
-import { minorAiTurn, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
+import { freeCityThreat, minorAiTurn, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
 import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
@@ -55,6 +55,7 @@ import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { knowledgeLook } from './tactical';
+import { plotsSeenNow } from './barbarians';
 import { cityStateMilitary, minorCampsLook } from './minorOps';
 import { tilesWithin } from '../../world/hex';
 import { hasRiver } from '../../world/query';
@@ -1115,6 +1116,56 @@ export function minorCombatDesire(state: GameState, cityState: CityState, turn: 
 }
 
 
+/** THE FREE CITIES' KNOWLEDGE BASE's army update (`knowledgeLook` on the
+ *  Free Cities' seat) over the plots they see (`plotsSeenNow`: their units,
+ *  their cities' centres two round, their plots with their ring) */
+export function freeKnowledge(state: GameState, age: boolean): void {
+  knowledgeLook(state, freeSeatOf(state), FREE_SEAT, plotsSeenNow(state, new Set([FREE_SEAT])), age);
+}
+
+/** THE COMBAT DESIRE of the Free Cities (`combatDesire`) at their military
+ *  AI's turn, every turn with or without a city (AI_Military.csv's player
+ *  62 rows), on the records as their last update aged them (`turn`): the
+ *  regions of their cities, each city's unit in training, the players in
+ *  the game's order — the majors at war with them, the city-states not
+ *  (runs/h1_duelw1123 t200-t201 with no Free City 0.5, the floor of two
+ *  majors at war), the barbarians a tribe at war —; their cities'
+ *  threats as their last updates left them (`City.aiThreat`: t203-t212
+ *  uncapped, 3.5 to 9.5, t213-t215 capped at 2.0 — no war footing); no
+ *  standing-army term (t203 3.5 = (160 - 90) x 0.05). */
+export function freeCombatDesire(state: GameState, turn: number): CombatDesire {
+  const free = freeSeatOf(state);
+  const regions = new Set<number>();
+  for (const c of free.cities) {
+    const r = state.map.tiles[c.centerIndex]?.region ?? -1;
+    if (r >= 0) regions.add(r);
+  }
+  const players = [
+    ...state.seats.filter((s) => isCiv(s.seat)).map((s) => ({ seat: s.seat, atWar: true, tribe: false, flagged: false })),
+    ...state.cityStates.map((c) => ({ seat: c.seat, atWar: false, tribe: false, flagged: false })),
+    { seat: FREE_SEAT, atWar: false, tribe: false, flagged: false },
+    { seat: BARB_SEAT, atWar: true, tribe: true, flagged: false },
+  ];
+  return combatDesire({
+    best: Math.max(1, free.bestMeleeCS ?? 0, Math.max(free.bestRangedCS ?? 0, CITY_MIN_STRIKE_CS)),
+    cities: free.cities.length,
+    regions,
+    self: FREE_SEAT,
+    players,
+    records: free.armyKnown ?? [],
+    regionOf: (plot) => state.map.tiles[plot]?.region ?? -1,
+    strength: (type) => {
+      const u = AI_UNITS[AI_UNIT_INDEX.get(installType('unit', type, 'UNIT_')) ?? -1];
+      return u ? Math.max(u.combat, u.rangedCombat) : 0;
+    },
+    turn,
+    queuedUnits: free.cities.flatMap((c) => (c.queue[0]?.kind === 'unit' ? [c.queue[0].unit] : [])),
+    warFooting: false,
+    threatened: free.cities.some((c) => (c.aiThreat ?? -1) >= 0),
+    standingArmy: 0,
+  });
+}
+
 /** the copies of each resource a minor's city counts (CityBuildAI +0x978,
  *  0x5c9700): its plots within three of the centre it owns, unimproved, the
  *  resource one it sees (0x4ab4b0) — by install type */
@@ -1670,9 +1721,11 @@ function freeCityBuildingOk(state: GameState, city: City, id: string, unlocks: U
  * a unit on or beside the centre (with no free tile it waits), a building
  * raised, the walls' repair at the HP it puts back (`projectCost`) — leaving
  * the bank the Production less what it lacked; with nothing in hand the
- * Production banks. Then, on an empty queue, the Default Specialization over
+ * Production banks. Then its city AI's update stores the city's threat
+ * (`City.aiThreat`) and, on an empty queue, the Default Specialization over
  * the city's tables (`freeCityBuildFacts`, `freeCityPickFacts`) queues its
- * pick.
+ * pick (runs/h1_duelw1114 Rome t124 UNIT_SLINGER 60.3, runs/h1_duelw1123
+ * Chen t205 UNIT_ARCHER 118.5).
  */
 export function freeCityBuild(state: GameState, city: City, production: number): void {
   const q = city.queue[0];
@@ -1687,6 +1740,8 @@ export function freeCityBuild(state: GameState, city: City, production: number):
       city.productionBank = Math.max(0, production - Math.max(0, cost - before));
     }
   }
+  // its city AI's update: the city's threat (`freeCityThreat`)
+  city.aiThreat = freeCityThreat(state, city);
   if (city.queue.length) return;
   const facts = freeCityBuildFacts(state, city);
   const tables: CityBuildTables = {
@@ -1756,7 +1811,7 @@ function freeCityProjectFacts(state: GameState, city: City, facts: CityBuildFact
  *  unique, none faith-bought, spawned or a spy, none asking a strategic
  *  resource — the Free Cities ignore no requirement and hold no stockpile —
  *  a naval unit at a coastal centre), the walls' repair while available;
- *  no favoured items, the plain pick */
+ *  no favoured items; the defensive pick under threat */
 export function freeCityPickFacts(state: GameState, city: City, facts: CityBuildFacts): PickFacts {
   const r = freeSeatOf(state).research;
   const unlocks = computeUnlocksIn(r, []);
@@ -1791,6 +1846,9 @@ export function freeCityPickFacts(state: GameState, city: City, facts: CityBuild
       return id === 'REPAIR_DEFENSES' && repairAvailable(state, city);
     },
     favored: () => 0,
-    defense: false,
+    // the defensive pick where the city is under threat (0x5cdc50): its
+    // threat above -1 with its centre's hit points damaged (the war footing
+    // clear, +0x218 clear)
+    defense: (city.aiThreat ?? -1) > -1 && city.hp < CITY_MAX_HP,
   };
 }

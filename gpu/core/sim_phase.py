@@ -784,6 +784,14 @@ class SimPhase:
         self._grant_free_unit(due, jc, torch.where(due, got, torch.full_like(got, -1)))
         self.city_free_grant[:, row, j] = torch.where(due, torch.zeros_like(cnt), self.city_free_grant[:, row, j])
 
+    def _free_military_turn(self, act: torch.Tensor) -> None:
+        """`freeMilitaryTurn` — THE FREE CITIES' MILITARY AI'S TURN in the
+        games of `act`, with or without a city: the Combat Desire on the
+        records as their last update aged them (`_free_combat_desire`), then
+        their knowledge base ages and looks (`_free_knowledge`)"""
+        self._free_combat_desire(act)
+        self._free_knowledge(act, True)
+
     def _free_cities_phase(self) -> None:
         """The FREE CITIES player's turn, after every major's — the
         `freeCitiesPhase` twin, every turn: its research is a city-state's
@@ -806,8 +814,11 @@ class SimPhase:
         and the flat loyalty of what stands in it — no amenity, governor,
         policy or roster term, which are an OWNER's and the Free Cities player
         carries none. Each major's share accrues into the city's race
-        (`city_free_press`). Then the Free Cities' units take their tactical
-        turn (`_free_tactics`). A city that reaches 0 joins the race's winner,
+        (`city_free_press`). Their military AI's turn (`_free_military_turn`)
+        runs before the cities, with or without one; each city's update
+        stores its threat in `_free_city_build`. Then the Free Cities' units
+        take their tactical turn (`_free_tactics`) and their knowledge base
+        looks again. A city that reaches 0 joins the race's winner,
         after it, in slot order: CIV6 "it will join the Civilization that
         has exerted the most Loyalty pressure on it since the Free City became
         independent". A seat that pulled nothing, or holds no city any more,
@@ -817,9 +828,12 @@ class SimPhase:
         row = self.FREE_ROW
         self._store_unit_strength(self.FR, torch.ones(self.B, dtype=torch.bool, device=self.device))
         alive = self.city_alive[:, row]
+        ones = torch.ones(self.B, dtype=torch.bool, device=self.device)
         if not bool(alive.count_nonzero()):
             zero = torch.zeros(self.B, dtype=torch.float64, device=self.device)
             self._minor_research(self.FR, zero, zero)
+            self._free_military_turn(ones)
+            self._free_knowledge(ones, False)
             return
         # a Free City's reactor keeps its clock: the seat resolves no power,
         # so the age is kept here (`ageReactors`)
@@ -864,6 +878,8 @@ class SimPhase:
         B, dev, F = self.B, self.device, torch.float64
         bidx, nrow = self._bidx, self.n_majors
         lmax = float(self.rules.seats["loyaltyMax"])
+        # its military AI's turn, in every game: the cityless ones' too
+        self._free_military_turn(ones)
         alive_c = alive.clone()
         joins = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
         for j in range(self.RC):
@@ -890,6 +906,8 @@ class SimPhase:
             self.city_loyalty[bidx, row, jc] = nxt.to(self.city_loyalty.dtype)
             joins[:, j] = act & (self.city_loyalty[bidx, row, jc] <= 0)
         self._free_tactics(acting)
+        # its knowledge base's look at its turn's end, in every game
+        self._free_knowledge(ones, False)
         for j in range(self.RC):
             jl = joins[:, j] & self.city_alive[:, row, j]
             if not bool(jl.count_nonzero()):

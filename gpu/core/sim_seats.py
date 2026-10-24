@@ -11088,6 +11088,7 @@ class SimSeats:
         self.city_proj_conv[b, row, col] = 0
         self.city_proj_yield[b, row, col] = -1
         self.city_free_grant[b, row, col] = 0
+        self.city_ai_threat[b, row, col] = -1
         self.city_free_allowed[b, row, col] = False
         self.city_lasers[b, row, col] = 0
         self.city_powered[b, row, col] = False
@@ -11559,6 +11560,7 @@ class SimSeats:
         # became independent"; any other arrival carries none
         self.city_free_press[b, dst_row, col, :] = 0
         self.city_free_grant[b, dst_row, col] = 0
+        self.city_ai_threat[b, dst_row, col] = -1
         self.city_free_allowed[b, dst_row, col] = False
         # ...and the turn its new owner took it
         self.city_founded_turn[b, dst_row, col] = int(self.turn)

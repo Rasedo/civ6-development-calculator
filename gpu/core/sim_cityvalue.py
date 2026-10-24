@@ -2118,6 +2118,23 @@ class _FreeFacts(_MinorFacts):
         # a Free City's update reads its growth as it stands
         return self.growth()
 
+    # the defensive pick where the city is under threat (0x5cdc50): its
+    # threat above -1 with its centre's hit points damaged
+    def defense(self):
+        sim = self.sim
+        hp = sim.city_hp[:, self.row, self.j].long()
+        return (sim.city_ai_threat[:, self.row, self.j] > -1) & (hp < int(sim.rules.combat["cityMaxHp"]))
+
+    # the Free Cities' military AI writes their Combat Desire over
+    # PSEUDOYIELD_UNIT_COMBAT, their explorers' and naval scouts' desire less
+    # what they hold less 1.0 (`pseudoYieldWeights`)
+    def pseudo_w(self, p):
+        if p == "PSEUDOYIELD_UNIT_COMBAT":
+            return self.sim.citystate_combat_desire[:, self.sim.FR]
+        if p in ("PSEUDOYIELD_UNIT_EXPLORER", "PSEUDOYIELD_UNIT_NAVAL_COMBAT"):
+            return -_FX
+        return super().pseudo_w(p)
+
     # the value view: the Gold weight of a seat losing Gold (`yieldWeights`:
     # its gold per turn, the Free Cities' cities' Gold less their units'
     # upkeep, x -0.2 while below 0)

@@ -27,7 +27,7 @@
  * city's plot order (AI_CityBuild.csv's PLOT ANALYSIS LOG, the centre
  * first).
  */
-import type { CityState, DistrictId, GameState, Tile, Unit } from './types';
+import type { City, CityState, DistrictId, GameState, Seat, Tile, Unit } from './types';
 import { BUILDINGS } from '../data/buildings';
 import { BUILDER_COST_STEP, UNITS } from '../data/units';
 import { TECHS as TECHS_KNOWN } from '../data/techs';
@@ -62,7 +62,7 @@ import { minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsS
 import { ARMY_READ_AGE } from './operations/knowledge';
 import { joinBuilt } from './operations/manager';
 import { minorCity, minorFoodFocus } from './cityStates';
-import { campTiles, civOf, hiddenResourcesFor, seatOf, tileSeat } from './seats';
+import { FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor, isCiv, seatOf, tileSeat } from './seats';
 import { cityAppealResolver } from './governors';
 import { canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
 import { borderCandidates, computeCityStats } from './city';
@@ -660,15 +660,35 @@ export function minorStandingArmy(state: GameState, cs: CityState): number {
  *  and the game starts no City Defense) and its running operations
  *  (`minorOpNear`) */
 export function minorThreat(state: GameState, cs: CityState): number {
-  const view = majorView(state);
-  const aged = cs.armyAged;
-  const records = (cs.armyKnown ?? []).filter((x) => aged === undefined || aged - x.seen <= ARMY_READ_AGE);
-  return cityThreat(view as unknown as Parameters<typeof cityThreat>[0], cs.seat, cs.centerIndex, {
+  return knownThreat(majorView(state) as unknown as Parameters<typeof cityThreat>[0], cs, cs.seat, cs.centerIndex,
+    (p, plot, dist) => minorOpNear(state, cs, p, plot, dist));
+}
+
+/** a city's threat (0x5cbd10) on its holder's knowledge base's records aged
+ *  at most ARMY_READ_AGE */
+function knownThreat(view: Parameters<typeof cityThreat>[0], holder: Seat, seat: number, centre: number,
+  operationNear: (player: number, plot: number, dist: number) => boolean): number {
+  const aged = holder.armyAged;
+  const records = (holder.armyKnown ?? []).filter((x) => aged === undefined || aged - x.seen <= ARMY_READ_AGE);
+  return cityThreat(view, seat, centre, {
     army: (p) => records.filter((x) => x.owner === p).map((x) => ({
       id: x.id, owner: x.owner, type: installType('unit', x.type, 'UNIT_'), plot: x.plot, combat: 0, ranged: 0, damage: 0, seen: x.seen,
     })),
-    operationNear: (p, plot, dist) => minorOpNear(state, cs, p, plot, dist),
+    operationNear,
   });
+}
+
+/** A FREE CITY's threat (0x5cbd10, its CityBuildAI's update) on the Free
+ *  Cities' knowledge base (`freeKnowledge`): the full civs are the players
+ *  it fights (0x469cd0 — the military AI's floor counts each major at war:
+ *  runs/h1_duelw1123 t200-t201, no Free City, desire 0.5 = -0.5 + 0.5 x 2),
+ *  the city-states not; no operation of its own against a player is read
+ *  (the Free Cities Raid's target unread) */
+export function freeCityThreat(state: GameState, city: City): number {
+  const view = majorView(state) as unknown as Parameters<typeof cityThreat>[0];
+  const fights = (i: number, j: number): boolean => (i === FREE_SEAT && isCiv(j)) || (j === FREE_SEAT && isCiv(i));
+  const free: typeof view = Object.assign(Object.create(view), { atWar: (i: number, j: number) => fights(i, j) || view.atWar(i, j) });
+  return knownThreat(free, freeSeatOf(state), FREE_SEAT, city.centerIndex, () => false);
 }
 
 let tracer: ((line: string) => void) | null = null;

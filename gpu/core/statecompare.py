@@ -440,6 +440,13 @@ GAME = {
     "barbArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.BK])],
     "barbCampsKnown": lambda sim, b, rows: [[int(x) for x in sim.barb_camps_known[b].tolist() if x >= 0]],
     "freeUnitStrength": lambda sim, b, rows: [int(sim.citystate_unit_strength[b, sim.FR])],
+    "freeArmyKnown": lambda sim, b, rows: [[x for r in sorted(
+        (int(o), int(t), int(n), int(p), int(d)) for k, o, t, n, p, d in zip(
+            sim.citystate_kb_slot[b, sim.FK].tolist(), sim.citystate_kb_owner[b, sim.FK].tolist(),
+            sim.citystate_kb_type[b, sim.FK].tolist(), sim.citystate_kb_seen[b, sim.FK].tolist(),
+            sim.citystate_kb_plot[b, sim.FK].tolist(), sim.citystate_kb_damage[b, sim.FK].tolist()) if k != -2) for x in r]],
+    "freeArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.FK])],
+    "freeCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, sim.FR])],
     "storms": lambda sim, b, rows: [_storm_table(sim, b)],
     "droughts": lambda sim, b, rows: [_drought_table(sim, b)],
 }
@@ -1264,6 +1271,7 @@ CITY = {
     ],
     "foundedTurn": _cty("city_founded_turn"),
     "freeGrantTurns": _cty("city_free_grant"),
+    "freeCityThreat": _cty("city_ai_threat"),
     "freeAllowed": lambda sim, b, rows: [[i for i, on in enumerate(sim.city_free_allowed[b, c, s].tolist()) if on]
                                          for c, s in rows],
     # every layout slot's work — object, maker, era, civilization; -1s for an

@@ -351,6 +351,7 @@
   readings:
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
   review: reviewed
 - addr: 0x7a58f0

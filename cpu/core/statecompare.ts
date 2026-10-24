@@ -617,6 +617,13 @@ const GAME: Record<string, Extractor> = {
   barbArmyAged: (s) => [s.barbSeat.armyAged ?? -1],
   barbCampsKnown: (s) => [[...(s.barbSeat.campsKnown ?? [])]],
   freeUnitStrength: (s) => [s.freeSeat?.unitStrength ?? 0],
+  // the Free Cities' knowledge base's army records (`freeKnowledge`), as the
+  // barbarians'; their last ageing; their military AI's Combat Desire
+  freeArmyKnown: (s) => [(s.freeSeat?.armyKnown ?? [])
+    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()],
+  freeArmyAged: (s) => [s.freeSeat?.armyAged ?? -1],
+  freeCombatDesire: (s) => [s.freeSeat?.combatDesire ?? 0],
   // the live storms in the order they began: the last serial, then per
   // record its serial, row, centre, turns left, and its struck plots sorted
   // behind their count
@@ -1113,6 +1120,7 @@ const CITY: Record<string, Extractor> = {
   // the turn its owner founded or took the city (a FREE CITY's revolt)
   foundedTurn: overCities((r) => r.city.foundedTurn),
   freeGrantTurns: overCities((r) => r.city.freeGrantTurns ?? 0),
+  freeCityThreat: overCities((r) => r.city.aiThreat ?? -1),
   // a FREE CITY's allowed units (`freeCityAllowed`), as unit rows
   freeAllowed: overCities((r) => (r.city.freeAllowed ?? []).map((x) => idx(UNIT_IDX, x)).sort((a, b) => a - b)),
   // every layout slot's work — object, maker, era, civilization; -1s for an

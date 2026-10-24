@@ -332,8 +332,9 @@ class SimInit:
         # turn's production and its growth: surplus, housing, population,
         # store, multiplier (raw 24.8 but the housing and population)
         self.citystate_ai_growth = torch.zeros(B, s_pad, 5, dtype=torch.long, device=device)
-        # its military AI's Combat Desire (raw 24.8), its PSEUDOYIELD_UNIT_COMBAT weight
-        self.citystate_combat_desire = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # its military AI's Combat Desire (raw 24.8), its PSEUDOYIELD_UNIT_COMBAT
+        # weight; the Free Cities' on the row `FR`
+        self.citystate_combat_desire = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # the count its city's standing army lacks (CityBuildAI +0x2d8), set in its city's update
         self.citystate_standing_short = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         self.citystate_savings = torch.zeros(B, s_pad, len(rules.ai_city_build["savings"]), dtype=torch.long, device=device)
@@ -381,11 +382,13 @@ class SimInit:
         # number in the order the records were added (`citystate_kb_next` the
         # row's next)
         self.BK = s_pad
-        _kb = (B, s_pad + 1, simbase.KB_RECORDS)
+        # the Free Cities' row past the barbarians' (`freeSeat.armyKnown`)
+        self.FK = s_pad + 1
+        _kb = (B, s_pad + 2, simbase.KB_RECORDS)
         self.citystate_kb_seq = torch.full(_kb, -1, dtype=torch.int32, device=device)
-        self.citystate_kb_next = torch.zeros(B, s_pad + 1, dtype=torch.long, device=device)
+        self.citystate_kb_next = torch.zeros(B, s_pad + 2, dtype=torch.long, device=device)
         # the turn each row's records last aged (`armyAged`), -1 never
-        self.citystate_kb_aged = torch.full((B, s_pad + 1), -1, dtype=torch.long, device=device)
+        self.citystate_kb_aged = torch.full((B, s_pad + 2), -1, dtype=torch.long, device=device)
         self.citystate_kb_slot = torch.full(_kb, -2, dtype=torch.int16, device=device)
         self.citystate_kb_owner = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_type = torch.full(_kb, -1, dtype=torch.int16, device=device)
@@ -3974,6 +3977,8 @@ class SimInit:
         self.city_prod_bank = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=dtype, device=device)
         # a FREE CITY's count of turns toward its next grant (`City.freeGrantTurns`)
         self.city_free_grant = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
+        # a FREE CITY's threat as its city AI's last update left it (`City.aiThreat`), -1 none
+        self.city_ai_threat = torch.full((B, self.CITY_ROWS, self.RC), -1, dtype=torch.long, device=device)
         # a FREE CITY's allowed units (`City.freeAllowed`), its grants' chassis
         self.city_free_allowed = torch.zeros(B, self.CITY_ROWS, self.RC, len(rules.units) or 1, dtype=torch.bool,
                                              device=device)

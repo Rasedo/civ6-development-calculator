@@ -218,45 +218,78 @@ class SimMinorAi:
 
     def _minor_threat(self, s: int) -> torch.Tensor:
         """[B] long — `minorThreat` (0x5cbd10) on minor `s`'s knowledge base's
-        records, with no operation of its own: per player of the game in its
-        order but the minor — a full civ (the barbarians not) hostile where
-        the minor fights it, the barbarians hostile, a city-state or the Free
-        Cities only where the minor fights them — the player's known units
-        within 5 (a full civ's) or 3 of the city summed by their threat
-        strengths (the larger of Combat, RangedCombat and Bombard + 20; a
-        Bombard unit counts, a ranged one above the defense less 15, any above
-        the defense less 5; never an explorer nor a barbarian camp defender);
-        at the city's defense plus
-        the margin (5.0 hostile, else 20.0 or the city's strength) the city
-        is threatened at its level (`threatLevel`: 2, 3 above two districts
-        the centre included; +2 its capital, the city-state's one city
-        holding the Palace; no wonder; + its citizens / 5), at most 1 not
-        hostile. The first such player decides; -1 none."""
+        records, with no operation of its own (`_known_threat`): the players
+        of the game in its order but the minor — a full civ hostile where the
+        minor fights it, the barbarians hostile, a city-state or the Free
+        Cities only where the minor fights them; its level (`threatLevel`: 2,
+        3 above two districts the centre included; +2 its capital, the
+        city-state's one city holding the Palace; no wonder; + its citizens /
+        5)."""
         B, dev = self.B, self.device
         row = self._CITY_MINOR0 + s
+        nd = (self.city_dist_tile[:, row, 0] >= 0).sum(dim=1) + 1
+        level = (torch.where(nd > 2, 3, 2) + 2
+                 + torch.div(self.citystate_pop[:, s].long(), 5, rounding_mode="trunc"))
+        seats = list(range(self.n_majors)) + [100 + k for k in range(self.S) if k != s] + [FREE_SEAT, BARB_SEAT]
+        return self._known_threat(s, self.citystate_center[:, s], torch.full((B,), row, dtype=torch.long, device=dev),
+                                  torch.zeros(B, dtype=torch.long, device=dev), level, seats,
+                                  lambda p: self.war[:, row, int(self._seat_row[p])])
+
+    def _free_city_threat(self, j: int) -> torch.Tensor:
+        """[B] long — `freeCityThreat` (0x5cbd10) of the Free City in column
+        `j` on the Free Cities' knowledge base (the row `FK`), no operation of
+        theirs read: the full civs are the players it fights, the city-states
+        not; its level 2, 3 above two districts the centre included, +1 with a
+        wonder complete, + its citizens / 5 (no capital)."""
+        B, dev = self.B, self.device
+        row = self.FREE_ROW
+        nd = (self.city_dist_tile[:, row, j] >= 0).sum(dim=1)
+        wt = self.city_wonder[:, row, j]
+        won = ((wt >= 0) & self.built_wonder_complete.gather(1, wt.clamp(min=0))).any(dim=1)
+        level = (torch.where(nd > 2, 3, 2) + won.long()
+                 + torch.div(self.city_pop[:, row, j].long(), 5, rounding_mode="trunc"))
+        seats = list(range(self.n_majors)) + [100 + k for k in range(self.S)] + [BARB_SEAT]
+        full = torch.ones(B, dtype=torch.bool, device=dev)
+        none = torch.zeros(B, dtype=torch.bool, device=dev)
+        return self._known_threat(self.FK, self.city_center[:, row, j], torch.full((B,), row, dtype=torch.long, device=dev),
+                                  torch.full((B,), j, dtype=torch.long, device=dev), level, seats,
+                                  lambda p: full if p < self.n_majors else none)
+
+    def _known_threat(self, r: int, centre: torch.Tensor, hrow: torch.Tensor, hcol: torch.Tensor, level: torch.Tensor,
+                      seats: list, war_of) -> torch.Tensor:
+        """[B] long — 0x5cbd10 on the knowledge base row `r`'s records aged at
+        most ARMY_READ_AGE (all where the row never aged), the city at
+        `centre` held by (`hrow`, `hcol`): per player of `seats` in order —
+        hostile where `war_of` says the holder fights it (the barbarians
+        always), a full civ counted either way, any other only where fought —
+        the player's known units within 5 (a full civ's) or 3 of the city
+        summed by their threat strengths (the larger of Combat, RangedCombat
+        and Bombard + 20; a Bombard unit counts, a ranged one above the
+        defense less 15, any above the defense less 5; never an explorer nor
+        a barbarian camp defender); at the city's defense plus the margin
+        (5.0 hostile, else 20.0 or the city's strength) the city is
+        threatened at `level`, at most 1 not hostile. The first such player
+        decides; -1 none."""
+        B, dev = self.B, self.device
         T = self._cv_tables()
         rows = T["unit_rows"]
-        hrow = torch.full((B,), row, dtype=torch.long, device=dev)
-        col0 = torch.zeros(B, dtype=torch.long, device=dev)
-        dcs = self._city_defense_cs(hrow, col0)[0]
+        dcs = self._city_defense_cs(hrow, hcol)[0]
         d = dcs * _FX
-        slot = self.citystate_kb_slot[:, s].long()
-        owner = self.citystate_kb_owner[:, s].long()
-        typ = self.citystate_kb_type[:, s].long()
-        plot = self.citystate_kb_plot[:, s].long()
-        # the records aged at most ARMY_READ_AGE (`minorThreat`), all where the
-        # row never aged
-        aged = self.citystate_kb_aged[:, s].unsqueeze(1)
-        rec = (slot != -2) & ((aged < 0) | (aged - self.citystate_kb_seen[:, s].long() <= _ARMY_READ_AGE))
+        slot = self.citystate_kb_slot[:, r].long()
+        owner = self.citystate_kb_owner[:, r].long()
+        typ = self.citystate_kb_type[:, r].long()
+        plot = self.citystate_kb_plot[:, r].long()
+        aged = self.citystate_kb_aged[:, r].unsqueeze(1)
+        rec = (slot != -2) & ((aged < 0) | (aged - self.citystate_kb_seen[:, r].long() <= _ARMY_READ_AGE))
         er = T["engine_row"].to(dev)
         arow = torch.where(typ >= 0, er.take(typ.clamp(min=0, max=er.numel() - 1)), torch.full_like(typ, -1))
-        comb = torch.tensor([int(r["combat"]) for r in rows] or [0], dtype=torch.long, device=dev)
-        rng = torch.tensor([int(r["rangedCombat"]) for r in rows] or [0], dtype=torch.long, device=dev)
-        bomb = torch.tensor([int(r["bombard"]) for r in rows] or [0], dtype=torch.long, device=dev)
-        expl = torch.tensor([r["pseudo"] == "PSEUDOYIELD_UNIT_EXPLORER" for r in rows] or [False], dtype=torch.bool, device=dev)
+        comb = torch.tensor([int(x["combat"]) for x in rows] or [0], dtype=torch.long, device=dev)
+        rng = torch.tensor([int(x["rangedCombat"]) for x in rows] or [0], dtype=torch.long, device=dev)
+        bomb = torch.tensor([int(x["bombard"]) for x in rows] or [0], dtype=torch.long, device=dev)
+        expl = torch.tensor([x["pseudo"] == "PSEUDOYIELD_UNIT_EXPLORER" for x in rows] or [False], dtype=torch.bool, device=dev)
         # the barbarians' camp defenders (their manager's CLASS_ANTI_CAVALRY
         # types, 0x153e40) count for none
-        acav = torch.tensor([r["promotionClass"] == "PROMOTION_CLASS_ANTI_CAVALRY" for r in rows] or [False],
+        acav = torch.tensor([x["promotionClass"] == "PROMOTION_CLASS_ANTI_CAVALRY" for x in rows] or [False],
                             dtype=torch.bool, device=dev)
         a0 = arow.clamp(min=0)
         bb = bomb.take(a0)
@@ -265,20 +298,12 @@ class SimMinorAi:
         dd = d.unsqueeze(1)
         counts = (bb > 0) | ((rng.take(a0) > 0) & (st.double() > dd - 15 * _FX)) | (st.double() > dd - 5 * _FX)
         strength = torch.where((arow >= 0) & counts & ~expl.take(a0), st, torch.zeros_like(st))
-        centre = self.citystate_center[:, s].clamp(min=0)
-        dist = self.pair_dist[centre.unsqueeze(1), plot.clamp(min=0)].long()
+        dist = self.pair_dist[centre.clamp(min=0).unsqueeze(1), plot.clamp(min=0)].long()
         out = torch.full((B,), -1, dtype=torch.long, device=dev)
-        # a minor's operations name no enemy (op +0x2a0), so none holds a
-        # player back (0x723cf0, `minorOpNear`)
-        nd = (self.city_dist_tile[:, row, 0] >= 0).sum(dim=1) + 1
-        level = (torch.where(nd > 2, 3, 2) + 2
-                 + torch.div(self.citystate_pop[:, s].long(), 5, rounding_mode="trunc"))
-        seats = list(range(self.n_majors)) + [100 + k for k in range(self.S) if k != s] + [FREE_SEAT, BARB_SEAT]
         for p in seats:
             full = p < self.n_majors
             barb = p == BARB_SEAT
-            war = (self.war[:, row, int(self._seat_row[p])] if not barb
-                   else torch.zeros(B, dtype=torch.bool, device=dev))
+            war = war_of(p) if not barb else torch.zeros(B, dtype=torch.bool, device=dev)
             hostile = war | barb
             if not full and not barb:
                 if not bool(war.count_nonzero()):
@@ -289,7 +314,7 @@ class SimMinorAi:
             anyu = mine.any(dim=1)
             sums = mine & ~acav.take(a0) if barb else mine
             tot = torch.where(sums, strength, torch.zeros_like(strength)).sum(dim=1)
-            hit = (out < 0) & anyu & (tot.double() >= d + margin)
+            hit = (out < 0) & anyu & (tot.double() >= d + margin) & (centre >= 0)
             if not full and not barb:
                 hit = hit & war
             out = torch.where(hit, torch.where(hostile, level, level.clamp(max=1)), out)
@@ -453,6 +478,68 @@ class SimMinorAi:
         _r, _e, _o, w = self._cv_combat_desire(owner, strength, counted, best, cities, players, 100 + s, queued,
                                               zero, threatened, standing)
         self.citystate_combat_desire[:, s] = torch.where(alive, w, self.citystate_combat_desire[:, s])
+
+    def _free_combat_desire(self, act: torch.Tensor) -> None:
+        """`freeCombatDesire` — THE FREE CITIES' COMBAT DESIRE at their
+        military AI's turn, in the games of `act`, with or without a city
+        (`citystate_combat_desire` on the row `FR`), on the records of their
+        knowledge base (the row `FK`) as their last update aged them (the
+        turn before): the regions of their cities, each city's unit in
+        training, the majors at war with them, the city-states not, the
+        barbarians a tribe at war; a city threatened at its last update
+        (`city_ai_threat`); no war footing, no standing-army term."""
+        B, dev = self.B, self.device
+        if not bool(act.count_nonzero()):
+            return
+        row, r = self.FREE_ROW, self.FK
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        er = T["engine_row"].to(dev)
+        st_row = torch.tensor([max(int(x["combat"]), int(x["rangedCombat"])) for x in rows] + [0],
+                              dtype=torch.long, device=dev)
+
+        def strength_of(typ: torch.Tensor) -> torch.Tensor:
+            ar = torch.where(typ >= 0, er.take(typ.clamp(min=0, max=er.numel() - 1)), torch.full_like(typ, -1))
+            return st_row.take(torch.where(ar >= 0, ar, torch.full_like(ar, len(rows))))
+        slot = self.citystate_kb_slot[:, r].long()
+        owner = self.citystate_kb_owner[:, r].long()
+        typ = self.citystate_kb_type[:, r].long()
+        seen = self.citystate_kb_seen[:, r].long()
+        plot = self.citystate_kb_plot[:, r].long()
+        alive_c = self.city_alive[:, row, : self.RC]
+        ctr = self.city_center[:, row, : self.RC]
+        area_c = torch.where(alive_c & (ctr >= 0), self.tile_region.gather(1, ctr.clamp(min=0)), torch.full_like(ctr, -1))
+        rec_area = self.tile_region.gather(1, plot.clamp(min=0))
+        in_area = ((rec_area.unsqueeze(2) == area_c.unsqueeze(1)) & (area_c >= 0).unsqueeze(1)).any(dim=2)
+        turn = int(self.turn) - 1
+        counted = (slot != -2) & (turn - seen <= 2) & in_area
+        strength = strength_of(typ)
+        best = torch.maximum(torch.ones(B, dtype=torch.long, device=dev),
+                             torch.maximum(self.free_best_melee.long(),
+                                           torch.full((B,), self._city_min_strike, dtype=torch.long, device=dev)))
+        queued = torch.zeros(B, dtype=torch.long, device=dev)
+        for j in range(self.RC):
+            cur = self.city_current[:, row, j, 0].long()
+            is_u = alive_c[:, j] & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
+            q = torch.where(is_u, strength_of((cur - self.UNIT_BASE).clamp(min=0)), torch.zeros_like(cur))
+            queued = queued + torch.where(q + 20 > best, q, torch.zeros_like(q))
+        cities = alive_c.sum(dim=1).long()
+        full = torch.ones(B, dtype=torch.bool, device=dev)
+        none = torch.zeros(B, dtype=torch.bool, device=dev)
+        players = ([(p, full, False, False) for p in range(self.n_majors)]
+                   + [(100 + k, none, False, False) for k in range(self.S)]
+                   + [(FREE_SEAT, none, False, False), (BARB_SEAT, True, True, False)])
+        threatened = (alive_c & (self.city_ai_threat[:, row, : self.RC] >= 0)).any(dim=1)
+        _r, _e, _o, w = self._cv_combat_desire(owner, strength, counted, best, cities, players, FREE_SEAT, queued,
+                                              none, threatened, torch.zeros(B, dtype=torch.long, device=dev))
+        self.citystate_combat_desire[:, self.FR] = torch.where(act, w, self.citystate_combat_desire[:, self.FR])
+
+    def _free_knowledge(self, act: torch.Tensor, age: bool) -> None:
+        """`freeKnowledge` — the Free Cities' knowledge base's look (row
+        `FK`) over the plots they see (`_barb_seen` of their seat)."""
+        if not bool(act.count_nonzero()):
+            return
+        self._knowledge_look(self.FK, FREE_SEAT, self._barb_seen(FREE_SEAT), act, age)
 
     def _minor_standing_army(self, s: int, act: torch.Tensor) -> torch.Tensor:
         """[B] `minorStandingArmy` — THE STANDING ARMY of minor `s`'s city
@@ -1053,8 +1140,9 @@ class SimMinorAi:
         the centre (with no free tile it waits), a building raised (walls at
         full), the walls' repair at the HP it puts back — leaving the bank the
         Production less what it lacked; with nothing in hand the Production
-        banks. Then, on an empty queue, the Default Specialization over the
-        city's tables (`_FreeFacts`) queues its pick."""
+        banks. Then its city AI's update stores the city's threat
+        (`city_ai_threat`) and, on an empty queue, the Default Specialization
+        over the city's tables (`_FreeFacts`) queues its pick."""
         from .sim_cityvalue import _FreeFacts
         B, dev = self.B, self.device
         row = self.FREE_ROW
@@ -1114,6 +1202,8 @@ class SimMinorAi:
                 self._q_pop(row, jc, fin)
                 left = (prod - (cost - before).clamp(min=0)).clamp(min=0)
                 self.city_prod_bank[:, row, j] = torch.where(fin, left.to(self.city_prod_bank.dtype), self.city_prod_bank[:, row, j])
+        # its city AI's update: the city's threat (`_free_city_threat`)
+        self.city_ai_threat[:, row, j] = torch.where(act, self._free_city_threat(j), self.city_ai_threat[:, row, j])
         idle = act & (self.city_current[:, row, j, 0] < 0)
         if not bool(idle.count_nonzero()):
             return

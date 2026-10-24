@@ -430,11 +430,16 @@
     - recording: 1124
       turn: 9
       value: "Logged as   AI_Military.csv's Combat Desire (1124 Cardiff: 0.1 at t9 -> the Warrior   10.73 -> 11.05 at the same table value;"
+    - recording: h1_duelw1123
+      turn: 213
+      value: "the Free Cities (player 62): t200-t201 no city 0.5 (two majors at war), t203 3.5 = (160 - 90) x 0.05 uncapped (a threatened city), t213-t215 capped at 2.0 (no war footing)"
   impl:
     - ai/major/warValue.ts:regionalStrength
     - cpu/core/aiMilitary.ts:combatDesire
     - gpu/core/sim_cityvalue.py:_cv_combat_desire
-    - cpu/core/aiWeights.ts:cs
+    - cpu/core/aiWeights.ts:pseudoYieldWeights
+    - cpu/core/minorBuild.ts:freeCombatDesire
+    - gpu/core/sim_minorai.py:_free_combat_desire
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

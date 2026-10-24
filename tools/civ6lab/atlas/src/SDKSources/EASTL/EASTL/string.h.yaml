@@ -3,6 +3,23 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x263240
+  kind: function
+  status: READ
+  cases:
+    - recording: 1123
+      value: "- THE THREAT AND THE DESIRE: the Free Cities' military AI runs every turn   with or without a city (AI_Military.csv player 62, 249 rows a game) on a   knowledge base of their own (AI_Knowledge.csv pla"
+    - recording: 1123
+      turn: 200
+      value: "The floor M counts each MAJOR at war and no city-state (1123   t200-t201, no Free City: 0.5 = -0.5 + 0.5 x 2);"
+    - recording: 1123
+      turn: 203
+      value: "the desire's unit values against the   recorded picks (the free runs diverge before every Free City: 1123's   Chen still China's at t203)."
+  readings:
+    - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
+  context:
+    - ...the only displacement writes are the military AI's constructor 0x71a960 at 0x71b68a and 0x264296); the Free Cities Raid's target as an operation near the city (0x723cf0); the desire's...
+  review: imported
 - addr: 0x388ee0
   kind: function
   status: READ
@@ -81,6 +98,24 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...` the player's AI::GrandStrategic at player +0x1290, its members named by the constructor 0x6f6e10) is the sum of five 24.8 parts; the yield value 0x7a6690 is amount x Yields.DefaultValue..."
+  review: imported
+- addr: 0x71a960
+  final: 0x4c88d0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1123
+      value: "- THE THREAT AND THE DESIRE: the Free Cities' military AI runs every turn   with or without a city (AI_Military.csv player 62, 249 rows a game) on a   knowledge base of their own (AI_Knowledge.csv pla"
+    - recording: 1123
+      turn: 200
+      value: "The floor M counts each MAJOR at war and no city-state (1123   t200-t201, no Free City: 0.5 = -0.5 + 0.5 x 2);"
+    - recording: 1123
+      turn: 203
+      value: "the desire's unit values against the   recorded picks (the free runs diverge before every Free City: 1123's   Chen still China's at t203)."
+  readings:
+    - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
+  context:
+    - "...LAB: +0x4b8's writer (the only displacement writes are the military AI's constructor 0x71a960 at 0x71b68a and 0x264296); the Free Cities Raid's target as an operation near the city..."
   review: imported
 - addr: 0x74af30
   final: 0x4e9d60

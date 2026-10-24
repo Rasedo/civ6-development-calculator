@@ -221,7 +221,10 @@
     - recording: h1_duelv1121
       turn: 4
       value: "0x153e40), which its start (0x153720) fills   with each Units row tagged CLASS_ANTI_CAVALRY — the camps' defenders   (runs/h1_duelv1121 t4-t12: a barbarian Spearman 3 from city-states 2's   and 4's ci"
-  impl: [cpu/core/operations/cityThreat.ts:campDefender, gpu/core/sim_minorai.py:_minor_threat]
+  impl:
+    - cpu/core/operations/cityThreat.ts:campDefender
+    - gpu/core/sim_minorai.py:_minor_threat
+    - gpu/core/sim_minorai.py:_known_threat
   readings:
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   context:

@@ -47,7 +47,7 @@ import { FX, fmul, fxConst, type AiListItem, type AiListRef } from './aiValue';
 import { civEraIndex, computeCityStats, luxuryAmenities } from './city';
 import { getModifiers, unitUpkeep } from './effects';
 import { wmdUpkeep } from './nuclear';
-import { isCiv, majorsMet, seatOf } from './seats';
+import { FREE_SEAT, isCiv, majorsMet, seatOf } from './seats';
 import { minorCity } from './cityStates';
 import type { GameState, Seat } from './types';
 
@@ -179,6 +179,12 @@ export function pseudoYieldWeights(state: GameState, seat: number, inputs: AiWei
   // city-state desires none and counts none (AI_Military.csv "0:0, 0:0" on
   // every city-state turn), so both read -1.0 — a Galley valued at its
   // Maintenance alone (runs/h1_duelv1117 Caguana t18 -4.14 at T 19)
+  // The Free Cities' military AI writes theirs alike (`freeCombatDesire`;
+  // AI_Military.csv's player 62 rows "0:0, 0:0")
+  if (seat === FREE_SEAT) {
+    out.set('PSEUDOYIELD_UNIT_COMBAT', s.combatDesire ?? 0);
+    for (const p of ['PSEUDOYIELD_UNIT_EXPLORER', 'PSEUDOYIELD_UNIT_NAVAL_COMBAT']) out.set(p, Math.max(-FX, (out.get(p) ?? 0) - FX));
+  }
   const cs = state.cityStates.find((c) => c.seat === seat);
   if (cs) {
     out.set('PSEUDOYIELD_UNIT_COMBAT', cs.combatDesire ?? 0);

@@ -8974,6 +8974,69 @@ engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
   housing value, a Theater's late rows (1117 player 4's hundreds off
   from t99).
 
+## C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread
+
+- THE LISTS (Expansion1_Leaders.xml, Expansion2's copy alike):
+  TRAIT_LEADER_FREE_CITIES' CityEvents list FreeCitiesCityBuilds holds
+  CITY_EVENT_DEFAULT "Simple City Tree" alone — no CITY_UNDER_THREAT (no
+  City Defense operation: AI_Operation.csv's player 62 runs "Free Cities
+  Raid" only, runs/h1_duelw1123 t205-), no building, district or
+  improvement event, so no contract and no district repair through a
+  tree. A Free City's build is the Default Specialization on an empty
+  queue (AI_CityBuild.csv player 62: runs/h1_duelw1114 Rome t124
+  UNIT_SLINGER 60.3, t125 UNIT_WARRIOR 16.9; runs/h1_duelw1123 Chen t202
+  UNIT_SLINGER 54.9, t205 UNIT_ARCHER 118.5; runs/h1_duelw1130 Rome t152
+  UNIT_SLINGER 57.9, t154 UNIT_WARRIOR 16.8), each after the city's
+  update's yield lines.
+- THE DEFENSIVE PICK reads 0x5cdc50 as a city-state's: the war footing, or
+  the city's threat above -1 with its centre damaged. The six recorded
+  picks stand on undamaged centres (Chen's garrison damage 0 t203-t213), so
+  none tells it from the plain pick.
+- THE THREAT AND THE DESIRE: the Free Cities' military AI runs every turn
+  with or without a city (AI_Military.csv player 62, 249 rows a game) on a
+  knowledge base of their own (AI_Knowledge.csv player 62, 2,308 rows on
+  1123). The floor M counts each MAJOR at war and no city-state (1123
+  t200-t201, no Free City: 0.5 = -0.5 + 0.5 x 2); a Free City lifts the
+  target term (t202 1.0); t203-t212 the desire stands uncapped (3.5 =
+  (160 - 90) x 0.05 to 9.5) and t213-t215 capped at 2.0 (raw 3.9, 4.25,
+  2.75) with Chen still Free — so the war footing +0x4b8 is clear and the
+  cap lifts on a city's threat at or above 0, the Free City's threat
+  (0x5cbd10) varying turn to turn; no standing-army term (t203 exact). The
+  engines: `freeKnowledge` / `_free_knowledge` (the row `FK`) at the
+  military AI's turn and at the turn's end, `freeCombatDesire` /
+  `_free_combat_desire` (the row `FR`) over `pseudoYieldWeights`' Combat,
+  explorer and naval scout weights as a city-state's, `freeCityThreat` /
+  `_free_city_threat` (the majors fought, the city-states not, no
+  operation of theirs read) stored per city (`City.aiThreat` /
+  `city_ai_threat`), the defensive pick on it; the Free Cities' tactical
+  target list takes the knowledge base's entries. LAB: +0x4b8's writer
+  (the only displacement writes are the military AI's constructor
+  0x71a960 at 0x71b68a and 0x264296); the Free Cities Raid's target as an
+  operation near the city (0x723cf0); the desire's unit values against the
+  recorded picks (the free runs diverge before every Free City: 1123's
+  Chen still China's at t203).
+
+## C-96: an event's civilian kill spares a Trader — PARTLY READ
+
+- UNIT_KILLED_CIVILIAN 0x33a070 (every event's: floods, storms, eruptions,
+  the accident): the plot's units of the unit container's layer 0
+  (0x75c50, its layer argument r9d 0), each not dead (+0x770), of
+  formation class CIVILIAN (GetFormationClass 2), without
+  CanRetreatWhenCaptured (unit info +0x1b8 bit 8), its owner not immune to
+  the event (0x468100, the player's m_aRandomEventNoUnitDamage), are
+  collected and killed. A Trader stands in a layer of its own (the target
+  list's one entry per Trader beside the plot's one civilian, "C-95: the
+  attack plots in the reach, ...") and is not among them. Recorded:
+  runs/h1_duelw1127 t160, the major flood at 43:13 (Game_RandomEvents.csv
+  FLOOD Severity 1, Units Killed 0): six reach plots, Muscat's centre the
+  fifth (its CITY_GARRISON band, RandCalls line 11520, after the row's fifth
+  draw), its UNIT_KILLED_CIVILIAN draw 6 < 15 (line 11506), its Trader in
+  the centre alive after; the engines killed it. The engines
+  (`strikeUnits` / `_strike_units`) spare a Trader. LAB: the layers'
+  assignment (a religious unit's layer: the target list gives the plot's
+  religious unit apart from its civilian; no recorded kill), whether layer
+  0 holds the civilians alone.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

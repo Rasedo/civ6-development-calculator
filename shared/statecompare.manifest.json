@@ -508,6 +508,44 @@
           ]
         },
         {
+          "name": "freeArmyKnown",
+          "compare": "exact",
+          "note": "the Free Cities' knowledge base's records (`freeKnowledge` on `freeSeat.armyKnown`; the row `FK`) as a sorted multiset of (owner, unit type, turn seen, plot, damage), as barbArmyKnown.",
+          "covers": [
+            "Seat.armyKnown"
+          ],
+          "planes": [
+            "citystate_kb_slot",
+            "citystate_kb_owner",
+            "citystate_kb_type",
+            "citystate_kb_seen",
+            "citystate_kb_plot",
+            "citystate_kb_damage"
+          ]
+        },
+        {
+          "name": "freeArmyAged",
+          "compare": "exact",
+          "note": "the turn the Free Cities' knowledge base's records last aged (`freeKnowledge` on `freeSeat.armyAged`; the row `FK`); -1 never.",
+          "covers": [
+            "Seat.armyAged"
+          ],
+          "planes": [
+            "citystate_kb_aged"
+          ]
+        },
+        {
+          "name": "freeCombatDesire",
+          "compare": "exact",
+          "note": "the Free Cities' military AI's Combat Desire (`freeCombatDesire` on `freeSeat.combatDesire`; the row `FR`), their PSEUDOYIELD_UNIT_COMBAT weight, raw 24.8; 0 until the seat is made.",
+          "covers": [
+            "Seat.combatDesire"
+          ],
+          "planes": [
+            "citystate_combat_desire"
+          ]
+        },
+        {
           "name": "storms",
           "compare": "exact",
           "covers": [
@@ -2636,7 +2674,7 @@
           "name": "minorCombatDesire",
           "compare": "exact",
           "covers": [
-            "CityState.combatDesire"
+            "Seat.combatDesire"
           ],
           "planes": [
             "citystate_combat_desire"
@@ -3256,6 +3294,17 @@
             "city_free_grant"
           ],
           "note": "a FREE CITY's count of turns toward its next grant (`freeCityGrant`, 0x274010's +0x18): back to 0 at a grant, held while its own grants stand at the cap; 0 for any other city."
+        },
+        {
+          "name": "freeCityThreat",
+          "compare": "exact",
+          "covers": [
+            "City.aiThreat"
+          ],
+          "planes": [
+            "city_ai_threat"
+          ],
+          "note": "a FREE CITY's threat (CityBuildAI +0x1b8, `freeCityThreat`) as its city AI's last update left it, -1 none; -1 for any other city."
         },
         {
           "name": "freeAllowed",

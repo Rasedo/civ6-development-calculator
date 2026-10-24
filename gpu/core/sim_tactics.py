@@ -3033,7 +3033,8 @@ class SimTactics:
         npass = units.sum(dim=1)
         # the tactical target list, where a foe stands within a planning's
         # reach of a unit (no move of the pass takes a target farther)
-        kb = seat - 100 if 100 <= seat < 100 + self.S else -1
+        # (the knowledge base's entries a city-state's row or the Free Cities' `FK`)
+        kb = seat - 100 if 100 <= seat < 100 + self.S else (self.FK if seat == FREE_SEAT else -1)
         tg = self._tac_targets(seat, kb) if self._tac_foe_near(units, pre, seat, _ATTACK_SIGHT) else None
         rows, slots = units.nonzero(as_tuple=True)
         rowof = torch.full((B, P), -1, dtype=torch.long, device=dev)

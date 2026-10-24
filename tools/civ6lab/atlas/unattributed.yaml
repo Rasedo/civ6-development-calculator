@@ -1822,6 +1822,7 @@
   final: 0x3fa8e0
   kind: function
   name: the contract eligibility
+  semantics: "under threat (0x5cdc50) a district only where its Districts row has hit points: +0x58 set and +0x5c non-zero (the City Center, the Encampment and its replacements)"
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -1829,9 +1830,12 @@
       value: Muscat's Walls contract printed ACCEPTED once its Walls stood
     - recording: h1_duelw1124
       turn: 43
-      value: "Granada's Harbor contract kept under a threat with its centre whole (0x5cdc50 false), complete t45"
-  semantics: "under threat (0x5cdc50) a district only where its Districts row has hit points: +0x58 set and +0x5c non-zero (the City Center, the Encampment and its replacements)"
-  impl: [cpu/core/aiContracts.ts:contractEligible, cpu/core/minorCityAi.ts:minorTreeCity, gpu/core/sim_citytrees.py:contract_eligible]
+      value: Granada's Harbor contract kept under a threat with its centre whole (0x5cdc50 false), complete t45
+  impl:
+    - cpu/core/aiContracts.ts:contractEligible
+    - cpu/core/minorCityAi.ts:minorTreeCity
+    - gpu/core/sim_citytrees.py:contract_eligible
+    - cpu/core/minorBuild.ts:minorUnderThreat
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
@@ -2685,6 +2689,7 @@
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
   review: reviewed
 - addr: 0x723db0
   kind: function

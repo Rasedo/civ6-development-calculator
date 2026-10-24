@@ -148,9 +148,8 @@ class SimCivics:
         strength = self._cai_strength(s).unsqueeze(1).expand(B, NC)
         adjacency = whole(self._rai_from_landing(strength * _FX, nn)) * m[:, :, 2]
         # a formation's units at the minor's PSEUDOYIELD_UNIT_COMBAT weight,
-        # its military AI's Combat Desire (a Free City's none)
-        desire = (self.citystate_combat_desire[:, s] if s < self.S
-                  else torch.zeros(B, dtype=torch.long, device=self.device))
+        # its military AI's Combat Desire (the Free Cities' on the row `FR`)
+        desire = self.citystate_combat_desire[:, s]
         formation = _fmul(torch.full_like(desire, T["formation"]),
                           _fmul(_FX + desire, torch.full_like(desire, T["formation_def"])))
         val = (own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * district

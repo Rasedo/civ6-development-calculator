@@ -31,7 +31,7 @@ import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBo
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MAX_HP } from '../data/cityStates';
-import { freeCityBuild, minorBestOfClass, minorCompleteNow, minorResearch, trainableIn } from './minorBuild';
+import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorResearch, trainableIn } from './minorBuild';
 import { storeUnitStrength } from './majorView';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { freeCityTactics, plotDistance, tacticalTargets } from './tactical';
@@ -981,22 +981,26 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  and the tier is recorded off one read of every Free City, before the
  *  research and again after a completion. Its
  *  treasury banks the Gold those same stats make, in array order, then pays
- *  its units' upkeep and meets the `bankruptcy` that may force. Then each
+ *  its units' upkeep and meets the `bankruptcy` that may force. Its military
+ *  AI's turn follows, with or without a city (`freeMilitaryTurn`: the Combat
+ *  Desire, the knowledge base's ageing look). Then each
  *  city takes its grant when one falls due,
- *  puts the same stats' Production into its item and its AI picks the next
- *  on an empty queue (`freeCityBuild`),
+ *  puts the same stats' Production into its item, its city AI stores its
+ *  threat and picks the next on an empty queue (`freeCityBuild`),
  *  fires the ranged strikes any walled city fires and runs
  *  `freeCityLoyaltyDelta` (its heal is the turn's end's, `healCities`) — its
  *  cities press a religion they follow on that religion's founder's turn
  *  (`spreadReligiousPressure`). Then the Free Cities' units take their
- *  tactical turn (`freeCityTactics`); the cities that reached 0 join their
- *  race's winner, in array order, after it. */
+ *  tactical turn (`freeCityTactics`), their knowledge base looks again; the
+ *  cities that reached 0 join their race's winner, in array order, after it. */
 export function freeCitiesPhase(state: GameState): void {
   const free = freeSeatOf(state);
   const urban = () => urbanDefensesFit(state, FREE_SEAT);
   storeUnitStrength(state, FREE_SEAT);
   if (free.cities.length === 0) {
     minorResearch(state, free.research, FREE_SEAT, 0, 0, () => undefined, urban, []);
+    freeMilitaryTurn(state);
+    freeKnowledge(state, false);
     return;
   }
   // a Free City's reactor keeps its clock: the seat resolves no power, so the
@@ -1036,6 +1040,7 @@ export function freeCitiesPhase(state: GameState): void {
     const mods2 = getModifiers(state, FREE_SEAT);
     free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, lux2, mods2); });
   }
+  freeMilitaryTurn(state);
   const joiners: City[] = [];
   [...free.cities].forEach((city, i) => {
     freeCityGrant(state, city);
@@ -1046,7 +1051,17 @@ export function freeCitiesPhase(state: GameState): void {
     if (city.loyalty <= 0) joiners.push(city);
   });
   freeCityTactics(state);
+  // its knowledge base's look at its turn's end
+  freeKnowledge(state, false);
   for (const city of joiners) joinFromFreeCity(state, city);
+}
+
+/** THE FREE CITIES' MILITARY AI'S TURN, with or without a city: the Combat
+ *  Desire on the records as their last update aged them (`freeCombatDesire`),
+ *  then their knowledge base ages and looks (`freeKnowledge`) */
+function freeMilitaryTurn(state: GameState): void {
+  freeSeatOf(state).combatDesire = freeCombatDesire(state, state.turn - 1).desire;
+  freeKnowledge(state, true);
 }
 
 /**

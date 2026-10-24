@@ -217,7 +217,11 @@ function strikeUnits(state: GameState, tile: Tile, owner: number, s: UnitStrike,
     if (dom === 'air' || dom === 'spy') continue;
     if (ev && stormSpares(state, u.seat, ev)) continue;
     if (dom === 'civilian') {
-      if (s.civ) disbandUnit(state, u.id);
+      // the kill walks the plot's unit layer 0 (0x33a070 -> 0x75c50): a
+      // Trader stands in a layer of its own and survives (runs/h1_duelw1127
+      // t160: Muscat's Trader in its centre under the major flood's draw 6
+      // of 15)
+      if (s.civ && !UNITS[u.type]?.trader) disbandUnit(state, u.id);
       continue;
     }
     const naval = !!UNITS[u.type]?.naval;
