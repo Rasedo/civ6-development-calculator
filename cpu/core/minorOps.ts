@@ -33,7 +33,7 @@ import { NO_PLOT, opDef, opUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
 import { installType, minorCanUpgrade, minorSetItem, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
-import { minorContractCity } from './minorCityAi';
+import { minorContractCity, minorSecondHook } from './minorCityAi';
 import { campTiles, tileSeat } from './seats';
 import { disbandUnit } from './units';
 import { goldAffordable } from './game';
@@ -344,17 +344,26 @@ function upgradeTarget(state: GameState, cs: CityState, u: Unit): number {
   return minorCity(cs).districts.find((d) => d.type === 'HARBOR')?.tileIndex ?? -1;
 }
 
+/** THE REPLAY'S HOLD AROUND A CITY'S SECOND HOOK (`holdSecondHook`): the
+ *  copy of the replay's units' turn stands on record t+1's ground, its city
+ *  trees' orders on the ground the city's turn found. Null outside a replay. */
+let hookHeld: ((state: GameState, cs: CityState, run: () => void) => void) | null = null;
+export function holdSecondHook(fn: typeof hookHeld): void {
+  hookHeld = fn;
+}
+
 /**
  * C: A CITY-STATE'S UNITS' TURN — its tactical pass (`cityStateTactics`),
  * its operations run once the pass has its units' planning: each operation
- * unit's turn is its operation's.
+ * unit's turn is its operation's; its city's second hook
+ * (`minorSecondHook`) in its pass among the trees.
  */
 export function cityStateMilitary(state: GameState, cs: CityState): void {
   cityStateTactics(state, cs, (pass) => {
     const ops = opsOfMinor(cs);
     const env = minorEnv(state, cs, pass);
     operationsRun(ops, { ...env, trees: [{ priority: UPGRADE_TREE_PRIORITY, tick: () => upgradeTreesTick(state, cs, pass) }],
-      held: () => cs.upgrading ?? [] });
+      cityHook: () => (hookHeld ?? ((_st, _cs, run) => run()))(state, cs, () => minorSecondHook(state, cs)), held: () => cs.upgrading ?? [] });
     for (const id of opsOf(ops).flatMap(opUnits)) {
       const u = state.units.find((x) => x.id === id && x.seat === cs.seat);
       if (u) passFinish(pass, u, 'Operation', u.tileIndex);

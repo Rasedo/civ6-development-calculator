@@ -366,6 +366,12 @@ class SimInit:
         self.citystate_unit_values = torch.full((B, s_pad, len(rules.ai_city_build["units"])), -9999 * 256,
                                                 dtype=torch.long, device=device)
         self.citystate_unit_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # its BUILDINGS and PROJECTS tables as its city's update of the turn
+        # left them, its second hook's (`CityState.buildingValues`, `projectValues`)
+        self.citystate_building_values = torch.full((B, s_pad, len(rules.ai_city_build["buildings"])), -9999 * 256,
+                                                    dtype=torch.long, device=device)
+        self.citystate_project_values = torch.full((B, s_pad, len(rules.ai_city_build["projects"])), -9999 * 256,
+                                                   dtype=torch.long, device=device)
         self.citystate_res_counts = torch.zeros(B, s_pad, len(rules.res_ai), dtype=torch.long, device=device)
         # the events' slots, the trees, the contracts and the reservations of
         # each minor's city (`CityAi`, gpu/core/sim_citytrees.py), then the

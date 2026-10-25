@@ -68,6 +68,10 @@ export interface OpsEnv {
    *  Units", `upgradeTreesTick`): each ticks in the run beside the
    *  operations' trees by its priority, after the operations of its own */
   trees?: readonly { priority: number; tick: () => void }[];
+  /** the city's second hook (0x5c2610 -> 0x5ce5b0), run in the city AI's
+   *  pass (`CITY_AI_PASS`): after the trees of a higher priority, before
+   *  those of its own or lower */
+  cityHook?: () => void;
   /** the units those trees hold, out of the operations' offers */
   held?: () => readonly number[];
   /** the view as the actions so far left the game */
@@ -109,6 +113,7 @@ export interface OpsEnv {
   barbarian?: BarbarianHooks;
   /** Operation Defend Units' orders (`OpsContext`), where the seat's units' turn gives them */
   defend?: OpsContext['defend'];
+  endTurn?: OpsContext['endTurn'];
   /** Naval Patrol's moves (`OpsContext`), where the seat's units' turn gives them */
   patrol?: OpsContext['patrol'];
   /** Naval Pillage's blows (`OpsContext`), where the seat's units' turn gives them */
@@ -320,6 +325,11 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv): void {
   ai.pick = best ? { def: best.def.name, enemy: best.enemy, target: best.target, rally: best.rally } : null;
 }
 
+/** the Control Manager's pass a city's AI acts in (CityBuildAI +0x470, 2
+ *  from the AI::CityBuild constructor 0x5c4f40): its update and its second
+ *  hook run in that pass of their lists (0x608870, 0x608580) */
+export const CITY_AI_PASS = 2;
+
 /** THE OPERATIONS' RUN (with the tree manager's tick): each operation's
  *  target and teams logged; the chosen candidate started; the trees by
  *  priority, the highest first, of equals in slot order — the tree
@@ -327,16 +337,35 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv): void {
  *  that priority alone (0x7d3a00 / 0x7cb3d0: tree +0x548, its definition's
  *  Priority) (runs/h1_duelw1121 Hunza t13: City Defense, priority 4, ticks
  *  before the older Attack Barb Camp, priority 3, and recruits both its
- *  Warriors; Attack Barb Camp then completes, empty) */
+ *  Warriors; Attack Barb Camp then completes, empty). The +0x388 list runs
+ *  its passes from 4 down to 0 (0x608580), the city's second hook ahead of
+ *  the tree manager's tick in a pass, so the hook runs after the trees of a
+ *  priority above `CITY_AI_PASS` and before the rest (runs/h1_dueld1127
+ *  city-state 4 t16: City Defense's Warrior steps onto the centre, no
+ *  purchase) */
 export function operationsRun(ai: OpsAi, env: OpsEnv): void {
   operationsRefresh(ai, env);
   const order = opsOf(ai).map((op, k) => ({ op, k })).sort((a, b) => opDef(b.op).priority - opDef(a.op).priority || a.k - b.k);
   const trees = [...(env.trees ?? [])].sort((a, b) => b.priority - a.priority);
+  let hooked = !env.cityHook;
+  const hook = (priority: number) => {
+    if (hooked || priority > CITY_AI_PASS) return;
+    hooked = true;
+    env.cityHook!();
+  };
   for (const { op } of order) {
-    while (trees.length && trees[0].priority > opDef(op).priority) trees.shift()!.tick();
+    while (trees.length && trees[0].priority > opDef(op).priority) {
+      hook(trees[0].priority);
+      trees.shift()!.tick();
+    }
+    hook(opDef(op).priority);
     tickTree(ai, env, op);
   }
-  for (const t of trees) t.tick();
+  for (const t of trees) {
+    hook(t.priority);
+    t.tick();
+  }
+  hook(CITY_AI_PASS);
 }
 
 /** the operations' run before the trees tick: each operation's target and
@@ -384,6 +413,7 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     moveUpdate: env.moveUpdate,
     moveExec: env.moveExec,
     defend: env.defend,
+    endTurn: env.endTurn,
     patrol: env.patrol,
     pillage: env.pillage,
     ownAiType: env.ownAiType,

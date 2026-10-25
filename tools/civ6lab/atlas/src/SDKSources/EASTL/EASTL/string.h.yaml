@@ -84,6 +84,7 @@
   name: AI::CityBuild constructor
   semantics: "FinalRelease: +0x98 m_cityId (value +0xa8), +0xb0 m_playerOwner, +0xc8 m_cityThreat, +0x140 m_managedWorkingContract (the handle +0x150), +0x160 m_managedContracts (+0x10 the handles, +0x18 their count)"
   status: PARTLY
+  impl: [cpu/core/operations/manager.ts:CITY_AI_PASS, gpu/core/sim_minorops.py:_CITY_AI_PASS]
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

@@ -5013,8 +5013,28 @@ operations' contracts, the improvement values below, the purchases).
   and its threatened purchases — runs in pass 2, after the trees of
   priority 4 (City Defense, Settle New City, Barbarian City Assault) and 3
   (Attack Barb Camp and the assaults) have ticked, and before the trees of
-  priority 2 (Naval Superiority, the city trees). The port runs the city's
-  second hook in the city's update, before any tree ticks.
+  priority 2 (Naval Superiority, the city trees). PORTED (`operationsRun`'s
+  `cityHook`, `minorSecondHook`; `_mops_run`, `_minor_second_hook`): the
+  hook, then the city trees' tick, in the units' turn between the priority-3
+  and priority-2 trees; the replay runs it in its copy of the units' turn,
+  its purchases, its item and its Builders' layings answered against the
+  record's after (`minorBuysAfter`, `minorLaysAfter`).
+- GARRISON CITY ENDS ITS UNITS' TURNS (0x810d30, READ, ported): the unit on
+  the city — the operation's garrison, or with none a military unit of the
+  seat standing there (0x81100a: formation class 0 or 3 takes the garrison's
+  branch at 0x811129) — has its turn ended (0x570b40 with dl 1) before the
+  swap and fortify tests; a candidate it moves in (0x811038) or beside the
+  city (0x8111d7) likewise. Operation Move's execution (0x816cb0) then moves
+  only members with their turn to come, and Operation Attack Units takes none of them
+  (runs/h1_duely1127 Mexico City t17: its garrisoned Warrior logs no Op
+  Attack Units Targets; ours had struck out and the pass-2 purchase bought a
+  Warrior): runs/h1_dueldA1117 Antananarivo t24,
+  City Defense's Warrior on 32:5 stays and only the one on 29:3 moves
+  (29:3 -> 30:3), as AI_Operation.csv logs; the port's had moved both, and
+  the pass-2 purchase found the centre empty (an Archer at t24-t26,
+  runs/h1_dueld1121 Hunza t21 a Warrior the game never bought).
+  runs/h1_dueld1127 city-state 4 t46: the t16 Warrior gone, contract 112's
+  Builder still unbought at the savings' edge below.
 - THE THREATENED PURCHASE AFTER THE PASS-4 AND PASS-3 TREES (the records,
   runs/h1_dueld*): with the city threatened (aimem CityBuildAI +0x1b8), a
   land military unit of the city-state reaching the centre in the turn

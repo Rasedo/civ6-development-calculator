@@ -2832,6 +2832,30 @@
           "note": "the minor city's UNITS table as its city AI's last turn left it, raw 24.8 in the AI unit rows' order; empty before its first"
         },
         {
+          "name": "minorBuildingValues",
+          "compare": "exact",
+          "covers": [
+            "CityState.buildingValues"
+          ],
+          "planes": [
+            "citystate_building_values",
+            "citystate_unit_on"
+          ],
+          "note": "the minor city's BUILDINGS table as its city's update of the turn left it, raw 24.8 in the AI building rows' order; empty before its first"
+        },
+        {
+          "name": "minorProjectValues",
+          "compare": "exact",
+          "covers": [
+            "CityState.projectValues"
+          ],
+          "planes": [
+            "citystate_project_values",
+            "citystate_unit_on"
+          ],
+          "note": "the minor city's PROJECTS table as its city's update of the turn left it, raw 24.8 in the Projects rows' order; empty before its first"
+        },
+        {
           "name": "minorResourceCounts",
           "compare": "exact",
           "covers": [

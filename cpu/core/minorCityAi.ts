@@ -16,12 +16,14 @@
  *    City Defense (its operation manager's start, `minorOpsStart`), the
  *    building or unit event, the district event, the improvement event — a
  *    city its AI first sees this turn running none;
- *  - C: the Default Specialization where the queue is empty (0x5d4d70: the
+ *  - C: its units' turn (`cityStateMilitary`), its operations' trees by
+ *    priority in the Control Manager's passes; in pass 2, after the trees of
+ *    priority 4 and 3, the city's second hook (`minorSecondHook`): the
+ *    Default Specialization where the queue is empty (0x5d4d70: the
  *    contract in hand where it takes the turn, else the pick), the
  *    purchases (0x5ce5b0's tail: a threatened city buys the first unit of
- *    its list while TryPurchaseUnits succeeds), the trees' tick (0x7ffdd0),
- *    their orders carried out at once; its operations' trees tick in its
- *    units' turn (`cityStateMilitary`).
+ *    its list while TryPurchaseUnits succeeds), the city trees' tick
+ *    (0x7ffdd0), their orders carried out at once.
  *
  * The plot analysis covers the 37 plots within three of the centre in the
  * city's plot order (AI_CityBuild.csv's PLOT ANALYSIS LOG, the centre
@@ -818,15 +820,13 @@ function minorBuyInstall(state: GameState, cs: CityState, u: string): void {
 
 /**
  * THE MINOR'S CITY AI TURN (the order above, after `minorMilitaryTurn` and
- * the knowledge base's look): its city's update and events, the Default
- * Specialization on an empty queue, its purchases, its trees' tick.
- * `fresh`: its city AI had not run before this turn (the founding turn's
- * first look).
+ * the knowledge base's look): its city's update and events, its tables kept
+ * for its second hook (`minorSecondHook`). `fresh`: its city AI had not run
+ * before this turn (the founding turn's first look).
  */
 export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): void {
   if (cs.centerIndex < 0) return;
   const ai = (cs.cityAi ??= newCityAi());
-  const eco = (cs.economy ??= newEconomicMemory());
   // A: the city's update
   // a founding turn's first look reads the military AI's unit production
   // table as it stood before the city: no known unit, every entry 1.0
@@ -840,6 +840,8 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
     projects: projectTable(minorProjectFacts(cs, facts)),
   };
   cs.unitValues = tables.units;
+  cs.buildingValues = tables.buildings;
+  cs.projectValues = tables.projects;
   if (!fresh) cs.resourceCounts = Object.fromEntries(minorResourceCounts(state, cs));
   const t = minorThreat(state, cs);
   const threat = t.level;
@@ -876,7 +878,43 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
     districtEvent(ai, w, city, list.CITY_EVENT_DISTRICT);
     improvementEvent(ai, w, city, list.CITY_EVENT_IMPROVEMENT);
   }
-  // C: the Default Specialization on an empty queue
+  if (tracer) {
+    const b = specializationBests(tables, pf);
+    const name = (k: string, i: number) => (i < 0 ? '-' : (k === 'b' ? AI_BUILDINGS[i].type : AI_UNITS[i]?.type ?? `${i}`));
+    tracer(`t${state.turn} ${cs.name} threat ${threat} under ${city.underThreat} item ${cs.prodItem ?? '-'} ${Math.round(cs.prodProgress ?? 0)}`
+      + ` best b ${name('b', b.building.index)} ${(b.building.value / FX).toFixed(1)} u ${name('u', b.unit.index)} ${(b.unit.value / FX).toFixed(1)} p ${b.project.index} ${(b.project.value / FX).toFixed(1)}`
+      + ` imp ${city.bestImprovement} slots ${JSON.stringify(ai.slots[city.id] ?? [])}`
+      + ` trees [${ai.trees.map((t) => `${t.id}:${t.name.split(' ').pop()}:${t.trigger.building ?? t.trigger.unit ?? t.trigger.district ?? t.trigger.improvement}@${t.trigger.plot}`).join(' ')}]`
+      + ` contracts [${ai.contracts.map((c) => `${c.id}:${c.unit ?? c.building ?? c.district ?? ai.techContracts[c.id] ?? 'PLOT'}:${c.progress}:${(c.value / FX).toFixed(1)}`).join(' ')}] hand ${ai.inHand[city.id] ?? -1}`);
+  }
+}
+
+/**
+ * THE CITY'S SECOND HOOK (0x5c2610 -> 0x5ce5b0) in the Control Manager's
+ * pass 2 (`CITY_AI_PASS`, `operationsRun`): after the trees of priority 4
+ * and 3 have ticked (City Defense, Attack Barb Camp: their recruits'
+ * contracts listed, their units moved), before those of priority 2 and the
+ * city trees' tick. The Default Specialization on an empty queue — the
+ * contract in hand where it takes the turn, else the pick — then, the city
+ * threatened, its list's first unit bought while TryPurchaseUnits succeeds;
+ * then the city trees' tick (0x7ffdd0, the city trees' priority the pass's:
+ * the hook ahead of it in the pass), their orders carried out at once. Its
+ * tables the city's update's (`CityState.unitValues`, `buildingValues`,
+ * `projectValues`), its plot analysis the update's inputs read again
+ * (runs/h1_dueldA1117 Valletta t2: the Monument the hook takes, cleared by
+ * the Harbor contract the tick submits; Caguana t15: the Warrior contract
+ * queued before its tree's tick ends it).
+ */
+export function minorSecondHook(state: GameState, cs: CityState, fresh = false): void {
+  const ai = cs.cityAi;
+  if (cs.centerIndex < 0 || !ai) return;
+  const threat = cs.threat ?? -1;
+  const eco = (cs.economy ??= newEconomicMemory());
+  const facts = minorBuildFacts(state, cs, fresh ? () => 0 : minorKnownUnits(cs), fresh);
+  if (!cs.unitValues || !cs.buildingValues || !cs.projectValues) return;
+  const tables: CityBuildTables = { buildings: cs.buildingValues, units: cs.unitValues, projects: cs.projectValues };
+  const pf = minorPickFacts(state, cs, facts);
+  const city = minorTreeCity(state, cs, facts, tables, pf, [], threat);
   if (!cs.prodItem) {
     const hand = cityContracts(ai, city, () => undefined);
     const bests = specializationBests(tables, pf);
@@ -896,8 +934,6 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
         cs.prodSetValue = pick.value;
       }
     }
-    city.current = currentItem(cs);
-    city.currentValue = cs.prodSetValue ?? FX_MIN;
   }
   // the purchases: a threatened city buys its list's first unit while it may
   if (threat > -1) {
@@ -905,17 +941,9 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
     purchaseTurn(eco, minorPurchaseCity(state, cs, threat), false, () => purchasePick(entries, (u) => pf.canTrain(u),
       (u) => !AI_UNITS[AI_UNIT_INDEX.get(u)!].mustPurchase, () => null, null), (_c, u) => minorBuyInstall(state, cs, u));
   }
-  // the trees' tick
-  tickCityTrees(ai, w);
-  if (tracer) {
-    const b = specializationBests(tables, pf);
-    const name = (k: string, i: number) => (i < 0 ? '-' : (k === 'b' ? AI_BUILDINGS[i].type : AI_UNITS[i]?.type ?? `${i}`));
-    tracer(`t${state.turn} ${cs.name} threat ${threat} under ${city.underThreat} item ${cs.prodItem ?? '-'} ${Math.round(cs.prodProgress ?? 0)}`
-      + ` best b ${name('b', b.building.index)} ${(b.building.value / FX).toFixed(1)} u ${name('u', b.unit.index)} ${(b.unit.value / FX).toFixed(1)} p ${b.project.index} ${(b.project.value / FX).toFixed(1)}`
-      + ` imp ${city.bestImprovement} slots ${JSON.stringify(ai.slots[city.id] ?? [])}`
-      + ` trees [${ai.trees.map((t) => `${t.id}:${t.name.split(' ').pop()}:${t.trigger.building ?? t.trigger.unit ?? t.trigger.district ?? t.trigger.improvement}@${t.trigger.plot}`).join(' ')}]`
-      + ` contracts [${ai.contracts.map((c) => `${c.id}:${c.unit ?? c.building ?? c.district ?? ai.techContracts[c.id] ?? 'PLOT'}:${c.progress}:${(c.value / FX).toFixed(1)}`).join(' ')}] hand ${ai.inHand[city.id] ?? -1}`);
-  }
+  // the city trees' tick, on the city as the hook left it
+  const trees = minorTreeCity(state, cs, facts, tables, pf, minorPlotEvals(state, cs, facts, tables.buildings), threat);
+  tickCityTrees(ai, minorTreeWorld(state, cs, ai, trees));
 }
 
 /** a contract's item as the minor's item (a district at the contract's plot) */

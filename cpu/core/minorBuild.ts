@@ -627,6 +627,7 @@ export const minorOrdersHeld = (): boolean => ordersHeld;
 /** A MINOR'S BUILDER LAYS AN IMPROVEMENT: it stands on the plot, spends a
  *  charge and its turn, and is gone with its last charge. */
 export function minorBuilderLays(state: GameState, u: Unit, plot: number, imp: string): void {
+  layTracer?.(u, plot, imp);
   const tile = state.map.tiles[plot];
   u.tileIndex = plot;
   tile.improvement = imp;
@@ -638,6 +639,15 @@ export function minorBuilderLays(state: GameState, u: Unit, plot: number, imp: s
   // (0xa4cee0 -> 0x196320)
   const owner = state.cityStates.find((c) => c.seat === tileSeat(tile));
   if (owner) minorReplaceCitizens(state, owner);
+}
+
+let layTracer: ((u: Unit, plot: number, imp: string) => void) | null = null;
+
+/** The action replay's view of a minor's Builder's layings (the unit, the
+ *  plot, the improvement), so that it can answer the record's with them.
+ *  Null outside a replay. */
+export function traceMinorLays(fn: typeof layTracer): void {
+  layTracer = fn;
 }
 
 /** The land (or, with `naval`, the naval) military chassis a research

@@ -88,6 +88,10 @@ export interface OpsContext {
   /** Operation Defend Units' orders, where the seat's units' turn gives
    *  them; none, the node moves no unit */
   defend?: DefendOrders;
+  /** the unit's turn ends (0x570b40): the pass moves it no more, the
+   *  operations' nodes read it with no Movement (its rest kept); none
+   *  outside the seat's units' turn */
+  endTurn?: (id: number) => void;
   /** NAVAL PATROL's execution for the units (0x803060), in the player's
    *  unit order: each with Movement left takes HL Explore's target and moves
    *  there, its turn done; none, the node moves no unit */

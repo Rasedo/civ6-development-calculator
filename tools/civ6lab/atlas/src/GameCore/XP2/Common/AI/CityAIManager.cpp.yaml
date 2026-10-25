@@ -7,6 +7,10 @@
   final: 0x3d90f0
   kind: function
   status: PARTLY
+  impl:
+    - cpu/core/minorCityAi.ts:minorSecondHook
+    - cpu/core/operations/manager.ts:OpsEnv
+    - gpu/core/sim_minorai.py:_minor_second_hook
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]

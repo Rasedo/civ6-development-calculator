@@ -1929,7 +1929,12 @@
   cases:
     - recording: AI_Tactical.csv
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
-  impl: [cpu/core/tactical.ts:Pass, gpu/core/sim_barbops.py:to_safe]
+  impl:
+    - cpu/core/tactical.ts:Pass
+    - gpu/core/sim_barbops.py:to_safe
+    - cpu/core/operations/assault.ts:garrisonExecute
+    - cpu/core/operations/nodes.ts:OpsContext
+    - gpu/core/sim_minorops.py:_x_garrison
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -1941,6 +1946,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -4282,6 +4288,7 @@
     - cpu/core/barbarianOps.ts:barbarianTrees
     - cpu/core/operations/manager.ts:operationsRun
     - cpu/core/barbarianOps.ts:freeEndedTrees
+    - cpu/core/minorCityAi.ts:minorSecondHook
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"

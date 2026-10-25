@@ -1038,6 +1038,10 @@ CITY_STATE = {
     "minorStandingArmyShort": lambda sim, b, rows: [int(sim.citystate_standing_short[b, s]) for s in rows],
     "minorUnitValues": lambda sim, b, rows: [[int(x) for x in sim.citystate_unit_values[b, s].tolist()]
                                              if bool(sim.citystate_unit_on[b, s]) else [] for s in rows],
+    "minorBuildingValues": lambda sim, b, rows: [[int(x) for x in sim.citystate_building_values[b, s].tolist()]
+                                                 if bool(sim.citystate_unit_on[b, s]) else [] for s in rows],
+    "minorProjectValues": lambda sim, b, rows: [[int(x) for x in sim.citystate_project_values[b, s].tolist()]
+                                                if bool(sim.citystate_unit_on[b, s]) else [] for s in rows],
     "minorResourceCounts": lambda sim, b, rows: [[int(x) for x in sim.citystate_res_counts[b, s].tolist()] for s in rows],
     "minorTradeList": lambda sim, b, rows: [_trade_list(sim, b, s) for s in rows],
     "minorTradeValue": lambda sim, b, rows: [int(sim.citystate_trade_value[b, s]) for s in rows],

@@ -251,7 +251,7 @@ export function ownAiType(state: GameState, seat: number, pass: Pass | null): Op
 
 /** the orders of `seat`'s operations in `pass`; `changed` after each */
 export function passOrders(state: GameState, seat: number, pass: Pass, changed: () => void):
-  Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend' | 'patrol' | 'pillage'> {
+  Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend' | 'endTurn' | 'patrol' | 'pillage'> {
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id && u.seat === seat);
   return {
     move: (id, dest) => {
@@ -282,6 +282,12 @@ export function passOrders(state: GameState, seat: number, pass: Pass, changed: 
       return out.map((x) => ({ type: gameTypeOf('unit', x.unit.type, 'UNIT_'), from: x.from, dest: x.dest, after: x.unit.tileIndex }));
     },
     defend: passDefend(state, seat, pass, changed),
+    endTurn: (id) => {
+      const u = unitOf(id);
+      if (!u) return;
+      pass.ended.add(u.id);
+      passFinish(pass, u, 'Operation', u.tileIndex);
+    },
     // the units in the player's unit order (0x6092c0: pool order)
     patrol: (ids) => {
       const us = ids.map(unitOf).filter((u): u is Unit => !!u).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));

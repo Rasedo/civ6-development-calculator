@@ -188,7 +188,7 @@ const canAlphaCity: BtHandler<OpsContext> = {
         sum += view.cityBlow(id, op.target);
       }
     }
-    return Math.fround(sum) >= Math.fround(Math.fround(hp.max - hp.damage) * 0.5) ? BT_SUCCESS : BT_FAILURE;
+      return Math.fround(sum) >= Math.fround(Math.fround(hp.max - hp.damage) * 0.5) ? BT_SUCCESS : BT_FAILURE;
   },
 };
 
@@ -223,8 +223,9 @@ const garrisonCity: BtHandler<OpsContext> = {
  *  garrison's. With no garrison of the operation's and no military unit of
  *  the seat on the city, the candidate moves in. With a garrison and a
  *  stronger candidate, the candidate moves beside the city (the swap
- *  command 0x972880 into it is unported). The fortify commands are none in
- *  the action rows. */
+ *  command 0x972880 into it is unported). The garrison's turn ends, a
+ *  military unit's of the seat on the city, the candidate's (0x570b40). The
+ *  fortify commands are none in the action rows. */
 function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], _run: unknown, ctx: OpsContext): void {
   const view = ctx.view();
   const { op } = ctx;
@@ -265,15 +266,28 @@ function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], 
       if (!pick && gRanged === 0 && bestRanged === 0) pick = u;
     }
   }
+  // each unit the execution takes its turn ends (0x570b40, dl 1): the
+  // garrison, a military unit of the seat on the city, the candidate it
+  // moves (runs/h1_dueldA1117 Antananarivo t24: City Defense's Warrior on
+  // 32:5 stands, Operation Move takes only the one on 29:3)
   if (!garrison) {
-    if (view.units(ctx.seat).some((u) => u.plot === city && u.combat + u.ranged + u.bombard > 0)) return;
-    if (pick) moveTo(ctx, pick, city);
+    const standing = view.units(ctx.seat).find((u) => u.plot === city && u.combat + u.ranged + u.bombard > 0);
+    if (standing) {
+      ctx.endTurn?.(standing.id);
+      return;
+    }
+    if (pick) {
+      moveTo(ctx, pick, city);
+      ctx.endTurn?.(pick.id);
+    }
     return;
   }
+  ctx.endTurn?.(garrison.id);
   const stronger = gRanged < bestRanged || (gRanged <= 0 && gCombat < bestCombat);
   if (!stronger || !pick) return;
   const spot = view.planSpot(pick.id, city, 1, true, 1);
   if (spot >= 0 && spot !== pick.plot) moveTo(ctx, pick, spot);
+  ctx.endTurn?.(pick.id);
 }
 
 // OPERATION DIPLOMACY (0x819db0 update, 0x8163f0 execution)

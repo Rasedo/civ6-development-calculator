@@ -1,16 +1,15 @@
 /**
  * THE MINOR'S PURSE: its units' upkeep, the units a threatened city buys
- * (the Economic AI's savings in `minorMilitaryTurn`, `minorAiTurn`'s
- * purchases: TryPurchaseUnits over the city's unit list) and the upgrade a
- * research completion
- * triggers. The GPU twin is tests/gpu/minor_purse_test.py.
+ * (the Economic AI's savings in `minorMilitaryTurn`, the second hook's
+ * purchases in `minorSecondHook`: TryPurchaseUnits over the city's unit
+ * list) and the upgrade a research completion triggers. The GPU twin is tests/gpu/minor_purse_test.py.
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { BARB_SEAT, emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { minorEconomy } from '../../../cpu/core/minorBuild';
-import { minorAiTurn, minorMilitaryTurn, minorThreat } from '../../../cpu/core/minorCityAi';
+import { minorAiTurn, minorMilitaryTurn, minorSecondHook, minorThreat } from '../../../cpu/core/minorCityAi';
 import { computeCityStats } from '../../../cpu/core/city';
 import { spawnUnit } from '../../../cpu/core/units';
 import { UNITS } from '../../../cpu/data/units';
@@ -65,6 +64,7 @@ describe("a city-state's purse", () => {
     expect(minorThreat(state, cs).level).toBeGreaterThan(-1);
     minorMilitaryTurn(state, cs);
     minorAiTurn(state, cs, true);
+    minorSecondHook(state, cs, true);
     expect(cs.threat).toBeGreaterThan(-1);
     expect(army(state, cs).length).toBeGreaterThan(0);
     expect(cs.treasury).toBeLessThan(2000);
@@ -76,6 +76,7 @@ describe("a city-state's purse", () => {
     cs.treasury = 2000;
     minorMilitaryTurn(state, cs);
     minorAiTurn(state, cs, true);
+    minorSecondHook(state, cs, true);
     expect(cs.threat).toBe(-1);
     expect(army(state, cs)).toEqual([]);
     expect(cs.treasury).toBe(2000);

@@ -54,6 +54,9 @@ N_MOVES = 2
 # the age at most of a record the army strength reads (`ARMY_READ_AGE`,
 # 0x5eadb0 -> 0x5ef760 with 2)
 _ARMY_READ_AGE = 2
+# the Control Manager's pass a city's AI acts in (`CITY_AI_PASS`, CityBuildAI
+# +0x470 from the AI::CityBuild constructor 0x5c4f40)
+_CITY_AI_PASS = 2
 # a goal of a team (Operation Move's "Move To (enum)" slots)
 G_RALLY, G_TARGET, G_CENTRE, G_LINE, G_MARCH = 0, 1, 3, 4, 5
 # the list's unit entries the operations' attacks take (0x80c080: a
@@ -1181,7 +1184,16 @@ class SimMinorOps:
         Tm = self._mops_tables()
         on = act & ((self.mops_def[:, s] >= 0).any(dim=1) | (self.mops_pick[:, s] >= 0))
         upg = s != self.FR and bool((act & (self.mops_upg_on[:, s] | self.mops_upg_trig[:, s])).any())
+        # the city's second hook in the city AI's pass (`CITY_AI_PASS`):
+        # after the trees of a higher priority, before the rest
+        hook = [s != self.FR]
+
+        def city_hook(prio: int) -> None:
+            if hook[0] and prio <= _CITY_AI_PASS:
+                hook[0] = False
+                self._minor_second_hook(s, act)
         if not bool(on.any()):
+            city_hook(_CITY_AI_PASS)
             if upg:
                 self._mops_upgrade_trees(s, act, done)
             return
@@ -1203,6 +1215,7 @@ class SimMinorOps:
         # "Upgrade Units" trees after the operations of their own
         prios = {int(Tm.defs[d]["priority"]) for d in Tm.trees} | ({Tm.upgrade_priority} if upg else set())
         for prio in sorted(prios, reverse=True):
+            city_hook(prio)
             for k in range(N_OPS):
                 for d in Tm.trees:
                     if int(Tm.defs[d]["priority"]) != prio:
@@ -1212,6 +1225,7 @@ class SimMinorOps:
                         self._mops_tick(s, k, d, m, view)
             if upg and prio == Tm.upgrade_priority:
                 self._mops_upgrade_trees(s, act, done)
+        city_hook(_CITY_AI_PASS)
         busy = self._mops_busy(s) & self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
         done |= busy & on.unsqueeze(1) & (op["rowof"] >= 0)
         if bool(view["ended"].any()):
@@ -2413,7 +2427,8 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     the city this turn the candidate (the ranged, the bombard, the combat
     strength above the best and the garrison's); with no garrison and no
     military unit of the minor on the city the candidate moves in; with a
-    stronger candidate it moves beside the city"""
+    stronger candidate it moves beside the city; the garrison's turn ends, a
+    military unit's of the minor on the city, the candidate's (0x570b40)"""
     s, k = c.s, c.k
     view = c.view
     dev = sim.device
@@ -2459,22 +2474,42 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         b_c = torch.where(cc, cb, b_c)
         pick = torch.where(cc & (pick < 0) & (g_r == 0) & (b_r == 0), us, pick)
     seat = 100 + s
+    done, ended, ended_mp = c.view["done"], c.view["ended"], c.view["ended_mp"]
+
+    def end_turn(u: torch.Tensor, mask: torch.Tensor) -> None:
+        # its turn done, read with no Movement through the run (its rest kept)
+        r = (mask & (u >= 0)).nonzero(as_tuple=True)[0]
+        if not r.numel():
+            return
+        uc = u[r]
+        done[r, uc] = True
+        fresh = ~ended[r, uc]
+        ended_mp[r, uc] = torch.where(fresh, sim.major_unit_mp[r, uc], ended_mp[r, uc])
+        ended[r, uc] = True
+        sim.major_unit_mp[r, uc] = 0
     no_g = g & (gar < 0)
     if bool(no_g.any()):
         cc = city.clamp(min=0)
-        held = torch.zeros(B, dtype=torch.bool, device=dev)
         own = sim.major_unit_alive & (sim.major_unit_seat == seat) & (sim.major_unit_tile == cc.unsqueeze(1))
         ut = sim.major_unit_type.clamp(min=0, max=sim.NU - 1)
         fights = (sim._type_combat.take(ut) + sim._type_ranged_strength.take(ut) + sim._type_bombard.take(ut)) > 0
         held = (own & fights).any(dim=1)
-        sim._mops_move(s, pick, city, no_g & ~held & (pick >= 0))
+        # the first such unit in the player's unit order (pool order)
+        okey = torch.where(own & fights, sim.major_unit_pslot, torch.full_like(sim.major_unit_pslot, 1 << 30))
+        standing = okey.argmin(dim=1)
+        end_turn(standing, no_g & held)
+        go = no_g & ~held & (pick >= 0)
+        sim._mops_move(s, pick, city, go)
+        end_turn(pick, go)
     with_g = g & (gar >= 0)
+    end_turn(gar, with_g)
     stronger = (g_r < b_r) | ((g_r <= 0) & (g_c < b_c))
     m = with_g & stronger & (pick >= 0)
     if bool(m.any()):
         spot = sim._mops_plan_spot(s, view, pick, city, 1, True, torch.ones_like(city))
         here = sim.major_unit_tile[b, pick.clamp(min=0)]
         sim._mops_move(s, pick, spot, m & (spot >= 0) & (spot != here))
+    end_turn(pick, m)
 
 
 def _x_attack_city(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:

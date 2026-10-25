@@ -1043,6 +1043,8 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorCombatDesire: overCityStates((cityState) => cityState.combatDesire ?? 0),
   minorStandingArmyShort: overCityStates((cityState) => cityState.standingArmyShort ?? 0),
   minorUnitValues: overCityStates((cityState) => [...(cityState.unitValues ?? [])]),
+  minorBuildingValues: overCityStates((cityState) => [...(cityState.buildingValues ?? [])]),
+  minorProjectValues: overCityStates((cityState) => [...(cityState.projectValues ?? [])]),
   minorResourceCounts: overCityStates((cityState) =>
     Object.keys(RESOURCES).map((id) => cityState.resourceCounts?.[installType('resource', id, 'RESOURCE_')] ?? 0)),
   minorTradeList: overCityStates((cityState) => [...(cityState.tradeCities ?? [])].sort((a, b) => a - b)

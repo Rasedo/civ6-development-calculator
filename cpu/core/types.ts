@@ -1267,6 +1267,11 @@ export interface CityState extends Seat {
    *  city terms read them (0x5d4cd0, 0x5d45c0); a founding turn's first look
    *  counts none */
   unitValues?: readonly number[];
+  /** its city's BUILDINGS and PROJECTS tables (raw, `AI_BUILDINGS`' and
+   *  `AI_PROJECTS`' order) as its city's update of the turn left them: its
+   *  second hook's Default Specialization reads them (`minorSecondHook`) */
+  buildingValues?: readonly number[];
+  projectValues?: readonly number[];
   resourceCounts?: Record<string, number>;
   economy?: EconomicMemory;
   threat?: number;

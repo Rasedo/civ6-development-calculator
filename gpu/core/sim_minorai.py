@@ -14,12 +14,13 @@ city events, trees and contracts"). Each city-state's turn after its step
    manager's start, `_mops_start`), the building or unit event, the district
    event, the improvement event — a city its AI first sees this turn running
    none;
- - C: the Default Specialization where the queue is empty (0x5d4d70: the
-   contract in hand where it takes the turn, else the pick), the purchases
-   (0x5ce5b0's tail: a threatened city buys the first unit of its list while
-   TryPurchaseUnits succeeds), the trees' tick (0x7ffdd0), their orders
-   carried out at once; its operations' trees tick in its units' turn
-   (`_mops_run`).
+ - C: the city's second hook (`_minor_second_hook`) in its operations' run
+   (`_mops_run`, the Control Manager's pass 2): the Default Specialization
+   where the queue is empty (0x5d4d70: the contract in hand where it takes
+   the turn, else the pick), the purchases (0x5ce5b0's tail: a threatened
+   city buys the first unit of its list while TryPurchaseUnits succeeds),
+   then the city trees' tick (0x7ffdd0), their orders carried out at once —
+   after the trees of priority 4 and 3.
 
 The city AI's state is the sim's `cai_*` planes (`CityAi`, sim_citytrees.py);
 a unit's id is its slot in the majors' pool. A Free City's AI runs no event
@@ -183,6 +184,10 @@ class SimMinorAi:
         # the tables the research and civics values' city terms read next turn
         self.citystate_unit_values[:, s] = torch.where(alive.unsqueeze(1), torch.stack(u_tab, dim=1),
                                                        self.citystate_unit_values[:, s])
+        self.citystate_building_values[:, s] = torch.where(alive.unsqueeze(1), torch.stack(b_tab, dim=1),
+                                                           self.citystate_building_values[:, s])
+        self.citystate_project_values[:, s] = torch.where(alive.unsqueeze(1), torch.stack(p_tab, dim=1),
+                                                          self.citystate_project_values[:, s])
         self.citystate_unit_on[:, s] |= alive
         counted = alive & ~fresh
         if bool(counted.count_nonzero()):
@@ -211,8 +216,27 @@ class SimMinorAi:
             building_event(ai, s, w, ev)
             district_event(ai, s, w, ev)
             improvement_event(ai, s, w, best_imp, ev)
-        # C: the Default Specialization on an empty queue
+
+    def _minor_second_hook(self, s: int, act: torch.Tensor) -> None:
+        """`minorSecondHook` — THE CITY'S SECOND HOOK (0x5c2610 -> 0x5ce5b0)
+        of minor `s` where `act`, in the Control Manager's pass 2 (`_mops_run`):
+        the Default Specialization on an empty queue, then a threatened city's
+        purchases; then the city trees' tick; its tables the city's update's
+        (`citystate_unit_values`, `citystate_building_values`,
+        `citystate_project_values`), its plot analysis read again"""
+        ai = self.cityai
+        alive = (act & self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0) & self.citystate_ai_on[:, s]
+                 & self.citystate_unit_on[:, s])
+        if not bool(alive.count_nonzero()):
+            return
+        threat = self.citystate_threat[:, s]
         idle = alive & (self.citystate_item[:, s] < 0)
+        buy = alive & (threat > -1)
+        f = self._cv_minor_facts(s)
+        b_tab = list(self.citystate_building_values[:, s].unbind(1))
+        u_tab = list(self.citystate_unit_values[:, s].unbind(1))
+        p_tab = list(self.citystate_project_values[:, s].unbind(1))
+        w = _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), {}, threat)
         if bool(idle.count_nonzero()):
             hand = city_contracts(ai, s, w, idle)
             bests = self._cv_bests(b_tab, u_tab, p_tab, f)
@@ -234,11 +258,11 @@ class SimMinorAi:
                     self._minor_set_item(s, ok2, pkey, torch.full_like(pkey, -1))
                     self.citystate_prod_set_value[:, s] = torch.where(ok2, val, self.citystate_prod_set_value[:, s])
         # the purchases: a threatened city buys its list's first unit while it may
-        buy = alive & (threat > -1)
         if bool(buy.count_nonzero()):
             self._minor_purchases(s, f, threat, buy)
-        # the trees' tick
-        tick_city_trees(ai, s, w, int(self.turn), alive)
+        # the city trees' tick, on the city as the hook left it
+        evals = self._minor_plot_evals(s, f, b_tab)
+        tick_city_trees(ai, s, _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), evals, threat), int(self.turn), alive)
 
     def _minor_defensive_cancel(self, s: int, w, f, tables, evals: dict, mask: torch.Tensor) -> None:
         """`defensiveCancel` (0x5d7640) of minor `s`'s city where `mask` and
