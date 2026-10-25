@@ -166,9 +166,10 @@ class SimMinorAi:
             self._minor_buy_unit(s, bought, ui, price)
             _cset(ai.c_progress, s, j, CP_COMPLETED, bought)
 
-    def _minor_ai_turn(self, s: int) -> None:
+    def _minor_ai_turn(self, s: int, units: torch.Tensor | None = None) -> None:
         """`minorAiTurn` — THE MINOR'S CITY AI TURN (the order above, after
-        `_minor_military_turn` and the knowledge base's look)"""
+        `_minor_military_turn` and the knowledge base's look); `units` [B]
+        the units its City Analysis counts (None: those standing now)"""
         alive = self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0)
         if not bool(alive.count_nonzero()):
             return
@@ -177,6 +178,7 @@ class SimMinorAi:
         self.citystate_ai_on[:, s] |= alive
         # A: the city's update
         f = self._cv_minor_facts(s)
+        f.units_before = units
         # a founding turn's first look: the unit production table with no
         # known unit (`minorAiTurn`)
         f.no_known = fresh
@@ -216,6 +218,17 @@ class SimMinorAi:
             building_event(ai, s, w, ev)
             district_event(ai, s, w, ev)
             improvement_event(ai, s, w, best_imp, ev)
+        # the founding turn's pick (the update's 0x5ce8f0 on an empty queue)
+        # on the founding City Analysis (`foundingProduction`); the tables
+        # kept for the turn after are the turn's own (`minorAiTurn`)
+        first = fresh & (self.citystate_item[:, s] < 0)
+        if bool(first.count_nonzero()):
+            ff = self._cv_minor_facts(s)
+            ff.units_before = units
+            ff.no_known = fresh
+            ff.founding = fresh
+            ft = self._cv_minor_tables(s, ff)
+            self._minor_empty_pick(s, first, ff, _MinorWorld(self, s, ff, ft, evals, threat), ft)
 
     def _minor_second_hook(self, s: int, act: torch.Tensor) -> None:
         """`minorSecondHook` — THE CITY'S SECOND HOOK (0x5c2610 -> 0x5ce5b0)
@@ -238,31 +251,39 @@ class SimMinorAi:
         p_tab = list(self.citystate_project_values[:, s].unbind(1))
         w = _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), {}, threat)
         if bool(idle.count_nonzero()):
-            hand = city_contracts(ai, s, w, idle)
-            bests = self._cv_bests(b_tab, u_tab, p_tab, f)
-            take = idle & takes_turn(ai, s, hand, bests[1][1], bests[2][1])
-            key, site = self._minor_contract_item(s, hand)
-            ok = (key >= 0) & self._minor_queue_ok(s, key, site)
-            q = queue_contract(ai, s, hand, w, ok, take)
-            if bool(q.count_nonzero()):
-                self._minor_set_item(s, q, key, site)
-                self.citystate_prod_set_value[:, s] = torch.where(q, _cget(ai.c_value, s, hand), self.citystate_prod_set_value[:, s])
-            # the queue's refusal FAILS the contract and the turn falls to the pick
-            rest = idle & ~q
-            ai.in_hand[:, s] = torch.where(rest, -1, ai.in_hand[:, s])
-            if bool(rest.count_nonzero()):
-                kind, row, val = self._cv_pick(b_tab, u_tab, p_tab, f, bests)
-                pkey = self._minor_pick_key(kind, row)
-                ok2 = rest & (pkey >= 0) & self._minor_queue_ok(s, pkey, torch.full_like(pkey, -1))
-                if bool(ok2.count_nonzero()):
-                    self._minor_set_item(s, ok2, pkey, torch.full_like(pkey, -1))
-                    self.citystate_prod_set_value[:, s] = torch.where(ok2, val, self.citystate_prod_set_value[:, s])
+            self._minor_empty_pick(s, idle, f, w, (b_tab, u_tab, p_tab))
         # the purchases: a threatened city buys its list's first unit while it may
         if bool(buy.count_nonzero()):
             self._minor_purchases(s, f, threat, buy)
         # the city trees' tick, on the city as the hook left it
         evals = self._minor_plot_evals(s, f, b_tab)
         tick_city_trees(ai, s, _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), evals, threat), int(self.turn), alive)
+
+    def _minor_empty_pick(self, s: int, idle: torch.Tensor, f, w, tables) -> None:
+        """`emptyQueuePick` — THE DEFAULT SPECIALIZATION (0x5d4d70) of minor
+        `s` where `idle` (an empty queue) over `tables`: the contract in hand
+        where it takes the turn, else the pick"""
+        ai = self.cityai
+        b_tab, u_tab, p_tab = tables
+        hand = city_contracts(ai, s, w, idle)
+        bests = self._cv_bests(b_tab, u_tab, p_tab, f)
+        take = idle & takes_turn(ai, s, hand, bests[1][1], bests[2][1])
+        key, site = self._minor_contract_item(s, hand)
+        ok = (key >= 0) & self._minor_queue_ok(s, key, site)
+        q = queue_contract(ai, s, hand, w, ok, take)
+        if bool(q.count_nonzero()):
+            self._minor_set_item(s, q, key, site)
+            self.citystate_prod_set_value[:, s] = torch.where(q, _cget(ai.c_value, s, hand), self.citystate_prod_set_value[:, s])
+        # the queue's refusal FAILS the contract and the turn falls to the pick
+        rest = idle & ~q
+        ai.in_hand[:, s] = torch.where(rest, -1, ai.in_hand[:, s])
+        if bool(rest.count_nonzero()):
+            kind, row, val = self._cv_pick(b_tab, u_tab, p_tab, f, bests)
+            pkey = self._minor_pick_key(kind, row)
+            ok2 = rest & (pkey >= 0) & self._minor_queue_ok(s, pkey, torch.full_like(pkey, -1))
+            if bool(ok2.count_nonzero()):
+                self._minor_set_item(s, ok2, pkey, torch.full_like(pkey, -1))
+                self.citystate_prod_set_value[:, s] = torch.where(ok2, val, self.citystate_prod_set_value[:, s])
 
     def _minor_defensive_cancel(self, s: int, w, f, tables, evals: dict, mask: torch.Tensor) -> None:
         """`defensiveCancel` (0x5d7640) of minor `s`'s city where `mask` and

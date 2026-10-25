@@ -3,6 +3,20 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x1baa90
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 10
+      value: "Fits runs/h1_duelv1117   Antananarivo (1 x 0.9: Builder / Slinger / Warrior T 10 / 19 / 23),   Valletta (3 x 0.9: T 4 / 7 / 8), runs/h1_duelv1121 Hunza (4 x 0.9: T 3 / 5   / 6)."
+    - recording: 1121
+      turn: 1
+      value: "CONFIRMED: every   city-state founding of the five duely duels picks the game's item at the   game's value (AI_CityBuild.csv t1 Default Specialization): Antananarivo   and Muscat the Slinger at 8.3 (t"
+  readings: ["C-96: the unit value's unit count and the founding Production — READ, both twins"]
+  context:
+    - ...te::Value 0xaa740; build queue +0x1f0 is the yield type, set at the city's construction 0x1baa90 -> 0x17d210). The founding city's first City Analysis reads it before the Palace lands...
+  review: imported
 - addr: 0x263240
   kind: function
   status: READ

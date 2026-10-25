@@ -5444,6 +5444,55 @@ operations' contracts, the improvement values below, the purchases).
   two-step upgrades (1127 p2 t105, 1128 p2 t106 / p3 t108 / p3 t203, 1117
   t168) pair.
 
+## C-96: the unit value's unit count and the founding Production — READ, both twins
+
+- THE UNIT COUNT the unit value's cut reads (0x7b62c0 at 0x7b63aa: a
+  player neither FULL_CIV (0x469db0) nor the barbarians (0x469ce0), not at
+  war (0x3dcf50), with player +0x12e8 +0xc0 above 5 values every unit
+  FX(-9999)): +0xc0 is Player_Units' unit pool count (the pool of 0x2200-byte
+  units at +0xc0.., 0x4ed94a), every unit of the player, civilians and
+  traders included. The City Analysis that holds the cut runs before the
+  turn's savings purchases (0x687bf0's contract purchases): the verbose
+  logs' PLOT ANALYSIS LOG blocks (printed by 0x5d4030 in the update) value
+  the units where the record of the turn's start holds 5 and a contract
+  PURCHASE line precedes the block (runs/h1_duelv1124 Bologna t18 Warrior,
+  t40 Builder; h1_duelv1117 t42 / t59 / t140; h1_duelv1121 t170 / t217;
+  h1_duelv1127 t102 / t128; h1_duelv1128 t77: every such turn of the five),
+  and cut them where a unit trained or a levy came home at the turn's start
+  takes the count to 6 with no purchase (1124 t29, 1117 t81, 1128 t22, and
+  40-odd more). Ported: `minorPhase` counts the minor's units before
+  `minorMilitaryTurn` and hands the count to `minorAiTurn` ->
+  `minorBuildFacts`' `unitCount`; GPU `_minor_ai_turn(s, units)` ->
+  `_MinorFacts.units_before`. Confirmed on runs/h1_duely1124 Bologna t19:
+  the research scores the t18 table feeds (Archery 267.5, Wheel 330,
+  Horseback Riding 312.9, Engineering 377.8) as the game's log, where the
+  six-unit table had cut them to 99.2 / 175.8 / 144.6 / 204.9. Left: 1128
+  Hong Kong t196-203 valued at 6 (at war, unread).
+- THE FOUNDING PRODUCTION: the train / build turns (0x17bb40 / 0x17b1e0 /
+  0x17b5a0) read the city's Production attribute live (0x1cb9f0 ->
+  0x1c5350 -> GameAttribute::Value 0xaa740; build queue +0x1f0 is the yield
+  type, set at the city's construction 0x1baa90 -> 0x17d210). The founding
+  city's first City Analysis reads it before the Palace lands (the record's
+  CityProductionCompleted of BUILDING_PALACE follows CityInitialized) and
+  before the minor's PLAYER_CITIES modifiers: its plots' and buildings'
+  Production less the Palace's 2, under the happiness of its amenities less
+  the Palace's 2 (Displeased, -10%), no -50%. Fits runs/h1_duelv1117
+  Antananarivo (1 x 0.9: Builder / Slinger / Warrior T 10 / 19 / 23),
+  Valletta (3 x 0.9: T 4 / 7 / 8), runs/h1_duelv1121 Hunza (4 x 0.9: T 3 / 5
+  / 6). The founding turn holds two analyses: the founding one the pick
+  reads (the update's Default Specialization 0x5ce8f0 on its empty queue),
+  and the turn's own, at the city's full Production, that its research
+  reads the next turn (runs/h1_duely1124 Bologna t2 Archery 142.3 on the
+  latter, 143.4 on the founding one). Ported: `foundingProduction`
+  (minorBuild.ts, `minorBuildFacts`' `founding`), the founding pick in
+  `minorAiTurn`; GPU `_MinorFacts._founding_production` / `.founding`, the
+  pick in `_minor_ai_turn`. CONFIRMED: every
+  city-state founding of the five duely duels picks the game's item at the
+  game's value (AI_CityBuild.csv t1 Default Specialization): Antananarivo
+  and Muscat the Slinger at 8.3 (the Monument 6.0), the three 1121 cities'
+  Monument at 26.7, Granada / Mexico City / 1128 Bologna 18.1, 1124 Bologna
+  30.2, the six others 24.0 — before it 9 of 15.
+
 ## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)
 
 Ported in `cpu/core/aiTrade.ts` (`minorTradeList`, `minorTradeValue`; the

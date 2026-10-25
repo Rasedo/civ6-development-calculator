@@ -24,6 +24,7 @@
   readings:
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
+    - "C-96: the unit value's unit count and the founding Production — READ, both twins"
   context:
     - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0x1108 of the city's yield component) a...
     - "...'s step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Production toward the item), B with none (the city's plain P..."
@@ -154,8 +155,10 @@
     - recording: 1124
       turn: 40
       value: the rest   our contracts' or queues' divergence (1124 Cardiff t40-48 a Builder's   kept 24 of 25 where the game built a Granary).
+  impl: [cpu/core/minorBuild.ts:foundingProduction]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: the unit value's unit count and the founding Production — READ, both twins"
   context:
     - "...its whole part added. The train turns 0x17bb40(unit, 0, &extra): the city's Production (0x1cb9f0) x (the unit's production multiplier 0x17c1c0 + extra), the cost (0x17bfa0) less the un..."
   review: imported

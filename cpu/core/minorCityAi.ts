@@ -842,7 +842,8 @@ function minorBuyInstall(state: GameState, cs: CityState, u: string): void {
  * for its second hook (`minorSecondHook`). `fresh`: its city AI had not run
  * before this turn (the founding turn's first look).
  */
-export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): void {
+export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
+  units = state.units.filter((u) => u.seat === cs.seat).length): void {
   if (cs.centerIndex < 0) return;
   const ai = (cs.cityAi ??= newCityAi());
   // A: the city's update
@@ -851,7 +852,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
   // (runs/h1_duelv1117 t1: every city-state's Warrior, Slinger and Builder
   // on the one curve of 1.0), and no city modifier yet
   const known = fresh ? () => 0 : minorKnownUnits(cs);
-  const facts = minorBuildFacts(state, cs, known, fresh);
+  const facts = minorBuildFacts(state, cs, known, fresh, units);
   const tables: CityBuildTables = {
     buildings: buildingTable(facts),
     units: unitTable(facts).map((v) => v ?? FX_MIN),
@@ -896,6 +897,17 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
     districtEvent(ai, w, city, list.CITY_EVENT_DISTRICT);
     improvementEvent(ai, w, city, list.CITY_EVENT_IMPROVEMENT);
   }
+  // the founding turn's pick (the update's 0x5ce8f0 on an empty queue) on
+  // the founding City Analysis: the city's Production before its Palace
+  // and its PLAYER_CITIES modifiers (`foundingProduction`); the tables kept
+  // for the turn after are the turn's own (runs/h1_duely1117 Antananarivo
+  // t1: the Slinger at 8.3 over the Monument at 6.0; its t2 research
+  // reads the kept tables)
+  if (fresh && !cs.prodItem) {
+    const ff = minorBuildFacts(state, cs, known, fresh, units, true);
+    const ft: CityBuildTables = { buildings: buildingTable(ff), units: unitTable(ff).map((v) => v ?? FX_MIN), projects: projectTable(minorProjectFacts(cs, ff)) };
+    emptyQueuePick(state, cs, ai, city, ft, minorPickFacts(state, cs, ff));
+  }
   if (tracer) {
     const b = specializationBests(tables, pf);
     const name = (k: string, i: number) => (i < 0 ? '-' : (k === 'b' ? AI_BUILDINGS[i].type : AI_UNITS[i]?.type ?? `${i}`));
@@ -933,26 +945,7 @@ export function minorSecondHook(state: GameState, cs: CityState, fresh = false):
   const tables: CityBuildTables = { buildings: cs.buildingValues, units: cs.unitValues, projects: cs.projectValues };
   const pf = minorPickFacts(state, cs, facts);
   const city = minorTreeCity(state, cs, facts, tables, pf, [], threat);
-  if (!cs.prodItem) {
-    const hand = cityContracts(ai, city, () => undefined);
-    const bests = specializationBests(tables, pf);
-    const item = hand ? contractItemOf(hand) : null;
-    // the queue's refusal FAILS the contract and the turn falls to the pick
-    // (0x5d5162 -> 0x5d516a)
-    if (hand && takesTurn(hand, bests.unit.value, bests.project.value)
-      && queueContract(hand, city, () => !!item && minorQueueOk(state, cs, item), () => undefined) && item) {
-      minorSetItem(state, cs, item);
-      cs.prodSetValue = hand.value;
-    } else {
-      ai.inHand[city.id] = -1;
-      const pick = defaultSpecialization(tables, pf);
-      const item = pick ? minorItemOfType(pick.type) : null;
-      if (pick && item && minorQueueOk(state, cs, item)) {
-        minorSetItem(state, cs, item);
-        cs.prodSetValue = pick.value;
-      }
-    }
-  }
+  if (!cs.prodItem) emptyQueuePick(state, cs, ai, city, tables, pf);
   // the purchases: a threatened city buys its list's first unit while it may
   if (threat > -1) {
     const entries = purchaseEntries(state, cs);
@@ -962,6 +955,29 @@ export function minorSecondHook(state: GameState, cs: CityState, fresh = false):
   // the city trees' tick, on the city as the hook left it
   const trees = minorTreeCity(state, cs, facts, tables, pf, minorPlotEvals(state, cs, facts, tables.buildings), threat);
   tickCityTrees(ai, minorTreeWorld(state, cs, ai, trees));
+}
+
+/** THE DEFAULT SPECIALIZATION on an empty queue (0x5d4d70) over `tables`:
+ *  the contract in hand where it takes the turn, else the pick */
+function emptyQueuePick(state: GameState, cs: CityState, ai: CityAi, city: CityTreeCity, tables: CityBuildTables, pf: PickFacts): void {
+  const hand = cityContracts(ai, city, () => undefined);
+  const bests = specializationBests(tables, pf);
+  const item = hand ? contractItemOf(hand) : null;
+  // the queue's refusal FAILS the contract and the turn falls to the pick
+  // (0x5d5162 -> 0x5d516a)
+  if (hand && takesTurn(hand, bests.unit.value, bests.project.value)
+    && queueContract(hand, city, () => !!item && minorQueueOk(state, cs, item), () => undefined) && item) {
+    minorSetItem(state, cs, item);
+    cs.prodSetValue = hand.value;
+    return;
+  }
+  ai.inHand[city.id] = -1;
+  const pick = defaultSpecialization(tables, pf);
+  const it = pick ? minorItemOfType(pick.type) : null;
+  if (pick && it && minorQueueOk(state, cs, it)) {
+    minorSetItem(state, cs, it);
+    cs.prodSetValue = pick.value;
+  }
 }
 
 /** a contract's item as the minor's item (a district at the contract's plot) */

@@ -410,6 +410,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: the unit value's unit count and the founding Production — READ, both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current != bld) + prereq buildings...  value = 0x7a4d40(bld, turns, plot=-999..."
   context:
@@ -433,6 +434,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: the unit value's unit count and the founding Production — READ, both twins"
   context:
     - ...T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0, the queue's own es...
   review: imported
@@ -464,11 +466,13 @@
     - gpu/core/sim_cityvalue.py:item_turns
     - cpu/core/minorBuild.ts:minorItemTurns
     - gpu/core/sim_cityvalue.py:item_turns
+    - cpu/core/minorBuild.ts:foundingProduction
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-96: the unit value's unit count and the founding Production — READ, both twins"
   context:
     - "...t, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot wit..."
     - "...buildings' turns (+0x258), then, but for MustPurchase (+0x1b9 bit 128), the train turns 0x17bb40 and +10 while the city builds another item; negative T values FX(-9999). Measured: the..."
@@ -550,6 +554,21 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "...t check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it..."
+  review: imported
+- addr: 0x17d210
+  final: 0xff720
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 10
+      value: "Fits runs/h1_duelv1117   Antananarivo (1 x 0.9: Builder / Slinger / Warrior T 10 / 19 / 23),   Valletta (3 x 0.9: T 4 / 7 / 8), runs/h1_duelv1121 Hunza (4 x 0.9: T 3 / 5   / 6)."
+    - recording: 1121
+      turn: 1
+      value: "CONFIRMED: every   city-state founding of the five duely duels picks the game's item at the   game's value (AI_CityBuild.csv t1 Default Specialization): Antananarivo   and Muscat the Slinger at 8.3 (t"
+  readings: ["C-96: the unit value's unit count and the founding Production — READ, both twins"]
+  context:
+    - ...aa740; build queue +0x1f0 is the yield type, set at the city's construction 0x1baa90 -> 0x17d210). The founding city's first City Analysis reads it before the Palace lands (the record'...
   review: imported
 - addr: 0x17d660
   final: 0xff9f0

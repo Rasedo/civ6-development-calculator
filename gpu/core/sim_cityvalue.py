@@ -1532,6 +1532,10 @@ class _MinorFacts:
         self.T = sim._cv_tables()
         self.E = self.T["engine"]
         self._memo = {}
+        self.units_before = None
+        # [B] games whose turns read the founding Production
+        # (`foundingProduction`, the founding City Analysis), None none
+        self.founding = None
         # [B] games whose unit production table counts no known unit (a
         # founding turn's first look), None none
         self.no_known = None
@@ -1691,6 +1695,10 @@ class _MinorFacts:
         return False
 
     def unit_count(self):
+        # the units the City Analysis counts (`minorAiTurn`'s `units`: those
+        # standing before the savings turn's purchases), else those now
+        if self.units_before is not None:
+            return self.units_before
         return self._mine().sum(dim=1)
 
     def _production_table(self):
@@ -1945,8 +1953,27 @@ class _MinorFacts:
             # a founding turn's first look: no PLAYER_CITIES modifier on the
             # city yet, the military units' percent among them
             pct = torch.where(self.no_known, torch.zeros_like(pct), pct)
-        rate = torch.floor(self._total(1) * (1 + pct / 100) * _FX + 0.5).long()
+        prod = self._total(1)
+        if self.founding is not None:
+            prod = torch.where(self.founding, self._founding_production(), prod)
+        rate = torch.floor(prod * (1 + pct / 100) * _FX + 0.5).long()
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
+
+    def _founding_production(self):
+        """[B] f64 — `foundingProduction`: the founding city's Production
+        as its founding City Analysis reads it, before the Palace and the
+        minor's PLAYER_CITIES modifiers: its plots' and buildings' yield
+        less the Palace's, under the happiness level of its amenities
+        less the Palace's"""
+        sim = self.sim
+        bal = sim._amen_balance_of[self.row][:, 0].double()
+        _g, yf_now = sim._amenity_factors(bal)
+        pct_now = float(sim.rules.citystate["productionPct"]) / 100 + (yf_now.double() - 1)
+        raw = torch.round(self._total(1) / (1 + pct_now)) - sim._palace_y[1].double()
+        _g, yf = sim._amenity_factors(bal - sim._palace_amenities)
+        b256 = torch.floor(raw * 256)
+        mod = torch.round((yf.double() - 1) * 100 * 256)
+        return (b256 + torch.trunc(torch.floor(b256 * mod / 256) / 100)) / 256
 
     def item_turns(self, u, extra, scale=False):
         """`minorItemTurns`: the turns the item takes (0x17bb40, 0x17b1e0,

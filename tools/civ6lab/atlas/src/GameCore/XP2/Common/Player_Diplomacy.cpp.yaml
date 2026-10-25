@@ -302,6 +302,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-96: the unit value's unit count and the founding Production — READ, both twins"
   context:
     - ...l (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), population / 5 + 1, +2 at war (0x3dcf50), the city's CityBuildAI +0x1b8 where above -1, +4 where any city of the player has i...
     - "...VEL_FULL_CIV (0x469db0, hash 0x253718b0) nor _TRIBE (0x469ce0, 0xd959ec24), not at war (0x3dcf50) and holding more than five units (player +0x12e8 +0xc0); a Spy (Units +0x1ba bit 2 — t..."

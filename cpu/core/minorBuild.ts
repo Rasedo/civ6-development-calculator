@@ -30,7 +30,7 @@ import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
 import { PROJECTS, projectConversionRate } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
-import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, gameProgressPct } from '../data/constants';
+import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, amenityTier, gameProgressPct } from '../data/constants';
 import { detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, urbanDefensesFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
@@ -39,7 +39,7 @@ import { freeCityThreat, minorAiTurn, minorItemBuilt, minorMilitaryTurn } from '
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
 import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
-import { civEraIndex, computeCityStats } from './city';
+import { civEraIndex, computeCityStats, withPercent256 } from './city';
 import { researchCost, selectResearch } from './economy';
 import { CP_ACCEPTED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
@@ -122,11 +122,14 @@ export function minorPhase(state: GameState): void {
     // update aged them
     cityState.combatDesire = minorCombatDesire(state, cityState, state.turn - 1).desire;
     const fresh = !cityState.cityAi;
+    // the units its City Analysis counts: those standing before its savings
+    // turn's purchases
+    const units = state.units.filter((u) => u.seat === cityState.seat).length;
     minorMilitaryTurn(state, cityState);
     minorKnowledge(state, cityState, true);
     // its "Upgrade Units" trees' trigger: a technology or civic gained
     if (gained > 0) cityState.upgradeTrigger = true;
-    minorAiTurn(state, cityState, fresh);
+    minorAiTurn(state, cityState, fresh, units);
     minorTrade(state, cityState, !ordersHeld);
     const city = minorCity(cityState);
     cityStrikes(state, city, cityStrikeStrength(state, city));
@@ -1450,7 +1453,8 @@ export function minorCityGrowth(state: GameState, cityState: CityState): CityGro
  *  Warrior and Slinger at their Production alone, their Builder under
  *  MINOR_CIV_PRODUCTION_BUILDERS, their Archer past the horizon on
  *  Archery's 37 turns) */
-export function minorBuildFacts(state: GameState, cityState: CityState, known: (unit: string) => number, fresh = false): CityBuildFacts {
+export function minorBuildFacts(state: GameState, cityState: CityState, known: (unit: string) => number, fresh = false,
+  unitCount = state.units.filter((u) => u.seat === cityState.seat).length, founding = false): CityBuildFacts {
   const city = minorCity(cityState);
   const stats = computeCityStats(state, city);
   const r = cityState.research;
@@ -1505,7 +1509,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     unitVersion: minorUnitVersion,
     fullCiv: false,
     tribe: false,
-    unitCount: state.units.filter((u) => u.seat === cityState.seat).length,
+    unitCount,
     unitProduction: minorUnitProduction(state, cityState, known),
     trainsDomain: (d) => d !== 'DOMAIN_SEA' || cityNavalCapable(state, city),
     cities: 1,
@@ -1539,10 +1543,27 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       const progress = (cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0) + (cityState.prodOverflow ?? 0);
       const cost = minorItemCost(state, cityState, item as Exclude<MinorItem, { none: true }>);
       const pct = fresh && 'unit' in item && item.unit !== 'BUILDER' ? 0 : minorItemPct(state, cityState, item);
-      const rate = fxOf(stats.total.production * (1 + pct / 100));
+      const rate = fxOf((founding ? foundingProduction(stats) : stats.total.production) * (1 + pct / 100));
       return turnsAt(cost * FX - fxOf(progress), rate);
     },
   };
+}
+
+/**
+ * The founding city's Production as its founding City Analysis reads it
+ * (0x17bb40 -> 0x1cb9f0, the city's Production attribute at the moment):
+ * before the Palace (CityProductionCompleted of BUILDING_PALACE after
+ * CityInitialized) and the minor's PLAYER_CITIES modifiers (its -50%
+ * Production) — its plots' and buildings' yield less the Palace's, under
+ * the happiness level of its amenities less the Palace's (Displeased,
+ * -10%). runs/h1_duelv1117 t1 Antananarivo 1 x 0.9 (Builder / Slinger /
+ * Warrior at T 10 / 19 / 23), Valletta 3 x 0.9 (T 4 / 7 / 8); runs/
+ * h1_duelv1121 Hunza 4 x 0.9 (T 3 / 5 / 6).
+ */
+function foundingProduction(stats: ReturnType<typeof computeCityStats>): number {
+  const palace = BUILDINGS.PALACE;
+  const raw = Math.round(stats.total.production / (1 + stats.yieldPct.production)) - (palace.yields?.production ?? 0);
+  return withPercent256(raw, amenityTier(stats.amenities.balance - (palace.amenities ?? 0)).yieldFactor - 1);
 }
 
 /** What the PROJECTS table (`aiProjectValue.ts`) reads of a minor's city
