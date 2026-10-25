@@ -154,6 +154,18 @@
   context:
     - "...ntext's n reach MinimumTokens (parser 0x6d4490, stoi); REQUIREMENT_PLAYER_IS_AT_PEACE 0x6d2470: a context player (+0x40) the player is not at war with. The suzerain requirements are..."
   review: reviewed
+- addr: 0x6d2760
+  final: 0x48fbc0
+  kind: function
+  name: REQUIREMENT_PLAYER_IS_MINOR
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS, gpu/core/sim_policy.py:_pol_admits]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e suzerain (0x44c850) is not the player, +10 raw. Its set's REQUIREMENT_PLAYER_IS_MINOR 0x6d2760 (@f04448) reads the evaluating player (context +0x80): no full civilization (0x469db0..."
+  review: imported
 - addr: 0x6d27a0
   final: 0x48fc00
   kind: function

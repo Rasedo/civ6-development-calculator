@@ -247,6 +247,9 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
     t.other !== undefined && t.view.envoys(t.other, t.seat) + (t.tokens ?? 0) >= (Number(args.MinimumTokens ?? 0) | 0),
   // 0x6d2470: with an other player in the context (+0x40), not at war with it
   REQUIREMENT_PLAYER_IS_AT_PEACE: (t) => t.other !== undefined && !t.view.atWar(t.seat, t.other),
+  // 0x6d2760: the evaluating player (context +0x80) is no full civilization
+  // and no barbarian — a city-state or the Free Cities
+  REQUIREMENT_PLAYER_IS_MINOR: (t) => !t.view.fullCiv(t.seat) && !t.view.barbarianSeats().includes(t.seat),
 };
 
 /** 0x6cf3c0 over the set as 0x6ccec0 builds it: null where a kept
@@ -614,6 +617,11 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   EFFECT_GRANT_COMBAT_ADJACENCY: (t, args) =>
     args.Enable === 'true' ? whole(valueBetween(t.view.domainStrength(t.seat) * FX, t.start, t.horizon, t.rate)) : 0,
   // 0x6ae510: PSEUDOYIELD_INFLUENCE, PV(horizon) - PV(start)
+  // 0x6b63a0: per city-state of the game's list (game +0x3f8 +0x1650) whose
+  // suzerain (0x44c850) is not the player, 10, raw — whatever the subject
+  // (runs/h1_duelu1117 / 1121 city-states' Gunboat Diplomacy 30 above its
+  // Influence's 29 over three city-states)
+  EFFECT_ADJUST_PLAYER_OPEN_BORDERS_FROM_INFLUENCE: (t) => 10 * (t.view.cityStateCount() - t.view.tributaries(t.seat)),
   EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN: (t, args) => whole(span(t, pseudoYieldValue(t.view, t.seat, amountOf(args), 'PSEUDOYIELD_INFLUENCE'))),
   // 0x6addf0: a district subject only; the district's yield (0x24b5a0) x the
   // percent x 0.01f, bare, PV(horizon) - PV(start)

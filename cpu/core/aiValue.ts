@@ -236,6 +236,8 @@ export interface AiValueView {
   influenceTokensUsed(seat: number): number;
   /** the city-states the seat is suzerain of (0x44a5a0) */
   tributaries(seat: number): number;
+  /** the city-states the game holds (its minor list, game +0x3f8 +0x1650) */
+  cityStateCount(): number;
   /** each of the seat's units' Units.Maintenance */
   unitMaintenances(seat: number): readonly number[];
   /** the seat's units in its list's order, their plot, UnitType and whole

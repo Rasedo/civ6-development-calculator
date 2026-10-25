@@ -1624,6 +1624,10 @@ class _MinorFacts:
         return self.sim.city_bldg[:, self.row, 0, bi]
 
     def city_has_building(self, b):
+        # a civilization's own building (BUILDING_TSIKHE, the engine's
+        # Renaissance Walls) in no minor's city
+        if any(r["type"] == b and r["trait"] for r in self.sim.rules.ai_city_build["buildings"]):
+            return self._bools(False)
         return self.has_building(b)
 
     def _district_done(self, dv: int):
@@ -1940,10 +1944,20 @@ class _MinorFacts:
             return 500
         cur = sim.citystate_item[:, s]
         progress = torch.where(cur == k, sim.citystate_prod[:, s], sim.citystate_kept[:, s, k]) + sim.citystate_ovf[:, s]
-        rate = torch.floor(self._total(1) * (1 + self._item_pct(u) / 100 + (0 if scale else extra / _FX)) * _FX + 0.5).long()
+        pct = self._item_pct(u)
+        cost = self._item_cost(u)
+        row = self.T["bld"].get(u)
+        if row is not None and row["trait"]:
+            # a civilization's own building (`traitBuildingCost`): its row's
+            # Cost at the engine building's scale, none of the minor's percents
+            base = self.sim.rules.ai_city_build["buildings"][int(self.T["building_row"][self._building_index(u)])]
+            if int(base["cost"]) > 0:
+                cost = torch.floor(cost * int(row["cost"]) / int(base["cost"]))
+                pct = torch.zeros_like(pct)
+        rate = torch.floor(self._total(1) * (1 + pct / 100 + (0 if scale else extra / _FX)) * _FX + 0.5).long()
         if scale and extra:
             rate = _fmul(rate, torch.full_like(rate, int(extra)))
-        return _turns_at(torch.floor(self._item_cost(u) * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
+        return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
     def unit_expected(self, u):
         """`minorUnitExpected` (0x5d4750), raw: 1.0 with progress kept on

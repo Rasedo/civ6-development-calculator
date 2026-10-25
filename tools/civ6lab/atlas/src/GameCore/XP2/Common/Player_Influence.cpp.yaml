@@ -87,9 +87,11 @@
     - recording: h1_duelw1117
       turn: 85
       value: "runs/h1_duelw1117 Antananarivo t85-90 and runs/h1_duelw1118 Armagh t83-95: the next-plot scorer's -1 for the Niter beside 339/340 and 872 counts from the turn China (their suzerain) holds Military Eng"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "H-1: a city-state sees its suzerain's resources — READ"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...yer's own reveal bit (+0xf0), then — where its influence component's suzerain (+0x1368 -> 0x44c850) is a player — the SUZERAIN's resource condition, recursively; then the reveal modifiers,..."
   review: imported

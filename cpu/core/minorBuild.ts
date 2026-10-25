@@ -987,9 +987,24 @@ export function minorItemTurns(state: GameState, cityState: CityState, type: str
   const k = minorItemKey(item);
   const progress = (cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0) + (cityState.prodOverflow ?? 0);
   const stats = computeCityStats(state, minorCity(cityState));
-  const base = fxOf(stats.total.production * (1 + minorItemPct(state, cityState, item) / 100 + (scale ? 0 : extra / FX)));
+  // a civilization's own building (BUILDING_TSIKHE, the engine's
+  // RENAISSANCE_WALLS) at its own Cost, none of the minor's percents (its
+  // walls' names the three walls alone)
+  const own = 'building' in item ? traitBuildingCost(state, cityState, type, item.building) : null;
+  const pct = own === null ? minorItemPct(state, cityState, item) : 0;
+  const base = fxOf(stats.total.production * (1 + pct / 100 + (scale ? 0 : extra / FX)));
   const rate = scale && extra ? fmul(base, extra) : base;
-  return turnsAt(minorItemCost(state, cityState, item) * FX - fxOf(progress), rate);
+  return turnsAt((own ?? minorItemCost(state, cityState, item)) * FX - fxOf(progress), rate);
+}
+
+/** a civilization's own building's Cost at a minor (its row's Cost at the
+ *  engine building's scale), null for any other type */
+function traitBuildingCost(state: GameState, cityState: CityState, type: string, engine: string): number | null {
+  const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(type) ?? -1];
+  if (!row?.trait) return null;
+  const base = AI_BUILDINGS[AI_BUILDING_INDEX.get(gameTypeOf('building', engine, 'BUILDING_')) ?? -1];
+  if (!base || base.cost <= 0) return null;
+  return Math.floor((minorBuildingCost(state, cityState, engine) * row.cost) / base.cost);
 }
 
 /** CityBuildAI's expected count of the unit (0x5d4750), raw: 1.0 with

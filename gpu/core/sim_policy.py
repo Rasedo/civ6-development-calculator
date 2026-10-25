@@ -32,6 +32,7 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_CITY_OUTER_DEFENSE", "EFFECT_ADJUST_CITY_RANGED_STRIKE", "EFFECT_ADJUST_UNIT_PRODUCTION",
     "EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT", "EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION",
     "EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER", "EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT",
+    "EFFECT_ADJUST_PLAYER_OPEN_BORDERS_FROM_INFLUENCE",
 }
 # worth 0 in a minor's policy context: the context's own city (none), the
 # Influence a minor may not give, its tributaries and placed envoys (none)
@@ -53,7 +54,7 @@ _KNOWN_AGE = 10
 _POL_NO_SUBJECTS = {"COLLECTION_CITY_DISTRICTS", "COLLECTION_CITY_TRAINED_UNITS", "COLLECTION_CITY_PLOT_YIELDS", "COLLECTION_ALL_CITIES"}
 _POL_EVALUATORS = {"REQUIREMENT_DISTRICT_TYPE_MATCHES", "REQUIREMENT_CITY_HAS_BUILDING", "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN",
                    "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
-                   "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT"}
+                   "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT", "REQUIREMENT_PLAYER_IS_MINOR"}
 
 
 class SimPolicy:
@@ -225,6 +226,10 @@ class SimPolicy:
                 v = no if sub["kind"] != "city" or wonder in reads["wonders"] else sub["f"].city_has_building(b).bool()
             elif ty == "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN":
                 v = no  # no plot subject in a policy's context
+            elif ty == "REQUIREMENT_PLAYER_IS_MINOR":
+                # 0x6d2760: the evaluating player no full civilization nor a
+                # barbarian — every policy context here (a minor's)
+                v = torch.ones_like(mask)
             elif ty == "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT":
                 # 0x6cfd60: an owner with no capital (the Free Cities), or the
                 # city on its owner's home continent (a city-state's one city on it)
@@ -346,6 +351,10 @@ class SimPolicy:
             have = self._pol_district_yield(ctx, sub, y).to(torch.float32)
             amt = _fx_const_t((torch.tensor(_f32(amount * _f32(0.01)), dtype=torch.float32) * have).to(torch.float32).double())
             return span(self._cv_yield(amt, y)) >> 8
+        if eff == "EFFECT_ADJUST_PLAYER_OPEN_BORDERS_FROM_INFLUENCE":
+            # 0x6b63a0: 10 per city-state whose suzerain is not the player —
+            # a minor is none's, so every living one
+            return 10 * (self.citystate_center >= 0).long().sum(dim=1)
         if eff == "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN":
             p = "PSEUDOYIELD_INFLUENCE"
             return span(self._cv_pseudo(full(amount * _FX), p, f0.pseudo_w(p))) >> 8

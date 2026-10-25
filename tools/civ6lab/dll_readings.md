@@ -7640,6 +7640,36 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40).
 - EFFECT_ADJUST_DISTRICT_YIELD_CHANGE 0x6acd00: a district subject; Amount
   bare, span.
+- EFFECT_ADJUST_PLAYER_OPEN_BORDERS_FROM_INFLUENCE 0x6b63a0 (@f03f28):
+  whatever its subject, per city-state of the game's list (game +0x3f8
+  +0x1650, each player's influence +0x1368) whose suzerain (0x44c850) is
+  not the player, +10 raw. Its set's REQUIREMENT_PLAYER_IS_MINOR 0x6d2760
+  (@f04448) reads the evaluating player (context +0x80): no full
+  civilization (0x469db0) and no barbarian (0x469ce0). Gunboat Diplomacy on
+  runs/h1_duelu's city-states: 30 above its Influence's 29 over three
+  city-states (945 rows).
+- A civilization's own building in the building production analyzer
+  0x6c1a80: the city lacks BUILDING_TSIKHE unless it holds that very type (a
+  city-state's Star Fort is none), and its turns run at its own Cost (260,
+  the engine's at the Star Fort's scale) without the minor's
+  MINOR_CIV_PRODUCTION_WALLS (BuildingType BUILDING_WALLS, BUILDING_CASTLE,
+  BUILDING_STAR_FORT alone): runs/h1_duelu1117 Antananarivo t132-t148, Limes
+  84-97 as logged on the Tsikhe alone.
+- LAB, the district yield 0x24b5a0 (EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER):
+  neither the plot's adjacency nor its buildings' rows alone fit the
+  city-states' Natural Philosophy / Town Charters / Five Year Plan on
+  runs/h1_duelu (1124 Bologna's Campus, 2 Science of adjacency and a Library,
+  29 at t40 and t117; 1127 Hattusa's, 2 of adjacency, 14 at t31, none at t62
+  and none at t137 with a Library and a University; 1121 Antioch's
+  Commercial Hub, 4 Gold of adjacency, 14 at t193; Hunza's with a Market,
+  none at t121) while every Harbor's Naval Infrastructure reads its
+  adjacency as ours — the district's own yields vector +0x249850 unread.
+- Colonial Offices / Colonial Taxes: their one set
+  (CITY_NOT_OWNER_CAPITAL_CONTINENT_REQUIREMENTS) — Colonial Taxes is never
+  listed by anyone and Colonial Offices 16.0 for every city-state on every
+  turn (majors 4.0 a city), as if the set held with the growth read on no
+  city (0x6beb00's 2.0 Food, 4.0 over the horizon) — for a city-state 16
+  unexplained: ASK.
 - EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT 0x6ac440 (the
   registry's @f040b8; Amount +8): on the context's unit (+0x90, set per
   subject by COLLECTION_PLAYER_UNITS' walk) of Movement (0x56e130 above 0):

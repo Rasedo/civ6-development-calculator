@@ -38,8 +38,8 @@ import { IMPROVEMENTS } from '../data/improvements';
 import type { ImprovementId } from './types';
 import { computeUnlocks } from './effects';
 import { civicAnalysis } from './aiCivics';
-import { AI_UNIT_INDEX, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
-import { AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
+import { AI_BUILDINGS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { unitProductionTable } from './aiUnitProduction';
 import { resourceValue } from './aiResource';
 import { stockFree } from './stockpile';
@@ -262,7 +262,13 @@ export function aiView(state: GameState): AiView {
     },
     cityHasBuilding: (i, id, building) => {
       const city = cityOf(i, id);
-      // the install type as the engine's id (BUILDING_WALLS is ANCIENT_WALLS)
+      // the install type as the engine's id (BUILDING_WALLS is ANCIENT_WALLS);
+      // a civilization's own building (BUILDING_TSIKHE, the engine's
+      // RENAISSANCE_WALLS) only in a city of its trait: a city-state's Star
+      // Fort is no Tsikhe (runs/h1_duelu1117 Antananarivo t132-t148, Limes
+      // valued on the Tsikhe it lacks, 84-97 as logged)
+      const trait = AI_BUILDINGS[AI_BUILDING_INDEX.get(building) ?? -1]?.trait;
+      if (trait && (isCityStateSeat(i) || !majorTraits(state, i).includes(trait))) return false;
       const b = engineId('building', building, 'BUILDING_', BUILDINGS);
       return !!city && !!b && city.buildings.includes(b);
     },
@@ -338,6 +344,7 @@ export function aiView(state: GameState): AiView {
     tradeKnowledge: (i) => (isCityStateSeat(i) ? state.cityStates.find((c) => c.seat === i)?.tradeValue ?? 0 : null),
     influenceTokensUsed: (i) => state.cityStates.reduce((n, cs) => n + envoysOf(cs, i), 0),
     tributaries: (i) => state.cityStates.filter((cs) => suzerainOf(cs) === i).length,
+    cityStateCount: () => state.cityStates.filter((cs) => cs.centerIndex >= 0).length,
     unitMaintenances: (i) => state.units.filter((u) => u.seat === i).map((u) => UNITS[u.type]?.maintenance ?? 0),
     // a city-state's table on its knowledge base's counts; a major's or the
     // Free Cities' on their own versions, the Free Cities knowing none
