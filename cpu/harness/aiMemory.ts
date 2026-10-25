@@ -19,7 +19,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { CP_ACCEPTED, CP_IN_PROGRESS, CP_SUBMITTED, type AiContract } from '../core/aiContracts';
 import { opsOf } from '../core/operations/manager';
-import type { Seat } from '../core/types';
+import type { ArmyRecord, Seat } from '../core/types';
+import { gameTypeOf } from '../data/aliases';
 
 export const MEMORY_KINDS = ['knowledge.army', 'knowledge.camps', 'cityAi.contracts', 'ops'] as const;
 export type MemoryKind = typeof MEMORY_KINDS[number];
@@ -150,12 +151,22 @@ export interface MemoryRead {
   game: string;
 }
 
+/** a knowledge base's army records as its tactical turn's ageing and look
+ *  left them (`traceKnowledge`), with that turn */
+export interface ArmyLogged {
+  turn: number;
+  records: readonly ArmyRecord[];
+}
+
 /**
  * A player's memory at the end of its turn `turn` against the logs:
- * `playerOf` names a seat's player as the logs do, `W` the map's width.
+ * `playerOf` names a seat's player as the logs do, `W` the map's width. Its
+ * army records are `army`, the knowledge base as the game writes its ARMY
+ * lines (after the tactical turn's ageing and look, before the turn's end
+ * look), each record's age the ageings since it was last seen.
  */
 export function readMemory(logs: MemoryLogs, seat: Seat, player: number, turn: number, W: number,
-  playerOf: (seat: number) => number): MemoryRead[] {
+  playerOf: (seat: number) => number, army: ArmyLogged | undefined): MemoryRead[] {
   const out: MemoryRead[] = [];
   const add = (kind: MemoryKind, ours: string[], game: string[]) => {
     if (!logs.logged[kind]) return;
@@ -163,11 +174,11 @@ export function readMemory(logs: MemoryLogs, seat: Seat, player: number, turn: n
     out.push({ kind, equal: a === b, ours: a || 'none', game: b || 'none' });
   };
   const by = new Map<string, { n: number; age: number }>();
-  for (const r of seat.armyKnown ?? []) {
-    const k = `${playerOf(r.owner)}|${r.type}`;
+  for (const r of army?.records ?? []) {
+    const k = `${playerOf(r.owner)}|${gameTypeOf('unit', r.type, 'UNIT_').slice(5)}`;
     const e = by.get(k) ?? (by.set(k, { n: 0, age: 0 }), by.get(k)!);
     e.n += 1;
-    e.age = Math.max(e.age, turn - r.seen);
+    e.age = Math.max(e.age, army!.turn - r.seen);
   }
   // the log's army records hold no Settler
   add('knowledge.army', [...by].map(([k, e]) => `${k} ${e.n} ${e.age}`).filter((x) => !x.includes('|SETTLER ')).sort(),

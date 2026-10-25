@@ -218,9 +218,8 @@ class SimMinors:
             vis = vis & ~(stealthy & self._stealth_hidden(seat).gather(1, tile) & (self.unit_seat != seat))
         if self._spy_idx >= 0:
             vis = vis & ~((self.unit_type == self._spy_idx) & (self.unit_seat != seat))
-        # the barbarians' look reads the map's layer 0: no Trader
-        if seat == BARB_SEAT:
-            vis = vis & (self.unit_type != self._trader_idx)
+        # the look reads the map's layer 0: no Trader, no religious unit
+        vis = vis & ~self._kb_off_layer.take(self.unit_type.clamp(min=0, max=self.NU - 1))
         if not bool(vis.count_nonzero()):
             return
         U = vis.shape[1]
@@ -259,6 +258,31 @@ class SimMinors:
             nxt = self.citystate_kb_next[:, r]
             seq[b, k] = (nxt[b] + rank[b, u]).to(seq.dtype)
             self.citystate_kb_next[:, r] = nxt + new.sum(dim=1)
+
+    def _kb_birth(self, r: int, seat: int, rows: torch.Tensor, g: torch.Tensor) -> None:
+        """the knowledge base on row `r` records the unit its player `seat`
+        made, global unit `g` [N] in the games `rows` [N] (player signal
+        +0xc0 -> 0x7874a0, no sight asked; `spawnUnit`): a free record, age 0
+        as of the knowledge base's last ageing (`citystate_kb_aged`, the turn
+        where none ran)"""
+        if not rows.numel():
+            return
+        slot = self.citystate_kb_slot[:, r]
+        free = slot[rows] == -2
+        if not bool(free.any(dim=1).all()):
+            raise RuntimeError(f"_kb_birth: more than KB_RECORDS={slot.shape[1]} army records")
+        k = free.to(torch.int8).argmax(dim=1)
+        aged = self.citystate_kb_aged[rows, r]
+        slot[rows, k] = g.to(slot.dtype)
+        self.citystate_kb_owner[rows, r, k] = seat
+        self.citystate_kb_type[rows, r, k] = self.unit_type[rows, g].to(self.citystate_kb_type.dtype)
+        self.citystate_kb_seen[rows, r, k] = torch.where(aged >= 0, aged, torch.full_like(aged, int(self.turn))).to(
+            self.citystate_kb_seen.dtype)
+        self.citystate_kb_plot[rows, r, k] = self.unit_tile[rows, g].to(self.citystate_kb_plot.dtype)
+        self.citystate_kb_damage[rows, r, k] = 0
+        nxt = self.citystate_kb_next[rows, r]
+        self.citystate_kb_seq[rows, r, k] = nxt.to(self.citystate_kb_seq.dtype)
+        self.citystate_kb_next[rows, r] = nxt + 1
 
     def _minor_levy_return(self, s: int) -> None:
         """`minorLevyReturn` — CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS):

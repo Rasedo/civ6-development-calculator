@@ -576,13 +576,14 @@ export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord
   sight: ArrayLike<number>, age: boolean): void {
   const kept = (holder.armyKnown ?? []).filter((r) => !age || state.turn - r.seen <= ARMY_RECORD_AGE);
   if (age) holder.armyAged = state.turn;
-  // the barbarians' look (Targets.cpp 0x7877e0) walks each plot's units of
-  // the map's layer 0 (0x75800): a Trader is none of them (none of their
-  // AI_Knowledge.csv ARMY lines on runs/h1_duelw1117-1128 names one, the
-  // city-states' do)
-  const barb = isBarbSeat(seat);
+  // the look (Targets.cpp 0x7877e0) walks each plot's units of the map's
+  // layer 0 (0x75800): a Trader and a religious unit are none of them (no
+  // AI_Knowledge.csv ARMY line on runs/h1_duelw1117-1128 names a
+  // Missionary, an Apostle or another player's Trader; a city-state's own
+  // Trader is on its line from the turn after its birth, its age climbing to
+  // 21 — runs/h1_duelw1117 city-state 3's t32 Trader, t33-t53)
   for (const u of state.units) {
-    if (!sight[u.tileIndex] || !unitVisibleTo(state, u, seat) || (barb && UNITS[u.type]?.trader)) continue;
+    if (!sight[u.tileIndex] || !unitVisibleTo(state, u, seat) || UNITS[u.type]?.trader || (UNITS[u.type]?.religiousStrength ?? 0) > 0) continue;
     const r = kept.find((x) => x.id === u.id && x.type === u.type && x.owner === u.seat);
     if (r) {
       r.seen = state.turn;
@@ -593,6 +594,17 @@ export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord
   }
   if (kept.length) holder.armyKnown = kept;
   else delete holder.armyKnown;
+  // the tactical turn's targets update (0x783980) logs the ARMY lines here,
+  // after the ageing and the look (0x785f30)
+  if (age) knowledgeTrace?.(seat, state.turn, kept);
+}
+
+let knowledgeTrace: ((seat: number, turn: number, records: readonly ArmyRecord[]) => void) | null = null;
+/** REPLAY: each knowledge base as the tactical turn's ageing and look leave
+ *  it (the moment AI_Knowledge.csv's ARMY lines are written), with that
+ *  turn */
+export function traceKnowledge(fn: ((seat: number, turn: number, records: readonly ArmyRecord[]) => void) | null): void {
+  knowledgeTrace = fn;
 }
 
 /** the barbarians' knowledge base's camps (its look 0x7877e0 -> 0x5f0110,

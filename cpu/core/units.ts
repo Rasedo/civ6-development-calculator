@@ -1774,6 +1774,17 @@ export function spawnUnit(
     logXpWrite(state, unit, 'fp');
   }
   state.units.push(unit);
+  // the player's knowledge base records the unit it made at once (player
+  // signal +0xc0 -> 0x7874a0, no sight asked): a Trader, which no look
+  // takes, is known so from its birth until its record ages out. The record
+  // starts at age 0 as of the knowledge base's last ageing: one born before
+  // the turn's ageing ages with it (runs/h1_duelw1117 city-state 3's Trader
+  // made at t32 reads age 1 on t33's line)
+  const holder = seatOf(state, seat);
+  if (holder) {
+    holder.armyKnown ??= [];
+    holder.armyKnown.push({ id: unit.id, owner: seat, type: unitType, seen: holder.armyAged ?? state.turn, plot: unit.tileIndex, damage: 0 });
+  }
   questUnitAdded(state, seat, unitType);
   revealAround(state, seat, unit.tileIndex, unitSight(unit, state), { seeThrough: unitSeesThrough(unit) });
   // CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): a chassis whose price

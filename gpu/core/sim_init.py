@@ -4910,6 +4910,10 @@ class SimInit:
         self._type_naval_melee = (self.unit_naval & (self._type_ranged_strength == 0)
                                   & ~self._type_raider & (self._type_air_slots == 0))
         self._trader_idx = next(i for i, u in enumerate(ru) if bool(u["trader"]))
+        # the types off the map's layer 0, which no knowledge base's look
+        # takes (`knowledgeLook`): the Trader and the religious units
+        self._kb_off_layer = self._rel_strength[:self.NU] > 0
+        self._kb_off_layer[self._trader_idx] = True
         # SCOUT is a military explorer (combat 10) but never in the civ roster
         # (BUY_UNITS and the ladder exclude it). The production ladder
         # prefers WARRIOR anyway, but the gold buy's affordability gate can

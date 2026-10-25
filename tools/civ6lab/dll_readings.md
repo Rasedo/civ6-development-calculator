@@ -4049,8 +4049,38 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   on it (0x75ce0's list), one hidden (+0x15f0, not +0x1650) only where
   0x5033a0 lets the player see it, through 0x5f0440 into its owner's list;
   a barbarian camp improvement (plot +0x44 the barbarians') -> 0x5f0110.
-  Player signal +0xc0 (0x7874a0) and game signal +0x2e8 (0x7838a0 ->
-  0x783570) refresh one unit outside the look.
+  Player signal +0xc0 (0x7874a0, bound in 0x7864c0 at 0x786b25) records
+  a unit of the player's own through 0x5f0440 with no sight asked: the
+  unit it made. Game signal +0x2e8 (0x7838a0) walks a city's list
+  (+0x1a50) into the known cities, not a unit; the lambda 0x783570 (one
+  unit, through 0x5f0440) is referenced only from 0x787fb0, its caller
+  unread.
+- THE LOG'S MOMENT (READ): 0x785f30 runs the ageing, the look, then the
+  targets update 0x783980, which writes AI_Knowledge.csv's lines (0x7858b7
+  -> 0x5ed280 -> 0x5eceb0) — so a turn's ARMY lines show the records after
+  that turn's ageing and look, before its units move and before the turn's
+  end look (player signal +0x228). A record's age is the count of ageings
+  since it was last seen (+0xc reset to 0 by a sight or a birth): a unit
+  made before the turn's ageing reads age 1 on that turn's line.
+- LAYER 0 FOR EVERY PLAYER: no ARMY line of runs/h1_duelw1117-1128 names a
+  Missionary, Apostle, Inquisitor or Guru, nor another player's Trader; a
+  player's own Trader is on its line from its birth, never refreshed, its
+  age climbing to 21 then gone (runs/h1_duelw1117 city-state 3's Trader
+  made at t32: age 1 at t33 to 21 at t53; its next made at t63: t64-t84).
+  The engines' look takes no Trader and no religious unit for any player,
+  and `spawnUnit` / `_spawn_unit` / `_spawn_barb` record the unit made
+  (`_kb_birth`), its age 0 as of the knowledge base's last ageing.
+- MEASURED (--aiscore, `--to 60`, knowledge.army player-turns equal; the
+  memory read at the log's moment, `traceKnowledge`, the type names the
+  log's): runs/h1_duelw1117 48.8% -> 56.6%, h1_duelw1121 47.8% -> 60.3%.
+  The decisions on clean memory: barb.move.plot compared 16 -> 91 (1117),
+  12 -> 146 (1121); cityState.build 165 -> 168 of 174 (1117). Left: a
+  record a turn fresher than the game's (1117 t17 the barbarians' record of
+  city-state 4's Warrior: ours age 1, the log's 2 — ours refreshed at the
+  end look after the city-state's move), units the replay's AI made that
+  the game did not (a birth record each pair: 1117 city-state 4's Archer
+  t25-t27, 1121 city-state 2's Archer t32-t34), and sight (1117 t42
+  city-state 3 sees no Scout of player 1, the log one at age 0).
 - MEASURED (the lab's update over the five verbose duels in turn order —
   the players before the minor where the next record has them, its own
   units made this turn, its turn's end with its units where the next
@@ -6300,9 +6330,8 @@ gpu/core/sim_tactics.py.
   one of them — none of the barbarians' AI_Knowledge.csv ARMY lines on
   runs/h1_duelw1117-1128 names a UNIT_TRADER (the city-states' name 90-147
   each), and none of the 207 barbarian Attack Civilian rows targets one
-  (1117 t74: China's Trader at 36:13 drew ours off a pillage). PARTLY READ:
-  which layer a Trader stands on. The engines skip a Trader in the
-  barbarians' `knowledgeLook` / `_knowledge_look`.
+  (1117 t74: China's Trader at 36:13 drew ours off a pillage). Every
+  player's look reads layer 0 alike: "LAYER 0 FOR EVERY PLAYER" above.
 - The knowledge base: the city-states' (C-96) and the barbarians' (aged
   and looked at their tactical turn's start, looked again at its end),
   `knowledgeLook` in cpu/core/tactical.ts (`Seat.armyKnown`) /

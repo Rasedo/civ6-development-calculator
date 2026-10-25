@@ -2818,6 +2818,8 @@ class SimMasks:
         self.tribe_defender[rows] = torch.where(_ds == slot.unsqueeze(1), torch.full_like(_ds, -1), _ds)
         self.barb_unit_slotno[rows, slot] = -1
         self.barb_unit_tile[rows, slot] = spot[rows]
+        # its player's knowledge base records the unit it made (`spawnUnit`)
+        self._kb_birth(self.BK if seat == BARB_SEAT else self.FK, seat, rows, slot + self.POOL_LO["barb"])
         self.barb_unit_hp[rows, slot] = self.rules.combat["unitHp"]
         self.barb_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
         self.barb_unit_revealed_turn[rows, slot] = -1
@@ -3473,6 +3475,9 @@ class SimMasks:
         self.major_unit_pslot[rows, slot] = -1  # no pool slot until its player's pass (`poolSlots`)
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx.take(rows)
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot.take(rows)
+        # a city-state's knowledge base records the unit it made (`spawnUnit`)
+        if minor:
+            self._kb_birth(seat - 100, seat, rows, slot + self.POOL_LO[pre])
         # the unit added answers a Train Unit quest (`questUnitAdded`)
         if not minor:
             self._quest_unit_added(row, can, type_idx)
