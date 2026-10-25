@@ -928,6 +928,14 @@ BARB_CAP_MAX = 4
 # controls, the first tree generation 3
 BARB_TREE_HELD = 2
 BARB_TREE_FIRST_GEN = 3
+# the barbarians' trees' priorities (`BARB_TREE_TOP_PRIORITY`,
+# `BARB_SCOUT_PRIORITY`; their definitions' Priority): the City Assault 4,
+# the raid, the capture and a scout's tree 3
+BARB_ASSAULT_PRIORITY = 4
+BARB_RAID_PRIORITY = 3
+BARB_CAPTURE_PRIORITY = 3
+BARB_SCOUT_PRIORITY = 3
+BARB_TREE_TOP_PRIORITY = 4
 #: the slots a city-state's or the Free Cities' unit pool may number
 SEAT_POOL_MAX = 64
 #: the knowledge base's army records a city-state may hold (`armyKnown`):

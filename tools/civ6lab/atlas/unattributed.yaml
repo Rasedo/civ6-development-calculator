@@ -4419,6 +4419,7 @@
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's..."

@@ -39,6 +39,20 @@ export const BARB_ASSAULT_DEF = 'Barbarian City Assault';
 /** the definition a capture starts (BarbarianTriggeredTrees:
  *  TRIGGER_CAPTURE_BARBARIAN, the tree "Escort Worker To Camp") */
 export const BARB_CAPTURE_DEF = 'Barbarian Builder Capture';
+/** the trees' priorities: the highest of the barbarians' definitions (the
+ *  City Assault's 4) first; a scout's tree 3 (its requestPriority in the
+ *  game's AI memory, runs/h1_duely1128 "Barbarian Found City") */
+export const BARB_TREE_TOP_PRIORITY = Math.max(...[BARB_RAID_DEF, BARB_ASSAULT_DEF, BARB_CAPTURE_DEF].map((d) => AI_OP_DEFS[d].priority));
+export const BARB_SCOUT_PRIORITY = 3;
+
+/** THE CAPTURES HELD: the action replay's captures are the record's, landed
+ *  before the barbarians' turn; it names whether one starts its operation
+ *  now (`ticked`: the units of the operations the walk has ticked so far,
+ *  null at the turn's end) by its captor; null outside a replay */
+let captureHeld: ((capture: { captive: number; captor: number }, ticked: ReadonlySet<number> | null) => boolean) | null = null;
+export function holdBarbCaptures(held: typeof captureHeld): void {
+  captureHeld = held;
+}
 
 /** the replay's view of the barbarians' operation lines (null off) */
 let tracer: ((line: string) => void) | null = null;
@@ -301,21 +315,28 @@ export function barbarianOpsTurn(state: GameState): void {
 }
 
 /**
- * THE CAPTURES' OPERATIONS at the barbarians' turn's end (AI_EVENT_UNIT_CAPTURED
+ * THE CAPTURES' OPERATIONS (AI_EVENT_UNIT_CAPTURED
  * from the capture 0x212500, the triggered tree 0x800c60): each capture
  * starts "Barbarian Builder Capture" by name (0x7265b0) on the captive's
  * plot, its rally the plot, the event's units — the captive, then its
  * captor — joining its team (0x737e80), the captor leaving the operation it
- * held; the tree first ticks in the next turn's walk.
+ * held. A capture inside the trees' walks starts at once and its tree ticks
+ * in its priority's walk where that is yet to come (`barbarianTrees`); one
+ * of the tactical pass after them first ticks in the next turn's walk.
  */
-export function barbarianCaptures(state: GameState): void {
+export function barbarianCaptures(state: GameState, ticked: ReadonlySet<number> | null = null): void {
   const caps = state.barbCaptures ?? [];
   delete state.barbCaptures;
   if (!caps.length) return;
   const ai = opsOfBarbs(state);
-  for (const { captive, captor } of caps) {
+  for (const c of caps) {
+    const { captive, captor } = c;
     const cu = unitOf(state, captive);
     if (!cu) continue;
+    if (captureHeld && !captureHeld(c, ticked)) {
+      (state.barbCaptures ??= []).push(c);
+      continue;
+    }
     const units = [cu, unitOf(state, captor)].filter((u): u is Unit => !!u);
     for (const o of opsOf(ai)) for (const t of o.teams) t.members = t.members.filter((id) => !units.some((u) => u.id === id));
     const op = startOperationAt(ai, barbEnv(state, null), BARB_CAPTURE_DEF, -1, cu.tileIndex, cu.tileIndex);
@@ -370,33 +391,43 @@ function freeEndedTrees(state: GameState): void {
 /**
  * THE BARBARIANS' TREES' TICK in their tactical pass (the tree manager's
  * tick 0x7ffdd0, list C of the player's turn, once each unit's planning is
- * taken): every tree of the player — its operations' and its scouts' — in
- * the pool's slot order, a tree a tree's order starts (a scout's report
- * raids at once) ticking in the same walk where its slot lies past the one
- * ticking (one reusing a freed slot before it waits for the next walk:
- * runs/h1_duelw1105 log t12, tribe 4's raid in tribe 0's scout's old slot 0
- * first recruits at t13, its Warriors from t14); the trees that ended free
- * their slots after the walk. The operations' units' turns are their
- * operations'; a scout its tree moved has its turn ended. The ids of the
- * units the trees held.
+ * taken): once per priority, the highest first, each tree of the player of
+ * that priority — its operations' (their definitions' Priority) and its
+ * scouts' (`BARB_SCOUT_PRIORITY`) — in the pool's slot order (0x7cb3d0:
+ * tree +0x548), a tree a tree's order starts ticking in its own priority's
+ * walk where that walk is yet to come, or in the same walk where its slot
+ * lies past the one ticking (one reusing a freed slot before it waits for
+ * the next turn: runs/h1_duelw1105 log t12, tribe 4's raid in tribe 0's
+ * scout's old slot 0 first recruits at t13, its Warriors from t14). A
+ * capture an operation's blow takes starts its operation there
+ * (`barbarianCaptures`): runs/h1_duely1128 t35 / t37, the City Assault's
+ * (priority 4) Warrior takes China's Settler on 16:13 and the capture's
+ * "Escort Worker To Camp" (priority 3) ticks in the walk after it —
+ * Started, Operation Move, Change Target INVALID, complete. The trees that
+ * ended free their slots after the walks. The operations' units' turns are
+ * their operations'; a scout its tree moved has its turn ended. The ids of
+ * the units the trees held.
  */
 export function barbarianTrees(state: GameState, pass: Pass): Set<number> {
   const held = new Set<number>();
   const ai = opsOfBarbs(state);
-  for (let last = -1; ;) {
-    const ops = opsOf(ai).filter((o) => treeSlot(o.id) > last);
-    const scouts = (state.barbTribes ?? []).filter((t) => t.homing && treeSlot(t.homing.id) > last);
-    const op = ops.reduce<Operation | null>((a, o) => (!a || treeSlot(o.id) < treeSlot(a.id) ? o : a), null);
-    const tr = scouts.reduce<BarbTribe | null>((a, t) => (!a || treeSlot(t.homing!.id) < treeSlot(a.homing!.id) ? t : a), null);
-    if (!op && !tr) break;
-    if (op && (!tr || treeSlot(op.id) < treeSlot(tr.homing!.id))) {
-      last = treeSlot(op.id);
-      for (const id of opUnits(op)) held.add(id);
-      tickOperation(ai, barbEnv(state, pass), op);
-      for (const id of opUnits(op)) held.add(id);
-    } else {
-      last = treeSlot(tr!.homing!.id);
-      tickScout(state, pass, tr!);
+  for (let priority = BARB_TREE_TOP_PRIORITY; priority >= 0; priority--) {
+    for (let last = -1; ;) {
+      const ops = opsOf(ai).filter((o) => opDef(o).priority === priority && treeSlot(o.id) > last);
+      const scouts = priority === BARB_SCOUT_PRIORITY ? (state.barbTribes ?? []).filter((t) => t.homing && treeSlot(t.homing.id) > last) : [];
+      const op = ops.reduce<Operation | null>((a, o) => (!a || treeSlot(o.id) < treeSlot(a.id) ? o : a), null);
+      const tr = scouts.reduce<BarbTribe | null>((a, t) => (!a || treeSlot(t.homing!.id) < treeSlot(a.homing!.id) ? t : a), null);
+      if (!op && !tr) break;
+      if (op && (!tr || treeSlot(op.id) < treeSlot(tr.homing!.id))) {
+        last = treeSlot(op.id);
+        for (const id of opUnits(op)) held.add(id);
+        tickOperation(ai, barbEnv(state, pass), op);
+        for (const id of opUnits(op)) held.add(id);
+      } else {
+        last = treeSlot(tr!.homing!.id);
+        tickScout(state, pass, tr!);
+      }
+      barbarianCaptures(state, held);
     }
   }
   freeEndedTrees(state);

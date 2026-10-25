@@ -6792,11 +6792,21 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   reader lists the pool's VT_TREE controls alone: the two are another
   control's; generation 2 one gone before the first tree) — `BARB_TREE_HELD`
   / `BARB_TREE_FIRST_GEN`. With it the engine's 1128 ids run the game's
-  through t39 (196610, 262147, 327684, 393221, 458755, 524293); runs/h1_duely1128
-  t35 / t37 the game's capture operation starts inside the walk, ticks in it
-  and completes ("Operation Change Target INVALID, No backup"), where ours
-  starts after the pass and stands on (its slot 4 held to t49, the game's
-  free at t48).
+  through t39 (196610, 262147, 327684, 393221, 458755, 524293). The tick
+  runs once per priority, the highest first, as the city-states' does
+  (0x7cb3d0: tree +0x548): the barbarians' trees are the City Assault's
+  "Barbarian City Attack" at 4 and the raid's, the capture's and a scout's
+  at 3 (their requestPriority on every end look). runs/h1_duely1128 t35 /
+  t37: the City Assault's Warrior (priority 4) takes China's Settler on
+  16:13 in its walk; the capture's operation starts at the event (0x800c60,
+  no tick of its own) in slot 4, below the assault's 5, and its tree ticks
+  in the priority-3 walk after it — Started, Operation Move, Change Target
+  INVALID No backup, complete — so slot 4 is free again by t48 (the scout's
+  720900) and the t78 raid takes slot 5 past the reporting scout's 4 and
+  executes its Spawn Change at once (Raid City node 3 SUCCESS on the t78
+  end look; the tribe's Swordsman at t79). With the walks by priority the
+  engine's 1128 tree ids are the game's through t78 (720900, 851972,
+  917509).
 - THE NODES' HANDLERS (the dispatcher 0x7cbca0 storing each type's
   functions under the id the registration 0x7db850 gives it, the k-th id
   stored the k-th name, @d5b198 one unnamed): Operation Move update 0x81a130
@@ -7223,7 +7233,12 @@ the event in `seizeCivilian` (cpu/core/combat.ts, `GameState.barbCaptures`);
   the target the first payload unit's plot (+0x220), the candidate's rally
   (the engines: the plot); each payload unit to its team (addMember
   0x737e80, the unit leaving the team it held: runs/h1_duelw1128 t25-26, the
-  raid's Slinger to the capture, the raid's team two Warriors).
+  raid's Slinger to the capture, the raid's team two Warriors). The start
+  runs at the event, inside the trees' walks where a tree's blow took the
+  civilian: its tree ticks in its priority's walk where that is yet to come
+  (runs/h1_duely1128 t35 / t37, the City Assault's capture, the escort's
+  tree at priority 3 ticking the same turn); a capture of the tactical
+  pass after the walks first ticks in the next turn's.
 - THE BACKUP: the military AI's turn names a running operation's candidate
   its backup (0x73e610): of the camps, from the target, at the strength
   the last refresh left (0x727510 sets the backups at 0x72763d, before the

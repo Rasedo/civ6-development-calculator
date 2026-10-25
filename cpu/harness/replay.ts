@@ -95,7 +95,7 @@ import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './rec
 import { num, bool } from './record';
 import { holdMinorClears, minorAiTurn, minorGreatPersonClass, minorMilitaryTurn, minorSecondHook, traceMinorAi } from '../core/minorCityAi';
 import { UPGRADE_MOVE, cityStateMilitary, holdSecondHook, traceMinorOps, unupgradedDeleted, upgradeMayGo } from '../core/minorOps';
-import { barbSpawnChange, traceBarbOps } from '../core/barbarianOps';
+import { barbSpawnChange, holdBarbCaptures, traceBarbOps } from '../core/barbarianOps';
 import { opsOf } from '../core/operations/manager';
 import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
@@ -872,11 +872,14 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     copy.map.tiles[plot].districtPillaged = was[1];
   }
   // the turn's captures are the record's, landed on the state with its
-  // battles: they start their operations at the copy's turn end, and a
-  // capture the copy's own moves take adds none (the record's battles are the
-  // pair's); the state's list is spent there
+  // battles: one whose captor an operation holds starts its operation once
+  // the trees' walk has ticked that operation (its blow's, `barbarianTrees`),
+  // any other at the copy's turn end; a capture the copy's own moves take
+  // adds none (the record's battles are the pair's)
   copy.barbCaptures = Object.assign([...(state.barbCaptures ?? [])], { push: () => 0 });
   delete state.barbCaptures;
+  const recordCaptives = new Set((copy.barbCaptures ?? []).map((c) => c.captive));
+  holdBarbCaptures((c, ticked) => recordCaptives.has(c.captive) && (ticked === null || ticked.has(c.captor)));
   // the units the barbarians' battles of the pair struck (or lost) stand as
   // they were before the first blow, another player's where the blow found
   // it, a barbarian where their turn found it (`barbStart`)
@@ -980,6 +983,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   try {
     barbarianTactics(copy, acting);
   } finally {
+    holdBarbCaptures(null);
     traceKnowledge(logged);
     taken();
     traceTactics(null);

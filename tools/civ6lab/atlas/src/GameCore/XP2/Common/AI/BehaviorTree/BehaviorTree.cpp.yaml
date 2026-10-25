@@ -27,6 +27,7 @@
     - cpu/core/behaviorTree.ts:BT_SUCCESS
     - cpu/core/behaviorTree.ts:AiTreeNode
     - cpu/core/operations/manager.ts:operationsRun
+    - cpu/core/barbarianOps.ts:barbarianTrees
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"

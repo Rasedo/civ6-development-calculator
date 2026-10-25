@@ -523,9 +523,12 @@ class SimBarbOps:
     def _barb_trees(self, done: torch.Tensor, ai: torch.Tensor, order: torch.Tensor, rowof: torch.Tensor,
                     res: dict, tg: dict, danger: torch.Tensor) -> None:
         """`barbarianTrees`: every tree of the barbarians — their tribes'
-        operations', their captures' and their scouts' — in the pool's slot
-        order, a tree started in the walk ticking in it where its slot lies
-        past the one ticking; the trees that ended free their slots after the
+        operations', their captures' and their scouts' — once per priority,
+        the highest first, of that priority in the pool's slot order, a tree
+        started in the walks ticking in its priority's walk where that is yet
+        to come, or in the same walk where its slot lies past the one
+        ticking; a capture a tree's blow took starts its operation after that
+        tree's tick (`_barb_captures`); the trees that ended free their slots after the
         walk (`_bop_free_ended`); the operations' members' turns are theirs;
         the units whose moves an order ended (0x56d6f0) read no Movement
         through the walk and take it back after it"""
@@ -537,39 +540,45 @@ class SimBarbOps:
         ctx = {"done": done, "ai": ai, "order": order, "rowof": rowof, "res": res, "tg": tg, "danger": danger,
                "ended": torch.zeros_like(self.barb_unit_mp, dtype=torch.bool),
                "ended_mp": torch.zeros_like(self.barb_unit_mp)}
-        last = torch.full((B,), -1, dtype=torch.long, device=dev)
         big = 1 << 40
-        while True:
-            K = int(self.n_tribes.max())
-            op_s = self.tribe_op_id[:, :K] % _TREE_SLOT
-            hm_s = self.tribe_home_id[:, :K] % _TREE_SLOT
-            cp_s = self.bcap_id % _TREE_SLOT
-            op_on = (self.tribe_op[:, :K] > 0) & ~self.tribe_op_done[:, :K] & (self.tribe_op_id[:, :K] >= 0) & (op_s > last.unsqueeze(1))
-            hm_on = (self.tribe_home_slot[:, :K] != -1) & (self.tribe_home_id[:, :K] >= 0) & (hm_s > last.unsqueeze(1))
-            cp_on = (self.bcap_id >= 0) & (cp_s > last.unsqueeze(1))
-            ids = torch.cat((torch.where(op_on, op_s, big), torch.where(hm_on, hm_s, big),
-                             torch.where(cp_on, cp_s, big)), dim=1)
-            nxt = ids.min(dim=1).values
-            go = nxt < big
-            if not bool(go.any()):
-                break
-            for c in range(self.bcap_id.shape[1]):
-                m = go & cp_on[:, c] & (cp_s[:, c] == nxt)
-                if bool(m.any()):
-                    self._bop_capture_tick(m, c, ctx)
-            for k in range(K):
-                m = go & op_on[:, k] & (op_s[:, k] == nxt)
-                if bool(m.any()):
-                    raid = m & (self.tribe_op[:, k] == 1)
-                    if bool(raid.any()):
-                        self._bop_raid_tick(raid, k, ctx)
-                    ass = m & (self.tribe_op[:, k] == 2)
-                    if bool(ass.any()):
-                        self._bop_assault_tick(ass, k, ctx)
-                h = go & hm_on[:, k] & (hm_s[:, k] == nxt)
-                if bool(h.any()):
-                    self._bop_scout_tick(h, k, ctx)
-            last = torch.where(go, nxt, last)
+        for prio in range(simbase.BARB_TREE_TOP_PRIORITY, -1, -1):
+            last = torch.full((B,), -1, dtype=torch.long, device=dev)
+            while True:
+                K = int(self.n_tribes.max())
+                op_s = self.tribe_op_id[:, :K] % _TREE_SLOT
+                hm_s = self.tribe_home_id[:, :K] % _TREE_SLOT
+                cp_s = self.bcap_id % _TREE_SLOT
+                op_p = torch.where(self.tribe_op[:, :K] == 2, simbase.BARB_ASSAULT_PRIORITY, simbase.BARB_RAID_PRIORITY)
+                op_on = ((self.tribe_op[:, :K] > 0) & ~self.tribe_op_done[:, :K] & (self.tribe_op_id[:, :K] >= 0)
+                         & (op_s > last.unsqueeze(1)) & (op_p == prio))
+                hm_on = ((self.tribe_home_slot[:, :K] != -1) & (self.tribe_home_id[:, :K] >= 0) & (hm_s > last.unsqueeze(1))
+                         & (prio == simbase.BARB_SCOUT_PRIORITY))
+                cp_on = (self.bcap_id >= 0) & (cp_s > last.unsqueeze(1)) & (prio == simbase.BARB_CAPTURE_PRIORITY)
+                ids = torch.cat((torch.where(op_on, op_s, big), torch.where(hm_on, hm_s, big),
+                                 torch.where(cp_on, cp_s, big)), dim=1)
+                nxt = ids.min(dim=1).values
+                go = nxt < big
+                if not bool(go.any()):
+                    break
+                for c in range(self.bcap_id.shape[1]):
+                    m = go & cp_on[:, c] & (cp_s[:, c] == nxt)
+                    if bool(m.any()):
+                        self._bop_capture_tick(m, c, ctx)
+                for k in range(K):
+                    m = go & op_on[:, k] & (op_s[:, k] == nxt)
+                    if bool(m.any()):
+                        raid = m & (self.tribe_op[:, k] == 1)
+                        if bool(raid.any()):
+                            self._bop_raid_tick(raid, k, ctx)
+                        ass = m & (self.tribe_op[:, k] == 2)
+                        if bool(ass.any()):
+                            self._bop_assault_tick(ass, k, ctx)
+                    h = go & hm_on[:, k] & (hm_s[:, k] == nxt)
+                    if bool(h.any()):
+                        self._bop_scout_tick(h, k, ctx)
+                # a capture a tree's blow took starts its operation at once
+                self._barb_captures()
+                last = torch.where(go, nxt, last)
         if bool(ctx["ended"].any()):
             self.barb_unit_mp.copy_(torch.where(ctx["ended"], ctx["ended_mp"], self.barb_unit_mp))
         self._bop_free_ended()
