@@ -235,6 +235,7 @@
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:cityAmenity
     - gpu/core/sim_policy.py:full
+    - cpu/core/aiValue.ts:AiValueView
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"

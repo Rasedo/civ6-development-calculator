@@ -4935,7 +4935,13 @@ Contract %d").
   of 1.0 (0x7a60d0: amount x DefaultValue x max(0, 1 + bias), the bias
   0x700810 the sum of four per-player arrays, unread), +1.0 where row +0xc0
   is set, +5.0 for EmbarkAll (+0x70 bit 4), +5.0 where 0x7a4850 holds; a row
-  of an era before the game's x (game - era + 1), else + PSEUDOYIELD_GOLDENAGE_POINT
+  of an era before the game's x (game - era + 1) — the game's era as the
+  player's PlayerEras holds it ([player+0x1358]+0x158, m_eGameEra, named in
+  the constructor 0x411770; its writer unread), the era before through the
+  players' starts of the turn a new era begins: runs/h1_duelw1121 t30 and t60,
+  every major's, city-state's and the Free Cities' Tech and Civic rows as in
+  the era before, while those starts' research prices read the new era
+  (`aiGameEra`) — else + PSEUDOYIELD_GOLDENAGE_POINT
   of 0x2c4170(player). Each term is paid from landing to the horizon:
   PV(H) - PV(turns) (0x7a16e0: a(D-1)/(kD), D = 1 + nk + n(n-1)k²/2 +
   n(n-1)(n-2)k³ x 0.16667, k = rate/100, a perpetuity a/k past nk >= 10;
@@ -5111,8 +5117,9 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   discount and H are the research value's (4.0, 50). The CivicModifiers'
   analyzers: EFFECT_GRANT_INFLUENCE_TOKEN 0x6a3780 (Amount x the player's
   points a token, Player_Influence +0x270 — 50 for every city-state, the
-  Chiefdom threshold at the speed — PSEUDOYIELD_INFLUENCE, discounted from
-  landing); EFFECT_GRANT_SPY 0x6aa780 (PSEUDOYIELD_UNIT_SPY of Amount, landing
+  Chiefdom threshold at the speed; the Free Cities' none: their Mysticism
+  logged the token's whole 13.0 below it at 20 turns, runs/h1_duelw1121
+  t32-t100 — PSEUDOYIELD_INFLUENCE, discounted from landing); EFFECT_GRANT_SPY 0x6aa780 (PSEUDOYIELD_UNIT_SPY of Amount, landing
   to the horizon); EFFECT_GRANT_COMBAT_ADJACENCY 0x6c4060 (Enable: the
   player's strength over every domain 0x4bd0d0(-1) = PlayerStats +0x210 -
   +0x390, bare, landing to the horizon — 20 a Warrior, AI_Military.csv's
@@ -6746,7 +6753,23 @@ by 0x6cf3c0. Read evaluators: REQUIREMENT_DISTRICT_TYPE_MATCHES 0x6d08c0 (the
 district subject's type, context +0x78; else the district type the
 evaluation is of, +0x1c), REQUIREMENT_CITY_HAS_BUILDING 0x6d3830 (a city
 subject holding it; a wonder (Buildings +0x158 & 0x40) only when the
-evaluation is of that city, context +0x10..+0x14). The Monument's
+evaluation is of that city, context +0x10..+0x14),
+REQUIREMENT_CITY_HAS_GARRISON_UNIT 0x6d4420 (a city subject whose population,
+City +0x588, is at least 9 — no unit is read; every city-state's Retainers
+line is first logged the turn its city grows to 9, runs/h1_duelw1117 / 1121 /
+1124 / 1127 / 1128), REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS 0x6d4190 (a
+city subject whose City_Districts count of finished districts counting toward the
+limit, 0x1ae8f0, is at least Amount), REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT
+0x6cfd60 (the context's city, +0x70: an owner with no capital, 0x36f460,
+holds; else the city's plot continent, +0x30, against the owner's
+PlayerCities m_eHomeContinent, 0x467cd0 -> +0x160, named in the constructor
+0x36a870; a city-state's one city on it, the Free Cities holding no
+capital: no player lists Colonial Taxes in runs/h1_duelw1117 / 1121 / 1124 /
+1127 / 1128). Colonial Offices, whose sets are the same inverse, is logged
+16.0 for every city-state on every turn of those five runs (majors 4.0 a
+city): the set refused, its subjects go to the analyzer's slot 2, which
+EFFECT_ADJUST_CITY_GROWTH's 0x6beb00 does not hold here — ASK: the slot-2
+analysis that pays it. The Monument's
 MONUMENT_CULTURE_AT_FULL_LOYALTY's set (REQUIREMENT_CITY_HAS_FULL_LOYALTY, not
 registered) is therefore empty and holds: what keeps it out of the city
 build AI's v 1.0 is not its requirement (its COLLECTION_OWNER subject in a
@@ -6913,14 +6936,14 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   CIVILIZATION_LEVEL_FREE_CITIES) a table's row (0x276310 / 0x276370, +0x1c);
   any other player its +0x12f0 +0xf4 where above 0, else the sum of its
   buildings' OuterDefenseHitPoints (+0x58 where +0x54); then + City +0x14, at
-  least 0. LAB: a city-state's centre reads its outer defence standing with
-  or without walls — every minor's Bastions reads its +6 before any walls
-  (runs/h1_duelw1121 Ayutthaya t40-58, walls at t59; Hunza t40, walls t41),
-  7 / 8 / 9 with the strike's term — while in combat a wall-less city-state's
+  least 0. A city-state's centre stands as any other's, on its walls' pool:
+  every city-state's Bastions line is first logged the turn its walls
+  complete (the fifteen city-states of runs/h1_duelw1117 / 1121 / 1124 /
+  1127 / 1128: 1121 Hunza t40, Ayutthaya t58, Antioch t47; 1124 Granada t70;
+  before, its civic listed, none), as in combat a wall-less city-state's
   centre has no outer pool (CombatLog: 1117 t13 a Warrior's 18 on Valletta,
   1116 t8-9, 1127 t22-25 whole damage); ASK: player +0x12f0 +0xf4's writer.
-  Port: `aiModifiers.ts` (`cityOuterStands`, `cityStrike`), `sim_policy.py`;
-  every minor turn the game lists Bastions equal (1121 t40-75, 1117 t32-75).
+  Port: `aiModifiers.ts` (`cityOuterStands`, `cityStrike`), `sim_policy.py`.
 - READ, the policy Amenity and Housing (Civil Prestige, Retainers, Robber
   Barons, Monarchy's walls, Collectivism, Digital Democracy):
   EFFECT_ADJUST_POLICY_AMENITY 0x6b45a0: with arguments and the context's

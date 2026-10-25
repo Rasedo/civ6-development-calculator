@@ -51,7 +51,9 @@ _KNOWN_AGE = 10
 # the collections of the context's own city, which a policy's context has
 # not: no subject (`subjects`' empty walks)
 _POL_NO_SUBJECTS = {"COLLECTION_CITY_DISTRICTS", "COLLECTION_CITY_TRAINED_UNITS", "COLLECTION_CITY_PLOT_YIELDS", "COLLECTION_ALL_CITIES"}
-_POL_EVALUATORS = {"REQUIREMENT_DISTRICT_TYPE_MATCHES", "REQUIREMENT_CITY_HAS_BUILDING", "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN"}
+_POL_EVALUATORS = {"REQUIREMENT_DISTRICT_TYPE_MATCHES", "REQUIREMENT_CITY_HAS_BUILDING", "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN",
+                   "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
+                   "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT"}
 
 
 class SimPolicy:
@@ -223,6 +225,22 @@ class SimPolicy:
                 v = no if sub["kind"] != "city" or wonder in reads["wonders"] else sub["f"].city_has_building(b).bool()
             elif ty == "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN":
                 v = no  # no plot subject in a policy's context
+            elif ty == "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT":
+                # 0x6cfd60: an owner with no capital (the Free Cities), or the
+                # city on its owner's home continent (a city-state's one city on it)
+                v = torch.ones_like(mask) if sub["kind"] == "city" else no
+            elif ty == "REQUIREMENT_CITY_HAS_GARRISON_UNIT":
+                # 0x6d4420: the city's population at least 9
+                v = no if sub["kind"] != "city" else sub["f"].population() >= 9
+            elif ty == "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS":
+                # 0x6d4190: the city's finished specialty districts, pillaged
+                # or not, at least Amount
+                if sub["kind"] != "city":
+                    v = no
+                else:
+                    t = self.city_dist_tile[:, sub["f"].row, sub["j"]]
+                    done = (t >= 0) & self.district_complete.gather(1, t.clamp(min=0))
+                    v = (done & self._is_specialty).sum(dim=1) >= int(float(a.get("Amount", 0) or 0))
             else:
                 raise NotImplementedError(ty)
             met.append(v != bool(r.get("inverse")))
@@ -418,12 +436,10 @@ class SimPolicy:
             out = between(self._cv_pseudo(v, p, f0.pseudo_w(p))) >> 8
             return torch.where(ok, out, zero)
         if eff == "EFFECT_ADJUST_CITY_OUTER_DEFENSE":
-            # the centre's outer defence standing: a city-state's always
-            # (`cityOuterStands`), a Free City's walls' pool above 0
+            # the centre's outer defence standing (`cityOuterStands`): its
+            # walls' pool above 0, a city-state's and a Free City's alike
             if not city:
                 return zero
-            if ctx["s"] != self.FR:
-                return full(amount)
             row = ctx["row"]
             col = torch.full((B,), sub["j"], dtype=torch.long, device=dev)
             walls = self._walls_max_at(torch.full_like(col, row), col).long()

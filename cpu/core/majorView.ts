@@ -15,7 +15,7 @@ import { CITY_STRIKE_RANGE, denounceOpen, loyaltyPerTurn, plotPressure, plotPres
 import { governedCityIds, governorPromotionOpen, governorSum, governorsOf, governorTitlesAvailable } from './governors';
 import { GOVERNORS, GOVERNOR_INSTALL_ID, GOVERNOR_PROMOTIONS, GOVERNOR_TITLE_CIVICS, PROMO_INSTALL_ID, promotionBit } from '../data/governors';
 import { CITY_STATE_SUZERAIN_BONUS } from '../data/cityStates';
-import { BARB_SEAT, borderTurnsFrom, campTiles, cityStateOfSeat, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
+import { BARB_SEAT, FREE_SEAT, borderTurnsFrom, campTiles, cityStateOfSeat, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
 import { aiStrengths, assignTo, dangerDistricts, districtHealth, pathTo, planUnit, reachPlots, tacticalTargets, type Pass, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
@@ -382,7 +382,9 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     },
     cityHasBuilding: (i, id, building) => {
       const city = cityOf(i, id);
-      return !!city && city.buildings.includes(building.replace(/^BUILDING_/, ''));
+      // the install type as the engine's id (BUILDING_WALLS is ANCIENT_WALLS)
+      const b = engineId('building', building, 'BUILDING_', BUILDINGS);
+      return !!city && !!b && city.buildings.includes(b);
     },
     cityHasDistrict: (i, id, type) => {
       const city = cityOf(i, id);
@@ -646,6 +648,15 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const c = id ? UNIT_PROMO_CLASS[id] : undefined;
       return c ? PROMO_INSTALL[c] ?? `PROMOTION_CLASS_${c}` : null;
     },
+    // a city-state's one city stands on its home continent, the Free Cities
+    // hold no capital: no city-state
+    // nor any major lists Colonial Taxes (runs/h1_duelw1117 / 1121 / 1124 /
+    // 1127 / 1128)
+    cityOnHomeContinent: (i, id) => {
+      if (isCityStateSeat(i) || i === FREE_SEAT) return true;
+      const city = cityOf(i, id);
+      return homeContinent(state, i) < 0 || (!!city && onHomeContinent(state, i, city.centerIndex));
+    },
     cityAmenity: (i, id) => {
       const city = cityOf(i, id);
       if (!city) return { balance: 0, yields: {} };
@@ -808,7 +819,8 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       return city?.population ?? 0;
     },
     citySpecialtyDistricts: (i, id) => {
-      const city = citiesOf(state, i).find((c) => c.id === id);
+      const minor = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      const city = minor ? minorCity(minor) : citiesOf(state, i).find((c) => c.id === id);
       return city ? city.districts.filter((d) => d.type !== 'CITY_CENTER' && map.tiles[d.tileIndex].districtComplete && DISTRICTS[d.type].countsTowardLimit).length : 0;
     },
     cityStrikes: (i, id) => {
@@ -816,14 +828,13 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const city = minor ? minorCity(minor) : citiesOf(state, i).find((c) => c.id === id);
       return !!city && outerPool(state, city) > 0;
     },
-    // a city-state's centre reads its outer defence standing with or
-    // without walls (LAB: 0x198310's player +0x12f0 +0xf4 term, its writer
-    // unread — every minor's Bastions reads its Outer Defense whole before any
-    // walls, runs/h1_duelw1121 Ayutthaya t40-58; in combat a wall-less
-    // city-state's centre has no outer pool, its CombatLog damage whole)
+    // a centre's outer defence stands where its walls' pool is above 0, a
+    // city-state's alike: every city-state's Bastions is first logged the
+    // turn its walls complete (runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128,
+    // the fifteen city-states)
     cityOuterStands: (i, id) => {
       const city = cityOf(i, id);
-      return !!city && (isCityStateSeat(i) || outerPool(state, city) > 0);
+      return !!city && outerPool(state, city) > 0;
     },
     cityStrike: (i, id) => {
       const city = cityOf(i, id);

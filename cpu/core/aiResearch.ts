@@ -44,7 +44,7 @@ import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_FAVORED, R
 import { researchCost } from './economy';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
-import { FX, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt } from './aiValue';
+import { FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt } from './aiValue';
 import { pseudoYieldWeights, type AiWeightInputs } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
@@ -142,7 +142,7 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
  * 0x7b3e50, THE VALUE of landing `id` in `turns` turns: the technology's own
  * pseudo-yield (PSEUDOYIELD_TECHNOLOGY; an EmbarkUnitType adds 1.0, EmbarkAll
  * 5; a row of an era before the game's counts once per era between, plus
- * one), and per building it unlocks a share (a wonder's at
+ * one; the game era `aiGameEra`), and per building it unlocks a share (a wonder's at
  * PSEUDOYIELD_WONDER), per district a share at PSEUDOYIELD_DISTRICT, per
  * project `AI_PROJECT_SHARE` and a weapon project PSEUDOYIELD_NUCLEAR_WEAPON
  * of 1.0 more — each a yield a turn from landing to the horizon, each
@@ -157,7 +157,7 @@ export function techValue(state: GameState, id: string, turns: number, pw: Reado
   if (RESEARCH_AI_EMBARK_UNIT.includes(id)) own += FX;
   if (def.embarkAll) own += fxConst(RESEARCH_AI_EMBARK_ALL);
   const era = ERAS.indexOf(def.era);
-  const game = state.gameEra ?? 0;
+  const game = aiGameEra(state);
   if (era < game) own = fmul(own, (game - era + 1) * FX);
   const share = fxConst(AI_UNLOCK_SHARE);
   const n = techUnlocks(id);

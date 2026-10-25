@@ -29,6 +29,7 @@ import {
   FX, discounted, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, whole, yieldValue, type AiPlotView, type AiValueView,
 } from './aiValue';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn } from './aiCityBuild';
+import { FREE_SEAT } from './seats';
 
 export interface AiRequirement {
   type: string;
@@ -214,6 +215,15 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
     if (b.replace(/^BUILDING_/, '') in BUILT_WONDERS) return false;
     return t.view.cityHasBuilding(s.seat, s.id, b);
   },
+  // 0x6d4420: a city subject of nine citizens or more (City +0x588 >= 9:
+  // the AI's reading of a garrison; every city-state's Retainers first
+  // logged the turn its city grows to nine, runs/h1_duelw1117-1128)
+  REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT: (t, _args, s) => s.kind === 'city' && t.view.cityOnHomeContinent(s.seat, s.id),
+  REQUIREMENT_CITY_HAS_GARRISON_UNIT: (t, _args, s) => s.kind === 'city' && t.view.cityCitizens(s.seat, s.id) >= 9,
+  // 0x6d4190: a city subject whose specialty districts (0x1ae8f0) reach
+  // the Amount
+  REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS: (t, args, s) =>
+    s.kind === 'city' && t.view.citySpecialtyDistricts(s.seat, s.id) >= (Number(args.Amount ?? 0) | 0),
   // 0x6cfbf0: a city subject whose owner (+0x1b8) is the context's player
   REQUIREMENT_CITY_FOLLOWS_PANTHEON: (t, _args, s) => s.kind === 'city' && s.seat === t.seat,
   // 0x6cfcb0: a city subject; any with no religion in the context (+0x48),
@@ -581,9 +591,12 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // 0x6a3780: the amount x the player's points a token (Player_Influence
   // +0x270: its government's InfluencePointsThreshold at the game speed, a
   // player in none Chiefdom's — every city-state's 50 at the online speed,
-  // runs/h1_duelv1127's envoy civics), as PSEUDOYIELD_INFLUENCE, discounted
-  // from the start (0x7a1240)
+  // runs/h1_duelv1127's envoy civics; the Free Cities' none, their
+  // Mysticism logged the token's whole 13.0 below it at 20 turns,
+  // runs/h1_duelw1121 t32-t100), as PSEUDOYIELD_INFLUENCE, discounted from
+  // the start (0x7a1240)
   EFFECT_GRANT_INFLUENCE_TOKEN: (t, args) => {
+    if (t.seat === FREE_SEAT) return 0;
     const threshold = AI_GOVERNMENT_INFLUENCE_THRESHOLD[t.view.government(t.seat) ?? 'GOVERNMENT_CHIEFDOM'] ?? 0;
     const token = Math.trunc((threshold * t.view.costMultiplierPct) / 100);
     const v = pseudoYieldValue(t.view, t.seat, amountOf(args) * token, 'PSEUDOYIELD_INFLUENCE');

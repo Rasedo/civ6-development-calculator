@@ -1156,7 +1156,8 @@ class SimCityValue:
     _CV_EVALUATORS = ("REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES", "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
                       "REQUIREMENT_PLOT_RESOURCE_TYPE_MATCHES", "REQUIREMENT_PLOT_RESOURCE_VISIBLE",
                       "REQUIREMENT_PLOT_HAS_ANY_IMPROVEMENT", "REQUIREMENT_DISTRICT_TYPE_MATCHES",
-                      "REQUIREMENT_CITY_HAS_BUILDING")
+                      "REQUIREMENT_CITY_HAS_BUILDING", "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT",
+                      "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS")
     _CV_ANALYZERS = ("EFFECT_ADJUST_PLOT_YIELD", "EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
                      "EFFECT_ADJUST_CITY_INNER_DEFENSE", "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY",
                      "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN",
@@ -1256,6 +1257,22 @@ class SimCityValue:
                     v = no
                 else:
                     v = _t(f.city_has_building(b), shape).bool()
+            elif ty == "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT":
+                # 0x6cfd60: an owner with no capital (the Free Cities), or the
+                # city on its home continent (a city-state's one city on it)
+                v = torch.ones_like(shape) if k == "city" else no
+            elif ty == "REQUIREMENT_CITY_HAS_GARRISON_UNIT":
+                # 0x6d4420: the city's population at least 9
+                v = _t(f.population() >= 9, shape).bool() if k == "city" else no
+            elif ty == "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS":
+                # 0x6d4190: the city's finished specialty districts at least Amount
+                if k != "city":
+                    v = no
+                else:
+                    tl = self.city_dist_tile[:, f.row, getattr(f, "j", 0)]
+                    done = (tl >= 0) & self.district_complete.gather(1, tl.clamp(min=0))
+                    n = (done & self._is_specialty).sum(dim=1)
+                    v = _t(n >= int(float(a.get("Amount", 0) or 0)), shape).bool()
             else:
                 raise NotImplementedError(ty)
             met.append(v.bool() != bool(r.get("inverse")))
@@ -1354,6 +1371,9 @@ class SimCityValue:
         # horizon
         C = self._cai_grants()
         if eff == "EFFECT_GRANT_INFLUENCE_TOKEN":
+            # the Free Cities' token points none
+            if isinstance(f, _FreeFacts):
+                return zero
             return _discounted(torch.full_like(like, amount * C["token"]), r, t) >> 8
         if eff == "EFFECT_GRANT_SPY":
             return between(torch.full_like(like, amount * C["spy"])) >> 8

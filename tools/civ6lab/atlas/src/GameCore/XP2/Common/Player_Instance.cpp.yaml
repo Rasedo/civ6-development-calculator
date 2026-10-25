@@ -3,6 +3,20 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x467cd0
+  final: 0x2f7db0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: every city-state's Retainers line is first logged the turn its city grows to 9, runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128), REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS 0x6d4190 (a city subject whos
+    - recording: h1_duelw1117
+      value: "a city-state's one city on it, the Free Cities holding no capital: no player lists Colonial Taxes in runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128)."
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - ...else the city's plot continent, +0x30, against the owner's PlayerCities m_eHomeContinent, 0x467cd0 -> +0x160, named in the constructor 0x36a870; a city-state's one city on it, the Free Cit...
+  review: imported
 - addr: 0x467eb0
   final: 0x2f7ed0
   kind: function

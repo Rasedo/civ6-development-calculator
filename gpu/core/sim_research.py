@@ -531,7 +531,7 @@ class SimResearch:
         T = self._rai_tables()
         B, NT = turns.shape
         era = T["era"].unsqueeze(0)
-        game = self.game_era.unsqueeze(1)
+        game = self._ai_game_era().unsqueeze(1)
         own = torch.full((B, NT), T["own"], dtype=torch.long, device=self.device)
         own = own + T["embark_unit"].long().unsqueeze(0) * _FX + T["embark"].long().unsqueeze(0) * T["embark_add"]
         own = torch.where(era < game, _fmul(own, (game - era + 1) * _FX), own)

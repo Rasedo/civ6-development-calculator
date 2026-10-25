@@ -128,7 +128,7 @@ class SimCivics:
         B, NC = turns.shape
         nn = turns.clamp(min=0)
         era = T["era"].unsqueeze(0)
-        game = self.game_era.unsqueeze(1)
+        game = self._ai_game_era().unsqueeze(1)
         own = self._rai_from_landing(torch.full((B, NC), T["own"], dtype=torch.long, device=self.device), nn)
         own = own + self._cai_gov_term(s, B, NC)
         own = torch.where(era < game, _fmul(own, (game - era) * _FX), own)
@@ -143,7 +143,8 @@ class SimCivics:
         def whole(x: torch.Tensor) -> torch.Tensor:
             return torch.div(x, _FX, rounding_mode="floor") * _FX
 
-        tokens = whole(_discounted(m[:, :, 0] * T["token"], T["rate"], nn))
+        # the Free Cities' token points none
+        tokens = whole(_discounted(m[:, :, 0] * (0 if s == self.FR else T["token"]), T["rate"], nn))
         spies = whole(self._rai_from_landing(m[:, :, 1] * T["spy"], nn))
         strength = self._cai_strength(s).unsqueeze(1).expand(B, NC)
         adjacency = whole(self._rai_from_landing(strength * _FX, nn)) * m[:, :, 2]

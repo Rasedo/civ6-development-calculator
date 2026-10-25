@@ -20,6 +20,20 @@
   context:
     - ...the only displacement writes are the military AI's constructor 0x71a960 at 0x71b68a and 0x264296); the Free Cities Raid's target as an operation near the city (0x723cf0); the desire's...
   review: imported
+- addr: 0x36a870
+  final: 0x262590
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: every city-state's Retainers line is first logged the turn its city grows to 9, runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128), REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS 0x6d4190 (a city subject whos
+    - recording: h1_duelw1117
+      value: "a city-state's one city on it, the Free Cities holding no capital: no player lists Colonial Taxes in runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128)."
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...t the owner's PlayerCities m_eHomeContinent, 0x467cd0 -> +0x160, named in the constructor 0x36a870; a city-state's one city on it, the Free Cities holding no capital: no player lists Colon..."
+  review: imported
 - addr: 0x388ee0
   kind: function
   status: READ
@@ -31,6 +45,17 @@
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
   context:
     - "...and civic overflows (`m_xResearchOverflow`, serializer 0x4c6dc2; `m_xCulturalOverflow`, 0x38a93a): only the members are read; the records fit the production rule's shape — a completion..."
+  review: imported
+- addr: 0x411770
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1121
+      turn: 30
+      value: "its writer unread), the era before through the   players' starts of the turn a new era begins: runs/h1_duelw1121 t30 and t60,   every major's, city-state's and the Free Cities' Tech and Civic rows as "
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - ...ayer's PlayerEras holds it ([player+0x1358]+0x158, m_eGameEra, named in the constructor 0x411770; its writer unread), the era before through the players' starts of the turn a new era b...
   review: imported
 - addr: 0x4a2f60
   final: 0x31b820

@@ -398,9 +398,11 @@ function policyScoreAgainstLog(ctx: Ctx, kind: ResearchParty, turn: number, play
   for (const [policy, g] of logged) {
     const ours = (scores.get(policy) ?? NO_SCORE) / 256;
     score(ctx, `policyScore.${kind}`, turn, player, `p${player} ${policy}`, Math.abs(ours - g) <= 0.051, r3(ours), g);
+    if (TRACE.has('policyScores')) console.error(`t${turn} policy score ${kind} p${player} ${policy} log ${g} ours ${r3(ours)}`);
   }
   for (const [policy, v] of scores) {
     if (v > 0 && !logged.has(policy)) score(ctx, `policyScore.${kind}`, turn, player, `p${player} ${policy}`, false, r3(v / 256), 'unlogged');
+    if (TRACE.has('policyScores') && v > 0 && !logged.has(policy)) console.error(`t${turn} policy score ${kind} p${player} ${policy} log unlogged ours ${r3(v / 256)}`);
   }
 }
 
@@ -3838,12 +3840,13 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  (runs/h1_duelw1121 Hunza t7: Pottery's 1.5 over, Astrology 7 turns as
  *  logged), the barbarian kills a boost counts, the wars' clocks; a
  *  city-state's production overflow, its powered project and repair waits,
- *  its fuel shortfall, the trade routes the record's routes laid (the
+ *  its fuel shortfall, its strategic stockpile and the queue front's
+ *  reservation on it (the importer reads a minor's none), the trade routes the record's routes laid (the
  *  importer reads a city-state's none), the turn its city was founded */
 const GAME_STORES = ['warTurns'] as const;
 const SEAT_STORES = ['barbKills'] as const;
 const RESEARCH_STORES = ['techOverflow', 'civicOverflow'] as const;
-const MINOR_STORES = ['prodOverflow', 'fullyPowered', 'repairWait', 'fuelShort', 'tradeRoutes', 'foundedTurn'] as const;
+const MINOR_STORES = ['prodOverflow', 'fullyPowered', 'repairWait', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved'] as const;
 
 /** the named fields of `from` onto `to`, a field `from` lacks dropped */
 function carryFields(from: object, to: object, keys: readonly string[]): void {

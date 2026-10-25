@@ -936,6 +936,7 @@
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...): the city's Culture x it, weighted, + 0.5 (0x16eb20), span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth object's surplus (0x1b5620), 2.0 with no city, x fx(Amount..."
   review: imported

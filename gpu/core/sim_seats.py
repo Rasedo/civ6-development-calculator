@@ -1443,6 +1443,13 @@ class SimSeats:
         """`gameEraIndex`: [B] each game's game era, an ERAS index."""
         return self.game_era
 
+    def _ai_game_era(self) -> torch.Tensor:
+        """`aiGameEra`: [B] the game era the research and civic values read
+        (the player's eras record's), the era before through the players' starts
+        of the turn a new one begins (run before the counter moves)"""
+        new = (self.game_era > 0) & (self.era_start == int(self.turn) + 1)
+        return torch.where(new, self.game_era - 1, self.game_era)
+
     def _game_era_turn(self, t: int) -> None:
         """`gameEraTurn` on the turn `t` opens, before its starts. Where no
         countdown runs, one starts once the era's minimum less the countdown

@@ -92,6 +92,18 @@ export function valueBetween(a: number, from: number, to: number, r = AI_RATE): 
   return presentValue(a, r, to) - presentValue(a, r, from);
 }
 
+/** the game era the research and civic values count rows of an earlier era
+ *  against: the player's eras record's (PlayerEras m_eGameEra, player
+ *  +0x1358 +0x158), the era before through the players' starts of the turn
+ *  a new one begins (`endTurn` runs them before the counter moves; the
+ *  research prices of those starts read the new era) — runs/h1_duelw1121
+ *  t30 and t60: every major's, city-state's and the Free Cities' rows as
+ *  the era before, the new era's the turn after */
+export function aiGameEra(state: { gameEra?: number; eraStartTurn?: number; turn: number }): number {
+  const era = state.gameEra ?? 0;
+  return era > 0 && state.turn + 1 === state.eraStartTurn ? era - 1 : era;
+}
+
 /** what a yield `a` a turn is worth from the turn a row `turns` away lands
  *  to the tree values' horizon */
 export function fromLanding(a: number, turns: number): number {
@@ -260,8 +272,7 @@ export interface AiValueView {
   /** a city's centre strikes (0x249ee0 above 0: its walls stand) */
   cityStrikes(seat: number, cityId: number): boolean;
   /** a city centre's outer defence stands (0x24b290 on 0x6da56a3d above its
-   *  damage, district +0x8d8): its walls' pool above 0; a city-state's always
-   *  (LAB) */
+   *  damage, district +0x8d8): its walls' pool above 0 */
   cityOuterStands(seat: number, cityId: number): boolean;
   /** a city centre's strike strength (0x249ee0), its whole part */
   cityStrike(seat: number, cityId: number): number;
@@ -301,6 +312,9 @@ export interface AiValueView {
   /** a city's Amenity balance (have less needed) and its yields by
    *  YieldType, as the Amenity value reads them (0x79f7c0) */
   cityAmenity(seat: number, cityId: number): { balance: number; yields: Readonly<Record<string, number>> };
+  /** 0x6cfd60: an owner with no capital, or a city on its owner's home
+   *  continent (PlayerCities m_eHomeContinent, +0x160; a city-state's city on it) */
+  cityOnHomeContinent(seat: number, cityId: number): boolean;
   /** `housing` more in a city from `t` to `h` (0x7a3d70 on its growth and
    *  its CityBuildAI's growth forecast), raw */
   cityHousingValue(seat: number, cityId: number, housing: number, t: number, h: number): number;

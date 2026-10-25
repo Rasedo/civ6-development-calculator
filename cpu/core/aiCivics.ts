@@ -40,7 +40,7 @@ import { FORMATION_CIVIC } from '../data/units';
 import { researchCost } from './economy';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
-import { AI_RATE, FX, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
+import { AI_RATE, FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
 import { modifiersValue } from './aiModifiers';
 import { getModifiers } from './effects';
 import { majorView } from './majorView';
@@ -162,7 +162,7 @@ export function civicValue(state: GameState, seat: number, id: string, turns: nu
     }
   }
   const era = ERAS.indexOf(def.era);
-  const game = state.gameEra ?? 0;
+  const game = aiGameEra(state);
   if (era < game) v = fmul(v, (game - era) * FX);
   const share = fxConst(AI_UNLOCK_SHARE);
   const n = civicUnlocks(id);
