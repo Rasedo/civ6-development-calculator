@@ -22,6 +22,7 @@
     - cpu/core/operations/assault.ts:attackCityExecute
     - cpu/core/operations/assault.ts:operationAttackExecute
     - cpu/core/tactical.ts:canAct
+    - cpu/core/opsOrders.ts:us
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -55,6 +56,14 @@
   cases:
     - recording: AI_Tactical.csv
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
+  impl:
+    - cpu/core/opsOrders.ts:to
+    - cpu/core/opsOrders.ts:us
+    - cpu/core/tactical.ts:Pass
+    - gpu/core/sim_barbops.py:_barb_trees
+    - gpu/core/sim_barbops.py:_bop_defend_exec
+    - gpu/core/sim_minorops.py:_mops_run
+    - gpu/core/sim_minorops.py:_x_defend
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"

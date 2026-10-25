@@ -28,12 +28,15 @@ import type { MajorAttackTargetView, MajorView } from '../../ai/major/view';
 /** `base` as `seat`'s operations read it in its pass: the pass's target list
  *  (the one its attack assignment walks), and its units' planning — their
  *  reach, the plot at a range, the spots and the blow on a target (0x791300
- *  taken as the pass opened) */
+ *  taken as the pass opened) — and its units with no Movement left where an
+ *  order ended their moves */
 export function passView(state: GameState, seat: number, pass: Pass, base: MajorView): MajorView {
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id);
   const reach = (id: number) => pass.plan.get(id)?.reach ?? null;
   return {
     ...base,
+    units: (i) => (i !== seat || !pass.ended.size ? base.units(i)
+      : base.units(i).map((u) => (pass.ended.has(u.id) ? { ...u, movesLeft: 0 } : u))),
     attackTargets: (i) => (i !== seat ? base.attackTargets(i) : pass.targets.map((t): MajorAttackTargetView => ({
       type: t.type, plot: t.tile, owner: t.seat, unitType: t.unit ? gameTypeOf('unit', t.unit.type, 'UNIT_') : null,
       range: t.unit ? unitAttackRange(t.unit) : t.type === 'COMBAT_DISTRICT' ? CITY_STRIKE_RANGE : 0,
@@ -149,6 +152,8 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
   const xy = (p: number) => `${p % state.map.width} ${Math.floor(p / state.map.width)}`;
   const inCity = (u: Unit) => state.map.tiles[u.tileIndex].district === 'CITY_CENTER';
   const off = (u: Unit, target: number, range: number) => range < 0 || plotDistance(state, u.tileIndex, target) >= range;
+  // Movement left (+0xdb0), none once an order ended its moves
+  const moves = (u: Unit) => (pass.ended.has(u.id) ? 0 : u.movesLeft);
   return {
     flagged: (members, pct) => {
       const us = unitsOf(members);
@@ -160,18 +165,20 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
       const us = unitsOf(members);
       // the endangered to their safe plots (0x716b90)
       for (const u of endangered(state, pass, us)) {
-        if (!off(u, target, range) || aiStrengths(state, u).bombard > 0 || u.movesLeft <= 0 || inCity(u)) continue;
+        if (!off(u, target, range) || aiStrengths(state, u).bombard > 0 || moves(u) <= 0 || inCity(u)) continue;
         const to = passSafePlot(state, pass, u);
         passFinish(pass, u, 'Operation', u.tileIndex);
         if (to >= 0) {
           moveTo(state, u, to, false);
+          // arrived, its moves end (0x56d6f0)
+          if (state.units.includes(u) && u.tileIndex === to) pass.ended.add(u.id);
           lines.push({ type: type(u), what: `Move ${xy(to)}` });
           changed();
         }
       }
       // the hurt, or a land unit afloat in danger
       for (const u of us) {
-        if (!state.units.includes(u) || u.movesLeft <= 0 || !off(u, target, range)) continue;
+        if (!state.units.includes(u) || moves(u) <= 0 || !off(u, target, range)) continue;
         if (!hurt(u, pct) && !afloatInDanger(state, pass, u)) continue;
         // a promotion due: the AI's pick, its turn done
         const k = aiPromotionPick(u);
@@ -190,31 +197,36 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
           passFinish(pass, u, 'Operation', u.tileIndex);
           if (to >= 0) {
             moveTo(state, u, to, false);
+            // arrived, its moves end (0x56d6f0)
+            if (state.units.includes(u) && u.tileIndex === to) pass.ended.add(u.id);
             lines.push({ type: type(u), what: `Move ${xy(to)}` });
             changed();
           }
           if (!state.units.includes(u)) continue;
         }
         // with Movement, a pillage where the plot pays a plunder
-        if (u.movesLeft > 0 && hostilePillageAmount(state, u) > 0) {
+        if (moves(u) > 0 && hostilePillageAmount(state, u) > 0) {
           const at = u.tileIndex;
           hostilePillage(state, u);
           lines.push({ type: type(u), what: `Plunder ${xy(at)}` });
           changed();
         }
-        if (u.movesLeft > 0 && !isBarbSeat(seat)) {
-          const owner = tileSeat(state.map.tiles[u.tileIndex]);
-          if ((owner !== NO_SEAT && owner >= 0 && civsAtWar(state, seat, owner)) || pass.danger[u.tileIndex] > 0) {
-            const to = passSafePlot(state, pass, u);
-            passFinish(pass, u, 'Operation', u.tileIndex);
-            if (to >= 0 && to !== u.tileIndex) {
-              moveTo(state, u, to, false);
-              lines.push({ type: type(u), what: `Move ${xy(to)}` });
-              changed();
-              if (!state.units.includes(u)) continue;
-            }
+        // with no Movement left, or a barbarian (0x56c690, 0x469ce0), its
+        // orders end there: no fortification, its turn not done
+        if (moves(u) <= 0 || isBarbSeat(seat)) continue;
+        const owner = tileSeat(state.map.tiles[u.tileIndex]);
+        if ((owner !== NO_SEAT && owner >= 0 && civsAtWar(state, seat, owner)) || pass.danger[u.tileIndex] > 0) {
+          const to = passSafePlot(state, pass, u);
+          passFinish(pass, u, 'Operation', u.tileIndex);
+          if (to >= 0 && to !== u.tileIndex) {
+            moveTo(state, u, to, false);
+            lines.push({ type: type(u), what: `Move ${xy(to)}` });
+            changed();
+            if (!state.units.includes(u)) continue;
           }
         }
+        // fortified, its moves end (0x56d6f0)
+        pass.ended.add(u.id);
         passFinish(pass, u, 'Operation', u.tileIndex);
         lines.push({ type: type(u), what: 'Fortify' });
       }

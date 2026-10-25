@@ -6300,16 +6300,30 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   `_bop_defend_exec` / `_x_defend`). A land unit on water (+0x650 == 2,
   0x834d0) to its safe plot ("Move"); with Movement a
   plunder where the plot's district or improvement pays a heal (0x51a080 /
-  0x51a160, "Plunder"); with Movement, not a barbarian, on a plot of a
-  player it fights (0x469cd0) or of danger, to its safe plot ("Move", then
-  its turn ends 0x56d6f0); then, still on the map, fortified (0x56ef30's
-  mission, "Fortify"). Each order sets the unit's turn done (0x570b40).
+  0x51a160, "Plunder"); then (0x80e7e5..0x80e811) a unit with no Movement
+  left (0x56c690) or a barbarian's (0x469ce0) goes on to the next member:
+  no danger move, no fortification, its turn not done; any other on a plot
+  of a player it fights (0x469cd0) or of danger to its safe plot ("Move",
+  its moves ended 0x56d6f0 at 0x80e9c5); then, still on the map, fortified
+  (0x56ef30's mission, "Fortify", 0x570b40 then 0x56d6f0 at 0x80eb3a /
+  0x80eb42). The endangered's move (0x80dc28..0x80dc4e) and the afloat's
+  (0x80e559..0x80e57c) end the unit's moves (0x56d6f0) where it stands on
+  its safe plot after the move or has no Movement left. 0x56d6f0 sets the
+  Movement left (+0xdb0, through +0xd58) to 0: the later nodes' units with
+  Movement (0x56c690: Operation Attack's four passes, Attack Units' members)
+  leave it out, and the unit still rests (runs/h1_duelw1117 log t7:
+  city-state 2's Attack Barb Camp's two Warriors fortify under Protect
+  Units and the operation's attack lists no target and moves no one; t8
+  the one at 46 damage, under the node's 50, attacks alone; record t8 holds
+  both healed 10 on the plots they fortified on). The engines: the pass's `ended`
+  (`passView` reads their Movement as none, `passDefend`'s `moves`) /
+  `view["ended"]` and `ctx["ended"]` (the Movement zeroed through the run,
+  given back after it). Each order sets the unit's turn done (0x570b40).
   The promotion ("Operation Protect Units, %s, Promote") and the plunder
   ("Plunder %d %d": the pillage mission 0x963190 where it may, the plot's
   district (0x51a080) or improvement (0x51a160, the row's +0x48 scaled by
   the player's progress) paying above 0) are ported (`passDefend`,
-  `hostilePillageAmount`; `_promote_due`, `_plunder`); the danger move skips
-  a barbarian (0x469ce0).
+  `hostilePillageAmount`; `_promote_due`, `_plunder`).
 - THE TEAM UPDATE'S ENDANGERED (0x738f20, +0xa0, cleared each tick): per
   live member, each entry of the player's target list (+0x370, 40 bytes)
   within twice its base Movement (0x56d9f0): an entry's unit (kind 1) that
@@ -6564,9 +6578,12 @@ the event in `seizeCivilian` (cpu/core/combat.ts, `GameState.barbCaptures`);
   city-states' reading ("Operation Defend Units, both twins") on the
   barbarians' pool: the raid's node 20, the assault's 1, the capture's 5;
   a hurt ship is released (no plot is the barbarians' own ground), staying
-  in its team (THE RELEASE 0x73d1f0); a hurt land unit fortifies where it
-  stands, and the barbarians hold no war rows (a hurt member flees danger
-  alone). runs/h1_duelw1117 log t6: city-state 2's Attack Barb Camp's
+  in its team (THE RELEASE 0x73d1f0); a hurt land unit afloat goes to its
+  safe plot, and a hurt barbarian's orders end there (0x469ce0: no danger
+  move, no fortification, no line, its turn not done: runs/h1_duelw1128 log
+  t35-t37, the assault's Warrior 1114128 at 83 damage, over the node's 66,
+  logs no Protect Units and attacks at t37). runs/h1_duelw1117 log t6:
+  city-state 2's Attack Barb Camp's
   Warriors, 56 and 60 damage on no one's ground beside the camp, go to
   their safe plots 13:10 and 14:10 and fortify ("Operation Protect Units,
   Move" / "Fortify").

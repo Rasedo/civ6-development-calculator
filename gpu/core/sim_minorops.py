@@ -1146,7 +1146,9 @@ class SimMinorOps:
         """`operationsRun` for holder `s` in its pass (`op` the pass's opening,
         `done` its units' turns): each running operation refreshed, the pick
         started, the trees by priority (the highest first, of equals in slot
-        order); the operations' units' turns end"""
+        order); the operations' units' turns end; the units whose moves an
+        order ended (0x56d6f0) read no Movement through the run and take it
+        back after it (their rest kept)"""
         Tm = self._mops_tables()
         on = act & ((self.mops_def[:, s] >= 0).any(dim=1) | (self.mops_pick[:, s] >= 0))
         upg = s != self.FR and bool((act & (self.mops_upg_on[:, s] | self.mops_upg_trig[:, s])).any())
@@ -1155,7 +1157,9 @@ class SimMinorOps:
                 self._mops_upgrade_trees(s, act, done)
             return
         tg = op["tg"] if op["tg"] is not None else self._tac_targets(self._mops_seat(s), self._mops_kb(s))
-        view = {"op": op, "done": done, "tg": tg, "rows": None, "world": None}
+        view = {"op": op, "done": done, "tg": tg, "rows": None, "world": None,
+                "ended": torch.zeros_like(self.major_unit_mp, dtype=torch.bool),
+                "ended_mp": torch.zeros_like(self.major_unit_mp)}
         u = self._mops_units(s)
         rows = view["rows"] = self._mops_unit_rows(s, u)
         for k in range(N_OPS):
@@ -1181,6 +1185,8 @@ class SimMinorOps:
                 self._mops_upgrade_trees(s, act, done)
         busy = self._mops_busy(s) & self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
         done |= busy & on.unsqueeze(1) & (op["rowof"] >= 0)
+        if bool(view["ended"].any()):
+            self.major_unit_mp.copy_(torch.where(view["ended"], view["ended_mp"], self.major_unit_mp))
 
     def _mops_upgrade_trees(self, s: int, act: torch.Tensor, done: torch.Tensor) -> None:
         """`upgradeTreesTick` for minor `s` where `act` (its pass, `done` its
@@ -2537,9 +2543,12 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     off friendly ground released, its orders ending there (0x73d1f0 removes it
     from copies of the teams, so it stays the team's); a land unit afloat to its safe
     plot; one with Movement on a plot paying a plunder pillages it
-    (`_plunder`); one with Movement on the ground of a player it is at war
-    with or a plot of danger to its safe plot; each fortified (its turn ends
-    where it stands)"""
+    (`_plunder`); one with no Movement left is left there, its turn not
+    done; one on the ground of a player it is at war with or a plot of
+    danger to its safe plot; each fortified (its turn ends where it
+    stands). One arrived on its safe plot by the endangered's or the
+    afloat's move, and each fortified, has its moves ended (0x56d6f0: no
+    Movement through the run, `view["ended"]`)"""
     s, k = c.s, c.k
     g = on & (c.ma[:, i] == 1)
     if not bool(g.any()):
@@ -2549,6 +2558,7 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     rng = -1 if rng is None else rng
     view = c.view
     op, done = view["op"], view["done"]
+    ended, ended_mp = view["ended"], view["ended_mp"]
     danger = op["danger"]
     seat = 100 + s
     B, dev = sim.B, sim.device
@@ -2565,6 +2575,16 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             return torch.ones(B, dtype=torch.bool, device=dev)
         return sim.pair_dist[sim.major_unit_tile[b, us.clamp(min=0)].clamp(min=0), target].to(torch.long) >= rng
 
+    def end(us: torch.Tensor, m: torch.Tensor) -> None:
+        uc = us.clamp(min=0)
+        m = m & ~ended[b, uc]
+        if not bool(m.any()):
+            return
+        mp = sim.major_unit_mp[b, uc]
+        ended_mp[b, uc] = torch.where(m, mp, ended_mp[b, uc])
+        ended[b, uc] = ended[b, uc] | m
+        sim.major_unit_mp[b, uc] = torch.where(m, torch.zeros_like(mp), mp)
+
     def to_safe(us: torch.Tensor, m: torch.Tensor, stay_ok: bool) -> None:
         if not bool(m.any()):
             return
@@ -2574,6 +2594,9 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         here = sim.major_unit_tile[b, uc]
         go = m & (dest >= 0) & (stay_ok | (dest != here))
         sim._mops_move(s, us, dest, go)
+        # arrived, its moves end
+        if stay_ok:
+            end(us, go & live(us) & (sim.major_unit_tile[b, uc] == dest))
 
     for ti in range(N_TEAMS):
         tm = sim.mops_tm[:, s, k, ti]
@@ -2624,9 +2647,14 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             war = (owner >= 0) & (owner != seat) & sim.war[b, int(sim._seat_row[seat])].gather(1, orow.unsqueeze(1)).squeeze(1)
             # with Movement, a pillage where the plot pays a plunder
             _plunder(sim, ok & (sim.major_unit_mp[b, uc] > 0) & war, uc, plot)
+            # with no Movement left its orders end there: no fortification,
+            # its turn not done
+            ok &= sim.major_unit_mp[b, uc] > 0
             dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
-            to_safe(us, ok & (sim.major_unit_mp[b, uc] > 0) & (war | dang), False)
+            to_safe(us, ok & (war | dang), False)
             ok &= live(us)
+            # fortified, its moves end
+            end(us, ok)
             done[b, uc] = torch.where(ok, True, done[b, uc])
 
 

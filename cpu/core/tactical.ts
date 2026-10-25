@@ -1190,14 +1190,16 @@ const PLAN_TURNS = 2;
 
 /** One pass's state: its player, whether a move that ends on a plot it
  *  attacks into strikes it (the barbarians'; not a city-state's or the Free
- *  Cities' wander or chase), the units left, each one's planning reach, and
- *  those done (`0x570b40`). */
+ *  Cities' wander or chase), the units left, each one's planning reach,
+ *  those done (`0x570b40`) and those whose moves an order ended (`0x56d6f0`:
+ *  their Movement read as none, their rest kept). */
 export interface Pass {
   seat: number;
   strike: boolean;
   units: Unit[];
   reach: Map<number, Reach[]>;
   done: Set<number>;
+  ended: Set<number>;
   ai: Map<number, number>;
   /** the tactical target list as the pass began, and each unit's planning */
   targets: Target[];
@@ -2593,7 +2595,7 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
     plan.set(u.id, p);
     reach.set(u.id, p.reach);
   }
-  return { seat, strike: false, units, reach, done: new Set(), ai, targets, plan, danger: dangerPlane(state, seat), regions: seenRegions(state, seat) };
+  return { seat, strike: false, units, reach, done: new Set(), ended: new Set(), ai, targets, plan, danger: dangerPlane(state, seat), regions: seenRegions(state, seat) };
 }
 
 /** an operation's member of the player, null for one killed */
@@ -2859,7 +2861,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
     plan.set(u.id, p);
     reach.set(u.id, p.reach);
   }
-  const pass: Pass = { seat: BARB_SEAT, strike: true, units: all, reach, done: new Set(), ai, targets, plan,
+  const pass: Pass = { seat: BARB_SEAT, strike: true, units: all, reach, done: new Set(), ended: new Set(), ai, targets, plan,
     danger: dangerPlane(state, BARB_SEAT), regions: seenRegions(state, BARB_SEAT) };
   // the operations first (their manager's job opens the player's turn);
   // then an operation's units are the operation's

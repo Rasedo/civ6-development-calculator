@@ -526,13 +526,17 @@ class SimBarbOps:
         operations', their captures' and their scouts' — in the pool's slot
         order, a tree started in the walk ticking in it where its slot lies
         past the one ticking; the trees that ended free their slots after the
-        walk (`_bop_free_ended`); the operations' members' turns are theirs"""
+        walk (`_bop_free_ended`); the operations' members' turns are theirs;
+        the units whose moves an order ended (0x56d6f0) read no Movement
+        through the walk and take it back after it"""
         B = self.B
         dev = self.device
         if not B:
             return
         self._barb_op_bury()
-        ctx = {"done": done, "ai": ai, "order": order, "rowof": rowof, "res": res, "tg": tg, "danger": danger}
+        ctx = {"done": done, "ai": ai, "order": order, "rowof": rowof, "res": res, "tg": tg, "danger": danger,
+               "ended": torch.zeros_like(self.barb_unit_mp, dtype=torch.bool),
+               "ended_mp": torch.zeros_like(self.barb_unit_mp)}
         last = torch.full((B,), -1, dtype=torch.long, device=dev)
         big = 1 << 40
         while True:
@@ -566,6 +570,8 @@ class SimBarbOps:
                 if bool(h.any()):
                     self._bop_scout_tick(h, k, ctx)
             last = torch.where(go, nxt, last)
+        if bool(ctx["ended"].any()):
+            self.barb_unit_mp.copy_(torch.where(ctx["ended"], ctx["ended_mp"], self.barb_unit_mp))
         self._bop_free_ended()
         self._barb_op_bury()
 
@@ -850,11 +856,14 @@ class SimBarbOps:
         bombard: a ship released (+0x650 == 0; no plot is the barbarians' own
         ground; 0x73d1f0 removes it from copies of the teams, so it stays
         the operation's), its orders ending there; a land unit afloat to
-        its safe plot; one with Movement on a plot of danger to its safe plot
-        (the barbarians hold no war rows); each fortified, its turn ended"""
+        its safe plot; there a barbarian's orders end (0x469ce0: no danger
+        move, no fortification, its turn not done); one arrived on its safe
+        plot by the endangered's or the afloat's move has its moves ended
+        (0x56d6f0: no Movement through the walk, `ctx["ended"]`)"""
         B, dev = self.B, self.device
         b = self._bidx
         danger, done = ctx["danger"], ctx["done"]
+        ended, ended_mp = ctx["ended"], ctx["ended_mp"]
         rowof, res = ctx["rowof"], ctx["res"]
         none_taken = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
         tc = target.clamp(min=0)
@@ -866,16 +875,28 @@ class SimBarbOps:
                 return torch.ones(B, dtype=torch.bool, device=dev)
             return self.pair_dist[self.barb_unit_tile[b, us.clamp(min=0)].clamp(min=0), tc].to(torch.long) >= rng
 
-        def to_safe(us: torch.Tensor, m: torch.Tensor, stay_ok: bool) -> None:
+        def end(us: torch.Tensor, m: torch.Tensor) -> None:
+            uc = us.clamp(min=0)
+            m = m & ~ended[b, uc]
+            if not bool(m.any()):
+                return
+            mp = self.barb_unit_mp[b, uc]
+            ended_mp[b, uc] = torch.where(m, mp, ended_mp[b, uc])
+            ended[b, uc] = ended[b, uc] | m
+            self.barb_unit_mp[b, uc] = torch.where(m, torch.zeros_like(mp), mp)
+
+        def to_safe(us: torch.Tensor, m: torch.Tensor) -> None:
             if not bool(m.any()):
                 return
             uc = us.clamp(min=0)
             dest = self._tac_safe_plot(m, uc, "barb", BARB_SEAT, danger, rowof, res, none_taken)
             done[b, uc] = torch.where(m, True, done[b, uc])
             here = self.barb_unit_tile[b, uc]
-            go = m & (dest >= 0) & (stay_ok | (dest != here)) & (here != dest) & (self.barb_unit_mp[b, uc] > 0)
+            go = m & (dest >= 0) & (here != dest) & (self.barb_unit_mp[b, uc] > 0)
             if bool(go.any()):
                 self._tac_move_to(go, uc, dest.clamp(min=0), strike=False)
+            # arrived (or on it already), its moves end
+            end(us, m & (dest >= 0) & self._bop_live(us) & (self.barb_unit_tile[b, uc] == dest))
 
         # the endangered, listed as the execution opens, in the team's order
         listed = [self._bop_endangered(us, g & self._bop_live(us), ctx) for us in team]
@@ -887,7 +908,7 @@ class SimBarbOps:
             ut = self.barb_unit_type[b, uc].clamp(min=0, max=self.NU - 1)
             ok &= (off(us) & (self._type_bombard.take(ut) <= 0) & (self.barb_unit_mp[b, uc] > 0)
                    & ~self._centre_plane()[b, self.barb_unit_tile[b, uc].clamp(min=0)])
-            to_safe(us, ok, True)
+            to_safe(us, ok)
         # the hurt
         for us in team:
             ok = g & self._bop_live(us)
@@ -908,13 +929,9 @@ class SimBarbOps:
             # a member released ends its turn in the walk that holds it
             done[b, uc] = torch.where(rel, True, done[b, uc])
             ok &= ~rel
-            to_safe(us, ok & ~ship & wat, True)
-            ok &= self._bop_live(us)
-            plot = self.barb_unit_tile[b, uc].clamp(min=0)
-            dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
-            to_safe(us, ok & (self.barb_unit_mp[b, uc] > 0) & dang, False)
-            ok &= self._bop_live(us)
-            done[b, uc] = torch.where(ok, True, done[b, uc])
+            # a land unit afloat to its safe plot; a barbarian's orders end
+            # there (0x469ce0: no fortification, its turn not done)
+            to_safe(us, ok & ~ship & wat)
 
     def _bop_team(self, k: int) -> list:
         """tribe `k`'s operation's living members as a team in pool slot

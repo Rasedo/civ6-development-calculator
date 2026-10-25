@@ -183,7 +183,12 @@
       value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
     - recording: h1_duelv1124
       value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
-  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts, cpu/core/aiMilitary.ts:MilitaryFacts]
+  impl:
+    - cpu/core/aiCityBuild.ts:CityBuildFacts
+    - cpu/core/aiMilitary.ts:MilitaryFacts
+    - cpu/core/opsOrders.ts:us
+    - gpu/core/sim_barbops.py:_bop_defend_exec
+    - gpu/core/sim_barbops.py:to_safe
   readings:
     - "H-1: a minor's research catch-up — READ"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -194,6 +199,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ..., +0x1b9 bit 0x40 MakeTradeRoute, bit 2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDENAGE_POINT, f2e214..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...plot reads no danger. - THE NON-BARBARIAN PRIORITIES (TacticalAI +0xa8 = 0x787000 for any player   0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a   district of the player's own: its cit..."

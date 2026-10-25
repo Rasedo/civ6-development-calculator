@@ -946,7 +946,8 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
   const was = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
-  const hpWas = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, UNIT_HP - num(r.damage)]));
+  const hpWas = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}` as string, UNIT_HP - num(r.damage)]));
+  const xpWas = new Map(ctx.prev.units.flatMap((r) => (typeof r.xp === 'number' ? [[`${r.owner}:${r.id}` as string, r.xp] as const] : [])));
   // the units the minors' and the barbarians' battles of the pair struck (or
   // lost) stand as they were before the first blow: the game fought a
   // minor's in its own pass, the barbarians' after it (runs/h1_duelw1121 t9:
@@ -994,6 +995,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
     // 131073, 8 damage at the turn's start, takes Heal)
     const r0 = hpWas.get(key);
     if (r0 !== undefined && !ctx.minorBlows.has(u)) c.hp = r0;
+    // ...and its experience the first record's, the promotion due its
+    // Promotion move reads (runs/h1_duelw1117 t23: city-state 3's Warrior
+    // 196610, 8 experience at the turn's start, attacks with no promotion due)
+    const x0 = xpWas.get(key);
+    if (x0 !== undefined) c.xp = x0;
     c.slot = Number(key.split(':')[1]) & 0xffff;
     c.attacksLeft = attacksPerTurn(c);
     mine.push(c);

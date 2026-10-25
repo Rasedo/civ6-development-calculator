@@ -7,7 +7,11 @@
   final: 0x680a80
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiEconomic.ts:PurchaseCity]
+  impl:
+    - cpu/core/aiEconomic.ts:PurchaseCity
+    - cpu/core/minorCityAi.ts:price
+    - gpu/core/sim_minorai.py:_minor_contract_purchases
+    - gpu/core/sim_minorai.py:_minor_purchases
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
