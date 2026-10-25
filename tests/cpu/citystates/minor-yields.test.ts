@@ -141,11 +141,11 @@ describe("the levy takes the minor's own army", () => {
     expect(levyUnits(state, cs.id, 0).ok).toBe(false);
 
     // the term runs: home at its end
-    // (the minor's start of turn T runs at the engine's turn T - 1)
-    state.turn = cs.levyEnds! - 2;
+    // (the minor's start in the levy's own turn is the term's first)
+    state.turn = cs.levyEnds! - 1;
     minorLevyReturn(state, cs);
     expect(w1.seat).toBe(0);
-    state.turn = cs.levyEnds! - 1;
+    state.turn = cs.levyEnds!;
     minorLevyReturn(state, cs);
     for (const u of [w1, w2]) {
       expect(u.seat).toBe(cs.seat);

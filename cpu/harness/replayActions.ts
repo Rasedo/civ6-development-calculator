@@ -60,12 +60,12 @@ export type Decision = Base & (
    *  was placed in the pair, its queue head the step's own */
   | { kind: 'wonderCharge'; player: number; unit: string; plot: number; placed?: boolean }
   /** a city-state's army levied: its units leave it and come back the
-   *  major's on their plots (`UnitRemovedFromMap` then `UnitAddedToMap`),
-   *  each record key old → new */
-  | { kind: 'levy'; player: number; minor: number; units: [string, string][] }
-  /** a levy's end: the city-state's units home, each the major's unit and
-   *  the minor's id the game gives it */
-  | { kind: 'levyEnd'; player: number; units: [string, string][] }
+   *  major's (`UnitRemovedFromMap` then `UnitAddedToMap`), each record key
+   *  old → new and the plot the game adds it on */
+  | { kind: 'levy'; player: number; minor: number; units: [string, string, number][] }
+  /** a levy's end: the city-state's units home, each the major's unit, the
+   *  minor's id the game gives it and the plot the game adds it on */
+  | { kind: 'levyEnd'; player: number; units: [string, string, number][] }
   /** a great person's activation (`UnitGreatPersonActivated`) on the plot
    *  the log's steps had it on, the catalog's individual it names; a
    *  Prophet's founding is `religion`'s */
@@ -719,8 +719,10 @@ export class RecordedActions implements ActionSource {
         put('queueHead', `${centre}`, { kind: 'queue', phase: 'before', player: act, city: centre, items: [{ kind: pk, row: n(r, 3), plot: -1 }] });
       }
     }
-    // a levy: a city-state's unit removed and a major's added on its plot in
-    // the next event
+    // a levy: a city-state's unit removed and a major's added in the next
+    // event, on its plot or, where the major may not stand there, within 3
+    // of it (runs/h1_duelw1117 t74: city-state 3's Heavy Chariot in its
+    // centre at (42,13), China's at (41,13))
     const minors = new Set(b.players.filter((p) => bool(p.minor)).map((p) => p.id));
     const majorIds = new Set(b.players.filter((p) => bool(p.major)).map((p) => p.id));
     const levies = new Map<string, Extract<Decision, { kind: 'levy' }>>();
@@ -728,10 +730,10 @@ export class RecordedActions implements ActionSource {
       const nx = ev[i + 1];
       if (r[2] !== 'UnitRemovedFromMap' || !nx || nx[2] !== 'UnitAddedToMap' || !minors.has(n(r, 0)) || !majorIds.has(n(nx, 0))) return;
       const u0 = a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
-      if (!u0 || u0.x !== n(nx, 2) || u0.y !== n(nx, 3)) return;
+      if (!u0 || hexDistance({ width: W, height: b.head.H, wrapX: bool(b.head.wrapX) }, u0.x, u0.y, n(nx, 2), n(nx, 3)) > 3) return;
       const key = `${n(nx, 0)}:${n(r, 0)}`;
       const d = levies.get(key) ?? { kind: 'levy', phase: phaseOf(n(nx, 0)), player: n(nx, 0), minor: n(r, 0), units: [] };
-      d.units.push([`${n(r, 0)}:${n(r, 1)}`, `${n(nx, 0)}:${n(nx, 1)}`]);
+      d.units.push([`${n(r, 0)}:${n(r, 1)}`, `${n(nx, 0)}:${n(nx, 1)}`, n(nx, 3) * W + n(nx, 2)]);
       levies.set(key, d);
     });
     out0.push(...levies.values());
@@ -749,7 +751,7 @@ export class RecordedActions implements ActionSource {
       // (a unit that came home and fell in the same pair is in neither record)
       if (typeOf(from) === undefined || (typeOf(to) !== undefined && typeOf(from) !== typeOf(to))) return;
       const d = homes.get(n(nx, 0)) ?? { kind: 'levyEnd', phase: phaseOf(n(nx, 0)), player: n(nx, 0), units: [] };
-      d.units.push([from, to]);
+      d.units.push([from, to, n(nx, 3) * W + n(nx, 2)]);
       homes.set(n(nx, 0), d);
     });
     out0.push(...homes.values());

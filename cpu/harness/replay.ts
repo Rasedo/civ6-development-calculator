@@ -88,7 +88,7 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, levyUnitHome, releaseLevies, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -1787,6 +1787,13 @@ function assault(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision): v
   const { state } = ctx;
   const atk = unitOf(ctx, d.attacker);
   if (!atk) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); return; }
+  // a barbarian's or a minor's assault stands, as its unit battles do, as it
+  // was before the blow where the blow found it, for its player's turn on the
+  // copy (runs/h1_duelw1117 t13: the barbarian Warrior that died on Rome's
+  // city at 14:8, seen at age 0 by its knowledge base's look before)
+  const snap = () => Object.assign(structuredClone(atk), { tileIndex: d.from });
+  if (isBarbSeat(atk.seat) && !ctx.barbBlows.has(atk)) ctx.barbBlows.set(atk, snap());
+  if (minorAiSeat(atk.seat) && !ctx.minorBlows.has(atk)) ctx.minorBlows.set(atk, { snap: snap(), key: d.attacker });
   const s0 = battleDraw(ctx, wit, b, d);
   if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); if (TRACE.has('battle')) console.error(`   ${d.attacker || 'city@' + d.from} vs ${d.defender || 'city@' + d.at} seq${d.seq}`); return; }
   if (atk.tileIndex !== d.from) atk.fortifyTurns = 0;
@@ -2210,13 +2217,21 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const res = levyUnits(state, cs.id, seat);
         // the old id still names the unit through the pair: a battle it
         // fought before the levy is the log's under it (`unitGone`)
-        for (const [from, to] of d.units) {
+        for (const [from, to, plot] of d.units) {
           const u = unitOf(ctx, from);
           if (!u) continue;
           ctx.units.set(to, u);
           if (!res.ok) {
             u.seat = seat;
             u.leviedFrom = cs.seat;
+          }
+          // a unit made anew where its major may not stand is added where
+          // the game jumps it, which the engine does not lay
+          // (runs/h1_duelw1117 t74: city-state 3's Heavy Chariot from its
+          // centre to (41,13))
+          if (u.tileIndex !== plot) {
+            u.tileIndex = plot;
+            count(ctx, 'levy:jump', 'fallback', d.player, 'the engine jumps no re-made unit');
           }
         }
         if (!res.ok) {
@@ -2255,28 +2270,19 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         break;
       }
       case 'levyEnd': {
-        // the engine's own levy clock sends the units home
-        // (`minorLevyReturn`), held to the minor's own place in the turn
-        // (`holdLevies`); the game's new ids name the same units, the old
-        // ones still through the pair: a battle a unit fought before it came
-        // home is the log's under its levied id (runs/h1_duelw1117 t42:
-        // China's levied Warrior killed a barbarian, then went home with its
-        // 23 damage)
+        // the engine's own levy clock sent the units home at the minor's
+        // start (`minorLevyReturn`); the game's new ids name the same units,
+        // the old ones still through the pair: a battle a unit fought before
+        // it came home is the log's under its levied id (runs/h1_duelw1117
+        // t42: China's levied Warrior killed a barbarian, then went home with
+        // its 23 damage)
         const seat = seatOfP(ctx, d.player);
-        if (isCityStateSeat(seat)) releaseLevies(state, cityStateOfSeat(seat));
         for (const [from, to] of d.units) {
           const u = unitOf(ctx, from);
           if (!u) continue;
           ctx.units.set(to, u);
-          if (u.seat === seat) { count(ctx, 'levyEnd', 'applied'); continue; }
-          if (TRACE.has('levyEnd')) { const cs = state.cityStates.find((c) => c.seat === seat); console.error(`   levyEnd ${from} seat${u.seat} levied${u.leviedFrom} cs${seat} levySeat${cs?.levySeat} ends${cs?.levyEnds} turn${state.turn}`); }
-          const cs = state.cityStates.find((c) => c.seat === seat);
-          if (cs) levyUnitHome(state, cs, u);
-          else {
-            u.seat = seat;
-            delete u.leviedFrom;
-          }
-          count(ctx, 'levyEnd', 'fallback', d.player);
+          count(ctx, 'levyEnd', u.seat === seat ? 'applied' : 'refused', d.player,
+            `the engine's levy clock kept ${u.type} levied (ends ${state.cityStates.find((c) => c.seat === seat)?.levyEnds ?? '-'})`);
         }
         break;
       }
@@ -4114,7 +4120,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // after its turn (`minorBuilds`, `buyUnit`, `improve`, `unitNew`)
   holdMinorOrders(true);
   holdCityStrikes(true);
-  holdLevies(true);
   // the city-states' own purchases of the pair, each with its price
   const minorBought = new Map<Unit, { cityState: CityState; price: number }>();
   traceMinorPurchases((cityState, u, price) => minorBought.set(u, { cityState, price }));
@@ -4480,6 +4485,19 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       seatPhase(state, { seats: new Set(others), deals: true });
       stream.actions(a.turn);
       otherMajorsTurn();
+      // a levied unit the game makes anew on a plot its minor may not stand
+      // on is added where the game jumps it, which the engine does not lay
+      // (runs/h1_duelw1117 t42: China's levied Warrior on China's (33,12)
+      // added to city-state 3 on (32,14), out of sight of China's Builder)
+      for (const d of ds) {
+        if (d.kind !== 'levyEnd') continue;
+        for (const [from, , plot] of d.units) {
+          const u = unitOf(ctx, from);
+          if (!u || u.tileIndex === plot) continue;
+          u.tileIndex = plot;
+          count(ctx, 'levyEnd:jump', 'fallback', d.player, 'the engine jumps no re-made unit');
+        }
+      }
       // each city-state's turn opens with the city-states before it standing
       // where their turn left them, as the record holds them: the game runs
       // them one at a time (runs/h1_dueld1121 t40: Ayutthaya's Galley out of
@@ -4560,7 +4578,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       disbandUnit(state, u.id);
       const cs = state.cityStates.find((c) => c.seat === u.seat);
       const paid = minorBought.get(u);
+      // a purchase the game never made leaves no record in any knowledge
+      // base: its own minor's would count it gone in its army two turns on
+      // (runs/h1_duelw1127 t17: city-state 4's Warrior bought at t16,
+      // undone, its record at its centre starting Attack Barb Camp the game
+      // never started). A unit trained may be the game's, gone in its turn
+      // (runs/h1_duelw1128 t42: city-state 2's Warrior, its record aging on
+      // in the game's)
       if (paid) {
+        for (const h of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : []), state.barbSeat]) {
+          if (h.armyKnown?.some((r) => r.id === u.id && r.owner === u.seat)) h.armyKnown = h.armyKnown.filter((r) => r.id !== u.id || r.owner !== u.seat);
+        }
         paid.cityState.treasury += paid.price;
         if (u.type === 'BUILDER') paid.cityState.buildersTrained -= 1;
       }
@@ -4594,9 +4622,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       count(ctx, 'governors:alone', 'fallback', p, 'the port acted, the record did not');
       ctx.governorAi.rosterCheck(a.turn, p, 1, 0, 'the port acted, the record did not');
     }
-    // an army due home the record shows no return of comes home at its
-    // minor's start all the same
-    releaseLevies(state);
     for (const u of struckHp.keys()) {
       if (!state.units.includes(u) || u.hp >= UNIT_HP) continue;
       const rest = { ...u };
@@ -4823,7 +4848,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdResearchEra(null);
   holdMinorOrders(false);
   holdCityStrikes(false);
-  holdLevies(false);
   traceMinorPurchases(null);
   traceMinorPolicyScores(null);
   holdCongressBallots(null);

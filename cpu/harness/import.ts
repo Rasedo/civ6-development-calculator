@@ -62,7 +62,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { GOVERNMENTS, POLICIES, type SlotKind } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { AGE_GOLDEN } from '../data/seats';
-import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, MINOR_CATCHUP_PCT } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, LEVY_TURNS, MINOR_CATCHUP_PCT } from '../data/cityStates';
 import { researchCost } from '../core/economy';
 import { PROMO_CLASSES } from '../data/promotions';
 import { unitPromoRows } from '../core/promotions';
@@ -282,8 +282,10 @@ export function specialistPins(rec: TurnRecord, cat: Catalog, c: DumpCity): numb
 }
 
 /** The units a major took by levy across two records, by `owner:id`, with
- *  the city-state it came from: a unit new at the later record beside (within
- *  3 plots) one of its type a city-state lost (`Unit.leviedFrom`). */
+ *  the city-state it came from: a major's unit new at the later record beside
+ *  (within 3 plots) one of its type a city-state lost (`Unit.leviedFrom`); a
+ *  barbarian's is a capture (runs/h1_duelw1124 t46: city-state 3's Builder
+ *  taken at 41:11). */
 export function leviesAcross(last: TurnRecord, rec: TurnRecord): Map<string, number> {
   const out = new Map<string, number>();
   const seen = new Set(last.units.map((u) => `${u.owner}:${u.id}`));
@@ -291,8 +293,9 @@ export function leviesAcross(last: TurnRecord, rec: TurnRecord): Map<string, num
   const handed = last.units.filter((u) => !live.has(`${u.owner}:${u.id}`));
   const shape = { width: rec.head.W, height: rec.head.H, wrapX: bool(rec.head.wrapX) };
   const minors = new Set(rec.players.filter((p) => bool(p.minor)).map((p) => p.id));
+  const majors = new Set(rec.players.filter((p) => bool(p.major)).map((p) => p.id));
   for (const u of rec.units) {
-    if (seen.has(`${u.owner}:${u.id}`) || minors.has(u.owner)) continue;
+    if (seen.has(`${u.owner}:${u.id}`) || !majors.has(u.owner)) continue;
     const from = handed.find((g) => g.owner !== u.owner && g.type === u.type && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
     if (from && minors.has(from.owner)) out.set(`${u.owner}:${u.id}`, from.owner);
   }
@@ -471,6 +474,9 @@ export interface History {
    *  city-state's player id: a city-state's unit gone at t+1 beside a new
    *  one of its type under the major */
   levied: Map<string, number>;
+  /** the turn of each city-state's last levy, by its player id: the term's
+   *  clock (`CityState.levyEnds`) */
+  levyTurn: Map<number, number>;
   /** the turn each player last seated each governor (`GovernorAssigned` in
    *  the records' action log), by `player:governor` catalog index */
   govSeated: Map<string, number>;
@@ -819,7 +825,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), bestRanged: new Map(), levied: new Map(), govSeated: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), bestRanged: new Map(), levied: new Map(), levyTurn: new Map(), govSeated: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
@@ -1403,7 +1409,10 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       if (seen.has(`${u.owner}:${u.id}`)) continue;
       const from = handed.find((g) => g.owner !== u.owner && g.type === u.type && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
       const levy = levies.get(`${u.owner}:${u.id}`);
-      if (levy !== undefined) h.levied.set(`${u.owner}:${u.id}`, levy);
+      if (levy !== undefined) {
+        h.levied.set(`${u.owner}:${u.id}`, levy);
+        h.levyTurn.set(levy, h.last.turn);
+      }
       // a levied unit upgraded is a new unit of the type it upgrades into,
       // beside where it stood and as wounded: it stays levied (1118 China's
       // levied Catapult, a Trebuchet from t87, still costs no upkeep)
@@ -2636,6 +2645,14 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     const levy = history?.levied.get(`${u.owner}:${u.id}`);
     if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
     state.units.push(unit);
+    // the levy in force: the major holding the minor's army, and its term
+    // from the levy's turn (`levyUnits`)
+    const levied = levy === undefined ? undefined : state.cityStates.find((c) => c.seat === seatOfGame(levy));
+    const levyTurn = levy === undefined ? undefined : history?.levyTurn.get(levy);
+    if (levied && levyTurn !== undefined) {
+      levied.levySeat = seat;
+      levied.levyEnds = levyTurn + LEVY_TURNS - 1;
+    }
   }
   state.nextUnitId = nextId;
 

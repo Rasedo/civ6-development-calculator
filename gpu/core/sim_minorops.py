@@ -421,7 +421,7 @@ class SimMinorOps:
         live = slot != -2
         aged = self.citystate_kb_aged[:, s].unsqueeze(1)
         recent = live & ((aged < 0) | (aged - self.citystate_kb_seen[:, s].long() <= _ARMY_READ_AGE))
-        return {"live": live, "recent": recent, "owner": self.citystate_kb_owner[:, s].long(),
+        return {"live": live, "recent": recent, "slot": slot.long(), "owner": self.citystate_kb_owner[:, s].long(),
                 "row": torch.where(typ >= 0, er.take(tc), torch.full_like(typ, -1)),
                 "plot": self.citystate_kb_plot[:, s].long(),
                 "combat": self._type_combat.take(tc), "ranged": self._type_ranged_strength.take(tc),
@@ -1005,18 +1005,24 @@ class SimMinorOps:
 
     def _mops_army_near(self, s: int, plot: torch.Tensor, radius: int, own: bool, u: dict) -> torch.Tensor:
         """`armyStrength` about `plot` [B] within `radius`: the minor's own
-        units (`own`) or the barbarians' records of its knowledge base"""
-        if own:
-            m = u["own"]
-            d = self.pair_dist[u["tile"].clamp(min=0), plot.clamp(min=0).unsqueeze(1)].to(torch.long)
-            term = self._mops_army_term(u["combat"], u["ranged"], u["dmg"])
-        else:
-            r = self._mops_records(s)
-            m = r["recent"] & (r["owner"] == BARB_SEAT)
-            d = self.pair_dist[r["plot"].clamp(min=0), plot.clamp(min=0).unsqueeze(1)].to(torch.long)
-            term = self._mops_army_term(r["combat"], r["ranged"], r["dmg"])
-        m = m & (d <= radius)
-        return torch.where(m, term, torch.zeros_like(term)).sum(dim=1)
+        units as they stand and its knowledge base's records (`recentOf`) of
+        its units gone (`own`), or its records of the barbarians'"""
+        r = self._mops_records(s)
+        pz = plot.clamp(min=0).unsqueeze(1)
+        rd = self.pair_dist[r["plot"].clamp(min=0), pz].to(torch.long)
+        rterm = self._mops_army_term(r["combat"], r["ranged"], r["dmg"])
+        if not own:
+            m = r["recent"] & (r["owner"] == BARB_SEAT) & (rd <= radius)
+            return torch.where(m, rterm, torch.zeros_like(rterm)).sum(dim=1)
+        P = u["own"].shape[1]
+        rel = r["slot"] - self.POOL_LO[self._mops_pre(s)]
+        standing = (rel >= 0) & (rel < P) & u["own"].gather(1, rel.clamp(min=0, max=P - 1))
+        gone = r["recent"] & (r["owner"] == self._mops_seat(s)) & ~standing & (rd <= radius)
+        d = self.pair_dist[u["tile"].clamp(min=0), pz].to(torch.long)
+        term = self._mops_army_term(u["combat"], u["ranged"], u["dmg"])
+        m = u["own"] & (d <= radius)
+        return (torch.where(m, term, torch.zeros_like(term)).sum(dim=1)
+                + torch.where(gone, rterm, torch.zeros_like(rterm)).sum(dim=1))
 
     def _mops_camp_eval(self, s: int, rally: torch.Tensor, preset: torch.Tensor | None, alive: torch.Tensor, u: dict):
         """`evaluate` of Attack Barb Camp from one rally [B] (`preset` its

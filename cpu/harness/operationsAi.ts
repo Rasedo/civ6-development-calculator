@@ -326,7 +326,11 @@ export class OperationsProbe {
         turn,
         view: () => view,
         defs: null,
-        army: (p) => recentArmy(mo.army, p, mo.armyAged),
+        // the seat's own units as they stand: its knowledge base records
+        // other players' alone (`lookArmy`)
+        army: (p) => (p === seat
+          ? view.units(seat).map((u) => ({ id: u.id, owner: seat, type: u.type, plot: u.plot, combat: u.combat, ranged: u.ranged, damage: u.damage, seen: turn }))
+          : recentArmy(mo.army, p, mo.armyAged)),
         camps: () => mo.camps,
         known: () => mo.known ?? view.knownCities(seat),
         threat: (plot) => mo.threat.get(plot) ?? -1,

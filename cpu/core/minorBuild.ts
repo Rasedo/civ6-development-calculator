@@ -153,18 +153,17 @@ export function minorPhase(state: GameState): void {
  * "They will return to the city-state after {2_TurnLimit} Turns, or if the
  * Suzerain changes." Every unit still standing that the levy took from this
  * minor (`Unit.leviedFrom`) is the minor's again where it stands. The
- * term's turns are the minor's own starts, the first the one that follows
+ * term's turns are the minor's own starts, the first the one in the turn of
  * the levy, so the army is home at the minor's start of turn `levyEnds` —
  * 14 turns after the levy online (every recorded levy of the H-1 duels that
- * ran its term, runs/h1_duelw1117-1131).
+ * ran its term, runs/h1_duelw1117-1131; 1117: China's levy at t28, the
+ * Warriors city-state 3's again on its t42 line). The players before the
+ * minor in that turn still fight with the army (1117 t42: China's levied
+ * Warrior took 23 damage killing a barbarian, then came home).
  */
 export function minorLevyReturn(state: GameState, cityState: CityState): void {
   if (cityState.levySeat === undefined) return;
-  if (state.turn + 1 < (cityState.levyEnds ?? 0) && suzerainOf(cityState) === cityState.levySeat) return;
-  if (leviesHeld) {
-    leviesHeld.add(cityState.id);
-    return;
-  }
+  if (state.turn < (cityState.levyEnds ?? 0) && suzerainOf(cityState) === cityState.levySeat) return;
   sendLevyHome(state, cityState);
 }
 
@@ -175,32 +174,6 @@ let minorStart: ((state: GameState, cityState: CityState) => void) | null = null
  *  outside a replay. */
 export function holdMinorStart(fn: ((state: GameState, cityState: CityState) => void) | null): void {
   minorStart = fn;
-}
-
-/** the replay's hold on the levied armies' return (`holdLevies`): the
- *  minors whose start found their army due home, which the replay sends
- *  home when the minor acts, after the players before it in the turn */
-let leviesHeld: Set<number> | null = null;
-
-/** hold (or release) the levied armies' return at the minor's start: a
- *  replay applies the players' actions after every start, and the players
- *  before the minor fight with the levied army in the game's turn
- *  (runs/h1_duelw1117 t42: China's levied Warrior took 23 damage killing a
- *  barbarian, then came home). Nothing outside a replay. */
-export function holdLevies(on: boolean): void {
-  leviesHeld = on ? new Set() : null;
-}
-
-/** the held armies due home — one minor's (`cityStateId`) or every one —
- *  sent home now */
-export function releaseLevies(state: GameState, cityStateId?: number): void {
-  if (!leviesHeld) return;
-  for (const id of [...leviesHeld]) {
-    if (cityStateId !== undefined && id !== cityStateId) continue;
-    leviesHeld.delete(id);
-    const cs = state.cityStates.find((c) => c.id === id);
-    if (cs && cs.levySeat !== undefined) sendLevyHome(state, cs);
-  }
 }
 
 /** the levied army is the minor's again where it stands. The game removes
@@ -217,7 +190,7 @@ function sendLevyHome(state: GameState, cityState: CityState): void {
 }
 
 /** one levied unit home to its minor, made anew there (`sendLevyHome`) */
-export function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
+function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
   u.seat = cityState.seat;
   delete u.leviedFrom;
   for (const r of cityState.armyKnown ?? []) if (r.id === u.id && r.owner === cityState.seat) r.id = -1;

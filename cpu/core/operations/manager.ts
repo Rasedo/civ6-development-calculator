@@ -37,7 +37,7 @@ import { compileTree, tick, BT_FRESH, type BtNode, type BtRun } from '../behavio
 import { NO_PLOT, addMember, newTeams, opDef, opUnits, xy, type Operation } from './operation';
 import { OP_NODES, refreshStrengths, switchToBackup, type DiplomacyRequest, type OpsContext } from './nodes';
 import type { ContractBook, ContractCity, ContractNodeWorld } from '../aiContracts';
-import { evaluate, type ArmyUnit, type Candidate } from './evaluate';
+import { evaluate, type Candidate } from './evaluate';
 import type { KnownUnit } from './knowledge';
 import type { AiOpDef, OpsSettle } from './types';
 import type { BarbarianHooks } from './barbarian';
@@ -74,7 +74,8 @@ export interface OpsEnv {
   view(): MajorView;
   /** the definitions the seat runs (null: its leader's list, `allowedOps`) */
   defs: readonly string[] | null;
-  /** the knowledge base: a player's army records, the camps, the city
+  /** the knowledge base: a player's army records (the seat's own, where its
+   *  knowledge base records them: a city-state's), the camps, the city
    *  records as the turn before left them */
   army(player: number): readonly KnownUnit[];
   camps(): readonly number[];
@@ -321,7 +322,6 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv): void {
   }
   const allowed = env.defs ? env.defs.map((n) => AI_OP_DEFS[n]) : allowedOps(view.leaderType(ai.seat));
   const staging = stagingPlots(view, ai.seat);
-  const army = (p: number): readonly ArmyUnit[] => (p === ai.seat ? view.units(ai.seat) : env.army(p));
   const blank = (def: AiOpDef, enemy: number): Candidate => ({ def, enemy, presetRally: NO_PLOT, presetStrength: null, op: null,
     valid: false, odds: 0, value: 0, target: NO_PLOT, rally: NO_PLOT });
   // the military AI's turn (0x7271d0 -> 0x722d70): the candidates — the
@@ -336,7 +336,7 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv): void {
     for (const def of allowed) if (def.enemyType === 'WAR') cands.push(blank(def, p));
   }
   for (const def of allowed) if (def.enemyType === 'NONE') cands.push(blank(def, -1));
-  const inputs = { settle: env.settle, camps: env.camps(), taken: new Set(opsOf(ai).map((o) => o.target)), known: env.known, army };
+  const inputs = { settle: env.settle, camps: env.camps(), taken: new Set(opsOf(ai).map((o) => o.target)), known: env.known, army: env.army };
   for (const c of cands) evaluate(view, ai.seat, c, staging, inputs);
   const { base, perWar } = limitsOf(view, ai.seat);
   // AI_EVENT_DESIRE_SETTLE (0x7265b0): for a seat that settles, Settle New City starts where the seat

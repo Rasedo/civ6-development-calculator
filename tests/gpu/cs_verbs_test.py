@@ -182,11 +182,11 @@ def main() -> None:
 
     # -- L1b: the army comes home at the term's end, or when the suzerain changes
     sim.citystate_suzerain[0, S0] = R + 1
-    # (the minor's start of turn T runs at the engine's turn T - 1)
-    sim.turn = sim.citystate_levy_ends[0, S0].clone() - 2
+    # (the minor's start in the levy's own turn is the term's first)
+    sim.turn = sim.citystate_levy_ends[0, S0].clone() - 1
     sim._minor_levy_return(S0)
     assert army_of(sim, cs_seat) == 0, "L1b: home before the term"
-    sim.turn = int(sim.citystate_levy_ends[0, S0]) - 1
+    sim.turn = int(sim.citystate_levy_ends[0, S0])
     sim._minor_levy_return(S0)
     assert army_of(sim, cs_seat) == n_army, "L1b: not home at the term"
     assert int(sim.citystate_levy_seat[0, S0]) == -1
