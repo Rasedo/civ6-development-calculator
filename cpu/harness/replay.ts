@@ -821,6 +821,8 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // scout's report list, the scouts' trees)
   state.barbSeat.ops = copy.barbSeat.ops;
   state.barbSeat.opsNext = copy.barbSeat.opsNext;
+  state.barbSeat.treeSlots = copy.barbSeat.treeSlots;
+  state.barbSeat.treeFree = copy.barbSeat.treeFree;
   (copy.barbTribes ?? []).forEach((c, i) => {
     const tr = state.barbTribes?.[i];
     if (!tr) return;
@@ -3827,7 +3829,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
  */
-const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'unitStrength'] as const;
+const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'aiLeft', 'aiLeftSeen',
   'techCatchUp', 'civicCatchUp'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'unitValues', 'resourceCounts',

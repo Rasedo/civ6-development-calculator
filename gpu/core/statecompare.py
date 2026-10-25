@@ -375,6 +375,9 @@ def _barb_tribes_row(sim, b: int) -> list[int]:
                 int(sim.tribe_ramp[b, k])]
     row += [int(x) for x in sim.barb_spot_next[b, : sim.n_majors].tolist()]
     row += [int(sim.barb_tree_next[b])]
+    # the trees' pool (`newBarbTreeId`): its slots made, its free list
+    nf_t = int(sim.barb_tree_nfree[b])
+    row += [int(sim.barb_tree_slots[b]), nf_t, *[int(x) for x in sim.barb_tree_free[b, :nf_t].tolist()]]
     techs = sim.barb_techs[b].nonzero().flatten().tolist()
     civics = sim.barb_civics[b].nonzero().flatten().tolist()
     row += [len(techs), *techs, len(civics), *civics]

@@ -357,10 +357,7 @@ export function barbUnitFor(state: GameState, tag: BarbTag): string | null {
  *  ids raised */
 function raise(state: GameState, tribe: BarbTribe, tag: BarbTag, radius: number, n: number): number[] {
   const type = barbUnitFor(state, tag);
-  return type ? raiseType(state, tribe, type, radius, n) : [];
-}
-
-function raiseType(state: GameState, tribe: BarbTribe, type: string, radius: number, n: number): number[] {
+  if (!type) return [];
   const naval = !!UNITS[type].naval;
   const probe = { type, seat: BARB_SEAT };
   const out: number[] = [];
@@ -399,7 +396,8 @@ export function raidBoldness(tribe: BarbTribe): number {
 /**
  * A TRIBE'S TURN (0x1488a0): its spawn clock runs; at its interval — the
  * tribe's TurnsToWarriorSpawn at the speed, or the SpawnRate its operation
- * set — it resets and raises the first unit its operation asked for, else,
+ * set — it resets and raises the first unit its operation asked for (its
+ * class's best unit now, 0x144fb0 -> 0x147470), else,
  * while the tribe holds fewer than its NumMilitary, one unit within a plot of
  * the camp — ranged when "Barbarian Ranged unit roll" falls under
  * PercentRangedUnits, else melee. A turn the clock does not strike, a tribe
@@ -415,7 +413,7 @@ function tribeTurn(state: GameState, tribe: BarbTribe): void {
   if (tribe.spawnTurns >= (tribe.every ?? def.spawnEvery)) {
     tribe.spawnTurns = 0;
     if (tribe.queue?.length) {
-      const ids = raiseType(state, tribe, tribe.queue.shift()!, 1, 1);
+      const ids = raise(state, tribe, tribe.queue.shift()!, 1, 1);
       tribe.units.push(...ids);
       tribe.fresh.push(...ids);
     } else if (living(state, tribe.units) < BARB_MAX_UNITS) {
@@ -612,9 +610,13 @@ export function barbSlotsDying(state: GameState): void {
  */
 export function barbarianRules(state: GameState, closing: number): void {
   atRngPoint(state, { kind: 'seat', seat: BARB_SEAT, turn: closing });
-  // the military AI's part of their turn: their operations logged and refreshed
-  barbarianOpsTurn(state);
   barbarianTechs(state);
   campStep(state);
   for (const tr of [...tribesOf(state)]) if (tr.alive) tribeTurn(state, tr);
+  // the military AI's part of their turn after the tribes': their operations
+  // logged and refreshed, one a tribe started this turn among them
+  // (AI_Operation.csv: runs/h1_duelw1110 t42 "Barbarian City Assault,
+  // Started" before the running raid's line, the assault's "running" line
+  // the same turn)
+  barbarianOpsTurn(state);
 }

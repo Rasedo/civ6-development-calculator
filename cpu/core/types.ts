@@ -7,6 +7,7 @@ import type { EconomicMemory } from './aiEconomic';
 import type { CityGrowth } from './aiCityBuild';
 import type { GreatWork } from '../data/greatWorks';
 import type { QuestType } from '../data/quests';
+import type { BarbTag } from '../data/barbarians';
 import type { DistrictId, GameMap, YieldKey } from '../../world/types';
 
 export type FocusId = 'balanced' | YieldKey;
@@ -668,9 +669,10 @@ export interface BarbTribe {
   /** its raid or city assault (the AI operation it runs) */
   op?: BarbOp;
   /** the spawn interval its operation set (the force's SpawnRate) while it
-   *  recruits, and the units it asked for, raised one a spawn turn */
+   *  recruits, and the classes of the units it asked for, one raised a spawn
+   *  turn as the class's unit then */
   every?: number;
-  queue?: string[];
+  queue?: BarbTag[];
 }
 
 /** a city a barbarian tribe goes after: its owner and its centre */
@@ -864,10 +866,13 @@ export interface Seat {
    *  operations' trees take, `freeOps.ts`) (`CityAi`) */
   cityAi?: CityAi;
   /** the operation manager of a city-state (`minorOps.ts`), the Free Cities
-   *  (`freeOps.ts`) or the barbarians (`barbarianOps.ts`), and the id the
-   *  barbarians' next operation's tree takes */
+   *  (`freeOps.ts`) or the barbarians (`barbarianOps.ts`); the barbarians'
+   *  tree pool (`newBarbTreeId`): the generation the next tree's id takes,
+   *  the slots it made, its free slots (the head last) */
   ops?: OpsAi;
   opsNext?: number;
+  treeSlots?: number;
+  treeFree?: number[];
   /**
    * THIS SEAT'S CITIES — one field on one interface, so a rule that touches
    * a seat's cities cannot be written twice and drift.

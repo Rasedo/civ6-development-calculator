@@ -105,18 +105,17 @@ class SimBarb:
             out.append(best)
         return torch.stack(out, dim=1)
 
-    def _barb_raise(self, mask: torch.Tensor, k: torch.Tensor, tag: torch.Tensor | None, radius: int, n: int,
-                    scout: bool, track: bool = True, utype: torch.Tensor | None = None) -> None:
-        """`raise`: up to `n` units of each game's class `tag` (`raiseType`:
-        of the roster type `utype`) on the first free plots `radius` round its
-        tribe `k`'s camp in ring order — no city on the plot, the unit's own
-        domain (`tileFreeForUnit`) —, counted to the tribe's units (raised in
-        its turn) or its scouts where `track`; a new scout has seen nothing."""
+    def _barb_raise(self, mask: torch.Tensor, k: torch.Tensor, tag: torch.Tensor, radius: int, n: int,
+                    scout: bool, track: bool = True) -> None:
+        """`raise`: up to `n` units of each game's class `tag` (its best unit
+        now) on the first free plots `radius` round its tribe `k`'s camp in
+        ring order — no city on the plot, the unit's own domain
+        (`tileFreeForUnit`) —, counted to the tribe's units (raised in its
+        turn) or its scouts where `track`; a new scout has seen nothing."""
         if not bool(mask.count_nonzero()):
             return
         bidx = torch.arange(self.B, device=self.device)
-        if utype is None:
-            utype = self._barb_unit_for().gather(1, tag.clamp(min=0).unsqueeze(1)).squeeze(1)
+        utype = self._barb_unit_for().gather(1, tag.clamp(min=0).unsqueeze(1)).squeeze(1)
         mask = mask & (utype >= 0)
         if not bool(mask.count_nonzero()):
             return
@@ -430,7 +429,7 @@ class SimBarb:
         q0 = self.tribe_queue[:, k, 0]
         qhit = hit & (q0 >= 0)
         if bool(qhit.count_nonzero()):
-            self._barb_raise(qhit, kk, None, 1, 1, scout=False, utype=q0.clamp(min=0))
+            self._barb_raise(qhit, kk, q0, 1, 1, scout=False)
             self._barb_pop(self.tribe_queue, qhit.nonzero(as_tuple=True)[0], k)
         room = hit & ~qhit & (self._barb_living(kk, False) < bb["maxUnits"])
         pct = self._barb_kind_col(3, kind)
@@ -591,11 +590,12 @@ class SimBarb:
                 self.tribe_bold[rows, tr[rows]] += delta[rows]
 
     def _barbarian_rules(self) -> None:
-        """`barbarianRules`: the military AI's part of the turn (its operations
-        refreshed, `_barb_ops_refresh`), the techs, the camp step, each living
-        tribe's turn in the tribes' order."""
-        self._barb_ops_refresh()
+        """`barbarianRules`: the techs, the camp step, each living tribe's turn
+        in the tribes' order, then the military AI's part of the turn (its
+        operations refreshed, one a tribe started this turn among them,
+        `_barb_ops_refresh`)."""
         self._barb_tech_step()
         self._barb_camp_step()
         for k in range(int(self.n_tribes.max())):
             self._barb_tribe_turn(k)
+        self._barb_ops_refresh()

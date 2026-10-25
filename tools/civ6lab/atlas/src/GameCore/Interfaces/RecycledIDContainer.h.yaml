@@ -14,3 +14,19 @@
   context:
     - "...0x73a840 finds the operation's tree gone and the manager ends it (\"Operation complete\", 0x725000 -> 0x7353d0)."
   review: imported
+- addr: 0x7ff430
+  final: 0x563440
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1110
+      turn: 42
+      value: "The military AI's part (each running   operation logged and its team refreshed) follows the tribes' turn:   AI_Operation.csv prints a tribe's start before the running operations'   lines and the new o"
+    - recording: h1_duelw1105
+      turn: 12
+      value: "So a tree started in the walk ticks in it   only where its slot lies past the one ticking: runs/h1_duelw1105 log t12,   tribe 4's scout's tree (slot 1) starts the raid on 12:14 in slot 0 (tribe   0's "
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - ...slot its free list's head (+0x2c, each entry's +8 the next) names, else a new block's (0x7ff430); the id (+0x28 += 0x10000) | slot; the used list (head +0x38, tail +0x40, each entry's...
+  review: imported

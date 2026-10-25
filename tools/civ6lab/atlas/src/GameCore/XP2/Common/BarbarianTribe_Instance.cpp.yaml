@@ -24,15 +24,25 @@
   final: 0xda590
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:raise]
+  impl:
+    - cpu/core/barbarians.ts:raise
+    - cpu/core/barbarianOps.ts:missing
+    - cpu/core/barbarians.ts:tribeTurn
+  readings: ["H-1: the raids — READ"]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x147470
   final: 0xdb480
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:barbUnitFor, cpu/data/barbarians.ts:BARB_TAG_UNITS]
-  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  impl:
+    - cpu/core/barbarians.ts:barbUnitFor
+    - cpu/data/barbarians.ts:BARB_TAG_UNITS
+    - cpu/core/barbarianOps.ts:missing
+    - cpu/core/barbarians.ts:tribeTurn
+  readings:
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "H-1: the raids — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...47fc0: a CLASS_ANTI_CAVALRY defender on the camp, the scouts within 3; the unit chooser 0x147470 takes the first unit of the highest Combat in the tag that the barbarians' techs and ci..."

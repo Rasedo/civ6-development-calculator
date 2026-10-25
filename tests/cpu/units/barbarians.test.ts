@@ -144,7 +144,7 @@ describe('a barbarian raid', () => {
     expect(tribe.homing).toBeUndefined();
     expect(tribe.op).toMatchObject({ assault: false, target: { seat: 0 } });
     expect(tribe.every).toBe(1);
-    expect(tribe.queue).toEqual(['WARRIOR', 'WARRIOR', 'SLINGER']);
+    expect(tribe.queue).toEqual(['CLASS_MELEE', 'CLASS_MELEE', 'CLASS_RANGED']);
     const team = () => barbOp(state, tribe.op!.id)?.teams[0].members ?? [];
     const raised: string[] = [];
     for (let k = 0; k < 6 && team().length === 0; k++) {

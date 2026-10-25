@@ -12,9 +12,10 @@
     - recording: 1121
       turn: 9
       value: "A tree one of whose units its own orders   spent ends that tick (1121 t9 Hunza's last charge on a Rainforest: the   next Builder contract t10;"
-  impl: [cpu/core/aiCityTrees.ts:tickCityTrees]
+  impl: [cpu/core/aiCityTrees.ts:tickCityTrees, cpu/core/barbarianOps.ts:freeEndedTrees]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a loop destroys a tree whose +0x368 is set or whose +0x308 is set with its root ne..."
   review: reviewed

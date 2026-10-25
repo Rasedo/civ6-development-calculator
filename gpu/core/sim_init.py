@@ -4103,8 +4103,8 @@ class SimInit:
         self.barb_unit_tribe = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=device)
         self.barb_unit_scout = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
         # THE RAIDS AND CITY ASSAULTS (`barbarianScouts`): each tribe's Boldness,
-        # the spawn interval its operation set (-1 its own), the unit types it
-        # asked for (-1 empty), the owners of the cities its raid and its
+        # the spawn interval its operation set (-1 its own), the unit classes
+        # it asked for (the export's tag order, -1 empty), the owners of the cities its raid and its
         # assault wait for, its scout's tree (its scout's slot, the city's
         # owner, the tree's id, its Sequence's resume, Move Unit's held
         # scout), the owned plots its scout saw at its last look; its
@@ -4137,7 +4137,14 @@ class SimInit:
         self.tribe_op_ready = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
         self.barb_unit_op = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
         self.barb_unit_join = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=device)
+        # the barbarians' tree pool (`newBarbTreeId`): the next tree's
+        # generation, the slots made, the free slots (a stack, the head on
+        # top) — at most every tribe's operation and scout's tree and every
+        # capture's at once
         self.barb_tree_next = torch.zeros(B, dtype=torch.long, device=device)
+        self.barb_tree_slots = torch.zeros(B, dtype=torch.long, device=device)
+        self.barb_tree_free = torch.zeros(B, 2 * self.KT + simbase.BARB_CAP_MAX, dtype=torch.long, device=device)
+        self.barb_tree_nfree = torch.zeros(B, dtype=torch.long, device=device)
         self.barb_unit_fresh = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
         # THE BARBARIANS' UNIT POOL (`BarbPool`, `barbSlots`): each unit's
         # place in the player's unit list (-1 none yet), the slots ever used,

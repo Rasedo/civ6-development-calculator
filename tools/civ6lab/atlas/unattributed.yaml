@@ -3,6 +3,23 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0xfe90
+  final: 0xd330
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1110
+      turn: 42
+      value: "The military AI's part (each running   operation logged and its team refreshed) follows the tribes' turn:   AI_Operation.csv prints a tribe's start before the running operations'   lines and the new o"
+    - recording: h1_duelw1105
+      turn: 12
+      value: "So a tree started in the walk ticks in it   only where its slot lies past the one ticking: runs/h1_duelw1105 log t12,   tribe 4's scout's tree (slot 1) starts the raid on 12:14 in slot 0 (tribe   0's "
+  impl: [cpu/core/barbarianOps.ts:TREE_SLOT]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - ...x2c, each entry's +8 the next) names, else a new block's (0x7ff430); the id (+0x28 += 0x10000) | slot; the used list (head +0x38, tail +0x40, each entry's +8 / +0x10 its neighbours)...
+  review: imported
 - addr: 0x1deb0
   final: 0x15ec0
   kind: function
@@ -3990,6 +4007,26 @@
   context:
     - ...nit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670; Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
   review: imported
+- addr: 0x7fef20
+  final: 0x563070
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1110
+      turn: 42
+      value: "The military AI's part (each running   operation logged and its team refreshed) follows the tribes' turn:   AI_Operation.csv prints a tribe's start before the running operations'   lines and the new o"
+    - recording: h1_duelw1105
+      turn: 12
+      value: "So a tree started in the walk ticks in it   only where its slot lies past the one ticking: runs/h1_duelw1105 log t12,   tribe 4's scout's tree (slot 1) starts the raid on 12:14 in slot 0 (tribe   0's "
+  impl:
+    - cpu/core/barbarianOps.ts:TREE_SLOT
+    - cpu/core/barbarianOps.ts:newBarbTreeId
+    - gpu/core/sim_barbops.py:_bop_next_id
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - "...irst). THE TREE POOL (the manager +0x3a0, READ): 0x7ff7b0 makes a tree in the pool by 0x7fef20 — the slot its free list's head (+0x2c, each entry's +8 the next) names, else a new blo..."
+  review: imported
 - addr: 0x7ffdd0
   final: 0x5639b0
   kind: function
@@ -4003,6 +4040,7 @@
     - cpu/core/aiCityTrees.ts:tickCityTrees
     - cpu/core/barbarianOps.ts:barbarianTrees
     - cpu/core/operations/manager.ts:operationsRun
+    - cpu/core/barbarianOps.ts:freeEndedTrees
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"

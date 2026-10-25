@@ -96,7 +96,7 @@ import { engineId } from '../data/aliases';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, RELIGION_TYPES, unconvertedOf } from '../data/religion';
 import { grantedMoves, unitStackSlot } from './units';
 import { GOODY_KINDS } from '../data/goodyHuts';
-import { BARB_TRIBES } from '../data/barbarians';
+import { BARB_TAG_UNITS, BARB_TRIBES, type BarbTag } from '../data/barbarians';
 
 const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.meta.url);
 // `cpu/core/types.ts` re-exports `world/types.ts` (Tile, GameMap live there),
@@ -564,7 +564,8 @@ const GAME: Record<string, Extractor> = {
     const r = s.barbSeat.research;
     const techs = r.techs.map((t) => idx(TECH_IDX, t)).sort((a, b) => a - b);
     const civics = r.civics.map((c) => idx(CIVIC_IDX, c)).sort((a, b) => a - b);
-    const uidx = (id: string) => UNIT_INDEX[id] ?? -1;
+    // a class asked for by its place among the classes (`BARB_TAG_UNITS`, the export's `BARB_TAGS` order)
+    const tagIdx = (tag: BarbTag) => (Object.keys(BARB_TAG_UNITS) as BarbTag[]).indexOf(tag);
     const pool = s.barbPool ?? { size: 0, free: [], dying: [] };
     const slots = s.units.filter((u) => u.seat === BARB_SEAT).map((u) => u.slot ?? -1);
     return [[s.barbCampsBegun ? 1 : 0, tribes.length, ...tribes.flatMap((t) => [t.plot, t.alive ? 1 : 0,
@@ -573,7 +574,7 @@ const GAME: Record<string, Extractor> = {
       // the raid and the city assault: Boldness, the interval set, the units
       // asked for, the cities waited for (their owners), the scout's tree
       // (`barbHomingRecord`)
-      t.boldness ?? 0, t.every ?? -1, (t.queue ?? []).length, ...(t.queue ?? []).map(uidx),
+      t.boldness ?? 0, t.every ?? -1, (t.queue ?? []).length, ...(t.queue ?? []).map(tagIdx),
       (t.raidTargets ?? []).length, ...(t.raidTargets ?? []).map((x) => x.seat), ...(t.raidTargets ?? []).map((x) => x.plot),
       (t.assaultTargets ?? []).length, ...(t.assaultTargets ?? []).map((x) => x.seat), ...(t.assaultTargets ?? []).map((x) => x.plot),
       ...barbHomingRecord(t),
@@ -582,6 +583,8 @@ const GAME: Record<string, Extractor> = {
       // the player its units rampage against, its camp taken
       t.rampage ?? -1]),
     ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0), s.barbSeat.opsNext ?? 0,
+    // the trees' pool (`newBarbTreeId`): its slots made, its free list
+    s.barbSeat.treeSlots ?? 0, (s.barbSeat.treeFree ?? []).length, ...(s.barbSeat.treeFree ?? []),
     techs.length, ...techs, civics.length, ...civics,
     // the unit pool (`barbSlots`): its size, its free slots, those waiting to
     // go free, each unit's slot in unit order; each tribe's camp defender alive

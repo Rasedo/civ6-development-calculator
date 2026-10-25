@@ -27,7 +27,7 @@ import { BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, da
 import { AI_OP_DEFS, AI_TREES } from '../data/aiOperations';
 import { moveTo, passEnd, passPillage, passReachAt, passSafePlot, turnsToPlot, type Pass } from './tactical';
 import { barbUnitFor, handicapOf, raidBoldness } from './barbarians';
-import { BARB_TAG_UNITS, barbForce } from '../data/barbarians';
+import { BARB_TAG_UNITS, barbForce, type BarbTag } from '../data/barbarians';
 import { gameTypeOf } from '../data/aliases';
 import { UNIT_HP } from '../data/units';
 import type { MajorUnitView, MajorView } from '../../ai/major/view';
@@ -105,10 +105,11 @@ function hooksOf(state: GameState): BarbarianHooks {
         .sort((a, b) => (unitOf(state, a)!.slot ?? 0) - (unitOf(state, b)!.slot ?? 0));
       const damage = (id: number) => UNIT_HP - unitOf(state, id)!.hp;
       const taken: number[] = [];
-      const missing: string[] = [];
+      // the units it lacks asked for by their class (0x155b50: the class's
+      // name, its unit chosen when the tribe raises it, 0x144fb0 -> 0x147470)
+      const missing: BarbTag[] = [];
       for (const [tag, n] of force?.units ?? []) {
-        const type = barbUnitFor(state, tag);
-        if (!type) continue;
+        if (!barbUnitFor(state, tag)) continue;
         const held: number[] = [];
         for (const id of free) {
           const u = unitOf(state, id)!;
@@ -121,7 +122,7 @@ function hooksOf(state: GameState): BarbarianHooks {
           if (k >= 0) held[k] = id;
         }
         taken.push(...held);
-        for (let j = held.length; j < n; j++) missing.push(type);
+        for (let j = held.length; j < n; j++) missing.push(tag);
       }
       if (missing.length) {
         tr.queue = missing;
@@ -175,11 +176,7 @@ function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
     newContractId: none,
     contractCities: () => [],
     clearProduction: none,
-    newOpId: () => {
-      const id = state.barbSeat.opsNext ?? 0;
-      state.barbSeat.opsNext = id + 1;
-      return id;
-    },
+    newOpId: () => newBarbTreeId(state),
     settle: null,
     unitRows: () => [],
     // a unit action row of theirs: a pillage where the unit stands
@@ -311,35 +308,74 @@ export function barbarianCaptures(state: GameState): void {
   }
 }
 
+/** a tree's id: the tree manager's pool generation over its slot (0x7fef20:
+ *  +0x28 += 0x10000, or'd with the slot) */
+const TREE_SLOT = 0x10000;
+export const treeSlot = (id: number): number => id % TREE_SLOT;
+
+/**
+ * A NEW TREE OF THE BARBARIANS (the tree manager's pool +0x3a0, 0x7fef20):
+ * the slot its free list's head names — the last one freed — else the
+ * pool's next new slot; the pool's list of trees kept in slot order. Its id
+ * the next generation over the slot.
+ */
+export function newBarbTreeId(state: GameState): number {
+  const seat = state.barbSeat;
+  const gen = seat.opsNext ?? 0;
+  seat.opsNext = gen + 1;
+  const free = (seat.treeFree ??= []);
+  let slot = free.pop();
+  if (slot === undefined) {
+    slot = seat.treeSlots ?? 0;
+    seat.treeSlots = slot + 1;
+  }
+  return gen * TREE_SLOT + slot;
+}
+
+/** THE POOL'S DESTROY LOOP after the walk (0x7ffdd0 -> 0x7cb2e0): each slot
+ *  whose tree ended goes to the free list's head, in slot order (the last
+ *  freed, the highest, taken first) */
+function freeEndedTrees(state: GameState): void {
+  const seat = state.barbSeat;
+  const live = new Set([...(seat.ops ? opsOf(seat.ops).map((o) => o.id) : []),
+    ...(state.barbTribes ?? []).flatMap((t) => (t.homing ? [t.homing.id] : []))].map(treeSlot));
+  const free = (seat.treeFree ??= []);
+  for (let s = 0; s < (seat.treeSlots ?? 0); s++) if (!live.has(s) && !free.includes(s)) free.push(s);
+}
+
 /**
  * THE BARBARIANS' TREES' TICK in their tactical pass (the tree manager's
  * tick 0x7ffdd0, list C of the player's turn, once each unit's planning is
  * taken): every tree of the player — its operations' and its scouts' — in
- * the order they were made (their ids), a tree a tree's order starts (a
- * scout's report raids at once) ticking in the same walk after them; a tree
- * that ends goes. The operations' units' turns are their operations'; a
- * scout its tree moved has its turn ended. The ids of the units the trees
- * held.
+ * the pool's slot order, a tree a tree's order starts (a scout's report
+ * raids at once) ticking in the same walk where its slot lies past the one
+ * ticking (one reusing a freed slot before it waits for the next walk:
+ * runs/h1_duelw1105 log t12, tribe 4's raid in tribe 0's scout's old slot 0
+ * first recruits at t13, its Warriors from t14); the trees that ended free
+ * their slots after the walk. The operations' units' turns are their
+ * operations'; a scout its tree moved has its turn ended. The ids of the
+ * units the trees held.
  */
 export function barbarianTrees(state: GameState, pass: Pass): Set<number> {
   const held = new Set<number>();
   const ai = opsOfBarbs(state);
   for (let last = -1; ;) {
-    const ops = opsOf(ai).filter((o) => o.id > last);
-    const scouts = (state.barbTribes ?? []).filter((t) => t.homing && t.homing.id > last);
-    const op = ops.reduce<Operation | null>((a, o) => (!a || o.id < a.id ? o : a), null);
-    const tr = scouts.reduce<BarbTribe | null>((a, t) => (!a || t.homing!.id < a.homing!.id ? t : a), null);
+    const ops = opsOf(ai).filter((o) => treeSlot(o.id) > last);
+    const scouts = (state.barbTribes ?? []).filter((t) => t.homing && treeSlot(t.homing.id) > last);
+    const op = ops.reduce<Operation | null>((a, o) => (!a || treeSlot(o.id) < treeSlot(a.id) ? o : a), null);
+    const tr = scouts.reduce<BarbTribe | null>((a, t) => (!a || treeSlot(t.homing!.id) < treeSlot(a.homing!.id) ? t : a), null);
     if (!op && !tr) break;
-    if (op && (!tr || op.id < tr.homing!.id)) {
-      last = op.id;
+    if (op && (!tr || treeSlot(op.id) < treeSlot(tr.homing!.id))) {
+      last = treeSlot(op.id);
       for (const id of opUnits(op)) held.add(id);
       tickOperation(ai, barbEnv(state, pass), op);
       for (const id of opUnits(op)) held.add(id);
     } else {
-      last = tr!.homing!.id;
+      last = treeSlot(tr!.homing!.id);
       tickScout(state, pass, tr!);
     }
   }
+  freeEndedTrees(state);
   for (const id of held) pass.done.add(id);
   return held;
 }
@@ -518,11 +554,10 @@ function tickScout(state: GameState, pass: Pass, tribe: BarbTribe): void {
 }
 
 /** THE SCOUT'S TREE'S START (0x1485c0, from the scout's look): on the scout
- *  alone, its trigger the camp and the tribe, the city it saw; its id the
- *  player's next tree's */
+ *  alone, its trigger the camp and the tribe, the city it saw; a new tree
+ *  of the player's pool (`newBarbTreeId`) */
 export function barbScoutTreeStart(state: GameState, tribe: BarbTribe, scout: number, target: BarbTarget): void {
   const nodes = scoutTreeNodes();
-  const id = state.barbSeat.opsNext ?? 0;
-  state.barbSeat.opsNext = id + 1;
+  const id = newBarbTreeId(state);
   tribe.homing = { id, scout, target, status: nodes.map(() => BT_FRESH), mem: nodes.map(() => ({})), bb: {} };
 }

@@ -346,6 +346,7 @@
   final: 0xe6490
   kind: function
   status: PARTLY
+  impl: [cpu/core/barbarianOps.ts:taken]
   readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:

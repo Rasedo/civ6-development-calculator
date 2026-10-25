@@ -33,6 +33,8 @@ _S, _R, _F = 1, 2, 3
 # DIRECTION_TYPES: SE, E, NE, NW, W, SW), as the neighbour table's columns
 # (E NE NW W SW SE)
 _SIEGE_DIRS = (5, 0, 1, 2, 3, 4)
+# a tree's id: the pool's generation over its slot (`treeSlot`)
+_TREE_SLOT = 0x10000
 
 
 def _node_data(node: dict, name: str):
@@ -133,10 +135,43 @@ class SimBarbOps:
         return self.barb_unit_alive & self.barb_unit_op & (self.barb_unit_tribe == k)
 
     def _bop_next_id(self, mask: torch.Tensor) -> torch.Tensor:
-        """the barbarian player's next tree's id where `mask` (taken)"""
-        nid = self.barb_tree_next.clone()
+        """`newBarbTreeId` where `mask`: a new tree of the barbarians' pool
+        (0x7fef20) — the slot the free list's head names, else the pool's
+        next new one — its id the next generation over the slot"""
+        b = self._bidx
+        gen = self.barb_tree_next.clone()
         self.barb_tree_next += mask.long()
-        return nid
+        pop = mask & (self.barb_tree_nfree > 0)
+        top = self.barb_tree_free[b, (self.barb_tree_nfree - 1).clamp(min=0)]
+        slot = torch.where(pop, top, self.barb_tree_slots)
+        self.barb_tree_nfree -= pop.long()
+        self.barb_tree_slots += (mask & ~pop).long()
+        return gen * _TREE_SLOT + slot
+
+    def _bop_free_ended(self) -> None:
+        """`freeEndedTrees`: after the walk each slot whose tree ended to the
+        free list's head, in slot order"""
+        b = self._bidx
+        n = self.barb_tree_free.shape[1]
+        live = torch.zeros(self.B, n, dtype=torch.bool, device=self.device)
+        K = int(self.n_tribes.max()) if self.B else 0
+        for ids, on in ((self.tribe_op_id[:, :K], (self.tribe_op[:, :K] > 0) & ~self.tribe_op_done[:, :K]),
+                        (self.tribe_home_id[:, :K], self.tribe_home_slot[:, :K] != -1),
+                        (self.bcap_id, self.bcap_id >= 0)):
+            for j in range(ids.shape[1]):
+                m = on[:, j] & (ids[:, j] >= 0)
+                live[b[m], (ids[m, j] % _TREE_SLOT).clamp(max=n - 1)] = True
+        listed = torch.zeros(self.B, n, dtype=torch.bool, device=self.device)
+        for j in range(int(self.barb_tree_nfree.max()) if self.B else 0):
+            m = j < self.barb_tree_nfree
+            listed[b[m], self.barb_tree_free[m, j].clamp(max=n - 1)] = True
+        for s in range(int(self.barb_tree_slots.max()) if self.B else 0):
+            go = (s < self.barb_tree_slots) & ~live[:, s] & ~listed[:, s]
+            if not bool(go.any()):
+                continue
+            self.barb_tree_free[b[go], self.barb_tree_nfree[go]] = s
+            self.barb_tree_nfree += go.long()
+            listed[go, s] = True
 
     def _barb_start_op(self, mask: torch.Tensor, k: int, assault: bool, seat: torch.Tensor, plot: torch.Tensor) -> None:
         """`barbOpStart`: tribe `k`'s raid or city assault on `seat`'s city at
@@ -488,9 +523,10 @@ class SimBarbOps:
     def _barb_trees(self, done: torch.Tensor, ai: torch.Tensor, order: torch.Tensor, rowof: torch.Tensor,
                     res: dict, tg: dict, danger: torch.Tensor) -> None:
         """`barbarianTrees`: every tree of the barbarians — their tribes'
-        operations', their captures' and their scouts' — in id order, a tree
-        started in the walk ticking in it after the others; the operations'
-        members' turns are theirs"""
+        operations', their captures' and their scouts' — in the pool's slot
+        order, a tree started in the walk ticking in it where its slot lies
+        past the one ticking; the trees that ended free their slots after the
+        walk (`_bop_free_ended`); the operations' members' turns are theirs"""
         B = self.B
         dev = self.device
         if not B:
@@ -501,21 +537,24 @@ class SimBarbOps:
         big = 1 << 40
         while True:
             K = int(self.n_tribes.max())
-            op_on = (self.tribe_op[:, :K] > 0) & ~self.tribe_op_done[:, :K] & (self.tribe_op_id[:, :K] > last.unsqueeze(1))
-            hm_on = (self.tribe_home_slot[:, :K] != -1) & (self.tribe_home_id[:, :K] > last.unsqueeze(1))
-            cp_on = (self.bcap_id >= 0) & (self.bcap_id > last.unsqueeze(1))
-            ids = torch.cat((torch.where(op_on, self.tribe_op_id[:, :K], big), torch.where(hm_on, self.tribe_home_id[:, :K], big),
-                             torch.where(cp_on, self.bcap_id, big)), dim=1)
+            op_s = self.tribe_op_id[:, :K] % _TREE_SLOT
+            hm_s = self.tribe_home_id[:, :K] % _TREE_SLOT
+            cp_s = self.bcap_id % _TREE_SLOT
+            op_on = (self.tribe_op[:, :K] > 0) & ~self.tribe_op_done[:, :K] & (self.tribe_op_id[:, :K] >= 0) & (op_s > last.unsqueeze(1))
+            hm_on = (self.tribe_home_slot[:, :K] != -1) & (self.tribe_home_id[:, :K] >= 0) & (hm_s > last.unsqueeze(1))
+            cp_on = (self.bcap_id >= 0) & (cp_s > last.unsqueeze(1))
+            ids = torch.cat((torch.where(op_on, op_s, big), torch.where(hm_on, hm_s, big),
+                             torch.where(cp_on, cp_s, big)), dim=1)
             nxt = ids.min(dim=1).values
             go = nxt < big
             if not bool(go.any()):
                 break
             for c in range(self.bcap_id.shape[1]):
-                m = go & cp_on[:, c] & (self.bcap_id[:, c] == nxt)
+                m = go & cp_on[:, c] & (cp_s[:, c] == nxt)
                 if bool(m.any()):
                     self._bop_capture_tick(m, c, ctx)
             for k in range(K):
-                m = go & op_on[:, k] & (self.tribe_op_id[:, k] == nxt)
+                m = go & op_on[:, k] & (op_s[:, k] == nxt)
                 if bool(m.any()):
                     raid = m & (self.tribe_op[:, k] == 1)
                     if bool(raid.any()):
@@ -523,10 +562,11 @@ class SimBarbOps:
                     ass = m & (self.tribe_op[:, k] == 2)
                     if bool(ass.any()):
                         self._bop_assault_tick(ass, k, ctx)
-                h = go & hm_on[:, k] & (self.tribe_home_id[:, k] == nxt)
+                h = go & hm_on[:, k] & (hm_s[:, k] == nxt)
                 if bool(h.any()):
                     self._bop_scout_tick(h, k, ctx)
             last = torch.where(go, nxt, last)
+        self._bop_free_ended()
         self._barb_op_bury()
 
     # -- Raid City -----------------------------------------------------------
@@ -916,7 +956,8 @@ class SimBarbOps:
         evaluator's walk, 0x60a8c0): each class's first n held, a later one
         with less damage taking the place of the first held with more
         (0x7c62f0); whole, it joins the team in slot
-        order (`barb_unit_join`); else the rest is asked for, melee first.
+        order (`barb_unit_join`); else the rest is asked for by class, melee
+        first.
         [B] the force joined."""
         if not bool(act.count_nonzero()):
             return torch.zeros_like(act)
@@ -974,7 +1015,7 @@ class SimBarbOps:
             for j in range(int(n_t.max()) if n_t.numel() else 0):
                 put = valid & (j < miss) & (off + j < self.TQ)
                 rows = put.nonzero(as_tuple=True)[0]
-                queue[rows, (off + j)[rows]] = utype[rows]
+                queue[rows, (off + j)[rows]] = tag_t[rows]
             off = off + miss
         need = act & (off > 0)
         self.tribe_queue[need, k] = queue[need]

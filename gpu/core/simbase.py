@@ -1172,7 +1172,8 @@ _MUTABLE = [
     "tribe_bold", "tribe_every", "tribe_queue", "tribe_raidq", "tribe_assq", "tribe_home_slot", "tribe_home_seat",
     "tribe_home_id", "tribe_home_resume", "tribe_home_mu",
     "tribe_saw", "tribe_op", "tribe_op_seat", "tribe_op_id", "tribe_op_rstart", "tribe_op_ready", "barb_unit_op",
-    "barb_unit_join", "barb_unit_fresh", "barb_spot_next", "barb_tree_next",
+    "barb_unit_join", "barb_unit_fresh", "barb_spot_next", "barb_tree_next", "barb_tree_slots", "barb_tree_free",
+    "barb_tree_nfree",
     "bcap_id", "bcap_civ", "bcap_esc", "bcap_target", "bcap_rally", "bcap_bk_target", "bcap_bk_rally", "bcap_resume",
     "bcap_form", "bcap_ready", "bcap_str", "bcap_estr", "bcap_store", "bcap_store_goal", "barb_capq",
     # their unit pool and each tribe's camp defender (`barbSlots`, `cpu/core/tactical.ts`)

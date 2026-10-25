@@ -1817,6 +1817,13 @@ the operations and the scout's tree in gpu/core/sim_barbops.py.
   again next turn. Success or the limiter's end: Spawn Change back to the
   tribe's interval. The tribe turn's tick spawns the queue's head first
   (0x148ac6, popped whatever the raise did), with no roll and no unit cap.
+  The queue holds the classes' names, not unit types: the raise 0x144fb0
+  (its flag +0xe0 clear, the tribe turn's) resolves the name through
+  0x147470 — the class's units the tribe may raise, the best — when it
+  raises (runs/h1_duelw1127 log t34-35: tribe 4's ranged asks raise Archers
+  the turn China holds Archery, asked for before it). The engines: the
+  queue's classes (`BarbTribe.queue` / `tribe_queue`, the export's tag
+  order), `raise` / `_barb_raise` by class.
 
 Cases (the log's rolls tell a queue spawn from a clock one): 1124 camp
 (40,21): its scout home at t8's pass, then t9 W, t10 W, t11 S, t12 S with no
@@ -5808,13 +5815,30 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   — 0x785ec0, the tactical pass 0x771530 — then the homeland 0x70a370. The
   operations' trees tick after the tribes' turn and before the tactical
   pass, on the plannings and the target list the pass then reads; an
-  operation's units leave the pass. The engines: the military AI's part
-  (each running operation's team refreshed, its readiness) before the
-  tribes' turn (`barbarianOpsTurn` / `_barb_ops_refresh`); every tree of the
-  barbarian player — its operations' and its scouts' — ticks in id order in
-  the tactical pass (`barbarianTrees` / `_barb_trees`: the manager's tree
-  list, 0x7ffdd0), a tree started in the walk (a scout's report starting a
-  raid) ticking in it after the others; the trees' units leave the pass's
+  operation's units leave the pass. The military AI's part (each running
+  operation logged and its team refreshed) follows the tribes' turn:
+  AI_Operation.csv prints a tribe's start before the running operations'
+  lines and the new one's "running" line the same turn (runs/h1_duelw1110
+  log t42, 1128 t32, 1105 t31: "Barbarian City Assault, Started" first).
+  THE TREE POOL (the manager +0x3a0, READ): 0x7ff7b0 makes a tree in the
+  pool by 0x7fef20 — the slot its free list's head (+0x2c, each entry's +8
+  the next) names, else a new block's (0x7ff430); the id (+0x28 +=
+  0x10000) | slot; the used list (head +0x38, tail +0x40, each entry's +8
+  / +0x10 its neighbours) kept in slot order (the next used slot after the
+  new one found, the entry linked before it, else at the tail). The tick
+  0x7ffdd0 walks the used list from its head by +0x10, ticking each
+  (0x7d3a00), then its destroy loop (0x7cb2e0) frees each ended tree's
+  slot to the free list's head. So a tree started in the walk ticks in it
+  only where its slot lies past the one ticking: runs/h1_duelw1105 log t12,
+  tribe 4's scout's tree (slot 1) starts the raid on 12:14 in slot 0 (tribe
+  0's scout's, freed at t9): the raid first recruits at t13 and its
+  Warriors come at t14, t15, t16 (Barbarians_Units.csv), where 1124 t8's
+  raid in a new slot recruits at once. The engines: the military AI's part
+  after the tribes' turn (`barbarianOpsTurn` / `_barb_ops_refresh`); the
+  trees' pool (`newBarbTreeId` / `_bop_next_id`, `freeEndedTrees` /
+  `_bop_free_ended`), every tree of the barbarian player — its operations',
+  its captures' and its scouts' — ticking in slot order in the tactical pass
+  (`barbarianTrees` / `_barb_trees`); the trees' units leave the pass's
   later moves.
 - THE NODES' HANDLERS (the dispatcher 0x7cbca0 storing each type's
   functions under the id the registration 0x7db850 gives it, the k-th id
