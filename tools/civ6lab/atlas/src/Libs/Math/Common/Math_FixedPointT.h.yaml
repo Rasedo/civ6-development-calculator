@@ -255,6 +255,7 @@
     - cpu/harness/replay.ts:minor
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...RITORY\", the Gold \"INSUFFICIENT_FUNDS\", Movement) passing, the economic AI's upgrade (0x68c940) — else, with Can Delete (no data: true), the deletion (UNITCOMMAND_DELETE, 0x73cd1698)..."

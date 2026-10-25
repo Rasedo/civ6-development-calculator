@@ -157,6 +157,7 @@
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96: the savings' accrual — READ (0x687bf0's slots, remainder and debt), both twins"
   context:
     - "...on >= threshold); Cannot Found Religion (0x7bada0: none founded, no Prophet offered now 0x2f7eb0, none earned 0x2f30c0); Religion Destroyed (0x7bf080); Good Culture (0x7bce30: the play..."
   review: imported

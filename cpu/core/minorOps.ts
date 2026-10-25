@@ -34,7 +34,8 @@ import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
 import { installType, minorCanUpgrade, minorSetItem, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
 import { minorContractCity } from './minorCityAi';
-import { campTiles } from './seats';
+import { campTiles, tileSeat } from './seats';
+import { disbandUnit } from './units';
 import { goldAffordable } from './game';
 import { FX } from './aiValue';
 import { newEconomicMemory, upgradePurchase } from './aiEconomic';
@@ -239,7 +240,15 @@ const UPGRADE_TREE_PRIORITY = AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade
  *    move, no operation's offer (runs/h1_duelw1128 Hong Kong t144-250, its
  *    six units held from Gunpowder on with no Gold to upgrade: no tactical
  *    row, City Defense recruiting none and completing each turn).
- * Unported: the deletion of an excess obsolete unit (Can Delete, 0x591000).
+ *  - THE DELETION (0x7ef850 with Can Delete, the node's data absent: true):
+ *    a unit whose upgrade the treasury cannot buy (the full test failing, the
+ *    visible one passing) is deleted on the minor's own ground where its
+ *    upgrade asks no strategic resource (0x591000 -1); one whose upgrade may
+ *    go but the economic AI does not buy, where its upgrade asks none or it
+ *    holds at most one promotion beside more than 10 of its type; one no
+ *    longer visible, released and deleted (runs/h1_duelu1128 Bologna at 0
+ *    Gold: its eight Scouts, Skirmishers asking no resource, gone at t240;
+ *    1128 Hong Kong's Warriors and Men-at-Arms, Iron and Niter asked, held).
  */
 export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): void {
   const own = (id: number) => state.units.find((u) => u.id === id && u.seat === cs.seat);
@@ -275,12 +284,23 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
     delete cs.upgrading;
     return;
   }
-  // Upgrade Units' execution, then Move Unit's
+  // Upgrade Units' execution (Can Delete: the node holds no data, true),
+  // then Move Unit's
   const eco = (cs.economy ??= newEconomicMemory());
+  const drop = (u: Unit): void => {
+    held.delete(u.id);
+    disbandUnit(state, u.id);
+  };
   for (const u of order(held)) {
-    if (!minorCanUpgrade(state, cs, u) || !goldAffordable(cs.treasury, MINOR_UPGRADE_GOLD)) continue;
-    if (!upgradePurchase(eco, MINOR_UPGRADE_GOLD * FX)) continue;
-    if (minorUpgradeUnit(state, cs, u)) held.delete(u.id);
+    if (upgradeMayGo(state, cs, u)) {
+      if (upgradePurchase(eco, MINOR_UPGRADE_GOLD * FX)) {
+        if (minorUpgradeUnit(state, cs, u)) held.delete(u.id);
+        continue;
+      }
+      if (upgradeUnasked(u) || (promotionCount(u) <= 1 && state.units.filter((x) => x.seat === cs.seat && x.type === u.type).length > 10)) drop(u);
+      continue;
+    }
+    if (unupgradedDeleted(state, cs, u)) drop(u);
   }
   for (const u of order(held)) {
     const p = targets.get(u.id) ?? -1;
@@ -288,6 +308,30 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
   }
   for (const u of order(held)) passFinish(pass, u, UPGRADE_MOVE, u.tileIndex);
   cs.upgrading = order(held).map((u) => u.id);
+}
+
+/** Upgrade Units' full test (0x58fff0 with r8 0): the research, the minor's
+ *  ground, Movement left and the treasury covering the price */
+export function upgradeMayGo(state: GameState, cs: CityState, u: Unit): boolean {
+  return minorCanUpgrade(state, cs, u) && goldAffordable(cs.treasury, MINOR_UPGRADE_GOLD);
+}
+
+/** the unit's upgrade asks no strategic resource (0x591000 -1) */
+const upgradeUnasked = (u: Unit): boolean => !UNITS[UNITS[u.type]?.upgradesTo ?? '']?.requiresResource;
+
+/** Upgrade Units with Can Delete on a held unit whose full test fails: one
+ *  no longer visible (0x58fff0 with r8 1) deleted, a visible one deleted on
+ *  the minor's own ground where its upgrade asks no strategic resource */
+export function unupgradedDeleted(state: GameState, cs: CityState, u: Unit): boolean {
+  if (!minorUpgradeVisible(cs, u)) return true;
+  return tileSeat(state.map.tiles[u.tileIndex]) === cs.seat && upgradeUnasked(u);
+}
+
+/** the promotions a unit holds (its `promos` bits) */
+function promotionCount(u: Unit): number {
+  let n = 0;
+  for (let b = u.promos ?? 0; b; b &= b - 1) n += 1;
+  return n;
 }
 
 /** Find Unit Targets' plot for a unit (the job 0x7eba40, a city-state's one

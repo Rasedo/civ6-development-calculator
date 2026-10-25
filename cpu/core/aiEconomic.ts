@@ -9,8 +9,11 @@
  * balance shared over the SavingTypes slots by the DefaultSavings weights
  * (each share the change x the weight's fraction of the total, the fraction
  * truncated to 1/256), a slot below 0 cleared, the PLOTS slot held at 150
- * with the excess to the SLUSH_FUND, and with no Great Person class
- * available (0x2f7eb0) the GREAT_PEOPLE slot joined to the SLUSH_FUND. A spend (0x68acd0) takes its slot, the
+ * with the excess to the SLUSH_FUND, with no Great Person class
+ * available (0x2f7eb0) the GREAT_PEOPLE slot joined to the SLUSH_FUND, and
+ * the change the slots did not take (the truncation, a cleared slot's debt)
+ * the SLUSH_FUND's, its own debt met from the slots in order (all cleared
+ * with the treasury at 0 or less). A spend (0x68acd0) takes its slot, the
  * overflow from slot 0, and lowers the balance; the can-afford (0x6874d0)
  * asks the slot for the price x (1 - frac) and slot 0 + the slot for the
  * price.
@@ -52,9 +55,16 @@ export const newEconomicMemory = (): EconomicMemory => ({ savings: AI_DEFAULT_SA
  *  `classAvailable` whether a Great Person class is available */
 export function savingsTurn(e: EconomicMemory, treasury: number, classAvailable: boolean): void {
   const delta = treasury - e.balance;
+  // what the slots took: each share, and the debt of a slot cleared below 0
+  let taken = 0;
   for (let i = 0; i < e.savings.length; i++) {
-    e.savings[i] += (delta * SHARE[i]) >> 8;
-    if (e.savings[i] < 0) e.savings[i] = 0;
+    const share = (delta * SHARE[i]) >> 8;
+    e.savings[i] += share;
+    taken += share;
+    if (e.savings[i] < 0) {
+      taken -= e.savings[i];
+      e.savings[i] = 0;
+    }
   }
   if (e.savings[SLOT_PLOTS] > PLOTS_CAP) {
     e.savings[SLOT_SLUSH] += e.savings[SLOT_PLOTS] - PLOTS_CAP;
@@ -63,6 +73,22 @@ export function savingsTurn(e: EconomicMemory, treasury: number, classAvailable:
   if (!classAvailable) {
     e.savings[SLOT_SLUSH] += e.savings[SLOT_GREAT_PEOPLE];
     e.savings[SLOT_GREAT_PEOPLE] = 0;
+  }
+  // the change the slots did not take (the shares' truncation, a cleared
+  // slot's debt) is the SLUSH_FUND's; a SLUSH_FUND below 0 is met from the
+  // slots in order, or, with the treasury at 0 or less, every slot cleared
+  e.savings[SLOT_SLUSH] += delta - taken;
+  if (e.savings[SLOT_SLUSH] < 0) {
+    if (treasury <= 0) e.savings.fill(0);
+    else {
+      let owed = -e.savings[SLOT_SLUSH];
+      e.savings[SLOT_SLUSH] = 0;
+      for (let i = 0; i < e.savings.length && owed > 0; i++) {
+        const take = Math.min(e.savings[i], owed);
+        e.savings[i] -= take;
+        owed -= take;
+      }
+    }
   }
   e.balance = treasury;
 }

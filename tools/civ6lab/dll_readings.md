@@ -8929,11 +8929,12 @@ execution families) on runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128.
   "INSUFFICIENT_FUNDS", Movement) passing, the economic AI's upgrade
   (0x68c940) — else, with Can Delete (no data: true), the deletion
   (UNITCOMMAND_DELETE, 0x73cd1698) of an excess obsolete unit: no
-  district asked by its upgrade (0x591000 -1), or at most one promotion and
+  strategic resource asked by its upgrade (0x591000 -1; section "C-96: the
+  upgrade trees' deletion", ported), or at most one promotion and
   more than 10 of its type (0x4f2c90); the full test failing and the
   visible one too: released (+0x778 -1, its turn done 0x570b40) and, Can
   Delete, deleted; the visible one passing: Can Delete, on its own ground
-  and no district asked, deleted.
+  and no resource asked, deleted.
 - THE ECONOMIC AI'S UPGRADE (0x68c940): the cost (0x590520, << 8): the
   UNITS (+0x540 slot 1) and SLUSH (slot 0) slots together at the cost or
   more spend the UNITS slot, the rest from SLUSH; else a balance (+0x1b8)
@@ -10636,3 +10637,65 @@ raised one.
   and the record's purchases and upgrades through the savings):
   unit.trained 213 / 359 (59.3%) -> 231 / 281 (82.2%), cityState.build
   91.6% -> 92.2%; the Warrior contract purchases (35 of the 146 misses) gone.
+
+## C-96: the savings' accrual — READ (0x687bf0's slots, remainder and debt), both twins
+
+`savingsTurn` (cpu/core/aiEconomic.ts), `_cv_savings_turn`
+(gpu/core/sim_cityvalue.py).
+
+- 0x687bf0 (AI::Economic, the player's AI turn; not a barbarian, not a
+  human): delta = the treasury (player +0x13a0 +0xf8) less the balance
+  (+0x1b8). Per slot of the SavingTypes (4): its weight (+0x4b8 [i]) over the
+  total (+0x458) as float, to 24.8 (floor << 8 | trunc(frac x 256)); the
+  share (fx x delta) >> 8 added to the slot (+0x540 [i]), the shares summed
+  (r14); a slot below 0 (0x688045) cleared, its debt taken off the sum
+  (0x688064 fx_sub_assign: sum -= slot).
+- PLOTS (slot 2) above 0x9600 (150.0): the excess to slot 0, PLOTS 150.
+- No Great Person class available (0x2f7eb0 over the classes, 0x6882f0..
+  0x688339): GREAT_PEOPLE (slot 3) added to slot 0 and cleared.
+- THE REMAINDER (0x68845b..0x68851b): slot 0 += delta - sum — the shares'
+  truncation and a cleared slot's debt land on the SLUSH_FUND.
+- THE DEBT (0x6885bd..0x68872b): slot 0 below 0 — with the treasury at 0 or
+  less every slot cleared; else the debt owed, slot 0 set to 0, and each slot
+  in order gives min(slot, owed).
+- The balance set to the treasury (0x688836, the watched +0x160); the check
+  "totalSaved == m_currentBalance || totalSaved == m_currentBalance +
+  netIncome" (an assert only).
+- CONFIRMED (savsim off the records' treasuries, the logged purchases spent):
+  runs/h1_duelu1117 Valletta's Builder 47 (105 Gold) first passes the test at
+  t22 as logged, its SLUSH + UNITS 105.47 over 105 with the remainder (104.41
+  without it, never by t22; 106-120 with the GREAT_PEOPLE slot folded, t19 —
+  the port's old pass); Caguana t73, UNITS 62.74: its Heavy Chariot (125, half
+  62.5) bought, its Builder contract (130, half 65) not, as logged;
+  runs/h1_duelu1124 Granada's Builder 58 (105) at t27, 105.47.
+- MEASURED (--aiscore, the five duelu duels, with the upgrade trees'
+  deletion below): unit.bought carried 30 -> 35 of 47, aimem 35 -> 39;
+  Valletta t22, Granada t27 and 1127 Mexico City's Builder at t46 bought as
+  logged.
+
+## C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins
+
+`upgradeTreesTick` / `upgradeMayGo` / `unupgradedDeleted`
+(cpu/core/minorOps.ts), `_mops_upgrade_trees` (gpu/core/sim_minorops.py);
+the replay leaves such a unit its city made out of unit.trained.
+
+- Can Delete (r14, 0x7ef8b3): the node's data byte; the tree "Upgrade Units"
+  gives node 3 no TreeData row (BehaviorTrees.xml: DataName "Can Delete",
+  Required False), so true.
+- Per unit in the player's order: the full test (0x58fff0, r8 0) passing —
+  the economic AI's upgrade (0x68c940) bought, done; else, Can Delete,
+  0x591000 -1 deletes; else at most one promotion (+0x1bc0's count, 0x382f0
+  <= 1) and more than 10 of its type (0x4f2c90 > 0xa) deletes. The full test
+  failing: the visible test (r8 1) failing — released (+0x778 -1), its turn
+  done (0x570b40), Can Delete deleted; passing — Can Delete, on its own
+  ground (the plot's owner +0x1c = the unit's +0x2e0) with 0x591000 -1,
+  deleted (UNITCOMMAND_DELETE through vt +0x48 / +0x58 each).
+- 0x591000: the unit's upgrade (0x5909a0) row's +0x2c8 — its
+  StrategicResource — index, -1 none (not a district).
+- CONFIRMED: runs/h1_duelu1128 Bologna (player 3) at 0 Gold, eight Scouts
+  (Skirmisher: no resource) held t231-t239 with no tree, all gone at t240 as
+  Steel lands (no tactical row for them at t240), its Infantry (Mechanized
+  Infantry: Oil) kept; t241-t246 a technology each turn, its Default
+  Specialization's Scouts never in a record; runs/h1_duelw1128 Hong Kong's
+  Warriors (Swordsman: Iron) and Men-at-Arms (Musketman: Niter) held at 0
+  Gold t144-t250.

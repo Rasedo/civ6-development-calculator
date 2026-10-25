@@ -141,6 +141,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
   context:
     - ...Tech +0x240, ObsoleteCivic +0x248 / Tech +0x250 held) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers; per...
   review: imported

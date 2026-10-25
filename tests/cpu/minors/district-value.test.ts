@@ -117,9 +117,11 @@ describe('the savings (0x687bf0) and the unit purchases (0x68be60)', () => {
   it('shares the treasury\'s change by the DefaultSavings weights and holds PLOTS at 150', () => {
     const e = newEconomicMemory();
     savingsTurn(e, 90 * FX, true);
-    // 3 / 4 / 1 / 1 of 9, each fraction truncated to 1/256
-    expect(e.savings.map((x) => x / FX)).toEqual([(90 * 85) / 256, (90 * 113) / 256, (90 * 28) / 256, (90 * 28) / 256]
-      .map((x) => Math.floor(x * 256) / 256));
+    // 3 / 4 / 1 / 1 of 9, each fraction truncated to 1/256, the truncation's
+    // remainder to the SLUSH_FUND
+    const shares = [(90 * 85) / 256, (90 * 113) / 256, (90 * 28) / 256, (90 * 28) / 256].map((x) => Math.floor(x * 256) / 256);
+    shares[0] += 90 - shares.reduce((a, b) => a + b, 0);
+    expect(e.savings.map((x) => x / FX)).toEqual(shares);
     savingsTurn(e, (90 + 2000) * FX, true);
     expect(e.savings[SLOT_PLOTS]).toBe(150 * FX);
     // no Great Person class left: GREAT_PEOPLE folds into the SLUSH_FUND

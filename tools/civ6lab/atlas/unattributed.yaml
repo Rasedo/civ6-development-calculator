@@ -143,6 +143,15 @@
   context:
     - "...lled by 0xa28900, which the SetNEOfRiver / SetWOfRiver / SetNWOfRiver bindings (0x2be20 / 0x2c220 / 0x2bff0) call per edge: it finds the river of the edge's ID or creates it at the back (..."
   review: imported
+- addr: 0x382f0
+  final: 0x902f0
+  kind: function
+  status: PARTLY
+  readings: ["C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ne; else, Can Delete, 0x591000 -1 deletes; else at most one promotion (+0x1bc0's count, 0x382f0 <= 1) and more than 10 of its type (0x4f2c90 > 0xa) deletes. The full test failing: t..."
+  review: imported
 - addr: 0x39080
   final: 0x2cea0
   kind: function
@@ -1878,6 +1887,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -1934,6 +1944,7 @@
       value: "Not ported: on runs/h1_duelw1121   every unit with an unlocked, reachable upgrade reads 23-59 for Hunza where   the game lists 1.0 (Professional Army t76-t93) — ASK: which units the list   +0xd8 holds"
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
   context:
     - "..., unit, test-visible 1) — not a barbarian's (0x56ee80) and an upgrade type it may take (0x5909a0 -> 0x5374c0) — the Amount x its upgrade's Gold (0x590520 << 8) as Gold at the player'..."
   review: imported
@@ -1954,14 +1965,21 @@
 - addr: 0x591000
   final: 0x3b8620
   kind: function
-  status: PARTLY
-  impl: [cpu/core/minorOps.ts:upgradeTreesTick]
+  name: upgradeResource
+  status: READ
+  cases:
+    - recording: h1_duelu1128
+      turn: 240
+      value: "the upgrade's StrategicResource (+0x2c8) index, -1 none: Bologna's Scouts (Skirmisher, none) deleted, Hong Kong's Warriors (Swordsman, Iron) held"
+  impl: [cpu/core/minorOps.ts:upgradeTreesTick, gpu/core/sim_minorops.py:_mops_upgrade_trees]
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...MMAND_DELETE, 0x73cd1698) of an excess obsolete unit: no district asked by its upgrade (0x591000 -1), or at most one promotion and more than 10 of its type (0x4f2c90); the full test fa..."
-  review: imported
+  notes: ["returns the upgrade's StrategicResource, not a district"]
+  review: reviewed
 - addr: 0x5bbf80
   final: 0x3d4270
   kind: function

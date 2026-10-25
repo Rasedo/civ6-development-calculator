@@ -88,12 +88,12 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
 import { holdMinorClears, minorAiTurn, minorGreatPersonClass, minorMilitaryTurn, traceMinorAi } from '../core/minorCityAi';
-import { UPGRADE_MOVE, cityStateMilitary, traceMinorOps } from '../core/minorOps';
+import { UPGRADE_MOVE, cityStateMilitary, traceMinorOps, unupgradedDeleted, upgradeMayGo } from '../core/minorOps';
 import { traceBarbOps } from '../core/barbarianOps';
 import { opsOf } from '../core/operations/manager';
 import { opUnits } from '../core/operations/operation';
@@ -4643,6 +4643,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         }
       }
       const op = cs?.ops ? opsOf(cs.ops).find((o) => opUnits(o).includes(u.id))?.def : undefined;
+      // a unit its city made that its own "Upgrade Units" tree, running this
+      // turn, deletes in the same turn (its upgrade unaffordable and asking
+      // no strategic resource), as the game's did: no unit record t+1 holds
+      // (runs/h1_duelu1128 Bologna at 0 Gold t241-t246, a tree each turn a
+      // technology lands, its Default Specialization's Scouts gone)
+      if (!paid && cs && !op && (cs.upgradeTrigger || (cs.upgrading?.length ?? 0) > 0) && minorUpgradeVisible(cs, u)
+        && !upgradeMayGo(state, cs, u) && unupgradedDeleted(state, cs, u)) continue;
       count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat),
         `${u.type}${paid ? ' bought' : ''}${op ? ` for ${op}` : ''}`);
       if (TRACE.has('minorUnits')) console.error(`t${b.turn - 1} minorAi:unit p${ctx.playerOfSeat.get(u.seat)} ${u.type}${paid ? ' bought' : ' trained'}${op ? ` for ${op}` : ''}`);

@@ -679,18 +679,32 @@ class SimCityValue:
         raw and whether a Great Person class is available): the change shared
         by the DefaultSavings weights, a slot below 0 cleared, PLOTS held at
         150 with the excess to the SLUSH_FUND, GREAT_PEOPLE folded into it
-        with no class left"""
+        with no class left, the change the slots did not take (the
+        truncation, a cleared slot's debt) the SLUSH_FUND's, its own debt met
+        from the slots in order (all cleared with the treasury at 0 or less)"""
         w = self._cv_tables()["savings"]
         tot = sum(w)
         share = torch.tensor([int(x / tot * _FX) for x in w], dtype=torch.long, device=savings.device)
-        delta = (treasury - balance).unsqueeze(-1)
-        s = (savings + ((delta * share) >> 8)).clamp(min=0)
+        delta = treasury - balance
+        part = (delta.unsqueeze(-1) * share) >> 8
+        raw = savings + part
+        s = raw.clamp(min=0)
+        taken = (part - raw.clamp(max=0)).sum(dim=-1)
         over = (s[..., _SLOT_PLOTS] - _PLOTS_CAP).clamp(min=0)
         s[..., _SLOT_SLUSH] += over
         s[..., _SLOT_PLOTS] -= over
         fold = torch.where(class_available.bool(), torch.zeros_like(over), s[..., _SLOT_GREAT_PEOPLE])
         s[..., _SLOT_SLUSH] += fold
         s[..., _SLOT_GREAT_PEOPLE] -= fold
+        s[..., _SLOT_SLUSH] += delta - taken
+        debt = s[..., _SLOT_SLUSH] < 0
+        owed = (-s[..., _SLOT_SLUSH]).clamp(min=0)
+        s[..., _SLOT_SLUSH] = s[..., _SLOT_SLUSH].clamp(min=0)
+        for i in range(s.shape[-1]):
+            take = torch.minimum(s[..., i], owed)
+            s[..., i] = s[..., i] - take
+            owed = owed - take
+        s = torch.where((debt & (treasury <= 0)).unsqueeze(-1), torch.zeros_like(s), s)
         return s, treasury.clone()
 
     def _cv_try_purchase(self, savings: torch.Tensor, balance: torch.Tensor, cost: torch.Tensor,

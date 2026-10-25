@@ -64,15 +64,21 @@
 - addr: 0x7ef850
   final: 0x557910
   kind: function
-  status: PARTLY
-  impl: [cpu/core/minorOps.ts:upgradeTreesTick]
+  name: Upgrade Units execution
+  status: READ
+  cases:
+    - recording: h1_duelu1128
+      turn: 240
+      value: "Bologna at 0 Gold: its eight Scouts (Skirmisher, no resource) deleted as Steel lands; its Infantry (Mechanized Infantry, Oil) kept"
+  impl: [cpu/core/minorOps.ts:upgradeTreesTick, cpu/core/minorOps.ts:upgradeMayGo, cpu/core/minorOps.ts:unupgradedDeleted, gpu/core/sim_minorops.py:_mops_upgrade_trees]
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...s tables): Find Unit Targets update 0x7ed200, Upgrade Units update 0x7f0ea0 / execution 0x7ef850."
     - "...UNITS: update (0x7f0ea0) SUCCESS with the tree holding a unit, else FAILURE. Execution (0x7ef850), a player no human drives, over the tree's units in the player's order (0x6092c0): the..."
-  review: imported
+  review: reviewed
 - addr: 0x7efd70
   final: 0x557e40
   kind: function

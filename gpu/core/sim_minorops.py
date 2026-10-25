@@ -1224,8 +1224,9 @@ class SimMinorOps:
         trees; Find Unit Targets (the city centre, a ship's a coastal centre
         or else the Harbor's plot), none ending the trees; Upgrade Units'
         execution (in pool order, the full test and the treasury, the
-        economic AI's purchase); Move Unit's (each left for its target); the
-        units' turns done"""
+        economic AI's purchase; Can Delete's deletion of the units it does
+        not upgrade); Move Unit's (each left for its target); the units'
+        turns done"""
         Tm = self._mops_tables()
         trig = act & self.mops_upg_trig[:, s]
         self.mops_upg_trig[:, s] &= ~act
@@ -1276,6 +1277,11 @@ class SimMinorOps:
         # Upgrade Units' execution, then Move Unit's, in pool order
         order, _n = self._mops_in_order(held, u["key"])
         cost = torch.full_like(self.citystate_balance[:, s], int(self._mb_upgrade_gold * _FX))
+        # the full test (0x58fff0 r8 0) as the execution opens, and the units
+        # whose upgrade may go that the economic AI did not buy
+        full = (self._minor_can_upgrade(s)[:, :P]
+                & self._afford(self.citystate_treasury[:, s], self._mb_upgrade_gold).unsqueeze(1))
+        unbought = torch.zeros_like(held)
         for j in range(order.shape[1]):
             us = order[:, j]
             m = live & (us >= 0)
@@ -1290,10 +1296,40 @@ class SimMinorOps:
             bought &= can
             self.citystate_savings[:, s] = torch.where(bought.unsqueeze(1), sv, self.citystate_savings[:, s])
             self.citystate_balance[:, s] = torch.where(bought, bal, self.citystate_balance[:, s])
+            miss = can & ~bought
+            if bool(miss.any()):
+                rr = miss.nonzero(as_tuple=True)[0]
+                unbought[rr, us[rr]] = True
             up = self._minor_upgrade_unit(s, bought, us)
             if bool(up.any()):
                 rr = up.nonzero(as_tuple=True)[0]
                 held[rr, us[rr]] = False
+        # THE DELETION (Can Delete, the node's data absent: true): a unit the
+        # economic AI did not buy where its upgrade asks no strategic resource
+        # (0x591000 -1) or it holds at most one promotion beside more than 10
+        # of its type; one whose full test failed — no longer visible, or on
+        # the minor's own ground with its upgrade asking no resource
+        ut = self.major_unit_type[:, :P].clamp(min=0, max=self.NU - 1)
+        nxt = self._type_up_to[ut]
+        unasked = self._type_resource.take(nxt.clamp(min=0)) < 0
+        pr = self.major_unit_promos[:, :P].long()
+        npro = torch.zeros_like(pr)
+        for bit in range(32):
+            npro = npro + ((pr >> bit) & 1)
+        cnt = torch.zeros(ut.shape[0], self.NU, dtype=torch.long, device=self.device)
+        cnt.scatter_add_(1, ut, own.long())
+        many = cnt.gather(1, ut) > 10
+        tile = self.major_unit_tile[:, :P].clamp(min=0)
+        home = self.tile_seat.gather(1, tile) == 100 + s
+        vis_now = self._minor_upgrade_visible(s)[:, :P]
+        drop = held & live.unsqueeze(1) & (
+            (unbought & (unasked | ((npro <= 1) & many)))
+            | (~full & ~unbought & (~vis_now | (home & unasked))))
+        if bool(drop.any()):
+            rows, slots = drop.nonzero(as_tuple=True)
+            self._occ_clear(rows, self.major_unit_tile[rows, slots], slots + self.POOL_LO["major"])
+            self.major_unit_alive[rows, slots] = False
+            held &= ~drop
         order, _n = self._mops_in_order(held, u["key"])
         for j in range(order.shape[1]):
             us = order[:, j]
