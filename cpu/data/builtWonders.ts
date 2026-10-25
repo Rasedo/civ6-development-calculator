@@ -1022,7 +1022,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'effects.tileYields.0.terrain': { derived: 'LAKE — the plot the requirement names is a lake', inputs: [xml('Requirements', 'RequirementId=REQUIRES_PLOT_IS_LAKE', 'RequirementType', { expect: 'REQUIREMENT_PLOT_IS_LAKE' })] },
         'effects.tileYields.0.yields.food': xml('ModifierArguments', 'ModifierId=HUEY_LAKE_FOOD_MODIFIER&Name=Amount', 'Value'),
         'effects.tileYields.0.yields.production': xml('ModifierArguments', 'ModifierId=HUEY_LAKE_PRODUCTION_MODIFIER&Name=Amount', 'Value'),
-        'effects.amenityPerLake.range': { lab: 'C-94', note: 'runs/h1_duelw1106 Rome t140: Entertainment 2 -> 5 the turn Huey Teocalli stands, on a three-tile lake (its own plot and two beside it)' },
+        'effects.amenityPerLake.range': { lab: 'C-103', note: 'runs/h1_duelw1106 Rome t140: Entertainment 2 -> 5 the turn Huey Teocalli stands, on a three-tile lake (its own plot and two beside it)' },
       },
     }),
     W({

@@ -385,7 +385,7 @@ export const MOMENT_ON_TUNDRA = moment('CITY_BUILT_ON_TUNDRA', 1);
 export const MOMENT_NEW_CONTINENT = moment('CITY_BUILT_NEW_CONTINENT', 2);
 export const MOMENT_NEAR_CIV_CITY = moment('CITY_BUILT_NEAR_OTHER_CIV_CITY', 1);
 export const MOMENT_NEAR_CIV_RANGE = srcConst('eras.momentNearCivRange', 5,
-  { lab: 'C-94', note: 'GameCore_XP2 0x306b40: the plot search radius (tools/civ6lab/dll_readings.md)' });
+  { lab: 'C-115', note: 'GameCore_XP2 0x306b40: the plot search radius (tools/civ6lab/dll_readings.md)' });
 export const MOMENT_PANTHEON = moment('PANTHEON_FOUNDED', 1);
 export const MOMENT_PANTHEON_FIRST = moment('PANTHEON_FOUNDED_FIRST_IN_WORLD', 2);
 export const MOMENT_RELIGION = moment('RELIGION_FOUNDED', 2);
@@ -407,11 +407,11 @@ export const MOMENT_LARGEST = moment('CITY_BUILT_BECAME_LARGEST_CIV_BY_MARGIN', 
 /** CIV6 (the rows' text): "within 2 tiles of a natural wonder" / "of a river
  *  that could flood" / "of a volcano that could erupt" */
 export const MOMENT_NEAR_RANGE = srcConst('eras.momentNearRange', 2,
-  { lab: 'C-94', note: 'GameCore_XP2 0x306b40: natural wonder, floodable river and volcano within 2 (tools/civ6lab/dll_readings.md); the rows\' text says "within 2 tiles"' });
+  { lab: 'C-115', note: 'GameCore_XP2 0x306b40: natural wonder, floodable river and volcano within 2 (tools/civ6lab/dll_readings.md); the rows\' text says "within 2 tiles"' });
 /** CIV6 (LARGEST_CIV_BY_MARGIN): "at least 3 more cities than its next
  *  biggest rival" */
 export const MOMENT_LARGEST_MARGIN = srcConst('eras.momentLargestMargin', 3,
-  { lab: 'C-94', note: 'GameCore_XP2 0x306b40: cities - 3 >= every other major\'s (tools/civ6lab/dll_readings.md)' });
+  { lab: 'C-115', note: 'GameCore_XP2 0x306b40: cities - 3 >= every other major\'s (tools/civ6lab/dll_readings.md)' });
 /** CIV6 (GOODY_HUT_TRIGGERED): "A Tribal Village was contacted", paid while
  *  the game era is the Ancient */
 export const MOMENT_GOODY = moment('GOODY_HUT_TRIGGERED', 1);

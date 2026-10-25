@@ -358,7 +358,7 @@ const PROMO_EFFECT_SRC: Readonly<Record<string, SrcMap>> = {
       'ModifierId=GARRISON_COMMANDER_ADJUST_CITY_COMBAT_BONUS&Name=Amount', 'Value'),
     'effects.loyaltyToOwn.loyalty': xml('ModifierArguments',
       'ModifierId=PRESTIGE_IDENTITY_PRESSURE_TO_DOMESTIC_CITIES&Name=Amount', 'Value'),
-    'effects.loyaltyToOwn.range': { lab: 'C-94', note: 'EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE reaches 10 tiles, the governed city included: 1,059 city-turns of the Garrison Commander, every one at distance 0-10 paid +4 and every one at 11-18 nothing, runs/h1_duelw1103-1108' },
+    'effects.loyaltyToOwn.range': { lab: 'C-102', note: 'EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE reaches 10 tiles, the governed city included: 1,059 city-turns of the Garrison Commander, every one at distance 0-10 paid +4 and every one at 11-18 nothing, runs/h1_duelw1103-1108' },
   },
   DEFENSE_LOGISTICS: {
     'effects.noSiege': xml('ModifierArguments',
@@ -384,7 +384,7 @@ const PROMO_EFFECT_SRC: Readonly<Record<string, SrcMap>> = {
   EMISSARY: {
     'effects.loyaltyToForeign.loyalty': xml('ModifierArguments',
       'ModifierId=EMISSARY_IDENTITY_PRESSURE_TO_FOREIGN_CITIES&Name=Amount', 'Value'),
-    'effects.loyaltyToForeign.range': { lab: 'C-94', note: 'EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE reaches 10 tiles, the governed city included: 1,059 city-turns of the Garrison Commander, every one at distance 0-10 paid +4 and every one at 11-18 nothing, runs/h1_duelw1103-1108' },
+    'effects.loyaltyToForeign.range': { lab: 'C-102', note: 'EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE reaches 10 tiles, the governed city included: 1,059 city-turns of the Garrison Commander, every one at distance 0-10 paid +4 and every one at 11-18 nothing, runs/h1_duelw1103-1108' },
   },
   AFFLUENCE: {
     'effects.minorLuxuries': xml('Modifiers', 'ModifierId=AFFLUENCE_COPY_LUXURIES_FOR_IMPORT', 'ModifierType',
