@@ -28,10 +28,9 @@ import { NO_SCORE, policyScores, type PolicyScores } from '../core/aiPolicyValue
 import { AI_POLICIES } from '../../ai/major/tables';
 import type { MajorView } from '../../ai/major/view';
 import { majorView, type MajorViewInputs } from '../core/majorView';
-import { adoptGovernment, fitPolicies, governmentSlots } from '../core/effects';
+import { adoptGovernment, governmentSlots, policyLayoutOf } from '../core/effects';
 import { seatOf } from '../core/seats';
 import type { GameState, GovernmentState } from '../core/types';
-import { POLICY_LIST } from '../data/policies';
 
 /** REPLAY_TRACE=majorAiScores prints every score line that differs from the
  *  log's to stderr */
@@ -163,8 +162,8 @@ export class MajorAiProbe {
         const view = this.view(state, turn - 1);
         const choice = choosePolicies(view, seat, scoresOf(view), true);
         t.choices++;
-        // the cards as a set: the engine lays a set into its own slot order
-        // (`fitPolicies`), so a slot's place is not the game's
+        // the cards as a set: the log names the slots' cards in its own
+        // order
         const ours = choice.slots.map((x) => x.policy ?? '-');
         const govOk = (choice.government ?? null) === ev.government;
         if (govOk) t.government++;
@@ -188,8 +187,7 @@ export class MajorAiProbe {
         // the next completed civic of the turn reads the slots this one left
         const rec = policyRecord(view, choice);
         if (rec.government !== null && rec.government !== undefined) adoptGovernment(state, seat, rec.government);
-        const ids = (rec.policies ?? []).map((i) => POLICY_LIST[i].id);
-        s.government.policies = fitPolicies(governmentSlots(state, seat), ids) ?? s.government.policies;
+        s.government.policies = policyLayoutOf(governmentSlots(state, seat), rec.policies ?? []) ?? s.government.policies;
       }
       const ours = new Set(s.government.policies.filter((x): x is string => !!x));
       const want = record ? new Set(record.policies) : new Set(pre.policies.filter((x): x is string => !!x));

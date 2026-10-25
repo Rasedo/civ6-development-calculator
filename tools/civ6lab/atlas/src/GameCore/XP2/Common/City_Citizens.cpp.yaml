@@ -21,6 +21,8 @@
     - cpu/core/citizens.ts:replaceAllCitizens
     - cpu/core/minorBuild.ts:minorGrowth
     - gpu/core/sim_minors.py:_minor_growth
+    - cpu/core/production.ts:boostEra
+    - gpu/core/sim_phase.py:_seat_city_produce
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:

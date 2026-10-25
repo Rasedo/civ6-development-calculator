@@ -18,8 +18,12 @@ policy knew. Per turn, per driven seat:
                                  engine may pick it (v3)
         "tech": col | None       None = no pick
         "civic": col | None
-        "policies": [i, ...]     the SLOTTED policy cards as table indices, a
-                                 SET (v3+); absent = no decision this turn
+        "policies": [i, ...]     the SLOT LAYOUT: per slot of the seat's
+                                 government, grouped by kind (military,
+                                 economic, diplomatic, wildcard) and within a
+                                 kind in slot order, the card's table index or
+                                 -1 empty (`policyWireOrder`); absent = no
+                                 decision this turn
         "units": [[N], ...]      one entry per unit STEP this turn, since a
                                  unit may act several times
         "beliefs": [[c, i], ...] the beliefs the religion adopts (class code,
@@ -233,7 +237,7 @@ def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_s
     if _w is not None and war_kind is not None and int(war_kind[b]) >= 0:
         rec["warKind"] = int(war_kind[b])  # the WAR_KINDS code the declaration takes
     if policies is not None:
-        rec["policies"] = policies[b].nonzero(as_tuple=True)[0].tolist()
+        rec["policies"] = [int(x) for x in policies[b].tolist() if int(x) != simbase.POLICY_PAST]
     rec.update(buy_record_fields(b, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist))
     if route is not None and int(route[0][b]) >= 0:
         rec["route"] = [int(route[0][b]), int(route[1][b])]
@@ -373,14 +377,13 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     # record apply gathers on dim 1.
     tech = None if rec["tech"] is None else torch.full((sim.B,), int(rec["tech"]), dtype=torch.long, device=dev)
     civic = None if rec["civic"] is None else torch.full((sim.B,), int(rec["civic"]), dtype=torch.long, device=dev)
-    # the slotted cards, a SET of table indices
+    # the slot layout, its places past the list sent POLICY_PAST
     _pv = rec.get("policies")
     policies = None
     if _pv is not None:
-        policies = torch.zeros(sim.B, max(sim._npol, 1), dtype=torch.bool, device=dev)
-        for _i in _pv:
-            if 0 <= int(_i) < sim._npol:
-                policies[:, int(_i)] = True
+        policies = torch.full((sim.B, simbase.POLICY_WIRE), simbase.POLICY_PAST, dtype=torch.long, device=dev)
+        for _k, _i in enumerate(_pv[:simbase.POLICY_WIRE]):
+            policies[:, _k] = int(_i) if int(_i) >= 0 else -1
     _wv = rec.get("war")
     war = None if _wv is None else torch.full((sim.B,), int(_wv), dtype=torch.long, device=dev)
     _wk = rec.get("warKind")

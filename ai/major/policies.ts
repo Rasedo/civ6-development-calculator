@@ -84,15 +84,18 @@ export function choosePolicies(view: MajorView, seat: number, scores: PolicyScor
   return { government: adopted, slots, deferred: false };
 }
 
+/** the slot types in the action's order (SLOT_KINDS: military, economic,
+ *  diplomatic, wildcard) */
+const WIRE_SLOTS = ['SLOT_MILITARY', 'SLOT_ECONOMIC', 'SLOT_DIPLOMATIC', 'SLOT_WILDCARD'];
+
 /** The choice as the seat's action record: the government's column and the
- *  slotted set's columns (the engine re-validates and lays them) */
+ *  slot layout — each slot's card column, -1 empty, the slots grouped by
+ *  type in the action's order (`policyWireOrder`; the engine re-validates) */
 export function policyRecord(view: MajorView, c: PolicyChoice): Pick<SeatActionRecord, 'government' | 'policies'> {
   const gi = c.government ? view.governmentColumn(c.government) : -1;
   return {
     government: gi >= 0 ? gi : null,
-    policies: c.slots.flatMap((x) => {
-      const i = x.policy ? view.policyColumn(x.policy) : -1;
-      return i >= 0 ? [i] : [];
-    }),
+    policies: WIRE_SLOTS.flatMap((t) => c.slots.filter((x) => x.slot === t)
+      .map((x) => (x.policy ? view.policyColumn(x.policy) : -1))),
   };
 }

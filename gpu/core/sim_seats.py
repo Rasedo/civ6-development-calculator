@@ -429,7 +429,7 @@ class SimSeats:
         production: torch.Tensor | None = None,
         tech: torch.Tensor | None = None,
         civic: torch.Tensor | None = None,
-        policies: torch.Tensor | None = None,  # [B, nPol] bool — the cards to SLOT; None = no decision
+        policies: torch.Tensor | None = None,  # [B, POLICY_WIRE] long — the SLOT LAYOUT, `_policy_slots_of`; None = no decision
         war: torch.Tensor | None = None,
         war_kind: torch.Tensor | None = None,  # [B] the WAR_KINDS code the war column declares under; -1/None = the default kind
         production_pref: torch.Tensor | None = None,
@@ -1218,22 +1218,24 @@ class SimSeats:
             chg = self._government_changes(row, government, g_ok)
             self._adopt_government(row, government, g_ok & (~chg | _unlock(chg)))
         if policies is not None:
-            # the SLOTTED CARDS — validated whole (every card unlocked,
-            # the set fits the slots) and STORED; a set that does not fit is
-            # refused entire, as `applySeatPolicies` refuses it
-            chosen = policies.to(torch.bool)
-            ok = active & ext & self._policy_set_ok(row, chosen)
-            chg = ok & self._policy_set_changes(row, chosen)
+            # the SLOT LAYOUT — validated whole (every card unlocked and
+            # fitting its slot, `_policy_slots_of`) and STORED; a layout that
+            # does not fit is refused entire, as `applySeatPolicies` refuses
+            # it. A card moved to another slot comes off and goes on again
+            # and pays; a lapsed card left in its slot stays lapsed
+            slot, fits = self._policy_slots_of(row, policies)
+            ok = active & ext & fits
+            chg = ok & self._policy_layout_changes(row, slot)
             ok = ok & (~chg | _unlock(chg))
             if bool(ok.count_nonzero()):
-                laid = torch.where(ok.unsqueeze(1), chosen, self.civ_policies[:, row])
-                # the same set laid again changes nothing; a new one moves the
-                # version, which the government memo's fast path trusts alone
-                if not torch.equal(laid, self.civ_policies[:, row]):
-                    self.civ_policies[:, row] = laid
-                    # a lapsed card the set keeps keeps its standing; one it
-                    # drops is gone
-                    self.civ_policy_lapsed[:, row] = self.civ_policy_lapsed[:, row] & laid
+                was = self.civ_policy_slot[:, row]
+                laid = torch.where(ok.unsqueeze(1), slot, was)
+                # the same layout laid again changes nothing; a new one moves
+                # the version, which the government memo's fast path trusts alone
+                if not torch.equal(laid, was):
+                    self.civ_policy_slot[:, row] = laid
+                    self.civ_policies[:, row] = laid >= 0
+                    self.civ_policy_lapsed[:, row] = self.civ_policy_lapsed[:, row] & (laid == was) & (laid >= 0)
                     self._eff_version += 1
         return carried
 

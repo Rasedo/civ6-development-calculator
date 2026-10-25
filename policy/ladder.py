@@ -343,6 +343,37 @@ def pick_policies(mask: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor,
     return out
 
 
+# the action's slot layout: its places, and the mark past the seat's slots
+# (gpu/core/simbase.py POLICY_WIRE / POLICY_PAST)
+POLICY_WIRE = 16
+POLICY_PAST = -2
+
+
+def lay_policies(picked: torch.Tensor, nslots: torch.Tensor, kind: torch.Tensor) -> torch.Tensor:
+    """[B, POLICY_WIRE] long — the picked cards `picked` [B, nPol] as the
+    action's SLOT LAYOUT: the seat's slots `nslots` [B, 4] grouped by kind
+    (military, economic, diplomatic, wildcard), each kind's own cards in its
+    slots in table order, the rest in the wildcard slots in table order;
+    -1 an empty slot, POLICY_PAST past the seat's slots."""
+    B = picked.shape[0]
+    dev = picked.device
+    nslots = nslots.long()
+    cum = nslots.cumsum(dim=1)
+    start = cum - nslots
+    p = torch.arange(POLICY_WIRE, device=dev).unsqueeze(0)
+    out = torch.where(p < cum[:, 3:4], -1, POLICY_PAST).to(torch.long).expand(B, -1).clone()
+    own = torch.zeros_like(picked)
+    for k in range(4):
+        uk = picked & (kind == k).unsqueeze(0) & ~own if k < 3 else picked & ~own
+        rank = uk.long().cumsum(dim=1) - 1
+        fit = uk & (rank < nslots[:, k:k + 1])
+        own = own | fit
+        rows, cols = fit.nonzero(as_tuple=True)
+        if rows.numel():
+            out[rows, start[rows, k] + rank[rows, cols]] = cols
+    return out
+
+
 def pick_research(cost: torch.Tensor, mask: torch.Tensor,
                   deep: torch.Tensor | None = None) -> torch.Tensor:
     """[B] long — the RESEARCH verb (tech or civic), over `cost` [B, n] the

@@ -2872,6 +2872,10 @@ class SimInit:
         # by a slot rebuild (`GovernmentState.lapsed`): they pay nothing
         self.civ_policies = torch.zeros(self.B, self.n_majors, max(self._npol, 1), dtype=torch.bool, device=device)
         self.civ_policy_lapsed = torch.zeros_like(self.civ_policies)
+        # each slotted card's slot (`GovernmentState.policies`' layout): its
+        # slot kind x POLICY_KIND_STRIDE + its ordinal among that kind's slots,
+        # -1 unslotted; `civ_policies` is its >= 0
+        self.civ_policy_slot = torch.full((self.B, self.n_majors, max(self._npol, 1)), -1, dtype=torch.long, device=device)
         if self._ngov:
             self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
             # its Influence Points a turn, the fill and the envoys a fill grants (`govInfluence`)

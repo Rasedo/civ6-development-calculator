@@ -295,8 +295,11 @@ export interface SeatActionRecord {
   envoys?: number[];
   tech: number | null;
   civic: number | null;
-  /** the SLOTTED policy cards as table indices (POLICY_LIST order), a SET —
-   *  a driver decision; absent = no decision this turn */
+  /** the SLOT LAYOUT — which card in which slot, a driver decision: per slot
+   *  of the seat's government (wonder extras included), grouped by kind in
+   *  SLOT_KINDS order and within a kind in the slots' order
+   *  (`policyWireOrder`), the card's table index (POLICY_LIST order) or -1
+   *  for an empty slot; absent = no decision this turn */
   policies?: number[];
   units: number[][];
   /** the ONE gold purchase: [kind, a, b]. Kind 0 building (a=centre,

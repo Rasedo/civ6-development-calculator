@@ -3,7 +3,8 @@
 import type { City, GameMap, GameState, TerrainId, Tile } from '../../cpu/core/types';
 import { BARB_SEAT, NO_SEAT, emptySeat, isCiv, seatOf, setMetTurnWith, setTileOwner, tileSeat } from '../../cpu/core/seats';
 import { foundCity } from '../../cpu/core/game';
-import { slotGreedily } from '../../cpu/core/effects';
+import { governmentSlots, policyWireOf, seatGovernment, slotGreedily } from '../../cpu/core/effects';
+import { POLICIES, POLICY_LIST, cardFitsSlot } from '../../cpu/data/policies';
 import { deriveAreas, deriveContinents, deriveMountainRanges, deriveRegions } from '../../world/query';
 import { deriveLowlands, standingRemovable } from '../../cpu/core/climate';
 import { canFoundCity } from '../../cpu/core/rules';
@@ -142,6 +143,27 @@ export function grantTechs(state: GameState, ...ids: string[]): void {
 }
 
 /** Mark civics as researched without paying for them. */
+/** a card set as the policy action's slot layout on government `gov`'s slots
+ *  (default the seat's): under the seat's own government a card it holds
+ *  keeps its slot, the rest in table order each take the first open slot of
+ *  its kind, else the first open wildcard */
+export function policyWireFor(state: GameState, seat: number, ids: readonly string[], gov?: string): number[] {
+  const g = gov ?? seatGovernment(state, seat);
+  const slots = governmentSlots(state, seat, g);
+  const out: (string | null)[] = slots.map(() => null);
+  const cur = g === seatGovernment(state, seat) ? seatOf(state, seat)!.government.policies : [];
+  cur.forEach((c, i) => { if (c && ids.includes(c) && i < out.length) out[i] = c; });
+  const order = new Map(POLICY_LIST.map((p, i) => [p.id, i] as const));
+  for (const id of [...ids].sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0))) {
+    if (out.includes(id)) continue;
+    const card = POLICIES[id];
+    let i = slots.findIndex((k, j) => out[j] === null && k !== 'wildcard' && cardFitsSlot(card, k));
+    if (i < 0) i = slots.findIndex((k, j) => out[j] === null && k === 'wildcard');
+    if (i >= 0) out[i] = id;
+  }
+  return policyWireOf(slots, out);
+}
+
 export function grantCivics(state: GameState, ...ids: string[]): void {
   for (const id of ids) {
     if (!seatOf(state, 0)!.research.civics.includes(id)) seatOf(state, 0)!.research.civics.push(id);

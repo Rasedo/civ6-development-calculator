@@ -37,9 +37,8 @@ import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMA
 import { plotDistance, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
 import { plotsSeenNow } from './barbarians';
-import { POLICY_LIST } from '../data/policies';
 import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
-import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, fitPolicies, governmentSlots, governmentChanges, policySetChanges, policyUnlockCost } from './effects';
+import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, governmentSlots, governmentChanges, policyLayoutChanges, policyLayoutOf, policyUnlockCost } from './effects';
 import type { RuleResult } from './rules';
 import { TECHS, type ResearchEffect } from '../data/techs';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
@@ -1728,20 +1727,25 @@ export function applySeatPolicies(state: GameState, actor: Seat, rec: SeatAction
       && (!governmentChanges(state, actor.seat, rec.government) || unlock())) {
     adoptGovernment(state, actor.seat, rec.government);
   }
-  // The SLOTTED CARDS are a driver decision. Validated whole here —
-  // every card unlocked under the live government, the set fitting its
-  // slots — and STORED in `government.policies`; a set that does not fit is
-  // refused entire. The stored set is what pays the card effects.
+  // The SLOTTED CARDS are a driver decision: the slot layout, which card in
+  // which slot (`policyLayoutOf`). Validated whole here — every card
+  // unlocked under the live government and fitting its slot — and STORED in
+  // `government.policies`; a layout that does not fit is refused entire. The
+  // stored layout is what pays the card effects. Each slot whose card
+  // changes is SetSlotPolicy's (0x3a3990): the card it held comes off, the
+  // new one goes on and pays — a card moved to another slot pays again
+  // (runs/h1_duelw1121 China t31: Urban Planning, laid back lapsed in the
+  // Economic slot by Autocracy's rebuild, re-slotted in the Wildcard). A
+  // lapsed card left in its slot stays lapsed.
   if (rec.policies) {
     const gov = seatGovernment(state, actor.seat);
     if (gov) {
       const open = unlockedPolicyIds(actor.research, darkAgeEra(state, actor.seat), actor.government.held, gov);
-      const ids = rec.policies.map((i) => POLICY_LIST[i]?.id).filter((id): id is string => !!id && open.has(id));
-      const fit = ids.length === rec.policies.length ? fitPolicies(governmentSlots(state, actor.seat), ids) : null;
-      // a lapsed card the set keeps keeps its standing; one it drops is gone
-      if (fit && (!policySetChanges(state, actor.seat, fit) || unlock())) {
-        actor.government.policies = fit;
-        actor.government.lapsed = actor.government.lapsed.filter((c) => fit.includes(c));
+      const layout = policyLayoutOf(governmentSlots(state, actor.seat), rec.policies);
+      if (layout && layout.every((c) => !c || open.has(c)) && (!policyLayoutChanges(state, actor.seat, layout) || unlock())) {
+        const was = actor.government.policies;
+        actor.government.policies = layout;
+        actor.government.lapsed = actor.government.lapsed.filter((c) => was.indexOf(c) === layout.indexOf(c));
       }
     }
   }

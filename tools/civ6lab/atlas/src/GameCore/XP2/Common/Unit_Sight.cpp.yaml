@@ -3,6 +3,43 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x58ae50
+  final: 0x3b4370
+  kind: function
+  name: sightHexDistance
+  signature: int sightHexDistance(int x0, int y0, int x1, int y1, int width, int height, bool wrapX, bool wrapY)
+  semantics: |
+    The hex distance of two plots in odd-row offset coordinates, the
+    shorter way round a wrapping map.
+  status: READ
+  cases:
+    - recording: h1_duelw1127
+      value: run natively under the emulated walk on every plot of 1127 t2 and t100
+  impl: [world/hex.ts:hexDistance]
+  readings:
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
+  review: reviewed
+- addr: 0x58af70
+  final: 0x3b4490
+  kind: function
+  name: sightEyeHeight
+  signature: "int sightEyeHeight(?, int x, int y)"
+  semantics: |
+    The height a look stands at on plot (x, y): its terrain's SightModifier
+    (+0x30), and 1 where the plot holds a district that is a city centre or
+    complete, unpillaged and of a row with ZOC and HitPoints above 0
+    (0x24c2f0).
+  status: READ
+  cases:
+    - recording: h1_duelw1127
+      turn: 2
+      value: "a city centre's raise is a unit's: the city's own look reads the terrain's (Xi'an (13,9) dark as recorded)"
+  impl: [cpu/core/fog.ts:eyeHeight, gpu/core/sim_masks.py:_eye_height]
+  readings:
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
+  review: reviewed
 - addr: 0x58b1d0
   final: 0x3b4650
   kind: function
@@ -44,38 +81,20 @@
       value: "China's Settler (12,7), range 3: Grassland (13,10) past the Forest (12,9) listed (the record's fog)"
     - recording: h1_duelw1117
       turn: 2
-      value: "Rome's look leaves plot 716 dark, as recorded"
+      value: Rome's look leaves plot 716 dark, as recorded
     - recording: h1_duelw1127
       value: "emulated (unicorn, the callees stubbed with the map's heights) on every plot of 1127 t2 / t100, 1117 t60, 1121 t150, ranges 1-5, Sentry off and on: losDisk and sight_walk list the same plots on all 45,760 looks"
   impl: [cpu/core/fog.ts:losDisk, gpu/core/simbase.py:sight_walk]
   readings:
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
-  review: reviewed
-- addr: 0x58af70
-  final: 0x3b4490
-  kind: function
-  name: sightEyeHeight
-  signature: "int sightEyeHeight(?, int x, int y)"
-  semantics: |
-    The height a look stands at on plot (x, y): its terrain's SightModifier
-    (+0x30), and 1 where the plot holds a district that is a city centre or
-    complete, unpillaged and of a row with ZOC and HitPoints above 0
-    (0x24c2f0).
-  status: READ
-  cases:
-    - recording: h1_duelw1127
-      turn: 2
-      value: "a city centre's raise is a unit's: the city's own look reads the terrain's (Xi'an (13,9) dark as recorded)"
-  impl: [cpu/core/fog.ts:eyeHeight, gpu/core/sim_masks.py:_eye_height]
-  readings:
-    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
   review: reviewed
 - addr: 0x58d1c0
   final: 0x3b5c00
   kind: function
   name: sightThroughHeight
-  signature: "int sightThroughHeight(int x, int y, bool feature, bool terrain)"
+  signature: int sightThroughHeight(int x, int y, bool feature, bool terrain)
   semantics: |
     The height plot (x, y) puts in the way of a look: its terrain's
     SightThroughModifier (+0x34) where `terrain`, plus its feature's
@@ -88,29 +107,15 @@
   impl: [cpu/core/fog.ts:sightThrough, gpu/core/sim_masks.py:_sight_through_plane]
   readings:
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
-  review: reviewed
-- addr: 0x58ae50
-  final: 0x3b4370
-  kind: function
-  name: sightHexDistance
-  signature: "int sightHexDistance(int x0, int y0, int x1, int y1, int width, int height, bool wrapX, bool wrapY)"
-  semantics: |
-    The hex distance of two plots in odd-row offset coordinates, the
-    shorter way round a wrapping map.
-  status: READ
-  cases:
-    - recording: h1_duelw1127
-      value: "run natively under the emulated walk on every plot of 1127 t2 and t100"
-  impl: [world/hex.ts:hexDistance]
-  readings:
-    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
   review: reviewed
 - addr: 0x58f170
   final: 0x3b7040
   kind: function
-  status: UNREAD
   semantics: |
     A caller of the unit sight walk 0x58b1d0.
+  status: UNREAD
   readings:
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
   review: reviewed

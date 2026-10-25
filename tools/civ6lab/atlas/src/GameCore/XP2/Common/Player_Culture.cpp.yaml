@@ -627,6 +627,7 @@
   kind: function
   name: SetSlotPolicy
   status: PARTLY
+  impl: [cpu/core/phase.ts:applySeatPolicies]
   readings: ["C-94: the slot rebuild — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:

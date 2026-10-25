@@ -42,7 +42,8 @@ export function researchObs(state: GameState, seat: number): { tech_cost: number
 /** The `policy` group: the card indices the seat may slot under the
  *  government it is in (the record's validator, `unlockedPolicyIds`),
  *  ascending, and that government's slots by kind — `governmentSlots`, the
- *  list `fitPolicies` lays the set into; empty and all zero without one.
+ *  counts the action's slot layout groups its places by (`policyWireOrder`);
+ *  empty and all zero without one.
  *  Then that government's `GOVERNMENT_LIST` position (-1 none) and the
  *  positions the record's government arm accepts now (`governmentsOpen`). */
 export function policyObs(state: GameState, seat: number): {

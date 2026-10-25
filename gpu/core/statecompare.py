@@ -822,7 +822,7 @@ SEAT = {
     "governmentAnarchyEnd": _civ_scalar("civ_gov_anarchy_end"),
     "policySlotsExtra": lambda sim, b, rows: [
         [int(x) for x in _batch_rows(sim, "wslots", c, sim._wonder_extra_slots)[b]] for c in rows],
-    "policiesSlotted": _civ_mask("civ_policies"),
+    "policyLayout": lambda sim, b, rows: [_policy_layout(sim, b, s) for s in rows],
     "policiesLapsed": _civ_mask("civ_policy_lapsed"),
     "prevAge": _civ_scalar("prev_age"),
     "darkAges": _civ_scalar("dark_ages"),
@@ -1088,6 +1088,18 @@ def _ai_trees(sim, b: int, s: int) -> list[int]:
         tr = [int(x) for x in sim.cai_tr_trigger[b, s, k].tolist()]
         out += [int(sim.cai_tr_id[b, s, k])] + (units + [-1] * 4)[:4] + tr[:7]
     return out
+
+
+def _policy_layout(sim, b: int, row: int) -> list[int]:
+    """the seat's slot layout as the action carries it (`policyWireOf`): per
+    slot of its government, grouped by kind, the card's table index, -1
+    empty"""
+    import torch
+    n = sim._seat_policy_slots(row)[b:b + 1] if sim._ngov else torch.zeros(1, 4, dtype=torch.long)
+    ws = sim._policy_wire_slot(n.to(sim.device))[0].tolist()
+    at = sim.civ_policy_slot[b, row].tolist()
+    by = {int(x): c for c, x in enumerate(at) if x >= 0}
+    return [by.get(int(w), -1) for w in ws if w >= 0]
 
 
 def _minor_ops(sim, b: int, s: int) -> list[int]:

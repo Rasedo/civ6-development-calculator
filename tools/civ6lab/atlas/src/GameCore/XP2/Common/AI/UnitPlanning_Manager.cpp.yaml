@@ -149,6 +149,8 @@
     - cpu/core/tactical.ts:barbarianTactics
     - cpu/core/tactical.ts:Planner
     - cpu/core/tactical.ts:planUnit
+    - cpu/core/tactical.ts:plan
+    - gpu/core/sim_tactics.py:_tac_pass
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"

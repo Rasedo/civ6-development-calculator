@@ -756,7 +756,15 @@ handler 0xc97410, "Policy Enacted - Attaching modifiers") and detach on
   (so never one already slotted, a laid-back one included) scoring above
   the slot's card takes the slot by command type 0. A card laid back pays
   again only when it is displaced and slotted again; one left where the
-  rebuild laid it pays nothing while it is listed.
+  rebuild laid it pays nothing while it is listed. The engines carry the
+  slots on the per-seat action as the slot LAYOUT (`policies`: per slot,
+  grouped by kind, a card or -1; `policyLayoutOf` / `_policy_slots_of`, the
+  GPU's `civ_policy_slot` a card's kind and ordinal): a card in another
+  slot than before came off and went on again and pays, a lapsed one left
+  in its slot stays lapsed. runs/h1_duelw1121 China t31: Autocracy's
+  rebuild lays Survey (Military) and Urban Planning (Economic) back
+  lapsed; the AI slots Discipline, Caravansaries in the Economic slot,
+  Diplomatic League, and Urban Planning in the Wildcard, which pays its +1.
 - Fit: `importLapsed` reads the records' slot lists by these rules (a
   rebuild where the government or the slot count moved). Over the six
   Duels gap-free city.housing 1,319 → 438, city.amenities 1,629 → 827,

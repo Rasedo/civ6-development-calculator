@@ -1497,8 +1497,11 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
             cstyle = ladder.card_style_of(_policy_rng(st.device, seeds, 0, row, 10))
         else:
             cstyle = None
-        policies = ladder.pick_policies(pol_open, _obs_dense(nobs, "policy", "slots", dev), st.pol_kind,
-                                        legacy=st.pol_legacy, style=cstyle, dark=st.pol_dark)
+        nslots = _obs_dense(nobs, "policy", "slots", dev)
+        picked = ladder.pick_policies(pol_open, nslots, st.pol_kind,
+                                      legacy=st.pol_legacy, style=cstyle, dark=st.pol_dark)
+        # the action is the slot layout: which card in which slot
+        policies = ladder.lay_policies(picked, nslots, st.pol_kind)
     war = None
     war_kind = None
     if seeds is not None:

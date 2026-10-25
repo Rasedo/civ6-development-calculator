@@ -131,6 +131,13 @@
   context:
     - "...120, the district row's hash). The route's path score (Trade_Manager 0x5500b0 counting, 0x54eeb0 weighing): past the origin, a centre counts its Trading Post (foreign, own); any other..."
   review: imported
+- addr: 0x54fe20
+  final: 0x38dab0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/goodyHuts.ts:goodyEligible, gpu/core/sim_seats.py:_trader_room]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x54ff90
   final: 0x38dc20
   kind: function

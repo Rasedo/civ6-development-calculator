@@ -6,7 +6,7 @@
  * builder's governor-gated jobs. The GPU twin is tests/gpu/eco_residue_test.py.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, settleAt, tileAtCoords, grantCivics, grantTechs, standDistrict } from '../helpers';
+import { makeMap, makeState, settleAt, tileAtCoords, grantCivics, grantTechs, standDistrict, policyWireFor } from '../helpers';
 import { emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { buildingPurchaseCost, buildingFaithCost, unitPurchaseCost } from '../../../cpu/core/game';
 import { applySeatPolicies } from '../../../cpu/core/phase';
@@ -97,12 +97,12 @@ describe('the policy unlock', () => {
     s.treasury = cost + 7;
     // the government and a new card set in one record pay once
     const card = POLICY_LIST.findIndex((p) => p.id === 'DISCIPLINE');
-    applySeatPolicies(state, s, REC(GOV('OLIGARCHY'), [card]));
+    applySeatPolicies(state, s, REC(GOV('OLIGARCHY'), policyWireFor(state, 0, [POLICY_LIST[card].id], 'OLIGARCHY')));
     expect(seatGovernment(state, 0)).toBe('OLIGARCHY');
     expect(s.government.policies).toContain('DISCIPLINE');
     expect(s.treasury).toBe(7);
     // naming what the seat already holds changes nothing and costs nothing
-    applySeatPolicies(state, s, REC(GOV('OLIGARCHY'), [card]));
+    applySeatPolicies(state, s, REC(GOV('OLIGARCHY'), policyWireFor(state, 0, [POLICY_LIST[card].id])));
     expect(s.treasury).toBe(7);
   });
 

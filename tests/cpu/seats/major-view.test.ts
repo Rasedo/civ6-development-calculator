@@ -39,7 +39,7 @@ describe('the majors\' AI view', () => {
     const rec = policyRecord(v, choice);
     applySeatPolicies(state, seatOf(state, 0)!, { production: [], tech: null, civic: null, units: [], ...rec });
     const cards = seatOf(state, 0)!.government.policies.filter((x): x is string => !!x).sort();
-    expect(cards).toEqual((rec.policies ?? []).map((i) => POLICY_LIST[i].id).sort());
+    expect(cards).toEqual((rec.policies ?? []).filter((i) => i >= 0).map((i) => POLICY_LIST[i].id).sort());
     // God King (+1 Gold, +1 Faith in the capital) over Urban Planning (+1
     // Production a city) with one city and every weight 0
     expect(cards).toContain('GOD_KING');

@@ -43,7 +43,7 @@ export type Decision = Base & (
   | { kind: 'queue'; player: number; city: number; items: QueueSpec[] }
   | { kind: 'research'; player: number; tech: number }
   | { kind: 'civic'; player: number; civic: number }
-  | { kind: 'policies'; player: number; government: number; policies: number[] }
+  | { kind: 'policies'; player: number; government: number; policies: number[] /* per slot, the game's order; -1 empty */ }
   | { kind: 'found'; player: number; plot: number; unit?: string }
   | { kind: 'buyPlot'; player: number; city: number; plot: number }
   | { kind: 'buyBuilding'; player: number; city: number; building: number; currency: 'gold' | 'faith' }
@@ -261,7 +261,8 @@ export class InferredActions implements ActionSource {
         if (tech >= 0) out.push({ kind: 'research', phase: ph, player: p1.id, tech });
         const civic = stepPick(p0, p1, 'civic', 'civics', active);
         if (civic >= 0) out.push({ kind: 'civic', phase: ph, player: p1.id, civic });
-        const cards = (p: DumpPlayer) => (p.policies ?? []).map(num).filter((i) => i >= 0).sort((x, y) => x - y);
+        // the slots' cards in the game's slot order, -1 an empty slot
+        const cards = (p: DumpPlayer) => (p.policies ?? []).map(num).map((i) => (i >= 0 ? i : -1));
         if (num(p0.government) !== num(p1.government) || cards(p0).join() !== cards(p1).join()) {
           out.push({ kind: 'policies', phase: ph, player: p1.id, government: num(p1.government), policies: cards(p1) });
         }

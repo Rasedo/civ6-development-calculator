@@ -1773,21 +1773,65 @@ export function governmentChanges(state: GameState, seat: number, index: number)
   return !!g && now !== null && g.id !== now && governmentsOpen(state, seat).includes(index);
 }
 
-/** Does the card layout `cards` slot a different SET than the seat holds —
- *  its stored cards still open under its government? */
-export function policySetChanges(state: GameState, seat: number, cards: readonly (string | null)[]): boolean {
+/** Does the card layout `cards` (the seat's slots in order) put a different
+ *  card in any slot than the seat holds there — its stored cards still open
+ *  under its government? */
+export function policyLayoutChanges(state: GameState, seat: number, cards: readonly (string | null)[]): boolean {
   const s = seatOf(state, seat);
   const gov = seatGovernment(state, seat);
   if (!s || !gov) return false;
   const open = unlockedPolicyIds(s.research, darkAgeEra(state, seat), s.government.held, gov);
-  const now = new Set(s.government.policies.filter((p): p is string => !!p && open.has(p)));
-  const next = new Set(cards.filter((p): p is string => !!p));
-  return now.size !== next.size || [...next].some((p) => !now.has(p));
+  const now = s.government.policies;
+  return cards.length !== now.length || cards.some((c, i) => {
+    const was = now[i] && open.has(now[i]!) ? now[i] : null;
+    return (c ?? null) !== was;
+  });
+}
+
+/** THE POLICY ACTION'S SLOT ORDER (the per-seat action's `policies`): the
+ *  seat's slots (`slots`, `governmentSlots`) grouped by kind in SLOT_KINDS
+ *  order, within a kind in their own order — for each place of the action
+ *  the slot it names. A slot is the j-th of its kind whichever block (the
+ *  government's own, a wonder's extra) holds it, so a driver that knows only
+ *  the count of each kind lays a layout. */
+export function policyWireOrder(slots: readonly SlotKind[]): number[] {
+  const out: number[] = [];
+  for (const k of SLOT_KINDS) slots.forEach((x, i) => { if (x === k) out.push(i); });
+  return out;
+}
+
+/** The action's layout `wire` (card table indices, -1 an empty slot, in
+ *  `policyWireOrder`) as the cards in the seat's slots: null where its length
+ *  is not the slots' count, a card does not fit its slot (`cardFitsSlot`)
+ *  or stands twice. */
+export function policyLayoutOf(slots: readonly SlotKind[], wire: readonly number[]): (string | null)[] | null {
+  if (wire.length !== slots.length) return null;
+  const order = policyWireOrder(slots);
+  const out: (string | null)[] = slots.map(() => null);
+  const seen = new Set<string>();
+  for (let p = 0; p < wire.length; p++) {
+    if (wire[p] < 0) continue;
+    const card = POLICY_LIST[wire[p]];
+    const i = order[p];
+    if (!card || !cardFitsSlot(card, slots[i]) || seen.has(card.id)) return null;
+    seen.add(card.id);
+    out[i] = card.id;
+  }
+  return out;
+}
+
+/** The cards in the seat's slots as the action's layout (`policyLayoutOf`'s
+ *  inverse). */
+export function policyWireOf(slots: readonly SlotKind[], cards: readonly (string | null)[]): number[] {
+  return policyWireOrder(slots).map((i) => {
+    const c = cards[i];
+    return c ? POLICY_LIST.findIndex((x) => x.id === c) : -1;
+  });
 }
 
 /** A CHANGED government rebuilds the slots (CIV6, dll_readings "C-94: the
  *  slot rebuild"): every card comes off, and the old layout — the stored
- *  cards laid into the slots `before` held, `fitPoliciesLoose` — is laid back
+ *  cards in the slots `before` held — is laid back
  *  into the new slots by `carryLayout`, each card it lays slotted but LAPSED
  *  (`GovernmentState.lapsed`); the rest are dropped, and the freed slots wait
  *  for the driver's next decision. `_carry_policies` is the twin. */
@@ -1796,8 +1840,8 @@ export function carryPolicies(state: GameState, seat: number, before: readonly S
   const gov = seatGovernment(state, seat);
   if (!gov) return;
   const open = unlockedPolicyIds(s.research, darkAgeEra(state, seat), s.government.held, gov);
-  const old = fitPoliciesLoose(before, s.government.policies.filter((p): p is string => !!p));
-  const laid = carryLayout(old.map((c, i) => [before[i], c] as const), governmentSlots(state, seat), (c) => open.has(c));
+  const old = s.government.policies;
+  const laid = carryLayout(before.map((k, i) => [k, old[i] ?? null] as const), governmentSlots(state, seat), (c) => open.has(c));
   s.government.policies = laid;
   s.government.lapsed = laid.filter((c): c is string => !!c);
 }
@@ -1948,44 +1992,12 @@ export function slottedPolicyIndices(state: GameState, seat: number): number[] {
   return out.sort((a, b) => a - b);
 }
 
-/** Lay `cards` into `slots` in TABLE order, DROPPING what finds no slot — a
- *  government change's carry-over (`carryPolicies`) and the greedy
- *  reference's own rule; `_fit_policy_set` is the twin. */
-export function fitPoliciesLoose(slots: readonly SlotKind[], cards: readonly string[]): (string | null)[] {
-  const out: (string | null)[] = slots.map(() => null);
-  const order = new Map(POLICY_LIST.map((p, i) => [p.id, i] as const));
-  for (const id of [...cards].sort((a, b) => (order.get(a) ?? 1e9) - (order.get(b) ?? 1e9))) {
-    const card = POLICIES[id];
-    if (!card) continue;
-    let slot = slots.findIndex((kind, i) => out[i] === null && kind !== 'wildcard' && cardFitsSlot(card, kind));
-    if (slot < 0) slot = slots.findIndex((kind, i) => out[i] === null && kind === 'wildcard');
-    if (slot >= 0) out[slot] = id;
-  }
-  return out;
-}
-
 /** Fill `seat`'s store with the greedy reference — what a test scene that
  *  sets civics by hand calls in place of the driver's pick. */
 export function slotGreedily(state: GameState, seat: number): void {
   const s = seatOf(state, seat)!;
   s.government.policies = computeAdoption(s.research, wonderExtraSlots(state, seat), darkAgeEra(state, seat), s.government.held, seatGovernment(state, seat)).policies;
   s.government.lapsed = [];
-}
-
-/** Lay `cards` (table order) into `slots`: each takes the first open slot of
- *  its kind, else the first open wildcard; null when one finds no slot — the
- *  set does not fit and is refused whole. `_policy_set_ok` is the twin. */
-export function fitPolicies(slots: readonly SlotKind[], cards: readonly string[]): (string | null)[] | null {
-  const out: (string | null)[] = slots.map(() => null);
-  for (const id of cards) {
-    const card = POLICIES[id];
-    if (!card) return null;
-    let slot = slots.findIndex((kind, i) => out[i] === null && kind !== 'wildcard' && cardFitsSlot(card, kind));
-    if (slot < 0) slot = slots.findIndex((kind, i) => out[i] === null && kind === 'wildcard');
-    if (slot < 0) return null;
-    out[slot] = id;
-  }
-  return out;
 }
 
 function applyGovernment(mods: Modifiers, government: string | null, research: ResearchState,

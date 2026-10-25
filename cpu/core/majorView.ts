@@ -36,7 +36,7 @@ import { GWO_COUNT } from '../data/greatWorks';
 import { gwCountsByObj } from './greatWorks';
 import { UNIT_PROMO_CLASS } from '../data/promotions';
 import { availableBuildings } from './rules';
-import { carryLayout, darkAgeEra, fitPoliciesLoose, getModifiers, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment, type YieldCtx,
+import { carryLayout, darkAgeEra, getModifiers, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment, type YieldCtx,
   unlockedPolicyIds } from './effects';
 import { gpCapped, gpOffer, gpOfferCost, greatPersonPointsPerTurn, patronageCost } from './greatPeople';
 import { gpActivateOk } from './gpAbility';
@@ -322,10 +322,10 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const g = govId(type);
       if (!g || g === seatGovernment(state, i)) return slotsOf(i);
       const before = governmentSlots(state, i);
-      const old = fitPoliciesLoose(before, seat(i).government.policies.filter((p): p is string => !!p));
+      const old = seat(i).government.policies;
       const after = governmentSlots(state, i, g);
       const open = slottable(i, g);
-      const laid = carryLayout(old.map((c, j) => [before[j], c] as const), after, (c) => open.has(c));
+      const laid = carryLayout(before.map((k, j) => [k, old[j] ?? null] as const), after, (c) => open.has(c));
       return after.map((k, j) => ({ slot: slotType(k), policy: laid[j] ? policyType(laid[j]!) : null }));
     },
     policiesSlottableUnder: (i, type) => {

@@ -41,7 +41,7 @@ import { AI_GOVERNMENTS } from '../../ai/major/tables';
 import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { installType } from './minorBuild';
-import { wonderExtraSlots } from './effects';
+import { governmentSlots, policyWireOf, wonderExtraSlots } from './effects';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -827,8 +827,8 @@ const SEAT: Record<string, Extractor> = {
     const x = wonderExtraSlots(state, s.seat);
     return SLOT_KINDS.map((k) => x[k]);
   }),
-  policiesSlotted: overSeats((s) => s.government.policies
-    .map((p) => (p ? POLICY_IDX.get(p) ?? -1 : -1)).filter((i) => i >= 0).sort((a, b) => a - b)),
+  // the slot layout as the action carries it: which card in which slot
+  policyLayout: overSeats((s, state) => policyWireOf(governmentSlots(state, s.seat), s.government.policies)),
   policiesLapsed: overSeats((s) => s.government.lapsed
     .map((p) => POLICY_IDX.get(p) ?? -1).filter((i) => i >= 0).sort((a, b) => a - b)),
   prevAge: overSeats((s) => s.prevAge ?? 1),

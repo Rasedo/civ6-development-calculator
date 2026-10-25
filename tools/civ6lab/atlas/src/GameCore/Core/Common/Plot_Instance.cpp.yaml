@@ -175,7 +175,8 @@
   readings:
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
-  notes: ["the new owner's visibility count raised on the plot and on each plot beside it (neighbour walk, vtable +0x58), no line of sight"]
+  notes:
+    - the new owner's visibility count raised on the plot and on each plot beside it (neighbour walk, vtable +0x58), no line of sight
   context:
     - "...t of 0x58b1d0's line-of-sight list, from 0x58f3f0 on a move, 0x586d40), a plot's owner (0x84760, territory: none for the barbarians), an improvement's owner (0x84340 from the placemen..."
   review: reviewed

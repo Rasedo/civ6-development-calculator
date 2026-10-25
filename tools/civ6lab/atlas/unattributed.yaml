@@ -1740,6 +1740,7 @@
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights hold raises..."
@@ -4561,6 +4562,7 @@
   final: 0x669c50
   kind: function
   status: PARTLY
+  impl: [cpu/harness/replay.ts:dugIn, cpu/harness/replay.ts:recordState]
   readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:

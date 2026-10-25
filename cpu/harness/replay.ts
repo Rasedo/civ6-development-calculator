@@ -43,7 +43,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, FORTIFY_MAX_TURNS } from '../core/units';
-import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, seatGovernment, darkAgeEra,
+import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
 import { computeCityStats } from '../core/city';
@@ -75,7 +75,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { PROJECTS } from '../data/projects';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
-import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST } from '../data/policies';
+import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES } from '../data/policies';
 import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_IDS, RELIGION_INITIAL_BELIEFS, RELIGION_TYPES, beliefIdAt, gainPopulationPressure } from '../data/religion';
 import { missionOf, missionPayable } from '../core/deals';
 import { DEAL_MISSION, DELEGATION_COST, EMBASSY_COST } from '../data/seats';
@@ -1544,11 +1544,12 @@ function applyTransitions(ctx: Ctx, probe: DiplomacyProbe, sender: DiploSender, 
 
 type PolicyDecision = Extract<Decision, { kind: 'policies' }>;
 
-/** a government and card set as the engine names them */
-function policyIds(ctx: Ctx, d: PolicyDecision): { gid: string | null; ids: string[] } {
+/** a government and slot layout as the engine names them: per slot (the
+ *  game's slot order, the engine's `governmentSlots`) its card, null empty */
+function policyIds(ctx: Ctx, d: PolicyDecision): { gid: string | null; ids: string[]; layout: (string | null)[] } {
   const gid = d.government >= 0 ? engineId('government', ctx.cat.governments[d.government], 'GOVERNMENT_', GOVERNMENTS) : null;
-  const ids = d.policies.map((i) => engineId('policy', ctx.cat.policies[i], 'POLICY_', POLICIES)).filter((x): x is string => !!x);
-  return { gid, ids };
+  const layout = d.policies.map((i) => (i >= 0 ? engineId('policy', ctx.cat.policies[i], 'POLICY_', POLICIES) ?? null : null));
+  return { gid, ids: layout.filter((x): x is string => !!x), layout };
 }
 
 /** THE PENDING POLICIES. A government or card set the next record shows was
@@ -1563,10 +1564,11 @@ function stagePolicies(ctx: Ctx, ds: Decision[]): PolicyDecision[] {
   for (const d of staged) {
     const seat = seatOfP(ctx, d.player);
     if (seat === NO_SEAT || seat >= ctx.state.seats.length) continue;
-    const { gid, ids } = policyIds(ctx, d);
+    const { gid, layout } = policyIds(ctx, d);
     const gi = gid ? GOVERNMENT_LIST.findIndex((g) => g.id === gid) : -1;
-    Object.assign(recOf(seat), { government: gi >= 0 ? gi : null,
-      policies: ids.map((id) => POLICY_LIST.findIndex((p) => p.id === id)).filter((i) => i >= 0) });
+    // the layout on the slots of the government the record's set is laid in
+    const slots = governmentSlots(ctx.state, seat, gid ?? seatGovernment(ctx.state, seat));
+    Object.assign(recOf(seat), { government: gi >= 0 ? gi : null, policies: policyWireOf(slots, layout) });
   }
   for (const d of ctx.envoys) {
     const seat = seatOfP(ctx, d.player);
@@ -1833,11 +1835,10 @@ function verifyPolicies(ctx: Ctx, staged: PolicyDecision[]): void {
   for (const d of staged) {
     const s = seatOf(ctx.state, seatOfP(ctx, d.player));
     if (!s) continue;
-    const { gid, ids } = policyIds(ctx, d);
-    // the cards as a set: the stored layout holds its empty slots as null
-    const cards = (xs: readonly (string | null)[]) => xs.filter((x): x is string => !!x).sort().join();
+    const { gid, ids, layout } = policyIds(ctx, d);
+    // the layout slot by slot
     const govOk = !gid || s.government.chosen === gid;
-    const same = govOk && cards(s.government.policies) === cards(ids);
+    const same = govOk && s.government.policies.length === layout.length && layout.every((c, i) => (s.government.policies[i] ?? null) === c);
     let why: string | undefined;
     if (!same) {
       const gov = seatGovernment(ctx.state, s.seat);
@@ -1845,10 +1846,10 @@ function verifyPolicies(ctx: Ctx, staged: PolicyDecision[]): void {
         : new Set<string>();
       why = !govOk ? `government ${gid} not adopted (in ${s.government.chosen})`
         : ids.some((id) => !open.has(id)) ? `a card not unlocked: ${ids.filter((id) => !open.has(id)).join(',')}`
-          : !fitPolicies(governmentSlots(ctx.state, s.seat), ids) ? 'the set does not fit the slots'
-            : 'the unlock unaffordable';
+          : layout.length !== governmentSlots(ctx.state, s.seat).length ? 'the layout is not the slots\' count'
+            : 'a card off its slot, or the unlock unaffordable';
       if (gid) s.government.chosen = gid as typeof s.government.chosen;
-      s.government.policies = fitPolicies(governmentSlots(ctx.state, s.seat), ids) ?? ids;
+      s.government.policies = layout;
     }
     count(ctx, 'policies', same ? 'applied' : 'fallback', d.player, why);
   }

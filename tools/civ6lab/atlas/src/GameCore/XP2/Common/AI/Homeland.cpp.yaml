@@ -55,6 +55,7 @@
     - gpu/core/sim_tactics.py:_tac_explore
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
   context:
     - "...s within the unit's sight +0x1998 seen from the plot): those the player never revealed (0x70a6c0) and those not visible now (0x70a8b0, [player +0x290] <= 0). The first plot of the la..."
     - "...a revealed plot's +0x47 that makes a plot of positive count win once ahead of a larger (0x70a6c0's second flag: not carried); the turn test on a plot of a player at war (0x70bd40: the..."
@@ -72,6 +73,7 @@
   impl: [cpu/core/tactical.ts:exploreTarget]
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...n from the plot): those the player never revealed (0x70a6c0) and those not visible now (0x70a8b0, [player +0x290] <= 0). The first plot of the largest first count above 0 wins (\"HL: Ex..."

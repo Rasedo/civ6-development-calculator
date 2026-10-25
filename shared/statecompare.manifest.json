@@ -1281,15 +1281,16 @@
           "note": "the policy slots a seat holds BEYOND its government's own, in SLOT_KINDS order — a wonder's, Adam Smith's, a roster row's, and the kind a conversion (Founding Fathers, the Holy Roman Emperor) moves. Derived on both engines (`wonderExtraSlots` / `_wonder_extra_slots`); compared beside policiesSlotted, since two engines can agree on every slotted card and still disagree about how many slots exist."
         },
         {
-          "name": "policiesSlotted",
+          "name": "policyLayout",
           "compare": "exact",
           "covers": [
             "GovernmentState.policies"
           ],
           "planes": [
-            "civ_policies"
+            "civ_policies",
+            "civ_policy_slot"
           ],
-          "note": "the cards a seat has SLOTTED, as a sorted index set over the policy table — a DRIVER decision carried on the wire, and the set whose effects both engines pay."
+          "note": "the seat's SLOT LAYOUT — per slot of its government, grouped by kind (military, economic, diplomatic, wildcard) and within a kind in slot order, the card's table index or -1 (`policyWireOf` / `civ_policy_slot`, `civ_policies` its slotted set) — a DRIVER decision carried on the wire, whose cards both engines pay but the lapsed"
         },
         {
           "name": "policiesLapsed",

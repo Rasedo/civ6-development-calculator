@@ -3476,13 +3476,64 @@ class SimEconomy:
         before, had = self._adopted_gov(row)
         return ok & inr & self._gov_open(row).gather(1, gc.unsqueeze(1)).squeeze(1) & had & (gc != before)
 
-    def _policy_set_changes(self, row: int, chosen: torch.Tensor) -> torch.Tensor:
-        """[B] bool — does the card mask `chosen` slot a different SET than
-        the seat holds (its stored cards still open under its government)?
-        `policySetChanges`' twin."""
+    def _policy_layout_changes(self, row: int, slot: torch.Tensor) -> torch.Tensor:
+        """[B] bool — does the slot layout `slot` [B, nPol] (each card's slot,
+        `_policy_slots_of`) put a different card in any slot than the seat
+        holds there (its stored cards still open under its government)?
+        `policyLayoutChanges`' twin."""
         _adopted, has_gov = self._adopted_gov(row)
-        now = self.civ_policies[:, row] & self._seat_policy_mask(row)
-        return has_gov & (now != chosen).any(dim=1)
+        open_ = self._seat_policy_mask(row)
+        now = torch.where(open_, self.civ_policy_slot[:, row], torch.full_like(slot, -1))
+        return has_gov & (now != slot).any(dim=1)
+
+    def _policy_wire_slot(self, nslots: torch.Tensor) -> torch.Tensor:
+        """[B, POLICY_WIRE] long — each place of the action's layout as the
+        slot it names (kind x POLICY_KIND_STRIDE + ordinal), over the slots
+        `nslots` [B, 4] by kind; POLICY_PAST past them. `policyWireOrder`'s
+        twin."""
+        dev = self.device
+        W = simbase.POLICY_WIRE
+        p = torch.arange(W, device=dev).unsqueeze(0)
+        cum = nslots.cumsum(dim=1)                                     # [B, 4]
+        start = cum - nslots
+        out = torch.full((nslots.shape[0], W), simbase.POLICY_PAST, dtype=torch.long, device=dev)
+        for k in range(4):
+            inside = (p >= start[:, k:k + 1]) & (p < cum[:, k:k + 1])
+            out = torch.where(inside, k * simbase.POLICY_KIND_STRIDE + (p - start[:, k:k + 1]), out)
+        return out
+
+    def _policy_slots_of(self, row: int, wire: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """The action's layout `wire` [B, POLICY_WIRE] (a card's table index or
+        -1 per place, POLICY_PAST past the places sent) as each card's slot
+        [B, nPol] (-1 unslotted) and [B] whether it stands: the places sent
+        are the seat's slots, every card unlocked, fitting its slot's kind (a
+        wildcard slot any card) and slotted once. `policyLayoutOf`'s twin."""
+        B, dev, npol = self.B, self.device, self._npol
+        S = simbase.POLICY_KIND_STRIDE
+        adopted, has_gov = self._adopted_gov(row)
+        nslots = self._seat_policy_slots(row)
+        ws = self._policy_wire_slot(nslots)                            # [B, W]
+        inside = ws >= 0
+        ok = has_gov & ((wire == simbase.POLICY_PAST) == ~inside).all(dim=1)
+        card = wire.clamp(min=0, max=max(npol - 1, 0))
+        has = inside & (wire >= 0) & (wire < npol)
+        ok = ok & ~(inside & (wire >= npol)).any(dim=1)
+        unlocked = self._seat_policy_mask(row)
+        ok = ok & (unlocked.gather(1, card) | ~has).all(dim=1)
+        kind = torch.div(ws.clamp(min=0), S, rounding_mode="floor")
+        ck = self._pol_kind.take(card)
+        ok = ok & ((kind == 3) | (ck == kind) | ~has).all(dim=1)
+        slot = torch.full((B, max(npol, 1)), -1, dtype=torch.long, device=dev)
+        count = torch.zeros(B, max(npol, 1), dtype=torch.long, device=dev)
+        for p in range(simbase.POLICY_WIRE):
+            m = has[:, p]
+            if not bool(m.any()):
+                continue
+            rows = m.nonzero(as_tuple=True)[0]
+            slot[rows, card[rows, p]] = ws[rows, p]
+            count[rows, card[rows, p]] += 1
+        ok = ok & (count <= 1).all(dim=1)
+        return slot, ok
 
     def _adopt_government(self, row: int, gov: torch.Tensor, ok: torch.Tensor) -> None:
         """The record's GOVERNMENT arm, where `ok`: seat row `row` adopts roster
@@ -3517,14 +3568,15 @@ class SimEconomy:
     def _carry_policies(self, row: int, chg: torch.Tensor, before: torch.Tensor) -> None:
         """Where `chg`: a CHANGED government rebuilds the slots (CIV6,
         dll_readings "C-94: the slot rebuild"). The old layout — the stored
-        cards laid into the slots `before` [B, 4] held, `_fit_policy_set`'s
-        order — is saved sorted by each card's unlocking civic Cost, highest
-        first, ties in slot order; the new slots, the government's own then
+        cards in the slots `before` [B, 4] held (`civ_policy_slot`) — is
+        saved sorted by each card's unlocking civic Cost, highest first, ties
+        in slot order; the new slots, the government's own then
         the extras, each kind in SLOT_KINDS order, are walked in order: while
         more than one stands empty, the j-th slot of a kind takes the j-th
         saved card of that slot kind, the card spent whether or not the new
-        government opens it. The cards laid back are slotted but LAPSED
-        (`civ_policy_lapsed`); the rest are dropped. `carryPolicies`' twin."""
+        government opens it. The cards laid back are slotted, each in its
+        new slot, but LAPSED (`civ_policy_lapsed`); the rest are dropped.
+        `carryPolicies`' twin."""
         if not self._npol or not bool(chg.count_nonzero()):
             return
         B, dev, npol = self.B, self.device, self._npol
@@ -3533,26 +3585,23 @@ class SimEconomy:
         _open = self._policy_unlocked(civ, self.civ_age[:, row] == 0, self.game_era,
                                       self.civ_gov_held[:, row], adopted)
         stored = self.civ_policies[:, row]
-        # each stored card's OLD slot kind: its own kind within that kind's
-        # count in table order, the overflow (and every wildcard-only card)
-        # the wildcard slots
+        # each stored card's OLD slot: its kind, and its ordinal among that
+        # kind's slots (`civ_policy_slot`); one past the slots `before` held
+        # is no card of the old layout
+        S = simbase.POLICY_KIND_STRIDE
+        at = self.civ_policy_slot[:, row]
+        ok_at = stored & (at >= 0)
+        oldk = torch.where(ok_at, torch.div(at, S, rounding_mode="floor"), torch.full_like(at, -1))
+        ordo = at - oldk * S
         nb = before.clamp(min=0)
-        oldk = torch.full((B, npol), -1, dtype=torch.long, device=dev)
-        inkind = torch.zeros(B, npol, dtype=torch.bool, device=dev)
-        for k in range(3):
-            uk = stored & (self._pol_kind == k).unsqueeze(0)
-            fit = uk & (uk.long().cumsum(dim=1) <= nb[:, k:k + 1])
-            oldk = torch.where(fit, torch.full_like(oldk, k), oldk)
-            inkind = inkind | fit
-        over = stored & ~inkind
-        oldk = torch.where(over & (over.long().cumsum(dim=1) <= nb[:, 3:4]), torch.full_like(oldk, 3), oldk)
+        oldk = torch.where(ok_at & (ordo < nb.gather(1, oldk.clamp(min=0))), oldk, torch.full_like(oldk, -1))
         # each card's rank among the saved cards of its old slot kind: Cost
-        # descending, then table order (the order its kind's slots hold it in)
+        # descending, then slot order
         cost = self._pol_civic_cost
-        ar = torch.arange(npol, device=dev)
-        ahead = (cost.unsqueeze(0) > cost.unsqueeze(1)) | ((cost.unsqueeze(0) == cost.unsqueeze(1)) & (ar.unsqueeze(0) < ar.unsqueeze(1)))
+        ahead = (cost.unsqueeze(0).unsqueeze(1) > cost.unsqueeze(0).unsqueeze(2)) | (
+            (cost.unsqueeze(0).unsqueeze(1) == cost.unsqueeze(0).unsqueeze(2)) & (ordo.unsqueeze(1) < ordo.unsqueeze(2)))
         same = (oldk.unsqueeze(2) == oldk.unsqueeze(1)) & (oldk >= 0).unsqueeze(1)
-        rank = (same & ahead.unsqueeze(0)).sum(dim=2)
+        rank = (same & ahead).sum(dim=2)
         # the new slots: the government's own (a negative extra takes its kind
         # off them), then the extras
         gov = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)
@@ -3562,6 +3611,7 @@ class SimEconomy:
         placed = torch.zeros(B, dtype=torch.long, device=dev)
         seen = torch.zeros(B, 4, dtype=torch.long, device=dev)
         kept = torch.zeros(B, npol, dtype=torch.bool, device=dev)
+        new_at = torch.full_like(at, -1)
         for blk in blocks:
             for k in range(4):
                 for j in range(int(blk[:, k].max())):
@@ -3569,9 +3619,12 @@ class SimEconomy:
                     take = stored & (oldk == k) & (rank == seen[:, k:k + 1]) & go.unsqueeze(1)
                     put = take & _open
                     kept = kept | put
+                    # the new slot: the walk's j-th of kind k over both blocks
+                    new_at = torch.where(put, k * S + seen[:, k:k + 1], new_at)
                     placed = placed + put.any(dim=1).long()
                     seen[:, k] = seen[:, k] + go.long()
         self.civ_policies[:, row] = torch.where(chg.unsqueeze(1), kept, stored)
+        self.civ_policy_slot[:, row] = torch.where(chg.unsqueeze(1), new_at, at)
         self.civ_policy_lapsed[:, row] = torch.where(chg.unsqueeze(1), kept, self.civ_policy_lapsed[:, row])
         self._eff_version += 1
 
@@ -3620,30 +3673,15 @@ class SimEconomy:
 
     def _seat_policy_mask(self, row: int) -> torch.Tensor:
         """[B, nPol] — the cards seat row `row` may SLOT right now. The per-kind
-        FIT is a property of the SET, so the mask is per card; the picker
-        enforces the fit and the record's apply re-validates it
-        (`_policy_set_ok`). A seat with no government slots nothing."""
+        FIT is a property of the layout, so the mask is per card; the picker
+        lays the cards and the record's apply re-validates them
+        (`_policy_slots_of`). A seat with no government slots nothing."""
         if not self._ngov or not self._npol:
             return torch.zeros(self.B, max(self._npol, 1), dtype=torch.bool, device=self.device)
         civ = self._seat_civics(row)
         adopted, has_gov = self._adopted_gov(row)
         dark = self.civ_age[:, row] == 0
         return self._policy_unlocked(civ, dark, self.game_era, self.civ_gov_held[:, row], adopted) & has_gov.unsqueeze(1)
-
-    def _policy_set_ok(self, row: int, chosen: torch.Tensor) -> torch.Tensor:
-        """[B] — `fitPolicies`' twin: every chosen card is unlocked for the seat
-        and the SET fits its government's slots by kind, the wildcard slots
-        taking each kind's overflow and every wildcard-kind card."""
-        unlocked = self._seat_policy_mask(row)
-        legal = ~(chosen & ~unlocked).any(dim=1)
-        adopted, has_gov = self._adopted_gov(row)
-        nslots = (self._gov_slots[adopted] + self._wonder_extra_slots(row)) * has_gov.long().unsqueeze(1)
-        over = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        for k in range(3):
-            n_k = (chosen & (self._pol_kind == k).unsqueeze(0)).sum(dim=1)
-            over = over + (n_k - nslots[:, k]).clamp(min=0)
-        n_w = (chosen & (self._pol_kind == 3).unsqueeze(0)).sum(dim=1)
-        return legal & has_gov & (over + n_w <= nslots[:, 3])
 
     def _slotted_policies(self, civics2: torch.Tensor,
                           extra_slots: torch.Tensor | None = None,
@@ -3676,7 +3714,7 @@ class SimEconomy:
     def _fit_policy_set(self, cands: torch.Tensor, nslots: torch.Tensor) -> torch.Tensor:
         """[B, nPol] — lay `cands` into `nslots` [B, 4] in TABLE order: each kind
         fills its own slots first, the overflow (and every wildcard-kind card)
-        takes the W slots. `fitPoliciesLoose`'s twin — the greedy fill, the
+        takes the W slots: the greedy fill, the
         driver's greedy-equivalent picker and the government-change carry-over
         all lay cards this one way."""
         slotted = torch.zeros_like(cands)
@@ -3699,10 +3737,39 @@ class SimEconomy:
         """Fill seat row `row`'s STORE with the greedy reference — what a test
         scene that sets civics by hand calls in place of the driver's pick."""
         civ = self._seat_civics(row)
-        self.civ_policies[:, row] = self._slotted_policies(
+        cards = self._slotted_policies(
             civ, self._wonder_extra_slots(row), self.civ_age[:, row] == 0,
             self.game_era, self.civ_gov_held[:, row],
             self._adopted_gov(row))
+        # each card in table order into the first open slot of the seat's
+        # slots in order (the government's own, then the extras, each by
+        # kind) of its kind or a wildcard one (`computeAdoption`)
+        B, dev, S = self.B, self.device, simbase.POLICY_KIND_STRIDE
+        adopted, has_gov = self._adopted_gov(row)
+        xs = self._wonder_extra_slots(row) * has_gov.long().unsqueeze(1)
+        gov = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)
+        blocks = ((gov - (-xs).clamp(min=0)).clamp(min=0), xs.clamp(min=0))
+        kinds, ords = [], []
+        seen = torch.zeros(B, 4, dtype=torch.long, device=dev)
+        for blk in blocks:
+            for k in range(4):
+                for j in range(int(blk[:, k].max()) if B else 0):
+                    on = j < blk[:, k]
+                    kinds.append(torch.where(on, k, -1))
+                    ords.append(seen[:, k].clone())
+                    seen[:, k] = seen[:, k] + on.long()
+        free = [torch.ones(B, dtype=torch.bool, device=dev) for _ in kinds]
+        at = torch.full((B, max(self._npol, 1)), -1, dtype=torch.long, device=dev)
+        for c in range(self._npol):
+            want = cards[:, c].clone()
+            ck = int(self._pol_kind[c])
+            for i, (kk, oo) in enumerate(zip(kinds, ords)):
+                fit = want & free[i] & (kk >= 0) & ((kk == 3) | (kk == ck))
+                at[:, c] = torch.where(fit, kk * S + oo, at[:, c])
+                free[i] = free[i] & ~fit
+                want = want & ~fit
+        self.civ_policy_slot[:, row] = at
+        self.civ_policies[:, row] = at >= 0
         self.civ_policy_lapsed[:, row] = False
         self._eff_version += 1
 

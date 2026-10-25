@@ -125,6 +125,13 @@
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
     - "City_BuildQueue 0x16f050 → 0x1853d0: an item's progress takes (A + the stored overflow) × the item's percent multi..."
   review: imported
+- addr: 0x16f6e0
+  final: 0xf5520
+  kind: function
+  name: AddProgress
+  status: PARTLY
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x16f7b0
   kind: function
   status: PARTLY

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
+import { makeMap, makeState, settleAt, tileAtCoords, grantCivics, policyWireFor } from '../helpers';
 import { seatOf } from '../../../cpu/core/seats';
 import { applySeatPolicies } from '../../../cpu/core/phase';
 import { endTurn } from '../../../cpu/core/game';
@@ -35,8 +35,11 @@ function scene(...civics: string[]): GameState {
   return state;
 }
 
+/** the record with its card set laid as the slot layout (`policyWireFor`) */
 function adopt(state: GameState, rec: SeatActionRecord): void {
-  applySeatPolicies(state, seatOf(state, 0)!, rec);
+  const gov = rec.government !== undefined && rec.government !== null ? GOVERNMENT_LIST[rec.government]?.id : undefined;
+  const policies = rec.policies && policyWireFor(state, 0, rec.policies.map((i) => POLICY_LIST[i].id), gov);
+  applySeatPolicies(state, seatOf(state, 0)!, { ...rec, policies });
 }
 
 describe('the government choice', () => {
