@@ -36,6 +36,7 @@ import { AI_BUILDINGS, AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { FX, FX_MIN, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, yieldValue, AI_RATE, type AiValueView } from './aiValue';
 import type { UnitProductionEntry } from './aiUnitProduction';
+import type { CityStats } from './city';
 import { AMENITY_TIERS, amenityTier, growthFoodNeeded, housingGrowthFactor } from '../data/constants';
 import { AI_YIELD_DEFAULT } from '../data/aiTables';
 import { modifiersValue, type AiModifier } from './aiModifiers';
@@ -435,6 +436,22 @@ export function buildingPerTurn(f: CityBuildFacts, b: AiBuildingRow): number {
 export interface AmenityCity {
   balance: number;
   yields: Readonly<Record<string, number>>;
+}
+
+/** the city's Amenity view off its stats: CityBuildAI +0x1080's yields are
+ *  each yield attribute's base, its modifier held to 0 (0x5cc510: the
+ *  attribute's clamps set to [0, 0] before its second Value) — before the
+ *  amenity tier's, the cards' and a city-state's -50% Production
+ *  (runs/h1_duely1127 Hattusa t77, Unhappy at -3: Retainers logged 82, 80 on its base
+ *  yields, 54 on its yields) */
+export function amenityCityOf(stats: { amenities: CityStats['amenities']; baseYields: CityStats['baseYields'] }): AmenityCity {
+  return {
+    balance: stats.amenities.have - stats.amenities.needed,
+    yields: {
+      YIELD_FOOD: stats.baseYields.food, YIELD_PRODUCTION: stats.baseYields.production, YIELD_GOLD: stats.baseYields.gold,
+      YIELD_SCIENCE: stats.baseYields.science, YIELD_CULTURE: stats.baseYields.culture, YIELD_FAITH: stats.baseYields.faith,
+    },
+  };
 }
 
 /** the happiness level's NonFoodYieldModifier (the Happinesses rows: the

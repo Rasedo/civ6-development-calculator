@@ -18,7 +18,7 @@
  * set holds), TEST_ANY when one does (an empty set fails), TEST_NONE when
  * none does.
  */
-import { AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD, AI_MINOR_INFLUENCE_MODIFIERS, AI_SPACE_RACE_PROJECTS } from '../data/aiTables';
+import { AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD, AI_GREAT_PERSON_CLASSES, AI_MINOR_INFLUENCE_MODIFIERS, AI_SPACE_RACE_PROJECTS } from '../data/aiTables';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -89,7 +89,7 @@ export interface ValueTerms {
   /** the unit the evaluation stands on (context +0x90): the subject of a
    *  COLLECTION_PLAYER_UNITS walk, kept through a granted ability's own
    *  modifiers; absent, none */
-  unit?: { plot: number; type: string; moves: number };
+  unit?: { plot: number; type: string; moves: number; level: number };
   /** a resolution's target hint (0x67dd40's handlers), in the install's
    *  types: the luxury (+0x4c), the yield (+0x64), the government (+0x28),
    *  the great person class (+0x6c), the project (+0x68) */
@@ -112,14 +112,19 @@ export interface AiCitySubject {
   capital: boolean;
 }
 
-/** an analysis subject: the player, a city (context +0x70), a district
- *  (+0x78) */
+/** an analysis subject: the player, a city (context +0x70), the empty city
+ *  COLLECTION_PLAYER_CITIES' walk ends on (+0x70 null), a district (+0x78) */
 type Subject =
   | { kind: 'player'; other?: number }
   | { kind: 'city'; seat: number; id: number; capital: boolean }
+  | { kind: 'nocity' }
   | { kind: 'district'; cityId: number; type: string }
   | { kind: 'plot'; plot: AiPlotView }
-  | { kind: 'unit'; plot: number; type: string; moves: number };
+  | { kind: 'unit'; plot: number; type: string; moves: number; level: number };
+
+/** the subjects COLLECTION_PLAYER_CITIES' walk gives at least (0x69ea00's
+ *  +0xd4 against 5) */
+const PLAYER_CITIES_WALK = 5;
 
 const ownerCity = (t: ValueTerms): Subject | null =>
   t.owner ? { kind: 'city', seat: t.owner.seat ?? t.seat, id: t.owner.cityId, capital: t.owner.capital } : null;
@@ -129,7 +134,17 @@ const ownerCity = (t: ValueTerms): Subject | null =>
 function subjects(t: ValueTerms, collection: string): Subject[] | null {
   switch (collection) {
     case 'COLLECTION_OWNER': return [ownerCity(t) ?? { kind: 'player' }];
-    case 'COLLECTION_PLAYER_CITIES': return t.view.cities(t.seat).map((c) => ({ kind: 'city', seat: t.seat, id: c.id, capital: c.capital }));
+    // 0x69e9e0 / 0x69ea00: the player's cities, each setting the context's
+    // city (+0x70); then, while fewer than five subjects have been given
+    // (+0xd4), a subject with no city (+0x70 null) — every city-state's
+    // Colonial Offices 16.0, four empty subjects at 2.0 Food, its one city
+    // failing the set; a major's 4.0 per city short of five (runs/h1_duely1117
+    // China 12.0 with two cities t61-93, 8.0 with three, 4.0 with four)
+    case 'COLLECTION_PLAYER_CITIES': {
+      const out: Subject[] = t.view.cities(t.seat).map((c) => ({ kind: 'city', seat: t.seat, id: c.id, capital: c.capital }));
+      while (out.length < PLAYER_CITIES_WALK) out.push({ kind: 'nocity' });
+      return out;
+    }
     case 'COLLECTION_PLAYER_CAPITAL_CITY': return t.view.cities(t.seat).filter((c) => c.capital).map((c) => ({ kind: 'city', seat: t.seat, id: c.id, capital: true }));
     case 'COLLECTION_PLAYER_DISTRICTS': return t.view.districts(t.seat).map((d) => ({ kind: 'district', cityId: d.cityId, type: d.type }));
     // 0x69fdf0: the evaluation city's districts (+0x70), its centre's among
@@ -153,7 +168,7 @@ function subjects(t: ValueTerms, collection: string): Subject[] | null {
     // context's other player (+0x40)
     case 'COLLECTION_MAJOR_PLAYERS': return t.view.majors().map((m) => ({ kind: 'player', other: m }));
     // the player's units in its list's order, each the context's unit (+0x90)
-    case 'COLLECTION_PLAYER_UNITS': return t.view.playerUnits(t.seat).map((u) => ({ kind: 'unit', plot: u.plot, type: u.type, moves: u.moves }));
+    case 'COLLECTION_PLAYER_UNITS': return t.view.playerUnits(t.seat).map((u) => ({ kind: 'unit', plot: u.plot, type: u.type, moves: u.moves, level: u.level }));
     default: return null;
   }
 }
@@ -250,6 +265,20 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
   // 0x6d2760: the evaluating player (context +0x80) is no full civilization
   // and no barbarian — a city-state or the Free Cities
   REQUIREMENT_PLAYER_IS_MINOR: (t) => !t.view.fullCiv(t.seat) && !t.view.barbarianSeats().includes(t.seat),
+  // 0x6cfad0: a city subject (the context's city, +0x70) of at least Amount
+  // citizens (+0x588)
+  REQUIREMENT_CITY_HAS_X_POPULATION: (t, args, s) => s.kind === 'city' && t.view.cityCitizens(s.seat, s.id) >= (Number(args.Amount ?? 0) | 0),
+  // 0x6d4860: a city subject's district of the type (0x1ae530) whose yield
+  // (District::GetYield, no modifier) of the kind reaches Amount
+  REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_DISTRICT: (t, args, s) => s.kind === 'city'
+    && t.view.cityHasDistrict(s.seat, s.id, args.DistrictType ?? '')
+    && t.view.districtYield(s.seat, s.id, args.DistrictType ?? '', args.YieldType ?? '') >= (Number(args.Amount ?? 0) | 0),
+  // 0x6d22c0: with the context's unit (+0x90), its Units row's
+  // PromotionClass is the argument's; with none, the context holds a city
+  // (+0x70)
+  REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES: (t, args, s) => s.kind === 'unit'
+    ? AI_UNITS[AI_UNIT_INDEX.get(s.type) ?? -1]?.promotionClass === args.UnitPromotionClass
+    : s.kind === 'city' || (s.kind !== 'nocity' && !!t.owner),
 };
 
 /** 0x6cf3c0 over the set as 0x6ccec0 builds it: null where a kept
@@ -753,6 +782,73 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     for (const m of t.view.unitMaintenances(t.seat)) sum += Math.min(a, m) * FX;
     return whole(span(t, yieldValue(null, null, sum, 'YIELD_GOLD')));
   },
+  // 0x6bf850 (Professional Army, Force Modernization; Amount +8 as
+  // fx(Amount x 0.01f)): per unit of the player whose upgrade it may take
+  // (0x58fff0, the visible test), the Amount x the upgrade's Gold (0x590520:
+  // a city-state's at its own 100% discount, MINOR_CIV_GOLD_MILITARY_UPGRADE)
+  // as Gold at the player's weight, x 0.75 (@d1a188), each whole —
+  // runs/h1_duelw1121 Hunza t76 1.0 for its one Horseman, Ayutthaya t78 3.0
+  // for two Warriors and a Swordsman short of their Iron
+  EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT: (t, args) => {
+    let sum = 0;
+    for (const g of t.view.unitUpgradeGolds(t.seat)) {
+      const v = yieldValue(t.view, t.seat, fmul(pctOf(args), g * FX), 'YIELD_GOLD');
+      sum += whole(fmul(v, fxConst(0.75)));
+    }
+    return sum;
+  },
+  // 0x6c5700 (Amount +8 as fx(Amount x 0.01f), BonusType +0xc): per
+  // government bonus type, its sum whole. GOVERNMENTBONUS_ENVOYS
+  // (0xe96ca959): the Amount x the player's Influence Points a turn
+  // (0x44c6a0) as PSEUDOYIELD_INFLUENCE at its weight, from the start to the
+  // horizon (runs/h1_duely1121 every city-state's Divine Right 5.0 above
+  // ours: Monarchy's 50% of Chiefdom's one point). WONDER_CONSTRUCTION
+  // (0x5953bf98): the most Production of its cities x PSEUDOYIELD_WONDER of
+  // the Amount, likewise. COMBAT_EXPERIENCE (0xc819e0a3): its units x
+  // PSEUDOYIELD_UNIT_COMBAT of the Amount / 10.0, likewise, then GREAT_PEOPLE's
+  // term (0xf8705d00, which the branch runs on into): per class its points a
+  // turn x the Amount as the class's pseudo-yield, likewise — a city-state's
+  // none (its player list holds no city), the Free Cities' not read.
+  // FAITH_PURCHASES (0xc25143f9): none for a player whose religion entry
+  // (0x4979f0) holds none — a city-state's; with one, and the other types,
+  // not read
+  EFFECT_ADJUST_FLAT_BONUS: (t, args) => {
+    const a = pctOf(args);
+    let sum = 0;
+    switch (args.BonusType) {
+      case 'GOVERNMENTBONUS_ENVOYS': {
+        const v = pseudoYieldValue(t.view, t.seat, fmul(a, t.view.influencePointsPerTurn(t.seat) * FX), 'PSEUDOYIELD_INFLUENCE');
+        sum = valueBetween(v, t.start, t.horizon, t.rate);
+        break;
+      }
+      case 'GOVERNMENTBONUS_WONDER_CONSTRUCTION': {
+        let best = 0;
+        for (const c of t.view.cities(t.seat)) best = Math.max(best, fxOf(t.view.cityYield(t.seat, c.id, 'YIELD_PRODUCTION')));
+        const pv = pseudoYieldValue(t.view, t.seat, a, 'PSEUDOYIELD_WONDER');
+        sum = valueBetween(fmul(best, pv), t.start, t.horizon, t.rate);
+        break;
+      }
+      case 'GOVERNMENTBONUS_COMBAT_EXPERIENCE':
+      case 'GOVERNMENTBONUS_GREAT_PEOPLE': {
+        if (args.BonusType === 'GOVERNMENTBONUS_COMBAT_EXPERIENCE') {
+          const pv = pseudoYieldValue(t.view, t.seat, a, 'PSEUDOYIELD_UNIT_COMBAT');
+          const x = t.view.playerUnits(t.seat).length * pv;
+          sum = valueBetween(fdiv(x, 10 * FX), t.start, t.horizon, t.rate);
+        }
+        if (t.seat === FREE_SEAT) break;
+        for (const cls of AI_GREAT_PERSON_CLASSES) {
+          const pseudo = AI_GP_CLASS_PSEUDOYIELD[cls];
+          if (!pseudo) continue;
+          const v = pseudoYieldValue(t.view, t.seat, fmul(a, fxOf(t.view.greatPersonPointsPerTurn(t.seat, cls))), pseudo);
+          sum += valueBetween(v, t.start, t.horizon, t.rate);
+        }
+        break;
+      }
+      default:
+        return 0;
+    }
+    return whole(sum);
+  },
   // 0x6c4820: PSEUDOYIELD_DIPLOMATIC_FAVOR at the player's weight,
   // PV(horizon) - PV(start)
   EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN: (t, args) => whole(span(t, pseudoYieldValue(t.view, t.seat, amountOf(args), 'PSEUDOYIELD_DIPLOMATIC_FAVOR'))),
@@ -767,11 +863,22 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     return whole(yieldValue(null, null, fmul(span(t, amountOf(args)), fxConst(0.5)), args.YieldType ?? ''));
   },
   // 0x6c09b0 (its parser 0x6c0590 stores fx(Amount x 0.01f) as unweighted
-  // Gold): with no unit, a city subject's Production (City::GetYield) times
-  // it, from the start to the horizon
+  // Gold): with the context's unit (+0x90), one that fights (Combat,
+  // RangedCombat or Bombard above 0), its level (its experience +0x1bc0,
+  // +0x10) times it, PV to the horizon (runs/h1_duely1127 Mexico City's
+  // Survey 7, 14, 21 over t124-129 for one, two, three recon units of level
+  // 1; 1124 Cardiff's After Action Reports 7 for its one level-2 Infantry,
+  // t205); with none, a city
+  // subject's Production (City::GetYield) times it, from the start to the
+  // horizon
   EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER: (t, args, s) => {
-    if (s.kind !== 'city') return 0;
     const per = yieldValue(null, null, fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(0.01))), 'YIELD_GOLD');
+    if (s.kind === 'unit') {
+      const row = AI_UNITS[AI_UNIT_INDEX.get(s.type) ?? -1];
+      if (!row || Math.max(row.combat, row.rangedCombat, row.bombard) <= 0) return 0;
+      return whole(presentValue(fmul(per, s.level * FX), t.rate, t.horizon));
+    }
+    if (s.kind !== 'city') return 0;
     const production = fxOf(t.view.cityYield(s.seat, s.id, 'YIELD_PRODUCTION'));
     return whole(valueBetween(fmul(per, production), t.start, t.horizon, t.rate));
   },
@@ -985,11 +1092,12 @@ const NONE_ANALYZERS: Readonly<Record<string, (t: ValueTerms, args: Readonly<Rec
 };
 
 /** the context a subject leaves for an analysis nested on it (0x142650's
- *  copy): a city subject is the city the nested analysis is of (+0x70), a
- *  unit subject its unit (+0x90); any
+ *  copy): a city subject is the city the nested analysis is of (+0x70), the
+ *  empty city leaves it none, a unit subject its unit (+0x90); any
  *  other leaves the city as it stood */
 const onSubject = (t: ValueTerms, s: Subject): ValueTerms =>
   s.kind === 'city' ? { ...t, owner: { cityId: s.id, capital: s.capital, seat: s.seat } }
+    : s.kind === 'nocity' ? { ...t, owner: undefined }
     : s.kind === 'player' && s.other !== undefined ? { ...t, other: s.other }
     : s.kind === 'unit' ? { ...t, unit: s } : t;
 
@@ -1032,7 +1140,8 @@ function analysis(t: ValueTerms, m: AiModifier, depth: number): number | null {
     if (ok === null) return 0;
     if (!ok) continue;
     passed = true;
-    const ctx = s.kind === 'player' && s.other !== undefined ? { ...t, other: s.other } : s.kind === 'unit' ? { ...t, unit: s } : t;
+    const ctx = s.kind === 'player' && s.other !== undefined ? { ...t, other: s.other } : s.kind === 'unit' ? { ...t, unit: s }
+      : s.kind === 'nocity' ? { ...t, owner: undefined } : t;
     sum = (SETS[m.effect] ?? ((acc: number, v: number) => acc + v))(sum, an(ctx, m.args, s));
   }
   // no subject passed: the analyzer's slot 2

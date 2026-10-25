@@ -240,9 +240,14 @@ export interface AiValueView {
   cityStateCount(): number;
   /** each of the seat's units' Units.Maintenance */
   unitMaintenances(seat: number): readonly number[];
-  /** the seat's units in its list's order, their plot, UnitType and whole
-   *  Movement (0x56e130) */
-  playerUnits(seat: number): readonly { plot: number; type: string; moves: number }[];
+  /** per unit of the seat whose upgrade its research unlocks (0x58fff0, the
+   *  visible test), the upgrade's Gold (0x590520) */
+  unitUpgradeGolds(seat: number): readonly number[];
+  /** the seat's Influence Points a turn (Player_Influence 0x44c6a0) */
+  influencePointsPerTurn(seat: number): number;
+  /** the seat's units in its list's order, their plot, UnitType, whole
+   *  Movement (0x56e130) and level (the unit's experience +0x1bc0, its +0x10) */
+  playerUnits(seat: number): readonly { plot: number; type: string; moves: number; level: number }[];
   /** the military AI's unit production value of a UnitType (0x79ca90: its
    *  table entry's +0x160, 0 none) */
   unitProductionValue(seat: number, unitType: string): number;

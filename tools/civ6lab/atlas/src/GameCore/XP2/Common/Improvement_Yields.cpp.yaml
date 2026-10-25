@@ -71,10 +71,14 @@
     - recording: h1_duelv1127
       turn: 2
       value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
-  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts, cpu/core/aiDistrictValue.ts:v]
+  impl:
+    - cpu/core/aiDistrictValue.ts:DistrictValueFacts
+    - cpu/core/aiDistrictValue.ts:v
+    - cpu/core/aiView.ts:districtYieldOf
   readings:
     - "H-1: the district adjacency — READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 it...

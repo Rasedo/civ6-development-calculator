@@ -4191,6 +4191,13 @@ building tables).
   context, 0x142650, their sums added); COLLECTION_CITY_TRAINED_UNITS
   (0x69ffa0: once, the evaluation's city); EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER
   0x6c09b0 (its parser 0x6c0590 stores Amount x 0.01f as unweighted Gold;
+  with the context's unit, +0x90, one that fights, GetCombat /
+  GetRangedCombat / GetBombardCombat above 0: its level, the experience
+  +0x1bc0's +0x10 (0x382f0), times it, PV to H (0x7a16e0) — runs/h1_duely1127
+  Mexico City's Survey 7, 14, 21 for one, two, three level-1 recon units
+  t124-129, 1124 Cardiff's After Action Reports 7 for one level-2 Infantry
+  t205; REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES 0x6d22c0: with the context's
+  unit its Units row's PromotionClass, with none the context holding a city;
   no unit: the city's Production, City::GetYield, times it, from T to H) —
   the Barracks', Stable's, Lighthouse's trained-unit XP, an integer 0..3 at
   a city-state; COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of
@@ -7691,11 +7698,22 @@ holds; else the city's plot continent, +0x30, against the owner's
 PlayerCities m_eHomeContinent, 0x467cd0 -> +0x160, named in the constructor
 0x36a870; a city-state's one city on it, the Free Cities holding no
 capital: no player lists Colonial Taxes in runs/h1_duelw1117 / 1121 / 1124 /
-1127 / 1128). Colonial Offices, whose sets are the same inverse, is logged
-16.0 for every city-state on every turn of those five runs (majors 4.0 a
-city): the set refused, its subjects go to the analyzer's slot 2, which
-EFFECT_ADJUST_CITY_GROWTH's 0x6beb00 does not hold here — ASK: the slot-2
-analysis that pays it. The Monument's
+1127 / 1128). COLLECTION_PLAYER_CITIES' walk (vtable 0xd624b8, the
+registry's object @f03bb8: begin 0x69e9e0 clears +0x70 and the counters
++0xd0 / +0xd4; next 0x69ea00 sets +0x70 to each of the player's cities,
++0x12f0 +0xa0, counting +0xd4; past the last city it keeps returning true
+with +0x70 null while +0xd4 was below 5; end 0x69efa0 clears +0x70) so gives
+at least five subjects, the cities then empty ones. The requirement 0x6cfd60
+on an empty subject fails (no city), so the inverse admits it, and
+EFFECT_ADJUST_CITY_GROWTH 0x6beb00, reading the context's city (+0x70, not
+the subject), values it at its 2.0 Food: 0.3 Food bare from 0 to 25, whole
+4. Colonial Offices: 16.0 for every city-state on every turn (its one city
+on its home continent fails, four empty subjects pass), China 12.0 / 8.0 /
+4.0 with two / three / four cities (runs/h1_duely1117 t61-93, t94-107,
+t108-122); Colonial Taxes, EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90,
+returns on a null +0x70, so is never listed. Port: `aiModifiers.ts`
+(`subjects`, the `nocity` subject), `sim_policy.py` / `sim_cityvalue.py`
+(`_pol_subjects`, `_cv_subjects`). The Monument's
 MONUMENT_CULTURE_AT_FULL_LOYALTY's set (REQUIREMENT_CITY_HAS_FULL_LOYALTY, not
 registered) is therefore empty and holds: what keeps it out of the city
 build AI's v 1.0 is not its requirement (its COLLECTION_OWNER subject in a
@@ -7709,9 +7727,15 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   (runs/h1_duelw1124 player 1's Natural Philosophy 58 at t54, its one Campus
   not yet built).
 - EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER 0x6addf0: a district subject; its
-  yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier) / 100;
-  0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural
-  Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40).
+  yield 0x24b5a0 x Amount x 0.01f, bare, span. 0x24b5a0 = District::GetYield
+  0x249850 (none where the district's +0xc88 is set; the adjacency at its
+  plot +0x218, 0x366df0, plus 0x24acc0 and 0x249db0 of the yield, x (100 +
+  0x249940) / 100) + 0x24aae0 (the same per entry of the district's +0x3e0
+  list keyed by the yield; unread). The city's buildings in the district are
+  no part of it: a city-state's Natural Philosophy 29 for a Campus of
+  adjacency 2 beside its Library (runs/h1_duelw1124 player 4 t40), 1121
+  Hunza's Commercial Hub of no adjacency beside its Market none. Port:
+  `aiView.ts` (`districtYieldOf`), `sim_policy.py` (`_pol_district_yield`).
 - EFFECT_ADJUST_DISTRICT_YIELD_CHANGE 0x6acd00: a district subject; Amount
   bare, span.
 - EFFECT_ADJUST_PLAYER_OPEN_BORDERS_FROM_INFLUENCE 0x6b63a0 (@f03f28):
@@ -7769,13 +7793,53 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   0x5374c0) — the Amount x its upgrade's Gold (0x590520 << 8) as Gold at the
   player's weight, x 0.75 (@d1a188), whole. The list +0xd8 is the player's
   every unit (the standing army's walk 0x5ca7e0 and the trade count 0x7a7110
-  read it alike). Not ported: on runs/h1_duelw1121 Hunza t76 the one unit
-  whose upgrade is unlocked and reachable, its Horseman (to the Courser, 125
-  Gold), reads whole(0.75 x 0.5 x 0.5 x 125) = 23 where the game lists 1.0,
-  and Ayutthaya t78, with two Warriors (55) and a Swordsman (75) whose
-  upgrades lack their Iron, 3.0 where none of ours counts — ASK: the Gold
-  weight the analyzer's 0x7a6690 takes for a city-state, or the upgrade
-  0x5374c0 names (its walk past the first rung unread).
+  read it alike). The upgrade's Gold 0x590520 is the unit's upgrade price
+  (0x5376d0), a city-state's at its own MINOR_CIV_GOLD_MILITARY_UPGRADE
+  100% (`MINOR_UPGRADE_GOLD`, 5): whole(0.75 x Amount x 5 x 0.5 x (1 + w))
+  a unit — runs/h1_duelw1121 Hunza t76 1.0 for its one Horseman, Ayutthaya
+  t78 3.0 for two Warriors and a Swordsman short of their Iron (the visible
+  test takes no resource), each 1 on a Gold weight w of 0.07 or more. Port:
+  `aiModifiers.ts` (`unitUpgradeGolds`), `sim_policy.py`; the Free Cities'
+  upgrades not read.
+- EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (@f03ea0, vtable 0xd626c8; its parser
+  0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's hash +0xc): a switch on
+  the bonus type, the branches' sum whole at the end.
+  GOVERNMENTBONUS_WONDER_CONSTRUCTION (0x5953bf98): the most Production
+  (City::GetYield) of the player's cities (at least 0) x PSEUDOYIELD_WONDER
+  of the Amount, weighted, between. GOVERNMENTBONUS_COMBAT_EXPERIENCE
+  (0xc819e0a3): the player's units (the units manager +0x12e8 +0xc0) x
+  PSEUDOYIELD_UNIT_COMBAT of the Amount, weighted, / 10.0, between — and the
+  branch runs on into GOVERNMENTBONUS_GREAT_PEOPLE's (0xf8705d00): per
+  GreatPersonClasses row the player's points a turn of the class (+0x1360
+  +0x168) x the Amount as the class's pseudo-yield, weighted, between.
+  GOVERNMENTBONUS_ENVOYS (0xe96ca959): the Amount x the
+  player's Influence Points a turn (Player_Influence 0x44c6a0: with cities,
+  the base +0x1b0 plus its stats' points, x 1 + the ENVOYS bonus), as
+  PSEUDOYIELD_INFLUENCE weighted, between (0x7a2140) — Monarchy's 50% on a
+  city-state's Chiefdom point: whole(0.25 between 0 and 50) = 5 in its
+  government value, every city-state's Divine Right 5.0 above ours on
+  runs/h1_duely1121 (44 rows from t51) before it was read. GOVERNMENTBONUS_FAITH_PURCHASES (0xc25143f9): where the
+  player's religion entry (0x4979f0: the religion manager's +0xa0 entry of
+  the player's +0x128 holding more than 0) — 0.1 x min(its Faith +0x100,
+  150) as Gold weighted, discounted from the start, plus 0.2 x min(its Faith
+  yield, 100) as Gold weighted, between; the Amount unused. The others
+  (0xbcfe99b8 the per-city best project, GOLD_PURCHASES 0x7530bd65,
+  UNIT_PRODUCTION 0x3d5ff1a2, 0xc1a005d2) unread; GOLD_PURCHASES: 0.5 x the
+  treasury (+0x13a0 +0xf8) x the Amount as Gold weighted, discounted from
+  the start, plus 0.5 x the Gold yield (0x4e0bf0, the player's gross:
+  cities, tributaries, deals, interest ...) x the Amount, between — not
+  ported (the gross Gold yield unread here). Port: `aiModifiers.ts`
+  (ENVOYS, WONDER_CONSTRUCTION, COMBAT_EXPERIENCE with GREAT_PEOPLE; a
+  city-state's Great Person points none, its player list holding no city;
+  the Free Cities' not read; FAITH_PURCHASES none for a city-state),
+  `sim_policy.py`.
+- REQUIREMENT_CITY_HAS_X_POPULATION 0x6cfad0: the context's city (+0x70)
+  of at least Amount citizens (+0x588). REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_
+  DISTRICT 0x6d4860 (DistrictType +8, YieldType +0xc, Amount +0x10): the
+  context's city's district of the type (0x1ae530) whose District::GetYield
+  (0x249850, no modifier) of the yield reaches Amount, the district set as
+  the context's (+0x78) — Free Market's and Rationalism's halves. Port:
+  `aiModifiers.ts` (EVALUATORS), `sim_policy.py` / `sim_cityvalue.py`.
 - EFFECT_ADJUST_BUILDING_YIELD_CHANGE 0x6c5080 (args BuildingType +8,
   YieldType +0xc, Amount +0x10): a city subject; Amount weighted, x0.5 where
   the city lacks the building (0x18e9f0), span.
@@ -7960,8 +8024,16 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   changing level reads more than the reading gives (1121 Hunza t45 62 against
   42, t48 66 against 47; 1124 Bologna t61 60 against 50; 1128 Bologna t70 55
   against 39), as if a Food term of about 0.8 x its Food stood beside the
-  others — ASK: CityBuildAI +0x1080's yields (0x1c64d0's attribute and its
-  Value flag) unread.
+  others. CityBuildAI +0x1080's yields (0x5cc510, per yield): the city's
+  yield attribute (0x1c64d0) read twice through GameAttribute::Value
+  (0xaa740: base + base x modifier / 100, the modifier held by the
+  attribute's clamps +0x30 / +0x38): into +0xfb0 as it stands, then, its
+  clamps set to [0, 0], into +0x1028 — the base, before every percent (the
+  amenity tier's, the cards', a city-state's -50% Production): runs/h1_duely1127
+  Hattusa t77, Unhappy at -3, Retainers logged 82, 80 on its base yields where its
+  yields give 54; Mexico City t74-76 66 = 66. Port: `aiCityBuild.ts`
+  (`amenityCityOf`, `CityStats.baseYields`), `sim_economy.py`
+  (`_seat_city_base`).
 - The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66
   requirements; the effects the policies and governments name, ranked by the
   score lines they miss, with their analyzers and whether they reach

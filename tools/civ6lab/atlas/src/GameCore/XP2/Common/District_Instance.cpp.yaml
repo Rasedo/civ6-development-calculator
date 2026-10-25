@@ -7,19 +7,52 @@
   final: 0x1905f0
   kind: function
   name: District::GetYield
-  status: READ
+  semantics: none where +0xc88; the adjacency at the district's plot (0x366df0) + 0x24acc0 + 0x249db0 of the yield, x (100 + 0x249940) / 100
+  status: PARTLY
   cases:
     - recording: h1_duelw1124
       turn: 40
+      value: Natural Philosophy 29 for a Campus of adjacency 2 beside its Library
+    - recording: h1_duelw1124
+      turn: 40
       value: "0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural   Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40)."
-  impl: [cpu/core/moments.ts:adj]
+  impl:
+    - cpu/core/aiView.ts:districtYieldOf
+    - cpu/core/moments.ts:adj
+    - gpu/core/sim_policy.py:_pol_district_yield
   readings:
     - "H-1: the district adjacency — READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
   context:
     - ...a Plot:GetAdjacencyYield (binding 0x25600 -> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield...
     - "- District::GetYield 0x249850 (yield, percent flag): 0 while pillaged; else 0x366df0's adjacency + the district's fla..."
     - "...EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER 0x6addf0: a district subject; its yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier) / 100; 0x24aae0: its buildings') x Amount x 0.01..."
+  review: reviewed
+- addr: 0x249940
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 40
+      value: "The city's buildings in the district are   no part of it: a city-state's Natural Philosophy 29 for a Campus of   adjacency 2 beside its Library (runs/h1_duelw1124 player 4 t40), 1121   Hunza's Commerc"
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - ...cency at its plot +0x218, 0x366df0, plus 0x24acc0 and 0x249db0 of the yield, x (100 + 0x249940) / 100) + 0x24aae0 (the same per entry of the district's +0x3e0 list keyed by the yield...
+  review: imported
+- addr: 0x249db0
+  final: 0x190a20
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 40
+      value: "The city's buildings in the district are   no part of it: a city-state's Natural Philosophy 29 for a Campus of   adjacency 2 beside its Library (runs/h1_duelw1124 player 4 t40), 1121   Hunza's Commerc"
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - ...district's +0xc88 is set; the adjacency at its plot +0x218, 0x366df0, plus 0x24acc0 and 0x249db0 of the yield, x (100 + 0x249940) / 100) + 0x24aae0 (the same per entry of the district'...
   review: imported
 - addr: 0x249e40
   kind: function
@@ -126,10 +159,23 @@
     - recording: h1_duelw1124
       turn: 40
       value: "0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural   Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40)."
+  impl: [cpu/core/aiView.ts:districtYieldOf]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...t subject; its yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier) / 100; 0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural Philosophy 29 for..."
+  review: imported
+- addr: 0x24acc0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 40
+      value: "The city's buildings in the district are   no part of it: a city-state's Natural Philosophy 29 for a Campus of   adjacency 2 beside its Library (runs/h1_duelw1124 player 4 t40), 1121   Hunza's Commerc"
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - ...ne where the district's +0xc88 is set; the adjacency at its plot +0x218, 0x366df0, plus 0x24acc0 and 0x249db0 of the yield, x (100 + 0x249940) / 100) + 0x24aae0 (the same per entry of...
   review: imported
 - addr: 0x24ae50
   final: 0x191650
@@ -238,8 +284,13 @@
 - addr: 0x24b5a0
   final: 0x191c00
   kind: function
-  status: READ
+  name: districtYield
+  semantics: "District::GetYield (0x249850) + 0x24aae0 (per entry of the district's +0x3e0 list keyed by the yield, unread): no building's yield"
+  status: PARTLY
   cases:
+    - recording: h1_duelw1124
+      turn: 40
+      value: Natural Philosophy 29 for a Campus of adjacency 2 beside its Library
     - recording: h1_duelw1124
       turn: 40
       value: "0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural   Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40)."
@@ -249,9 +300,10 @@
     - cpu/core/aiView.ts:districtYieldOf
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
   context:
     - "- EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER 0x6addf0: a district subject; its yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier) / 100; 0x24aae0: its buildings') x Amo..."
-  review: imported
+  review: reviewed
 - addr: 0x24b820
   final: 0x191e10
   kind: function

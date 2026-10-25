@@ -32,7 +32,9 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_CITY_OUTER_DEFENSE", "EFFECT_ADJUST_CITY_RANGED_STRIKE", "EFFECT_ADJUST_UNIT_PRODUCTION",
     "EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT", "EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION",
     "EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER", "EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT",
-    "EFFECT_ADJUST_PLAYER_OPEN_BORDERS_FROM_INFLUENCE",
+    "EFFECT_ADJUST_PLAYER_OPEN_BORDERS_FROM_INFLUENCE", "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+    "EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT", "EFFECT_ADJUST_FLAT_BONUS",
+    "EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT",
 }
 # worth 0 in a minor's policy context: the context's own city (none), the
 # Influence a minor may not give, its tributaries and placed envoys (none)
@@ -43,18 +45,23 @@ _POL_ZERO = {
 }
 _POL_COLLECTIONS = {"COLLECTION_OWNER", "COLLECTION_PLAYER_CITIES", "COLLECTION_PLAYER_CAPITAL_CITY", "COLLECTION_PLAYER_DISTRICTS",
                     "COLLECTION_ALL_PLAYERS", "COLLECTION_PLAYER_UNITS"}
-# on a unit subject every analyzer here but the barbarian combat's reads
-# nothing (a city's, a district's or a plot's)
-_POL_UNIT_ZERO = {"EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER", "EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_PLOT_YIELD",
-                  "EFFECT_GRANT_UNIT_IN_CITY"}
+# on a unit subject every analyzer here but the barbarian combat's, the
+# start movement's and the experience's reads nothing (a city's, a
+# district's or a plot's)
+_POL_UNIT_ZERO = {"EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_PLOT_YIELD", "EFFECT_GRANT_UNIT_IN_CITY"}
 # the records' age the barbarian combat reads (0x5eb0f0's fifth argument)
 _KNOWN_AGE = 10
+# the subjects COLLECTION_PLAYER_CITIES' walk gives at least: the player's
+# cities, then empty ones (`subjects`)
+_PLAYER_CITIES_WALK = 5
 # the collections of the context's own city, which a policy's context has
 # not: no subject (`subjects`' empty walks)
 _POL_NO_SUBJECTS = {"COLLECTION_CITY_DISTRICTS", "COLLECTION_CITY_TRAINED_UNITS", "COLLECTION_CITY_PLOT_YIELDS", "COLLECTION_ALL_CITIES"}
 _POL_EVALUATORS = {"REQUIREMENT_DISTRICT_TYPE_MATCHES", "REQUIREMENT_CITY_HAS_BUILDING", "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN",
                    "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
-                   "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT", "REQUIREMENT_PLAYER_IS_MINOR"}
+                   "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT", "REQUIREMENT_PLAYER_IS_MINOR",
+                   "REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES", "REQUIREMENT_CITY_HAS_X_POPULATION",
+                   "REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_DISTRICT"}
 
 
 class SimPolicy:
@@ -202,6 +209,11 @@ class SimPolicy:
                 for dv in sorted(names):
                     t = self.city_dist_tile[:, ctx["row"], j, dv]
                     out.append({"kind": "district", "mask": alive & (t >= 0), "f": f, "j": j, "dv": dv, "type": names[dv], "tile": t})
+        if collection == "COLLECTION_PLAYER_CITIES":
+            # the walk's empty cities (0x69ea00) while fewer than five
+            # subjects have been given
+            n = torch.stack([alive for _f, alive, _c in ctx["cities"]], 0).long().sum(0)
+            out += [{"kind": "nocity", "mask": n + k < _PLAYER_CITIES_WALK} for k in range(_PLAYER_CITIES_WALK)]
         return out
 
     def _pol_admits(self, rs, sub: dict) -> torch.Tensor:
@@ -237,6 +249,23 @@ class SimPolicy:
             elif ty == "REQUIREMENT_CITY_HAS_GARRISON_UNIT":
                 # 0x6d4420: the city's population at least 9
                 v = no if sub["kind"] != "city" else sub["f"].population() >= 9
+            elif ty == "REQUIREMENT_CITY_HAS_X_POPULATION":
+                # 0x6cfad0: the city's population at least Amount
+                v = no if sub["kind"] != "city" else sub["f"].population() >= int(float(a.get("Amount", 0) or 0))
+            elif ty == "REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_DISTRICT":
+                # 0x6d4860: the city's district of the type, its yield
+                # (District::GetYield) at least Amount
+                if sub["kind"] != "city":
+                    v = no
+                else:
+                    dv = self._pol_district_index(a.get("DistrictType", ""))
+                    if dv is None:
+                        v = no
+                    else:
+                        tl = self.city_dist_tile[:, sub["f"].row, sub["j"], dv]
+                        dsub = {"j": sub["j"], "dv": dv, "tile": tl}
+                        y = self._pol_district_yield({"row": sub["f"].row, "B": mask.shape[0], "dev": mask.device}, dsub, a.get("YieldType", ""))
+                        v = (tl >= 0) & (y >= float(a.get("Amount", 0) or 0))
             elif ty == "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS":
                 # 0x6d4190: the city's finished specialty districts, pillaged
                 # or not, at least Amount
@@ -260,11 +289,49 @@ class SimPolicy:
 
     # -- the analyzers ---------------------------------------------------------
 
+    def _pol_district_index(self, name: str):
+        """a DistrictType's index in the district planes, None for none"""
+        for dv, n in self._cv_tables()["dist_name"].items():
+            if n == name:
+                return dv
+        return None
+
+    def _pol_district_buildings(self, ctx: dict, sub: dict, a: dict, h: int) -> torch.Tensor:
+        """EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT (0x6a1b80) on a
+        city subject holding the district: per building of the district its
+        yield of the kind x fx(Amount x 0.01f), at the minor's weight, from
+        the start to the horizon, halved where the city lacks it, each whole"""
+        B, dev = ctx["B"], ctx["dev"]
+        zero = torch.zeros(B, dtype=torch.long, device=dev)
+        dv = self._pol_district_index(a.get("DistrictType", ""))
+        y = a.get("YieldType", "")
+        k = _YIDX.get(y, -1)
+        if dv is None or k < 0:
+            return zero
+        row, j = ctx["row"], sub["j"]
+        held = self.city_dist_tile[:, row, j, dv] >= 0
+        T = self._cv_tables()
+        r = T["rate"]
+        hh = torch.full((B,), h, dtype=torch.long, device=dev)
+        t0 = torch.zeros(B, dtype=torch.long, device=dev)
+        amount = int(float(a.get("Amount", 0) or 0))
+        pct = _fx_const(_f32(amount * _f32(0.01)))
+        w = ctx["f0"].yield_w(y)
+        out = zero
+        for bi in (self.rules.b_req_district == dv).nonzero(as_tuple=True)[0].tolist():
+            amt = round(float(self.rules.b_yields[bi, k]) * _FX)
+            v = self._cv_yield(torch.full((B,), (pct * amt) // _FX, dtype=torch.long, device=dev), y, w)
+            v = _present_value(v, r, hh) - _present_value(v, r, t0) if h != 0 else _discounted(v, r, t0)
+            has = self.city_bldg[:, row, j, bi]
+            v = torch.where(has, v, _fmul(v, torch.full_like(v, _fx_const(0.5))))
+            out = out + (v >> 8)
+        return torch.where(held, out, zero)
+
     def _pol_district_yield(self, ctx: dict, sub: dict, y: str) -> torch.Tensor:
         """`districtYieldOf` [B] f64: nothing on a pillaged plot; the
-        district's adjacency where it pays the yield, its buildings' standing
-        rows of the yield"""
-        row, j, dv = ctx["row"], sub["j"], sub["dv"]
+        district's adjacency where it pays the yield (the city's buildings in
+        it no part of it)"""
+        row, dv = ctx["row"], sub["dv"]
         t = sub["tile"].clamp(min=0)
         k = _YIDX.get(y, -1)
         out = torch.zeros(ctx["B"], dtype=torch.float64, device=ctx["dev"])
@@ -272,12 +339,6 @@ class SimPolicy:
             return out
         if int(self.districts_cat[dv]["adjYield"]) == k:
             out = out + self._district_adj_seat(row, dv).gather(1, t.unsqueeze(1)).squeeze(1).double()
-        for bi in (self.rules.b_req_district == dv).nonzero(as_tuple=True)[0].tolist():
-            amt = float(self.rules.b_yields[bi, k])
-            if amt == 0:
-                continue
-            on = self.city_bldg[:, row, j, bi] & ~self.city_bldg_pillaged[:, row, j, bi]
-            out = out + on.double() * amt
         pill = self.district_pillaged.gather(1, t.unsqueeze(1)).squeeze(1)
         return torch.where(pill, torch.zeros_like(out), out)
 
@@ -475,6 +536,56 @@ class SimPolicy:
             if not city:
                 return zero
             return sub["f"].housing_value(1 if amount > 0 else 0, t0, hh) >> 8
+        if eff == "EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT":
+            return self._pol_district_buildings(ctx, sub, a, h) if city else zero
+        if eff == "EFFECT_ADJUST_FLAT_BONUS":
+            # 0x6c5700: GOVERNMENTBONUS_ENVOYS the Amount x the Influence
+            # Points a turn (a city-state's government's; the Free Cities
+            # none) as PSEUDOYIELD_INFLUENCE from the start to the horizon;
+            # the other types none here (`EFFECT_ADJUST_FLAT_BONUS`)
+            # the best city Production x PSEUDOYIELD_WONDER of the Amount
+            # (WONDER_CONSTRUCTION); the units x PSEUDOYIELD_UNIT_COMBAT of
+            # the Amount / 10 (COMBAT_EXPERIENCE, then the GREAT_PEOPLE term:
+            # a minor's Great Person points none)
+            bonus = a.get("BonusType")
+            pct = _fx_const(_f32(amount * _f32(0.01)))
+            if bonus == "GOVERNMENTBONUS_ENVOYS":
+                if ctx["s"] == self.FR:
+                    return zero
+                pts = int(self.rules.civic_ai["cityStateInfluencePoints"]) * _FX
+                p = "PSEUDOYIELD_INFLUENCE"
+                return between(self._cv_pseudo(full((pct * pts) // _FX), p, f0.pseudo_w(p))) >> 8
+            if bonus == "GOVERNMENTBONUS_WONDER_CONSTRUCTION":
+                best = zero
+                for f, alive, _cap in ctx["cities"]:
+                    prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64, device=dev) * _FX + 0.5).long()
+                    best = torch.maximum(best, torch.where(alive, prod.expand(B), zero))
+                p = "PSEUDOYIELD_WONDER"
+                pv = self._cv_pseudo(full(pct), p, f0.pseudo_w(p))
+                return between(_fmul(best, pv)) >> 8
+            if bonus == "GOVERNMENTBONUS_COMBAT_EXPERIENCE":
+                pre = "barb" if ctx["s"] == self.FR else "major"
+                n = (getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == ctx["seat"])).long().sum(dim=1)
+                p = "PSEUDOYIELD_UNIT_COMBAT"
+                pv = self._cv_pseudo(full(pct), p, f0.pseudo_w(p))
+                x = torch.div(n * _FX * pv, _FX, rounding_mode="floor")
+                return between(_fdiv(x, torch.full_like(x, 10 * _FX))) >> 8
+            return zero
+        if eff == "EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT":
+            # 0x6bf850: per unit of the minor whose upgrade its research
+            # unlocks (0x58fff0, the visible test), fx(Amount x 0.01f) x the
+            # upgrade's Gold (a city-state's `upgradeGold`) as Gold at its
+            # weight, x 0.75, each whole; the Free Cities' upgrades not read
+            # (`unitUpgradeGolds`)
+            if ctx["s"] == self.FR:
+                return zero
+            s = ctx["s"]
+            mine = self.major_unit_alive & (self.major_unit_seat == 100 + s) & self._minor_upgrade_visible(s)
+            pct = _fx_const(_f32(amount * _f32(0.01)))
+            gold = full(int(self._mb_upgrade_gold) * _FX)
+            v = self._cv_yield(_fmul(torch.full_like(gold, pct), gold), "YIELD_GOLD", f0.yield_w("YIELD_GOLD"))
+            per = _fmul(v, torch.full_like(v, _fx_const(0.75))) >> 8
+            return mine.long().sum(dim=1) * per
         if eff == "EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT":
             mine = self.major_unit_alive & (self.major_unit_seat == ctx["seat"])
             m = self._type_maintenance.take(self.major_unit_type.clamp(min=0, max=self.NU - 1)).long()
@@ -670,6 +781,42 @@ class SimPolicy:
             out = out + torch.where(has & (mv > 0), per, torch.zeros_like(per))
         return out
 
+    def _pol_unit_experience(self, ctx: dict, a: dict, rs, h: int) -> torch.Tensor:
+        """EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER (0x6c09b0) over the minor's
+        units its set admits (REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES 0x6d22c0:
+        the unit's PromotionClass): per unit that fights (Combat,
+        RangedCombat or Bombard above 0), its level x fx(Amount x 0.01f) as
+        bare Gold, PV to the horizon, each whole"""
+        dev = ctx["dev"]
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        on, row, _moves, _rk = self._pol_units(ctx["s"])
+        pre = "barb" if ctx["s"] == self.FR else "major"
+        level = getattr(self, f"{pre}_unit_level").long()
+        fight = torch.tensor([max(int(r["combat"]), int(r["rangedCombat"]), int(r["bombard"])) > 0 for r in rows] + [False],
+                             dtype=torch.bool, device=dev)
+        ok = on & fight.take(row)
+        if rs:
+            met = []
+            for q in rs["reqs"]:
+                if q["type"] not in T["reads"]["requirements"]:
+                    continue
+                if q["type"] != "REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES":
+                    raise NotImplementedError(f"{q['type']} on a unit subject")
+                cls = q["args"].get("UnitPromotionClass")
+                match = torch.tensor([r["promotionClass"] == cls for r in rows] + [False], dtype=torch.bool, device=dev)
+                met.append(match.take(row) != bool(q.get("inverse")))
+            if met:
+                st = torch.stack(met, 0)
+                ok = ok & (st.any(0) if rs["test"] == "ANY" else ~st.any(0) if rs["test"] == "NONE" else st.all(0))
+            elif rs["test"] == "ANY":
+                ok = torch.zeros_like(ok)
+        amount = int(float(a.get("Amount", 0) or 0))
+        per = self._cv_yield(torch.full_like(level, _fx_const(_f32(amount * _f32(0.01)))), "YIELD_GOLD")
+        hh = torch.full_like(level, h)
+        v = _present_value(_fmul(per, level * _FX), T["rate"], hh) >> 8
+        return torch.where(ok, v, torch.zeros_like(v)).sum(dim=1)
+
     def _pol_mod_value(self, ctx: dict, m: dict, h: int) -> torch.Tensor:
         """one modifier's whole value [B] (`modifierValue`), 0 where refused"""
         reads = self._cv_tables()["reads"]
@@ -679,6 +826,8 @@ class SimPolicy:
             return zero
         if m.get("collection") not in reads["collections"] or self._pol_refused(m.get("subjectReqs"), reads):
             return zero
+        if m.get("collection") == "COLLECTION_PLAYER_UNITS" and eff == "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER":
+            return self._pol_unit_experience(ctx, m.get("args") or {}, m.get("subjectReqs"), h)
         acc = zero
         for sub in self._pol_subjects(ctx, m["collection"])[:51]:
             ok = self._pol_admits(m.get("subjectReqs"), sub) & sub["mask"]

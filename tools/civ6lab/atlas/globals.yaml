@@ -192,6 +192,28 @@
   context:
     - ...ives Enemy (+0x3f8) its max and, not a tribe (0x469ce0), raises the floor M (from -0.5, 0xd5fed0) by 0.5 (0xd20458); any other gives Other (+0x458) its max and, flagged at +0xc58, rais...
   review: reviewed
+- addr: 0xd624b8
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: every city-state's Retainers line is first logged the turn its city grows to 9, runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128), REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS 0x6d4190 (a city subject whos
+    - recording: h1_duelw1117
+      value: "a city-state's one city on it, the Free Cities holding no capital: no player lists Colonial Taxes in runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128)."
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...in runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128). COLLECTION_PLAYER_CITIES' walk (vtable 0xd624b8, the registry's object @f03bb8: begin 0x69e9e0 clears +0x70 and the counters +0xd0 / +0xd..."
+  review: imported
+- addr: 0xd626c8
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (@f03ea0, vtable 0xd626c8; its parser 0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's hash +0xc): a switch on..."
+  review: imported
 - addr: 0xd62ad0
   kind: global
   status: READ

@@ -79,6 +79,28 @@
   context:
     - ...ation level CanAnnexTilesWithReceivedInfluence (+0x28 bit 4), with E the envoys it holds (0x44c4b0, every giver) and A its annexed count past its starting tiles (+0xc less 0x1ab460, Starti...
   review: imported
+- addr: 0x44c6a0
+  final: 0x2ea600
+  kind: function
+  name: GetPointsPerTurn
+  semantics: "Player_Influence's points a turn: with cities, the base +0x1b0 plus the stats' points, x 1 + the ENVOYS bonus"
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 51
+      value: "every city-state's Divine Right 5.0 above ours: Monarchy's ENVOYS 50% of Chiefdom's one point"
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/aiView.ts:aiView
+    - gpu/core/sim_policy.py:_pol_analyze
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...NVOYS (0xe96ca959): the Amount x the player's Influence Points a turn (Player_Influence 0x44c6a0: with cities, the base +0x1b0 plus its stats' points, x 1 + the ENVOYS bonus), as PSE..."
+  review: reviewed
 - addr: 0x44c850
   final: 0x2ea6e0
   kind: function

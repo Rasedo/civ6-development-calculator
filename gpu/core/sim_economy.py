@@ -7200,7 +7200,8 @@ class SimEconomy:
 
     def _seat_city_walk(self, row: int, j: int | None = None, *, amen_yf: torch.Tensor,
                         pick: list | None = None, maint: torch.Tensor | None = None,
-                        amen_tier: torch.Tensor | None = None, item_flat: bool = True) -> torch.Tensor:
+                        amen_tier: torch.Tensor | None = None, item_flat: bool = True,
+                        base: list | None = None) -> torch.Tensor:
         """THE computeCityStats twin — [B, n, 6] f64 per-city totals in engine
         yield order (food, production, gold, science, culture, faith) for ANY
         seat row, dead columns zeroed and gold NET of cityMaintenance. n is the
@@ -7227,7 +7228,9 @@ class SimEconomy:
         pick: when given, the worked-tile pick of the columns walked is
            appended to it, [B, n, M] tile ids, -1 unused.
         item_flat: False reads the city's PLAIN Production — the city-states'
-           flat toward the queue's head left out (`CityStats.plainProduction`)."""
+           flat toward the queue's head left out (`CityStats.plainProduction`).
+        base: when given, the columns' sums before the percent and the
+           maintenance are appended to it, [B, n, 6] (`CityStats.baseYields`)."""
         rd = self.rules_dev
         B, dev, F64 = self.B, self.device, torch.float64
         cols = self.RC
@@ -8055,6 +8058,8 @@ class SimEconomy:
         # city-state's city takes the minor's -50% in the same sum
         if self._CITY_MINOR0 <= row < self.FREE_ROW:
             pct[:, :, 1] = pct[:, :, 1] + float(self.rules.citystate["productionPct"]) / 100.0
+        if base is not None:
+            base.append(torch.where(alive.unsqueeze(2), total, torch.zeros_like(total)))
         # CIV6 (GameAttribute::Value 0xaa740): base + base x percent / 100 in
         # the game's 24.8 fixed point, the divide truncating toward zero
         # (`withPercent256`)
@@ -8105,7 +8110,7 @@ class SimEconomy:
         computation writes nothing; a `record` read stores the pick and the
         tier from the result, hit or miss. CIV6_STATS_MEMO_CHECK=1 recomputes
         on every hit and asserts."""
-        total, eff, need, tier_idx, worked, lux = simbase.memo_read(
+        total, eff, need, tier_idx, worked, lux, _base = simbase.memo_read(
             self, self._stats_memo, row, self._seat_city_stats_read, row,
             may_set=("_tiebreak_key_dtype",))
         if record:
@@ -8126,8 +8131,9 @@ class SimEconomy:
         tier_idx, growth_f, yield_f, lux = self._seat_amenity(row)
         maint, housing = self._seat_housing(row)  # once: maintenance for the walk, housing below
         worked: list = []
+        base: list = []
         total = self._seat_city_walk(row, amen_yf=yield_f, pick=worked, maint=maint,
-                                     amen_tier=tier_idx)
+                                     amen_tier=tier_idx, base=base)
         pop = self.city_pop[:, row, : self.RC].double()
         surplus = total[:, :, 0] - pop * self.rules.food_per_citizen
         head = housing - pop
@@ -8164,7 +8170,14 @@ class SimEconomy:
         eff = surplus * torch.floor(hf * m256) / 256.0
         eff = torch.where(surplus > 0, eff, surplus)
         need = self._growth_needed(pop)
-        return total, eff, need, tier_idx, worked[0], lux
+        return total, eff, need, tier_idx, worked[0], lux, base[0]
+
+    def _seat_city_base(self, row: int) -> torch.Tensor:
+        """[B, RC, 6] f64 each city yield's attribute base (`CityStats.
+        baseYields`): the walk's sum before its percent and the Gold's
+        maintenance, off the same memoised read as `_seat_city_stats`"""
+        return simbase.memo_read(self, self._stats_memo, row, self._seat_city_stats_read, row,
+                                 may_set=("_tiebreak_key_dtype",))[6]
 
     def seat_score(self, row: int) -> torch.Tensor:
         """[B] — the balanced empire score (`rules.score`) for ANY seat row: the

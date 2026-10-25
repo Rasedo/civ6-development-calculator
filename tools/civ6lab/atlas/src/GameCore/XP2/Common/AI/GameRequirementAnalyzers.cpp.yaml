@@ -3,6 +3,26 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x6cfad0
+  kind: function
+  name: REQUIREMENT_CITY_HAS_X_POPULATION
+  semantics: the context's city (+0x70) of at least Amount citizens
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 214
+      value: Free Market 32 where both halves' sets were refused
+  impl:
+    - cpu/core/aiModifiers.ts:EVALUATORS
+    - gpu/core/sim_cityvalue.py:_cv_admits
+    - gpu/core/sim_policy.py:_pol_admits
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- REQUIREMENT_CITY_HAS_X_POPULATION 0x6cfad0: the context's city (+0x70) of at least Amount citizens (+0x588). REQUIREMENT_CITY_HAS_..."
+  review: reviewed
 - addr: 0x6cfbd0
   kind: function
   name: PLAYER_HAS_PANTHEON
@@ -139,6 +159,28 @@
   context:
     - "...mpassable: half the Amount's PV(H) - PV(T), unweighted) and the plot evaluators TERRAIN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00,..."
   review: imported
+- addr: 0x6d22c0
+  final: 0x48f810
+  kind: function
+  name: REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES
+  semantics: with the context's unit (+0x90), its Units row's PromotionClass is the argument's; with none, the context holds a city (+0x70)
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 124
+      value: Mexico City's Survey 7, 14, 21 for one, two, three level-1 recon units (t124-129)
+    - recording: 1124
+      turn: 124
+      value: "with the context's unit, +0x90, one that fights, GetCombat /   GetRangedCombat / GetBombardCombat above 0: its level, the experience   +0x1bc0's +0x10 (0x382f0), times it, PV to H (0x7a16e0) — runs/h1"
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS, gpu/core/sim_policy.py:_pol_unit_experience]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  context:
+    - "...ction Reports 7 for one level-2 Infantry t205; REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES 0x6d22c0: with the context's unit its Units row's PromotionClass, with none the context holding..."
+  review: reviewed
 - addr: 0x6d2470
   final: 0x48f920
   kind: function
@@ -266,4 +308,22 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...EN_INFLUENCE_TOKENS, PLAYER_IS_SUZERAIN). REQUIREMENT_PLAYER_HAS_GIVEN_INFLUENCE_TOKENS 0x6d45b0: the tokens the city-state received from the player (0x44c860, the store +0x5d0 and a..."
+  review: reviewed
+- addr: 0x6d4860
+  final: 0x491cc0
+  kind: function
+  name: REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_DISTRICT
+  semantics: the context's city's district of the type whose District::GetYield (no modifier) of the yield reaches Amount; sets +0x78
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 214
+      value: Free Market 32 where both halves' sets were refused
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS, gpu/core/sim_policy.py:_pol_admits]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...) of at least Amount citizens (+0x588). REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_ DISTRICT 0x6d4860 (DistrictType +8, YieldType +0xc, Amount +0x10): the context's city's district of the t..."
   review: reviewed

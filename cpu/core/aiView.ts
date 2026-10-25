@@ -13,7 +13,7 @@ import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/al
 import { isExplored } from './fog';
 import { CITY_STRIKE_RANGE, plotPressureLead } from './phase';
 import { governorSum } from './governors';
-import { CITY_STATE_SUZERAIN_BONUS } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, MINOR_UPGRADE_GOLD, govInfluence } from '../data/cityStates';
 import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf } from './seats';
 import { aiStrengths, districtHealth, planUnit, reachPlots, tacticalTargets, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
@@ -38,17 +38,17 @@ import { IMPROVEMENTS } from '../data/improvements';
 import type { ImprovementId } from './types';
 import { computeUnlocks } from './effects';
 import { civicAnalysis } from './aiCivics';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
 import { AI_BUILDINGS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { unitProductionTable } from './aiUnitProduction';
 import { resourceValue } from './aiResource';
 import { stockFree } from './stockpile';
-import { minorItemTurns, minorKnownUnits, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
+import { minorItemTurns, minorKnownUnits, minorUpgradeVisible, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
 import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './freeCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
-import { buildingPillaged, buildingVariantAdjacency, effectiveAdjacency } from './yields';
+import { buildingVariantAdjacency, effectiveAdjacency } from './yields';
 import { civEraIndex, computeCityStats } from './city';
 import { PROJECTS } from '../data/projects';
 import { RESOURCES } from '../../world/resources';
@@ -58,8 +58,12 @@ import { availableProjects, districtCost, districtScaledBase, projectCost, settl
 
 const districtType = (id: string): string => `DISTRICT_${id}`;
 
-/** a district's yield of a kind (0x24b5a0): its adjacency yield of that
- *  kind, its flat yields, and the yields of the city's buildings in it */
+/** a district's yield of a kind (0x24b5a0: District::GetYield 0x249850 and
+ *  0x24aae0): its adjacency yield of that kind at its plot (0x366df0) and its
+ *  flat yields; none on a pillaged plot. The city's buildings in it are no
+ *  part of it (runs/h1_duelw1124 player 4 t40: Natural Philosophy 29 for a
+ *  Campus of adjacency 2 beside its Library; 1121 Hunza's Commercial Hub of
+ *  no adjacency beside its Market, none) */
 function districtYieldOf(state: GameState, seat: number, city: City, d: { type: DistrictId; tileIndex: number }, key: YieldKey): number {
   const tile = state.map.tiles[d.tileIndex];
   if (tile.districtPillaged) return 0;
@@ -68,10 +72,6 @@ function districtYieldOf(state: GameState, seat: number, city: City, d: { type: 
   let y = 0;
   if (def.adjacencyYield === key) y += effectiveAdjacency(ctx, tile, d.type, buildingVariantAdjacency(ctx.mods.civ, city, d.type));
   y += ctx.mods.districtYieldAdd[d.type]?.[key] ?? 0;
-  for (const b of city.buildings) {
-    const bd = effectiveBuilding(ctx.mods.civ, b);
-    if (bd?.district === d.type && !buildingPillaged(city, b)) y += bd.yields?.[key] ?? 0;
-  }
   return y;
 }
 const YIELD_KEY: Readonly<Record<string, YieldKey>> = {
@@ -346,6 +346,14 @@ export function aiView(state: GameState): AiView {
     tributaries: (i) => state.cityStates.filter((cs) => suzerainOf(cs) === i).length,
     cityStateCount: () => state.cityStates.filter((cs) => cs.centerIndex >= 0).length,
     unitMaintenances: (i) => state.units.filter((u) => u.seat === i).map((u) => UNITS[u.type]?.maintenance ?? 0),
+    // a city-state's units whose upgrade its research unlocks, each at the
+    // city-state's upgrade price; another party's not read
+    unitUpgradeGolds: (i) => {
+      const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      return cs ? state.units.filter((u) => u.seat === i && minorUpgradeVisible(cs, u)).map(() => MINOR_UPGRADE_GOLD) : [];
+    },
+    // its government's (a city-state's Chiefdom); the Free Cities accrue none
+    influencePointsPerTurn: (i) => (i === FREE_SEAT ? 0 : govInfluence(seatGovernment(state, i)).points),
     // a city-state's table on its knowledge base's counts; a major's or the
     // Free Cities' on their own versions, the Free Cities knowing none
     unitProductionValue: (i, type) => {
@@ -379,7 +387,7 @@ export function aiView(state: GameState): AiView {
       }
       return table.get(type)?.value ?? 0;
     },
-    playerUnits: (i) => unitsOf(state, i).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_'), moves: Math.floor(unitFullMoves(state, u) / MP_SCALE) })),
+    playerUnits: (i) => unitsOf(state, i).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_'), moves: Math.floor(unitFullMoves(state, u) / MP_SCALE), level: u.level ?? 1 })),
     barbarianSeats: () => [BARB_SEAT],
     bestUnitOfClass: (i, cls) => {
       const traits = isCityStateSeat(i) ? null : majorTraits(state, i);
@@ -461,9 +469,7 @@ export function aiView(state: GameState): AiView {
     cityAmenity: (i, id) => {
       const city = cityOf(i, id);
       if (!city) return { balance: 0, yields: {} };
-      const stats = computeCityStats(state, city);
-      return { balance: stats.amenities.have - stats.amenities.needed,
-        yields: Object.fromEntries(Object.entries(YIELD_KEY).map(([y, k]) => [y, stats.total[k]])) };
+      return amenityCityOf(computeCityStats(state, city));
     },
     // a city-state's forecast is its city's update's (`CityState.aiGrowth`),
     // any other city's its growth as it stands

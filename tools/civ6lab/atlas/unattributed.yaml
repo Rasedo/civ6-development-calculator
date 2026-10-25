@@ -147,7 +147,9 @@
   final: 0x902f0
   kind: function
   status: PARTLY
-  readings: ["C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"]
+  readings:
+    - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ne; else, Can Delete, 0x591000 -1 deletes; else at most one promotion (+0x1bc0's count, 0x382f0 <= 1) and more than 10 of its type (0x4f2c90 > 0xa) deletes. The full test failing: t..."
@@ -1444,6 +1446,16 @@
   context:
     - "...60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), raises it to 0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in..."
   review: imported
+- addr: 0x4e0bf0
+  final: 0x3439b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...8) x the Amount as Gold weighted, discounted from the start, plus 0.5 x the Gold yield (0x4e0bf0, the player's gross: cities, tributaries, deals, interest ...) x the Amount, between —..."
+  review: imported
 - addr: 0x4e4ad0
   final: 0x344fc0
   kind: function
@@ -1986,6 +1998,7 @@
     - recording: h1_duelw1117
       turn: 25
       value: "Check: runs/h1_duelw1117 China t25, Slinger (17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30."
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
   readings:
     - "H-1: the upgrade's gold — READ"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
@@ -2714,6 +2727,52 @@
   context:
     - ...nds once on the context as it is (the evaluating player); COLLECTION_OWNER 0x69fc90 / 0x69e790 once, the context's city (+0x70) where one is set; COLLECTION_CITY_DISTRICTS 0x69fdf0 t...
   review: imported
+- addr: 0x69e9e0
+  final: 0x4634d0
+  kind: function
+  name: collectionPlayerCitiesBegin
+  semantics: clears the context's +0x70 and, with a player, the walk's counters +0xd0 / +0xd4
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 61
+      value: every city-state's Colonial Offices 16.0; China 12.0 with two cities, 8.0 with three, 4.0 with four
+    - recording: h1_duelw1117
+      value: every city-state's Retainers line is first logged the turn its city grows to 9, runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128), REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS 0x6d4190 (a city subject whos
+    - recording: h1_duelw1117
+      value: "a city-state's one city on it, the Free Cities holding no capital: no player lists Colonial Taxes in runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128)."
+  impl: [cpu/core/aiModifiers.ts:subjects]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  context:
+    - "...8). COLLECTION_PLAYER_CITIES' walk (vtable 0xd624b8, the registry's object @f03bb8: begin 0x69e9e0 clears +0x70 and the counters +0xd0 / +0xd4; next 0x69ea00 sets +0x70 to each of the play..."
+  review: reviewed
+- addr: 0x69ea00
+  final: 0x4634f0
+  kind: function
+  name: collectionPlayerCitiesNext
+  semantics: "COLLECTION_PLAYER_CITIES' next: each of the player's cities into the context's +0x70, counting +0xd4; past the last, true with +0x70 null while +0xd4 was below 5"
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 61
+      value: every city-state's Colonial Offices 16.0; China 12.0 with two cities, 8.0 with three, 4.0 with four
+    - recording: h1_duelw1117
+      value: every city-state's Retainers line is first logged the turn its city grows to 9, runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128), REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS 0x6d4190 (a city subject whos
+    - recording: h1_duelw1117
+      value: "a city-state's one city on it, the Free Cities holding no capital: no player lists Colonial Taxes in runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128)."
+  impl:
+    - cpu/core/aiModifiers.ts:PLAYER_CITIES_WALK
+    - cpu/core/aiModifiers.ts:subjects
+    - gpu/core/sim_cityvalue.py:_cv_subjects
+    - gpu/core/sim_policy.py:_pol_subjects
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  context:
+    - "...gistry's object @f03bb8: begin 0x69e9e0 clears +0x70 and the counters +0xd0 / +0xd4; next 0x69ea00 sets +0x70 to each of the player's cities, +0x12f0 +0xa0, counting +0xd4; past the last c..."
+  review: reviewed
 - addr: 0x69ec70
   final: 0x463700
   kind: function
@@ -2723,6 +2782,19 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - ...TY_DISTRICTS 0x69fdf0 the city's districts (+0x78, plot +0x88); COLLECTION_PLAYER_UNITS 0x69ec70 (+0x90).
+  review: imported
+- addr: 0x69efa0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: every city-state's Retainers line is first logged the turn its city grows to 9, runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128), REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS 0x6d4190 (a city subject whos
+    - recording: h1_duelw1117
+      value: "a city-state's one city on it, the Free Cities holding no capital: no player lists Colonial Taxes in runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128)."
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - ...; past the last city it keeps returning true with +0x70 null while +0xd4 was below 5; end 0x69efa0 clears +0x70) so gives at least five subjects, the cities then empty ones. The requiremen...
   review: imported
 - addr: 0x69f320
   final: 0x4622d0
@@ -3851,6 +3923,7 @@
     - cpu/core/barbarianOps.ts:hooksOf
     - cpu/core/operations/barbarian.ts:BarbarianHooks
     - cpu/core/operations/barbarian.ts:spawnChange
+    - cpu/core/barbarianOps.ts:barbSpawnChange
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"

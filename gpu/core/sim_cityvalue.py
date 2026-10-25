@@ -1185,13 +1185,16 @@ class SimCityValue:
     # admitting each subject. A read the TS evaluator makes that is not here
     # stops the tables' build (`_cv_check_read`).
 
+    # the subjects COLLECTION_PLAYER_CITIES' walk gives at least
+    _CV_PLAYER_CITIES_WALK = 5
     _CV_COLLECTIONS = ("COLLECTION_OWNER", "COLLECTION_PLAYER_CITIES", "COLLECTION_CITY_DISTRICTS",
                        "COLLECTION_CITY_TRAINED_UNITS", "COLLECTION_CITY_PLOT_YIELDS")
     _CV_EVALUATORS = ("REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES", "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
                       "REQUIREMENT_PLOT_RESOURCE_TYPE_MATCHES", "REQUIREMENT_PLOT_RESOURCE_VISIBLE",
                       "REQUIREMENT_PLOT_HAS_ANY_IMPROVEMENT", "REQUIREMENT_DISTRICT_TYPE_MATCHES",
                       "REQUIREMENT_CITY_HAS_BUILDING", "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT",
-                      "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS")
+                      "REQUIREMENT_CITY_HAS_GARRISON_UNIT", "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
+                      "REQUIREMENT_CITY_HAS_X_POPULATION")
     _CV_ANALYZERS = ("EFFECT_ADJUST_PLOT_YIELD", "EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
                      "EFFECT_ADJUST_CITY_INNER_DEFENSE", "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY",
                      "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN",
@@ -1234,8 +1237,7 @@ class SimCityValue:
 
     # the analyzers worth nothing on a unit subject (they read a city's, a
     # district's or a plot's), and the wrappers whose nested ones are checked
-    _CV_UNIT_ZERO = ("EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER", "EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_PLOT_YIELD",
-                     "EFFECT_GRANT_UNIT_IN_CITY")
+    _CV_UNIT_ZERO = ("EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_PLOT_YIELD", "EFFECT_GRANT_UNIT_IN_CITY")
     _CV_WRAPPERS = ("EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER", "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE")
 
     def _cv_check_units(self, m: dict, reads: dict, depth: int, nested: bool = False) -> None:
@@ -1298,6 +1300,9 @@ class SimCityValue:
             elif ty == "REQUIREMENT_CITY_HAS_GARRISON_UNIT":
                 # 0x6d4420: the city's population at least 9
                 v = _t(f.population() >= 9, shape).bool() if k == "city" else no
+            elif ty == "REQUIREMENT_CITY_HAS_X_POPULATION":
+                # 0x6cfad0: the city's population at least Amount
+                v = _t(f.population() >= int(float(a.get("Amount", 0) or 0)), shape).bool() if k == "city" else no
             elif ty == "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS":
                 # 0x6d4190: the city's finished specialty districts at least Amount
                 if k != "city":
@@ -1327,10 +1332,13 @@ class SimCityValue:
         if collection in ("COLLECTION_OWNER", "COLLECTION_CITY_TRAINED_UNITS"):
             return [{"kind": "city", "mask": one}]
         if collection == "COLLECTION_PLAYER_CITIES":
+            # the player's cities, then the walk's empty ones (0x69ea00)
+            # while fewer than five subjects have been given
             n = f.player_cities()
             if torch.is_tensor(n):
-                return [{"kind": "city", "mask": n > k} for k in range(int(n.max()) if n.numel() else 0)]
-            return [{"kind": "city", "mask": one}] * int(n)
+                cities = [{"kind": "city", "mask": n > k} for k in range(int(n.max()) if n.numel() else 0)]
+                return cities + [{"kind": "nocity", "mask": n + k < self._CV_PLAYER_CITIES_WALK} for k in range(self._CV_PLAYER_CITIES_WALK)]
+            return [{"kind": "city", "mask": one}] * int(n) + [{"kind": "nocity", "mask": one}] * max(0, self._CV_PLAYER_CITIES_WALK - int(n))
         if collection == "COLLECTION_CITY_DISTRICTS":
             return [{"kind": "district", "type": d, "mask": _t(held, like).bool()} for d, held in f.city_districts()]
         if collection == "COLLECTION_CITY_PLOT_YIELDS":
@@ -1376,6 +1384,8 @@ class SimCityValue:
             prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64) * _FX + 0.5).long()
             return between(_fmul(per, prod.expand_as(per))) >> 8
         if eff == "EFFECT_ADJUST_CITY_INNER_DEFENSE":
+            if sub["kind"] == "nocity":
+                return zero
             return torch.where(_t(f.city_strikes(), like).bool(), torch.full_like(like, amount), zero)
         if eff == "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY":
             k = f.trade_knowledge()
@@ -1661,8 +1671,12 @@ class _MinorFacts:
             return self.sim._city_lowland_count(self.row)[:, 0] == 0
         return 0
 
+    def _base(self):
+        """the city yields' attribute bases (`amenityCityOf`)"""
+        return self._get("base", lambda: self.sim._seat_city_base(self.row))
+
     def amenity(self):
-        tot = self._stats()[0][:, 0]
+        tot = self._base()[:, 0]
         bal = self.sim._amen_balance_of[self.row][:, 0]
         ys = {y: tot[:, k] for k, y in enumerate(_YIELDS)}
         return bal.long(), ys
@@ -2287,7 +2301,7 @@ class _FreeFacts(_MinorFacts):
         return 0
 
     def amenity(self):
-        tot = self._stats()[0][:, self.j]
+        tot = self._base()[:, self.j]
         bal = self.sim._amen_balance_of[self.row][:, self.j]
         ys = {y: tot[:, k] for k, y in enumerate(_YIELDS)}
         return bal.long(), ys
@@ -2296,7 +2310,7 @@ class _FreeFacts(_MinorFacts):
         """the Free Cities' cities within `r` of the centre, each with the
         games it stands in"""
         sim = self.sim
-        tot = self._stats()[0]
+        tot = self._base()
         ctr = self._centre().clamp(min=0)
         out = []
         for c in range(tot.shape[1]):

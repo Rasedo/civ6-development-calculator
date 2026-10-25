@@ -118,6 +118,17 @@
   context:
     - ..._SITE_PRESSURE_MULTIPLIER (+0x5e8) with a Holy Site; then x (100 + the owner religion's 0x4975a0 + the city's +0xd4 (MODIFIER_SINGLE_CITY_RELIGION_PRESSURE, the Bishop) + the queue t...
   review: imported
+- addr: 0x4979f0
+  final: 0x3158b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...value. GOVERNMENTBONUS_FAITH_PURCHASES (0xc25143f9): where the player's religion entry (0x4979f0: the religion manager's +0xa0 entry of the player's +0x128 holding more than 0) — 0.1 x..."
+  review: imported
 - addr: 0x497cc0
   final: 0x315b30
   kind: function

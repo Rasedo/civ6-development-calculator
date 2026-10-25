@@ -66,7 +66,7 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { TECH_IMPROVEMENT_RESOURCES, resourceValue, type ResourceFacts } from './aiResource';
 import { RESOURCES, extractsResource } from '../../world/resources';
 import { unitProductionTable } from './aiUnitProduction';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, specializationBests, unitTable, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, amenityPerTurn, buildingTable, buildingValue, constructibleNow, defaultSpecialization, growthForecast, specializationBests, unitTable, type AiUnitRow, type CityBuildFacts, type CityGrowth, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost } from './stockpile';
@@ -1297,13 +1297,7 @@ export function minorResourceFacts(state: GameState, cityState: CityState): Reso
   const era = civEraIndex(r.techs, r.civics);
   const stats = computeCityStats(state, minorCity(cityState));
   const view = aiView(state);
-  const key: Record<string, YieldKey> = {
-    YIELD_FOOD: 'food', YIELD_PRODUCTION: 'production', YIELD_GOLD: 'gold', YIELD_SCIENCE: 'science', YIELD_CULTURE: 'culture', YIELD_FAITH: 'faith',
-  };
-  const amenity = {
-    balance: stats.amenities.have - stats.amenities.needed,
-    yields: Object.fromEntries(Object.entries(key).map(([y, k]) => [y, stats.total[k]])),
-  };
+  const amenity = amenityCityOf(stats);
   const extracted = new Map<string, number>();
   for (const t of state.map.tiles) {
     if (tileSeat(t) !== cityState.seat || !t.resource || !extractsResource(t)) continue;
@@ -1471,10 +1465,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
   const has = new Set(city.buildings);
   const centre = state.map.tiles[cityState.centerIndex];
   const worship = minorWorship(state, cityState);
-  const amenity = {
-    balance: stats.amenities.have - stats.amenities.needed,
-    yields: Object.fromEntries(Object.entries(key).map(([y, k]) => [y, stats.total[k]])),
-  };
+  const amenity = amenityCityOf(stats);
   return {
     view,
     seat: cityState.seat,

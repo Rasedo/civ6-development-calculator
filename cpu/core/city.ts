@@ -58,6 +58,9 @@ export interface CityStats {
     trade: Yields;
   };
   total: Yields;
+  /** each yield's attribute base, before its percent and the Gold's
+   *  maintenance (GameAttribute::Value with its modifier held to 0) */
+  baseYields: Yields;
   /** the Production with nothing at the queue's head: `total.production`
    *  without the city-states' flat toward the head */
   plainProduction: number;
@@ -1889,6 +1892,7 @@ export function computeCityStats(
   // the city's PLAIN Production (City_BuildQueue 0x16f050's read with no
   // item, 0x1c5350): the same sum without the flat toward the head
   const plainProduction = withPercent256(total.production - itemFlat, pct.production);
+  const baseYields = { ...total };
   for (const k of YIELD_KEYS) total[k] = withPercent256(total[k], pct[k]);
   const maintenance = cityMaintenance(state, city);
   total.gold -= maintenance;
@@ -1927,6 +1931,7 @@ export function computeCityStats(
     workedTiles: worked,
     breakdown: { tiles, districts, buildings, citizens, bonuses, trade },
     total,
+    baseYields,
     plainProduction,
     yieldPct: pct,
     foodSurplus,

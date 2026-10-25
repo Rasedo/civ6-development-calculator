@@ -1168,6 +1168,9 @@ export function buildRules() {
       // the Eras in order (an EraType argument's index)
       eraNames: ERAS,
       cityStateGovernment: gameTypeOf('government', CITY_STATE_GOVERNMENT, 'GOVERNMENT_'),
+      // a city-state's Influence Points a turn (its government's,
+      // EFFECT_ADJUST_FLAT_BONUS's envoys term)
+      cityStateInfluencePoints: govInfluence(CITY_STATE_GOVERNMENT).points,
       gpClassPseudo: AI_GP_CLASS_PSEUDOYIELD,
     },
     cityState: {

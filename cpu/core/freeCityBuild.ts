@@ -21,7 +21,7 @@ import { engineId } from '../data/aliases';
 import { RESOURCES } from '../../world/resources';
 import { hasRiver } from '../../world/query';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, growthForecast, type AmenityCity, type CityBuildFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityCityOf, growthForecast, type AmenityCity, type CityBuildFacts } from './aiCityBuild';
 import { FX, fmul, fxOf, turnsAt } from './aiValue';
 import { unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
@@ -126,13 +126,7 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
   const view = aiView(state);
   const traits = majorTraits(state, seat);
   const own = citiesOf(state, seat);
-  const amenityOf = (c: City): AmenityCity => {
-    const st = c === city ? stats : computeCityStats(state, c);
-    return {
-      balance: st.amenities.have - st.amenities.needed,
-      yields: Object.fromEntries(Object.entries(YIELD_KEY).map(([y, k]) => [y, st.total[k]])),
-    };
-  };
+  const amenityOf = (c: City): AmenityCity => amenityCityOf(c === city ? stats : computeCityStats(state, c));
   const amenity = amenityOf(city);
   const turns = seatResearchTurns(state, seat);
   const has = new Set(city.buildings);

@@ -42,7 +42,7 @@
   kind: function
   name: EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_district_buildings]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
@@ -863,6 +863,7 @@
   readings:
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - ...weight, 0x7a6690; PV(horizon) - PV(start), 0x7a2140); EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90 (min(City::GetYield 0x1cb8b0, 100) x the percent x 0.01f, weighted, the same span); E...
   review: imported
@@ -965,18 +966,23 @@
   final: 0x46fac0
   kind: function
   name: EFFECT_ADJUST_CITY_GROWTH
-  status: PARTLY
+  semantics: the context's city's (+0x70) growth surplus, 2.0 with none, x fx(Amount x 0.01f), bare Food, from start to horizon
+  status: READ
   cases:
+    - recording: h1_duely1117
+      turn: 61
+      value: every city-state's Colonial Offices 16.0; China 12.0 with two cities, 8.0 with three, 4.0 with four
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_analyze]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
   context:
     - "...): the city's Culture x it, weighted, + 0.5 (0x16eb20), span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth object's surplus (0x1b5620), 2.0 with no city, x fx(Amount..."
-  review: imported
+  review: reviewed
 - addr: 0x6bedb0
   final: 0x46fd70
   kind: function
@@ -1018,17 +1024,23 @@
   final: 0x470700
   kind: function
   name: EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT
+  semantics: per unit with a visible upgrade, the Amount x its upgrade Gold as Gold weighted x 0.75, each whole
   status: READ
   cases:
     - recording: h1_duelw1121
       turn: 76
+      value: Hunza's Professional Army 1.0 for its one Horseman; Ayutthaya t78 3.0 for three units
+    - recording: h1_duelw1121
+      turn: 76
       value: "Not ported: on runs/h1_duelw1121   every unit with an unlocked, reachable upgrade reads 23-59 for Hunza where   the game lists 1.0 (Professional Army t76-t93) — ASK: which units the list   +0xd8 holds"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_analyze]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
   context:
     - "- EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT 0x6bf850 (@f04120; Amount stored fx(Amount x 0.01f) by its parser 0x6bf3a0): over the player's..."
-  review: imported
+  review: reviewed
 - addr: 0x6c0490
   final: 0x471230
   kind: function
@@ -1059,17 +1071,23 @@
   final: 0x471740
   kind: function
   name: EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER
-  status: PARTLY
+  semantics: "with the context's unit that fights: its level x fx(Amount x 0.01f) as bare Gold, PV to the horizon; with none, the city's Production x it from start to horizon"
+  status: READ
   cases:
+    - recording: h1_duely1127
+      turn: 124
+      value: Mexico City's Survey 7, 14, 21 for one, two, three level-1 recon units (t124-129)
     - recording: 1124
       value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_unit_experience]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...LLECTION_CITY_PLOT_YIELDS (0x69feb0, owned plots ring 3),   EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER (0x6c09b0), EFFECT_ADJUST_PLOT_YIELD (0x6afa10),   EFFECT_ADJUST_TRADE_ROUTE_CAPACITY (0x6c0ff0), plot evalua..."
   context:
     - "...UNITS (0x69ffa0: once, the evaluation's city); EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER 0x6c09b0 (its parser 0x6c0590 stores Amount x 0.01f as unweighted Gold; no unit: the city's Prod..."
-  review: imported
+  review: reviewed
 - addr: 0x6c0ff0
   final: 0x471d80
   kind: function
@@ -1199,6 +1217,16 @@
   context:
     - "- EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN 0x6c4820: PSEUDOYIELD_DIPLOMATIC_FAVOR (@0xf2e204) of Amount with the player, span."
   review: imported
+- addr: 0x6c4e40
+  final: 0x475810
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (@f03ea0, vtable 0xd626c8; its parser 0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's hash +0xc): a switch on the bonus type, the bra..."
+  review: imported
 - addr: 0x6c5080
   final: 0x475a50
   kind: function
@@ -1211,6 +1239,24 @@
   context:
     - "- EFFECT_ADJUST_BUILDING_YIELD_CHANGE 0x6c5080 (args BuildingType +8, YieldType +0xc, Amount +0x10): a city subject; Amount weighted,..."
   review: imported
+- addr: 0x6c5700
+  final: 0x476060
+  kind: function
+  name: EFFECT_ADJUST_FLAT_BONUS
+  semantics: "a switch on the government bonus type's hash: ENVOYS the Amount x the Influence Points a turn as PSEUDOYIELD_INFLUENCE; WONDER_CONSTRUCTION the best city Production x PSEUDOYIELD_WONDER of the Amount; COMBAT_EXPERIENCE the units x PSEUDOYIELD_UNIT_COMBAT of the Amount / 10, running on into GREAT_PEOPLE's per-class points; FAITH_PURCHASES and GOLD_PURCHASES the treasury and the yield; between, whole at the end"
+  status: PARTLY
+  cases:
+    - recording: h1_duely1121
+      turn: 51
+      value: "every city-state's Divine Right 5.0 above ours: Monarchy's ENVOYS 50% of Chiefdom's one point"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_analyze]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (@f03ea0, vtable 0xd626c8; its parser 0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's..."
+  review: reviewed
 - addr: 0x6c6d60
   kind: function
   name: EFFECT_ADJUST_PLAYER_DIPLOMATIC_VICTORY_POINTS

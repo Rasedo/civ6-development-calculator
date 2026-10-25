@@ -16,6 +16,9 @@
     - cpu/core/minorOps.ts:upgradeMayGo
     - cpu/core/minorOps.ts:unupgradedDeleted
     - gpu/core/sim_minorops.py:_mops_upgrade_trees
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - gpu/core/sim_policy.py:full
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"

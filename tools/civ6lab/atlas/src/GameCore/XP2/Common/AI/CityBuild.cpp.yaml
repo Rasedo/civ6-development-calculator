@@ -143,8 +143,13 @@
 - addr: 0x5cc510
   final: 0x3e0aa0
   kind: function
+  name: cityBuildYieldsUpdate
+  semantics: per yield the city's yield attribute (0x1c64d0) through GameAttribute::Value into +0xfb0, then with its modifier clamped to [0, 0] (the base) into +0x1028 (its vector +0x1080)
   status: READ
   cases:
+    - recording: h1_duely1127
+      turn: 77
+      value: "Hattusa Unhappy at -3: Retainers 82 on its base yields (54 on its yields)"
     - recording: h1_duelw1121
       value: "Logged (runs/h1_duelw1121, 1124, 1127, 1128 minors' Civil   Prestige): every city staying in its level reads 14, PSEUDOYIELD_HAPPINESS   of 1;"
     - recording: 1124
@@ -156,11 +161,13 @@
     - recording: 1124
       turn: 61
       value: 1124 Bologna t61 60 against 50;
+  impl: [cpu/core/aiCityBuild.ts:amenityCityOf, gpu/core/sim_economy.py:_seat_city_base]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
   context:
     - ...but Food (@f2f974), CityBuildAI's yield (+0x1028's vector +0x1080, filled per yield by 0x5cc510 from 0x1c64d0's attribute) x (after + 100) / (before + 100) - 1, the level's percent be...
-  review: imported
+  review: reviewed
 - addr: 0x5cc8e0
   final: 0x3e0eb0
   kind: function
