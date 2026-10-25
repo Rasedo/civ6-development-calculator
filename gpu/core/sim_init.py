@@ -3331,6 +3331,9 @@ class SimInit:
             self._fire_feat[_f] = True
         # RANDOM_EVENT_START_TURN: no event fires, and no draw is spent, before it
         self._random_event_start_turn = int(_ds["randomEventStartTurn"])
+        # WORLD_CONGRESS_REQUEST_FOR_AID_DAMAGE_MIN: the damage one event deals
+        # a civilization before it asks for aid
+        self._aid_damage_min = int(_ds["aidDamageMin"])
         # the nuclear accident by severity: the reactor age that opens the
         # row, the fallout turns, the district, building and population chances
         self._accident_min_turn = [int(x) for x in _ds["accidentMinTurn"]]

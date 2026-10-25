@@ -3,6 +3,22 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x2597d0
+  final: 0x199290
+  kind: function
+  name: aidRequestGate
+  semantics: "EMERGENCY_TRIGGER_PLAYER_LOSES_POP_TO_RANDOM_EVENT's handler (subscribed by 0x25c460, called through 0x261ce0 with one event's tally for a player): a living full civilization (0x484a10, 0x4848c0) whose a x 0.5 + b + c (0x3388e0, rec+0x18, 0x339270 of 0x33b350) is at least GlobalParameters +0x7c4, WORLD_CONGRESS_REQUEST_FOR_AID_DAMAGE_MIN (4), reaches the trigger 0x260760; below it nothing."
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 46
+      value: "the fire on plot 542 takes Xi'an's one citizen: 1 point of 4, no SEND_AID in Game_Emergencies.csv (0 of 29 duels raise one)"
+  impl:
+    - cpu/core/disasters.ts:aidScope
+    - cpu/data/disasters.ts:AID_DAMAGE_MIN
+    - gpu/core/sim_economy.py:_aid_close
+  readings: ["C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"]
+  review: reviewed
 - addr: 0x25afc0
   final: 0x19a7b0
   kind: function

@@ -49,8 +49,8 @@ export function startCompetition(state: GameState, kind: number, field: readonly
 }
 
 /** CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): a
- *  civilization whose city lost population to a random event becomes the
- *  TARGET of an Aid Request; every other civilization is its field. Nothing
+ *  civilization one random event dealt `AID_DAMAGE_MIN` points of damage
+ *  (`disasterPhase`) becomes the TARGET of an Aid Request; every other civilization is its field. Nothing
  *  is voted. ONE slot on both engines, so a running competition (voted or
  *  triggered) leaves the request unraised. */
 export function raiseAidRequest(state: GameState, victim: number): void {

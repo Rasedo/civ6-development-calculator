@@ -746,6 +746,24 @@
   context:
     - "...s each row whose byte +0x48 is set and +0x50 non- null and whose live record (0x27a680 -> 0x25bef0 on the row's +0x20) reads -1 at +0x0 and +0xc — not in play —, weighs each 1 and draws ON..."
   review: imported
+- addr: 0x25c460
+  final: 0x19b660
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...OSES_POP_TO_RANDOM_EVENT (hash 0x63e0b202) is subscribed in the emergency manager's setup 0x25c460 (CAPABILITY_EMERGENCIES, hash 0x370521e0, gates it) to the game signal at GameSignals +0x...
+  review: imported
+- addr: 0x261ce0
+  final: 0x1a07b0
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...CIES, hash 0x370521e0, gates it) to the game signal at GameSignals +0xc48; the subscriber 0x261ce0 calls 0x2597d0(player, a, b, c). The install's SEND_AID_EMERGENCY_TARGET_REQUIREMENTS / _...
+  review: imported
 - addr: 0x26d6f0
   final: 0x1a6250
   kind: function
@@ -994,6 +1012,7 @@
   readings:
     - "C-41: the eruption's soil, the ring and the gates"
     - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0) share the appliers.
@@ -1003,7 +1022,10 @@
   final: 0x1f02a0
   kind: function
   status: PARTLY
-  readings: [DLL readings (GameCore_XP2_Release.dll), "C-95: a river crossing's Movement — READ"]
+  readings:
+    - DLL readings (GameCore_XP2_Release.dll)
+    - "C-95: a river crossing's Movement — READ"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ll_gp.py` (the GlobalParameters struct: each parameter's field offset, from the loader at 0x2d58f0), `dll_vtab.py` (vtables pointing into a code range) and `dll_rng.py` (every draw on the..."
@@ -1056,6 +1078,15 @@
   readings: ["H-1: draws the AI takes, draws the engines lack"]
   context:
     - "- \"NameManager::GetUnitNamePart\" (0x328760) is called only through 0x327d50 / 0x327de0 from the behaviour tree — \"HL: Rock Band Mo..."
+  review: imported
+- addr: 0x3338d0
+  final: 0x23a2e0
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...a per-player record the caller keeps on its own stack (0x4c bytes per player, zeroed by 0x3338d0): a = 0x3388e0, b = rec+0x18, c = 0x339270."
   review: imported
 - addr: 0x340740
   final: 0x243520
@@ -1175,6 +1206,15 @@
   context:
     - ...(DLC GranColombia_Maya), no other. The map is built at the player's DoTurn (0x4e4560 -> 0x46cdd0 at 0x4e4aa4); the engines build it as each tactical pass opens, the hostile units' sear...
   review: imported
+- addr: 0x4848c0
+  final: 0x307880
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- 0x2597d0: the player is a living full civilization (0x484a10, 0x4848c0), and a x 0.5 + b + c >= GlobalParameters +0x7c4 — WORLD_CONGRESS_REQUEST_FOR_AID_DAM..."
+  review: imported
 - addr: 0x484910
   final: 0x3078b0
   kind: function
@@ -1200,6 +1240,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...p, To Range 1, then Notify Owner) when none runs (+0x38) and the owner is a full civ (0x484a10 -> 0x469db0, hash 0x253718b0); the throttle becomes turn + max(0, BARBARIAN_MAX_THROTTL...

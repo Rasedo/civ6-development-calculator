@@ -76,6 +76,15 @@ export const FIRST_TIME_OCCURRENCE_BOOST = srcConst('disasters.firstTimeOccurren
   inputs: [xml('GlobalParameters', 'Name=RANDOM_EVENT_FIRST_TIME_OCCURRENCE_BOOST', 'Value')],
 });
 
+/** CIV6 (WORLD_CONGRESS_REQUEST_FOR_AID_DAMAGE_MIN, Expansion2_GlobalParameters;
+ *  GameCore_XP2 0x2597d0): the damage one event must deal a civilization
+ *  before EMERGENCY_TRIGGER_PLAYER_LOSES_POP_TO_RANDOM_EVENT names it —
+ *  ½ a point per improvement pillaged or destroyed, district or building
+ *  pillaged, 1 per specific improvement pillaged, citizen lost, civilian
+ *  killed and unit killed (the event's tally 0x33b350; `aidScope`). */
+export const AID_DAMAGE_MIN = srcConst('disasters.aidDamageMin', 4,
+  xml('GlobalParameters', 'Name=WORLD_CONGRESS_REQUEST_FOR_AID_DAMAGE_MIN', 'Value'));
+
 /** THE VOLCANO ROLL (Game_RandomEvents "Active Volcano Roll", GameCore_XP2
  *  0x335040; `volcanoRoll`): every volcano starts DORMANT, and ONE roll a
  *  turn for the whole map keeps the active share near the realism setting's

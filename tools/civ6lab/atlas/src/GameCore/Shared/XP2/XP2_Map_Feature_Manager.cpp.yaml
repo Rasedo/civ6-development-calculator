@@ -132,6 +132,7 @@
     - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
     - "C-41: the eruption's soil, the ring and the gates"
     - "H-1: a natural wonder's eruption — READ (the order; REVERSES the ring walk)"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - "- Eruption 0xa22000: damage 0xa1c1a0 (each row, each neighbour in DirectionTypes order not impassable and bare / Removable /..."
     - The volcano's eruption 0xa22000 runs the damage pass 0xa1c1a0 FIRST, then the soil pass 0xa219e0. The natural-wonder eruption 0xa22150 runs 0xa1c760 th...
@@ -151,6 +152,7 @@
   readings:
     - "C-41: the eruption's soil, the ring and the gates"
     - "H-1: a natural wonder's eruption — READ (the order; REVERSES the ring walk)"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - ...ss 0xa1c1a0 FIRST, then the soil pass 0xa219e0. The natural-wonder eruption 0xa22150 runs 0xa1c760 then 0xa21680 over EACH wonder plot's six neighbours (a plot two wonder plots share is ta...
     - "0xa22150 (a natural wonder) runs 0xa1c760 then 0xa21680, where a volcano's 0xa22000 runs 0xa1c1a0 then 0xa219e0 (\"Fertility Gain Ch..."

@@ -1029,8 +1029,11 @@ class SimEconomy:
         flat[touched] += cnt[touched]
 
     def _scorch(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
-        ok = ((self.improvement[rows, tiles] >= 0) & ~self.pillaged[rows, tiles]
-              & ~self._env_immune()[rows, tiles])
+        """`scorch` — IMPROVEMENT_PILLAGED: half a point of the event's damage
+        to the plot's owner wherever an improvement stands open to it,
+        pillaged already or not (0x33aba0 returns 1 on any it reaches)."""
+        ok = (self.improvement[rows, tiles] >= 0) & ~self._env_immune()[rows, tiles]
+        self._aid_damage(rows[ok], self.tile_seat[rows[ok], tiles[ok]], 1)
         self.pillaged[rows[ok], tiles[ok]] = True
 
     def _pillage_district(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
@@ -1041,6 +1044,7 @@ class SimEconomy:
         DISTRICT_PILLAGED takes every building standing in it."""
         ok = ((self.district[rows, tiles] >= 0) & self.district_complete[rows, tiles]
               & ~self.district_pillaged[rows, tiles] & ~self._env_immune()[rows, tiles])
+        self._aid_damage(rows[ok], self.tile_seat[rows[ok], tiles[ok]], 1)
         self.district_pillaged[rows[ok], tiles[ok]] = True
         self._pillage_held(rows[ok], tiles[ok], top_only=False)
 
@@ -1097,7 +1101,10 @@ class SimEconomy:
             col = self._city_col_at(r, br, bt)
             good = col >= 0
             if bool(good.count_nonzero()):
-                take(br[good], r, col[good], bd[good])
+                fell = take(br[good], r, col[good], bd[good])
+                if top_only:
+                    # BUILDING_PILLAGED: half a point of the event's damage
+                    self._aid_damage(br[good][fell], torch.full_like(br[good][fell], int(self._ROW_SEAT[r])), 1)
         for s in range(self.S):
             r = self._CITY_MINOR0 + s
             reg = self.city_dist_tile[rows, r, 0].gather(1, dd.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -1493,7 +1500,8 @@ class SimEconomy:
         # CIV6: fallout lasts 10 turns from a Nuclear Device and 20 from a
         # Thermonuclear one, and the tile is clean when the timer expires.
         self.tile_fallout.copy_((self.tile_fallout - 1).clamp(min=0))
-        # CIV6 (Aid Request trigger): the rows whose city loses population this phase
+        # CIV6 (Aid Request trigger): the majors one event of this phase dealt
+        # the aid request's damage (`_aid_close`)
         self._aid_hit = torch.zeros(B, self.n_majors, dtype=torch.bool, device=dev)
 
         # THE TURN'S RANDOM-EVENT STEP (0x338710), from its first turn on —
@@ -1511,6 +1519,37 @@ class SimEconomy:
         self._raise_aid_request(self._aid_hit)
         self._aid_hit = None
         self._eff_version += 1
+
+    def _aid_damage(self, rows: torch.Tensor, seat: torch.Tensor, halves: int) -> None:
+        """`aidDamage` — `halves` half points of the open event's damage
+        (`_aid_open`) to `seat` [len(rows)] (an absolute seat) in the games
+        `rows`; only a major's is kept, a civilization alone asking for aid."""
+        tally = getattr(self, "_aid_tally", None)
+        if tally is None or not rows.numel():
+            return
+        ok = (seat >= 0) & (seat < self.n_majors)
+        if not bool(ok.count_nonzero()):
+            return
+        r, s = rows[ok], seat[ok]
+        tally.index_put_((r, s), torch.full_like(r, halves), accumulate=True)
+
+    def _aid_open(self) -> torch.Tensor | None:
+        """`aidScope`'s open — ONE event's damage tally (0x33b350 over the
+        event's per-player record): a fresh [B, n_majors] tally in half
+        points; returns the enclosing event's, for `_aid_close`."""
+        outer = getattr(self, "_aid_tally", None)
+        self._aid_tally = torch.zeros(self.B, self.n_majors, dtype=torch.long, device=self.device)
+        return outer
+
+    def _aid_close(self, outer: torch.Tensor | None) -> None:
+        """`aidScope`'s close — every major the event dealt `_aid_damage_min`
+        points or more (0x2597d0: ½ x the pillage counts + the citizens + the
+        units killed) is an aid victim of the phase (`_aid_hit`; none outside
+        the phase); the enclosing event's tally comes back."""
+        hit = getattr(self, "_aid_hit", None)
+        if hit is not None:
+            hit |= self._aid_tally >= self._aid_damage_min * 2
+        self._aid_tally = outer
 
     def _storms_turn(self) -> None:
         """`stormsTurn` — the walk of each live storm record, in slot order
@@ -1828,9 +1867,15 @@ class SimEconomy:
         the civilians killed, each land unit its own UNIT_DAMAGE_LAND draw; and
         SPREAD on the spread turns: under the spread chance every neighbour,
         in the ring walk's order (`_RING_DIRS`), on the row's own live feature
-        starts a fire of its own (`_fire_birth`)."""
+        starts a fire of its own (`_fire_birth`). One event's damage
+        (`_aid_open`), a spread fire's its own."""
         if not bool(hit.count_nonzero()):
             return
+        outer = self._aid_open()
+        self._strike_fire(hit, tile, row, age)
+        self._aid_close(outer)
+
+    def _strike_fire(self, hit: torch.Tensor, tile: torch.Tensor, row: torch.Tensor, age: torch.Tensor) -> None:
         B, dev = self.B, self.device
         bidx = torch.arange(B, device=dev)
         t = tile.clamp(min=0)
@@ -2183,12 +2228,14 @@ class SimEconomy:
         area = tiles_from_offsets(centre.clamp(min=0), self._foot_offs[self._drought_hexes], self.W, self.H, self.wrap_x)
         turns, destroy_p = self._drought_duration[sev], self._drought_destroy_p[sev]
         keep = torch.zeros_like(area, dtype=torch.bool)
+        outer = self._aid_open()
         for j in range(area.shape[1]):
             t = area[:, j]
             tc = t.clamp(min=0)
             on = hit & (t >= 0) & ~self.water.gather(1, tc.unsqueeze(1)).squeeze(1)
             keep[:, j] = on
             self._drought_tile(on, tc, turns, destroy_p)
+        self._aid_close(outer)
         hr = hit.nonzero(as_tuple=True)[0]
         if not hr.numel():
             return
@@ -2221,11 +2268,15 @@ class SimEconomy:
                 out |= imp == i
             return out & ~self._env_immune()[rows, tt]
 
+        # the specific improvement destroyed counts nothing toward the event's
+        # damage, the specific one pillaged a full point (0x3388e0 sums its
+        # field twice)
         gr = (two & (r_destroy < js_round(destroy_p * 100).long())).nonzero(as_tuple=True)[0]
         if gr.numel():
             gt = tile[gr]
             gone = listed_at(gr, gt)
-            self._destroy_improvement(gr[gone], gt[gone])
+            self.improvement[gr[gone], gt[gone]] = -1
+            self.pillaged[gr[gone], gt[gone]] = False
         self._rand_range(on, 100)
         rows = on.nonzero(as_tuple=True)[0]
         if not rows.numel():
@@ -2233,6 +2284,7 @@ class SimEconomy:
         tt = tile[rows]
         self.drought[rows, tt] = torch.maximum(self.drought[rows, tt], turns[rows])
         struck = listed_at(rows, tt)
+        self._aid_damage(rows[struck], self.tile_seat[rows[struck], tt[struck]], 2)
         self.pillaged[rows[struck], tt[struck]] = True
         self._remove_fertility(on, tile)
 
@@ -2242,6 +2294,7 @@ class SimEconomy:
         if not rows.numel():
             return
         ok = (self.improvement[rows, tiles] >= 0) & ~self._env_immune()[rows, tiles]
+        self._aid_damage(rows[ok], self.tile_seat[rows[ok], tiles[ok]], 1)
         self.improvement[rows[ok], tiles[ok]] = -1
         self.pillaged[rows[ok], tiles[ok]] = False
 
@@ -2294,6 +2347,8 @@ class SimEconomy:
         a wonder's plot alike."""
         none = torch.full_like(row, -1)
         K = ring.shape[1]
+        # the damage pass is one event's damage (`_aid_open`)
+        outer = self._aid_open()
         # plot by plot (`eruptionRings`): the ring holds each plot's six in turn
         for c0 in range(0, K, 6):
             for kind in self._ERUPTION_DAMAGE_KINDS:
@@ -2314,6 +2369,7 @@ class SimEconomy:
                     r = self._rand_range(on, 100)
                     self._event_damage(on & (r < js_round(p * 100).long()), t, kind, self._er_dmg_lo.take(row),
                                        self._er_dmg_hi.take(row))
+        self._aid_close(outer)
         for c0 in range(0, K, 6):
             for py, plane in ((self._er_paint_p, self.fertility), (self._er_prod_p, self.fertility_prod),
                               (self._er_sci_p, self.fertility_sci), (self._er_cul_p, self.fertility_cul)):
@@ -2451,8 +2507,8 @@ class SimEconomy:
             pop = self.city_pop[sel, _r, sl]
             self.city_pop[sel, _r, sl] = torch.where(pop > 1, pop - 1, pop)
             self._log_pop(sel, _r, sl, "ds")
-            if _r < self.n_majors and getattr(self, "_aid_hit", None) is not None:
-                self._aid_hit[sel[pop > 1], _r] = True   # CIV6 (Aid Request trigger)
+            # a citizen lost: a full point of the event's damage to the owner
+            self._aid_damage(sel[pop > 1], torch.full_like(sel[pop > 1], _seat), 2)
 
     def _nuclear_accident(self, hit: torch.Tensor, centre: torch.Tensor, sev: int) -> None:
         """`nuclearAccident` — a nuclear accident at severity `sev` in the
@@ -2473,7 +2529,13 @@ class SimEconomy:
         UNIT_DAMAGE_LAND draws and its UNIT_KILLED_CIVILIAN chance
         (`_strike_units`). Fallout lies on that plot, the Industrial Zone, for
         the row's turns. No building is destroyed, no ring improvement
-        pillaged, no unit off the plot struck; the plant stays, ageing on."""
+        pillaged, no unit off the plot struck; the plant stays, ageing on.
+        One event's damage (`_aid_scope`)."""
+        outer = self._aid_open()
+        self._accident(hit, centre, sev)
+        self._aid_close(outer)
+
+    def _accident(self, hit: torch.Tensor, centre: torch.Tensor, sev: int) -> None:
         rows = hit.nonzero(as_tuple=True)[0]
         c = centre[rows]
         row_of = self._seat_row[self.tile_seat[rows, c].clamp(min=0)]
@@ -2540,8 +2602,7 @@ class SimEconomy:
             if b.numel():
                 self.city_pop[b, R, sl] = self.city_pop[b, R, sl] - 1
                 self._log_pop(b, R, sl, "ds")
-                if R < self.n_majors and getattr(self, "_aid_hit", None) is not None:
-                    self._aid_hit[b, R] = True   # CIV6 (Aid Request trigger)
+                self._aid_damage(b, torch.full_like(b, int(self._ROW_SEAT[R])), 2)
 
     def _storm_walk(self, walk: torch.Tensor, k: int, pct: torch.Tensor) -> None:
         """`stormWalk` — the storm in slot `k` where `walk` [B]: `_st_movement`
@@ -2638,6 +2699,7 @@ class SimEconomy:
         (`_storm_plot`) and joins the struck list."""
         bidx = torch.arange(self.B, device=self.device)
         hexes = self._st_hexes.take(ev)
+        outer = self._aid_open()
         for h, offs in self._foot_offs.items():
             on_h = hit & (hexes == h)
             if not bool(on_h.count_nonzero()):
@@ -2650,6 +2712,7 @@ class SimEconomy:
                     continue
                 self._storm_plot(on, t, ev, pct)
                 struck[bidx[on], t[on]] = True
+        self._aid_close(outer)
 
     def _storm_plot(self, on: torch.Tensor, t: torch.Tensor, ev: torch.Tensor,
                     pct: torch.Tensor | int = 100) -> None:
@@ -2808,6 +2871,10 @@ class SimEconomy:
                 dead[hr] = hp[hr, us[hr]] <= 0
                 gone_u = (kill | dead).nonzero(as_tuple=True)[0]
                 if gone_u.numel():
+                    # a civilian killed, a unit the damage kills: a full point
+                    # of the event's damage to its owner (0x3366a0 counts the
+                    # kills, not the blows)
+                    self._aid_damage(gone_u, useat[gone_u], 2)
                     alive[gone_u, us[gone_u]] = False
                     self._vacate(pool, gone_u, us[gone_u])
 
@@ -2843,6 +2910,7 @@ class SimEconomy:
         home = (self._flood_home == river.unsqueeze(1)) & (river >= 0).unsqueeze(1)
         self.tile_flood_ct += (reach & home).long()
         plots = [(lists[:, k] >= 0, lists[:, k].clamp(min=0)) for k in range(lists.shape[1])]
+        outer = self._aid_open()
         for s, rows in enumerate(self._flood_damage):
             hs = hit & (sev == s) & ~shield
             if not bool(hs.count_nonzero()):
@@ -2855,6 +2923,7 @@ class SimEconomy:
                     go = hs & on & ~self._seat_plays(seat_at, "EGYPT")
                     r = self._rand_range(go, 100)
                     self._event_damage(go & (r < pct), t, kind, lo_t, hi_t)
+        self._aid_close(outer)
         live = ~self._flood_halted()
         for s, rows in enumerate(self._flood_yields):
             hs = hit & (sev == s) & live

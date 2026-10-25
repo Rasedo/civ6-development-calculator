@@ -122,6 +122,7 @@
     - "C-41: the eruption's soil, the ring and the gates"
     - "H-1: the flood's river walk — READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - ...UNIT_KILLED_CIVILIAN 0x33a070 do not (the owner only sets the damage percent). Floods (0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0...
     - "The damage pass 0xa2a4d0 decides the shield: mitigated when the river is unnamed or its list empty, or when the Gr..."

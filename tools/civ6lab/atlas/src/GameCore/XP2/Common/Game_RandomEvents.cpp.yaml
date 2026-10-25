@@ -127,9 +127,12 @@
     - cpu/harness/drawSites.ts:DRAW_SITES
     - cpu/harness/eventDraws.ts:StruckPlot
     - gpu/core/sim_economy.py:_unit_damage_draws
+    - cpu/core/disasters.ts:strikeUnits
+    - gpu/core/sim_economy.py:drawn
   readings:
     - "C-41: the eruption's soil, the ring and the gates"
     - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...GED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and UNIT_KILLED_CIVILIAN 0x33a070 do not (the owner only sets the damage percent). Fl...
@@ -151,6 +154,7 @@
     - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
     - "C-74: BUILDING_PILLAGED's building — CLOSED"
     - "C-74: the fire — READ"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - ..., any owner; one draw rand(100) < Percentage applies the row through the shared applier 0x336a50.
     - "...the plot, through the city's building pillage 0x193190 directly — not the damage applier 0x336a50 — when the plot's district is owned and not already pillaged. So the plant goes with no d..."
@@ -191,6 +195,23 @@
     - "...barians' completed start of turn T-1 to player 0's start of turn T; the random-event step 0x338710 is the LAST thing to draw there. Its order: the storms' walks (0x288f40 → 0x28ecd0), the..."
     - "The turn's world step 0xa55190 calls the random-event step 0x338710 — the droughts' tick and the storms' walk (0x288f40: 0x2876c0, 0x28ecd0), the volcano rol..."
   review: imported
+- addr: 0x3388e0
+  kind: function
+  name: eventHalfDamage
+  semantics: "A player's half-weight damage of one event: rec+0x0 IMPROVEMENT_PILLAGED + 0x4 IMPROVEMENT_DESTROYED + 2 x 0x8 SPECIFIC_IMPROVEMENT_PILLAGED + 0x10 BUILDING_PILLAGED + 0x14 DISTRICT_PILLAGED + 0x2c + 0x3c + 0x44."
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 46
+      value: "the fire on plot 542: China's record holds 1 citizen lost (rec+0x18 = 1), no pillage or kill: 1 point, under the gate's 4; no SEND_AID raised"
+  impl:
+    - cpu/core/disasters.ts:aidDamage
+    - gpu/core/sim_economy.py:_aid_damage
+    - cpu/core/disasters.ts:aidTally
+    - cpu/core/disasters.ts:droughtTile
+    - gpu/core/sim_economy.py:_drought_tile
+  readings: ["C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"]
+  review: reviewed
 - addr: 0x339020
   final: 0x23e460
   kind: function
@@ -223,6 +244,27 @@
   context:
     - "...its river entry +0x98[sev] — 0xa2efb0's N / OccurrencesPerGame at the game's realism (0x339140), N the event draw's 0x339020 — and the turns are 100 over the sum, -1.0 where no named..."
   review: imported
+- addr: 0x3391f0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/disasters.ts:aidTally]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x339270
+  kind: function
+  name: eventUnitsKilled
+  semantics: "A player's units one event killed: rec+0x1c UNIT_KILLED_CIVILIAN + 0x20 UNIT_DAMAGE_LAND + 0x24 UNIT_DAMAGE_NAVAL (0x3366a0 counts the units its damage kills) + 0x40."
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 46
+      value: "the fire on plot 542: China's record holds 1 citizen lost (rec+0x18 = 1), no pillage or kill: 1 point, under the gate's 4; no SEND_AID raised"
+  impl:
+    - cpu/core/disasters.ts:aidDamage
+    - gpu/core/sim_economy.py:_aid_damage
+    - cpu/core/disasters.ts:aidTally
+  readings: ["C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"]
+  review: reviewed
 - addr: 0x339960
   final: 0x23eb10
   kind: function
@@ -254,6 +296,7 @@
   readings:
     - "C-41: the eruption's soil, the ring and the gates"
     - "C-96: an event's civilian kill spares a Trader — PARTLY READ"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   review: reviewed
 - addr: 0x33a280
   kind: function
@@ -282,7 +325,9 @@
   kind: function
   name: POPULATION_LOSS
   status: PARTLY
-  readings: ["C-41: the eruption's soil, the ring and the gates"]
+  readings:
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - ...YED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and UNIT_KILLED_CIVILIAN 0x33...
   review: imported
@@ -317,10 +362,29 @@
   kind: function
   name: IMPROVEMENT_PILLAGED
   status: PARTLY
-  readings: ["C-41: the eruption's soil, the ring and the gates"]
+  impl: [cpu/core/disasters.ts:scorch, gpu/core/sim_economy.py:_scorch]
+  readings:
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - "- The owned-plot gate belongs to the damage TYPE, not the family: IMPROVEMENT_PILLAGED 0x33aba0, IMPROVEMENT_DESTROYED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780..."
   review: imported
+- addr: 0x33b350
+  kind: function
+  name: eventDamageSignal
+  semantics: "The end of ONE event's application (the drought strike 0x286530, the one-off strike 0x2867f0, the storm strike 0x286f80, the accident 0x2d33a0, the eruption passes 0xa1c1a0 / 0xa1c760, the flood 0xa2a4d0): for each affected player of the caller's stack record (0x4c bytes per player, filled by the applier 0x336a50), the game signal at GameSignals +0xc48 with (player, 0x3388e0, rec+0x18 the citizens lost, 0x339270) — the aid request's gate 0x2597d0 listens."
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 46
+      value: "the fire on plot 542: China's record holds 1 citizen lost (rec+0x18 = 1), no pillage or kill: 1 point, under the gate's 4; no SEND_AID raised"
+  impl:
+    - cpu/core/disasters.ts:aidScope
+    - gpu/core/sim_economy.py:_aid_open
+    - cpu/core/disasters.ts:aidTally
+    - cpu/data/disasters.ts:AID_DAMAGE_MIN
+  readings: ["C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"]
+  review: reviewed
 - addr: 0x33b580
   final: 0x240390
   kind: function

@@ -59,8 +59,8 @@ import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
-import { barbarianTactics, dangerPlane, holdBarbarians, refreshBarbarians, tacticsDrawing, traceKnowledge, traceTactics } from '../core/tactical';
-import { barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
+import { barbarianTactics, dangerPlane, holdBarbarians, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
+import { barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
@@ -68,6 +68,7 @@ import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/que
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
+import { holdEventLosses, landHeldLosses } from '../core/disasters';
 import { displaceAirFrom } from '../core/air';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setDelegationWith, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
 import { activateGreatPerson, gpActivateOk, gpClassOfUnit } from '../core/gpAbility';
@@ -815,8 +816,13 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     tr.raidTargets = c.raidTargets;
     tr.homing = c.homing;
   });
-  // ...and the knowledge base's looks: its records name the units by id
-  state.barbSeat.armyKnown = copy.barbSeat.armyKnown;
+  // ...and the knowledge base as the tactical turn's ageing and look left it
+  // (its records name the units by id); its turn-end look runs once the
+  // barbarians stand where the record holds them (after `syncUnits`), not
+  // where the copy's moves took them (runs/h1_duelw1117 t16: the copy's
+  // Warrior beside city-state 4's at 28:5, the game's not, its record the
+  // log's age 2 at t17)
+  state.barbSeat.armyKnown = ctx.armyLogged.get(BARB_SEAT)!.records.map((r) => ({ ...r }));
   state.barbSeat.armyAged = copy.barbSeat.armyAged;
   if (copy.barbSeat.campsKnown) state.barbSeat.campsKnown = copy.barbSeat.campsKnown;
   else delete state.barbSeat.campsKnown;
@@ -4278,6 +4284,16 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       if (on) {
         st.units.push(...barbs);
         barbs.length = 0;
+        // ...and every other major's units where their own start of the
+        // turn moved them, which the game takes before the city-states'
+        // (record t+1 holds them so): the active player's alone act after
+        // them (runs/h1_duelw1117 t20: China's Scout gone from 41:12 by
+        // city-state 3's look, its record the log's age 1)
+        for (const r of b.units) {
+          if (r.owner === activePlayer(a) || !isCiv(seatOfP(ctx, r.owner))) continue;
+          const u = unitOf(ctx, `${r.owner}:${r.id}`);
+          if (u && st.units.includes(u)) u.tileIndex = r.y * ctx.W + r.x;
+        }
       } else takeBarbs(st, false);
     });
     const tribesBefore = state.barbTribes?.length ?? 0;
@@ -4315,16 +4331,24 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // (`seatFavor`, below), not at the start the engine's turn stands for
     const favorAfter = state.seats.filter((s) => s !== active && isCiv(s.seat)).map((s) => s.seat);
     holdFavor((seat) => favorAfter.includes(seat));
+    // the turn's random events strike the other players' cities after the
+    // starts the engine's turn stands for (in the game their starts of turn
+    // t come before the turn changes and the events strike: runs/
+    // h1_duelw1128 t46, a fire on plot 542 takes Xi'an's citizen after
+    // China's start banked its Food, the city growing at its next start)
+    holdEventLosses((seat) => seat !== active.seat);
     // each unit's health before the engine's turn heals it, beside the plot
     // the heal reads (`healedOn`)
     const hpPre = new Map(state.units.map((u) => [u, u.hp]));
     try {
       endTurn(state);
+      landHeldLosses(state);
     } catch (e) {
       report.stopped = `endTurn threw at turn ${a.turn}: ${(e as Error).message}`;
       break;
     } finally {
       holdFavor(null);
+      holdEventLosses(null);
     }
     holdMinorCatchUp(null);
     stream.actions(a.turn);
@@ -4469,6 +4493,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     barbarianTurn(ctx, b, a.turn);
     // the units the barbarians raised stand where the record holds them
     inTurn(state, a.turn, () => syncUnits(ctx, b));
+    // the barbarians' knowledge base looks at their turn's end from there
+    knowledgeLook(state, state.barbSeat, BARB_SEAT, plotsSeenNow(state, new Set([BARB_SEAT])), false);
     settleEnvoys(ctx, b);
     // the barbarians' units sat the engine's turn out, so their rest — the
     // fortification a unit holding the Fortify order digs in (`fortifyOrders`)

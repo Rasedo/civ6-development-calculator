@@ -7619,7 +7619,8 @@ class SimSeats:
     def _raise_aid_request(self, hit: torch.Tensor) -> None:
         """`raiseAidRequest`'s twin — CIV6 (EMERGENCY_SEND_AID, Trigger
         PLAYER_LOSES_POP_TO_RANDOM_EVENT): `hit` [B, n_majors] marks the rows
-        whose city lost population to a random event this phase; the LOWEST
+        one random event of this phase dealt the aid request's damage
+        (`_aid_close`); the LOWEST
         becomes the target (TS takes the min of its list), every other living
         civilization the field. One slot: a running competition leaves it."""
         if self._comp_aid < 0:

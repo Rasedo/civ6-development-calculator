@@ -4074,13 +4074,27 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   memory read at the log's moment, `traceKnowledge`, the type names the
   log's): runs/h1_duelw1117 48.8% -> 56.6%, h1_duelw1121 47.8% -> 60.3%.
   The decisions on clean memory: barb.move.plot compared 16 -> 91 (1117),
-  12 -> 146 (1121); cityState.build 165 -> 168 of 174 (1117). Left: a
-  record a turn fresher than the game's (1117 t17 the barbarians' record of
-  city-state 4's Warrior: ours age 1, the log's 2 — ours refreshed at the
-  end look after the city-state's move), units the replay's AI made that
-  the game did not (a birth record each pair: 1117 city-state 4's Archer
-  t25-t27, 1121 city-state 2's Archer t32-t34), and sight (1117 t42
-  city-state 3 sees no Scout of player 1, the log one at age 0).
+  12 -> 146 (1121); cityState.build 165 -> 168 of 174 (1117).
+- THE LOOKS AGAINST THE TURN'S MOVES (the replay; the game's order:
+  turn_order_civ6.md, the starts in ascending player id, each AI player
+  acting in its own start): the barbarians' end look (+0x228) sees their
+  units where the game's moves left them, not where the replay's copy of
+  their AI moved them (runs/h1_duelw1117 t16: the copy's Warrior beside
+  city-state 4's at 28:5, the game's not: the record's age 2 at t17, ours
+  1); a city-state's look sees an AI major's units after that major's own
+  start of the turn moved them, the active player's before its actions
+  (runs/h1_duelw1117 t20: China's Scout gone from 41:12 by city-state 3's
+  look, the log's age 1). The replay: the barbarians' records after their
+  tactical turn's look, their end look once their units stand as record
+  t+1 holds them; the other majors' units as record t+1 holds them while
+  the city-states' turn runs. MEASURED (knowledge.army, --to 60): 1117
+  56.6% -> 61.0% -> 66.1%, 1121 60.3% -> 69.8%; barb.move.plot 869 -> 872
+  of 957 (1117), 862 -> 863 of 944 (1121). Left: units the replay's AI
+  made that the game did not (a birth record each pair: 1117 city-state
+  4's Archer t25-t27, 1121 city-state 2's Archer t32-t34); 1117 t42 the
+  game's city-state 3 sees a turn before ours (player 1's Archer and a
+  second Scout, the barbarians' Scout, all age 0 at t42, ours at t43-t44)
+  and holds three more Warrior records of its own (8 against 5, age 16).
 - MEASURED (the lab's update over the five verbose duels in turn order —
   the players before the minor where the next record has them, its own
   units made this turn, its turn's end with its units where the next
@@ -9574,3 +9588,54 @@ level 3's 45 and promoted it every turn: 48 of 56 of its turns off). The
 promotion flag (+0x1bc0 +8, read by 0x116f80) and its writer are unread.
 Ported: `xpToNextLevel` / `_xp_to_next` the cumulative threshold,
 `takePromotion` / `_take_promotion` keep the experience.
+
+## C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins
+
+EMERGENCY_SEND_AID's Trigger EMERGENCY_TRIGGER_PLAYER_LOSES_POP_TO_RANDOM_EVENT
+(hash 0x63e0b202) is subscribed in the emergency manager's setup 0x25c460
+(CAPABILITY_EMERGENCIES, hash 0x370521e0, gates it) to the game signal at
+GameSignals +0xc48; the subscriber 0x261ce0 calls 0x2597d0(player, a, b, c).
+The install's SEND_AID_EMERGENCY_TARGET_REQUIREMENTS / _MEMBER_REQUIREMENTS
+are REQUIREMENTSET_TEST_ALL sets with no requirement rows
+(Expansion2_Emergencies.xml), so the gate is the DLL's:
+
+- 0x2597d0: the player is a living full civilization (0x484a10, 0x4848c0),
+  and a x 0.5 + b + c >= GlobalParameters +0x7c4 —
+  WORLD_CONGRESS_REQUEST_FOR_AID_DAMAGE_MIN (the loader 0x2d58f0 at
+  0x2d9870; Expansion2_GlobalParameters.xml Replace 4). Below it nothing is
+  raised; at or above it the trigger 0x260760 queues the emergency.
+- The signal is raised once per affected player at the end of ONE event's
+  application by 0x33b350 (callers: the drought strike 0x286530, the one-off
+  strike 0x2867f0 — a fire plot's, a meteor's —, the storm strike 0x286f80,
+  the accident 0x2d33a0, the eruption passes 0xa1c1a0 / 0xa1c760, the flood
+  0xa2a4d0), over a per-player record the caller keeps on its own stack
+  (0x4c bytes per player, zeroed by 0x3338d0): a = 0x3388e0, b = rec+0x18,
+  c = 0x339270.
+- The shared applier 0x336a50 adds each landed row's return to the field of
+  the plot's (or unit's) owner its out-parameter names: +0x0
+  IMPROVEMENT_PILLAGED (0x33aba0: 1 on any improvement of an owned plot,
+  pillaged already or not), +0x4 IMPROVEMENT_DESTROYED, +0x8
+  SPECIFIC_IMPROVEMENT_PILLAGED, +0xc SPECIFIC_IMPROVEMENT_DESTROYED, +0x10
+  BUILDING_PILLAGED, +0x14 DISTRICT_PILLAGED, +0x18 POPULATION_LOSS
+  (0x33a6e0: 1 per citizen), +0x1c UNIT_KILLED_CIVILIAN (0x33a070: the
+  civilians killed), +0x20 UNIT_DAMAGE_LAND, +0x24 UNIT_DAMAGE_NAVAL
+  (0x3366a0: the units the damage KILLS, damage >= COMBAT_MAX_HIT_POINTS, not
+  the units struck), +0x38 hash 0x24424839, +0x40 hash 0xfdf34e62, +0x44
+  hash 0x94d0056f, +0x48 hash 0xb8eaa363 (types no install row names).
+- a = +0x0 + +0x4 + 2 x +0x8 + +0x10 + +0x14 + +0x2c + +0x3c + +0x44
+  (0x3388e0 reads +0x8 twice); c = +0x1c + +0x20 + +0x24 + +0x40. So one
+  event must take 4 citizens, or kill 4 units, or pillage 8 improvements,
+  districts or buildings, or a mix, from ONE civilization.
+
+Records: 0 of the 29 duels' Game_Emergencies.csv raise SEND_AID over ~250
+majors' citizens lost to random events (runs/h1_duelw1128 t46: the fire on
+plot 542 takes Xi'an's one citizen, 1 point of 4; the engines raised the
+request on any citizen lost, Rome +100 Favor at t65).
+
+Ported: `aidScope` / `_aid_open` + `_aid_close` (one event's tally, a fire's
+spread its own), `aidDamage` / `_aid_damage` at each applier, `AID_DAMAGE_MIN`
+/ `_aid_damage_min`; the phase's lowest victim raises the request as before
+(`raiseAidRequest` / `_raise_aid_request`). Unread: what 0x260760's queue
+(+0x68) does with a raised aid request before it runs (the World Congress's
+WC_EMERGENCY_REQUEST_AID discussion, Expansion2_Congress.xml) — no record
+raised one.

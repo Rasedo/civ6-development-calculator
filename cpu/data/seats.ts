@@ -1513,8 +1513,9 @@ export const COMPETITIONS: readonly CompetitionDef[] = [
   // FromProject PROJECT_SEND_AID 200, FromAtWar -30, FromBadCO2Footprint
   // -400; rewards (EmergencyRewards) AID_REQUEST_FIRST_PLACE_VICTORY_POINT 2
   // Diplomatic Victory points, TOP_TIER 100 Favor, BOTTOM_TIER 50 Favor.
-  // TRIGGERED: a major's city losing population to a random event starts it
-  // (when no competition runs — both engines carry ONE slot), the victim is
+  // TRIGGERED: one random event dealing a major WORLD_CONGRESS_REQUEST_FOR_
+  // AID_DAMAGE_MIN points (`AID_DAMAGE_MIN`) starts it (when no competition
+  // runs — both engines carry ONE slot), the victim is
   // its target and every other living civilization its field.
   {
     id: 'AID_REQUEST', name: 'Aid Request',

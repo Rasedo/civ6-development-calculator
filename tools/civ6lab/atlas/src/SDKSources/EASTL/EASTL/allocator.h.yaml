@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x260760
+  final: 0x19ef20
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...GlobalParameters.xml Replace 4). Below it nothing is raised; at or above it the trigger 0x260760 queues the emergency.
+    - "...tim raises the request as before (`raiseAidRequest` / `_raise_aid_request`). Unread: what 0x260760's queue (+0x68) does with a raised aid request before it runs (the World Congress's WC_EM..."
+  review: imported
 - addr: 0x76f0f0
   final: 0x501700
   kind: function

@@ -27,7 +27,7 @@ import { unitDomain } from './units';
 import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, type FloodDamageRow, warmedWeight, RANDOM_EVENT_START_TURN, FLOODPLAIN_MIN, FLOODPLAIN_MAX } from '../data/disasters';
 import { ERUPTION_WEIGHT, volcanoRow, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_TURNS, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtGround, SOIL_REPLACES } from '../data/disasters';
 import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P } from '../data/disasters';
-import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE } from '../data/disasters';
+import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE, AID_DAMAGE_MIN } from '../data/disasters';
 import { TURN_LIMIT } from './game';
 import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
 import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
@@ -56,8 +56,13 @@ function envImmune(state: GameState, tile: Tile): boolean {
   return governorTileFlag(state, tile, (e) => e.envDamageImmune);
 }
 
+/** IMPROVEMENT_PILLAGED: half a point of the event's damage to the plot's
+ *  owner wherever an improvement stands open to it, pillaged already or not
+ *  (the applier 0x33aba0 returns 1 on any improvement it reaches). */
 function scorch(state: GameState, tile: Tile): void {
-  if (tile.improvement && !tile.pillaged && !envImmune(state, tile)) tile.pillaged = true;
+  if (!tile.improvement || envImmune(state, tile)) return;
+  aidDamage(tileSeat(tile), 1);
+  tile.pillaged = true;
 }
 
 /** CIV6 (Gathering Storm): a disaster damages the DISTRICT on the tile, not
@@ -68,6 +73,7 @@ function scorch(state: GameState, tile: Tile): void {
 function pillageDistrict(state: GameState, tile: Tile): void {
   if (tile.district && tile.district !== 'CITY_CENTER' && tile.districtComplete
       && !tile.districtPillaged && !envImmune(state, tile)) {
+    aidDamage(tileSeat(tile), 1);
     tile.districtPillaged = true;
     const h = districtHolder(state, tile);
     if (!h) return;
@@ -105,7 +111,10 @@ function pillageTileBuildings(state: GameState, tile: Tile): void {
       || buildingPillaged(h.city, id)) continue;
     if (top === undefined || def.cost > BUILDINGS[top].cost) top = id;
   }
-  if (top && !BUILDINGS[top].disasterProof) pillageHeld(h, top);
+  if (top && !BUILDINGS[top].disasterProof) {
+    aidDamage(tileSeat(tile), 1);
+    pillageHeld(h, top);
+  }
 }
 
 /** The city — a major's, the Free Cities', a city-state's — whose registry
@@ -139,6 +148,7 @@ function cityHoldingDistrict(state: GameState, tile: Tile): City | undefined {
 /** IMPROVEMENT_DESTROYED: the improvement is taken away, not pillaged. */
 function destroyImprovement(state: GameState, tile: Tile): void {
   if (tile.improvement && !envImmune(state, tile)) {
+    aidDamage(tileSeat(tile), 1);
     tile.improvement = null;
     tile.pillaged = false;
   }
@@ -152,14 +162,77 @@ function losePopulation(state: GameState, tile: Tile): void {
   const seat = tileSeat(tile);
   if (isCityStateSeat(seat)) {
     const cs = state.cityStates.find((c) => c.seat === seat);
-    if (cs && cs.population > 1) cs.population -= 1;
+    if (cs && cs.population > 1) loseCitizen(state, seat, -1);
     return;
   }
   const home = seatOf(state, seat)?.cities.find((c) => c.id === tile.ownerCity);
+  if (home && home.population > 1) loseCitizen(state, seat, home.id);
+}
+
+/** One citizen an event takes from `seat`'s city `cityId` (a city-state's
+ *  one city: -1), a full point of the event's damage to the owner
+ *  (`aidDamage`); held for `landHeldLosses` where the caller holds the
+ *  owner's losses (`holdEventLosses`). */
+function loseCitizen(state: GameState, seat: number, cityId: number): void {
+  aidDamage(seat, 2);
+  if (lossHeld?.(seat)) heldLosses.push({ seat, cityId });
+  else takeCitizen(state, seat, cityId);
+}
+
+function takeCitizen(state: GameState, seat: number, cityId: number): void {
+  if (isCityStateSeat(seat)) {
+    const cs = state.cityStates.find((c) => c.seat === seat);
+    if (cs && cs.population > 1) cs.population -= 1;
+    return;
+  }
+  const home = seatOf(state, seat)?.cities.find((c) => c.id === cityId);
   if (home && home.population > 1) {
     home.population -= 1;
     logPopWrite(state, home, 'ds');
-    (state.aidHit ??= []).push(seat);  // CIV6 (Aid Request trigger)
+  }
+}
+
+/** the seats whose event citizen losses wait for `landHeldLosses`, null for none */
+let lossHeld: ((seat: number) => boolean) | null = null;
+const heldLosses: { seat: number; cityId: number }[] = [];
+
+/** hold the event citizen losses of the seats `held` names out of the turn's
+ *  event step: the action replay, whose engine turn stands for the other
+ *  players' starts of the turn before the event (in the game they start,
+ *  then the turn changes and the event strikes), lands them after those
+ *  starts (`landHeldLosses`) */
+export function holdEventLosses(held: ((seat: number) => boolean) | null): void {
+  lossHeld = held;
+  heldLosses.length = 0;
+}
+
+/** the held event citizen losses, each never a city's last */
+export function landHeldLosses(state: GameState): void {
+  for (const h of heldLosses.splice(0)) takeCitizen(state, h.seat, h.cityId);
+}
+
+/** THE EVENT'S DAMAGE TALLY (0x33b350 over the event's per-player record,
+ *  GameCore_XP2 0x3388e0 / 0x3391f0 / 0x339270): per seat, in half points,
+ *  what the open event (`aidScope`) has dealt it; null outside an event */
+let aidTally: Map<number, number> | null = null;
+
+function aidDamage(seat: number, halves: number): void {
+  if (aidTally && seat >= 0) aidTally.set(seat, (aidTally.get(seat) ?? 0) + halves);
+}
+
+/** ONE EVENT's damage (a storm's strike, a fire's, a drought, an eruption, a
+ *  flood, an accident — each applier's own record): every seat it dealt
+ *  `AID_DAMAGE_MIN` points or more is an aid victim of the turn
+ *  (`GameState.aidHit`; 0x2597d0 compares ½ × the pillage counts + the
+ *  citizens + the units killed). A fire's spread opens its own. */
+function aidScope(state: GameState, fn: () => void): void {
+  const outer = aidTally;
+  aidTally = new Map();
+  try {
+    fn();
+    for (const [seat, h] of aidTally) if (h >= AID_DAMAGE_MIN * 2) state.aidHit?.push(seat);
+  } finally {
+    aidTally = outer;
   }
 }
 
@@ -222,7 +295,10 @@ function strikeUnits(state: GameState, tile: Tile, owner: number, s: UnitStrike,
       // Trader stands in a layer of its own and survives (runs/h1_duelw1127
       // t160: Muscat's Trader in its centre under the major flood's draw 6
       // of 15)
-      if (s.civ && !UNITS[u.type]?.trader) disbandUnit(state, u.id);
+      if (s.civ && !UNITS[u.type]?.trader) {
+        aidDamage(u.seat, 2);
+        disbandUnit(state, u.id);
+      }
       continue;
     }
     const naval = !!UNITS[u.type]?.naval;
@@ -231,7 +307,12 @@ function strikeUnits(state: GameState, tile: Tile, owner: number, s: UnitStrike,
     const pct = ev ? stormExtraPct(state, u.seat, owner, ev) : 0;
     const dmg = base + Math.floor(base * pct / 100);
     u.hp -= dmg;
-    if (u.hp <= 0) disbandUnit(state, u.id);
+    // a unit the damage kills is a full point of the event's damage to its
+    // owner (0x3366a0 counts the kills, not the blows)
+    if (u.hp <= 0) {
+      aidDamage(u.seat, 2);
+      disbandUnit(state, u.id);
+    }
   }
 }
 
@@ -734,12 +815,14 @@ export function floodRiver(state: GameState, start: Tile, sev: number): Tile[] {
   if (shield) mitigatedFloodMoment(state, tileSeat(shield));
   countFlood(state.map, floodRiverIndex(state.map, start));
   if (!mitigated) {
-    for (const row of FLOOD_DAMAGE_ROWS[sev]) {
-      for (const t of reach) {
-        if (floodImmune(state, t)) continue;
-        if (randRange(state, 100, 'Pillage Improvement Chance') < row.pct) eventDamage(state, t, row.kind, row.lo, row.hi);
+    aidScope(state, () => {
+      for (const row of FLOOD_DAMAGE_ROWS[sev]) {
+        for (const t of reach) {
+          if (floodImmune(state, t)) continue;
+          if (randRange(state, 100, 'Pillage Improvement Chance') < row.pct) eventDamage(state, t, row.kind, row.lo, row.hi);
+        }
       }
-    }
+    });
   }
   if (floodFertilityHalted(state)) return reach;
   for (const row of FLOOD_YIELD_ROWS[sev]) {
@@ -1187,6 +1270,10 @@ export function fireBirth(state: GameState, t: Tile, row: number): void {
  * of its own (`fireBirth`). `_fire_strike` is the twin.
  */
 function fireStrike(state: GameState, t: Tile, row: number, age: number): void {
+  aidScope(state, () => strikeFire(state, t, row, age));
+}
+
+function strikeFire(state: GameState, t: Tile, row: number, age: number): void {
   const map = state.map;
   if (!barren(t)) {
     if (age === 0) {
@@ -1268,11 +1355,13 @@ export function fireTurn(state: GameState): void {
 export function drought(state: GameState, center: Tile, sev: number): void {
   const turns = DROUGHT_TURNS[sev];
   const plots: number[] = [];
-  for (const t of stormFootprint(state.map, center, DROUGHT_HEXES)) {
-    if (isWater(t)) continue;
-    plots.push(t.index);
-    droughtTile(state, t, sev, turns);
-  }
+  aidScope(state, () => {
+    for (const t of stormFootprint(state.map, center, DROUGHT_HEXES)) {
+      if (isWater(t)) continue;
+      plots.push(t.index);
+      droughtTile(state, t, sev, turns);
+    }
+  });
   (state.droughts ??= []).push({ plots, left: turns });
   log(state, `Drought around (${center.col}, ${center.row}) — food suffers for ${turns} turns.`);
 }
@@ -1288,11 +1377,18 @@ export function drought(state: GameState, center: Tile, sev: number): void {
  */
 function droughtTile(state: GameState, t: Tile, sev: number, turns: number): void {
   const listed = () => !!t.improvement && DROUGHT_IMPROVEMENTS.includes(t.improvement) && !envImmune(state, t);
+  // the specific improvement destroyed counts nothing toward the event's
+  // damage, the specific one pillaged a full point (0x3388e0 sums its field
+  // twice)
   if (DROUGHT_DESTROY_P[sev] > 0 && randRange(state, 100, 'Pillage Improvement Chance') < Math.round(DROUGHT_DESTROY_P[sev] * 100) && listed()) {
-    destroyImprovement(state, t);
+    t.improvement = null;
+    t.pillaged = false;
   }
   randRange(state, 100, 'Pillage Improvement Chance');
-  if (listed()) t.pillaged = true;
+  if (listed()) {
+    aidDamage(tileSeat(t), 2);
+    t.pillaged = true;
+  }
   t.droughtTurns = Math.max(t.droughtTurns, turns);
   removeFertility(state, t);
 }
@@ -1365,17 +1461,19 @@ function silt(tile: Tile, key: 'fertility' | 'fertilityProd' | 'fertilitySci' | 
 export function erupt(state: GameState, plots: readonly Tile[], row: number): void {
   const rings = eruptionRings(state.map, plots);
   const volcano = plots[0];
-  for (const ring of rings) {
-    for (const kind of ERUPTION_DAMAGE_KINDS) {
-      const p = eruptionDamageP(kind, row);
-      if (p <= 0) continue;
-      for (const n of ring) {
-        if (!eruptionReaches(n)) continue;
-        if (n.resource && RESOURCES[n.resource].category === 'bonus') n.resource = null;
-        if (randRange(state, 100, 'Pillage Improvement Chance') < Math.round(p * 100)) eventDamage(state, n, kind, ERUPTION_DMG_LO[row], ERUPTION_DMG_HI[row]);
+  aidScope(state, () => {
+    for (const ring of rings) {
+      for (const kind of ERUPTION_DAMAGE_KINDS) {
+        const p = eruptionDamageP(kind, row);
+        if (p <= 0) continue;
+        for (const n of ring) {
+          if (!eruptionReaches(n)) continue;
+          if (n.resource && RESOURCES[n.resource].category === 'bonus') n.resource = null;
+          if (randRange(state, 100, 'Pillage Improvement Chance') < Math.round(p * 100)) eventDamage(state, n, kind, ERUPTION_DMG_LO[row], ERUPTION_DMG_HI[row]);
+        }
       }
     }
-  }
+  });
   const soil: [number, 'fertility' | 'fertilityProd' | 'fertilitySci' | 'fertilityCul'][] = [
     [ERUPTION_PAINT_P[row], 'fertility'], [ERUPTION_PROD_P[row], 'fertilityProd'],
     [ERUPTION_SCI_P[row], 'fertilitySci'], [ERUPTION_CUL_P[row], 'fertilityCul']];
@@ -1477,6 +1575,10 @@ export function ageReactors(cities: readonly City[]): void {
  * pillaged, no unit off the plot struck; the plant stays, ageing on.
  */
 export function nuclearAccident(state: GameState, seat: number, city: City, sev: number): void {
+  aidScope(state, () => accident(state, seat, city, sev));
+}
+
+function accident(state: GameState, seat: number, city: City, sev: number): void {
   const iz = city.districts.find((d) => d.type === 'INDUSTRIAL_ZONE');
   const t = iz ? state.map.tiles[iz.tileIndex] : null;
   const roll = new Map<string, number>();
@@ -1500,11 +1602,7 @@ export function nuclearAccident(state: GameState, seat: number, city: City, sev:
       land, naval: null, civ: fires('UNIT_KILLED_CIVILIAN', ACCIDENT_CIV_KILL_P[sev]),
     }, null);
   }
-  if (fires('POPULATION_LOSS', ACCIDENT_POP_P[sev]) && city.population > 1) {
-    city.population -= 1;
-    logPopWrite(state, city, 'ds');
-    (state.aidHit ??= []).push(seat);  // CIV6 (Aid Request trigger)
-  }
+  if (fires('POPULATION_LOSS', ACCIDENT_POP_P[sev]) && city.population > 1) loseCitizen(state, seat, city.id);
   log(state, `Nuclear accident in ${city.name} — severity ${sev}.`);
 }
 
@@ -1533,6 +1631,9 @@ export function disasterPhase(state: GameState): void {
     state.droughts = state.droughts.filter((d) => d.left > 0);
   }
 
+  // the phase's aid victims (`aidScope`); an event outside the phase (a
+  // spy's breached Dam) names none
+  state.aidHit = [];
   // CIV6 (RANDOM_EVENT_START_TURN): before its first turn the step takes no
   // draw at all
   if (state.turn >= RANDOM_EVENT_START_TURN) {
@@ -1541,11 +1642,12 @@ export function disasterPhase(state: GameState): void {
     volcanoRoll(state);
     randomEvent(state);
   } else seaRise(state);
-  // CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): the
-  // phase's LOWEST victim civilization asks for aid — resolved once at the
-  // end, so the order the two engines walk the turn's events cannot pick a
-  // different victim; a city-state's or Free City's loss raises nothing
-  const hits = (state.aidHit ?? []).filter((s) => isCiv(s));
+  // CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): of
+  // the civilizations one event dealt `AID_DAMAGE_MIN` (`aidScope`), the
+  // phase's LOWEST asks for aid — resolved once at the end, so the order the
+  // two engines walk the turn's events cannot pick a different victim; a
+  // city-state's or Free City's damage raises nothing
+  const hits = state.aidHit.filter((s) => isCiv(s));
   if (hits.length) raiseAidRequest(state, Math.min(...hits));
   state.aidHit = undefined;
 }
@@ -1685,11 +1787,13 @@ function barren(t: Tile): boolean {
  */
 export function stormStrike(state: GameState, s: StormRecord, pct: number): void {
   const ev = STORM_EVENTS[s.event];
-  for (const t of stormFootprint(state.map, state.map.tiles[s.at], ev.hexes)) {
-    if (s.struck.includes(t.index)) continue;
-    stormPlot(state, t, s.event, pct);
-    s.struck.push(t.index);
-  }
+  aidScope(state, () => {
+    for (const t of stormFootprint(state.map, state.map.tiles[s.at], ev.hexes)) {
+      if (s.struck.includes(t.index)) continue;
+      stormPlot(state, t, s.event, pct);
+      s.struck.push(t.index);
+    }
+  });
 }
 
 /**

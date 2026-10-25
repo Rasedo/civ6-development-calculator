@@ -25,6 +25,7 @@
     - "C-41: the eruption's soil, the ring and the gates"
     - "C-74: the drought's strike — READ"
     - "C-74: the sea's rise halts and removes fertility — READ"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - ...AN 0x33a070 do not (the owner only sets the damage percent). Floods (0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0) share the applier...
     - "0x286530 (from 0x291a20's drought arm): per plot of the stored footprint (the land plots), each `R..."
@@ -59,6 +60,7 @@
     - "C-74: the fire — READ"
     - "C-74: the one-off start — READ"
     - "C-74: the sea's rise halts and removes fertility — READ"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - "- The fire's draws: \"C-74: the fire\" below (the strike 0x2867f0, SPREAD)."
     - ...0 do not (the owner only sets the damage percent). Floods (0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0) share the appliers.
@@ -94,6 +96,7 @@
     - "C-49: the storm's walk"
     - "H-1: the plot's event yields and the city yield's percent — READ"
     - "C-74: the sea's rise halts and removes fertility — READ"
+    - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - "...the name (one draw over the naming player's citizen names, 0x28d400), the first strike 0x286f80 at 100% on a COPY of the record (stored before it, so the stored struck list starts emp..."
     - ...the owner only sets the damage percent). Floods (0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0) share the appliers.
