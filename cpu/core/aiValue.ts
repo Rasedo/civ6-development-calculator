@@ -238,8 +238,12 @@ export interface AiValueView {
   tributaries(seat: number): number;
   /** each of the seat's units' Units.Maintenance */
   unitMaintenances(seat: number): readonly number[];
-  /** the seat's units in its list's order, their plot and UnitType */
-  playerUnits(seat: number): readonly { plot: number; type: string }[];
+  /** the seat's units in its list's order, their plot, UnitType and whole
+   *  Movement (0x56e130) */
+  playerUnits(seat: number): readonly { plot: number; type: string; moves: number }[];
+  /** the military AI's unit production value of a UnitType (0x79ca90: its
+   *  table entry's +0x160, 0 none) */
+  unitProductionValue(seat: number, unitType: string): number;
   /** 0x5eb0f0 with no region: over `holder`'s knowledge base's records of
    *  `player`'s units of age at most `maxAge` whose plot lies in the area of
    *  `plot` or in no region, each unit's max(Combat, RangedCombat) summed */

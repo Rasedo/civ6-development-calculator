@@ -405,6 +405,19 @@
   context:
     - "...pseudo-yield, between; slot 2 0x6a4750 half the Amount as fx. EFFECT_GRANT_UNIT_IN_CITY 0x6abe40: the greater of the unit's current cost (0x4f2b20) and its value 0x7b62c0, x Amount, ad..."
   review: imported
+- addr: 0x6ac440
+  kind: function
+  name: EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: Logistics   on runs/h1_duelw1121's city-states, 30 rows of 0 -> 23 of 30 as logged.
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_unit_moves]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "- EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT 0x6ac440 (the registry's @f040b8; Amount +8): on the context's unit (+0x90, set per subject by..."
+  review: imported
 - addr: 0x6ac690
   kind: function
   name: EFFECT_ADJUST_CITY_TOURISM
@@ -777,6 +790,21 @@
   context:
     - ...ECT_ADJUST_CITY_YIELD_PER_POPULATION 0x6b6460 and EFFECT_ADJUST_CITY_GOLD_FROM_CITIZENS 0x6b8150 (Amount x the context city's citizens +0x588 of the yield, unweighted, span), EFFECT_...
   review: reviewed
+- addr: 0x6b85d0
+  final: 0x469cb0
+  kind: function
+  name: EFFECT_ADJUST_UNIT_SEA_MOVEMENT
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 37
+      value: "The research value adds the row's   TechnologyModifiers analysed from landing (0x7b3e50 -> 0x7a4b20):   Mathematics' MATHEMATICS_ADJUST_SEA_MOVEMENT, Ayutthaya's galleys   (runs/h1_duelw1121 p3 t37-t6"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_research.py:_rai_mods]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "- EFFECT_ADJUST_UNIT_SEA_MOVEMENT 0x6b85d0 (@f040f0; Amount +8): on the context's unit, a naval one (+0x650 0) of Movement: float(..."
+  review: imported
 - addr: 0x6b8930
   final: 0x469fb0
   kind: function
@@ -963,6 +991,33 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...nfluencePointsThreshold at the speed, added on adoption 0x44eaa0). PARTLY: Discipline's 0x6bef40 (a combat unit; the barbarians' units the AI knows within 10 of it, 0x5eb0f0 over the..."
+  review: imported
+- addr: 0x6bf3a0
+  final: 0x4702d0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 76
+      value: "Not ported: on runs/h1_duelw1121   every unit with an unlocked, reachable upgrade reads 23-59 for Hunza where   the game lists 1.0 (Professional Army t76-t93) — ASK: which units the list   +0xd8 holds"
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...RADE_DISCOUNT_PERCENT 0x6bf850 (@f04120; Amount stored fx(Amount x 0.01f) by its parser 0x6bf3a0): over the player's units manager's list (player +0x12e8 +0xd8, a linked list by +0x1..."
+  review: imported
+- addr: 0x6bf850
+  final: 0x470700
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 76
+      value: "Not ported: on runs/h1_duelw1121   every unit with an unlocked, reachable upgrade reads 23-59 for Hunza where   the game lists 1.0 (Professional Army t76-t93) — ASK: which units the list   +0xd8 holds"
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "- EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT 0x6bf850 (@f04120; Amount stored fx(Amount x 0.01f) by its parser 0x6bf3a0): over the player's..."
   review: imported
 - addr: 0x6c0490
   final: 0x471230

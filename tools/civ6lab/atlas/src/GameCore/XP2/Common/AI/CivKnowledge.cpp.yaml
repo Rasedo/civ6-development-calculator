@@ -94,6 +94,7 @@
     - cpu/core/aiValue.ts:playerUnits
     - gpu/core/sim_policy.py:_POL_UNIT_ZERO
     - gpu/core/sim_policy.py:_pol_barbarian_combat
+    - cpu/core/aiValue.ts:AiValueView
   readings:
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"

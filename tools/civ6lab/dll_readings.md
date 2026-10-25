@@ -2324,6 +2324,12 @@ draw of the game's, so the engines' integer draw there is the driver's stand-in
   raise) and handed back to it through ChangeResourceAmount (ownership 0,
   amount cap - (stock - reserved)) — a rebuild. A bank at the cap is not
   over it. Online the cap is 25 before the buildings.
+- A city-state under a suzerain banks no income of its own (the suzerain
+  holds its resources, LOC_CITY_STATES_SUZERAIN_DIPLOMATIC_BONUS): runs/
+  h1_duelw1121 Hunza, Horses 29 a turn (the cap's 25 + two Pastures' 4) at
+  its AI turns t30-t40, 25 every turn from t41 (its suzerain, player 1,
+  set during t41), Equestrian Orders 27 -> 37, 56, 75 as logged
+  (`stockpileIncome`, `_seat_stock_income`; the income writer unread).
 - The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070):
   a unit at the queue's front with a strategic cost and no progress
   (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less
@@ -7104,6 +7110,33 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40).
 - EFFECT_ADJUST_DISTRICT_YIELD_CHANGE 0x6acd00: a district subject; Amount
   bare, span.
+- EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT 0x6ac440 (the
+  registry's @f040b8; Amount +8): on the context's unit (+0x90, set per
+  subject by COLLECTION_PLAYER_UNITS' walk) of Movement (0x56e130 above 0):
+  fx(Amount) x the military AI's unit production value of its type (0x79ca90
+  on player +0x1290 +0x268: the entry's +0x160, 0 for none) over fx(its
+  Movement) (0x16e940), as Production (@f2f978) at the player's weight
+  (0x7a6690), between the start and the horizon (0x7a2140), whole. Logistics
+  on runs/h1_duelw1121's city-states, 30 rows of 0 -> 23 of 30 as logged.
+- EFFECT_ADJUST_UNIT_SEA_MOVEMENT 0x6b85d0 (@f040f0; Amount +8): on the
+  context's unit, a naval one (+0x650 0) of Movement: float(Amount) x
+  (float(its current cost, 0x4f2b20) x 0.5f) / float(its Movement), to 24.8
+  through floorf, as Production at the player's weight, discounted to the
+  start (0x7a1240), whole. The research value adds the row's
+  TechnologyModifiers analysed from landing (0x7b3e50 -> 0x7a4b20):
+  Mathematics' MATHEMATICS_ADJUST_SEA_MOVEMENT, Ayutthaya's galleys
+  (runs/h1_duelw1121 p3 t37-t63, Mathematics 1.0 / 2.0 / 3.0 / 5.0 under
+  the log before it, its descendants alike).
+- EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT 0x6bf850 (@f04120;
+  Amount stored fx(Amount x 0.01f) by its parser 0x6bf3a0): over the
+  player's units manager's list (player +0x12e8 +0xd8, a linked list by
+  +0x10), per unit 0x58fff0(upgrade manager, unit, test-visible 1) — not a
+  barbarian's (0x56ee80) and an upgrade type it may take (0x5909a0 ->
+  0x5374c0) — the Amount x its upgrade's Gold (0x590520 << 8) as Gold at the
+  player's weight, x 0.75 (@d1a188), whole. Not ported: on runs/h1_duelw1121
+  every unit with an unlocked, reachable upgrade reads 23-59 for Hunza where
+  the game lists 1.0 (Professional Army t76-t93) — ASK: which units the list
+  +0xd8 holds.
 - EFFECT_ADJUST_BUILDING_YIELD_CHANGE 0x6c5080 (args BuildingType +8,
   YieldType +0xc, Amount +0x10): a city subject; Amount weighted, x0.5 where
   the city lacks the building (0x18e9f0), span.

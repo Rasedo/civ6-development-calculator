@@ -487,6 +487,12 @@ def build() -> str:
     for c in rows("CivicModifiers"):
         if c.get("CivicType"):
             civic_mods[c["CivicType"]].append(c["ModifierId"])
+    # each technology's modifiers (TechnologyModifiers), the research AI's
+    # value analyses them (0x7b3e50 -> 0x7a4b20)
+    tech_mods: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("TechnologyModifiers"):
+        if c.get("TechnologyType"):
+            tech_mods[c["TechnologyType"]].append(c["ModifierId"])
     # THE ECONOMIC AI'S SAVINGS (every party's: the majors' and the minors'
     # traits carry DefaultSavings): the SavingTypes in table order (a slot's
     # index) and the list's weight of each
@@ -501,7 +507,8 @@ def build() -> str:
         " * trait — a leader's traits through its InheritFrom chain, a civilization's,\n"
         " * an agenda's (AgendaTraits) —, those and PseudoYields by strategy\n"
         " * (Strategy_Priorities); the city-states' modifiers their envoys reach,\n"
-        " * the civics' modifiers (CivicModifiers).\n */\n"
+        " * the civics' modifiers (CivicModifiers), the technologies' modifiers\n"
+        " * (TechnologyModifiers).\n */\n"
         "import type { AiModifier } from '../core/aiModifiers';\nimport type { AiListRef, AiListItem } from '../core/aiValue';\n\n"
         + lit("AI_YIELD_DEFAULT", yields, "Readonly<Record<string, number>>")
         + lit("AI_PSEUDOYIELD_DEFAULT", pseudo, "Readonly<Record<string, number>>")
@@ -518,6 +525,8 @@ def build() -> str:
         + lit("AI_DIFFICULTIES", difficulties, "readonly string[]")
         + lit("AI_MINOR_INFLUENCE_MODIFIERS", dict(sorted(minor_influence.items())), "Readonly<Record<string, readonly AiModifier[]>>")
         + lit("AI_CIVIC_MODIFIERS", {k: [modifier(m) for m in v] for k, v in sorted(civic_mods.items())},
+              "Readonly<Record<string, readonly AiModifier[]>>")
+        + lit("AI_TECH_MODIFIERS", {k: [modifier(m) for m in v] for k, v in sorted(tech_mods.items())},
               "Readonly<Record<string, readonly AiModifier[]>>")
         + lit("AI_SPACE_RACE_PROJECTS", [k for k, c in keyed(rows("Projects"), "ProjectType").items() if c.get("SpaceRace", "").lower() == "true"],
               "readonly string[]")

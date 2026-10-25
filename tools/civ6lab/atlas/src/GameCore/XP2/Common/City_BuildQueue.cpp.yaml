@@ -38,7 +38,7 @@
     - recording: 1108
       turn: 95
       value: "A city   yield's one modifier (0xaa740) truncates toward zero: 1108 Xi'an t95, 16   Production at −10% reads 14.40234375 (floor would read 14.3984375)."
-  impl: [ai/major/congress.ts:over]
+  impl: [ai/major/congress.ts:over, cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "H-1: the citizen pressure term — PARTLY READ"
     - "C-94: the growth modifier — READ (the accumulator's writer unread)"
@@ -49,6 +49,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...28, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8f100).  LOG: AI_CityBuild.csv lines: D..."
   context:

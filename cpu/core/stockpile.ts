@@ -17,7 +17,7 @@ import { GP_CITY_FREE_EXTRACTION, GP_FREE_EXTRACTION, gpCityPermOf, gpPermOf } f
 import { governorSum, governorTileSum } from './governors';
 import { extractsResource, resourceImprovement } from '../../world/resources';
 import { citiesOf, civOf, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
-import { minorCity, regionalReach, suzerainEffectCount, suzerainMinorSeats } from './cityStates';
+import { minorCity, regionalReach, suzerainEffectCount, suzerainMinorSeats, suzerainOf } from './cityStates';
 import { HATTUSA_FREE_STRATEGIC } from '../data/cityStates';
 import { hexDistance } from '../../world/hex';
 import { getModifiers } from './effects';
@@ -27,7 +27,7 @@ import { GOLD_EQUIVALENT_OTHER_YIELDS } from './trade';
 import { cityHasLiveDistrict, cityImprovedResourceKinds, cityPower, darkBuildings } from './yields';
 import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
 import { ageReactors } from './disasters';
-import type { City, GameState, Seat, Tile, Unit } from './types';
+import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
 
 /** the cities whose buildings raise a seat's cap: a city-state's own one */
 function capCities(state: GameState, seat: number): City[] {
@@ -113,10 +113,14 @@ export function accrueStockpiles(state: GameState, seat: number): void {
 }
 
 /** One turn's strategic income of a seat by slot (Player_Resources +0x350,
- *  0x4aa700): every source `accrueStockpiles` pays */
+ *  0x4aa700): every source `accrueStockpiles` pays. A city-state under a
+ *  suzerain banks none: its suzerain holds its resources (runs/h1_duelw1121
+ *  Hunza, suzerained in t41, its Horses read at the cap of 25 every turn
+ *  after through two Pastures, Equestrian Orders 37 / 56 / 75 as logged) */
 export function stockpileIncome(state: GameState, seat: number): number[] {
   const s = seatOf(state, seat)!;
   const bk = emptyStockpile();
+  if (isCityStateSeat(seat) && suzerainOf(s as CityState) >= 0) return bk;
   const rate = getModifiers(state, seat).stockpileRate;
   const perSource = getModifiers(state, seat).stockpilePerSource;
   // CIV6 (Resources.PrereqTech): a strategic resource the seat cannot see

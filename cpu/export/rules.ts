@@ -319,7 +319,7 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
 
 import { RESOURCES } from '../../world/resources';
 import { AI_RESOURCE_EXPORT, aiTechResources } from '../core/aiResource';
-import { AI_CIVIC_MODIFIERS, AI_DEFAULT_SAVINGS, AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD, AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
+import { AI_CIVIC_MODIFIERS, AI_TECH_MODIFIERS, AI_DEFAULT_SAVINGS, AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD, AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
 /** an engine row's install type: its own where that names it, else the one
  *  its catalog tag names */
@@ -3077,6 +3077,7 @@ export function buildRules() {
       aiWonders: techUnlocks(t.id).wonders,
       aiProjects: techUnlocks(t.id).projects,
       aiWeapons: techUnlocks(t.id).weapons,
+      ...techAiModifiers(t.id),
       embarkAll: t.embarkAll ? 1 : 0,
       embarkUnit: RESEARCH_AI_EMBARK_UNIT.includes(t.id) ? 1 : 0,
       // the resources the research value's improvement walk reaches (`TECH_IMPROVEMENT_RESOURCES`)
@@ -3162,10 +3163,26 @@ export function buildRules() {
   return rules;
 }
 
+/** the TechnologyModifiers the research AI's value reads of a technology, as
+ *  the GPU twin takes them: the spies' and the sea movement's Amounts; a
+ *  diplomatic victory points row is worth none there (no other player in the
+ *  context), any other effect the TS analyses is refused */
+function techAiModifiers(id: string): { aiSpies: number; aiSeaMoves: number } {
+  const mods = AI_TECH_MODIFIERS[gameTypeOf('tech', id, 'TECH_')] ?? [];
+  const read = new Set(AI_MODIFIER_READS.analyzers);
+  for (const m of mods) {
+    if (read.has(m.effect) && !['EFFECT_GRANT_SPY', 'EFFECT_ADJUST_UNIT_SEA_MOVEMENT', 'EFFECT_ADJUST_PLAYER_DIPLOMATIC_VICTORY_POINTS'].includes(m.effect)) {
+      throw new Error(`tech ${id}: modifier ${m.id} (${m.effect}) analysed in TS, not exported to the GPU`);
+    }
+  }
+  const sum = (effect: string): number => mods.filter((m) => m.effect === effect).reduce((n, m) => n + (Number(m.args.Amount ?? 0) | 0), 0);
+  return { aiSpies: sum('EFFECT_GRANT_SPY'), aiSeaMoves: sum('EFFECT_ADJUST_UNIT_SEA_MOVEMENT') };
+}
+
 /** the CivicModifiers the civics AI's value reads of a civic, as the GPU twin
  *  takes them: each effect's Amount (Enable as 1) */
 function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAdjacency: number } {
-  const mods = AI_CIVIC_MODIFIERS[`CIVIC_${id}`] ?? [];
+  const mods = AI_CIVIC_MODIFIERS[gameTypeOf('civic', id, 'CIVIC_')] ?? [];
   const sum = (effect: string, arg: string): number => mods.filter((m) => m.effect === effect)
     .reduce((n, m) => n + (arg === 'Enable' ? (m.args.Enable === 'true' ? 1 : 0) : Number(m.args[arg] ?? 0) | 0), 0);
   return {

@@ -261,7 +261,9 @@
             "BarbTribe.homing",
             "BarbTribe.op",
             "Seat.ops",
-            "Seat.opsNext"
+            "Seat.opsNext",
+            "Seat.treeSlots",
+            "Seat.treeFree"
           ],
           "planes": [
             "tribe_plot",
@@ -2356,6 +2358,20 @@
             "citystate_kb_seen",
             "citystate_kb_plot",
             "citystate_kb_damage"
+          ]
+        },
+        {
+          "name": "minorUpgrading",
+          "compare": "exact",
+          "note": "a city-state's \"Upgrade Units\" trees: whether one runs, its trigger, the units held",
+          "covers": [
+            "Seat.upgrading",
+            "Seat.upgradeTrigger"
+          ],
+          "planes": [
+            "mops_upg",
+            "mops_upg_on",
+            "mops_upg_trig"
           ]
         },
         {

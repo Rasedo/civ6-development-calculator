@@ -159,7 +159,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     for (const [type, l] of only !== 'civic' ? techLog.get(key) ?? [] : []) {
       const id = type.slice(5);
       if (!TECHS[id] || s.research.techs.includes(id) || l[1] < 0 || !TECHS[id].prereqs.every((x) => s.research.techs.includes(x))) continue;
-      tallyOwn('major tech', type, l, techValue(state, id, l[1], pw) + Math.round((contracts.get(key)?.get(type) ?? 0) * 256), `t${turn} p${player}`);
+      tallyOwn('major tech', type, l, techValue(state, s.seat, id, l[1], pw) + Math.round((contracts.get(key)?.get(type) ?? 0) * 256), `t${turn} p${player}`);
     }
     for (const [type, l] of only !== 'tech' ? civicLog.get(key) ?? [] : []) {
       const id = type.slice(6);
@@ -180,7 +180,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
         const l = logged.get(`TECH_${e.tech}`);
         if (l && !e.owned) tally('tech', `TECH_${e.tech}`, turn, player, l, e);
         if (l && !e.owned && l[1] >= 0 && TECHS[e.tech].prereqs.every((x) => cs.research.techs.includes(x))) {
-          tallyOwn('tech', `TECH_${e.tech}`, l, techValue(state, e.tech, l[1], pseudoYieldWeights(state, cs.seat, {})) + (l[1] <= 50 ? terms.tech(e.tech, l[1]) : 0)
+          tallyOwn('tech', `TECH_${e.tech}`, l, techValue(state, cs.seat, e.tech, l[1], pseudoYieldWeights(state, cs.seat, {})) + (l[1] <= 50 ? terms.tech(e.tech, l[1]) : 0)
             + Math.round((contracts.get(key)?.get(`TECH_${e.tech}`) ?? 0) * 256), `t${turn} p${player}`);
         }
       }

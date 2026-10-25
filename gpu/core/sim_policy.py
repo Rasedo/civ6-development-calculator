@@ -31,7 +31,7 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_GREAT_PERSON_POINTS", "EFFECT_ADJUST_POLICY_AMENITY", "EFFECT_ADJUST_POLICY_HOUSING",
     "EFFECT_ADJUST_CITY_OUTER_DEFENSE", "EFFECT_ADJUST_CITY_RANGED_STRIKE", "EFFECT_ADJUST_UNIT_PRODUCTION",
     "EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT", "EFFECT_ADJUST_UNIT_TAG_ERA_PRODUCTION",
-    "EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER",
+    "EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER", "EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT",
 }
 # worth 0 in a minor's policy context: the context's own city (none), the
 # Influence a minor may not give, its tributaries and placed envoys (none)
@@ -300,6 +300,8 @@ class SimPolicy:
         city = sub["kind"] == "city"
         y = a.get("YieldType", "")
         if sub["kind"] == "units":
+            if eff == "EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT":
+                return self._pol_unit_moves(ctx, amount, h)
             if eff != "EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT":
                 return zero
             scale = _f32(float(self.rules.civic_ai["combatPowerScaling"]))
@@ -606,6 +608,58 @@ class SimPolicy:
         w_barb = (hit & (owner == BARB_SEAT).unsqueeze(1)).long() * strength.unsqueeze(1)
         more = w_barb.sum(-1) > w_own.sum(-1)
         return (on & more).long().sum(dim=1)
+
+    def _pol_units(self, s: int):
+        """minor `s`'s units (the Free Cities' at `FR`), the first 51 in pool
+        order (`playerUnits`): [B, P] each — taken, their AI_UNITS row
+        (len(rows) none) and whole Movement (0x56e130, `unitFullMoves`)"""
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        er = T["engine_row"].to(self.device)
+        pre = "barb" if s == self.FR else "major"
+        alive = getattr(self, f"{pre}_unit_alive")
+        own = alive & (getattr(self, f"{pre}_unit_seat") == (FREE_SEAT if s == self.FR else 100 + s))
+        P = own.shape[1]
+        pslot = getattr(self, f"{pre}_unit_pslot")
+        key = torch.where(own, torch.where(pslot >= 0, pslot, torch.full_like(pslot, P)), torch.full_like(pslot, 1 << 40))
+        rank = key.argsort(dim=1, stable=True).argsort(dim=1)
+        typ = getattr(self, f"{pre}_unit_type").long()
+        ar = torch.where(typ >= 0, er.take(typ.clamp(min=0, max=er.numel() - 1)), torch.full_like(typ, -1))
+        row = torch.where(ar >= 0, ar, torch.full_like(ar, len(rows)))
+        moves = torch.div(self._tac_full_now(pre), self._mp_scale, rounding_mode="floor")
+        return own & (rank < 51), row, moves, rank
+
+    def _pol_unit_moves(self, ctx: dict, amount: int, h: int) -> torch.Tensor:
+        """EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT (0x6ac440) over
+        the minor's units: per unit with Movement, fx(Amount) x its type's
+        unit production value (0x79ca90) over its Movement, as Production at
+        the minor's weight from the start to the horizon, each whole"""
+        B, dev = ctx["B"], ctx["dev"]
+        f0 = ctx["f0"]
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        on, row, moves, rank = self._pol_units(ctx["s"])
+        val, _entry = f0._production_table()
+        val = torch.cat([val, torch.zeros(B, 1, dtype=val.dtype, device=dev)], dim=1)
+        r = T["rate"]
+        hh = torch.full((B,), h, dtype=torch.long, device=dev)
+        t0 = torch.zeros(B, dtype=torch.long, device=dev)
+        w = f0.yield_w("YIELD_PRODUCTION")
+        out = torch.zeros(B, dtype=torch.long, device=dev)
+        for k in range(min(51, on.shape[1])):
+            pick = (rank == k) & on
+            has = pick.any(dim=1)
+            if not bool(has.count_nonzero()):
+                break
+            i = pick.long().argmax(dim=1, keepdim=True)
+            mv = moves.gather(1, i).squeeze(1)
+            v = val.gather(1, row.gather(1, i)).squeeze(1)
+            x = _fmul(torch.full_like(v, amount * _FX), v)
+            x = torch.div(x * _FX, (mv * _FX).clamp(min=1), rounding_mode="trunc")
+            y = self._cv_yield(x, "YIELD_PRODUCTION", w)
+            per = (_present_value(y, r, hh) - _present_value(y, r, t0)) >> 8 if h != 0 else _discounted(y, r, t0) >> 8
+            out = out + torch.where(has & (mv > 0), per, torch.zeros_like(per))
+        return out
 
     def _pol_mod_value(self, ctx: dict, m: dict, h: int) -> torch.Tensor:
         """one modifier's whole value [B] (`modifierValue`), 0 where refused"""

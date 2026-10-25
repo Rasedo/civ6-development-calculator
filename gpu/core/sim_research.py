@@ -144,6 +144,7 @@ class SimResearch:
             "lv": _walk_slots(pre, dev),
             "leaf": ~required,
             "unlocks": rules.t_ai_unlocks.to(dev),
+            "mods": rules.t_ai_mods.to(dev),
             "embark": rules.t_embark_all.to(dev),
             "embark_unit": rules.t_embark_unit.to(dev),
             "era": rules.t_era.to(dev),
@@ -542,7 +543,50 @@ class SimResearch:
                + u[:, :, 2] * self._rai_from_landing(torch.full_like(own, _imul(T["share"], T["py_wonder"])), nn)
                + u[:, :, 3] * self._rai_from_landing(torch.full_like(own, T["project"]), nn)
                + u[:, :, 4] * self._rai_from_landing(torch.full_like(own, _imul(_FX, T["py_nuclear"])), nn))
+        val = val + self._rai_mods(s, nn)
         return torch.where(turns > T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
+
+    def _rai_mods(self, s: int, nn: torch.Tensor) -> torch.Tensor:
+        """the rows' TechnologyModifiers (`techValue`'s modifiers term) [B, NT]
+        for minor `s`, landing in `nn` turns: a spy as PSEUDOYIELD_UNIT_SPY
+        from landing to the horizon; the sea movement (0x6b85d0) per naval
+        unit of the minor's first 51 with Movement, Amount x (its cost x
+        0.5f) over its Movement in float, as Production discounted to landing,
+        each whole"""
+        T = self._rai_tables()
+        mods = T["mods"]
+        out = torch.zeros_like(nn)
+        spies = mods[:, 0]
+        if bool((spies != 0).any()):
+            spy = self._cai_grants()["spy"]
+            v = self._rai_from_landing(spies.unsqueeze(0).expand_as(nn) * spy, nn)
+            out = out + torch.div(v, _FX, rounding_mode="floor") * _FX
+        cols = (mods[:, 1] != 0).nonzero(as_tuple=True)[0].tolist()
+        if not cols:
+            return out
+        on, _row, moves, rank = self._pol_units(s)
+        pre = "barb" if s == self.FR else "major"
+        typ = getattr(self, f"{pre}_unit_type").long().clamp(min=0)
+        naval = self.unit_naval.take(typ)
+        cost = self._type_cost.take(typ).float()
+        r = T["rate"]
+        for c in cols:
+            amt = float(int(mods[c, 1]))
+            for k in range(min(51, on.shape[1])):
+                pick = (rank == k) & on
+                has = pick.any(dim=1)
+                if not bool(has.count_nonzero()):
+                    break
+                i = pick.long().argmax(dim=1, keepdim=True)
+                mv = moves.gather(1, i).squeeze(1)
+                sea = naval.gather(1, i).squeeze(1)
+                half = (cost.gather(1, i).squeeze(1) * 0.5).float()
+                x = (torch.tensor(amt, dtype=torch.float32, device=self.device) * half) / mv.clamp(min=1).float()
+                fx = _fx_const_t(x.double())
+                y = _fmul(fx, torch.full_like(fx, self._cv_tables()["yield_def"].get("YIELD_PRODUCTION", _FX)))
+                d = torch.div(_discounted(y, r, nn[:, c]), _FX, rounding_mode="floor")
+                out[:, c] = out[:, c] + torch.where(has & sea & (mv > 0), d * _FX, torch.zeros_like(d))
+        return out
 
     def _rai_upstream(self, have: torch.Tensor, base: torch.Tensor, turns: torch.Tensor) -> torch.Tensor:
         """`propagate`'s sum: per row in reach, its unowned prerequisites' own

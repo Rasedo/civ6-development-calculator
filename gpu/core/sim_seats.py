@@ -10435,6 +10435,11 @@ class SimSeats:
                         seen = seen | (self._gp_perm(row, self._gp_perm_names[_pk]) > 0)
                 improved = (owned & (self.res_id == rid)).any(dim=1)
                 bank[:, k] += (seen & ~improved).long() * _hat * self._suz_free_strat
+        # a city-state under a suzerain banks none: its suzerain holds its
+        # resources
+        if self._CITY_MINOR0 <= row < self.FREE_ROW:
+            held = self.citystate_suzerain[:, row - self._CITY_MINOR0] >= 0
+            bank = torch.where(held.unsqueeze(1), torch.zeros_like(bank), bank)
         return bank
 
     def _fuel_short_bank(self, row: int) -> torch.Tensor:

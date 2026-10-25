@@ -22,7 +22,7 @@ import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
 import { cityDefenseStrength, cityStrikeStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
 import { outerPool, wallsTier } from './rules';
-import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, trainableUnits, traderCost, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
+import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, trainableUnits, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { CITY_MIN_STRIKE_CS, COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
@@ -51,9 +51,10 @@ import type { ContractCity } from './aiContracts';
 import { civicAnalysis } from './aiCivics';
 import { AI_UNIT_INDEX, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
 import { AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
+import { unitProductionTable } from './aiUnitProduction';
 import { resourceValue } from './aiResource';
 import { stockFree } from './stockpile';
-import { minorItemTurns, minorResourceFacts, minorUnitExpected, minorUnitVersion } from './minorBuild';
+import { minorItemTurns, minorKnownUnits, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
 import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './majorCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, hasMet, minorCity, minorWarGate, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
@@ -196,6 +197,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
   };
   const seenBy = new Map<number, ReadonlySet<number>>();
   const yctx = new Map<number, YieldCtx>();
+  const unitTables = new Map<number, ReadonlyMap<string, { value: number }>>();
   const hidden = new Map<number, ReadonlySet<string>>();
   const hiddenOf = (i: number) => {
     let h = hidden.get(i);
@@ -459,7 +461,40 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     influenceTokensUsed: (i) => state.cityStates.reduce((n, cs) => n + envoysOf(cs, i), 0),
     tributaries: (i) => state.cityStates.filter((cs) => suzerainOf(cs) === i).length,
     unitMaintenances: (i) => state.units.filter((u) => u.seat === i).map((u) => UNITS[u.type]?.maintenance ?? 0),
-    playerUnits: (i) => unitsOf(state, i).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_') })),
+    // a city-state's table on its knowledge base's counts; a major's or the
+    // Free Cities' on their own versions, the Free Cities knowing none
+    unitProductionValue: (i, type) => {
+      let table = unitTables.get(i);
+      if (!table) {
+        const s = seatOf(state, i);
+        if (!s) return 0;
+        if (isCityStateSeat(i)) table = minorUnitProduction(state, s as CityState, minorKnownUnits(s as CityState));
+        else {
+          const traits = majorTraits(state, i);
+          const r = s.research;
+          const own = new Map<string, number>();
+          for (const u of unitsOf(state, i)) {
+            const t = gameTypeOf('unit', u.type, 'UNIT_');
+            own.set(t, (own.get(t) ?? 0) + 1);
+          }
+          const holds = (x: string): boolean => {
+            const t = x.startsWith('TECH_') ? engineId('tech', x, 'TECH_', TECHS) : null;
+            const c = x.startsWith('CIVIC_') ? engineId('civic', x, 'CIVIC_', CIVICS) : null;
+            return (!!t && r.techs.includes(t)) || (!!c && r.civics.includes(c));
+          };
+          const known = i === FREE_SEAT ? () => 0 : minorKnownUnits(s as CityState);
+          table = unitProductionTable({
+            isVersion: (u) => majorUnitVersion(traits, u) === u,
+            obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
+            owned: (u) => own.get(u) ?? 0,
+            known,
+          });
+        }
+        unitTables.set(i, table);
+      }
+      return table.get(type)?.value ?? 0;
+    },
+    playerUnits: (i) => unitsOf(state, i).map((u) => ({ plot: u.tileIndex, type: gameTypeOf('unit', u.type, 'UNIT_'), moves: Math.floor(unitFullMoves(state, u) / MP_SCALE) })),
     barbarianSeats: () => [BARB_SEAT],
     bestUnitOfClass: (i, cls) => {
       const traits = isCityStateSeat(i) ? null : majorTraits(state, i);

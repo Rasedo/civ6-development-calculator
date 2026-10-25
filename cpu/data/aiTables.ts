@@ -7,7 +7,8 @@
  * trait — a leader's traits through its InheritFrom chain, a civilization's,
  * an agenda's (AgendaTraits) —, those and PseudoYields by strategy
  * (Strategy_Priorities); the city-states' modifiers their envoys reach,
- * the civics' modifiers (CivicModifiers).
+ * the civics' modifiers (CivicModifiers), the technologies' modifiers
+ * (TechnologyModifiers).
  */
 import type { AiModifier } from '../core/aiModifiers';
 import type { AiListRef, AiListItem } from '../core/aiValue';
@@ -23809,6 +23810,226 @@ export const AI_CIVIC_MODIFIERS: Readonly<Record<string, readonly AiModifier[]>>
    "effect": "EFFECT_ADJUST_PLAYER_RELIGIOUS_TOURISM_REDUCTION",
    "args": {
     "Modifier": "50"
+   }
+  }
+ ]
+};
+export const AI_TECH_MODIFIERS: Readonly<Record<string, readonly AiModifier[]>> = {
+ "TECH_ADVANCED_AI": [
+  {
+   "id": "GDR_AA_DEFENSE_UPGRADE",
+   "collection": "COLLECTION_PLAYER_UNITS",
+   "effect": "EFFECT_GRANT_PROMOTION",
+   "args": {
+    "PromotionType": "PROMOTION_GDR_AA_DEFENSE"
+   },
+   "subjectReqs": {
+    "test": "ALL",
+    "reqs": [
+     {
+      "type": "REQUIREMENT_UNIT_TAG_MATCHES",
+      "inverse": false,
+      "args": {
+       "Tag": "CLASS_GIANT_DEATH_ROBOT"
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "TECH_ADVANCED_POWER_CELLS": [
+  {
+   "id": "GDR_SIEGE_LASER_UPGRADE",
+   "collection": "COLLECTION_PLAYER_UNITS",
+   "effect": "EFFECT_GRANT_PROMOTION",
+   "args": {
+    "PromotionType": "PROMOTION_GDR_SIEGE_LASER"
+   },
+   "subjectReqs": {
+    "test": "ALL",
+    "reqs": [
+     {
+      "type": "REQUIREMENT_UNIT_TAG_MATCHES",
+      "inverse": false,
+      "args": {
+       "Tag": "CLASS_GIANT_DEATH_ROBOT"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "UNIT_CO2_REDUCTION",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_CO2_GENERATION_REDUCTION",
+   "args": {
+    "Amount": "50",
+    "ResourceUsageType": "RESOURCE_USAGE_UNIT"
+   }
+  }
+ ],
+ "TECH_CARTOGRAPHY": [
+  {
+   "id": "CARTOGRAPHY_GRANT_OCEAN_NAVIGATION",
+   "collection": "COLLECTION_PLAYER_UNITS",
+   "effect": "EFFECT_ADJUST_UNIT_VALID_TERRAIN",
+   "args": {
+    "TerrainType": "TERRAIN_OCEAN",
+    "Valid": "true"
+   }
+  }
+ ],
+ "TECH_COMBUSTION": [
+  {
+   "id": "COMBUSTION_ADJUST_EMBARKED_MOVEMENT",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_EMBARKED_UNIT_MOVEMENT",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "TECH_COMPUTERS": [
+  {
+   "id": "TECH_GRANT_SPY",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_SPY",
+   "args": {
+    "Amount": "1"
+   }
+  },
+  {
+   "id": "COMPUTERS_BOOST_ALL_TOURISM",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_TOURISM",
+   "args": {
+    "Amount": "25"
+   }
+  }
+ ],
+ "TECH_CYBERNETICS": [
+  {
+   "id": "GDR_BONUS_MOVEMENT_UPGRADE",
+   "collection": "COLLECTION_PLAYER_UNITS",
+   "effect": "EFFECT_GRANT_PROMOTION",
+   "args": {
+    "PromotionType": "PROMOTION_GDR_BONUS_MOVEMENT"
+   },
+   "subjectReqs": {
+    "test": "ALL",
+    "reqs": [
+     {
+      "type": "REQUIREMENT_UNIT_TAG_MATCHES",
+      "inverse": false,
+      "args": {
+       "Tag": "CLASS_GIANT_DEATH_ROBOT"
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "TECH_FUTURE_TECH": [
+  {
+   "id": "FUTURE_TECH_PROJECT_PRODUCTION",
+   "collection": "COLLECTION_PLAYER_CITIES",
+   "effect": "EFFECT_ADJUST_ALL_PROJECTS_PRODUCTION",
+   "args": {
+    "Amount": "5"
+   }
+  }
+ ],
+ "TECH_MATHEMATICS": [
+  {
+   "id": "MATHEMATICS_ADJUST_SEA_MOVEMENT",
+   "collection": "COLLECTION_PLAYER_UNITS",
+   "effect": "EFFECT_ADJUST_UNIT_SEA_MOVEMENT",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "TECH_PRINTING": [
+  {
+   "id": "PRINTING_ADD_DIPLO_VISIBILITY",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADD_DIPLO_VISIBILITY",
+   "args": {
+    "Amount": "1",
+    "Source": "SOURCE_TECH",
+    "SourceType": "DIPLO_SOURCE_ALL_NAMES"
+   }
+  },
+  {
+   "id": "PRINTING_BOOST_WRITING_TOURISM",
+   "collection": "COLLECTION_PLAYER_CITIES",
+   "effect": "EFFECT_ADJUST_CITY_TOURISM",
+   "args": {
+    "GreatWorkObjectType": "GREATWORKOBJECT_WRITING",
+    "ScalingFactor": "200"
+   }
+  }
+ ],
+ "TECH_SEASTEADS": [
+  {
+   "id": "TECH_SEASTEADS_DIPLOVP",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_DIPLOMATIC_VICTORY_POINTS",
+   "args": {
+    "Amount": "1",
+    "Tooltip": "LOC_DVP_TOOLTIP_OTHER_SOURCES"
+   }
+  }
+ ],
+ "TECH_SMART_MATERIALS": [
+  {
+   "id": "GDR_ARMOR_UPGRADE",
+   "collection": "COLLECTION_PLAYER_UNITS",
+   "effect": "EFFECT_GRANT_PROMOTION",
+   "args": {
+    "PromotionType": "PROMOTION_GDR_ARMOR_UPGRADE"
+   },
+   "subjectReqs": {
+    "test": "ALL",
+    "reqs": [
+     {
+      "type": "REQUIREMENT_UNIT_TAG_MATCHES",
+      "inverse": false,
+      "args": {
+       "Tag": "CLASS_GIANT_DEATH_ROBOT"
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "TECH_SQUARE_RIGGING": [
+  {
+   "id": "SQUARE_RIGGING_ADJUST_EMBARKED_MOVEMENT",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_EMBARKED_UNIT_MOVEMENT",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "TECH_STEAM_POWER": [
+  {
+   "id": "STEAM_POWER_ADJUST_EMBARKED_MOVEMENT",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_EMBARKED_UNIT_MOVEMENT",
+   "args": {
+    "Amount": "2"
+   }
+  }
+ ],
+ "TECH_STEEL": [
+  {
+   "id": "STEEL_UNLOCK_URBAN_DEFENSES",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_CITIES_HAS_URBAN_DEFENSES",
+   "args": {
+    "DefenseValue": "400"
    }
   }
  ]

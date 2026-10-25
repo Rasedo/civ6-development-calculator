@@ -3,6 +3,19 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x5374c0
+  final: 0x37dbe0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 76
+      value: "Not ported: on runs/h1_duelw1121   every unit with an unlocked, reachable upgrade reads 23-59 for Hunza where   the game lists 1.0 (Professional Army t76-t93) — ASK: which units the list   +0xd8 holds"
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...isible 1) — not a barbarian's (0x56ee80) and an upgrade type it may take (0x5909a0 -> 0x5374c0) — the Amount x its upgrade's Gold (0x590520 << 8) as Gold at the player's weight, x 0...."
+  review: imported
 - addr: 0x5376d0
   final: 0x37dd10
   kind: function

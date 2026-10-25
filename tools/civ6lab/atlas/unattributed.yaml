@@ -1847,8 +1847,22 @@
   readings:
     - "H-1: the upgrade's gold — READ"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "Unit_Upgrade_Manager's cost 0x5376d0 (via 0x590520; \"Upgraded unit is cheaper than current unit\", \"iNetProduction >= 0\"), in 24.8: UPGRADE_B..."
+  review: imported
+- addr: 0x5909a0
+  final: 0x3b8010
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 76
+      value: "Not ported: on runs/h1_duelw1121   every unit with an unlocked, reachable upgrade reads 23-59 for Hunza where   the game lists 1.0 (Professional Army t76-t93) — ASK: which units the list   +0xd8 holds"
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "..., unit, test-visible 1) — not a barbarian's (0x56ee80) and an upgrade type it may take (0x5909a0 -> 0x5374c0) — the Amount x its upgrade's Gold (0x590520 << 8) as Gold at the player'..."
   review: imported
 - addr: 0x590a30
   final: 0x3b8080

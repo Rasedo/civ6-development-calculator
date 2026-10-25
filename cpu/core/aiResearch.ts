@@ -36,6 +36,7 @@
  * Arithmetic is the DLL's 24.8 fixed point throughout (`aiValue.ts`).
  */
 import { ERAS, TECHS, TECH_TABLE_ORDER } from '../data/techs';
+import { gameTypeOf } from '../data/aliases';
 import { AI_BUILDINGS, AI_PROJECTS } from '../data/aiBuildTables';
 import {
   AI_PROJECT_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
@@ -44,7 +45,10 @@ import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_FAVORED, R
 import { researchCost } from './economy';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
-import { FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt } from './aiValue';
+import { AI_RATE, FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
+import { AI_TECH_MODIFIERS } from '../data/aiTables';
+import { modifiersValue } from './aiModifiers';
+import { majorView } from './majorView';
 import { pseudoYieldWeights, type AiWeightInputs } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
@@ -147,9 +151,13 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
  * project `AI_PROJECT_SHARE` and a weapon project PSEUDOYIELD_NUCLEAR_WEAPON
  * of 1.0 more — each a yield a turn from landing to the horizon, each
  * pseudo-yield at the seat's weight `pw` (`aiWeights.ts`). A space race
- * project's term (0x7b8a30) is not read: none. Past the horizon -9999.
+ * project's term (0x7b8a30) is not read: none. Then the row's modifiers
+ * (TechnologyModifiers) analysed from landing to the horizon (0x7a4b20) on
+ * `view` (the state's `majorView` where none is given). Past the horizon
+ * -9999.
  */
-export function techValue(state: GameState, id: string, turns: number, pw: ReadonlyMap<string, number>): number {
+export function techValue(state: GameState, seat: number, id: string, turns: number, pw: ReadonlyMap<string, number>,
+  view?: AiValueView): number {
   if (turns > AI_VALUE_HORIZON) return fxConst(-9999);
   const def = TECHS[id];
   const w = (p: string): number => pw.get(p) ?? 0;
@@ -161,11 +169,13 @@ export function techValue(state: GameState, id: string, turns: number, pw: Reado
   if (era < game) own = fmul(own, (game - era + 1) * FX);
   const share = fxConst(AI_UNLOCK_SHARE);
   const n = techUnlocks(id);
+  const mods = AI_TECH_MODIFIERS[gameTypeOf('tech', id, 'TECH_')] ?? [];
   return fromLanding(own, turns) + n.buildings * fromLanding(share, turns)
     + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns)
     + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
     + n.projects * fromLanding(fxConst(AI_PROJECT_SHARE), turns)
-    + n.weapons * fromLanding(pseudoYield(PSEUDOYIELD_NUCLEAR_WEAPON, FX, w('PSEUDOYIELD_NUCLEAR_WEAPON')), turns);
+    + n.weapons * fromLanding(pseudoYield(PSEUDOYIELD_NUCLEAR_WEAPON, FX, w('PSEUDOYIELD_NUCLEAR_WEAPON')), turns)
+    + (mods.length ? modifiersValue({ view: view ?? majorView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0);
 }
 
 /** what a technology unlocks that its value counts: the buildings and
@@ -177,7 +187,7 @@ export function techUnlocks(id: string): { buildings: number; wonders: number; d
 }
 
 const UNLOCKS = new Map(Object.values(TECHS).map((t) => {
-  const type = `TECH_${t.id}`;
+  const type = gameTypeOf('tech', t.id, 'TECH_');
   const b = AI_BUILDINGS.filter((x) => x.tech === type && !x.trait);
   const p = AI_PROJECTS.filter((x) => x.tech === type && !x.spaceRace);
   return [t.id, {
@@ -238,11 +248,12 @@ export function researchAnalysis(state: GameState, seat: number, science: number
   const r = researchOf(state, seat);
   const rate = fxOf(science);
   const pw = pseudoYieldWeights(state, seat, weights);
+  let view: AiValueView | undefined;
   const entries: ResearchEntry[] = TECH_TABLE_ORDER.filter((id) => TECHS[id]).map((id) => {
     const leaf = !REQUIRED.has(id);
     if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
-    const base = turns < 0 ? 0 : techValue(state, id, turns, pw) + (cityTerm && turns <= AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
+    const base = turns < 0 ? 0 : techValue(state, seat, id, turns, pw, view ??= majorView(state)) + (cityTerm && turns <= AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
     return { tech: id, next, turns, owned: false, leaf, base, score: base };
   });
   addContracts(entries, contracts);

@@ -86,6 +86,10 @@ export interface ValueTerms {
   other?: number;
   /** the envoys the evaluation adds to those given (context +0x08) */
   tokens?: number;
+  /** the unit the evaluation stands on (context +0x90): the subject of a
+   *  COLLECTION_PLAYER_UNITS walk, kept through a granted ability's own
+   *  modifiers; absent, none */
+  unit?: { plot: number; type: string; moves: number };
   /** a resolution's target hint (0x67dd40's handlers), in the install's
    *  types: the luxury (+0x4c), the yield (+0x64), the government (+0x28),
    *  the great person class (+0x6c), the project (+0x68) */
@@ -115,7 +119,7 @@ type Subject =
   | { kind: 'city'; seat: number; id: number; capital: boolean }
   | { kind: 'district'; cityId: number; type: string }
   | { kind: 'plot'; plot: AiPlotView }
-  | { kind: 'unit'; plot: number; type: string };
+  | { kind: 'unit'; plot: number; type: string; moves: number };
 
 const ownerCity = (t: ValueTerms): Subject | null =>
   t.owner ? { kind: 'city', seat: t.owner.seat ?? t.seat, id: t.owner.cityId, capital: t.owner.capital } : null;
@@ -149,7 +153,7 @@ function subjects(t: ValueTerms, collection: string): Subject[] | null {
     // context's other player (+0x40)
     case 'COLLECTION_MAJOR_PLAYERS': return t.view.majors().map((m) => ({ kind: 'player', other: m }));
     // the player's units in its list's order, each the context's unit (+0x90)
-    case 'COLLECTION_PLAYER_UNITS': return t.view.playerUnits(t.seat).map((u) => ({ kind: 'unit', plot: u.plot, type: u.type }));
+    case 'COLLECTION_PLAYER_UNITS': return t.view.playerUnits(t.seat).map((u) => ({ kind: 'unit', plot: u.plot, type: u.type, moves: u.moves }));
     default: return null;
   }
 }
@@ -804,6 +808,29 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const v = Math.trunc((fmul(production, strength) * (Number(args.Amount ?? 0) | 0)) / 100);
     return whole(valueBetween(pseudoYieldValue(t.view, s.seat, v, 'PSEUDOYIELD_UNIT_COMBAT'), t.start, t.horizon, t.rate));
   },
+  // 0x6ac440 (Amount +8): with the context's unit (+0x90) of Movement
+  // (0x56e130): fx(Amount) x its type's military AI unit production value
+  // (0x79ca90) over its Movement (0x16e940), as Production at the player's
+  // weight, from the start to the horizon (0x7a2140)
+  EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT: (t, args) => {
+    const u = t.unit;
+    if (!u || u.moves <= 0) return 0;
+    const v = fmul((Number(args.Amount ?? 0) | 0) * FX, t.view.unitProductionValue(t.seat, u.type));
+    return whole(valueBetween(yieldValue(t.view, t.seat, fdiv(v, u.moves * FX), 'YIELD_PRODUCTION'), t.start, t.horizon, t.rate));
+  },
+  // 0x6b85d0 (Amount +8): with the context's unit, a naval one (+0x650 0)
+  // of Movement: Amount x (its current cost, 0x4f2b20, x 0.5f) over its
+  // Movement in float, as Production at the player's weight, discounted to
+  // the start (0x7a1240)
+  EFFECT_ADJUST_UNIT_SEA_MOVEMENT: (t, args) => {
+    const u = t.unit;
+    if (!u || u.moves <= 0) return 0;
+    const row = AI_UNITS[AI_UNIT_INDEX.get(u.type) ?? -1];
+    if (!row || row.domain !== 'DOMAIN_SEA') return 0;
+    const half = Math.fround(Math.fround(t.view.unitCost(t.seat, u.type)) * Math.fround(0.5));
+    const x = Math.fround(Math.fround(Math.fround(Number(args.Amount ?? 0) | 0) * half) / Math.fround(u.moves));
+    return whole(discounted(yieldValue(t.view, t.seat, fxConst(x), 'YIELD_PRODUCTION'), t.rate, t.start));
+  },
   // 0x6bef40 (Amount +8 as its parser 0x6bedb0 stores it,
   // fx(expf(Amount x COMBAT_POWER_SCALING))): a unit subject on a plot that
   // fights (0x209dd0: Combat, RangedCombat or Bombard above 0), where the
@@ -950,11 +977,13 @@ const NONE_ANALYZERS: Readonly<Record<string, (t: ValueTerms, args: Readonly<Rec
 };
 
 /** the context a subject leaves for an analysis nested on it (0x142650's
- *  copy): a city subject is the city the nested analysis is of (+0x70); any
+ *  copy): a city subject is the city the nested analysis is of (+0x70), a
+ *  unit subject its unit (+0x90); any
  *  other leaves the city as it stood */
 const onSubject = (t: ValueTerms, s: Subject): ValueTerms =>
   s.kind === 'city' ? { ...t, owner: { cityId: s.id, capital: s.capital, seat: s.seat } }
-    : s.kind === 'player' && s.other !== undefined ? { ...t, other: s.other } : t;
+    : s.kind === 'player' && s.other !== undefined ? { ...t, other: s.other }
+    : s.kind === 'unit' ? { ...t, unit: s } : t;
 
 /** One modifier's analysis (0x6cede0): null where it is refused — no
  *  analyzer or collection, or a fourth nested analysis — else the whole
@@ -995,7 +1024,8 @@ function analysis(t: ValueTerms, m: AiModifier, depth: number): number | null {
     if (ok === null) return 0;
     if (!ok) continue;
     passed = true;
-    sum = (SETS[m.effect] ?? ((acc: number, v: number) => acc + v))(sum, an(s.kind === 'player' && s.other !== undefined ? { ...t, other: s.other } : t, m.args, s));
+    const ctx = s.kind === 'player' && s.other !== undefined ? { ...t, other: s.other } : s.kind === 'unit' ? { ...t, unit: s } : t;
+    sum = (SETS[m.effect] ?? ((acc: number, v: number) => acc + v))(sum, an(ctx, m.args, s));
   }
   // no subject passed: the analyzer's slot 2
   if (!passed) sum += NONE_ANALYZERS[m.effect]?.(t, m.args) ?? 0;

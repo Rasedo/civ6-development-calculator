@@ -26,35 +26,35 @@ describe('the research value (0x7b3e50)', () => {
     // the row's own 5, a building's share, a district's and a wonder's, at
     // the 4% discount: Pottery at 12 turns 78.3 as every city-state of
     // runs/h1_duelw1124 logs it at t1, Mining 60.3
-    expect(techValue(st, 'POTTERY', 12, new Map())).toBe(20056);
-    expect(techValue(st, 'MINING', 12, new Map())).toBe(15424);
-    expect(techValue(st, 'ASTROLOGY', 25, new Map())).toBe(11713);
+    expect(techValue(st, 0, 'POTTERY', 12, new Map())).toBe(20056);
+    expect(techValue(st, 0, 'MINING', 12, new Map())).toBe(15424);
+    expect(techValue(st, 0, 'ASTROLOGY', 25, new Map())).toBe(11713);
     // an Ancient player's district weight, 0.5 x ChronologyIndex 1: runs/h1_duelw1124 t2 minor 3's Astrology 124.0 at 10 turns
-    expect(techValue(st, 'ASTROLOGY', 25, new Map([['PSEUDOYIELD_DISTRICT', 128]]))).toBe(13091);
-    expect(techValue(st, 'WRITING', 37, new Map())).toBe(4159);
+    expect(techValue(st, 0, 'ASTROLOGY', 25, new Map([['PSEUDOYIELD_DISTRICT', 128]]))).toBe(13091);
+    expect(techValue(st, 0, 'WRITING', 37, new Map())).toBe(4159);
     // EmbarkAll adds 5
-    expect(techValue(st, 'SHIPBUILDING', 4, new Map())).toBe(48958);
+    expect(techValue(st, 0, 'SHIPBUILDING', 4, new Map())).toBe(48958);
     // at the horizon the value is one discounted turn; past it -9999
-    expect(techValue(st, 'MINING', 50, new Map())).toBe(35);
-    expect(techValue(st, 'MINING', 51, new Map())).toBe(-9999 * 256);
+    expect(techValue(st, 0, 'MINING', 50, new Map())).toBe(35);
+    expect(techValue(st, 0, 'MINING', 51, new Map())).toBe(-9999 * 256);
   });
 
   it("adds 1.0 for an EmbarkUnitType, a project's 1.0, the install's buildings", () => {
     const st = { gameEra: 0 } as unknown as GameState;
     // runs/h1_duelv1127 t22 minor 3: Sailing at 1 turn 120.7, its own 6.0 a
     // turn (Builders embark)
-    expect(techValue(st, 'SAILING', 1, new Map())).toBe(30893);
+    expect(techValue(st, 0, 'SAILING', 1, new Map())).toBe(30893);
     // Industrialization: Factory, Coal Power Plant, Ruhr Valley, Convert Reactor
     // to Coal (each city-state at 1 turn 20.1 above the buildings' shares)
-    expect(techValue(st, 'INDUSTRIALIZATION', 1, new Map())).toBe(41184);
+    expect(techValue(st, 0, 'INDUSTRIALIZATION', 1, new Map())).toBe(41184);
     // Advanced Flight: the Airport (Buildings PrereqTech)
-    expect(techValue(st, 'ADVANCED_FLIGHT', 1, new Map())).toBe(28316);
+    expect(techValue(st, 0, 'ADVANCED_FLIGHT', 1, new Map())).toBe(28316);
   });
 
   it("counts an older era's row once per era between, plus one", () => {
     const st = { gameEra: 2 } as unknown as GameState;
-    expect(techValue(st, 'POTTERY', 12, new Map())).toBe(50905);
-    expect(techValue(st, 'MINING', 1, new Map())).toBe(77233);
+    expect(techValue(st, 0, 'POTTERY', 12, new Map())).toBe(50905);
+    expect(techValue(st, 0, 'MINING', 1, new Map())).toBe(77233);
   });
 });
 

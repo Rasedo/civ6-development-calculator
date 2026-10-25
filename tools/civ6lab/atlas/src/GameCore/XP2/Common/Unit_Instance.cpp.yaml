@@ -189,11 +189,16 @@
   final: 0x3a3a00
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:maxMoves]
+  impl:
+    - cpu/core/tactical.ts:maxMoves
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:playerUnits
+    - gpu/core/sim_policy.py:_pol_units
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...bard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The   type ids (0x5bcb80, each global the..."
   context:
@@ -248,6 +253,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...at half its health or worse whose planning holds no fight it wins (+0x60), a naval one 0x56ee80 holds however hurt; a whole one where the danger exceeds its strength + 20 — and move..."

@@ -115,7 +115,7 @@ export function civicUnlocks(id: string): { buildings: number; districts: number
 }
 
 const UNLOCKS = new Map(Object.values(CIVICS).map((c) => {
-  const b = AI_BUILDINGS.filter((x) => x.civic === `CIVIC_${c.id}` && !x.trait);
+  const b = AI_BUILDINGS.filter((x) => x.civic === gameTypeOf('civic', c.id, 'CIVIC_') && !x.trait);
   return [c.id, {
     buildings: b.filter((x) => !x.wonder).length,
     districts: c.effects.filter((e) => e.kind === 'unlockDistrict').length,
@@ -167,7 +167,7 @@ export function civicValue(state: GameState, seat: number, id: string, turns: nu
   const share = fxConst(AI_UNLOCK_SHARE);
   const n = civicUnlocks(id);
   const formations = [1, 2].filter((tier) => formationCivic(state, seat, tier) === id).length;
-  const mods = AI_CIVIC_MODIFIERS[`CIVIC_${id}`] ?? [];
+  const mods = AI_CIVIC_MODIFIERS[gameTypeOf('civic', id, 'CIVIC_')] ?? [];
   return v + n.buildings * fromLanding(share, turns)
     + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns)
     + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)

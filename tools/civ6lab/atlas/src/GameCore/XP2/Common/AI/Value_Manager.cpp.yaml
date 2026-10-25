@@ -307,6 +307,7 @@
     - gpu/core/sim_cityvalue.py:SimCityValue
     - gpu/core/sim_cityvalue.py:_cv_modifiers
     - cpu/core/aiCivics.ts:civicValue
+    - cpu/core/aiResearch.ts:techValue
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -750,6 +751,7 @@
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...ntouched: 0 for every row the walk never reached). Else turns = max(0, sum) and value = 0x7b3e50(row, turns, H, discount); score = value."
     - "- THE VALUE, 0x7b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04..."
