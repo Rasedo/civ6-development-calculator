@@ -15,6 +15,26 @@
   context:
     - "...the first offer (the units in no job, not done, alive) player signal +0x1c8 is raised (0x6075b0) with the recruit's priority (the tree's +0x5a8, else its operation's 0x723b90: the roo..."
   review: imported
+- addr: 0x608580
+  final: 0x401050
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs the +0x388 list from 4 down to 0, each pass again until every job answers tru...
+  review: imported
+- addr: 0x608870
+  final: 0x4012f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...its watched setter 0x731d10 on +0x220) and acts only in its own pass: the turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs..."
+  review: imported
 - addr: 0x609060
   final: 0x4019f0
   kind: function

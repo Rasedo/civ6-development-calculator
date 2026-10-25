@@ -4839,6 +4839,48 @@ operations' contracts, the improvement values below, the purchases).
   queue is empty, then TryPurchaseUnits 0x68be60 over the city's units;
   the tree manager's tick 0x7ffdd0; tactical). A city founded during the
   turn exists for C only: the Default Specialization, no events.
+- THE TURN'S PASSES (READ): 0x6096c0 pushes three job lists (std::function,
+  0x40 bytes each) — +0x370 (0x60e8c0: the cities 0x5c2650, ..., the
+  Economic AI 0x687bf0, the military 0x722690), +0x388 (0x60e960: 0x785ec0,
+  the second city hook 0x5c2610, the tree manager's tick 0x7ffdd0,
+  0x74f5a0, 0x70a250, the tactical pass 0x771530) and +0x3a0 (0x60e820:
+  0x7ffed0, ...). Each job takes a pass number (Control Manager +0x278,
+  its watched setter 0x731d10 on +0x220) and acts only in its own pass:
+  the turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list
+  at 4, 3, 2, 1, 0; 0x608580 then runs the +0x388 list from 4 down to 0,
+  each pass again until every job answers true, then the +0x3a0 list, then
+  the next pass. The passes the jobs keep: the Economic AI 3 (+0x100, its
+  constructor 0x685080), the military 2 (+0xf8, 0x71a960),
+  a city's CityBuildAI 2 (+0x470, the AI::CityBuild constructor 0x5c4f40;
+  0x5ce680 and 0x5ce5b0 open with that test; the city trees are seeded at
+  that priority, 0x7cb230), the tree manager's tick each tree of the
+  pass's priority. So the city's second hook — its Default Specialization
+  and its threatened purchases — runs in pass 2, after the trees of
+  priority 4 (City Defense, Settle New City, Barbarian City Assault) and 3
+  (Attack Barb Camp and the assaults) have ticked, and before the trees of
+  priority 2 (Naval Superiority, the city trees). The port runs the city's
+  second hook in the city's update, before any tree ticks.
+- THE THREATENED PURCHASE AFTER THE PASS-4 AND PASS-3 TREES (the records,
+  runs/h1_dueld*): with the city threatened (aimem CityBuildAI +0x1b8), a
+  land military unit of the city-state reaching the centre in the turn
+  bars the purchase, and one leaving it lets the purchase through.
+  runs/h1_dueld1127 city-state 4 t16 (City Defense's Warrior 7:12 -> 8:10,
+  AI_Planning.csv at 7:12 that turn, 80 Gold, the Warrior at 80: none bought),
+  city-state 2 t20 and t28, city-state 4 t70 (a Heavy Chariot): none bought,
+  the port buying a Warrior, a Warrior, a Spearman, a Horseman; runs/
+  h1_dueldA1117 city-state 3 t140 and t148 (its Trebuchet off the centre:
+  bought), city-state 4 t85 (its Catapult off: a Catapult bought). The
+  port's spot test reads the centre at the city's update (`purchaseSpotBlocked`),
+  before the operations move.
+- THE SAVINGS' TEST AT ITS EDGE: runs/h1_dueld1127 city-state 4's Builder
+  contract 112 (SUBMITTED t44, the game's PURCHASE t46 at 115 Gold): with
+  the port's purchases equal to the game's through t46 (no t16 Warrior),
+  the port's SLUSH_FUND + UNITS at t46 come to 114.96 against the price's
+  115 (0x68c0ad: the sum strictly above the price) — the per-turn shares
+  (0x687dcb: weight / total as a float, its floor and its fraction x 256
+  truncated, 85 / 113 / 28 / 28; (change x share) >> 8, 0x687df9) as the
+  port computes them, the record's treasury each turn; the game's sum
+  passes. Unread: where the game's sum gains the 0.04.
 - The city's update 0x5ce680: the in-hand contract's check 0x5d7e00, the
   slots freed of trees no longer running (0x800590), the analysis the
   turn's job wrote (0x5ce910 -> 0x5ce970 per plot; no direct caller) read by
@@ -8968,7 +9010,28 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   (AI_Knowledge.csv t92) the replay's records, the team's MaxPercentage test
   ((members + 1) x the percentage, 0x740562) as ported; no city-state's
   "Contract for" on the five duels names a Caravel, a Pikeman, a
-  Crossbowman, a Courser, an Infantry or a Field Cannon.
+  Crossbowman, a Courser, an Infantry or a Field Cannon. The sums are the
+  game's: runs/h1_duelt1121 city-state 3 t92 (AI_UnitEfficiency.csv over
+  the aimem knowledge base, row the entry) Caravel 199.5, Trebuchet 103.2,
+  Crossbowman 102.6, Pikeman 89.3, Warrior Monk 72.0 — the port's to the
+  0.01. The entry's +0x0e (0x7989e0: PrereqTech 0x4cb590, PrereqCivic
+  0x39d490, the stock 0x4aa790) and +0x08 (0x538460: ObsoleteTech +0x240,
+  ObsoleteCivic +0x238, MandatoryObsoleteTech +0x250, MandatoryObsoleteCivic
+  +0x248) hold for the Caravel and the Pikeman there (Cartography, Military
+  Tactics held; Combined Arms, Composites not); the comparator 0x79d3e0
+  (+0x0e, then +0x38[player] where the player is not -1, +0x2c, +0x30,
+  +0x18) and the walk (0x79bfe6: +0x0e, +0x08, a needed type by the GlobalAI
+  bitfield, no full type, the priority rule, the maintenance test, both sums
+  above the chosen's from -1.0, the last taken) as ported. Yet the game asks
+  the Warrior Monk on the empty team (MELEE needed: the Caravel and the
+  Pikeman above it) and the Trebuchet with the Caravel joined (the four had
+  types: the Caravel above it). The game does name a Caravel (runs/
+  h1_duelw1125 city-state 4 t187-, 41 lines) and a Pikeman (runs/
+  h1_duelw1111 city-state 2 t241-243); a Crossbowman or a Frigate never, on
+  any recording, a major's or a minor's. The aimem tree_nodes blocks of the
+  Naval Superiority Tree (runs/h1_duelt1121 t93) hold the nodes' tag
+  references (a pointer, a type, a slot), not the choice. Unread: what bars
+  the Caravel and the Pikeman.
 - RECRUIT UNITS (0x81c820; its data: +0x00 Already in progress, +0x10
   Contract ID, +0x20 Recruit Range, +0x30 Allow creation, +0x40 Recruit
   Value, +0x50 Time Limit, +0x60 Allow Stealing): "Contract for" names the

@@ -86,6 +86,7 @@
   status: PARTLY
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "- THE HOLDERS: a CityBuild (constructor 0x5c4f40 (FinalRelease 0x3db2f0)): +0xa8 m_cityId, +0xc0 m_playerOwner, +0xd8 m_cityThreat, +0x1..."
   review: imported
@@ -129,6 +130,15 @@
   context:
     - ...L = trunc(+0x6420 x 0.25 / 0.5) or +0x6420 by the mode (+0x6420 is 0 in the constructor 0x6419c0, its writer unread), 0 where n > L, else 10 / 20 / 40 x (L - n + 1) / L; negated withou...
   review: imported
+- addr: 0x685080
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...n the next pass. The passes the jobs keep: the Economic AI 3 (+0x100, its constructor 0x685080), the military 2 (+0xf8, 0x71a960), a city's CityBuildAI 2 (+0x470, the AI::CityBuild c..."
+  review: imported
 - addr: 0x6da870
   kind: function
   status: PARTLY
@@ -161,6 +171,7 @@
       value: "the desire's unit values against the   recorded picks (the free runs diverge before every Free City: 1123's   Chen still China's at t203)."
   readings:
     - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...LAB: +0x4b8's writer (the only displacement writes are the military AI's constructor 0x71a960 at 0x71b68a and 0x264296); the Free Cities Raid's target as an operation near the city..."
   review: imported
