@@ -1071,6 +1071,7 @@
     - DLL readings (GameCore_XP2_Release.dll)
     - "C-95: a river crossing's Movement — READ"
     - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ll_gp.py` (the GlobalParameters struct: each parameter's field offset, from the loader at 0x2d58f0), `dll_vtab.py` (vtables pointing into a code range) and `dll_rng.py` (every draw on the..."

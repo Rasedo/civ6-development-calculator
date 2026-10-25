@@ -186,6 +186,15 @@
     - "...of it, every later one 1. The regions are the map's Map_Region list (+0x620, filled at 0x153290 from the map's region container, vfunc +0x108): a region is taken when its plot count..."
     - ...more than 10 plots or on an area (m_area, looked up at the game's time) of more than 10 (0x153290).
   review: imported
+- addr: 0x153420
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/barbarians.ts:standing]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...10, READ): an AutoVariable (+0xb8, its value at +0x110) the manager's init writes once (0x153659: the game's +0xb50 list of the living full civs, its count, times GlobalParameters BA..."
+  review: imported
 - addr: 0x153720
   final: 0xe4970
   kind: function
@@ -308,6 +317,7 @@
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - ...uts EXPLORE, the rest COMBAT; a camp destroyed turns its tribe's DEFENDER units COMBAT (0x154830).
     - "...(0x152df0: tribe +0x18 clear, +0x1c the taker's player, written by the camp's removal 0x154830); each of their units, in pool order, takes of the planning's targets of that player th..."

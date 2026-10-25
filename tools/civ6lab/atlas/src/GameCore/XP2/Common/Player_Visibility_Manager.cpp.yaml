@@ -59,6 +59,7 @@
   final: 0x35bf10
   kind: function
   status: PARTLY
+  impl: [cpu/core/barbarians.ts:campStep, gpu/core/sim_barb.py:_barb_camp_step]
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:

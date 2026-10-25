@@ -39,7 +39,8 @@ class SimBarb:
     # ------------------------------------------------------------- the sight
 
     def _barb_seen(self, who: str | int) -> torch.Tensor:
-        """[B, T] bool — `plotsSeenNow`: what the majors (`who` "majors"),
+        """[B, T] bool — `plotsSeenNow`: what the majors (`who` "majors"), the
+        majors and the Free Cities ("fullciv"),
         every living player, the barbarians included ("all", `allSeers`), the
         barbarians alone ("barbarians") or one seat (`who` its absolute seat)
         see now — each unit's sight across the plots its line reaches, each
@@ -53,6 +54,8 @@ class SimBarb:
                 return seat == who
             if who == "majors":
                 return (seat >= 0) & (seat < self.n_majors)
+            if who == "fullciv":
+                return ((seat >= 0) & (seat < self.n_majors)) | (seat == FREE_SEAT)
             if who == "barbarians":
                 return seat == BARB_SEAT
             return seat >= 0
@@ -72,7 +75,7 @@ class SimBarb:
         nb = self.neigh  # [T, 6]
         ring = owned[:, nb.clamp(min=0)] & (nb >= 0)  # [B, T, 6]
         seen |= owned | ring.any(dim=2)
-        if who in (barbarians, all) or (isinstance(who, int) and who == BARB_SEAT):
+        if who in ("barbarians", "all") or (isinstance(who, int) and who == BARB_SEAT):
             # a camp's improvement: its owner sees its plot and the six beside it
             cp = self.camp_tile
             camp = torch.zeros(B, T, dtype=torch.bool, device=self.device)
@@ -263,13 +266,15 @@ class SimBarb:
         scored regions, the weighed pick, the camps raised."""
         B, T = self.B, self.T
         bb = self._bb
-        live = self._barb_majors_alive()
-        nmaj = live.sum(dim=1)
-        mx = bb["campsPerMajor"] * nmaj
+        # the most camps (+0x110), set as the manager opens: the game's full
+        # civs times the parameter
+        mx = torch.full_like(self.n_camps, int(bb["campsPerMajor"]) * self.n_majors)
         go = self.n_camps < mx
         if not bool(go.count_nonzero()):
             return
-        seen_maj = self._barb_seen("majors")
+        # the land no full civilization sees (0x50b2d0 on FULL_CIV: the
+        # majors and the Free Cities)
+        seen_maj = self._barb_seen("fullciv")
         land = ~self.water
         nland = land.sum(dim=1)
         dark = (land & ~seen_maj).sum(dim=1)
@@ -536,11 +541,14 @@ class SimBarb:
 
     def _barb_others_see(self, rows: torch.Tensor, slot: torch.Tensor, plots: torch.Tensor) -> torch.Tensor:
         """[N, T] of `plots` [N, T], those a barbarian unit other than the one
-        at local slot `slot` [N] sees where it stands (in games `rows`)"""
+        at local slot `slot` [N] sees where it stands (in games `rows`) — a
+        civilian of theirs (a capture) none"""
         out = torch.zeros_like(plots)
         if not bool(plots.any()):
             return out
-        live = self.barb_unit_alive[rows] & (self.barb_unit_seat[rows] == BARB_SEAT) & (self.barb_unit_tile[rows] >= 0)
+        civ = self._type_civilian.take(self.barb_unit_type[rows].clamp(min=0, max=self.NU - 1))
+        live = (self.barb_unit_alive[rows] & (self.barb_unit_seat[rows] == BARB_SEAT) & (self.barb_unit_tile[rows] >= 0)
+                & ~civ)
         live[torch.arange(rows.numel(), device=self.device), slot] = False
         for u in live.any(dim=0).nonzero(as_tuple=True)[0].tolist():
             m = live[:, u]

@@ -1701,10 +1701,24 @@ clans' 0x8e1bf0 (no clans in these games).
   recorded raise) / `tribe_unitn` / `tribe_scoutn`.
 - Raids: "H-1: the raids" below.
 
-LAB: the max camps at +0x110 is taken as 3 per living major, a fit to the
-recorded camp counts; its writer is unread. The sight the score and
-the target read is the engines' line of sight plus each centre's two rings
-and each owned plot's ring — a fit.
+- THE MOST CAMPS (+0x110, READ): an AutoVariable (+0xb8, its value at
+  +0x110) the manager's init writes once (0x153659: the game's +0xb50 list
+  of the living full civs, its count, times GlobalParameters
+  BARBARIAN_CAMP_MAX_PER_MAJOR_CIV +0x7c, read at 0x2d5d0e; 0 under
+  NO_BARBARIAN_TRIBES), so a major's elimination lowers nothing. The
+  standing camps +0x170 (m_numCamps) rise at a tribe's creation and fall at
+  its camp's removal (0x154874). The unseen land: 0x50b2d0 on FULL_CIV
+  (0x253718b0) walks every living player (+0x50) but a tribe (0xd959ec24)
+  and a city-state (0xc2577075, 0x469de0's), so the Free Cities' sight
+  counts with the majors'. The engines: the game's majors x the parameter
+  (`campStep`'s `state.seats.length`; `n_majors`), the majors' and the Free
+  Cities' sight (`plotsSeenNow` with FREE_SEAT; `_barb_seen("fullciv")`).
+
+LAB: the sight the score and the target read is the engines' line of sight
+plus each centre's two rings and each owned plot's ring — a fit.
+runs/h1_dueld1128 t162-t166: the engines' unseen land 187-196 of 363 against
+the 181 or fewer the game's no new camp needs (6 x unseen / 363 less the 2
+standing camps), each turn a camp the record never holds.
 
 ### The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported
 
@@ -1871,7 +1885,13 @@ Horseman 851980 (whole) displaces 655369 (20 damage) beside 720906.
   (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the
   old, so a plot both sights hold raises nothing. The engines: the scout's
   plots in sight now, not at its last look, that no other unit of theirs
-  sees (`barbScoutLook` / `_barb_scout_look`). The throttle write follows
+  sees (`barbScoutLook` / `_barb_scout_look`), a civilian of theirs (a
+  capture) counted for none — LAB, a fit: runs/h1_dueld1128 t76, the
+  Builder Capture's Settler 2228251 (sight 3) on 13:14, three plots from
+  the Farm on 15:12, and the new Skirmisher 4259868's step to 15:14 starts
+  the scout's tree all the same ("Barbarian Found City" in the AI memory
+  reader's end look, the raid "Started" at t78); which of the captive's
+  sight sources the count leaves out is unread. The throttle write follows
   0x1485c0 whether or not a tree starts, on a plot of an improvement or a
   district alone ("C-95: the scout's tree").
 - Protect Unit ("Barbarian Found City" node 3, a Concurrent with Move

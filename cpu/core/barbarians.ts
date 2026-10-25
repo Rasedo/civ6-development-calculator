@@ -164,9 +164,10 @@ function campScore(state: GameState, t: Tile, seen: Uint8Array, majorCentres: nu
 }
 
 /**
- * THE CAMP STEP (0x14fcc0). The target is the majors' camps
+ * THE CAMP STEP (0x14fcc0). The target is the game's majors' camps
  * (BARBARIAN_CAMP_MAX_PER_MAJOR_CIV each) times the share of the land no
- * major sees now, less the camps standing; the first step that adds lays
+ * full civilization (a major, the Free Cities) sees now, less the camps
+ * standing; the first step that adds lays
  * BARBARIAN_CAMP_FIRST_TURN_PERCENT_OF_TARGET_TO_ADD of it, every later one
  * a single camp. The candidates are scored per region — the map's regions
  * (`Tile.region`, 0x153290: a region of more than 10 plots or on an area of
@@ -183,10 +184,14 @@ function campScore(state: GameState, t: Tile, seen: Uint8Array, majorCentres: nu
 export function campStep(state: GameState): void {
   const majors = majorsAlive(state);
   const standing = state.barbSeat.camps.length;
-  const max = BARB_CAMPS_PER_MAJOR * majors.length;
+  // the most camps (+0x110), set once as the manager opens (0x153659): the
+  // game's full civs (its +0xb50 list then) times the parameter
+  const max = BARB_CAMPS_PER_MAJOR * state.seats.length;
   if (standing >= max) return;
   const { map } = state;
-  const seenByMajors = plotsSeenNow(state, new Set(majors));
+  // the land no full civilization sees (0x50b2d0 on FULL_CIV: every living
+  // player but a tribe and a city-state, the Free Cities among them)
+  const seenByMajors = plotsSeenNow(state, new Set([...majors, FREE_SEAT]));
   let land = 0;
   let dark = 0;
   for (const t of map.tiles) {
@@ -463,13 +468,17 @@ function cityCentreOf(state: GameState, t: Tile): number {
  * BARBARIAN_MAX_THROTTLE_PER_RAID less BARBARIAN_LOWER_THROTTLE_PER_DIFFICULTY
  * a handicap level turns.
  */
-/** of the plots, those another barbarian unit sees where it stands */
+/** of the plots, those another barbarian unit sees where it stands — a
+ *  civilian of theirs (a capture) none (runs/h1_dueld1128 t76: the captured
+ *  Settler on 13:14, three plots from the Farm on 15:12, leaves the
+ *  Skirmisher's report standing: the scout's tree that day, the raid at t78
+ *  as AI_Operation.csv logs it) */
 function othersSee(state: GameState, unit: Unit, plots: readonly number[]): Set<number> {
   const out = new Set<number>();
   if (!plots.length) return out;
   const { map } = state;
   for (const o of state.units) {
-    if (o === unit || !isBarbSeat(o.seat) || o.tileIndex < 0) continue;
+    if (o === unit || !isBarbSeat(o.seat) || o.tileIndex < 0 || unitDomain(o.type) === 'civilian') continue;
     const sees = losDisk(map, map.tiles[o.tileIndex], unitSight(o, state), unitSeesThrough(o));
     for (const p of plots) if (sees.has(p)) out.add(p);
   }
