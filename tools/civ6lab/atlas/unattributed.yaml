@@ -1693,17 +1693,31 @@
 - addr: 0x538460
   final: 0x37e6c0
   kind: function
-  status: PARTLY
+  name: unitObsolete
+  status: READ
   cases:
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
-  impl: [cpu/core/aiUnitProduction.ts:UnitProductionFacts, gpu/core/sim_cityvalue.py:_obsolete]
+    - recording: h1_duelu1117
+      turn: 195
+      value: Valletta's Warrior contract 680 ACCEPTED and unbought t195-t220 beside Gunpowder; the record's purchase list holds no obsolete unit
+  impl:
+    - cpu/core/aiUnitProduction.ts:UnitProductionFacts
+    - gpu/core/sim_cityvalue.py:_obsolete
+    - cpu/core/minorBuild.ts:unitObsoleteIn
+    - gpu/core/sim_minors.py:_unit_obsolete_in
+    - cpu/core/minorBuild.ts:minorCanTrain
+    - gpu/core/sim_cityvalue.py:can_train
+    - gpu/core/sim_minors.py:_minor_can_train
   readings:
-    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+  notes:
+    - true where the player holds the unit's MandatoryObsoleteTech +0x240, MandatoryObsoleteCivic +0x238, ObsoleteTech +0x250 or ObsoleteCivic +0x248
   context:
     - "...es, in the Units' order, for each unit the player's version of itself, an obsolete one (0x538460: MandatoryObsoleteCivic +0x238 / Tech +0x240, ObsoleteCivic +0x248 / Tech +0x250 held)..."
-  review: imported
+  review: reviewed
 - addr: 0x558ba0
   final: 0x393630
   kind: function
@@ -2118,6 +2132,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
   context:
     - "...0 runs each city's listener 0x5d6050 in city order: a city that may take it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where..."
   review: reviewed

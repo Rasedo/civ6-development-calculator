@@ -125,7 +125,9 @@ class SimMinorAi:
         """`purchaseContracts` where `act` (0x687bf0 after the savings): the
         purchase list keeps the contracts alive, ACCEPTED and gold-bought;
         each unit's, in id order, tries TryPurchaseUnits in the minor's city
-        (its price, the purse covering it, the centre taking the unit) and is COMPLETED where it buys (`minorBuyUnit`)"""
+        (its price; the purchase request: the city may train the unit, the
+        purse covers it, the centre takes the unit) and is COMPLETED where it
+        buys (`minorBuyUnit`)"""
         ai = self.cityai
         cs = (slice(None), s)
         live = ai.c_id[cs] >= 0
@@ -148,12 +150,13 @@ class SimMinorAi:
             ui = torch.where(on, eu.take(_cget(ai.c_unit, s, j).clamp(min=0)), torch.full_like(j, -1))
             on = on & (ui >= 0)
             price = self._minor_gold_price(s, ui.clamp(min=0))
-            # the purchase request (0x977570): the centre itself takes the unit
-            # (`purchaseSpotBlocked`: a hull by its own water rule)
+            # the purchase request (0x977570): the city may train the unit (an
+            # obsolete unit's contract stays ACCEPTED, unbought) and the centre
+            # itself takes it (`purchaseSpotBlocked`: a hull by its own water rule)
             pk = ui.clamp(min=0, max=self.NU - 1)
             found = self.unit_naval.take(pk) | ~self._purchase_blocked(
                 ctr, seat, is_civilian=self._type_civilian.take(pk), is_support=self._type_support.take(pk))
-            can = on & found & self._afford(self.citystate_treasury[:, s], price)
+            can = on & self._minor_can_train(s, ui) & found & self._afford(self.citystate_treasury[:, s], price)
             sav, bal, bought = self._cv_try_purchase(self.citystate_savings[:, s], self.citystate_balance[:, s],
                                                      price.long(), self.citystate_threat[:, s], can)
             bought = bought & on

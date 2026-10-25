@@ -98,7 +98,7 @@ import { traceBarbOps } from '../core/barbarianOps';
 import { opsOf } from '../core/operations/manager';
 import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
-import { newEconomicMemory, savingsTurn } from '../core/aiEconomic';
+import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
 import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
 import { AI_UNITS } from '../data/aiBuildTables';
@@ -179,6 +179,11 @@ interface Ctx {
   reasons: Map<string, Map<string, number>>;
   /** the record's units (`owner:id`) the engine's own turn destroyed */
   engineKilled: Set<string>;
+  /** the units standing as the pair's engine turn opened, and the types of
+   *  the units that turn made which a record route of the pair then spent
+   *  (by seat): a Trader a city-state trained and sent out in its turn */
+  standing?: ReadonlySet<Unit>;
+  routeSpent: Map<number, string[]>;
   /** this pair's moved units' steps (`move`'s path), by `owner:id` */
   paths: Map<string, number[]>;
   /** the units (`owner:id`) whose logged steps of this pair `syncUnits`
@@ -1967,8 +1972,15 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
   if (minor) {
     if (unitOf(ctx, d.unit)) return void count(ctx, 'minorAi:buy', 'applied', d.player);
     const price = id ? minorUnitPrice(state, minor, id, d.currency) : 0;
-    if (d.currency === 'gold') minor.treasury -= Math.min(price, Math.max(0, minor.treasury));
-    else minor.faith -= Math.min(price, Math.max(0, minor.faith));
+    if (d.currency === 'gold') {
+      minor.treasury -= Math.min(price, Math.max(0, minor.treasury));
+      // ...through its economic AI's purchase (TryPurchaseUnits' spend), so
+      // the turn after shares only the treasury's own change over the
+      // savings, as the game's do (runs/h1_duelu1117 Caguana: its Builder of
+      // t62 the game's alone, its savings unspent, every second turn a
+      // purchase t70-t101 the game never made)
+      if (minor.economy) purchaseSpend(minor.economy, price * FX, (minor.threat ?? -1) > -1);
+    } else minor.faith -= Math.min(price, Math.max(0, minor.faith));
     spawnRecorded(ctx, rec, d.unit);
     return void count(ctx, 'minorAi:buy', 'fallback', d.player, `${id}: the engine bought none (threat ${minor.threat ?? -1}, gold ${minor.treasury})`);
   }
@@ -2418,9 +2430,15 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
             // a city-state's Trader goes where its AI sent it; a major's city
             // it names is the engine's at that centre
             const to = r.toSeatCity !== undefined ? cityAt(state, dst) : undefined;
+            const traders = state.units.filter((u) => u.seat === seat && u.type === 'TRADER');
             res = r.toCs !== undefined ? minorRouteTo(state, minor, { from: -1, to: -1, toCs: r.toCs })
               : to ? minorRouteTo(state, minor, { from: -1, to: -1, toSeat: to.seat, toSeatCity: to.id })
                 : { ok: false, reason: 'no engine city at the destination' };
+            // the Trader the route spent, where the engine's turn made it
+            const spent = traders.find((u) => !state.units.includes(u));
+            if (spent && ctx.standing && !ctx.standing.has(spent)) {
+              ctx.routeSpent.set(seat, [...(ctx.routeSpent.get(seat) ?? []), spent.type]);
+            }
           } else if (from && from.seat === seat) {
             if (r.toCs !== undefined) res = addCsTradeRoute(state, from.id, r.toCs, seat);
             else if (r.toSeat !== undefined && r.toSeat !== seat) {
@@ -2522,6 +2540,18 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // a captive is the seizure's (`seize`)
         if (ds.some((x) => x.kind === 'seize' && x.into === d.unit)) break;
         spawnRecorded(ctx, b, d.unit);
+        // a Trader the engine's city-state made and the record's route then
+        // sent out (the engine's route spends its Trader; the record's stands
+        // on the map): the record's, made by the engine (runs/h1_duelu1117
+        // t44: Antananarivo's Trader 393218, trained and routed to Caguana in
+        // its turn)
+        const sent = ctx.routeSpent.get(seatOfP(ctx, d.player)) ?? [];
+        const k = sent.indexOf(engineRowOf(ctx.cat, 'unit', d.type) ?? '');
+        if (!major && k >= 0) {
+          sent.splice(k, 1);
+          count(ctx, 'minorAi:unitNew', 'applied', d.player);
+          break;
+        }
         count(ctx, major ? 'unitNew:other' : 'minorAi:unitNew', 'fallback', d.player, `${d.unit} ${ctx.cat.units[d.type]} ${d.why}: the engine made none`);
         break;
       }
@@ -2624,7 +2654,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const mapped = new Set(ctx.units.values());
         const made = unitOf(ctx, d.unit) ? undefined
           : state.units.find((x) => x.seat === seatOfP(ctx, d.player) && !mapped.has(x) && !!into && UNITS[x.type]?.upgradesTo === into);
-        if (made) ctx.units.set(d.unit, made);
+        if (made) {
+          ctx.units.set(d.unit, made);
+          // the unit trained the game's, upgraded in the same turn
+          if (isCityStateSeat(made.seat)) count(ctx, 'minorAi:unitNew', 'applied', d.player);
+        }
         const u = unitOf(ctx, d.unit);
         if (!u) {
           // a unit trained and upgraded within the turn, which no record
@@ -2644,6 +2678,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (u.movesLeft <= 0) u.movesLeft = grantedMoves(state, u);
         // a city-state's upgrade is its AI's, through the minor's own verb
         const minor = isCityStateSeat(u.seat) ? state.cityStates.find((c) => c.seat === u.seat) : undefined;
+        // bought through its economic AI (0x68c940), as its trees buy it
+        if (minor?.economy) upgradePurchase(minor.economy, MINOR_UPGRADE_GOLD * FX);
         const res = minor ? (minorUpgradeUnit(state, minor, u) ? { ok: true } : { ok: false, reason: `the minor may not upgrade ${u.type}->${UNITS[u.type]?.upgradesTo} (gold ${r3(minor.treasury)}, plot seat ${tileSeat(state.map.tiles[u.tileIndex])}, techs ${minor.research.techs.join('|')})` })
           : upgradeUnit(state, u, u.seat);
         ctx.units.delete(d.unit);
@@ -4046,8 +4082,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdMinorOrders(true);
   holdCityStrikes(true);
   // the city-states' own purchases of the pair, each with its price
-  const minorBought = new Map<Unit, { cityState: CityState; price: number }>();
-  traceMinorPurchases((cityState, u, price) => minorBought.set(u, { cityState, price }));
+  // each purchase with the economic AI's savings as it bought (its spend
+  // follows the purchase, on the city's threat)
+  const minorBought = new Map<Unit, { cityState: CityState; price: number; savings?: number[]; threatened: boolean }>();
+  traceMinorPurchases((cityState, u, price) => minorBought.set(u, {
+    cityState, price, savings: cityState.economy ? [...cityState.economy.savings] : undefined, threatened: (cityState.threat ?? -1) > -1,
+  }));
   const state = first.state;
   importedWorld(state, first, recs[0], history);
   // the city-states' city AI ran on the game's turns before the import's:
@@ -4082,7 +4122,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbSeized: [], minorBlows: new Map(), lateBlows: [], upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbSeized: [], minorBlows: new Map(), lateBlows: [], upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -4201,6 +4241,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);
     const standing = new Set(state.units);
+    ctx.standing = standing;
+    ctx.routeSpent = new Map();
+    // each city-state's routes as its turn opens: one its turn ends hands its
+    // Trader back (`spawnUnit` at the route's origin), which the record holds
+    // as the Trader it always was
+    const routesBefore = new Map(state.cityStates.map((c) => [c.seat, [...(c.tradeRoutes ?? [])]] as const));
     const improvements = state.map.tiles.map((x) => x.improvement ?? null);
     // the plots whose improvement the turn's change (its random events, its
     // climate) took or laid: no Builder's
@@ -4411,6 +4457,20 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       });
       try {
         minorTurns(state);
+        // ...and the last city-state's upgrades, made in its turn, before the
+        // units its turn made and the record lacks are undone: a unit it
+        // trained and upgraded in that turn is the record's (runs/h1_duelu1117
+        // t160: Antananarivo, the last city-state, its Scout trained and
+        // upgraded to the Skirmisher 2097158 as Industrialization lands)
+        const last = before as number | undefined;
+        if (last !== undefined) {
+          const ups = ds.filter((d) => d.kind === 'upgrade' && d.player === last);
+          if (ups.length) {
+            const rng = state.rngState;
+            applyPhase(ctx, ups, 'after', b, b, new Set([last]));
+            state.rngState = rng;
+          }
+        }
       } finally {
         holdMinorStart(null);
         for (const [u, i] of fallen.reverse()) state.units.splice(Math.min(i, state.units.length), 0, u);
@@ -4469,11 +4529,21 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // Defense's threat, which the game never bought; kept spent, the purse
     // ran 124 short to the bankruptcy that disbanded its Bombard at t149)
     const mapped = new Set(ctx.units.values());
+    // the Traders the city-states' ended routes handed back: the record's
+    // own, each on the map through its route, none a unit their cities made
+    const returned = new Map(state.cityStates.map((c) => {
+      const now = new Set(c.tradeRoutes ?? []);
+      return [c.seat, (routesBefore.get(c.seat) ?? []).filter((r) => !now.has(r)).length] as const;
+    }));
     for (const u of [...state.units]) {
       if (standing.has(u) || mapped.has(u) || u.seat < state.seats.length) continue;
       disbandUnit(state, u.id);
       const cs = state.cityStates.find((c) => c.seat === u.seat);
       const paid = minorBought.get(u);
+      if (!paid && u.type === 'TRADER' && (returned.get(u.seat) ?? 0) > 0) {
+        returned.set(u.seat, returned.get(u.seat)! - 1);
+        continue;
+      }
       // a purchase the game never made leaves no record in any knowledge
       // base: its own minor's would count it gone in its army two turns on
       // (runs/h1_duelw1127 t17: city-state 4's Warrior bought at t16,
@@ -4487,6 +4557,18 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         }
         paid.cityState.treasury += paid.price;
         if (u.type === 'BUILDER') paid.cityState.buildersTrained -= 1;
+        // ...and its savings back: the spend the purchase took from each
+        // slot and from the balance returned, so the turns after share the
+        // treasury's change as the game's unspent savings do (else the refund
+        // reads as income shared over every slot: runs/h1_duelu1117 Caguana's
+        // Builder bought at t70 and undone)
+        const eco = paid.cityState.economy;
+        if (eco && paid.savings) {
+          const spent: EconomicMemory = { savings: [...paid.savings], balance: 0 };
+          purchaseSpend(spent, paid.price * FX, paid.threatened);
+          for (let i = 0; i < eco.savings.length; i++) eco.savings[i] += paid.savings[i] - spent.savings[i];
+          eco.balance += paid.price * FX;
+        }
       }
       const op = cs?.ops ? opsOf(cs.ops).find((o) => opUnits(o).includes(u.id))?.def : undefined;
       count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat),

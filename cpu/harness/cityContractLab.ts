@@ -261,9 +261,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
       // district it had completed as the turn began
       buildingBlocked: (bt) => heldTypes.includes(bt),
       districtBlocked: (d) => ((before.minorOfPlayer.get(player) ?? cs).districts ?? []).some((x) => typeOf('district', x.type) === d && before.state.map.tiles[x.tileIndex].districtComplete),
-      // CanTrain refuses a unit its obsolescence (the Mandatory or plain
-      // ObsoleteTech / ObsoleteCivic) holds
-      canTrain: (u) => pf.canTrain(u) && !AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some((x) => research.techs.includes(x) || research.civics.includes(x)),
+      canTrain: (u) => pf.canTrain(u),
       trainsSea: facts.trainsDomain('DOMAIN_SEA'),
       buildTurns: (c) => facts.buildTurns(itemName(c)),
       itemValue: (c) => (c.unit ? tables.units[AI_UNIT_INDEX.get(c.unit) ?? -1] ?? FX_MIN

@@ -79,6 +79,7 @@ import { randRange } from './rand';
 import {
   installType, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
   minorProjectFacts, minorResourceCounts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
+  minorCanTrain, researchHolds, unitObsoleteIn,
 } from './minorBuild';
 
 /** the city's plots, the centre first, as axial offsets from it (the city's
@@ -601,16 +602,12 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
     const t = installType('unit', u.type, 'UNIT_');
     own.set(t, (own.get(t) ?? 0) + 1);
   }
-  const holds = (x: string): boolean => {
-    const t = x.startsWith('TECH_') ? engineId('tech', x, 'TECH_', TECHS_KNOWN) : null;
-    const c = x.startsWith('CIVIC_') ? engineId('civic', x, 'CIVIC_', CIVICS_KNOWN) : null;
-    return (!!t && r.techs.includes(t)) || (!!c && r.civics.includes(c));
-  };
+  const holds = (x: string): boolean => researchHolds(r, x);
   const wars = seatOf(state, cs.seat)?.wars ?? [];
   const players = [...new Set(records.map((x) => x.owner))].sort((a, b) => a - b);
   const rows = unitProductionEntries({
     isVersion: (u) => minorUnitVersion(u) === u,
-    obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
+    obsolete: (u) => unitObsoleteIn(r, u),
     owned: (u) => own.get(u) ?? 0,
     known: (u) => known.get(u) ?? 0,
     knownBy: (u, p) => by.get(`${u}:${p}`) ?? 0,
@@ -784,8 +781,10 @@ export function minorGreatPersonClass(state: GameState): boolean {
 }
 
 /** the minor's city as TryPurchaseUnits reads it: its Gold price of the
- *  unit; the purchase request lets it through where the purse covers the
- *  price and the centre or a plot beside it takes the unit */
+ *  unit; the purchase request lets it through where the city may train the
+ *  unit (CanTrain, `minorCanTrain`: an obsolete unit's contract stays
+ *  ACCEPTED and unbought), the purse covers the price and the centre takes
+ *  the unit */
 function minorPurchaseCity(state: GameState, cs: CityState, threat: number): PurchaseCity {
   const price = (u: string): number => {
     const id = engineId('unit', u, 'UNIT_', UNITS);
@@ -806,7 +805,7 @@ function minorPurchaseCity(state: GameState, cs: CityState, threat: number): Pur
     canPurchase: (u) => {
       if (!goldAffordable(cs.treasury, price(u))) return false;
       const id = engineId('unit', u, 'UNIT_', UNITS);
-      return !!id && !purchaseSpotBlocked(state, cs, cs.seat, id);
+      return !!id && minorCanTrain(state, cs, id) && !purchaseSpotBlocked(state, cs, cs.seat, id);
     },
   };
 }

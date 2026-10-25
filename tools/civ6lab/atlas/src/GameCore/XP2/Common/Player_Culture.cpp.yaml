@@ -427,6 +427,7 @@
     - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
     - "H-1: a minor's research catch-up — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
   context:
     - "...c that is not in this game\"), past its \"already held / already boosted\" gates (0x39d190 / 0x39d1f0), marks m_abBoostTriggered, finds the item's Boosts row (0x3990d0) and, in the 24.8 fixed..."
     - ...its Improvement_Tourism row pays only with its PrereqTech (+0x60, the player's techs 0x39d1f0) and its second link (+0x68, the civics 0x4cb2f0) held; source 6 (Appeal) reads the plo...

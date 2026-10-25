@@ -940,12 +940,17 @@ export function minorQueueOk(state: GameState, cityState: CityState, item: Exclu
   return false;
 }
 
-/** CanTrain of a minor's city (its research unlocks the unit, no
- *  civilization's unique unit, none faith-bought, spawned or a spy, a naval
- *  unit at a coastal centre, an air unit beside a complete Aerodrome, a
- *  Trader below the trade capacity, the Archaeologist with an
- *  Archaeological Museum; a city-state ignores the strategic resources);
- *  `id` the engine's unit */
+/** CanTrain of a minor's city, its prerequisites asked (0x172820 with its
+ *  sixth argument clear, as the queue, the Default Specialization's unit, the
+ *  purchase pick, the contracts' eligibility and the purchase request call
+ *  it): its research unlocks the unit and has not made it obsolete
+ *  (0x538460 — runs/h1_duelu1117 Valletta t195-t220: its Warrior contract 680
+ *  ACCEPTED beside Gunpowder, the Gold over a Warrior's price, never bought,
+ *  the record's purchase list without the Warrior), no civilization's unique
+ *  unit, none faith-bought, spawned or a spy, a naval unit at a coastal
+ *  centre, an air unit beside a complete Aerodrome, a Trader below the trade
+ *  capacity, the Archaeologist with an Archaeological Museum; a city-state
+ *  ignores the strategic resources. `id` the engine's unit */
 export function minorCanTrain(state: GameState, cityState: CityState, id: string): boolean {
   const r = cityState.research;
   const held = cityState.buildings ?? [];
@@ -953,6 +958,7 @@ export function minorCanTrain(state: GameState, cityState: CityState, id: string
   if (!d || d.uniqueTo || d.faithOnly || d.spawnOnly || d.spy) return false;
   if (d.requiresTech && !r.techs.includes(d.requiresTech)) return false;
   if (d.requiresCivic && !r.civics.includes(d.requiresCivic)) return false;
+  if (unitObsoleteIn(r, installType('unit', id, 'UNIT_'))) return false;
   if (d.requiresResource && !minorAnyResource()) return false;
   if (d.naval && !cityNavalCapable(state, minorCity(cityState))) return false;
   if (d.air && !(cityState.districts ?? []).some((x) => x.type === 'AERODROME' && state.map.tiles[x.tileIndex].districtComplete)) return false;
@@ -1077,6 +1083,20 @@ export function promotionWeight(traits: readonly string[], cls: string | null): 
   return w === 0 ? 0 : Math.max(w, fxConst(0.1));
 }
 
+/** a research record holds an install TECH_ / CIVIC_ type */
+export function researchHolds(r: { techs: readonly string[]; civics: readonly string[] }, x: string): boolean {
+  const t = x.startsWith('TECH_') ? engineId('tech', x, 'TECH_', TECHS) : null;
+  const c = x.startsWith('CIVIC_') ? engineId('civic', x, 'CIVIC_', CIVICS) : null;
+  return (!!t && r.techs.includes(t)) || (!!c && r.civics.includes(c));
+}
+
+/** 0x538460: the unit (an install type) is obsolete to the holder of the
+ *  research — its ObsoleteTech, ObsoleteCivic or their Mandatory columns
+ *  held */
+export function unitObsoleteIn(r: { techs: readonly string[]; civics: readonly string[] }, unit: string): boolean {
+  return !!AI_UNITS[AI_UNIT_INDEX.get(unit) ?? -1]?.obsolete.some((x) => researchHolds(r, x));
+}
+
 /** THE MILITARY AI'S UNIT PRODUCTION TABLE of a minor (`aiUnitProduction.ts`)
  *  against the units its knowledge base counts (`known`) */
 export function minorUnitProduction(state: GameState, cityState: CityState, known: (unit: string) => number) {
@@ -1087,14 +1107,9 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
     const t = installType('unit', u.type, 'UNIT_');
     own.set(t, (own.get(t) ?? 0) + 1);
   }
-  const holds = (x: string): boolean => {
-    const t = x.startsWith('TECH_') ? engineId('tech', x, 'TECH_', TECHS) : null;
-    const c = x.startsWith('CIVIC_') ? engineId('civic', x, 'CIVIC_', CIVICS) : null;
-    return (!!t && r.techs.includes(t)) || (!!c && r.civics.includes(c));
-  };
   return unitProductionTable({
     isVersion: (u) => minorUnitVersion(u) === u,
-    obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
+    obsolete: (u) => unitObsoleteIn(r, u),
     owned: (u) => own.get(u) ?? 0,
     known,
   });
@@ -1904,7 +1919,8 @@ function freeCityProjectFacts(state: GameState, city: City, facts: CityBuildFact
  *  or in hand, CanConstruct (`constructibleNow` and the city's own rule:
  *  the Free Cities' research, its district complete, unpillaged and clean, its required
  *  and exclusive rows, a river for a Water Mill, intact walls below a higher
- *  wall), CanTrain (the Free Cities' research unlocks it, no civilization's
+ *  wall), CanTrain (the Free Cities' research unlocks it and has not made it
+ *  obsolete, no civilization's
  *  unique, none faith-bought, spawned or a spy, none asking a strategic
  *  resource — the Free Cities ignore no requirement and hold no stockpile —
  *  a naval unit at a coastal centre), the walls' repair while available;
@@ -1933,6 +1949,7 @@ export function freeCityPickFacts(state: GameState, city: City, facts: CityBuild
       if (!d || d.uniqueTo || d.faithOnly || d.spawnOnly || d.spy || d.trader || d.settler) return false;
       if (d.requiresTech && !r.techs.includes(d.requiresTech)) return false;
       if (d.requiresCivic && !r.civics.includes(d.requiresCivic)) return false;
+      if (unitObsoleteIn(r, u)) return false;
       if (d.requiresResource && !CIV_LEVELS.FREE_CITIES.ignoresUnitStrategicResourceRequirements) return false;
       if (d.naval && !cityNavalCapable(state, city)) return false;
       if (d.air) return false;

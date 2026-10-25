@@ -63,6 +63,7 @@
   impl: [cpu/core/aiEconomic.ts:PurchaseCity]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...take the first. 0x68be60 (Economic, city or all, unit, flag): per city, the Gold price 0x1b22d0 (below 0 skipped); the UNITS and SLUSH slots together above it with UNITS above half..."
@@ -251,6 +252,7 @@
     - cpu/core/aiEconomic.ts:upgradePurchase
     - cpu/core/minorOps.ts:upgradeTreesTick
     - gpu/core/sim_cityvalue.py:_cv_upgrade_purchase
+    - cpu/harness/replay.ts:minor
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]

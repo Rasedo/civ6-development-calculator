@@ -129,21 +129,29 @@ export function tryPurchaseUnits(e: EconomicMemory, cities: readonly PurchaseCit
     if (!fromSavings && !emergency) continue;
     if (!c.canPurchase(unit)) continue;
     buy(c);
-    if (c.threat <= -1) {
-      e.savings[SLOT_SLUSH] -= Math.max(0, cost - s1);
-      e.savings[SLOT_UNITS] = Math.max(0, s1 - cost);
-    } else {
-      let left = cost;
-      for (let i = 0; i < e.savings.length && left > 0; i++) {
-        const take = Math.min(left, e.savings[i]);
-        e.savings[i] -= take;
-        left -= take;
-      }
-    }
-    e.balance -= cost;
+    purchaseSpend(e, cost, c.threat > -1);
     return c;
   }
   return null;
+}
+
+/** TryPurchaseUnits' spend of `cost` (raw): the UNITS slot then the SLUSH
+ *  slot for the overflow, a `threatened` city's from each slot in order; the
+ *  balance less the cost */
+export function purchaseSpend(e: EconomicMemory, cost: number, threatened: boolean): void {
+  const s1 = e.savings[SLOT_UNITS];
+  if (!threatened) {
+    e.savings[SLOT_SLUSH] -= Math.max(0, cost - s1);
+    e.savings[SLOT_UNITS] = Math.max(0, s1 - cost);
+  } else {
+    let left = cost;
+    for (let i = 0; i < e.savings.length && left > 0; i++) {
+      const take = Math.min(left, e.savings[i]);
+      e.savings[i] -= take;
+      left -= take;
+    }
+  }
+  e.balance -= cost;
 }
 
 /** THE CONTRACT PURCHASES (0x687bf0 after the savings, 0x688920): the

@@ -1259,13 +1259,45 @@ class SimMinors:
         self._eff_version += 1
         self._minor_replace_citizens(s, go)
 
+    def _unit_obsolete_cols(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """per engine chassis its AI row's ObsoleteTech / ObsoleteCivic and
+        Mandatory columns as engine tech and civic indices ([NU, K] each, -1
+        pad), built once"""
+        c = getattr(self, "_unit_obs_cols", None)
+        if c is not None:
+            return c
+        T = self._cv_tables()
+        E, rows, er = T["engine"], T["unit_rows"], T["engine_row"].tolist()
+        techs, civics = [], []
+        for ei in range(self.NU):
+            k = er[ei] if ei < len(er) else -1
+            obs = rows[k]["obsolete"] if k >= 0 else []
+            techs.append([E["tech"].get(o, -1) for o in obs if o.startswith("TECH_")])
+            civics.append([E["civic"].get(o, -1) for o in obs if o.startswith("CIVIC_")])
+        K = max([1] + [len(x) for x in techs + civics])
+        pad = lambda xs: [x + [-1] * (K - len(x)) for x in xs]  # noqa: E731
+        c = self._unit_obs_cols = (torch.tensor(pad(techs), dtype=torch.long, device=self.device),
+                                   torch.tensor(pad(civics), dtype=torch.long, device=self.device))
+        return c
+
+    def _unit_obsolete_in(self, have_t: torch.Tensor, have_c: torch.Tensor, u0: torch.Tensor) -> torch.Tensor:
+        """[B] — 0x538460: chassis `u0` ([B], clamped) obsolete to the holder
+        of the research `have_t` / `have_c` ([B, techs] / [B, civics]): one of
+        its obsolete columns held"""
+        ct, cc = self._unit_obsolete_cols()
+        t, c = ct[u0], cc[u0]
+        held_t = (t >= 0) & have_t.gather(1, t.clamp(min=0))
+        held_c = (c >= 0) & have_c.gather(1, c.clamp(min=0))
+        return held_t.any(dim=1) | held_c.any(dim=1)
+
     def _minor_can_train(self, s: int, ui: torch.Tensor) -> torch.Tensor:
-        """[B] — `minorCanTrain` of chassis `ui` ([B], -1 none): the minor's
-        research unlocks it, no civilization's unique, none faith-bought,
-        spawned or a spy, a naval unit at a coastal centre, an air unit beside
-        a complete Aerodrome, a Trader below the trade capacity, the
-        Archaeologist with an Archaeological Museum; a city-state ignores the
-        strategic resources"""
+        """[B] — `minorCanTrain` of chassis `ui` ([B], -1 none), its
+        prerequisites asked (0x172820, sixth argument clear): the minor's
+        research unlocks it and has not made it obsolete (0x538460), no
+        civilization's unique, none faith-bought, spawned or a spy, a naval
+        unit at a coastal centre, an air unit beside a complete Aerodrome, a
+        Trader below the trade capacity, the Archaeologist with an
+        Archaeological Museum; a city-state ignores the strategic resources"""
         row = self._CITY_MINOR0 + s
         u0 = ui.clamp(min=0, max=self.NU - 1)
         ok = (ui >= 0) & (self._type_uniq.take(u0) < 0) & ~self._type_faith_only.take(u0) & ~self._type_spawn_only.take(u0)
@@ -1276,6 +1308,7 @@ class SimMinors:
         tt, tc = self._type_tech.take(u0), self._type_civic.take(u0)
         ok = ok & ((tt < 0) | self.citystate_techs[:, s].gather(1, tt.clamp(min=0).unsqueeze(1)).squeeze(1))
         ok = ok & ((tc < 0) | self.citystate_civics[:, s].gather(1, tc.clamp(min=0).unsqueeze(1)).squeeze(1))
+        ok = ok & ~self._unit_obsolete_in(self.citystate_techs[:, s], self.citystate_civics[:, s], u0)
         nav = self.unit_naval.take(u0)
         if bool((ok & nav).any()):
             ok = ok & (~nav | self._naval_capable_minor(s))

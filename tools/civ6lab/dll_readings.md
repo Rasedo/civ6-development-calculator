@@ -10501,3 +10501,55 @@ spread its own), `aidDamage` / `_aid_damage` at each applier, `AID_DAMAGE_MIN`
 (+0x68) does with a raised aid request before it runs (the World Congress's
 WC_EMERGENCY_REQUEST_AID discussion, Expansion2_Congress.xml) — no record
 raised one.
+
+## C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins
+
+- CANTRAIN 0x172820 (city build queue +0x2170, unit, ..., its sixth argument
+  a byte at [rbp + 0xe8], the caller's [rsp + 0x28]): the PrereqTech
+  (Units +0x280, HasTech 0x4cb2f0 on player +0x1338) and PrereqCivic (+0x270,
+  HasCivic 0x39d1f0 on +0x1310) refuse unless the byte is set
+  (0x17296d / 0x172995); then 0x538460 — the unit OBSOLETE — refuses unless
+  the byte is set (0x1729be..0x1729ca, `test r12b, r12b; je` to the refusal
+  0x1738e2).
+- 0x538460 (unit, player): true where the player holds the unit's
+  MandatoryObsoleteTech (+0x240), MandatoryObsoleteCivic (+0x238),
+  ObsoleteTech (+0x250) or ObsoleteCivic (+0x248) — nothing more (no
+  upgrade-line test).
+- THE SIXTH ARGUMENT, read at each call: clear (0) in the Default
+  Specialization's best unit 0x5d2600 (0x5d2760, r12b = 0), the purchase
+  pick 0x5d2810 (0x5d28ba), the contracts' eligibility 0x5f6050 (0x5f67ec:
+  a unit contract is eligible where COMPLETED, else not MustPurchase and
+  CanTrain), the queue 0x5ca5a0 (0x5ca61e, r14b = 0) and the expected count
+  0x5d4750 (0x5d47be); set only in the plot analysis's unit loop 0x5ce970
+  (the AI +0x12a0 +0xba8 flag, "C-96 / C-97: the unit value"). So the unit
+  table and the building-or-unit event (0x5d2600 unchecked) value an
+  obsolete unit — its table entry x3 — and the event may submit its
+  contract, while the queue, the Default Specialization, the eligibility
+  and the purchase never take it.
+- THE PURCHASE (TryPurchaseUnits 0x68be60 -> the purchase request 0x977570,
+  the game core's command): the Gold price 0x1b22d0 holds no CanTrain test
+  (the cost, its modifiers, the Gold multiplier, the step), so an obsolete
+  unit's contract passes the savings test and the request refuses it — read
+  off the records below (the command's own validation of the request
+  unread). The record's own purchase list (each city's "buy" rows, the
+  game's CanPurchase) lists no obsolete unit.
+- CONFIRMED: runs/h1_duelu1117 Valletta (player 2), Gunpowder held, its
+  Warrior contract 680 (unit 21, value 0, ACCEPTED, in the economic AI's
+  purchase list at t195's aimem) unbought t195-t220 with its Gold at 99-150
+  over a Warrior's price; t195's purchase list: Scout, Swordsman, Horseman,
+  Heavy Chariot ... — no Warrior, Slinger, Archer, Spearman, Galley,
+  Catapult, Quadrireme or Trebuchet, each obsolete (ObsoleteTech Gunpowder,
+  Machinery, Ballistics, Metal Casting, Steam Power, Steel). The engines
+  bought the Warrior every second turn (1117 p2 t195-t223, 1121 Hunza
+  t158-t225: 35 of the five duels' unit.trained misses).
+- Ported: `unitObsoleteIn` / `researchHolds` (`minorBuild.ts`), refused by
+  `minorCanTrain` and the Free Cities' `canTrain`, the minor's purchase
+  request (`minorPurchaseCity` `canPurchase`); GPU `_unit_obsolete_in` /
+  `_minor_can_train` (sim_minors.py), `_MinorFacts.can_train` /
+  `_FreeFacts.can_train` (sim_cityvalue.py), `_minor_contract_purchases`.
+- MEASURED (--aiscore, the five duelu duels, carried memory, with the
+  replay's own corrections of the same pass — the last city-state's
+  in-turn upgrades, a route's returned or spent Trader, a purchase's undo
+  and the record's purchases and upgrades through the savings):
+  unit.trained 213 / 359 (59.3%) -> 231 / 281 (82.2%), cityState.build
+  91.6% -> 92.2%; the Warrior contract purchases (35 of the 146 misses) gone.

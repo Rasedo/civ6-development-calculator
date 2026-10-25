@@ -2096,11 +2096,12 @@ class _MinorFacts:
         return self.sim._cv_constructible(self, self.T["bld"][b])
 
     def can_train(self, u):
-        """CanTrain: the minor's research unlocks the unit, no civilization's
-        unique, none faith-bought, spawned or a spy; a naval unit at a coastal
-        centre, an air unit beside a complete Aerodrome, a Trader below the
-        trade capacity, the Archaeologist with an Archaeological Museum; the
-        strategic resources ignored"""
+        """CanTrain: the minor's research unlocks the unit and has not made it
+        obsolete (0x538460), no civilization's unique, none faith-bought,
+        spawned or a spy; a naval unit at a coastal centre, an air unit beside
+        a complete Aerodrome, a Trader below the trade capacity, the
+        Archaeologist with an Archaeological Museum; the strategic resources
+        ignored"""
         sim, s = self.sim, self.s
         ui = self._uidx(u)
         if ui < 0:
@@ -2110,7 +2111,7 @@ class _MinorFacts:
             return self._bools(False)
         if int(sim._type_resource[ui]) >= 0 and not sim._minor_any_res:
             return self._bools(False)
-        ok = self._bools(True)
+        ok = ~self._obsolete()[:, self.T["unit_index"][u]]
         ti, ci = int(sim._type_tech[ui]), int(sim._type_civic[ui])
         if ti >= 0:
             ok = ok & sim.citystate_techs[:, s, ti]
@@ -2495,10 +2496,11 @@ class _FreeFacts(_MinorFacts):
 
     def can_train(self, u):
         """CanTrain of a Free City: the Free Cities' research unlocks the
-        unit, no civilization's unique, none faith-bought, spawned or a spy,
-        no Trader or Settler, none asking a strategic resource (the Free
-        Cities ignore no requirement and hold no stockpile), a naval unit at a
-        coastal centre, no air unit"""
+        unit and has not made it obsolete (0x538460), no civilization's
+        unique, none faith-bought, spawned or a spy, no Trader or Settler,
+        none asking a strategic resource (the Free Cities ignore no
+        requirement and hold no stockpile), a naval unit at a coastal centre,
+        no air unit"""
         sim, s = self.sim, self.s
         ui = self._uidx(u)
         if ui < 0:
@@ -2509,7 +2511,7 @@ class _FreeFacts(_MinorFacts):
             return self._bools(False)
         if int(sim._type_resource[ui]) >= 0 and not sim._free_any_res:
             return self._bools(False)
-        ok = self._bools(True)
+        ok = ~self._obsolete()[:, self.T["unit_index"][u]]
         ti, ci = int(sim._type_tech[ui]), int(sim._type_civic[ui])
         if ti >= 0:
             ok = ok & sim.citystate_techs[:, s, ti]

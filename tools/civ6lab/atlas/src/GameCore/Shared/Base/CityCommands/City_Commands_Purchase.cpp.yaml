@@ -7,14 +7,21 @@
   final: 0x680a80
   kind: function
   status: PARTLY
+  cases:
+    - recording: h1_duelu1117
+      turn: 195
+      value: "an obsolete unit refused: Valletta's Warrior contract 680 passes the savings test t195-t220 and is never bought; the record's purchase list holds no obsolete unit (the command's own CanTrain test, unread)"
   impl:
     - cpu/core/aiEconomic.ts:PurchaseCity
     - cpu/core/minorCityAi.ts:price
+    - cpu/core/minorCityAi.ts:minorPurchaseCity
     - gpu/core/sim_minorai.py:_minor_contract_purchases
     - gpu/core/sim_minorai.py:_minor_purchases
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+  notes:
+    - "builds the purchase request; the command it submits validates it — the CanTrain refusal is read off the records, its code unread"
   context:
     - "...I +0x1b8's low byte) set — the balance (+0x1b8) at or above it; the purchase request (0x977570, the game core's +0x48 / +0x50); then the spend: UNITS then SLUSH for the overflow, a t..."
   review: imported
