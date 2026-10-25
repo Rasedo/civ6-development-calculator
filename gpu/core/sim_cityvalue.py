@@ -1908,7 +1908,12 @@ class _MinorFacts:
         cur = sim.citystate_item[:, s]
         progress = torch.where(cur == k, sim.citystate_prod[:, s], sim.citystate_kept[:, s, k]) + sim.citystate_ovf[:, s]
         cost = self._item_cost(item)
-        rate = torch.floor(self._total(1) * (1 + self._item_pct(item) / 100) * _FX + 0.5).long()
+        pct = self._item_pct(item)
+        if self.no_known is not None and item.startswith("UNIT_") and self._uidx(item) != sim._builder_idx:
+            # a founding turn's first look: no PLAYER_CITIES modifier on the
+            # city yet, the military units' percent among them
+            pct = torch.where(self.no_known, torch.zeros_like(pct), pct)
+        rate = torch.floor(self._total(1) * (1 + pct / 100) * _FX + 0.5).long()
         return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
 
     def item_turns(self, u, extra, scale=False):

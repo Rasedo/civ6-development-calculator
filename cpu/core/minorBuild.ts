@@ -1390,8 +1390,14 @@ export function minorCityGrowth(state: GameState, cityState: CityState): CityGro
 }
 
 /** THE CITY BUILD AI'S VIEW OF A MINOR'S CITY (`aiCityBuild.ts`), its
- *  knowledge base's unit counts `known` */
-export function minorBuildFacts(state: GameState, cityState: CityState, known: (unit: string) => number): CityBuildFacts {
+ *  knowledge base's unit counts `known`; `fresh`, a founding turn's first
+ *  look: the city carries none of the
+ *  player's PLAYER_CITIES modifiers yet, its military units' production
+ *  percent among them (runs/h1_duelv1117 / 1121 / 1124 t1: the city-states'
+ *  Warrior and Slinger at their Production alone, their Builder under
+ *  MINOR_CIV_PRODUCTION_BUILDERS, their Archer past the horizon on
+ *  Archery's 37 turns) */
+export function minorBuildFacts(state: GameState, cityState: CityState, known: (unit: string) => number, fresh = false): CityBuildFacts {
   const city = minorCity(cityState);
   const stats = computeCityStats(state, city);
   const r = cityState.research;
@@ -1482,7 +1488,8 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       // Cardiff's Library valued a turn sooner each turn from t60 to t75)
       const progress = (cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0) + (cityState.prodOverflow ?? 0);
       const cost = minorItemCost(state, cityState, item as Exclude<MinorItem, { none: true }>);
-      const rate = fxOf(stats.total.production * (1 + minorItemPct(state, cityState, item) / 100));
+      const pct = fresh && 'unit' in item && item.unit !== 'BUILDER' ? 0 : minorItemPct(state, cityState, item);
+      const rate = fxOf(stats.total.production * (1 + pct / 100));
       return turnsAt(cost * FX - fxOf(progress), rate);
     },
   };

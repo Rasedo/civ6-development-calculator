@@ -2330,6 +2330,13 @@ draw of the game's, so the engines' integer draw there is the driver's stand-in
   its AI turns t30-t40, 25 every turn from t41 (its suzerain, player 1,
   set during t41), Equestrian Orders 27 -> 37, 56, 75 as logged
   (`stockpileIncome`, `_seat_stock_income`; the income writer unread).
+- A district on the resource accrues once complete (0x4aa8e0: the plot's
+  district complete, 0x811b0, and not pillaged): yet runs/h1_dueld1128 /
+  h1_duelw1128 Nazca, its Holy Site placed on its Horses at t14 (the record's
+  t14, incomplete), complete in t15's production (complete in the record's
+  t16), lists Equestrian Orders 5.0 at t15 (4 Horses), then +2 a turn (7.0,
+  10.0 ...), where ours accrues from t16 (2) — ASK: the 4 the turn the
+  district completes.
 - The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070):
   a unit at the queue's front with a strategic cost and no progress
   (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less
@@ -4188,13 +4195,15 @@ rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
   19 / 23; 1121 Hunza 18.29 / 16.53 / 15.61 at T 3 / 5 / 6 — and the
   Default Specialization takes the Slinger (no BuildCharges unit). From t2
   the table counts the knowledge base's records (1117 Antananarivo t2
-  Warrior 9.95 at T 15 as ours). LAB the founding T: on the record of t2
-  our Warrior / Slinger turns are about a third of the game's while our
-  Builder's agree (Valletta 3 / 3 / 4 against 8 / 7 / 4) — the
-  MINOR_CIV_PRODUCTION_MILITARY +200% not yet on the founding city fits
-  Valletta and Caguana; Hunza's (6 / 5 against 7 / 6 without it) and
-  Antananarivo's (23 / 19 / 10 against 14 / 12 / 6) production at founding
-  differs from the record's of t2 (its citizens' first placement unread).
+  Warrior 9.95 at T 15 as ours). The founding T: MINOR_CIV_PRODUCTION_MILITARY
+  (+200%, PLAYER_CITIES) is not yet on the founding city while the
+  Builder's (PLAYER_UNITS) is (`minorBuildFacts`' `fresh`, the GPU's
+  `no_known`): Valletta and Caguana's 8 / 7 / 4, 1124 Cardiff's, the
+  Archer past the horizon (Archery's 37 turns + 5 + its own at the bare
+  Production; Galleys valued) — the founding Production itself differs from
+  the record's of t2 for Hunza (6 / 5 against our 7 / 6), 1124 Granada (12 /
+  10 against 10 / 9: 2 x 0.9, as if Displeased) and Antananarivo (its
+  citizens' first placement and amenities unread).
 - THE MILITARY PRODUCTION'S UNITS (EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION,
   registered 0xc1e610, its arguments' object vt 0xdf78a8, apply +0x60
   0xb7e0d0): per Units row whose FormationClass (+0xa0, 0xadd5e0) is not
@@ -7314,10 +7323,15 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   +0x10), per unit 0x58fff0(upgrade manager, unit, test-visible 1) — not a
   barbarian's (0x56ee80) and an upgrade type it may take (0x5909a0 ->
   0x5374c0) — the Amount x its upgrade's Gold (0x590520 << 8) as Gold at the
-  player's weight, x 0.75 (@d1a188), whole. Not ported: on runs/h1_duelw1121
-  every unit with an unlocked, reachable upgrade reads 23-59 for Hunza where
-  the game lists 1.0 (Professional Army t76-t93) — ASK: which units the list
-  +0xd8 holds.
+  player's weight, x 0.75 (@d1a188), whole. The list +0xd8 is the player's
+  every unit (the standing army's walk 0x5ca7e0 and the trade count 0x7a7110
+  read it alike). Not ported: on runs/h1_duelw1121 Hunza t76 the one unit
+  whose upgrade is unlocked and reachable, its Horseman (to the Courser, 125
+  Gold), reads whole(0.75 x 0.5 x 0.5 x 125) = 23 where the game lists 1.0,
+  and Ayutthaya t78, with two Warriors (55) and a Swordsman (75) whose
+  upgrades lack their Iron, 3.0 where none of ours counts — ASK: the Gold
+  weight the analyzer's 0x7a6690 takes for a city-state, or the upgrade
+  0x5374c0 names (its walk past the first rung unread).
 - EFFECT_ADJUST_BUILDING_YIELD_CHANGE 0x6c5080 (args BuildingType +8,
   YieldType +0xc, Amount +0x10): a city subject; Amount weighted, x0.5 where
   the city lacks the building (0x18e9f0), span.

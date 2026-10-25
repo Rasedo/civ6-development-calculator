@@ -327,7 +327,9 @@
     - recording: 1116
       value: 1116 city.yields 249 -> 112, step.border 114 -> 69;
   impl: [gpu/core/sim_seats.py:_res_extracting]
-  readings: ["H-1: a plot's resource for its owner (strategic access) — READ"]
+  readings:
+    - "H-1: a plot's resource for its owner (strategic access) — READ"
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
   context:
     - "Player_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourc..."
   review: imported
