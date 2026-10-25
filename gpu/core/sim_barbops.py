@@ -149,8 +149,8 @@ class SimBarbOps:
         return gen * _TREE_SLOT + slot
 
     def _bop_free_ended(self) -> None:
-        """`freeEndedTrees`: after the walk each slot whose tree ended to the
-        free list's head, in slot order"""
+        """`freeEndedTrees`: after the walk each slot past the standing
+        controls' whose tree ended to the free list's head, in slot order"""
         b = self._bidx
         n = self.barb_tree_free.shape[1]
         live = torch.zeros(self.B, n, dtype=torch.bool, device=self.device)
@@ -165,7 +165,7 @@ class SimBarbOps:
         for j in range(int(self.barb_tree_nfree.max()) if self.B else 0):
             m = j < self.barb_tree_nfree
             listed[b[m], self.barb_tree_free[m, j].clamp(max=n - 1)] = True
-        for s in range(int(self.barb_tree_slots.max()) if self.B else 0):
+        for s in range(simbase.BARB_TREE_HELD, int(self.barb_tree_slots.max()) if self.B else 0):
             go = (s < self.barb_tree_slots) & ~live[:, s] & ~listed[:, s]
             if not bool(go.any()):
                 continue

@@ -84,7 +84,7 @@ import { LUXURY_IDS } from '../../world/resources';
 import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import type { QueueItem } from '../core/types';
 import { projectCost, settlerCost, unitStepCost } from '../core/game';
-import { builderCost, traderCost } from '../core/units';
+import { builderCost, rangedCombatOf, traderCost, unitDomain } from '../core/units';
 import { carryLayout, computeUnlocks, governmentSlots } from '../core/effects';
 import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
 import { standingRemovable } from '../core/climate';
@@ -1319,7 +1319,28 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   for (const p of rec.players) {
     const melee = memField(rec, p.id, 'PlayerStats', 'm_iMaxMeleeStrengthTrained');
     const ranged = memField(rec, p.id, 'PlayerStats', 'm_iMaxRangedStrengthTrained');
-    if (typeof melee === 'number' && typeof ranged === 'number') h.trained.set(p.id, [melee, ranged]);
+    if (typeof melee === 'number' && typeof ranged === 'number') {
+      h.trained.set(p.id, [melee, ranged]);
+      continue;
+    }
+    // a record whose read of them failed: the last read raised by each unit
+    // new to the player since the record before, not one changing hands —
+    // a unit trained, bought or upgraded raises them (`raiseBestTrained`):
+    // runs/h1_duely1127 player 3, unread from t135 at 55, its Infantry
+    // 1507329 standing by t220 with no City Defense against China's
+    // Infantry and Field Cannon t223-t249
+    const was = h.trained.get(p.id);
+    if (!was || !h.last) continue;
+    const seen = new Set(h.last.units.map((u) => `${u.owner}:${u.id}`));
+    const levies = leviesAcross(h.last, rec);
+    for (const u of rec.units) {
+      if (u.owner !== p.id || seen.has(`${u.owner}:${u.id}`) || levies.has(`${u.owner}:${u.id}`)) continue;
+      const type = engineRowOf(cat, 'unit', u.type);
+      const def = type ? UNITS[type] : undefined;
+      if (!type || !def || !(def.combat > 0) || unitDomain(type) !== 'military') continue;
+      was[0] = Math.max(was[0], def.combat);
+      was[1] = Math.max(was[1], rangedCombatOf(type));
+    }
   }
   // a governor seated in a city: [.., turn, kind, city owner, city id,
   // player, governor]

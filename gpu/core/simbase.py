@@ -923,6 +923,11 @@ GP_LUX_MAX = 8
 BARB_POOL_MAX = 256
 # the barbarians' Builder Capture operations a game holds at once
 BARB_CAP_MAX = 4
+# the barbarians' tree pool as the game opens (`BARB_TREE_HELD`,
+# `BARB_TREE_FIRST_GEN`): slots 0 and 1 held for good by their two standing
+# controls, the first tree generation 3
+BARB_TREE_HELD = 2
+BARB_TREE_FIRST_GEN = 3
 #: the slots a city-state's or the Free Cities' unit pool may number
 SEAT_POOL_MAX = 64
 #: the knowledge base's army records a city-state may hold (`armyKnown`):

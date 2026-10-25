@@ -6678,7 +6678,18 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   `_bop_free_ended`), every tree of the barbarian player — its operations',
   its captures' and its scouts' — ticking in slot order in the tactical pass
   (`barbarianTrees` / `_barb_trees`); the trees' units leave the pass's
-  later moves.
+  later moves. The pool opens with slots 0 and 1 held for good and its
+  generation at 3: every duely recording's first barbarian tree is 196610
+  (generation 3, slot 2: 1117, 1121, 1124, 1128 t4-t6 a scout's, 1127 t22 a
+  capture's), and no tree of slots 0 / 1 ever stands on an end look (the
+  reader lists the pool's VT_TREE controls alone: the two are another
+  control's; generation 2 one gone before the first tree) — `BARB_TREE_HELD`
+  / `BARB_TREE_FIRST_GEN`. With it the engine's 1128 ids run the game's
+  through t39 (196610, 262147, 327684, 393221, 458755, 524293); runs/h1_duely1128
+  t35 / t37 the game's capture operation starts inside the walk, ticks in it
+  and completes ("Operation Change Target INVALID, No backup"), where ours
+  starts after the pass and stands on (its slot 4 held to t49, the game's
+  free at t48).
 - THE NODES' HANDLERS (the dispatcher 0x7cbca0 storing each type's
   functions under the id the registration 0x7db850 gives it, the k-th id
   stored the k-th name, @d5b198 one unnamed): Operation Move update 0x81a130

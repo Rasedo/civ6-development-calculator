@@ -86,7 +86,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { MINOR_OP_DEFS } from './minorOps';
-import { barbHomingRecord, barbOpRecord } from './barbarianOps';
+import { BARB_TREE_FIRST_GEN, BARB_TREE_HELD, barbHomingRecord, barbOpRecord } from './barbarianOps';
 import { opsOf, type OpsAi } from './operations/manager';
 import { FREE_RAID_DEF } from './freeOps';
 import { AI_OP_TEAMS } from '../data/aiOperations';
@@ -583,9 +583,9 @@ const GAME: Record<string, Extractor> = {
       t.score ?? 0, ...barbOpRecord(s, t),
       // the player its units rampage against, its camp taken
       t.rampage ?? -1]),
-    ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0), s.barbSeat.opsNext ?? 0,
+    ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0), s.barbSeat.opsNext ?? BARB_TREE_FIRST_GEN,
     // the trees' pool (`newBarbTreeId`): its slots made, its free list
-    s.barbSeat.treeSlots ?? 0, (s.barbSeat.treeFree ?? []).length, ...(s.barbSeat.treeFree ?? []),
+    s.barbSeat.treeSlots ?? BARB_TREE_HELD, (s.barbSeat.treeFree ?? []).length, ...(s.barbSeat.treeFree ?? []),
     techs.length, ...techs, civics.length, ...civics,
     // the unit pool (`barbSlots`): its size, its free slots, those waiting to
     // go free, each unit's slot in unit order; each tribe's camp defender alive

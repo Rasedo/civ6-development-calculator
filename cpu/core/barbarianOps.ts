@@ -329,6 +329,14 @@ export function barbarianCaptures(state: GameState): void {
 const TREE_SLOT = 0x10000;
 export const treeSlot = (id: number): number => id % TREE_SLOT;
 
+/** THE POOL AS THE GAME OPENS: slots 0 and 1 held for good by the
+ *  barbarians' two standing controls (no tree: the AI memory reader lists
+ *  the trees alone), generation 2 a control gone before the first tree, so
+ *  the first tree is generation 3 in slot 2 (runs/h1_duely1117, 1121, 1124,
+ *  1127, 1128: each one's first barbarian tree 196610) */
+export const BARB_TREE_HELD = 2;
+export const BARB_TREE_FIRST_GEN = 3;
+
 /**
  * A NEW TREE OF THE BARBARIANS (the tree manager's pool +0x3a0, 0x7fef20):
  * the slot its free list's head names — the last one freed — else the
@@ -337,26 +345,26 @@ export const treeSlot = (id: number): number => id % TREE_SLOT;
  */
 export function newBarbTreeId(state: GameState): number {
   const seat = state.barbSeat;
-  const gen = seat.opsNext ?? 0;
+  const gen = seat.opsNext ?? BARB_TREE_FIRST_GEN;
   seat.opsNext = gen + 1;
   const free = (seat.treeFree ??= []);
   let slot = free.pop();
   if (slot === undefined) {
-    slot = seat.treeSlots ?? 0;
+    slot = seat.treeSlots ?? BARB_TREE_HELD;
     seat.treeSlots = slot + 1;
   }
   return gen * TREE_SLOT + slot;
 }
 
 /** THE POOL'S DESTROY LOOP after the walk (0x7ffdd0 -> 0x7cb2e0): each slot
- *  whose tree ended goes to the free list's head, in slot order (the last
- *  freed, the highest, taken first) */
+ *  past the standing controls' whose tree ended goes to the free list's
+ *  head, in slot order (the last freed, the highest, taken first) */
 function freeEndedTrees(state: GameState): void {
   const seat = state.barbSeat;
   const live = new Set([...(seat.ops ? opsOf(seat.ops).map((o) => o.id) : []),
     ...(state.barbTribes ?? []).flatMap((t) => (t.homing ? [t.homing.id] : []))].map(treeSlot));
   const free = (seat.treeFree ??= []);
-  for (let s = 0; s < (seat.treeSlots ?? 0); s++) if (!live.has(s) && !free.includes(s)) free.push(s);
+  for (let s = BARB_TREE_HELD; s < (seat.treeSlots ?? BARB_TREE_HELD); s++) if (!live.has(s) && !free.includes(s)) free.push(s);
 }
 
 /**

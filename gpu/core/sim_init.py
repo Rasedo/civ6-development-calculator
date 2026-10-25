@@ -4152,10 +4152,10 @@ class SimInit:
         # the barbarians' tree pool (`newBarbTreeId`): the next tree's
         # generation, the slots made, the free slots (a stack, the head on
         # top) — at most every tribe's operation and scout's tree and every
-        # capture's at once
-        self.barb_tree_next = torch.zeros(B, dtype=torch.long, device=device)
-        self.barb_tree_slots = torch.zeros(B, dtype=torch.long, device=device)
-        self.barb_tree_free = torch.zeros(B, 2 * self.KT + simbase.BARB_CAP_MAX, dtype=torch.long, device=device)
+        # capture's at once, past the standing controls' slots
+        self.barb_tree_next = torch.full((B,), simbase.BARB_TREE_FIRST_GEN, dtype=torch.long, device=device)
+        self.barb_tree_slots = torch.full((B,), simbase.BARB_TREE_HELD, dtype=torch.long, device=device)
+        self.barb_tree_free = torch.zeros(B, simbase.BARB_TREE_HELD + 2 * self.KT + simbase.BARB_CAP_MAX, dtype=torch.long, device=device)
         self.barb_tree_nfree = torch.zeros(B, dtype=torch.long, device=device)
         self.barb_unit_fresh = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
         # THE BARBARIANS' UNIT POOL (`BarbPool`, `barbSlots`): each unit's
