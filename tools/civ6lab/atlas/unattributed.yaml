@@ -3823,6 +3823,7 @@
   impl: [cpu/core/aiCityTrees.ts:addGoalTech, gpu/core/sim_citytrees.py:_x_add_goal_tech]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the turn limit, reset when every contract it holds is alive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reserv..."

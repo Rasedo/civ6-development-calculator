@@ -130,7 +130,7 @@ import { OperationsProbe, operationsMarkdown, type OperationsTally } from './ope
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
-import { GameMemory, MemoryLogs, readGameMemory, readMemory, type ArmyLogged } from './aiMemory';
+import { GameMemory, MemoryLogs, readGameMemory, readMemory, syncContracts, type ArmyLogged } from './aiMemory';
 import { NO_SCORE } from '../core/aiPolicyValue';
 
 /** what became of one decision */
@@ -3971,7 +3971,8 @@ function bindQueuedContracts(ctx: Ctx, cs: CityState, imp: Imported, turn: numbe
  * records — each the unit the record holds under that game id (its engine
  * id), else a fresh id; its owner's seat, its engine type, its plot, seen
  * at `turn` less its age (the records aged at `turn`), no damage (the game's
- * record holds none the reader names) — and its camps in the game's order.
+ * record holds none the reader names) —, its camps in the game's order and
+ * its contracts' progress, value and times (`syncContracts`).
  */
 function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: number): void {
   let fresh = -1;
@@ -3998,6 +3999,9 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
     const camps = (read.camps ?? []).map((c) => c[1] * ctx.W + c[0]);
     if (camps.length) s.campsKnown = camps;
     else delete s.campsKnown;
+    // the contracts: ours take the game's progress, value and times
+    // (`syncContracts`)
+    syncContracts(ctx.gameMemory!, ctx.cat, s, pid!, turn, ctx.W);
   }
 }
 
@@ -4080,7 +4084,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   /** with `aiScore`, the memory the game's logs hold whole (the knowledge
    *  bases' camps) taken from them each pair instead of carried */
   memoryFromLog?: boolean;
-  /** with `aiScore`, the game's own knowledge bases (army records, camps)
+  /** with `aiScore`, the game's own knowledge bases (army records, camps) and contracts
    *  taken each pair from `<stem>.aimem.jsonl` instead of carried */
   memoryFromAimem?: boolean;
   /** called after each pair is compared, with the engine state and record t+1 */

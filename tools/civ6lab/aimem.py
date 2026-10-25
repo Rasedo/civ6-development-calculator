@@ -39,7 +39,7 @@ stood for the read), and by site:
             the cities' contract submissions): `army`, `camps`,
             `contracts`, `holders`, `trees`, `ops`, `stats`
   endlook   the end look (player signal +0x228) done, the player's AI turn
-            over: the same as `log`
+            over: the same as `log`, each tree with its `nodes` (`tree_nodes`)
 A section the reader could not read is named in `errors`.
 `army`: per owner id per unit type index the records [unit id, +4, +8, age,
 x, y, +0x18, +0x1c]. `contracts`: per contract its id, kind (build, tech,
@@ -220,7 +220,7 @@ class Reader:
             out[name] = self.handles(obj + at) if obj else []
         return out
 
-    def trees(self, pl: int) -> dict:
+    def trees(self, pl: int, nodes: bool = False) -> dict:
         cm = self.pm.u64(pl + 0x6B0)
         pages = self.pm.u64(cm + 0x110)
         npages = (self.pm.u64(cm + 0x118) - pages) // 8
@@ -246,7 +246,31 @@ class Reader:
                 for name, (off, ty) in TREE.items():
                     rec[name] = b[off] if ty == "b" else struct.unpack_from("<i", b, off)[0]
                 rec["contracts"] = self.handles(tree + 0x378)
+                if nodes:
+                    rec["nodes"] = self.tree_nodes(tree, b)
                 out[ident] = rec
+        return out
+
+    def tree_nodes(self, tree: int, b: bytes) -> list:
+        """a tree's nodes in BehaviorTreeNodes order (the tick 0x544360):
+        their count m_numNodes (+0xa0), per node its status (m_actionStates'
+        vector, +0x108: 0 fresh, 1 success, 2 running, 3 failure, 4 error, 5
+        skipped) and its 0xb8-byte state block (m_definitions' vector,
+        +0xb8: +0 its shape, +4 its handler's index, +8 the node's data — the
+        node type's own fields at their Release offsets less 8, e.g. Add Goal
+        Tech's contracts +0x94 / +0x9c): [status, shape, handler, data] with
+        the data as hex, its trailing zero bytes cut"""
+        n = struct.unpack_from("<i", b, 0xA0)[0]
+        st_p, bl_p = struct.unpack_from("<Q", b, 0x108)[0], struct.unpack_from("<Q", b, 0xB8)[0]
+        if not (0 < n <= 512) or not ptr(st_p) or not ptr(bl_p):
+            return []
+        st = struct.unpack(f"<{n}i", self.pm.read(st_p, 4 * n))
+        blocks = self.pm.read(bl_p, 0xB8 * n)
+        out = []
+        for k in range(n):
+            blk = blocks[0xB8 * k:0xB8 * (k + 1)]
+            shape, handler = struct.unpack_from("<ii", blk, 0)
+            out.append([st[k], shape, handler, blk[8:].rstrip(b"\0").hex()])
         return out
 
     # -- operations
@@ -294,13 +318,13 @@ class Reader:
         return {"maxMelee": self.pm.i32(self.pm.u64(pl + 0x710) + 0xA0),
                 "citiesEc": self.pm.i32(self.pm.u64(pl + 0x6D0) + 0xEC)}
 
-    def full(self, pid: int) -> dict:
+    def full(self, pid: int, nodes: bool = False) -> dict:
         pl = self.player(pid)
         kb = self.pm.u64(pl + 0x698) + 0x270
         out: dict = {}
         for name, fn in (("army", lambda: self.army(kb)), ("camps", lambda: self.camps(kb)),
                          ("contracts", lambda: self.contracts(pl)), ("holders", lambda: self.holders(pl)),
-                         ("trees", lambda: self.trees(pl)), ("ops", lambda: self.ops(pl)),
+                         ("trees", lambda: self.trees(pl, nodes)), ("ops", lambda: self.ops(pl)),
                          ("stats", lambda: self.stats(pl))):
             try:
                 out[name] = fn()
@@ -334,7 +358,7 @@ def hit_record(r: Reader, mb: bytes) -> dict | None:
         pid = pm.i32(pl + 0xD8)
         rec.update(site="endlook", player=pid)
         rec.update(r.common())
-        rec.update(r.full(pid))
+        rec.update(r.full(pid, nodes=True))
     elif site == 5:
         rec.update(site="start", player=pm.i32(rdx + 0xD8))
         rec.update(r.common())

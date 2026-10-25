@@ -22,7 +22,7 @@
  * next turn's decisions read it (`replay.ts`).
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { CP_ACCEPTED, CP_CLAIMED, CP_IN_PROGRESS, CP_NAMES, CP_SUBMITTED, type AiContract } from '../core/aiContracts';
+import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_IN_PROGRESS, CP_NAMES, CP_SUBMITTED, type AiContract } from '../core/aiContracts';
 import type { CityAi } from '../core/aiCityTrees';
 import { opsOf } from '../core/operations/manager';
 import type { ArmyRecord, Seat } from '../core/types';
@@ -158,6 +158,8 @@ export interface GameContract {
   id: number;
   owner: number;
   value: number;
+  timeLimit?: number;
+  timeEstimate?: number;
   unit?: number;
   building?: number;
   district?: number;
@@ -272,6 +274,43 @@ function ourItem(c: AiContract, ai: CityAi, W: number): string {
  * target, their members' unit types, their strengths (the teams' and the
  * enemy's about the target).
  */
+/**
+ * The game's contracts at the end look of `turn` onto the seat's own book
+ * (`--memory aimem`): each open contract of ours takes the game's open
+ * contract of the same item and tree — its progress, its value, its time
+ * limit and estimate; one the game holds none of is CANCELLED. A game
+ * contract no tree of ours made stays out: a contract lives in its tree,
+ * whose node memory is not imported. Returns [matched, cancelled, the game's
+ * left out].
+ */
+export function syncContracts(game: GameMemory, names: MemoryNames, seat: Seat, player: number, turn: number,
+  W: number): [number, number, number] {
+  const end = game.at('endlook', turn, player);
+  const ai = seat.cityAi;
+  if (!end?.contracts || !ai) return [0, 0, 0];
+  const tree = (c: GameContract) => end.trees?.[String(c.owner)]?.name ?? '-';
+  const pool = end.contracts.filter((c) => OPEN.has(c.status));
+  let matched = 0;
+  let cancelled = 0;
+  for (const c of ai.contracts) {
+    if (!OPEN.has(c.progress)) continue;
+    const key = `${ourItem(c, ai, W)}|${c.treeName}`;
+    const k = pool.findIndex((g) => `${gameItem(g, names)}|${tree(g)}` === key);
+    if (k < 0) {
+      c.progress = CP_CANCELLED;
+      cancelled += 1;
+      continue;
+    }
+    const g = pool.splice(k, 1)[0];
+    c.progress = g.status;
+    c.value = g.value;
+    if (g.timeLimit !== undefined) c.maxTurns = Math.max(0, g.timeLimit);
+    if (g.timeEstimate !== undefined) c.turns = g.timeEstimate;
+    matched += 1;
+  }
+  return [matched, cancelled, pool.length];
+}
+
 export function readGameMemory(game: GameMemory, names: MemoryNames, seat: Seat, player: number, turn: number, W: number,
   playerOf: (seat: number) => number, army: ArmyLogged | undefined, unitType: (id: number) => string | undefined): MemoryRead[] {
   const out: MemoryRead[] = [];

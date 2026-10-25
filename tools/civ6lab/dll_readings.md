@@ -3642,6 +3642,22 @@ this file do not carry over; the knowledge base's inner layout does.
   m_operationId, +0x378 m_managedContracts. The reset 0x7d3670 (FinalRelease
   0x544020) sets +0x170's value to 1: the Release's "marked (+0x3c8)" is
   m_allowRecruiting.
+- A TREE'S NODES (the tick 0x7d3a00 (FinalRelease 0x544360) and the node
+  update 0x7d3d30 (FinalRelease 0x544530)): +0xa0 the node count
+  (m_numNodes' value), +0xb8 the node blocks (m_definitions' value: 0xb8
+  bytes a node in BehaviorTreeNodes order — +0 its shape, +4 its handler's
+  index in the shape's table, +8 the node's own data, the update handed
+  +8), +0xe0 the node graph (0x14 bytes a node, +0 its parent), +0x108 the
+  statuses (m_actionStates' value, an int a node; the tick writes each
+  node's update there and the root's decides the execution). The statuses
+  stand at the end look as the turn's tick left them. A node's data holds
+  its own fields (Add Goal Tech, 0x7e7200 (FinalRelease 0x54f6b0): +0x94
+  its tech contract, +0x98 the goal, at the Release offsets of the data)
+  and its TreeData references, 16 bytes each — a pointer to the data
+  type's column, the type (0 boolean, 3, 4, 5, 8, 9, 10 by the column), the
+  slot — whose values stand in the tree's tagged data, not yet read.
+  aimem.py reads every tree's nodes at the end look (`tree_nodes`:
+  [status, shape, handler, the data as hex]).
 - THE OPERATIONS: Military (Player +0x680) +0x1f0 a list (node +0 the
   operation, +0x10 the next; 0x723cf0 (FinalRelease 0x4cf450) and the log
   0x727510 (FinalRelease 0x4d26e0) walk it). An operation (constructor

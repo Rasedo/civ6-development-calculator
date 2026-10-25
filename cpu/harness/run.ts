@@ -20,7 +20,7 @@
  * (`perTurnWorld`): the city-states', Free Cities' and barbarians' AI scored
  * turn by turn, decision by decision (`aiScore.ts`), into `<out>.json` and
  * `<out>.md`; `--memory log` takes the memory the game's logs hold whole
- * from them each pair instead, `--memory aimem` the game's own knowledge bases
+ * from them each pair instead, `--memory aimem` the game's own knowledge bases and contracts
  * (`<stem>.aimem.jsonl`). A recording with the game's AI memory beside it is
  * compared against that (`readGameMemory`), else against its logs.
  */
