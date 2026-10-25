@@ -711,6 +711,12 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   for (const u of [...state.units]) {
     if (!isBarbSeat(u.seat) || before.has(u) || mapped.has(u)) continue;
     disbandUnit(state, u.id);
+    // ...and no knowledge base's record of it (runs/h1_dueld1128 t105: the
+    // engine's Man-at-Arms on the camp at 17:4, aging in the barbarians'
+    // records alone)
+    for (const h of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : []), state.barbSeat]) {
+      if (h.armyKnown?.some((r) => r.id === u.id && r.owner === u.seat)) h.armyKnown = h.armyKnown.filter((r) => r.id !== u.id || r.owner !== u.seat);
+    }
     count(ctx, 'barb:unit', 'fallback', ctx.playerOfSeat.get(BARB_SEAT), `${u.type}: the game raised none`);
   }
   for (const [key, u] of ctx.units) {
@@ -1223,7 +1229,10 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
     // in the pair's turn and before the barbarians' turn: its units on the
     // plots record t+1 holds them on, the others where the turn found them
     // with record t+1's damage (the turn's engine pass looked before its
-    // moves). What it sees is seen in the pair's turn, so the next turn's
+    // moves) — a city-state or the Free Cities before it where record t+1
+    // holds them, one after it where the first record does, its turn yet to
+    // come (runs/h1_dueld1121 t99: Ayutthaya's record of Antioch's
+    // Man-at-Arms 1048577 at 42:16, its plot as Antioch's turn opens). What it sees is seen in the pair's turn, so the next turn's
     // operations evaluation reads it aged one (runs/h1_duelv1128 city-state
     // 4: the camp's Spearman, seen after its t13 moves and not again before
     // t18, is past the age its t17 Attack Barb Camp odds read)
@@ -1250,7 +1259,13 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
         }
         held.push([x, x.tileIndex, x.hp]);
         if (x.seat === c.seat) x.tileIndex = u.tileIndex;
-        else x.hp = u.hp;
+        else {
+          x.hp = u.hp;
+          if (minorAiSeat(x.seat)) {
+            const first = startAt.get(keyOf.get(u) ?? '');
+            x.tileIndex = ctx.playerOfSeat.get(x.seat)! < ctx.playerOfSeat.get(c.seat)! ? u.tileIndex : first ?? u.tileIndex;
+          }
+        }
       }
       const now = copy.turn;
       copy.turn = turn;
@@ -4539,13 +4554,32 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const now = new Set(c.tradeRoutes ?? []);
       return [c.seat, (routesBefore.get(c.seat) ?? []).filter((r) => !now.has(r)).length] as const;
     }));
+    // the units each player's log adds in the pair that record t+1 lost: a
+    // unit made and gone within its turn
+    const madeGone = new Map<number, number>();
+    const heldKeys = new Set(b.units.map((x) => `${x.owner}:${x.id}`));
+    for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
+      if (x[2] !== 'UnitAddedToMap' || heldKeys.has(`${x[3]}:${x[4]}`)) continue;
+      const seat = seatOfP(ctx, x[3] as number);
+      madeGone.set(seat, (madeGone.get(seat) ?? 0) + 1);
+    }
+    const forget = (u: Unit): void => {
+      for (const h of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : []), state.barbSeat]) {
+        if (h.armyKnown?.some((r) => r.id === u.id && r.owner === u.seat)) h.armyKnown = h.armyKnown.filter((r) => r.id !== u.id || r.owner !== u.seat);
+      }
+    };
     for (const u of [...state.units]) {
       if (standing.has(u) || mapped.has(u) || u.seat < state.seats.length) continue;
       disbandUnit(state, u.id);
       const cs = state.cityStates.find((c) => c.seat === u.seat);
       const paid = minorBought.get(u);
       if (!paid && u.type === 'TRADER' && (returned.get(u.seat) ?? 0) > 0) {
+        // ...and none the game's knowledge bases record: the engine's own
+        // Trader made at the route's end (runs/h1_dueld1128 Hong Kong's
+        // Trader on 10:7, t119-t137 and t164-t179 in the engine's records
+        // alone)
         returned.set(u.seat, returned.get(u.seat)! - 1);
+        forget(u);
         continue;
       }
       // a purchase the game never made leaves no record in any knowledge
@@ -4553,12 +4587,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // (runs/h1_duelw1127 t17: city-state 4's Warrior bought at t16,
       // undone, its record at its centre starting Attack Barb Camp the game
       // never started). A unit trained may be the game's, gone in its turn
+      // where the log adds one of its player's the record t+1 lost
       // (runs/h1_duelw1128 t42: city-state 2's Warrior, its record aging on
-      // in the game's)
+      // in the game's); one the log never adds leaves none (runs/h1_dueld1117
+      // t77: Caguana's Trader, trained, undone, its record aging on 43:12 to
+      // t97 in the engine's alone)
+      const gone = madeGone.get(u.seat) ?? 0;
+      if (!paid && gone > 0) madeGone.set(u.seat, gone - 1);
+      if (paid || gone === 0) forget(u);
       if (paid) {
-        for (const h of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : []), state.barbSeat]) {
-          if (h.armyKnown?.some((r) => r.id === u.id && r.owner === u.seat)) h.armyKnown = h.armyKnown.filter((r) => r.id !== u.id || r.owner !== u.seat);
-        }
         paid.cityState.treasury += paid.price;
         if (u.type === 'BUILDER') paid.cityState.buildersTrained -= 1;
         // ...and its savings back: the spend the purchase took from each

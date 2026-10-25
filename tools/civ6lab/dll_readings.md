@@ -4508,6 +4508,21 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   turn (runs/h1_dueld1128 t41: Hong Kong's Warrior 851968 trained and
   upgraded to the Swordsman 917509 before Granada's look; Granada's record
   a Swordsman, no Warrior).
+- THE KNOWLEDGE BASES OVER FULL GAMES (the replay): a unit the engine made
+  that the game did not — trained where the log adds none of its player's
+  that record t+1 lost, a Trader the engine makes at a route's end, a
+  barbarian unit no tribe of the game raised — leaves no record in any
+  knowledge base when the replay undoes it (runs/h1_dueld1117 t77
+  Caguana's Trader aging on 43:12 to t97, h1_dueld1128 Hong Kong's Trader
+  on 10:7 t119-t137, t105 the barbarians' Man-at-Arms on the camp at 17:4,
+  each in the engines' records alone). A city-state's end look sees a
+  city-state or the Free Cities after it where the first record holds them,
+  their turn to come, one before it where record t+1 does (runs/h1_dueld1121
+  t99: Ayutthaya's record of Antioch's Man-at-Arms 1048577 at 42:16).
+  --aiscore full length, the five dueld duels: knowledge.army 3,571 ->
+  4,391 of 6,173 (57.8% -> 71.1%), the decisions within a few rows. Left
+  (rows of a single class): another player's unit only the engines hold
+  (252), on another plot (238), at another age (145).
 - A DROUGHT IN THE PLOT ANALYSIS (the PLOT ANALYSIS LOG of the verbose
   recordings): an improvement a drought on the plot bars (the drought's
   list, `droughtBars`), which the plot's ground takes otherwise, is valued
