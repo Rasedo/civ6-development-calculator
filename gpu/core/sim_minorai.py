@@ -1278,12 +1278,15 @@ class SimMinorAi:
     def _minor_buy_unit(self, s: int, mask: torch.Tensor, ui: torch.Tensor, price: torch.Tensor) -> torch.Tensor:
         """`minorBuyUnit` in Gold where `mask`: the treasury covers the price,
         the unit stands on or beside the centre with the city's training
-        grants (none bought with no free tile), the treasury pays; [B] the
-        games where it landed"""
+        grants at Movement 0 (none bought with no free tile), the treasury
+        pays; [B] the games where it landed"""
         go = mask & self._afford(self.citystate_treasury[:, s], price)
         if not bool(go.count_nonzero()):
             return go
+        slot = self.unit_next.clone()
         landed = self._minor_spawn(s, go, ui)
+        rows = landed.nonzero(as_tuple=True)[0]
+        self.major_unit_mp[rows, slot[rows]] = 0
         self.citystate_treasury[:, s] -= torch.where(landed, price, torch.zeros_like(price))
         return landed
 

@@ -578,6 +578,10 @@ export function minorBuyUnit(state: GameState, cityState: CityState, id: string,
   if (!goldAffordable(currency === 'gold' ? cityState.treasury : cityState.faith, price)) return undefined;
   const u = spawnUnit(state, id, cityState.centerIndex, cityState.seat);
   if (!u) return undefined;
+  // a unit bought stands its turn out at Movement 0 (runs/h1_duely1127 t30:
+  // Muscat's Builder bought onto its centre 42:15 lays 43:15's Farm at t31;
+  // every unit the five duely duels' city-states bought sat its turn idle)
+  u.movesLeft = 0;
   if (currency === 'faith') {
     cityState.faith -= price;
     raiseBestTrained(state, cityState.seat, id);

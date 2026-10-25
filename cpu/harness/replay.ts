@@ -648,6 +648,20 @@ function campsTaken(ctx: Ctx, b: TurnRecord, turn: number): void {
   }
 }
 
+/** the units record t+1 holds that its next turn's start made (its log's
+ *  rows of that turn: a city's production at the active player's start),
+ *  which no look of turn t sees (runs/h1_duely1121 t5: Rome's Scout made on
+ *  35:14 at the start of turn 5, in no knowledge base at turn 4's end) */
+function unbornUnits(ctx: Ctx, b: TurnRecord): Set<Unit> {
+  const out = new Set<Unit>();
+  for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
+    if (x[2] !== 'UnitAddedToMap' || x[1] !== b.turn) continue;
+    const u = ctx.units.get(`${x[3]}:${x[4]}`);
+    if (u) out.add(u);
+  }
+  return out;
+}
+
 /**
  * THE BARBARIANS CLOSE THE PAIR: after every player's actions of the turn
  * (the record's, landed), their unit pool takes the game's slots (each unit
@@ -1269,7 +1283,12 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
       }
       const now = copy.turn;
       copy.turn = turn;
+      // ...seeing no unit the next turn's start made
+      const unborn = unbornUnits(ctx, b);
+      const all = copy.units;
+      copy.units = all.filter((x) => !unborn.has(twin.get(x)!));
       minorKnowledge(copy, c, false);
+      copy.units = all;
       copy.turn = now;
       for (const [x, at, hp] of held) {
         x.tileIndex = at;
@@ -4708,8 +4727,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     barbarianTurn(ctx, b, a.turn);
     // the units the barbarians raised stand where the record holds them
     inTurn(state, a.turn, () => syncUnits(ctx, b));
-    // the barbarians' knowledge base looks at their turn's end from there
+    // the barbarians' knowledge base looks at their turn's end from there,
+    // before the next turn's start made its units
+    const unborn = unbornUnits(ctx, b);
+    const all = state.units;
+    state.units = all.filter((u) => !unborn.has(u));
     knowledgeLook(state, state.barbSeat, BARB_SEAT, plotsSeenNow(state, new Set([BARB_SEAT])), false);
+    state.units = all;
     settleEnvoys(ctx, b);
     // the barbarians' units sat the engine's turn out, so their rest — the
     // fortification a unit holding the Fortify order digs in (`fortifyOrders`)
