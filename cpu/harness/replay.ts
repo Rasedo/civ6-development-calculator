@@ -3208,7 +3208,10 @@ function unitKeyOf(ctx: Ctx, u: Unit): string {
   return '';
 }
 
-function syncUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
+/** every unit of the record (of player `only`) on its record plot with the
+ *  record's moves; `keepMoves`: a unit the record holds where the engine
+ *  left it keeps the engine's moves, which its rest reads */
+function syncUnits(ctx: Ctx, b: TurnRecord, only?: number, keepMoves = false): void {
   for (const r of b.units) {
     if (only !== undefined && r.owner !== only) continue;
     const u = unitOf(ctx, `${r.owner}:${r.id}`);
@@ -3236,7 +3239,7 @@ function syncUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
       if (isBarbSeat(u.seat)) ctx.barbSteps.push({ u, plots: steps });
     }
     u.tileIndex = at;
-    u.movesLeft = num(r.moves) * MP_SCALE;
+    if (!keepMoves || moved) u.movesLeft = num(r.moves) * MP_SCALE;
     u.embarked = bool(r.embarked) || undefined;
     if (UNITS[u.type]?.charges !== undefined) u.charges = num(r.buildCharges) || num(r.spreadCharges) || u.charges;
   }
@@ -4617,13 +4620,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // ...and without the units an earlier city-state's battles killed, the
       // record's battles landing after the minors' turns (runs/h1_dueld1127
       // t39: the barbarians' Slinger Hattusa killed on 7:10, out of Mexico's
-      // look)
+      // look). Their moves stay the engine's where the record holds them on
+      // the engine's plot: the turn's rest reads them, and a Fortify order
+      // ends the game's Movement without spending the heal (runs/h1_duelw1117
+      // t7: city-state 2's two Warriors fortify under Protect Units, record
+      // t8 both healed 10 at Movement 0)
       const killedBy = new Map(ds.flatMap((d) => (d.kind === 'kill' && isCityStateSeat(seatOfP(ctx, d.player)) ? [[d.victimUnit, d.player] as const] : [])));
       const fallen: [Unit, number][] = [];
       let before: number | undefined;
       holdMinorStart((_st, cs) => {
         if (before !== undefined) {
-          syncUnits(ctx, b, before);
+          syncUnits(ctx, b, before, true);
           // ...its upgrades made in its turn, which no later look sees undone
           // (runs/h1_dueld1128 t41: Hong Kong's Warrior upgraded to a
           // Swordsman before Granada's turn, none of its records a Warrior)
