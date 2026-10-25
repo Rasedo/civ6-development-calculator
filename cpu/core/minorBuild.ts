@@ -1643,15 +1643,16 @@ export function minorItemCost(state: GameState, cityState: CityState, item: Excl
             - Math.floor((minorBuildingCost(state, cityState, item.repair) * MINOR_REPAIR_RESUME_PCT) / 100);
 }
 
-/** THE MINOR'S ITEM COMPLETES: the unit stands on or beside the centre with
- *  the city's training grants (none with no free tile: the item waits), the
+/** THE MINOR'S ITEM COMPLETES: the unit stands on the centre, beside the
+ *  minor's own units there (`spawnUnit`'s 'stack'), with the city's training
+ *  grants (none where no plot takes it: the item waits), the
  *  building rises, the district is laid, the project or the repair lands;
  *  the item in hand is done. Returns whether it completed. */
 function minorFinish(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): boolean {
   const city = minorCity(cityState);
   let built = -1;
   if ('unit' in item) {
-    const unit = spawnUnit(state, item.unit, cityState.centerIndex, cityState.seat);
+    const unit = spawnUnit(state, item.unit, cityState.centerIndex, cityState.seat, 'stack');
     if (!unit) return false;
     built = unit.id;
     applyTrainingGrants(state, minorCity(cityState), unit);
@@ -1856,9 +1857,11 @@ function freeItemCost(state: GameState, city: City, q: QueueItem): number {
   return Infinity;
 }
 
-/** a Free City's item completes: false where its unit finds no free tile */
+/** a Free City's item completes: its unit on the centre, beside the Free
+ *  Cities' own units there (`spawnUnit`'s 'stack'); false where no plot
+ *  takes it */
 function freeFinish(state: GameState, city: City, q: QueueItem): boolean {
-  if (q.kind === 'unit') return !!spawnUnit(state, q.unit, city.centerIndex, FREE_SEAT);
+  if (q.kind === 'unit') return !!spawnUnit(state, q.unit, city.centerIndex, FREE_SEAT, 'stack');
   if (q.kind === 'building') {
     city.buildings.push(q.building);
     if (BUILDINGS[q.building].walls) {

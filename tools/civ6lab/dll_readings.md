@@ -4365,10 +4365,29 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   strikes from 8:14 and falls in the barbarians' turn, its record 8:14).
   --aiscore --to 60, the five dueld duels: knowledge.army 69.7% -> 81.1%
   (a player's own unit on another plot at the same age 229 -> 47 rows).
-  Left: a unit a city makes on a centre another military unit holds is
-  added on the centre, stacked, until its moves (runs/h1_dueld1128 t19:
-  Hong Kong's Warrior 327683 added on 9:7 with its Warrior 196610 still
-  there, its record 9:7 on the log), where `spawnUnit` places it beside.
+- A UNIT A CITY MAKES (READ): the train order (0x175730, "pFront->eDirective
+  == ORDER_TRAIN") makes each unit through the city's create 0x1e6570, which
+  picks the plot (the centre; a district for a domain that needs one) and
+  places the unit with 0x586d40(unit, plot, 1, 0). Flags 1 run the
+  location test 0x586360 with no flag bit set: the plot is refused for its
+  terrain (impassable, the unit's domain), another player's closed borders,
+  a unit type that needs a district off one, or a hostile defender there
+  (0x208b80) — never for the owner's own units. A refused plot goes to
+  FindAlternateLocation 0x585940 (range 10). So a trained unit lands on the
+  centre whatever of its owner's stands there, stacked until one of them
+  moves; no step parts them (runs/h1_dueld1128 t19: Hong Kong's Warrior
+  327683 added on 9:7 with its Warrior 196610 there, which steps off in its
+  turn; t50 China's Archer 983042 on Archer 917504's centre; record t24
+  holds Rome's Warriors 393216 and 589828 both on its centre 42:20). A
+  purchase is
+  refused where a unit of its class stands (`purchaseSpotBlocked`), so a
+  bought unit stands on a centre its class leaves free. The engines:
+  `spawnUnit`'s 'stack' (`tileFreeForUnit`'s `stacks`: the owner's units
+  block none) for the majors' trained units, Settlers, copies and twins,
+  the city-states' and the Free Cities' trained units; the GPU's
+  `_spawn_unit` / `_spawn_barb` `stack`, the occupancy plane keeping the unit
+  already there (`_occ_set_new`) and taking the next of its class when it
+  leaves (`_occ_clear`). --aiscore --to 60, the five dueld duels: knowledge.army 1184 -> 1207 of 1460, every other kind within one row; the CPU tests 2659 of 2659 before and after.
 - THE FOUNDING SETTLER'S RECORD: a city-state's knowledge base holds the
   Settler that founded its city, a unit gone, aging as any record to 21
   (runs/h1_dueld1121 aimem: each city-state's SETTLER on its centre at age

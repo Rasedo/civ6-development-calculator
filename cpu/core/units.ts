@@ -683,6 +683,7 @@ export function tileFreeForUnit(
   seat: number,
   unit?: Unit | { type: string; seat: number; id?: number },
   allowEmbark = false,
+  stacks = false,
 ): boolean {
   const tile = state.map.tiles[tileIndex];
   if (isImpassable(tile) && !gdrJump(state, unit, tile) && !portalAt(tile)) return false;
@@ -716,7 +717,7 @@ export function tileFreeForUnit(
   for (const u of unitsAt(state, tileIndex)) {
     if (u.id === unit?.id || isAirUnit(u.type) || isSpy(u.type)) continue;
     if (u.seat !== side) return false; // foreign occupied
-    if (unitStackSlot(u) === domain) return false; // same-slot ally
+    if (!stacks && unitStackSlot(u) === domain) return false; // same-slot ally
   }
   return true;
 }
@@ -1716,26 +1717,36 @@ export function recordAttacker(state: GameState, attacker: Unit, seat: number): 
   } else recs.push({ id: attacker.id, owner: attacker.seat, type: attacker.type, seen, plot: attacker.tileIndex, damage });
 }
 
-/** `far`: a GRANT, which the game places on the nearest plot that takes the
- *  unit however far that is — past the anchor and its ring, the whole map by
- *  distance, the lower tile index on a tie. */
+/** `place`: where the unit lands —
+ *  - 'near': the anchor where it is free for the unit, else the first free
+ *    plot of its ring;
+ *  - 'stack': a unit a city makes (the city's create 0x1e6570 -> the
+ *    placement 0x586d40 -> 0x586360, which asks the plot's terrain, borders
+ *    and a hostile unit there, never the owner's units): the anchor even
+ *    where a unit of its own stacking class stands, stacked until it moves
+ *    (runs/h1_dueld1128 t19: Hong Kong's Warrior 327683 added on 9:7 beside
+ *    its Warrior 196610; t50: China's Archer 983042 on Archer 917504's
+ *    centre), else as 'near';
+ *  - 'far': a GRANT, which the game places on the nearest plot that takes
+ *    the unit however far that is — past the anchor and its ring, the whole
+ *    map by distance, the lower tile index on a tie. */
 export function spawnUnit(
   state: GameState,
   unitType: string,
   nearIndex: number,
   seat: number,
-  far = false,
+  place: 'near' | 'stack' | 'far' = 'near',
 ): Unit | null {
   const def = UNITS[unitType];
   if (!def) return null;
   const near = state.map.tiles[nearIndex];
   const probe = { type: unitType, seat };
-  let spot = isAirUnit(unitType) || isSpy(unitType)
+  let spot = isAirUnit(unitType) || isSpy(unitType) || (place === 'stack' && tileFreeForUnit(state, near.index, seat, probe, false, true))
     ? near
     : [near, ...neighbors(state.map, near)]
       .sort((a, b) => hexDistance(state.map, near.col, near.row, a.col, a.row) - hexDistance(state.map, near.col, near.row, b.col, b.row))
       .find((t) => tileFreeForUnit(state, t.index, seat, probe));
-  if (!spot && far) {
+  if (!spot && place === 'far') {
     let bd = Infinity;
     for (const t of state.map.tiles) {
       const d = hexDistance(state.map, near.col, near.row, t.col, t.row);

@@ -1572,7 +1572,7 @@ class SimPhase:
             if row < self.n_majors:
                 self._place_citizens(row, col, made_s & ~_free, None, full=True)
             if self._settler_idx >= 0:
-                landed = self._spawn_unit(row, made_s, ctr, self._settler_idx)
+                landed = self._spawn_unit(row, made_s, ctr, self._settler_idx, stack=True)
                 self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed.long()
 
         made_u = done & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
@@ -1590,7 +1590,7 @@ class SimPhase:
                 self.city_dist_tile[bidx, row, col], self.city_bldg_pillaged[bidx, row, col])
             _tr = self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp,
                                    free_promo=fp, formation=form_t,
-                                   init_mp=self._train_mp_bonus(_bl_u, ui, row))
+                                   init_mp=self._train_mp_bonus(_bl_u, ui, row), stack=True)
             self._raise_best_trained(row, _tr, ui, formation=form_t)
             # CIV6 (People of the Steppe): "Receive a second light cavalry
             # unit ... each time you train a light cavalry unit" — a TRAINED
@@ -1610,7 +1610,8 @@ class SimPhase:
                     continue
                 for _ in range(_en):
                     self._raise_best_trained(
-                        row, self._spawn_unit(row, _ew, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui,
+                        row, self._spawn_unit(row, _ew, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t,
+                                              stack=True), ui,
                         formation=form_t)
             # CIV6 (Suleiman's Janissary): the chassis costs the TRAINING city
             # a citizen, in a city this seat founded.
@@ -1636,7 +1637,8 @@ class SimPhase:
                 if bool(twin.count_nonzero()):
                     # what was trained arrives twice, tier and all
                     self._raise_best_trained(
-                        row, self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui,
+                        row, self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t,
+                                              stack=True), ui,
                         formation=form_t)
             if self._builder_idx >= 0:
                 made_b = made_u & (ui == self._builder_idx)

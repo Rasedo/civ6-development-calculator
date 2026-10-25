@@ -1484,9 +1484,10 @@ class SimMinors:
         return torch.where(first < NB, first, torch.full_like(first, -1))
 
     def _minor_spawn(self, s: int, mask: torch.Tensor, ui: torch.Tensor,
-                     grants: bool = True) -> torch.Tensor:
+                     grants: bool = True, stack: bool = False) -> torch.Tensor:
         """[B] — a unit of chassis `ui` lands on the minor's centre or its ring
-        (`spawnUnit`, the ordinary rule) under its seat, carrying what the
+        (`spawnUnit`; `stack`: one it trains, on the centre beside its own
+        units, `_spawn_unit`'s `stack`) under its seat, carrying what the
         city's buildings hand a unit trained there (`applyTrainingGrants`)
         unless `grants` is off; a Builder counts toward the next one's price.
         Every such unit is trained or bought, so it raises the minor's best
@@ -1501,7 +1502,7 @@ class SimMinors:
             bl = self.city_bldg[:, row, 0] & ~self._bldg_dark(
                 self.city_dist_tile[:, row, 0], self.city_bldg_pillaged[:, row, 0])
             xp = self._train_xp_pct(bl, u0, row, col0)
-        landed = self._spawn_unit(row, mask, self.citystate_center[:, s].clamp(min=0), u0, init_xp=xp)
+        landed = self._spawn_unit(row, mask, self.citystate_center[:, s].clamp(min=0), u0, init_xp=xp, stack=stack)
         self._raise_best_trained(row, landed, u0)
         if self._builder_idx >= 0:
             self.citystate_builders_trained[:, s] += (landed & (u0 == self._builder_idx)).long()
@@ -1606,9 +1607,9 @@ class SimMinors:
                                                self.citystate_ovf[:, s])
 
     def _minor_finish(self, s: int, done: torch.Tensor, item: torch.Tensor) -> torch.Tensor:
-        """`minorFinish` where `done`: the unit stands on or beside the centre
-        with the city's training grants (none with no free tile: the item
-        waits), the building rises (the walls at full, the Flood Barrier
+        """`minorFinish` where `done`: the unit stands on the centre, beside
+        the minor's own units there (`stack`), with the city's training grants
+        (none where no plot takes it: the item waits), the building rises (the walls at full, the Flood Barrier
         drying what it covers), the district is laid on its plot — where the
         plot no longer takes it the item leaves the queue — the walls'
         repair restores the walls at the HP it puts back, the pillaged
@@ -1628,7 +1629,7 @@ class SimMinors:
         if bool(m.any()):
             ui = item.clamp(min=0, max=self.NU - 1)
             slot0 = self.unit_next.clone()
-            landed = self._minor_spawn(s, m, ui)
+            landed = self._minor_spawn(s, m, ui, stack=True)
             uid = torch.where(landed, self.POOL_LO["major"] + slot0, uid)
             u_row = torch.where(landed, T["engine_row"].to(dev).take(ui), u_row)
             fin = fin | landed

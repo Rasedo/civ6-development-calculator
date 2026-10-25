@@ -1435,7 +1435,8 @@ class SimMinorAi:
             if bool(m.count_nonzero()):
                 ctr = self.city_center[:, row, j].clamp(min=0)
                 ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
-                fin = fin | self._spawn_barb(m, ctr, ui, seat=FREE_SEAT, home=torch.full((B,), -1, dtype=torch.long, device=dev))
+                fin = fin | self._spawn_barb(m, ctr, ui, seat=FREE_SEAT, home=torch.full((B,), -1, dtype=torch.long, device=dev),
+                                               stack=True)
             m = done & is_b
             if bool(m.count_nonzero()):
                 rr = m.nonzero(as_tuple=True)[0]

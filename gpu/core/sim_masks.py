@@ -2613,7 +2613,7 @@ class SimMasks:
         own = seat.reshape(-1, 1, 1) if torch.is_tensor(seat) else seat
         return ((seats >= 0) & ((seats != own) | same)).any(dim=1)
 
-    def _first_free_spot(self, at_tile: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None, sup_mask: torch.Tensor | None = None, utype: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def _first_free_spot(self, at_tile: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None, sup_mask: torch.Tensor | None = None, utype: torch.Tensor | None = None, stack: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
         first free neighbor in direction order (the stable distance sort
         keeps exactly that order). `seat` is the ABSOLUTE seat spawning —
@@ -2623,6 +2623,9 @@ class SimMasks:
         naval_mask [B] bool marks rows spawning a NAVAL unit — those probe over
         enterable WATER (wpass; OCEAN needs the owner's CARTOGRAPHY, passed as
         cart [B]) instead of the land plane, so ships land on water.
+        `stack`: a unit a city makes (`spawnUnit`'s 'stack') takes the anchor
+        wherever its terrain, borders and the units of other seats allow it,
+        the owner's own units there whatever their class.
         `utype` [B] is the chassis spawning: a CLOSED border refuses a plot as
         `tileFreeForUnit`'s `borderClosedTo` does, the chassis' own exemptions
         (a Trader, a religious unit) included.
@@ -2630,13 +2633,18 @@ class SimMasks:
         cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)
         ok7 = self._spot_free(cand7, seat, civ_mask=civ_mask, naval_mask=naval_mask, cart=cart,
                               sup_mask=sup_mask, utype=utype)
+        if stack:
+            ok7[:, 0] = self._spot_free(cand7[:, :1], seat, civ_mask=civ_mask, naval_mask=naval_mask, cart=cart,
+                                        sup_mask=sup_mask, utype=utype, stacks=True)[:, 0]
         first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
         spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
         return first < 7, spot
 
-    def _spot_free(self, cand7: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None, sup_mask: torch.Tensor | None = None, utype: torch.Tensor | None = None) -> torch.Tensor:
+    def _spot_free(self, cand7: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None, sup_mask: torch.Tensor | None = None, utype: torch.Tensor | None = None, stacks: bool = False) -> torch.Tensor:
         """[B, K] bool — `tileFreeForUnit` for the spawn probe over any
-        candidate tiles [B, K] (-1 = none), the arguments `_first_free_spot`'s."""
+        candidate tiles [B, K] (-1 = none), the arguments `_first_free_spot`'s;
+        `stacks`: the owner's own units block none (`tileFreeForUnit`'s
+        `stacks`), another seat's still do."""
         okc = cand7.clamp(min=0)
         # The SAME stacking rule the movement probe uses, keyed on the spawning
         # seat; the barbarian seat needs no special case, because "hostile to
@@ -2645,10 +2653,18 @@ class SimMasks:
         # `_blocked_for`, not `_stack_blocked`: TS's spawnUnit probes with
         # tileFreeForUnit (units.ts), which calls encampmentBlocks — so the
         # Encampment wall belongs here too.
-        blocked = self._blocked_for(cand7, seat,
-                                    is_civilian=False if civ_mask is None else civ_mask,
-                                    is_naval=False if naval_mask is None else naval_mask,
-                                    is_support=False if sup_mask is None else sup_mask)
+        if stacks:
+            tcs = cand7.clamp(min=0)
+            blocked = self._encamp_block(cand7, seat)
+            for plane in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+                held = plane.gather(1, tcs)
+                who = self.unit_seat.gather(1, held.clamp(min=0))
+                blocked = blocked | ((held >= 0) & (who != seat))
+        else:
+            blocked = self._blocked_for(cand7, seat,
+                                        is_civilian=False if civ_mask is None else civ_mask,
+                                        is_naval=False if naval_mask is None else naval_mask,
+                                        is_support=False if sup_mask is None else sup_mask)
         terr = self.passable.gather(1, okc)
         if naval_mask is not None and bool(naval_mask.count_nonzero()):
             ocean_ok = ~self.ocean_tile.gather(1, okc)
@@ -2785,7 +2801,8 @@ class SimMasks:
 
     def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int | torch.Tensor,
                     seat: int = BARB_SEAT, home: torch.Tensor | None = None, cart: torch.Tensor | None = None,
-                    naval_rows: torch.Tensor | None = None, civ: torch.Tensor | None = None) -> torch.Tensor:
+                    naval_rows: torch.Tensor | None = None, civ: torch.Tensor | None = None,
+                    stack: bool = False) -> torch.Tensor:
         """Spawn into the HOSTILE pool — the barbarians' and the Free Cities'
         (`seat`), the two classes that earn no experience and that no driven
         seat walks. `unit_type` is a roster index or [B] roster indices,
@@ -2794,13 +2811,14 @@ class SimMasks:
         the games whose unit is a hull where it varies per game, `cart` [B]
         the games whose owner may put one on OCEAN, `civ` [B] the games whose
         unit is a civilian (a Free City's Builder), standing in the civilian
-        plane. Returns the games where the unit landed."""
+        plane; `stack` a unit a Free City makes (`_spawn_unit`'s). Returns the
+        games where the unit landed."""
         if not bool(mask.count_nonzero()):
             return mask & False
         # a NAVAL barb probes the WATER plane (its hull cannot stand ashore),
         # exactly as TS's spawnUnit branches on UNITS[type].naval.
         _nm = naval_rows
-        found, spot = self._first_free_spot(at_tile, seat, naval_mask=_nm, cart=cart, civ_mask=civ)
+        found, spot = self._first_free_spot(at_tile, seat, naval_mask=_nm, cart=cart, civ_mask=civ, stack=stack)
         can = mask & found
         if not bool(can.count_nonzero()):
             return can
@@ -2871,12 +2889,12 @@ class SimMasks:
         self.barb_unit_mp[rows, slot] = _m
         self.barb_unit_mp_full[rows, slot] = _m
         self.barb_unit_attacks[rows, slot] = 1
-        if civ is None:
-            self.military_at[(rows, spot[rows])] = slot + self.POOL_LO["barb"]
-        else:
-            cv = civ[rows]
-            self.military_at[(rows[~cv], spot[rows[~cv]])] = slot[~cv] + self.POOL_LO["barb"]
-            self.civilian_at[(rows[cv], spot[rows[cv]])] = slot[cv] + self.POOL_LO["barb"]
+        # the plane keeps a unit already there (a stacking spawn's)
+        cv = torch.zeros_like(rows, dtype=torch.bool) if civ is None else civ[rows]
+        for plane, on in ((self.military_at, ~cv), (self.civilian_at, cv)):
+            r_, s_ = rows[on], slot[on]
+            free = plane[r_, spot[r_]] < 0
+            plane[(r_[free], spot[r_[free]])] = s_[free] + self.POOL_LO["barb"]
         # spawnUnit's revealAround: a barbarian's look lifts their fog
         if seat == BARB_SEAT:
             self._barb_reveal(rows, spot[rows], self._unit_sight(_ut_b, self.barb_unit_promos[rows, slot]),
@@ -3413,10 +3431,13 @@ class SimMasks:
         elif row == self.FREE_ROW:
             self.free_best_melee = torch.maximum(self.free_best_melee, cs.to(self.free_best_melee.dtype))
 
-    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None, init_mp: torch.Tensor | None = None, far: bool = False) -> torch.Tensor:
+    def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None, init_mp: torch.Tensor | None = None, far: bool = False, stack: bool = False) -> torch.Tensor:
         """`spawnUnit`. `far`: a GRANT, placed on the nearest plot that takes
         the unit however far that is — past the anchor and its ring, the whole
-        map by distance, the lower tile index on a tie."""
+        map by distance, the lower tile index on a tie. `stack`: a unit a city
+        makes, on the anchor even where the owner's unit of its class stands
+        (`_first_free_spot`'s `stack`); the plane keeps the unit already there
+        (`_occ_set_new`)."""
         if not bool(mask.count_nonzero()):
             return torch.zeros_like(mask)
         if isinstance(type_idx, int):
@@ -3437,7 +3458,7 @@ class SimMasks:
                 else self._row_ocean_open_naval(row))
         found, spot = self._first_free_spot(at_tile, seat, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
                                             utype=type_idx,
-                                            sup_mask=self._type_support.take(type_idx.clamp(min=0)))
+                                            sup_mask=self._type_support.take(type_idx.clamp(min=0)), stack=stack)
         if far and bool((mask & ~found).count_nonzero()):
             _allt = torch.arange(self.T, device=self.device).unsqueeze(0).expand(self.B, self.T)
             _okt = self._spot_free(_allt, seat, civ_mask=is_civ_u, naval_mask=naval_m, cart=cart,
@@ -3596,7 +3617,7 @@ class SimMasks:
         # still kept out of every plane.
         _hold = rows[~no_hold.take(rows)]
         if len(_hold) > 0:
-            self._occ_set(_hold, spot.take(_hold), nxt.take(_hold) + off)
+            self._occ_set_new(_hold, spot.take(_hold), nxt.take(_hold) + off)
         nxt[rows] += 1
         # no chassis a minor or the Free Cities trains climbs in price, so the
         # tally below has no column for them

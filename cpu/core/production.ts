@@ -414,7 +414,7 @@ export function completeQueueItem(
       // the city — a unit like any other, moved and founded by orders.
       // CIV6 (Provision): "Settlers trained in the city do not consume a
       // Population."
-      if (spawnUnit(state, 'SETTLER', city.centerIndex, city.seat)) owner.settlersTrained = (owner.settlersTrained ?? 0) + 1;
+      if (spawnUnit(state, 'SETTLER', city.centerIndex, city.seat, 'stack')) owner.settlersTrained = (owner.settlersTrained ?? 0) + 1;
       if (!governorFlag(state, city, (e) => e.settlerFreePop)) {
         city.population = Math.max(1, city.population - 1);
         // CIV6 (the citizen manager, 0x194fb0 with a negative count): a
@@ -434,7 +434,7 @@ export function completeQueueItem(
       // CIV6 (Military alliance 3): "Units start with a free Promotion."
       const freePromo = governorFlag(state, city, (e) => e.freePromoOnTrain)
         || allianceFreePromo(state, city.seat);
-      const trained = spawnUnit(state, item.unit, where, city.seat);
+      const trained = spawnUnit(state, item.unit, where, city.seat, 'stack');
       if (trained) {
         // a FORMATION entry arrives at its tier — the whole point of the order
         if (item.formation) trained.formation = item.formation;
@@ -465,7 +465,7 @@ export function completeQueueItem(
         logPopWrite(state, city, 'jn');
       }
       for (let k = 0; k < copies; k++) {
-        const extra = spawnUnit(state, item.unit, city.centerIndex, city.seat);
+        const extra = spawnUnit(state, item.unit, city.centerIndex, city.seat, 'stack');
         if (extra) {
           if (item.formation) extra.formation = item.formation;
           applyTrainingGrants(state, city, extra);
@@ -473,7 +473,7 @@ export function completeQueueItem(
         }
       }
       if (UNITS[item.unit]?.naval && seatWonderFlag(state, city.seat, 'duplicateNavalTrain')) {
-        const twin = spawnUnit(state, item.unit, city.centerIndex, city.seat);
+        const twin = spawnUnit(state, item.unit, city.centerIndex, city.seat, 'stack');
         if (twin) {
           // what was trained arrives twice, tier and all
           if (item.formation) twin.formation = item.formation;

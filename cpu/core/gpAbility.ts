@@ -432,7 +432,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   // it — a hull granted inland goes to the nearest water (`spawnUnit`'s
   // `far` probe).
   if (fx.unit && UNITS[fx.unit]) {
-    const made = spawnUnit(state, grantedChassis(state, unit.seat, fx.unit), unit.tileIndex, unit.seat, true);
+    const made = spawnUnit(state, grantedChassis(state, unit.seat, fx.unit), unit.tileIndex, unit.seat, 'far');
     if (made && fx.unitPromotions) {
       made.xp = xpToNextLevel(made);
       logXpWrite(state, made, 'gf');
@@ -442,7 +442,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   // carrying its Movement for life — born with it, as a trained unit is
   if (fx.unitBestClass) {
     const id = bestUnlockedOfClass(state, unit.seat, fx.unitBestClass);
-    const made = id ? spawnUnit(state, id, unit.tileIndex, unit.seat, true) : null;
+    const made = id ? spawnUnit(state, id, unit.tileIndex, unit.seat, 'far') : null;
     if (made && fx.unitMpBonus) {
       made.mpBonus = fx.unitMpBonus;
       made.movesLeft = unitFullMoves(state, made);

@@ -5152,16 +5152,52 @@ class SimSeats:
                     self._occ_set(_mv, _dst, _g)
         self._eff_version += 1
 
+    def _occ_class(self, rows: torch.Tensor) -> tuple[torch.Tensor, ...]:
+        """[N, U] bool per occupancy plane (military, civilian, support,
+        embarked) — the units of the games `rows` that plane holds, alive and
+        on a plot (`_occ_set`'s split; an aircraft and a Spy hold none)"""
+        ty = self.unit_type[rows].clamp(min=0, max=self.NU - 1)
+        emb = self.unit_emb[rows]
+        sup = self._type_support.take(ty)
+        civ = self._type_civilian.take(ty) & ~sup
+        here = self.unit_alive[rows] & (self.unit_tile[rows] >= 0) & ~(self._type_air.take(ty) > 0)
+        if self._spy_idx >= 0:
+            here = here & (ty != self._spy_idx)
+        return (here & ~civ & ~sup & ~emb, here & civ & ~emb, here & sup & ~emb, here & emb)
+
     def _occ_clear(self, rows: torch.Tensor, tiles: torch.Tensor, gslots: torch.Tensor) -> None:
         """Clear whichever occupancy plane holds these SLOTS on these tiles.
         Keyed on the slot, because a hull, an Admiral and a passenger sharing a
-        hex makes the class unknowable from the tile alone."""
+        hex makes the class unknowable from the tile alone. Where another unit
+        of that class stands on the plot (a city's stacking spawn,
+        `_spawn_unit`'s `stack`) the plane takes it, the lowest slot."""
         if rows.numel() == 0:
             return
-        for plane in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+        for p, plane in enumerate((self.military_at, self.civilian_at, self.support_at, self.embarked_at)):
             hit = plane[rows, tiles] == gslots
             if bool(hit.count_nonzero()):
-                plane[(rows[hit], tiles[hit])] = -1
+                r, t, g = rows[hit], tiles[hit], gslots[hit]
+                plane[(r, t)] = -1
+                left = (self._occ_class(r)[p] & (self.unit_tile[r] == t.unsqueeze(1))
+                        & (torch.arange(self.unit_tile.shape[1], device=self.device) != g.unsqueeze(1)))
+                has = left.any(dim=1)
+                if bool(has.count_nonzero()):
+                    plane[(r[has], t[has])] = left[has].to(torch.int8).argmax(dim=1)
+
+    def _occ_set_new(self, rows: torch.Tensor, tiles: torch.Tensor, gslots: torch.Tensor) -> None:
+        """`_occ_set` for units just made: a plane already holding a unit on
+        the plot (the owner's own, a city's stacking spawn) keeps it"""
+        if rows.numel() == 0:
+            return
+        emb = self.unit_emb[rows, gslots]
+        _ty = self.unit_type[rows, gslots].clamp(min=0, max=self.NU - 1)
+        sup = self._type_support.take(_ty)
+        civ = self._type_civilian.take(_ty) & ~sup
+        held = torch.zeros_like(emb)
+        for plane, on in ((self.embarked_at, emb), (self.support_at, sup & ~emb),
+                          (self.civilian_at, civ & ~emb), (self.military_at, ~civ & ~sup & ~emb)):
+            held = held | (on & (plane[rows, tiles] >= 0))
+        self._occ_set(rows[~held], tiles[~held], gslots[~held])
 
     def _occ_set(self, rows: torch.Tensor, tiles: torch.Tensor, gslots: torch.Tensor) -> None:
         """Put these SLOTS on these tiles, in the plane their stacking class
