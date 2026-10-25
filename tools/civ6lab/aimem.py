@@ -270,7 +270,43 @@ class Reader:
         for k in range(n):
             blk = blocks[0xB8 * k:0xB8 * (k + 1)]
             shape, handler = struct.unpack_from("<ii", blk, 0)
-            out.append([st[k], shape, handler, blk[8:].rstrip(b"\0").hex()])
+            out.append([st[k], shape, handler, blk[8:].rstrip(b"\0").hex(), self.node_data(blk[8:])])
+        return out
+
+    def node_data(self, data: bytes) -> dict:
+        """a node's TreeData values by DefnId: the node's data holds, at 16 x
+        its DefnId, a reference {the column (the player's TreeData table +
+        0x18 + 0x20 x the DataTypes id), the DataTypes id, the slot}; the
+        column {+0 its entries, +0x10 their count}. An entry by type: int
+        (3), bool (4), float (9, 24.8 raw) 8 bytes, its value first; Map
+        Point (5) 12, x and y; string (6) 16, its text's pointer; a list
+        (UnitTypes 0, TechTypes 1, BuildingTypes 2, Improvements 7, IDs 8,
+        Districts 10, Civics 11) 32, {its items (4 bytes each), its capacity,
+        its count}"""
+        out = {}
+        for off in range(0, len(data) - 15, 16):
+            p, ty, slot = struct.unpack_from("<Qii", data, off)
+            if not ptr(p) or not 0 <= ty <= 11 or slot < 0:
+                continue
+            try:
+                arr, _, cnt = struct.unpack("<QQQ", self.pm.read(p, 24))
+                if not ptr(arr) or not 0 <= slot < cnt or cnt > 1 << 20:
+                    continue
+                if ty in (3, 9):
+                    v = self.pm.i32(arr + 8 * slot)
+                elif ty == 4:
+                    v = bool(self.pm.u8(arr + 8 * slot))
+                elif ty == 5:
+                    v = list(struct.unpack("<ii", self.pm.read(arr + 12 * slot, 8)))
+                elif ty == 6:
+                    s = self.pm.u64(arr + 16 * slot)
+                    v = self.pm.cstr(s, 96) if ptr(s) else None
+                else:
+                    items, _, count = struct.unpack("<QQQ", self.pm.read(arr + 32 * slot, 24))
+                    v = list(struct.unpack(f"<{count}i", self.pm.read(items, 4 * count))) if ptr(items) and 0 < count < 4096 else []
+            except MemError:
+                continue
+            out[off // 16] = [ty, slot, v]
         return out
 
     # -- operations
@@ -314,6 +350,22 @@ class Reader:
             node = self.pm.u64(node + 0x10)
         return out
 
+    def assigned(self, pl: int) -> dict:
+        """per unit (its id, +0xb0) the control it is assigned to (+0x300:
+        a tree's, an operation's, the tactical pass's; the list 0x6092c0
+        (FinalRelease 0x401ba0) reads it), the units alive (+0x2e8 clear) on
+        Player::Units' list (+0xd0: node +0 the unit, +0x10 the next)"""
+        out = {}
+        node = self.pm.u64(self.pm.u64(pl + 0x6C8) + 0xD0)
+        while ptr(node):
+            u = self.pm.u64(node)
+            b = self.pm.read(u + 0xB0, 4) + self.pm.read(u + 0x2E8, 1) + self.pm.read(u + 0x300, 4)
+            ident, dead, job = struct.unpack("<iBi", b)
+            if not dead and job != -1:
+                out[ident] = job
+            node = self.pm.u64(node + 0x10)
+        return out
+
     def stats(self, pl: int) -> dict:
         return {"maxMelee": self.pm.i32(self.pm.u64(pl + 0x710) + 0xA0),
                 "citiesEc": self.pm.i32(self.pm.u64(pl + 0x6D0) + 0xEC)}
@@ -325,7 +377,7 @@ class Reader:
         for name, fn in (("army", lambda: self.army(kb)), ("camps", lambda: self.camps(kb)),
                          ("contracts", lambda: self.contracts(pl)), ("holders", lambda: self.holders(pl)),
                          ("trees", lambda: self.trees(pl, nodes)), ("ops", lambda: self.ops(pl)),
-                         ("stats", lambda: self.stats(pl))):
+                         ("stats", lambda: self.stats(pl)), ("assigned", lambda: self.assigned(pl))):
             try:
                 out[name] = fn()
             except MemError as e:

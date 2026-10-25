@@ -160,6 +160,8 @@ export interface GameContract {
   value: number;
   timeLimit?: number;
   timeEstimate?: number;
+  keepControl?: number;
+  city?: number;
   unit?: number;
   building?: number;
   district?: number;
@@ -188,8 +190,23 @@ export interface GameMemoryRead {
   army?: Record<string, Record<string, number[][]>>;
   camps?: number[][];
   contracts?: GameContract[];
-  trees?: Record<string, { name: string | null }>;
+  trees?: Record<string, GameTree>;
   ops?: GameOperation[];
+  /** the economic, research, culture and diplomatic AIs' and each city's
+   *  contract holders */
+  holders?: { cities: { city: number; hand: number; list: number[] }[]; economic: number[] };
+  /** per unit id the control it is assigned to */
+  assigned?: Record<string, number>;
+}
+
+/** one behaviour tree as the game holds it (aimem.py `trees`) */
+export interface GameTree {
+  name: string | null;
+  operation?: number;
+  contracts?: number[];
+  /** at the end look: per node [status, shape, handler, its data as hex,
+   *  its TreeData values by DefnId: [DataTypes id, slot, value]] */
+  nodes?: [number, number, number, string, Record<string, [number, number, unknown]>][];
 }
 
 /**
@@ -227,6 +244,7 @@ export interface MemoryNames {
   districts: readonly string[];
   techs: readonly string[];
   civics: readonly string[];
+  improvements: readonly string[];
 }
 
 const OPEN = new Set([CP_CLAIMED, CP_SUBMITTED, CP_ACCEPTED, CP_IN_PROGRESS]);

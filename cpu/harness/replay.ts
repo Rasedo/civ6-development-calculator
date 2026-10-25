@@ -131,6 +131,7 @@ import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
 import { GameMemory, MemoryLogs, readGameMemory, readMemory, syncContracts, type ArmyLogged } from './aiMemory';
+import { importCityAi } from './gameAiImport';
 import { NO_SCORE } from '../core/aiPolicyValue';
 
 /** what became of one decision */
@@ -4085,9 +4086,13 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
     const camps = (read.camps ?? []).map((c) => c[1] * ctx.W + c[0]);
     if (camps.length) s.campsKnown = camps;
     else delete s.campsKnown;
-    // the contracts: ours take the game's progress, value and times
-    // (`syncContracts`)
-    syncContracts(ctx.gameMemory!, ctx.cat, s, pid!, turn, ctx.W);
+    // a city-state's city AI whole — its city trees, their contracts and the
+    // holders (`importCityAi`); another seat's contracts take the game's
+    // progress, value and times (`syncContracts`)
+    const unitOf = (gameId: number) => ctx.units.get(`${pid}:${gameId}`)?.id;
+    if (world.cityStates.includes(s as CityState) && Object.values(read.trees ?? {}).some((t) => t.nodes?.[0]?.[4])) {
+      importCityAi(s as CityState, read, { names: ctx.cat, W: ctx.W, unitOf });
+    } else syncContracts(ctx.gameMemory!, ctx.cat, s, pid!, turn, ctx.W);
   }
 }
 

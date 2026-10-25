@@ -3660,11 +3660,30 @@ this file do not carry over; the knowledge base's inner layout does.
   stand at the end look as the turn's tick left them. A node's data holds
   its own fields (Add Goal Tech, 0x7e7200 (FinalRelease 0x54f6b0): +0x94
   its tech contract, +0x98 the goal, at the Release offsets of the data)
-  and its TreeData references, 16 bytes each — a pointer to the data
-  type's column, the type (0 boolean, 3, 4, 5, 8, 9, 10 by the column), the
-  slot — whose values stand in the tree's tagged data, not yet read.
-  aimem.py reads every tree's nodes at the end look (`tree_nodes`:
-  [status, shape, handler, the data as hex]).
+  and, at 16 x each TreeData row's DefnId, its reference {the column, its
+  DataTypes id, its slot}.
+- THE TREEDATA STORE (READ, live, the five duelu recordings): one table per
+  player, a column per DataTypes id (BehaviorTrees.xml: 0 UnitTypesList, 1
+  TechTypeList, 2 BuildingTypesList, 3 int, 4 bool, 5 Map Point, 6 string,
+  7 ImprovementList, 8 ID List, 9 float, 10 DistrictList, 11 CivicsList) at
+  the table + 0x18 + 0x20 x the id: +0 its entries, +0x10 their count, +0x18
+  its free head. An entry: int, bool, float (24.8) 8 bytes, the value first
+  and a link; Map Point 12, x, y, link; string 16, the text's pointer; a
+  list 32, {its 4-byte items (the database index; for an ID List the
+  contract or unit ids), its capacity, its count, a link}. A tag's nodes
+  share its slot; an untagged datum has its own slot (its default, or what
+  the node wrote). The node fields read, at the data's offset: Move Unit's
+  kept unit +0x50 (0 or -1 none), Clear Plot's +0x40, Build Improvement's
+  unit +0x50 and improvement +0x54, the Contract Manager Decorator's turn
+  counter +0x50.
+- A UNIT'S ASSIGNMENT: Player::Units +0xd0 the units' list (node +0 the
+  unit, +0x10 the next), a unit's id +0xb0, its control +0x300 (a tree's, an
+  operation's tree's or the tactical pass's control id; the Release's +0x778
+  / +0x7d0), dead +0x2e8 (the Release's +0x770); 0x6092c0 (FinalRelease
+  0x401ba0) lists a control's units by it.
+- aimem.py reads every tree's nodes at the end look (`tree_nodes`: [status,
+  shape, handler, the data as hex, the TreeData values by DefnId]) and every
+  unit's assignment (`assigned`).
 - THE OPERATIONS: Military (Player +0x680) +0x1f0 a list (node +0 the
   operation, +0x10 the next; 0x723cf0 (FinalRelease 0x4cf450) and the log
   0x727510 (FinalRelease 0x4d26e0) walk it). An operation (constructor
