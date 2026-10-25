@@ -8055,8 +8055,14 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   (+0x4a0) but the owner and a declared friend (0x3da770): a full civ the
   owner fights (0x469cd0) or that has denounced it (0x3da5e0) or that it
   denounced (0x3da8e0), and the barbarians, are hostile (margin 5.0);
-  another full civ, margin 20.0 or the centre's strength with its garrison
-  (0x24a180) where higher; a city-state the owner does not fight is
+  another full civ, margin 20.0 (0x1400) or the centre's garrison term
+  where higher (0x5cc088: 0x24a180(centre, out, 0, 0), the garrison's
+  Combat and formation strength less its wounds less the holder's base,
+  `garrisonTerm`; runs/h1_duelw1117 Antananarivo t214, t222, t225 and
+  h1_duelw1127 Mexico City t226, t233 start City Defense as logged and
+  1127 t201-207 start none as logged, where the centre's whole strength as
+  the margin did otherwise; the five duels' city-state starts 54 -> 59 of
+  140, aiscore); a city-state the owner does not fight is
   skipped. An undamaged city with an operation of the owner against the
   player whose target lies within 5 of it (0x723cf0: each operation of the
   owner's list +0x318 valid (0x73a840) whose enemy +0x2a0 is the player

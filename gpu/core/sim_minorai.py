@@ -460,7 +460,7 @@ class SimMinorAi:
         and Bombard + 20; a Bombard unit counts, a ranged one above the
         defense less 15, any above the defense less 5; never an explorer nor
         a barbarian camp defender); at the city's defense plus the margin
-        (5.0 hostile, else 20.0 or the city's strength) the city is
+        (5.0 hostile, else 20.0 or the centre's garrison term) the city is
         threatened at `level`, at most 1 not hostile; a player the holder runs
         an operation against near the city (`op_near(p)`, 0x723cf0) passed
         over while the city is whole (not `damaged`). The first such player
@@ -474,6 +474,9 @@ class SimMinorAi:
         rows = T["unit_rows"]
         dcs = self._city_defense_cs(hrow, hcol)[0]
         d = dcs * _FX
+        # the centre's garrison term (0x24a180) the margin over a full civ
+        # not hostile reads
+        gar = torch.trunc(self._garrison_cs(hrow, hcol, self._ROW_SEAT.take(hrow), self._holder_strength(hrow, hcol)) * _FX)
         slot = self.citystate_kb_slot[:, r].long()
         owner = self.citystate_kb_owner[:, r].long()
         typ = self.citystate_kb_type[:, r].long()
@@ -514,7 +517,7 @@ class SimMinorAi:
                 if not bool(war.count_nonzero()):
                     continue
             margin = torch.where(hostile, torch.full_like(d, _MARGIN_HOSTILE),
-                                 torch.maximum(torch.full_like(d, _MARGIN_OTHER), dcs * _FX))
+                                 torch.maximum(torch.full_like(d, _MARGIN_OTHER), gar))
             mine = rec & (owner == p) & (dist <= (_RANGE_CIV if full else _RANGE_OTHER))
             anyu = mine.any(dim=1)
             sums = mine & ~acav.take(a0) if barb else mine

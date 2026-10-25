@@ -113,8 +113,12 @@
     - recording: h1_duelv1128
       turn: 15
       value: "Xi'an threatened by the barbarians' Warrior and Scout: City Defense, Started"
+    - recording: h1_duelw1117
+      turn: 214
+      value: "Antananarivo: the margin over China 20.0 or the garrison term (0x24a180), City Defense started (aiscore op.start.cityState 54 -> 59 of 140 on the five duels)"
   impl:
     - cpu/core/operations/cityThreat.ts:cityThreat
+    - cpu/core/combat.ts:garrisonTerm
     - cpu/harness/operationsAi.ts:cityDefense
     - cpu/core/minorCityAi.ts:minorThreat
     - gpu/core/sim_minorai.py:_minor_threat

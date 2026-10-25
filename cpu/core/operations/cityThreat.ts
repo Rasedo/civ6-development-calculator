@@ -18,7 +18,8 @@ const RANGE_CIV = 5;
 const RANGE_OTHER = 3;
 /** the margin over the city's defense a hostile army must reach: 5.0 for a
  *  player the owner fights, has denounced or is denounced by, or the
- *  barbarians; else 20.0, or the city's strength where higher */
+ *  barbarians; else 20.0, or the centre's garrison term (0x24a180, the
+ *  garrison's Combat less its wounds and the holder's base) where higher */
 const MARGIN_HOSTILE = 5 * FX;
 const MARGIN_OTHER = 20 * FX;
 /** a running operation of the owner against the player whose target lies
@@ -77,7 +78,7 @@ function campDefender(type: string): boolean {
  * 0x5cbd10: per player of the game but the owner and those it declared
  * friendship with — a full civ the owner fights (the barbarians not), or one
  * that denounced it or that it denounced, or the barbarians: hostile, margin
- * 5.0; any other full civ: margin 20.0 or the city's strength; a city-state
+ * 5.0; any other full civ: margin 20.0 or the garrison term; a city-state
  * the owner does not fight: none — an undamaged city with a running
  * operation of the owner against the player within 5 is left alone; else
  * the player's known units within 5 (a full civ's) or 3 of the city summed
@@ -106,7 +107,7 @@ export function cityThreat(view: MajorView, seat: number, city: number, inp: Thr
     const war = view.atWar(seat, p) && p !== barb;
     const hostile = war || view.denounced(p, seat) || view.denounced(seat, p) || p === barb;
     if (!full && p !== barb && !war) continue;
-    const margin = hostile ? MARGIN_HOSTILE : Math.max(MARGIN_OTHER, c.strength * FX);
+    const margin = hostile ? MARGIN_HOSTILE : Math.max(MARGIN_OTHER, Math.trunc(c.garrison * FX));
     if (!c.damaged && inp.operationNear(p, city, OWN_OPERATION_RANGE)) continue;
     const range = full ? RANGE_CIV : RANGE_OTHER;
     let sum = 0;

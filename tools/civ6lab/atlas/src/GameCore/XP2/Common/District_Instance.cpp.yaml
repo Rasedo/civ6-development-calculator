@@ -104,6 +104,9 @@
     - cpu/core/tactical.ts:dangerDistricts
     - gpu/core/sim_seats.py:_garrison_cs
     - gpu/core/sim_tactics.py:_danger_districts
+    - cpu/core/combat.ts:garrisonTerm
+    - cpu/core/operations/cityThreat.ts:MARGIN_HOSTILE
+    - gpu/core/sim_minorai.py:_known_threat
   readings:
     - "C-94: the wounded law and the garrison — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"

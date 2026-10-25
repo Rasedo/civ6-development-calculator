@@ -1176,6 +1176,12 @@ export function centreStrength(state: GameState, city: City, garrisoned = true):
   return n;
 }
 
+/** the centre's GARRISON TERM alone (0x24a180): `garrisonCS` over the
+ *  holder's base */
+export function garrisonTerm(state: GameState, city: City): number {
+  return garrisonCS(state, city, holderStrength(state, cityBaseSeat(city)));
+}
+
 /** A DISTRICT WITH HIT POINTS' DEFENCE as the danger map reads it (0x24ae80
  *  with the garrison flag 0): its city's standing strength without the
  *  centre's garrison, and the garrison term (0x24a180) over the best

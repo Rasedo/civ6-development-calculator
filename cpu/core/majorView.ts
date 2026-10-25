@@ -20,7 +20,7 @@ import { aiStrengths, assignTo, dangerDistricts, districtHealth, pathTo, planUni
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
-import { centreStrength, cityDefenseStrength, cityStrikeStrength, encircled, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
+import { cityDefenseStrength, cityStrikeStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
 import { outerPool, wallsTier } from './rules';
 import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, trainableUnits, traderCost, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
@@ -888,7 +888,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       if (!city) return null;
       const hp = districtHealth(state, p);
       return {
-        defense: cityDefenseStrength(state, city), strength: centreStrength(state, city), damaged: !!hp && hp.hp < hp.max,
+        defense: cityDefenseStrength(state, city), garrison: garrisonTerm(state, city), damaged: !!hp && hp.hp < hp.max,
         districts: city.districts.length, capital: held ? city.isCapital : true,
         wonder: city.wonders.some((w) => state.map.tiles[w.tileIndex].builtWonderComplete), population: city.population,
       };
