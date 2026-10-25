@@ -214,6 +214,13 @@ interface Ctx {
   /** this pair's city-state improvements the record holds, each answered
    *  once the minors' units' turn has run their city trees (`minorLaysAfter`) */
   minorImproves: Extract<Decision, { kind: 'improve' }>[];
+  /** this pair's city-state clearings the record holds, each taken once the
+   *  minors' units' turn has run their city's second hook and trees
+   *  (`minorClearsAfter`) */
+  minorClears: Extract<Decision, { kind: 'clear' }>[];
+  /** the record's new units of those city-states the engine has not made,
+   *  matched once the clearings' lumps have landed (`minorClearsAfter`) */
+  minorClearUnits: { d: Extract<Decision, { kind: 'unitNew' }>; ds: readonly Decision[] }[];
   /** the city-states' units as each one's own engine turn left them, before
    *  the record's sync (`minorTurns`): their copy's turn opens so (a unit its
    *  city trained where it was made), a Builder record t+1 lost to its own
@@ -1231,6 +1238,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // the spent Builders gone again before the end look
   copy.units = copy.units.filter((c) => !spentBuilders.has(c));
   minorOpsAfter(ctx, b, turn, copy, twin, keyOf);
+  minorClearsAfter(ctx, b);
   const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c) && minorAiSeat(c.seat)) ended.set(u, c.tileIndex);
   const opOf = new Map<Unit, string>();
@@ -1412,6 +1420,23 @@ function minorLaysAfter(ctx: Ctx, lays: readonly { u: Unit; plot: number; imp: s
     replaceOwnerCitizens(state, t);
     count(ctx, 'minorAi:improve', 'fallback', d.player, `plot ${d.plot}: the engine laid none of ${want}`);
   }
+}
+
+/** THE CITY-STATES' CLEARINGS after their units' turn on the copy: the
+ *  record's, each through `applyClear`, its lump landing on the item the
+ *  city's second hook left in hand (runs/h1_duely1124 Granada t21: the
+ *  Warrior at 18 of 20 in hand through the hook, its Builder's Rainforest
+ *  lump completing it, City_BuildQueue.csv's second t21 line, the queue
+ *  empty in record t22) */
+function minorClearsAfter(ctx: Ctx, b: TurnRecord): void {
+  const open = ctx.minorClears;
+  const units = ctx.minorClearUnits;
+  ctx.minorClears = [];
+  ctx.minorClearUnits = [];
+  for (const d of open) applyClear(ctx, d);
+  // the record's new units of those city-states: a lump's completion
+  // among them
+  for (const { d, ds } of units) applyUnitNew(ctx, b, d, ds, false);
 }
 
 /** THE CITY-STATES' OPERATIONS after their units' turn on the copy: their
@@ -2179,6 +2204,72 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
   count(ctx, 'found', 'fallback', d.player, res.reason);
 }
 
+/** A FEATURE OR RESOURCE TAKEN OFF (the record's clearing): the order is the
+ *  player's, through the engine's verb with the builder the log names, from
+ *  the plot: the lump, the charge */
+function applyClear(ctx: Ctx, d: Extract<Decision, { kind: 'clear' }>): void {
+  const { state } = ctx;
+  const seat = seatOfP(ctx, d.player);
+  const t = state.map.tiles[d.plot];
+  if (d.what === 'feature' ? !t.feature : !t.resource) return void count(ctx, `clear:${d.what}`, 'refused', d.player);
+  const builder = d.unit ? unitOf(ctx, d.unit) : undefined;
+  let why = d.unit ? 'a builder the replay does not hold' : undefined;
+  if (builder) {
+    builder.tileIndex = d.plot;
+    const res = d.what === 'feature' ? builderRemoveFeature(state, builder.id, seat) : builderHarvest(state, builder.id);
+    if (res.ok) return void count(ctx, `clear:${d.what}`, 'applied');
+    why = res.reason;
+    // the record's charge, spent
+    builder.charges = Math.max(0, (builder.charges ?? 1) - 1);
+  }
+  if (why) count(ctx, `clear:${d.what}`, 'fallback', d.player, why);
+  const grants = d.what === 'feature' ? chopGrant(state, t, seat) : [harvestGrant(state, t, seat)].filter((g) => !!g);
+  for (const g of grants) applyLumpYield(state, d.plot, g!, seat);
+  if (d.what === 'feature') t.feature = null;
+  else t.resource = null;
+  if (!why) count(ctx, `clear:${d.what}`, 'applied');
+}
+
+/** A NEW UNIT OF THE RECORD, a major's, a city-state's or a Free City's.
+ *  `mayWait`: a city-state's the engine has not made waits for its
+ *  clearings' lumps (`minorClearsAfter`) */
+function applyUnitNew(ctx: Ctx, b: TurnRecord, d: Extract<Decision, { kind: 'unitNew' }>, ds: readonly Decision[], mayWait: boolean): void {
+  const seat = seatOfP(ctx, d.player);
+  const major = seat >= 0 && seat < ctx.state.seats.length;
+  // a unit an engine verb of this phase made (a wonder a charge completed
+  // grants its Great Person, a minor's harvest completes its item) is the
+  // record's
+  matchNewUnits(ctx, b);
+  if (d.why === 'trained' && major) {
+    if (unitOf(ctx, d.unit)) count(ctx, 'unitNew:trained', 'applied', d.player);
+    else completeTrained(ctx, b, d);
+    return;
+  }
+  if (unitOf(ctx, d.unit)) {
+    if (!major) count(ctx, 'minorAi:unitNew', 'applied', d.player);
+    return;
+  }
+  if (mayWait && isCityStateSeat(seat) && ctx.minorClears.some((c) => c.player === d.player)) {
+    ctx.minorClearUnits.push({ d, ds });
+    return;
+  }
+  // a captive is the seizure's (`seize`)
+  if (ds.some((x) => x.kind === 'seize' && x.into === d.unit)) return;
+  spawnRecorded(ctx, b, d.unit);
+  // a Trader the engine's city-state made and the record's route then sent
+  // out (the engine's route spends its Trader; the record's stands on the
+  // map): the record's, made by the engine (runs/h1_duelu1117 t44:
+  // Antananarivo's Trader 393218, trained and routed to Caguana in its turn)
+  const sent = ctx.routeSpent.get(seat) ?? [];
+  const k = sent.indexOf(engineRowOf(ctx.cat, 'unit', d.type) ?? '');
+  if (!major && k >= 0) {
+    sent.splice(k, 1);
+    count(ctx, 'minorAi:unitNew', 'applied', d.player);
+    return;
+  }
+  count(ctx, major ? 'unitNew:other' : 'minorAi:unitNew', 'fallback', d.player, `${d.unit} ${ctx.cat.units[d.type]} ${d.why}: the engine made none`);
+}
+
 function applyBuyBuilding(ctx: Ctx, d: Extract<Decision, { kind: 'buyBuilding' }>): void {
   const { state } = ctx;
   const seat = seatOfP(ctx, d.player);
@@ -2491,25 +2582,14 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           count(ctx, 'clear:improvement', 'applied');
           break;
         }
-        if (d.what === 'feature' ? !t.feature : !t.resource) { count(ctx, `clear:${d.what}`, 'refused', d.player); break; }
-        // the order is the player's, through the engine's verb with the
-        // builder the log names, from the plot: the lump, the charge
-        const builder = d.unit ? unitOf(ctx, d.unit) : undefined;
-        let why = d.unit ? 'a builder the replay does not hold' : undefined;
-        if (builder) {
-          builder.tileIndex = d.plot;
-          const res = d.what === 'feature' ? builderRemoveFeature(state, builder.id, seat) : builderHarvest(state, builder.id);
-          if (res.ok) { count(ctx, `clear:${d.what}`, 'applied'); break; }
-          why = res.reason;
-          // the record's charge, spent
-          builder.charges = Math.max(0, (builder.charges ?? 1) - 1);
+        // a city-state's clearing is its trees' Builder's, ordered in its
+        // units' turn after its city's second hook: answered once that turn
+        // has run (`minorClearsAfter`)
+        if (isCityStateSeat(seat)) {
+          ctx.minorClears.push(d);
+          break;
         }
-        if (why) count(ctx, `clear:${d.what}`, 'fallback', d.player, why);
-        const grants = d.what === 'feature' ? chopGrant(state, t, seat) : [harvestGrant(state, t, seat)].filter((g) => !!g);
-        for (const g of grants) applyLumpYield(state, d.plot, g!, seat);
-        if (d.what === 'feature') t.feature = null;
-        else t.resource = null;
-        if (!why) count(ctx, `clear:${d.what}`, 'applied');
+        applyClear(ctx, d);
         break;
       }
       case 'envoy': {
@@ -2742,40 +2822,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // City's is their scripts' decision, which the engine does not
         // replay; the barbarians' are their rules', which close the pair
         // (`barbarianTurn`)
-        const major = seatOfP(ctx, d.player) >= 0 && seatOfP(ctx, d.player) < state.seats.length;
         if (isBarbSeat(seatOfP(ctx, d.player))) {
           ctx.barbNew.push(d.unit);
           break;
         }
-        // a unit an engine verb of this phase made (a wonder a charge
-        // completed grants its Great Person, a minor's harvest completes its
-        // item) is the record's
-        matchNewUnits(ctx, b);
-        if (d.why === 'trained' && major) {
-          if (unitOf(ctx, d.unit)) count(ctx, 'unitNew:trained', 'applied', d.player);
-          else completeTrained(ctx, b, d);
-          break;
-        }
-        if (unitOf(ctx, d.unit)) {
-          if (!major) count(ctx, 'minorAi:unitNew', 'applied', d.player);
-          break;
-        }
-        // a captive is the seizure's (`seize`)
-        if (ds.some((x) => x.kind === 'seize' && x.into === d.unit)) break;
-        spawnRecorded(ctx, b, d.unit);
-        // a Trader the engine's city-state made and the record's route then
-        // sent out (the engine's route spends its Trader; the record's stands
-        // on the map): the record's, made by the engine (runs/h1_duelu1117
-        // t44: Antananarivo's Trader 393218, trained and routed to Caguana in
-        // its turn)
-        const sent = ctx.routeSpent.get(seatOfP(ctx, d.player)) ?? [];
-        const k = sent.indexOf(engineRowOf(ctx.cat, 'unit', d.type) ?? '');
-        if (!major && k >= 0) {
-          sent.splice(k, 1);
-          count(ctx, 'minorAi:unitNew', 'applied', d.player);
-          break;
-        }
-        count(ctx, major ? 'unitNew:other' : 'minorAi:unitNew', 'fallback', d.player, `${d.unit} ${ctx.cat.units[d.type]} ${d.why}: the engine made none`);
+        applyUnitNew(ctx, b, d, ds, true);
         break;
       }
       case 'move': {
@@ -4353,7 +4404,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbSeized: [], minorBlows: new Map(), minorBuys: [], minorImproves: [], minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbSeized: [], minorBlows: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorClearUnits: [], minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -4393,14 +4444,16 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (!e) ctx.minorOps.set(FREE_SEAT, (e = { lines: [], evals: [] }));
     e.lines.push(line);
   });
-  // a feature or resource a city-state's Builder would clear that record t+1
-  // still holds stands: the game's Builder kept it (`minorAi:clear`)
+  // a feature or resource a city-state's Builder would clear that record
+  // t+1 still holds stands: the game's Builder kept it (`minorAi:clear`);
+  // one it cleared goes unpaid in the copy's turn, the record's clearing's
+  // lump landing after it (`minorClearsAfter`)
   holdMinorClears((plot, clears) => {
     const r = ctx.next.state.map.tiles[plot];
-    if (!(clears === 'feature' ? r.feature : r.resource)) return false;
+    if (!(clears === 'feature' ? r.feature : r.resource)) return 'unpaid';
     count(ctx, 'minorAi:clear', 'fallback', ctx.playerOfSeat.get(ctx.state.map.tiles[plot].ownerSeat),
       `plot ${plot}: the engine cleared its ${clears}, the game kept it`);
-    return true;
+    return 'kept';
   });
   // the record's units in the importer's order
   let k = 0;
@@ -4911,10 +4964,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // turn t's moves left them: their looks reveal and meet in turn t
     inTurn(state, a.turn, () => syncUnits(ctx, b));
     campsTaken(ctx, b, a.turn);
-    // the units the minors' cities trained in the engine's turn (a purchase
-    // the record shows is not one)
+    // the units the minors' cities made in the engine's turn: trained, or
+    // bought by a contract purchase of the economic AI's turn, before the
+    // units' turn (runs/h1_duely1124 Granada t72: contract 190's Heavy
+    // Chariot on the centre, the threatened purchase's Horseman refused
+    // there, its Quadrireme bought) — a purchase the record shows that the
+    // engine's turn did not make is the units' turn's
     const bought = new Set(ds.flatMap((d) => (d.kind === 'buyUnit' ? [d.unit] : [])));
-    minorAi(ctx, b, a.turn, new Set([...ctx.units].filter(([k, u]) => minorAiSeat(u.seat) && !standing.has(u) && !bought.has(k)).map(([, u]) => u)), revealedWas);
+    minorAi(ctx, b, a.turn, new Set([...ctx.units].filter(([k, u]) => minorAiSeat(u.seat) && !standing.has(u)
+      && (!bought.has(k) || minorBought.has(u))).map(([, u]) => u)), revealedWas);
     // the items the city-states' second hooks set, against record t+1's
     minorBuilds(ctx, b, report.minorBuilds);
     // a later player's blow on a city-state's or the Free Cities' unit came

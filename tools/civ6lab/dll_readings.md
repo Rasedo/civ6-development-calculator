@@ -5297,7 +5297,19 @@ operations' contracts, the improvement values below, the purchases).
   +0x1b8's low byte) set — the balance (+0x1b8) at or above it; the
   purchase request (0x977570, the game core's +0x48 / +0x50); then the
   spend: UNITS then SLUSH for the overflow, a threatened city's from each
-  slot in order; the balance less the price.
+  slot in order; the balance less the price. 0x5ce5b0's tail loops the
+  pick (domain -1) and TryPurchaseUnits (flag 0) until either fails; the
+  pick collects the entries tied at the best rank and returns the first.
+  A contract purchase of the economic AI's turn (0x687bf0, before the
+  Control Manager's passes) stands on the centre by the hook (runs/h1_duely1124
+  Granada t72: contract 190's Heavy Chariot, then a Quadrireme bought, no
+  Horseman; why the pick passes the Horseman there is unread). A
+  city-state Builder's clearing is ordered in the city trees' tick after
+  the hook, so its lump lands on the item the hook left in hand
+  (City_BuildQueue.csv's second line of a turn: 1124 Granada t21 / t25 the
+  Warrior completed, the queue empty in record t+1; 1121 Hunza t21 the lump
+  on the Granary the hook took; 1127 Mexico City t49 the Water Mill, the
+  Walls contract taken at t50).
 - CITY DEFENSE'S START 0x5cced0 (slot 5): first the defensive cancel
   0x5d7640 (the military AI's +0x4b8, or the threat above -1 with the
   centre damaged or CityBuildAI +0x218: the in-hand item cancelled unless a
