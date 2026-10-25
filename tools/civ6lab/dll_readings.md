@@ -4320,11 +4320,27 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   barbarians' Slinger Hattusa killed on 7:10, out of Mexico's look; the
   record's battles land after the minors' turns). --aiscore --to 60, the
   five dueld duels: knowledge.army 64.9% -> 69.9% (another player's unit
-  on another plot at the same age 299 -> 46 rows). Left: a unit the
-  engine's battle killed and the game's did not, re-made under a new id,
-  holds a second record (1117 t50 China's Scout 983049, ours 58 damage,
-  the game's 53); the records of units a capture changed hands (1117 t33
-  China's Settler).
+  on another plot at the same age 299 -> 46 rows).
+- THE REPLAY'S UNITS AS THE KNOWLEDGE BASES SEE THEM: a record unit our
+  battle killed and the game's did not keeps its engine id when the next
+  pair's world re-makes it, so the records of it stay its own
+  (runs/h1_dueldA1117 t50: China's Scout 983049, 58 damage on our blow to
+  the game's 53, held once). A civilian the barbarians seize stands its
+  owner's, on its plot, through their tactical turn's ageing and look, the
+  seizure after it (1117 t33: China's Settler steps to 31:14, the
+  barbarians' log holds it there at age 0 and their own Settler first on
+  their end look). A barbarian a battle of the pair fought opens their turn
+  on its plot in the pair's first record (1117 t22: their Scout on 13:13,
+  which stepped to 14:12 and fell on its blow, their record of it 13:13);
+  a minor's own unit record t+1 lost and the log's steps never moved stands
+  for its end look where its turn found it (1124 t21: Cardiff's Warrior
+  strikes from 8:14 and falls in the barbarians' turn, its record 8:14).
+  --aiscore --to 60, the five dueld duels: knowledge.army 69.7% -> 81.1%
+  (a player's own unit on another plot at the same age 229 -> 47 rows).
+  Left: a unit a city makes on a centre another military unit holds is
+  added on the centre, stacked, until its moves (runs/h1_dueld1128 t19:
+  Hong Kong's Warrior 327683 added on 9:7 with its Warrior 196610 still
+  there, its record 9:7 on the log), where `spawnUnit` places it beside.
 - THE FOUNDING SETTLER'S RECORD: a city-state's knowledge base holds the
   Settler that founded its city, a unit gone, aging as any record to 21
   (runs/h1_dueld1121 aimem: each city-state's SETTLER on its centre at age
