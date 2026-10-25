@@ -447,6 +447,28 @@ def handle(t: Tuner, lp: int, cause: tuple[str, str], session_lua: str | None = 
     return None
 
 
+# whether one of the seat's notifications blocks its end turn on a Dedication
+# (the first blocker may be another: production, research)
+LUA_DEDICATION_DUE = """
+local due = false
+for _, nid in ipairs(NotificationManager.GetList(ZSEAT) or {}) do
+  local n = NotificationManager.Find(ZSEAT, nid)
+  if n ~= nil and n:GetEndTurnBlocking() == EndTurnBlockingTypes.ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE then due = true end
+end
+print("dedication " .. tostring(due))
+"""
+
+
+def answer_dedication(t: Tuner, lp: int) -> str | None:
+    """The seat's Dedication answered where one is due (`commemorate.lua`,
+    the offered choices in the order offered); None where none is. The seat's
+    AI does not answer it under Autoplay, so a recorder that answers it at
+    one fixed point of every turn records the same game every time."""
+    if t.run(IG, _seat(LUA_DEDICATION_DUE, lp))[-1].split()[-1] != "true":
+        return None
+    return handle(t, lp, ("blocker", COMMEMORATION))
+
+
 def unstick(t: Tuner, lp: int) -> list[str]:
     """The blind sweep, for a turn held by nothing `diagnose` names: close
     every session of the seat and every visible screen. Returns what was
@@ -474,7 +496,7 @@ def unstick(t: Tuner, lp: int) -> list[str]:
 def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None] = print,
               nudge: Callable[[], None] | None = None, session_lua: str | None = None,
               first: float = 5.0, poll: float = 3.0, blind: float = 30.0, ai_blockers: float = 15.0,
-              one_more_turn: bool = False, tick: float = 0.25) -> int:
+              one_more_turn: bool = False, tick: float = 0.25, dedication: bool = True) -> int:
     """Wait for the turn counter to pass `t0` and return the new turn. A
     finished game raises `GameOver` — unless `one_more_turn` and the end
     screen offers Just One More Turn, which is then pressed and the game
@@ -484,10 +506,11 @@ def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None
     logged by name — except a blocker the seat's AI answers itself under
     Autoplay (every one but the Dedication), which waits until the turn has
     stood `ai_blockers` seconds (0 in the endturn mode, where no AI plays the
-    seat). `nudge` (the endturn mode's end-turn request) runs after an answer
-    and every 20 s. The blind sweep (`unstick`) runs only when `blind`
-    seconds pass with no cause answered. The counter is read every `tick`
-    seconds."""
+    seat); with `dedication` false the Dedication is never answered here (a
+    caller that answers it at a fixed point, `answer_dedication`). `nudge`
+    (the endturn mode's end-turn request) runs after an answer and every
+    20 s. The blind sweep (`unstick`) runs only when `blind` seconds pass
+    with no cause answered. The counter is read every `tick` seconds."""
     start = time.monotonic()
     deadline = start + wait
     looked = start + first - poll
@@ -528,6 +551,8 @@ def wait_turn(t: Tuner, t0: int, lp: int, wait: float, log: Callable[[str], None
                     log(f"    cause endgame {c[1]}: the game is over")
                     raise GameOver(info)
                 if c[0] == "blocker" and c[1] != COMMEMORATION and now - start < ai_blockers:
+                    continue
+                if c == ("blocker", COMMEMORATION) and not dedication:
                     continue
                 try:
                     out = handle(t, lp, c, session_lua)

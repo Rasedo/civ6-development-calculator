@@ -7,7 +7,8 @@ Per turn record, every section both recordings carry (`seed`, `map`,
 `greatPeople`, `parks`, `revealed`, `volcanoes`, `actions`, ...), compared
 on what both hold: a dict on its common keys, a list item by item (its
 length too), so a field one recorder version added is not a difference.
-Then the draw logs (`<stem>.randcalls.csv`) draw by draw. Prints the first
+Then the draw logs (`<stem>.randcalls.csv`) draw by draw, and the AI memory
+reads (`<stem>.aimem.jsonl`, their timing fields aside) read by read. Prints the first
 differing turn per section, the first differing draw and its labels, and
 the turns both hold.
 """
@@ -82,6 +83,23 @@ def main(argv: list[str]) -> int:
             print(f"draws: {len(da)} / {len(db)}, the first {n} identical (turn, range, value, seed)")
         else:
             print(f"draws: {len(da)} / {len(db)}, first differing draw {k + 1} at turn {da[k][0]}: {da[k]} vs {db[k]}")
+    ma, mb = pa.with_suffix(".aimem.jsonl"), pb.with_suffix(".aimem.jsonl")
+    if ma.exists() and mb.exists():
+        def reads(p: pathlib.Path) -> list[dict]:
+            out = []
+            for ln in p.read_text(encoding="utf-8").splitlines():
+                r = json.loads(ln)
+                for k in ("seq", "at", "ms"):
+                    r.pop(k, None)
+                out.append(r)
+            return out
+        ra, rb = reads(ma), reads(mb)
+        k = next((i for i in range(min(len(ra), len(rb))) if ra[i] != rb[i]), None)
+        if k is None:
+            print(f"AI memory: {len(ra)} / {len(rb)} reads, the first {min(len(ra), len(rb))} identical")
+        else:
+            print(f"AI memory: {len(ra)} / {len(rb)} reads, first differing read {k + 1} "
+                  f"(turn {ra[k].get('turn')}, {ra[k].get('site')} of player {ra[k].get('player')}): {diff(ra[k], rb[k])}")
     return 0
 
 

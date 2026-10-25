@@ -47,8 +47,7 @@ civic, plot, diplomatic, or the vtable), status, priority, timeLimit, timeEstima
 owner (the control id that made it), player, value (24.8 fixed point,
 raw), refs, and the kind's fields. `holders`: per city (its id) the
 contract in hand and its list; the Economic, Research, CultureAi and
-Diplomatic AIs' lists (the handles' contract ids: a weak handle keeps the
-id of a contract the Control Manager no longer holds). `trees`: per behaviour tree control
+Diplomatic AIs' lists (the handles' contract ids, -1 a released handle). `trees`: per behaviour tree control
 id its name, flags, operation and contracts. `ops`: per operation its
 name, control ids, target, rally, strengths, flags, its tree's
 allowRecruiting (the tree "marked" for the recruit's offer) and its teams'
@@ -79,7 +78,7 @@ VT_TREE = 0xA0C238      # a behaviour tree's control interface (tree +0x218)
 CONTRACT = {"status": 0xB0, "priority": 0xC8, "timeLimit": 0xE0, "timeEstimate": 0xF8, "id": 0x110,
             "owner": 0x128, "player": 0x140, "value": 0x158, "refs": 0x160}
 KIND_FIELDS = {
-    "build": {"unit": 0x178, "building": 0x190, "district": 0x1A8, "plot": (0x1C0, 2), "city": (0x1D8, 2),
+    "build": {"unit": 0x178, "building": 0x190, "district": 0x1A8, "plot": (0x1C0, 2), "city": 0x1D8,
               "keepControl": (0x1F0, 0)},
     "tech": {"goal": 0x178, "next": 0x190, "bestController": 0x1A8},
     "civic": {"goal": 0x178, "next": 0x190},
@@ -136,13 +135,19 @@ class Reader:
         return c if c and self.pm.i32(c) == ident else 0
 
     def handles(self, at: int) -> list[int]:
-        """a managed-contracts container (vt, owner, vector, size): its
-        handles' contract ids"""
-        vec, n = self.pm.u64(at + 0x10), self.pm.i32(at + 0x18)
+        """a managed-contracts container (+0 vt, +8 owner, +0x10 the vector
+        of 16-byte handles {pointer, owner, id}, +0x18 its capacity, +0x20
+        its count): the first count handles' contract ids, -1 for a handle
+        released (its pointer null); past the count stand stale copies"""
+        vec, n = self.pm.u64(at + 0x10), self.pm.i32(at + 0x20)
         if not vec or n <= 0 or n > 4096:
             return []
         b = self.pm.read(vec, 16 * n)
-        return [struct.unpack_from("<i", b, 16 * k + 12)[0] for k in range(n)]
+        out = []
+        for k in range(n):
+            p, _, ident = struct.unpack_from("<Qii", b, 16 * k)
+            out.append(ident if p else -1)
+        return out
 
     def game(self) -> int:
         return self.pm.u64(self.base + G_GAME)

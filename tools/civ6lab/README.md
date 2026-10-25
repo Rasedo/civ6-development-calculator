@@ -602,7 +602,10 @@ stands still is read by CAUSE (`lab.wait_turn`, used by `advance`, both
 session and each visible screen (the `lab.POPUPS` contexts), and each is
 answered at once and logged by name (under Autoplay a blocker other than
 the Dedication, which the seat's AI answers itself, only after the turn has
-stood 15 s) — the blocker by `unblock.lua` or
+stood 15 s; the seat's AI never answers the Dedication, and `h1/dump.py`
+answers it itself after each record, before the seat's turn
+(`lab.answer_dedication`), with `wait_turn(dedication=False)`, so a
+recording never answers it on a timer) — the blocker by `unblock.lua` or
 `commemorate.lua`, a session by `close_sessions.lua` (or the caller's
 answer), a screen by the close its own script defines. The blind sweep
 (close every session and screen) runs only after 30 s with no named cause.

@@ -3616,16 +3616,16 @@ this file do not carry over; the knowledge base's inner layout does.
   +0xa8 m_cityId, +0xc0 m_playerOwner, +0xd8 m_cityThreat, +0x140
   m_managedWorkingContract (the handle in hand at +0x150, its id +0x15c),
   +0x160 m_managedContracts (a container: +0x10 a vector of 16-byte handles,
-  +0x18 their count). The same container in the Economic AI (+0x268, the
+  +0x18 its capacity, +0x20 the count; stale copies stand past the count). The same container in the Economic AI (+0x268, the
   purchases), Research (0x75e7a0 (FinalRelease 0x4f70f0): +0x178), CultureAi
   (0x6190d0 (FinalRelease 0x40e8c0): +0x218), Diplomatic (0x6419c0
   (FinalRelease 0x4271a0): +0x6158) and each behaviour tree (+0x378). The
   religious AI's (0x74af30 (FinalRelease 0x4e9d60), made by the religious
   manager, not reached from the Player) is not read: its Warrior Monk
   contracts stand in the Control Manager's list with no holder named. A
-  holder's handle is weak: it keeps the id of a contract the Control Manager
-  no longer holds (930 of runs/h1_duelm1117's 1,922 end-look records name
-  one).
+  handle within a container's count names a contract the Control Manager
+  holds, or is released (its pointer null): runs/h1_dueldA1117, 1,992
+  end-look records, none naming a contract the manager lacks.
 - THE BEHAVIOUR TREES: each control whose object's vtable is the tree's
   control interface (the tree +0x218; its +8 the tree): the tree's watched
   fields (constructor FinalRelease 0x53e4d0) +0x138 m_isActive, +0x150
@@ -3686,6 +3686,22 @@ this file do not carry over; the knowledge base's inner layout does.
   recordings of the seed (runs/h1_duelw1117, runs/h1_duelv1117) part the
   same way at t245 (the Dedication answered there in one, not the other),
   their draws equal to the end.
+- THE DEDICATION AT A FIXED POINT. The autoplayed seat's AI never answers
+  its Dedication (runs/h1_duelw1117: none taken at the t31, t61, t91, t121
+  era changes). `h1/dump.py` now answers it at the hold, after the record
+  and before the seat's turn is released, wherever one of the seat's
+  notifications blocks on ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE
+  (`lab.answer_dedication`, the first blocker or not), and `wait_turn`
+  never answers it. The choice is commemorate.lua's: the offered choices
+  (Game.GetEras():GetPlayerCommemorateChoices) in the order offered, as many
+  as GetPlayerNumAllowedCommemorations allows. The blocker stands at the
+  hold of each game-era turn (the record of t31, t61, ..., t241 holds the
+  new age with no Dedication; the next record holds it). MEASURED: seed
+  1117 recorded twice at once (runs/h1_dueldA1117, runs/h1_dueldB1117,
+  20261025T035053Z): every record of the 250, every one of the 23,363
+  draws and every one of the 7,224 AI memory reads identical; the
+  Dedication answered at t31, t61, t91, t121, t151, t181, t211, t241 in
+  both.
 
 ## H-1: a pillaged building's specialist, the centre's defence, three moments — READ
 

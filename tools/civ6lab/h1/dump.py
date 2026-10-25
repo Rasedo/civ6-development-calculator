@@ -42,7 +42,9 @@ again on the same `--out` and it carries on from the game's current turn. In
 a game with a human seat the seat is Autoplayed one turn at a time
 (`lab.advance`), so the game HOLDS at the seat's turn while the dump reads:
 the state cannot move under it; the dump waits (`--start-wait`) until the
-seat's own turn start has run (`wait_started`), so every record holds it. `--observer` follows an all-AI game as
+seat's own turn start has run (`wait_started`), so every record holds it.
+After each record, before the seat's turn, a Dedication due is answered
+(`lab.answer_dedication`), never on a timer. `--observer` follows an all-AI game as
 `watch.py` does; the counter can move during a dump there (an observer game
 cannot be paused from the tuner), which the `moved` flag records.
 """
@@ -291,7 +293,14 @@ def cmd_play(a, t: Tuner) -> int:
             if a.observer:
                 lab.wait_turn(t, now, -1, wait, log, one_more_turn=True)
             else:
-                lab.advance(t, "autoplay", lp, wait, log, one_more_turn=True)
+                # the seat's Dedication, which its AI does not answer under
+                # Autoplay, is answered here, after the record and before the
+                # seat's turn, every turn — never on a timer while the turn
+                # stands, so a seed records the same game every time
+                ded = lab.answer_dedication(t, lp)
+                if ded is not None:
+                    log(f"    dedication -> {ded}")
+                lab.advance(t, "autoplay", lp, wait, log, one_more_turn=True, dedication=False)
         except lab.TurnStalled as e:
             print(f"stalled: {e}")
             break
