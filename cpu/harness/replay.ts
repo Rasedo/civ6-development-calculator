@@ -4450,6 +4450,26 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // t7: city-state 2's two Warriors fortify under Protect Units, record
       // t8 both healed 10 at Movement 0)
       const killedBy = new Map(ds.flatMap((d) => (d.kind === 'kill' && isCityStateSeat(seatOfP(ctx, d.player)) ? [[d.victimUnit, d.player] as const] : [])));
+      // ...and without another player's units the log takes off the map before
+      // its turn opens that record t+1 lost — a removal the log follows
+      // with an addition on the unit's plot is a unit made anew (a free
+      // upgrade, a levy), no loss (runs/h1_dueld1124 t212: China's seven units
+      // removed in China's turn, none in Granada's records)
+      const acts = (b as { actions?: unknown[][] }).actions ?? [];
+      const heldAfter = new Set(b.units.map((x) => `${x.owner}:${x.id}`));
+      const lastPlot = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
+      const opens = new Map<number, number>();
+      const removed: { ord: number; key: string; owner: number }[] = [];
+      for (let j = 0; j < acts.length; j++) {
+        const x = acts[j];
+        const key = `${x[3]}:${x[4]}`;
+        if (x[2] === 'PlayerTurnActivated' && !opens.has(x[3] as number)) opens.set(x[3] as number, x[0] as number);
+        if (x[2] === 'UnitMoved' || x[2] === 'UnitTeleported') lastPlot.set(key, (x[6] as number) * ctx.W + (x[5] as number));
+        if (x[2] !== 'UnitRemovedFromMap' || heldAfter.has(key)) continue;
+        const at = lastPlot.get(key);
+        const remade = acts.slice(j + 1).some((y) => y[2] === 'UnitAddedToMap' && (y[6] as number) * ctx.W + (y[5] as number) === at);
+        if (!remade) removed.push({ ord: x[0] as number, key, owner: x[3] as number });
+      }
       const fallen: [Unit, number][] = [];
       let before: number | undefined;
       holdMinorStart((_st, cs) => {
@@ -4468,6 +4488,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         before = ctx.playerOfSeat.get(cs.seat)!;
         for (const [key, killer] of killedBy) {
           const u = killer < before ? ctx.units.get(key) : undefined;
+          const i = u ? state.units.indexOf(u) : -1;
+          if (i < 0) continue;
+          fallen.push([u!, i]);
+          state.units.splice(i, 1);
+        }
+        const open = opens.get(before);
+        for (const r of open === undefined ? [] : removed) {
+          if (r.ord >= open! || r.owner === before) continue;
+          const u = ctx.units.get(r.key);
+          // a levied unit goes home on the engine's own levy clock, not lost
+          if (u?.leviedFrom !== undefined) continue;
           const i = u ? state.units.indexOf(u) : -1;
           if (i < 0) continue;
           fallen.push([u!, i]);

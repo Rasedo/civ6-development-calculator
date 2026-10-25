@@ -139,7 +139,10 @@ export function minorPhase(state: GameState): void {
     // its K 2.10 from t29, its t29 build a Warrior
     minorTradeValue(state, cityState);
     if (!fresh) minorTradeList(state, cityState);
-    minorKnowledge(state, cityState, false);
+    // its end look; under the replay's hold its units still stand where its
+    // turn found them, and the replay's copy (`minorAi`) takes the look on
+    // the record's plots (runs/h1_dueld1128 t48: Hong Kong's Builder at 8:7)
+    if (!ordersHeld) minorKnowledge(state, cityState, false);
     // the boosts its turn earned (runs/h1_duelw1117 t1: every city-state
     // takes Pottery before its coastal city's Sailing eureka lands)
     detectBoosts(state, cityState.seat);
