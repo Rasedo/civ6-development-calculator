@@ -2169,8 +2169,13 @@ function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnR
   }
   const rank = (d: Decision) => (late(d) ? 1 << 20 : d.kind === 'kill' ? Math.max(d.player, fightOf.get(d.victimUnit) ?? -1)
     : 'player' in d ? d.player : -1);
-  // a charge on a wonder the pair placed lands once the queue holds it
-  const order = (d: Decision) => (d.kind === 'wonderCharge' && d.placed ? ORDER.indexOf('queue') + 0.5 : ORDER.indexOf(d.kind));
+  // a charge on a wonder the pair placed lands once the queue holds it; a
+  // Settler walks its steps, looking from each, before it founds (runs/h1_duelw1124
+  // t2: Rome's Settler steps (34,20) -> (34,19) and its look of three shows
+  // (37,19) before the city stands)
+  const founders = new Set(ds.flatMap((d) => (d.kind === 'found' && d.unit ? [d.unit] : [])));
+  const order = (d: Decision) => (d.kind === 'wonderCharge' && d.placed ? ORDER.indexOf('queue') + 0.5
+    : d.kind === 'move' && founders.has(d.unit) ? ORDER.indexOf('found') - 0.5 : ORDER.indexOf(d.kind));
   // `players`: the actions of those players' turns alone (their rank); else
   // every decision of the phase no earlier call took
   const taken = (d: Decision) => ctx.applied.has(d);
@@ -3461,13 +3466,18 @@ function replaceOwnerCitizens(state: GameState, t: Tile): void {
  *  engines' own round robin stands in for: each seat commits the ones record
  *  t+1 shows through the engine's verb (`commitDedications`; runs/
  *  h1_duelw1117 Rome's Dark Age from t31 holds none, where the round robin's
- *  paid +1 on a boost at t35); a set the verb refuses is the record's */
-function syncDedications(ctx: Ctx): void {
+ *  paid +1 on a boost at t35); a set the verb refuses is the record's.
+ *  `seats`: the players whose turn opens, picking before their actions where
+ *  the age already offers a set the record shows (runs/h1_duelw1124 t31: China takes Free
+ *  Inquiry, then its turn's Eureka pays +1); the pair's end takes every seat */
+function syncDedications(ctx: Ctx, seats?: ReadonlySet<number>): void {
   ctx.state.seats.forEach((s, seat) => {
+    if (seats && !seats.has(seat)) return;
     const want = seatOf(ctx.next.state, seat)?.dedicationPicks ?? [];
-    if ((s.dedicationPicks ?? []).join() === want.join()) return;
+    if ((s.dedicationPicks ?? []).join() === want.join() || (seats && !want.length)) return;
     const res = commitDedications(ctx.state, seat, want);
     if (res.ok) return void count(ctx, 'dedications', 'applied');
+    if (seats) return;
     s.dedicationPicks = [...want];
     s.dedications = want.length;
     count(ctx, 'dedications', 'fallback', ctx.playerOfSeat.get(seat), res.reason);
@@ -4377,6 +4387,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.governorAi.clear();
     ctx.governorAi.aiTurn(state, a.turn, (p) => p === activePlayer(a), (s, id) => recordCityName(ctx, s, id));
     stream.actions(a.turn);
+    syncDedications(ctx, new Set([seatOfP(ctx, activePlayer(a))]));
     applyPhase(ctx, ds, 'before', b, a);
     // the active player's units stand where its actions left them before its
     // next start (the engine's turn below): its moves reveal, and meet, there
@@ -4523,6 +4534,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // the units their starts made, under the record's ids, and the units
       // the turn has lost so far
       matchNewUnits(ctx, b);
+      syncDedications(ctx, new Set(others));
       const live = new Set(state.units);
       ctx.engineKilled = new Set([...ctx.units].filter(([, u]) => !live.has(u)).map(([k]) => k));
       {

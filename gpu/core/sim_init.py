@@ -434,6 +434,8 @@ class SimInit:
                 self.citystate_suz_code[b, s] = cs.get("suzCode", -1)
                 self.citystate_suz_imp[b, s] = cs.get("suzImp", -1)
                 self.citystate_founded_turn[b, s] = cs["foundedTurn"]
+                # its founding Settler's look (`placeCityStateAt`)
+                self.mops_revealed[b, s, torch.tensor(cs["revealed"], dtype=torch.long, device=device)] = True
         # A city-state's tile ownership lives in `tile_seat` (seeded below off
         # the wire's `ownerSeatInit` plane); `citystate_at` is a derived view.
         # The (seat, city-state) relations live on `seat_citystate_*`
@@ -4102,7 +4104,7 @@ class SimInit:
         self.barb_civics = torch.zeros(B, len(rules.c_cost), dtype=torch.bool, device=device)
         self.barb_unit_tribe = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=device)
         self.barb_unit_scout = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
-        # THE RAIDS AND CITY ASSAULTS (`barbarianScouts`): each tribe's Boldness,
+        # THE RAIDS AND CITY ASSAULTS (`barbScoutLook`): each tribe's Boldness,
         # the spawn interval its operation set (-1 its own), the unit classes
         # it asked for (the export's tag order, -1 empty), the owners of the cities its raid and its
         # assault wait for, its scout's tree (its scout's slot, the city's

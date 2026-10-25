@@ -54,6 +54,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     pop: cityState.population,
     suzCode: suzCodeOf(cityState.name),
     foundedTurn: cityState.foundedTurn ?? -99,
+    // the plots it has revealed (its founding Settler's look, `placeCityStateAt`)
+    revealed: (cityState.revealed ?? []).flatMap((v, p) => (v === 1 ? [p] : [])),
     // the IMPROVEMENT this minor's suzerain may build, by roster index. The
     // catalog names the minor and the seeder draws which minors a map holds,
     // so the pairing can only be resolved here, per game.

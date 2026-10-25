@@ -1,7 +1,7 @@
 
 import type { City, CityState, CityStateType, GameState, QueueItem, Yields } from './types';
 import { giveQuest } from './quests';
-import { suzerainSight } from './fog';
+import { losDisk, suzerainSight, unitSight } from './fog';
 import { NO_SEAT, cityStateOfSeat, isCiv, civsAtWar, emptySeat, isCityStateSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileBelongsTo, tileSeat, hiddenResourcesFor, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
 import { cancelRoutes } from './trade';
 import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
@@ -54,7 +54,13 @@ export function placeCityStateAt(
     // gone, aging out as any record (runs/h1_dueld1121 aimem: each
     // city-state's SETTLER on its centre at age 1 on t2's log, 2 on t3's)
     armyKnown: [{ id: -1, owner: seatOfCityState(id), type: 'SETTLER', seen: settlerSeen, plot: centerIndex, damage: 0 }],
+    // its revealed plots hold that Settler's look from the centre before the
+    // city stood (BaseSightRange 3, the line of sight from the bare plot;
+    // runs/h1_duelw1117 t29: China, Caguana's new suzerain, is shown (1,13),
+    // three from Caguana's centre and past its plots' ring)
+    revealed: new Array<number>(state.map.tiles.length).fill(0),
   };
+  for (const p of losDisk(state.map, tile, unitSight({ type: 'SETTLER' }), false)) cityState.revealed![p] = 1;
   // CIV6: a city-state's founding is a major's — a city of one citizen on
   // its centre and the whole first ring (runs/h1_duelw1103–1118: 48 of 48
   // city-states founded at t2 hold size 1 and all six ring plots; the

@@ -1170,7 +1170,7 @@ _MUTABLE = [
     # their units was raised by (`cpu/core/barbarians.ts`)
     "tribe_plot", "tribe_alive", "tribe_kind", "tribe_name", "tribe_spawn", "tribe_scoutc", "n_tribes",
     "barb_camps_begun", "barb_techs", "barb_civics", "barb_unit_tribe", "barb_unit_scout",
-    # their raids, city assaults and scouts' trees (`tribeTurn`, `barbarianOps.ts`, `barbarianScouts`)
+    # their raids, city assaults and scouts' trees (`tribeTurn`, `barbarianOps.ts`, `barbScoutLook`)
     "tribe_bold", "tribe_every", "tribe_queue", "tribe_raidq", "tribe_assq", "tribe_home_slot", "tribe_home_seat",
     "tribe_home_id", "tribe_home_resume", "tribe_home_mu",
     "tribe_saw", "tribe_op", "tribe_op_seat", "tribe_op_id", "tribe_op_rstart", "tribe_op_ready", "barb_unit_op",
