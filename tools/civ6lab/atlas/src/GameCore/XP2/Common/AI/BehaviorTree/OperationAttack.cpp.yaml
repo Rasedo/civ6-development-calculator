@@ -44,6 +44,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: Attack Units — READ, ported"
   context:
     - "...s of Operation Attack 0x80c180 (Attack Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore..."
   review: reviewed

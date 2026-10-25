@@ -2554,8 +2554,10 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     danger to its safe plot; each fortified (its turn ends where it
     stands). One arrived on its safe plot by the endangered's or the
     afloat's move, and each fortified, has its moves ended (0x56d6f0: no
-    Movement through the run, `view["ended"]`)"""
+    Movement through the run, `view["ended"]`). A city-state's alone: the
+    Free Cities' one tree ("Free Cities Assault") holds no such node."""
     s, k = c.s, c.k
+    assert s != sim.FR, "minor operations: Operation Defend Units in the Free Cities' tree"
     g = on & (c.ma[:, i] == 1)
     if not bool(g.any()):
         return

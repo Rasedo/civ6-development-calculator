@@ -856,8 +856,9 @@ class SimBarbOps:
         bombard: a ship released (+0x650 == 0; no plot is the barbarians' own
         ground; 0x73d1f0 removes it from copies of the teams, so it stays
         the operation's), its orders ending there; a land unit afloat to
-        its safe plot; there a barbarian's orders end (0x469ce0: no danger
-        move, no fortification, its turn not done); one arrived on its safe
+        its safe plot; one with Movement on a plot paying a plunder pillages
+        it (`_barb_pillage_here`); there a barbarian's orders end (0x469ce0:
+        no danger move, no fortification, its turn not done); one arrived on its safe
         plot by the endangered's or the afloat's move has its moves ended
         (0x56d6f0: no Movement through the walk, `ctx["ended"]`)"""
         B, dev = self.B, self.device
@@ -929,9 +930,26 @@ class SimBarbOps:
             # a member released ends its turn in the walk that holds it
             done[b, uc] = torch.where(rel, True, done[b, uc])
             ok &= ~rel
-            # a land unit afloat to its safe plot; a barbarian's orders end
-            # there (0x469ce0: no fortification, its turn not done)
+            # a land unit afloat to its safe plot
             to_safe(us, ok & ~ship & wat)
+            ok &= self._bop_live(us)
+            # with Movement, a pillage where the plot pays a plunder
+            # (`hostilePillageAmount` above 0); then a barbarian's orders end
+            # (0x469ce0: no fortification, its turn not done)
+            plot = self.barb_unit_tile[b, uc].clamp(min=0)
+            seat_h = self.tile_seat[b, plot]
+            owned = (seat_h >= 0) & ((seat_h < BARB_SEAT) | (seat_h == FREE_SEAT))
+            imp = self.improvement[b, plot]
+            i_on = (imp >= 0) & ~self.pillaged[b, plot]
+            dv_raw = self.district[b, plot]
+            pays = torch.where(
+                i_on, self._imp_plun_amt[imp.clamp(min=0)] > 0,
+                (dv_raw >= 0) & (dv_raw != self._encamp_didx) & self.district_complete[b, plot]
+                & ~self.district_pillaged[b, plot] & (self.centre_slot_at[b, plot] < 0)
+                & (self._d_plun_amt[dv_raw.clamp(min=0)] > 0))
+            loot = ok & (self.barb_unit_mp[b, uc] > 0) & owned & pays
+            if bool(loot.any()):
+                self._barb_pillage_here(loot, uc)
 
     def _bop_team(self, k: int) -> list:
         """tribe `k`'s operation's living members as a team in pool slot

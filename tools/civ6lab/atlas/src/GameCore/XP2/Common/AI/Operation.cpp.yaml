@@ -319,6 +319,7 @@
     - cpu/core/barbarianOps.ts:view
     - gpu/core/sim_barbops.py:_bcap_refresh
     - cpu/core/barbarianOps.ts:env
+    - cpu/core/barbarianOps.ts:barbarianOpsTurn
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"

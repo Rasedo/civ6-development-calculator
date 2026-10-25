@@ -931,7 +931,8 @@ export function embarkTechMoves(state: GameState, seat: number): number {
  *     HARBOR bordering the cliff) live in cliffBlocksStep.
  *   - ANY non-barbarian unit clears a barb camp by entering it.
  *     clearCampFor no-ops for barbarians and credits the right treasury.
- *   - ZOC: ending adjacent to a hostile MILITARY unit zeroes MP.
+ *   - ZOC: ending adjacent to a hostile MILITARY unit halts the walk, its
+ *     Movement kept.
  *
  * The CALLER still picks the destination. That is where the walkers genuinely
  * differ — candidate sets, occupancy tests, stop conditions — and those stay
@@ -1052,10 +1053,11 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     claimMeteorSite(state, unit);
   }
   clearCampFor(state, unit, to.index);
-  if (inEnemyZoc(state, unit.tileIndex, unit)) {
-    unit.movesLeft = 0;
-    return 'halted';
-  }
+  // the walk ends on a plot of an enemy's zone, the unit's Movement kept for
+  // a blow from there (runs/h1_duelw1117 log t8: city-state 2's Warrior
+  // steps 13:10 -> 12:11 beside the camp's Spearman and melee-attacks it;
+  // 48 of the 161 melee attacks of the log come from 2 plots or more)
+  if (inEnemyZoc(state, unit.tileIndex, unit)) return 'halted';
   return unit.movesLeft > 0 ? 'moved' : 'halted';
 }
 

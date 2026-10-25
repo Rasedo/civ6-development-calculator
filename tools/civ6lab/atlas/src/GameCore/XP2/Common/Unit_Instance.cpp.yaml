@@ -47,6 +47,8 @@
   kind: function
   status: PARTLY
   impl: [ai/major/view.ts:reachOf]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x56d6f0
@@ -190,6 +192,7 @@
     - "H-1: the raids — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: Attack Units — READ, ported"
   context:
     - "...s the node's units whose damage (unit +0xcf0) is at least that share of their health (0x56e0d0) AND whose plot reads above 0 on the AI's influence map (player +0x12d8, 0x716a90 — its..."
     - "...bFightWhileEmbarked). Both sides' totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is..."

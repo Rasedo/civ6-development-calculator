@@ -566,6 +566,7 @@
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-95: Attack Units — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- MOVE TO SAFETY (0x77a4b0) and the influence map (0x717460) — READ, unported: per player at war, each of its figh..."

@@ -288,6 +288,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - ...ns a city's own and foreign citizen pressure (24.8 fixed point, gathered by the plot walk 0x6aef0 over CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF, gp +0xf0 = 10, with the per-plot functor 0x...
     - "...barian Camp (0x849a70): a camp within 5 of the minor's capital (the plots in range 5, 0x6aef0); no target; done when the actor clears a camp within 5 (0x849c00: distance <= 5); a..."
@@ -756,6 +757,7 @@
   impl: [ai/major/view.ts:MajorView]
   readings:
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-95: Attack Units — READ, ported"
   context:
     - "...player +0x12f0 +0xf4 above 0; unread, taken clear); else the combat simulation's blow (0x213e00 .. 0x205720, dealt +0x24, taken +0x28 — the blow back none in the port) against COMBA..."
   review: imported
@@ -1407,6 +1409,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   notes:
     - ".claude/scratchpad/st1/reading.md: ....cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x7164..."
   context:
@@ -1606,6 +1609,22 @@
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
   context:
     - "- A barbarian outpost's dispersal (0x52e970): the improvement's DispersalGold (row +0x38) plus the clearer's `m_axGoldDispersalChan..."
+  review: imported
+- addr: 0x52f710
+  final: 0x377310
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 8
+      value: "THE LOG   AGAINST IT: the moves keep their Movement on entering a zone —   runs/h1_duelw1117 log t8, city-state 2's Warrior 196610 steps 13:10 ->   12:11 beside the camp's Spearman (\"Attack Target Mov"
+    - recording: AI_Planning.csv
+      turn: 10
+      value: AI_Planning.csv t10   lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one   Movement left;
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...ormation's layer 0x2665b0 — 3 the religious one) is in a zone where, first, the functor 0x52f710 over its ring (0x6aef0, range 1) finds one, else per direction (0..5) a neighbour hol..."
   review: imported
 - addr: 0x531660
   final: 0x3790d0

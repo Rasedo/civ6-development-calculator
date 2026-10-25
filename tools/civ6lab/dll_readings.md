@@ -5657,6 +5657,37 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   alone striking on any ground (--aiscore --to 60, eight duels:
   barb.move.family 7900 -> 8019 of 8336, barb.move.plot 7345 -> 7446,
   cityState.move.plot 3203 -> 3231).
+- THE ZONE OF CONTROL'S TEST (Rules_Movement 0x530f50, READ; through
+  0x26f980(finder, from, to, the path's destination) from the path cost
+  0x26e920, the move's step cost 0x270980 and the walk 0x26fe20 at
+  0x270800, which stores the answer on the formation +0x518): the plot
+  entered (the fifth argument: x, y, the formation's layer 0x2665b0 — 3
+  the religious one) is in a zone where, first, the functor 0x52f710 over
+  its ring (0x6aef0, range 1) finds one, else per direction (0..5) a
+  neighbour holds a district of a player at war with the mover that
+  exerts one (0x24c2f0) or a unit that is not the mover's player's, of a
+  player at war (on the religious layer, of another religion +0x1ce4),
+  alive (+0xcf0 below its hit points, +0x770 clear), of the mover's domain
+  (+0x650 against the fourth argument, 0x266720), exerting (0x56d6c0: not
+  embarked, +0x1410) and seen by the mover's player (0x5033a0: the plot's
+  visibility count above 0, a stealth unit only its own team's). An
+  exerter or district on the sixth argument — the path's destination —
+  answers no zone at all unless the seventh (the plot's stacking count at
+  its limit, 0x585eb0 against the player's +0x58c) is set: an attack's
+  target never zones the plot the attack is made from. The path cost and
+  the step cost then take max(cost, the Movement left) (0x26eb7c,
+  0x270a2d) unless the path flags hold 0x800 (the planning's). THE LOG
+  AGAINST IT: the moves keep their Movement on entering a zone —
+  runs/h1_duelw1117 log t8, city-state 2's Warrior 196610 steps 13:10 ->
+  12:11 beside the camp's Spearman ("Attack Target Move ... Arrive 12:11")
+  and melee-attacks it in Operation Attack's fourth pass, which takes
+  members with Movement left (0x56c690, +0xdb0 > 0); AI_Planning.csv t10
+  lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one
+  Movement left; 48 of the log's 161 melee attacks are made from two plots
+  or more. How the cost's "spend everything" leaves the Movement is
+  unread (the walk's deduction 0x265d80 of [rsp+0x60]). The engines: a
+  walk halts on a plot of an enemy's zone with its Movement kept
+  (`stepUnit`, `walk`; `_tac_zoc`'s halt, `_step_verb` no longer zeroes).
 - THE PLANNING'S ZONE OF CONTROL (0x26e570 at 0x26e83e..0x26e8ae, READ;
   its exerters PARTLY READ): with the search's flag 0x200 clear (the
   planning's 0x115 | 0x800 | 0x100; the danger map's 0x311 sets it), a step
@@ -5812,6 +5843,26 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   range from the target within two turns with Movement left and none of its
   own stacking there unless its own plot (0x78fa10); a DEFENDER only on its
   own plot. The targets of the type within 5 of it (0x76eb50).
+- THE ASSIGNMENT'S FILTERS (0x776140 at 0x776780..0x7767fa, READ): per
+  spot i of a claim, unless the target is HIGH or the unit info's +0x1ba
+  bit 0x20 (UseMaxMeleeTrainedStrength) is set: with the fifth argument,
+  dropped where taken + back taken (+0x7c, +0x94) tops dealt + back dealt
+  (+0x64, +0xac); with the sixth (Operation Attack Units passes it always,
+  0x80d63a), dropped where taken + back taken tops the unit's health
+  (0x56e0d0 less +0xcf0). THE PREDICTION'S KILL (0x791470 at 0x79174a):
+  per spot dealt = the larger of the simulation's two results ([rbp-0xc],
+  [rbp-8]; 150 a civilian), its kill byte (+0xc4) dealt >= the target's
+  health, the planning's `wins` (+0x60) dealt > it; the blow back per spot
+  re-simulated (0x205720 with the combat's sides swapped through 0x213e00,
+  the location the spot) into +0x94 / +0xac. MOVE TO SAFETY's test
+  (0x77a4b0): a unit with damage, less than half lost, holds; half or more
+  flees unless `wins`. AGAINST THE LOG (unresolved, the simulation's inputs
+  unread): runs/h1_duelw1117 t9, city-state 2's Warrior 131073 at 60
+  health, ours 30 taken + 33 back against the camp's Warrior (19 damage),
+  the spot dropped; the game attacks (CombatLog t9). t10, the Warrior at 8
+  health beside the camp's Warrior at 27: ours deals 30 (10.82 against
+  10.73), `wins`, and holds; the game flees ("Move to safety, Current
+  Danger: 20").
 - THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less
   its damage (1.1 in 24.8); for MEDIUM / LOW a spot whose received (taken +
   back taken) tops the dealt (dealt + back dealt), or the unit's health, is
@@ -6595,7 +6646,10 @@ the event in `seizeCivilian` (cpu/core/combat.ts, `GameState.barbCaptures`);
   barbarians' pool: the raid's node 20, the assault's 1, the capture's 5;
   a hurt ship is released (no plot is the barbarians' own ground), staying
   in its team (THE RELEASE 0x73d1f0); a hurt land unit afloat goes to its
-  safe plot, and a hurt barbarian's orders end there (0x469ce0: no danger
+  safe plot; one with Movement on a plot paying a plunder pillages it
+  ("Plunder", runs/h1_duelw1128 log t39: the assault's Warrior "Plunder 16
+  10"; `passDefend`, `_bop_defend_exec` through `_barb_pillage_here`); then
+  a hurt barbarian's orders end (0x469ce0: no danger
   move, no fortification, no line, its turn not done: runs/h1_duelw1128 log
   t35-t37, the assault's Warrior 1114128 at 83 damage, over the node's 66,
   logs no Protect Units and attacks at t37). runs/h1_duelw1117 log t6:

@@ -66,6 +66,7 @@
     - recording: h1_duelv1124
       turn: 6
       value: "runs/h1_duelv1124 t6 player 4: Writing 251.0 = 124.0 + its   Tech Contract 127.0, Astrology 124.0 none)."
+  impl: [cpu/core/aiCityTrees.ts:goalsReached]
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

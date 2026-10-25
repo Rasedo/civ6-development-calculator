@@ -35,6 +35,22 @@
   context:
     - "...est 0x815d50 takes a plot holding a unit of the mover's player only where 0x265ac0 -> 0x265af0 passes it on the mover's path finder (+0x738 0: any; else formation classes, damage, th..."
   review: imported
+- addr: 0x265d80
+  final: 0x1a3720
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 8
+      value: "THE LOG   AGAINST IT: the moves keep their Movement on entering a zone —   runs/h1_duelw1117 log t8, city-state 2's Warrior 196610 steps 13:10 ->   12:11 beside the camp's Spearman (\"Attack Target Mov"
+    - recording: AI_Planning.csv
+      turn: 10
+      value: AI_Planning.csv t10   lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one   Movement left;
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - ".... How the cost's \"spend everything\" leaves the Movement is unread (the walk's deduction 0x265d80 of [rsp+0x60]). The engines: a walk halts on a plot of an enemy's zone with its Movemen..."
+  review: imported
 - addr: 0x266470
   final: 0x1a3d30
   kind: function
@@ -43,6 +59,38 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the step crosses a river (0x531510 on the from / to plots) and the unit is not exempt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x3..."
+  review: imported
+- addr: 0x2665b0
+  final: 0x1a3e70
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 8
+      value: "THE LOG   AGAINST IT: the moves keep their Movement on entering a zone —   runs/h1_duelw1117 log t8, city-state 2's Warrior 196610 steps 13:10 ->   12:11 beside the camp's Spearman (\"Attack Target Mov"
+    - recording: AI_Planning.csv
+      turn: 10
+      value: AI_Planning.csv t10   lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one   Movement left;
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...he formation +0x518): the plot entered (the fifth argument: x, y, the formation's layer 0x2665b0 — 3 the religious one) is in a zone where, first, the functor 0x52f710 over its ring..."
+  review: imported
+- addr: 0x266720
+  final: 0x1a3fe0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 8
+      value: "THE LOG   AGAINST IT: the moves keep their Movement on entering a zone —   runs/h1_duelw1117 log t8, city-state 2's Warrior 196610 steps 13:10 ->   12:11 beside the camp's Spearman (\"Attack Target Mov"
+    - recording: AI_Planning.csv
+      turn: 10
+      value: AI_Planning.csv t10   lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one   Movement left;
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...s hit points, +0x770 clear), of the mover's domain (+0x650 against the fourth argument, 0x266720), exerting (0x56d6c0: not embarked, +0x1410) and seen by the mover's player (0x5033a0:..."
   review: imported
 - addr: 0x266950
   final: 0x1a4160

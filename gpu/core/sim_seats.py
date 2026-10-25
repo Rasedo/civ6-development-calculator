@@ -13332,7 +13332,8 @@ class SimSeats:
           * COST — moveCostInto + riverCharge, road-aware (`_road_terms`).
           * AFFORD — `movesLeft < cost && movesLeft < full` refuses, so a unit
             at FULL MP always gets its first step and pays everything it has.
-          * ZOC — ending adjacent to a hostile military zeroes what is left.
+          * ZOC — none here: the walkers halt on a plot of an enemy's zone
+            (`_tac_zoc`), the Movement kept for a blow.
           * the camp clear, for any landing unit.
 
         `gslot` is a MERGED pool slot, so the occupancy and tile writes below are
@@ -13532,7 +13533,6 @@ class SimSeats:
                 _s = gslot[_r] - _lo
                 self.unit_mp_full[_r, gslot[_r]] = _f[_r, _s]
                 spent[_r] = torch.minimum(spent[_r], _f[_r, _s])
-        spent = torch.where(self._in_enemy_zoc(dest, seat, u_type), torch.zeros_like(spent), spent)
         self.unit_mp[rows, gs] = spent.take(rows)
         _ty = u_type.clamp(min=0, max=self.NU - 1)
         self.unit_attacks[rows, gs] = self._step_attacks_left(
@@ -13558,69 +13558,6 @@ class SimSeats:
                        & self._seats_hostile(_ms.unsqueeze(1), _own.unsqueeze(1)).squeeze(1))
                 self._conquer_encampment(hit, d0, _ms)
         return moved
-
-    def _in_enemy_zoc(self, dest: torch.Tensor, seat, mover_type: torch.Tensor) -> torch.Tensor:
-        """ZOC, mirroring units.inEnemyZoc: does `dest` sit adjacent to a MILITARY
-        unit hostile to a mover of `seat`? [B] -> [B].
-
-        ONE function for every mover — the rule is identical whoever asks,
-        but WHICH zone answers is not: CIV6 (Zone of Control) reads "Religious
-        units exert ZOC against other religious units", so a religious mover
-        walks through a military zone and a military mover through a religious
-        one. Only a matching pair halts.
-        Hostility is unitsHostile, exactly: barbarians are hostile to every
-        non-barbarian and vice versa; otherwise it is civsAtWar(seat, other).
-
-        CIV6 gives a naval raider "Ignores enemy zone of control" (cavalry
-        classes ignore it too); "Ranged and Bombard class units do not exert
-        ZOC" unless SUPPRESSION hands it back; the two submarines additionally
-        "do not exert zone of control"; an embarked unit exerts none; and a
-        river between the exerter and the entered tile blocks the halt.
-
-        The zone is read AT THE SIX NEIGHBOURS the halt asks about, never built
-        over the whole map: every term below is a function of the tile alone,
-        so gathering the ring first and asking the predicate there is the same
-        answer over 6 columns instead of T."""
-        dc = dest.clamp(min=0)
-        dn = self.neigh[dc]                                   # [B, 6]
-        dnc = dn.clamp(min=0)
-        mil = self.military_at.gather(1, dnc)
-        here = mil >= 0
-        mslot = mil.clamp(min=0)
-        mtype = self.unit_type.gather(1, mslot).clamp(min=0, max=self.NU - 1)
-        mseat = torch.where(here, self.unit_seat.gather(1, mslot), torch.full_like(mil, -1))
-        pc = self.rules_dev.u_promo_class.take(mtype)
-        no_exert_cls = (pc == self._pc_ranged) | (pc == self._pc_siege)
-        if bool(no_exert_cls.count_nonzero()):
-            # SUPPRESSION hands the zone back; with no ranged/siege exerter in
-            # the ring the whole clause is False whatever the promotions say.
-            no_exert_cls = no_exert_cls & ~self._promo_flag(
-                mtype, self.unit_promos.gather(1, mslot), "ZOC_EXERT")
-        exert = here & ~self.unit_emb.gather(1, mslot) & ~self._type_zoc_none.take(mtype) & ~no_exert_cls
-        hostmil = exert & self._seats_hostile(seat, mseat)
-        rel_mover = self._rel_strength.take(mover_type.clamp(min=0, max=self.NU - 1)) > 0
-        if bool(rel_mover.count_nonzero()):
-            # the religious zone, off the CIVILIAN plane the religious units
-            # stand in; an embarked one exerts none, exactly as ashore.
-            civ = self.civilian_at.gather(1, dnc)
-            cslot = civ.clamp(min=0)
-            ctype = self.unit_type.gather(1, cslot).clamp(min=0, max=self.NU - 1)
-            cseat = torch.where(civ >= 0, self.unit_seat.gather(1, cslot), torch.full_like(civ, -1))
-            rel_here = (civ >= 0) & (self._rel_strength.take(ctype) > 0) & ~self.unit_emb.gather(1, cslot)
-            hostrel = rel_here & self._seats_hostile(seat, cseat)
-            hostmil = torch.where(rel_mover.reshape(-1, 1), hostrel, hostmil)
-        riv = (self.river_mask.gather(1, dc.unsqueeze(1))
-               >> torch.arange(6, device=self.device).unsqueeze(0)) & 1
-        halt = ((dn >= 0) & (riv == 0) & hostmil).any(dim=1)
-        # CIV6 (ABILITY_IGNORE_ZOC): the light, heavy and ranged cavalry tags —
-        # a cavalry-class unit with none of them (`chariot`, the War-Cart) only
-        # where it carries the ability itself. The
-        # three catalog vectors are fixed at load, so the OR is built once.
-        ign = getattr(self, "_zoc_ign_cache", None)
-        if ign is None:
-            ign = self._type_zoc_ignore | (self._type_cavalry & ~self._type_chariot)
-            self._zoc_ign_cache = ign
-        return halt & ~ign.take(mover_type.clamp(min=0, max=self.NU - 1))
 
     def _encamp_terms(self, tc: torch.Tensor):
         """(def_cs, hrow, hcol, wtier, held) for the Encampment on `tc`.
