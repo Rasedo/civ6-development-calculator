@@ -444,6 +444,7 @@
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "...50) answers (a not-yet-trainable unit: its PrereqTech or PrereqCivic unheld, 0x4cb590 / 0x39d490; the one listener the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: it..."
   review: imported

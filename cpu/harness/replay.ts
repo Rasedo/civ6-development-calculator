@@ -93,7 +93,7 @@ import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../cor
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
 import { holdMinorClears, minorAiTurn, minorGreatPersonClass, minorMilitaryTurn, traceMinorAi } from '../core/minorCityAi';
-import { cityStateMilitary, traceMinorOps } from '../core/minorOps';
+import { UPGRADE_MOVE, cityStateMilitary, traceMinorOps } from '../core/minorOps';
 import { traceBarbOps } from '../core/barbarianOps';
 import { opsOf } from '../core/operations/manager';
 import { opUnits } from '../core/operations/operation';
@@ -1109,7 +1109,9 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: Readonl
   for (const [u, m] of moves) {
     const key = keyOf.get(u);
     if (!key) continue;
-    const game = rows ? tacticalCategory(rows.get(key) ?? '(no row)') : undefined;
+    // a unit the "Upgrade Units" trees hold logs no tactical row (its turn
+    // the tree's: runs/h1_duelw1117 city-state 2's Warrior 131073 t43-44)
+    const game = rows ? tacticalCategory(rows.get(key) ?? (m.move === UPGRADE_MOVE ? UPGRADE_MOVE : '(no row)')) : undefined;
     // the Free Cities' moves apart
     const label = `${u.seat === FREE_SEAT ? 'Free Cities: ' : ''}${game ?? m.move}`;
     const t = (ctx.minorTally[label] ??= { units: 0, move: 0, plot: 0, plotOf: 0 });

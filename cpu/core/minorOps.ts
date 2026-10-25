@@ -192,6 +192,10 @@ export const minorOpUnits = (cs: CityState): number[] => (cs.ops ? opsOf(cs.ops)
  *  and its "Upgrade Units" trees' */
 export const minorJobUnits = (cs: CityState): number[] => [...minorOpUnits(cs), ...(cs.upgrading ?? [])];
 
+/** the move a unit the "Upgrade Units" trees hold takes in the pass: the
+ *  tree's, which logs no tactical row */
+export const UPGRADE_MOVE = 'Upgrade Units';
+
 /** the "Upgrade Units" trees' priority (TriggeredBehaviorTrees, both triggers) */
 const UPGRADE_TREE_PRIORITY = AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade Units' && AI_MINOR_TRIGGERS.includes(t.trigger))?.priority ?? 0;
 
@@ -270,7 +274,7 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
     const p = targets.get(u.id) ?? -1;
     if (p >= 0 && u.tileIndex !== p && u.movesLeft > 0) moveTo(state, u, p, false);
   }
-  for (const u of order(held)) passFinish(pass, u, 'Operation', u.tileIndex);
+  for (const u of order(held)) passFinish(pass, u, UPGRADE_MOVE, u.tileIndex);
   cs.upgrading = order(held).map((u) => u.id);
 }
 

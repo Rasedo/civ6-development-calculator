@@ -8652,6 +8652,18 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   "Contract for" names the Warrior Monk where the value's way names the
   Scout (1128, 248 of 580 recruit lines equal against 7). The maintenance
   resource's stockpile test (player +0x1320 +0x440 / +0x350) is unread.
+  The table's +0x0e (0x7989e0 at 0x798cc2): PrereqTech (0x4cb590 on player
+  +0x1338), PrereqCivic (0x39d490 on +0x1310) held and the StrategicResource
+  (DB.Units +0x2c8 +0x14) stocked above 0 (0x4aa790); an entry whose
+  prerequisites are unheld is still listed where the signal +0x168
+  (0x79ba50) answers. OPEN: runs/h1_duelw1121 city-state 3's Naval
+  Superiority asks the Warrior Monk on an empty team (MELEE needed) and the
+  Trebuchet with its Caravel (the had types), never the Caravel, the Pikeman
+  or the Courser the sums put first — its knowledge base's ARMY lines
+  (AI_Knowledge.csv t92) the replay's records, the team's MaxPercentage test
+  ((members + 1) x the percentage, 0x740562) as ported; no city-state's
+  "Contract for" on the five duels names a Caravel, a Pikeman, a
+  Crossbowman, a Courser, an Infantry or a Field Cannon.
 - RECRUIT UNITS (0x81c820; its data: +0x00 Already in progress, +0x10
   Contract ID, +0x20 Recruit Range, +0x30 Allow creation, +0x40 Recruit
   Value, +0x50 Time Limit, +0x60 Allow Stealing): "Contract for" names the
