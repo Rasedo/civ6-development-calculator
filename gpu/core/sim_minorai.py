@@ -536,7 +536,7 @@ class SimMinorAi:
 
     # -- the plot analysis ---------------------------------------------------
 
-    def _minor_ground_imps(self, s: int, standing: bool = False) -> torch.Tensor:
+    def _minor_ground_imps(self, s: int, standing: bool = False, drought: bool = True) -> torch.Tensor:
         """[B, T, K] — `groundImprovements` (with `standing`,
         `standingImprovements`: the plot as it stands alone, the trees'
         nodes' test): the improvements the ground of
@@ -549,7 +549,8 @@ class SimMinorAi:
         passable; a resource's plot its own improvement alone; a water plot
         the water rows; land the minor's own trait improvement, the Farm, the
         Mine, the Lumber Mill, the Seaside Resort and the ground-only rows,
-        each on its own ground; no row a governor gates; none a drought bars"""
+        each on its own ground; no row a governor gates; with `drought` none a
+        drought bars"""
         B, T, dev = self.B, self.T, self.device
         K = int(self._imp_unlock.numel())
         PN = self._cv_tables()["plot_names"]
@@ -628,7 +629,7 @@ class SimMinorAi:
                     ok = ok | ((land | land_h) & self._imp_ground_ok(k))
                     if any_c:
                         ok = ok | (land_c & self._imp_ground_compute(k, cleared=True))
-            if k in self._drought_imps:
+            if drought and k in self._drought_imps:
                 ok = ok & ~dry
             out[:, :, k] = ok
         return out
@@ -935,9 +936,13 @@ class SimMinorAi:
         ground = self._minor_ground_imps(s)
         K = ground.shape[2]
         g = ground.gather(1, p0.unsqueeze(-1).expand(-1, -1, K)) & (owned & ev).unsqueeze(-1)
+        # an improvement a drought on the plot bars, which its ground takes
+        # otherwise, is valued 0: the plot test asks no drought
+        dry_ground = self._minor_ground_imps(s, drought=False) if bool((self.drought > 0).any()) else ground
+        gd = dry_ground.gather(1, p0.unsqueeze(-1).expand(-1, -1, K)) & (owned & ev).unsqueeze(-1)
         # 0x5ce970's +0x54: an improvement the plot test takes, a plot
         # holding one among them, its own valued 0
-        improvable = owned & ev & g.any(-1)
+        improvable = owned & ev & gd.any(-1)
         # the plot of the city's own pillaged district values that district
         # alone, its repair (`minorRepairsDistrictAt`): per district row its
         # plots, each other value FX(-9999)
@@ -1010,12 +1015,15 @@ class SimMinorAi:
                 if ke < 0:
                     continue
                 gi = g[bb, pp, ke]
+                gdi = gd[bb, pp, ke]
                 ti = impT[i][bb]
                 # landing at or past the horizon: FX(-9999)
-                if not bool(gi.any()) or bool((ti >= hz).all()):
+                if not bool(gdi.any()) or bool((ti >= hz).all()):
                     continue
-                v = self._cv_improvement(pf, r["type"], ti, torch.full_like(bb, hz))
-                imps[bb, pp, i] = torch.where(gi, v, torch.full_like(v, _FX_MIN))
+                v = (self._cv_improvement(pf, r["type"], ti, torch.full_like(bb, hz)) if bool(gi.any())
+                     else torch.zeros_like(bb))
+                barred = torch.where(gdi & (ti < hz), torch.zeros_like(v), torch.full_like(v, _FX_MIN))
+                imps[bb, pp, i] = torch.where(gi, v, barred)
             for (i, name, _dv, pl, ok_t) in cand_rows:
                 ci = pl[bb, pp] & ok_t[bb]
                 ti = distT[i][bb]

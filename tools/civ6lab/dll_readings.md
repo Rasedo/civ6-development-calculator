@@ -4426,6 +4426,22 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   turn (runs/h1_dueld1128 t41: Hong Kong's Warrior 851968 trained and
   upgraded to the Swordsman 917509 before Granada's look; Granada's record
   a Swordsman, no Warrior).
+- A DROUGHT IN THE PLOT ANALYSIS (the PLOT ANALYSIS LOG of the verbose
+  recordings): an improvement a drought on the plot bars (the drought's
+  list, `droughtBars`), which the plot's ground takes otherwise, is valued
+  0.00, not FX(-9999), and the plot stays improvable — the plot test asks
+  no drought, the build does. runs/h1_duelv1128 Hong Kong: the Farm at 9:6
+  72.45 to t4, 0.00 through the drought of t5-t9, 71.45 at t10; t16-t17's
+  drought makes 8:5's, 7:6's and 7:7's Farms and 8:6's Camp 0.00 while
+  7:5's Mine stays 71.45. A Farm at 0 is a researched pick of value 0 that
+  holds a higher unresearched one off (`pickImprovement`): Hong Kong's
+  Mine at 8:7 (34.23-47.99, Mining not held) is never picked through the
+  drought, and the Farm is laid on 9:6 at t10, where the engines picked
+  the Mine at t7 and held the slot on its Mining contract. The engines:
+  `minorPlotEvals` / `_minor_plot_evals` (`_minor_ground_imps`'s `drought`).
+  The replay counts an improvement the engine's turn change (its random
+  events) took or laid as `draw:eventImprove`, no Builder's (runs/h1_duelu1124
+  t82: Cardiff's Farms on 539, 582 and 627 gone in the engine's turn change).
 - THE FOUNDING SETTLER'S RECORD: a city-state's knowledge base holds the
   Settler that founded its city, a unit gone, aging as any record to 21
   (runs/h1_dueld1121 aimem: each city-state's SETTLER on its centre at age

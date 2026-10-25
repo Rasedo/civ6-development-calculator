@@ -199,7 +199,7 @@ export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1
  * and its improvements' and districts' values in database order. An
  * improvement the ground does not take, a district the plot cannot hold or
  * the city has, one the minor's type disfavours (`minorDistrictVerdict`):
- * FX(-9999). The centre and a district's plot stand
+ * FX(-9999); one only a drought on the plot bars, 0. The centre and a district's plot stand
  * unanalysed (0), but the plot of the city's own pillaged district, which
  * values that district alone, its repair (`districtValue`: x2;
  * runs/h1_duelw1127 Muscat t160: the Commercial Hub pillaged, "Build City
@@ -268,9 +268,16 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       accumulationPct: accumulationPct(state, cs.seat, tile.terrain),
     };
     const ground = owned && !repair ? groundImprovements(state, cs, tile) : new Set<string>();
+    // an improvement a drought on the plot bars, which its ground takes
+    // otherwise, is valued 0: the plot test asks no drought (runs/h1_duelv1128
+    // Hong Kong: the Farm at 9:6 72.45 to t4, 0.00 through the drought of
+    // t5-t9, 71.45 at t10; the drought of t16-t17 makes 8:5's, 7:6's and
+    // 7:7's Farms and 8:6's Camp 0.00, 7:5's Mine 71.45)
+    const dry = owned && !repair && tile.droughtTurns > 0 ? groundImprovements(state, cs, { ...tile, droughtTurns: 0 }) : ground;
     const improvements = AI_IMPROVEMENTS.map((row, i) => {
       const id = IMPROVEMENT_ENGINE.get(row.type);
-      if (!id || !ground.has(id)) return FX_MIN;
+      if (!id || !dry.has(id)) return FX_MIN;
+      if (!ground.has(id)) return impT[i] >= AI_VALUE_HORIZON ? FX_MIN : 0;
       return improvementValue(f, row.type, impT[i], AI_VALUE_HORIZON);
     });
     // a district's adjacency at the plot, once per district
@@ -345,7 +352,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       // one among them, its own valued 0 (runs/h1_duelv1117 Valletta t10-t14:
       // its improved Farms' 0.00 the researched pick over plot 321's Mine
       // without Mining, no tree until Mining at t15)
-      improvable: owned && ground.size > 0,
+      improvable: owned && dry.size > 0,
       districtOk: districts.some((v) => v > FX_MIN && v !== 0),
       improvements, districts,
     });

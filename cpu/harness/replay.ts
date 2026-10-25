@@ -3266,7 +3266,7 @@ function scoreMinorResearch(ctx: Ctx, b: TurnRecord, tally: MinorResearchTally):
 /** the plots whose improvement the engine's own city-state, Free City or
  *  barbarian scripts changed in the turn take the record's: their builders'
  *  and raiders' decisions */
-function undoMinorPlots(ctx: Ctx, before: (string | null)[], charges: Map<Unit, number>): void {
+function undoMinorPlots(ctx: Ctx, before: (string | null)[], charges: Map<Unit, number>, events: ReadonlySet<number>): void {
   const { state, next } = ctx;
   // the Builder whose charge the undone order spent gets it back: one that
   // stood on the plot after it with fewer charges than it began the turn on,
@@ -3286,7 +3286,11 @@ function undoMinorPlots(ctx: Ctx, before: (string | null)[], charges: Map<Unit, 
     if ((t.improvement ?? null) === (next.state.map.tiles[t.index].improvement ?? null)) continue;
     const was = t.improvement;
     t.improvement = next.state.map.tiles[t.index].improvement;
-    count(ctx, 'minorAi:improve', 'fallback', ctx.playerOfSeat.get(t.ownerSeat), `plot ${t.index}: the engine laid ${was}, the game ${t.improvement}`);
+    // one the turn's change made is its event's, not a Builder's
+    // (runs/h1_duelu1124 t82: Cardiff's three Farms on 539, 582 and 627 gone
+    // in the engine's turn change, standing in record t+1)
+    if (events.has(t.index)) count(ctx, 'draw:eventImprove', 'fallback', ctx.playerOfSeat.get(t.ownerSeat), `plot ${t.index}: the engine's event left ${was}, the game ${t.improvement}`);
+    else count(ctx, 'minorAi:improve', 'fallback', ctx.playerOfSeat.get(t.ownerSeat), `plot ${t.index}: the engine laid ${was}, the game ${t.improvement}`);
     if (was) refund(t.index);
     replaceOwnerCitizens(state, t);
   }
@@ -3548,6 +3552,7 @@ const IMPOSES_ON: Record<string, readonly string[]> = {
   promote: UNITS_SUBS, 'minorAi:unit': UNITS_SUBS, 'minorAi:unitNew': UNITS_SUBS, 'minorAi:buy': UNITS_SUBS, 'minorAi:move': UNITS_SUBS,
   'minorAi:improve': PLOT_SUBS, pillage: PLOT_SUBS, repair: PLOT_SUBS, improve: PLOT_SUBS, clear: PLOT_SUBS,
   'draw:eventSoil': ['plots.feature', 'read.plot.yields'],
+  'draw:eventImprove': PLOT_SUBS,
   'draw:camps': ['plots.improvement', 'barb.camps'],
   'barb:unit': UNITS_SUBS, 'barb:unitNew': UNITS_SUBS, 'barb:move': UNITS_SUBS,
   'draw:floodRiver': [...UNITS_SUBS, 'plots.feature', 'read.plot.yields'],
@@ -4197,6 +4202,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const seed = turnSeed(b);
     const standing = new Set(state.units);
     const improvements = state.map.tiles.map((x) => x.improvement ?? null);
+    // the plots whose improvement the turn's change (its random events, its
+    // climate) took or laid: no Builder's
+    const eventPlots = new Set<number>();
     const charges = new Map(state.units.filter((u) => minorAiSeat(u.seat) && (u.charges ?? 0) > 0).map((u) => [u, u.charges ?? 0]));
     // what each unit did in its player's actions of the turn, which the
     // turn's heal and fortification read: one that stood on its plot and
@@ -4416,7 +4424,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const barbFrom = new Map(changing.map((u) => [u, u.tileIndex] as const));
       for (const u of changing) u.tileIndex = barbAt.get(u)!;
       state.units.push(...changing);
+      const preChange = state.map.tiles.map((x) => x.improvement ?? null);
       turnChange(state);
+      for (const t of state.map.tiles) if ((t.improvement ?? null) !== preChange[t.index]) eventPlots.add(t.index);
       // back where the replay's own steps take them from (`syncUnits`)
       for (const [u, at] of barbFrom) u.tileIndex = at;
       takeBarbs();
@@ -4483,7 +4493,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         `${u.type}${paid ? ' bought' : ''}${op ? ` for ${op}` : ''}`);
       if (TRACE.has('minorUnits')) console.error(`t${b.turn - 1} minorAi:unit p${ctx.playerOfSeat.get(u.seat)} ${u.type}${paid ? ' bought' : ' trained'}${op ? ` for ${op}` : ''}`);
     }
-    undoMinorPlots(ctx, improvements, charges);
+    undoMinorPlots(ctx, improvements, charges, eventPlots);
     minorBuilds(ctx, b, report.minorBuilds);
     freeBuilds(ctx, b);
     scoreMinorResearch(ctx, b, report.minorResearch);
