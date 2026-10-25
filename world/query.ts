@@ -92,13 +92,20 @@ export function isLand(tile: Tile): boolean {
 }
 
 /**
- * CIV6 (Canal): "Allows Naval units to pass through this tile." The passage is
- * a HULL fact and nothing else — the ground under a Canal is still land, so no
- * city turns coastal on it, no citizen works it as sea, and no land unit is
- * kept off it. A pillaged district carries no effect, this one included.
+ * A plot not of water a HULL may stand on and pass through:
+ * - CIV6 (Canal): "Allows Naval units to pass through this tile" — a
+ *   complete, unpillaged Canal; the ground under it is still land, so no city
+ *   turns coastal on it, no citizen works it as sea, and no land unit is kept
+ *   off it;
+ * - a City Centre: its plot answers land and water at once (the district
+ *   word 0x81240; the trade path reads it neither), and the placement's
+ *   location test 0x586360 takes a hull there (runs/h1_dueld1128 t56:
+ *   Rome's Galley 1245190 trained onto its centre 42:20; 1121 t30
+ *   Ayutthaya's Galley 524294 onto 42:18).
  */
-export function canalPassage(tile: Tile): boolean {
-  return tile.district === 'CANAL' && tile.districtComplete && !tile.districtPillaged;
+export function hullPassage(tile: Tile): boolean {
+  return tile.district === 'CITY_CENTER'
+    || (tile.district === 'CANAL' && tile.districtComplete && !tile.districtPillaged);
 }
 
 /**
@@ -112,9 +119,10 @@ export function multiDomainPlot(tile: Tile): boolean {
   return tile.district === 'CANAL' && tile.districtComplete;
 }
 
-/** where a HULL may float: open water, or a Canal's passage. */
+/** where a HULL may float: open water, or a hull's passage on land (a
+ *  Canal, a City Centre: `hullPassage`). */
 export function hullTile(tile: Tile): boolean {
-  return isWater(tile) || canalPassage(tile);
+  return isWater(tile) || hullPassage(tile);
 }
 
 export function isMountain(tile: Tile): boolean {

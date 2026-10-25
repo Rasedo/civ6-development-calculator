@@ -957,7 +957,7 @@ def poke_canal(rules, path, GALLEY, WARRIOR):
     sim.district_complete[0, land] = True
     sim._eff_version += 1
     sim._gen_ver += 1
-    assert bool(sim._canal_pass()[0, land]), "a finished Canal carries the passage"
+    assert bool(sim._hull_pass()[0, land]), "a finished Canal carries the passage"
     assert not bool(sim.water[0, land]), "and the ground under it is still land"
     assert bool(sim._seat_unit_mask(0)[0, rw, d]), "the passage opens the hull's step"
     sim.district_pillaged[0, land] = True

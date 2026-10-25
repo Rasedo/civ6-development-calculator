@@ -9,7 +9,7 @@
  */
 import type { ArmyRecord, City, CityState, GameState, Tile, Unit } from './types';
 import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, neighbors, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
-import { isCoastalLand, isImpassable, isWater } from '../../world/query';
+import { hullPassage, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { COMBAT_BOMBARD_VS_UNIT, MP_SCALE } from '../data/constants';
 import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { CITY_STATE_MAX_HP } from '../data/cityStates';
@@ -82,7 +82,8 @@ function enterable(state: GameState, unit: Unit, t: Tile, foes: ReadonlySet<numb
   embarks: boolean): boolean {
   if (isImpassable(t)) return false;
   const naval = !!UNITS[unit.type]?.naval;
-  if (isWater(t) !== naval && !(embarks && isWater(t))) return false;
+  // a hull on water or in a passage (`hullPassage`: its own centre, below)
+  if (naval ? !isWater(t) && !hullPassage(t) : isWater(t) && !embarks) return false;
   if (isWater(t) && !waterEnterable(state, t, unit)) return false;
   if (foes.has(t.index)) return false;
   if (t.district === 'CITY_CENTER' && tileSeat(t) !== unit.seat) return false;

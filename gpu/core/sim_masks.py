@@ -2079,15 +2079,16 @@ class SimMasks:
                 out = out | techs[:, t]
         return out.long()
 
-    def _canal_pass(self) -> torch.Tensor:
-        """[B, T] — CIV6 (Canal): "Allows Naval units to pass through this
-        tile" (`canalPassage`). A HULL fact and nothing else: the ground under
-        a Canal stays land for every other rule, and a pillaged district
-        carries no effect."""
+    def _hull_pass(self) -> torch.Tensor:
+        """[B, T] — `hullPassage`: a plot not of water a HULL may stand on and
+        pass through — a complete, unpillaged Canal (CIV6: "Allows Naval units
+        to pass through this tile"), a city centre (`_centre_plane`). A HULL
+        fact and nothing else: the ground stays land for every other rule."""
+        out = self._centre_plane()
         if self._canal_didx < 0:
-            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
-        return ((self.district == self._canal_didx) & self.district_complete
-                & ~self.district_pillaged)
+            return out
+        return out | ((self.district == self._canal_didx) & self.district_complete
+                      & ~self.district_pillaged)
 
     def _multi_domain_plot(self) -> torch.Tensor:
         """[B, T] — `multiDomainPlot`: a completed Canal's plot, land and
@@ -2671,7 +2672,7 @@ class SimMasks:
             if cart is not None:
                 ocean_ok = ocean_ok | cart.unsqueeze(1)
             water_terr = ((self.wpass.gather(1, okc) & ocean_ok)
-                          | self._canal_pass().gather(1, okc))
+                          | self._hull_pass().gather(1, okc))
             terr = torch.where(naval_mask.unsqueeze(1), water_terr, terr)
         ok7 = (cand7 >= 0) & terr & ~blocked
         if 0 <= seat < self.n_majors:
@@ -2794,7 +2795,7 @@ class SimMasks:
             | self._ocean_open(u_seat)
             | self._ocean_open_leif(u_seat)  # a HULL's advance: the naval arm applies
         )
-        hull_ok = water_ok | self._canal_pass().gather(1, dc).squeeze(1)
+        hull_ok = water_ok | self._hull_pass().gather(1, dc).squeeze(1)
         out = torch.where(self.unit_naval[ut], hull_ok, land_ok)
         return torch.where(self.unit_water_walk[ut],
                            land_ok | self.wpass.gather(1, dc).squeeze(1), out)
@@ -4217,13 +4218,13 @@ class SimMasks:
         passable = self.passable.gather(1, nbc).reshape(B, N, 6)
         is_nav = self.unit_naval.take(ut).unsqueeze(2)
         cart = self._row_ocean_open(row).view(B, 1, 1)
-        # a HULL floats over enterable water and through a Canal's passage;
+        # a HULL floats over enterable water and through a hull's passage (a Canal, a city centre);
         # the OCEAN gate is the seat's Cartography (or Leif Erikson's grant,
         # hulls alone) and the passage asks none.
         cart_nav = self._row_ocean_open_naval(row).view(B, 1, 1)
         hull = ((self.wpass.gather(1, nbc).reshape(B, N, 6)
                  & (~self.ocean_tile.gather(1, nbc).reshape(B, N, 6) | cart_nav))
-                | self._canal_pass().gather(1, nbc).reshape(B, N, 6))
+                | self._hull_pass().gather(1, nbc).reshape(B, N, 6))
         ship = (techs[:, self._shipbuilding_tech] if self._shipbuilding_tech >= 0
                 else torch.zeros(B, dtype=torch.bool, device=dev)).view(B, 1, 1)
         water = (

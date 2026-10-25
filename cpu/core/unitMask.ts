@@ -10,7 +10,7 @@
  */
 import type { GameState, ImprovementId, Tile, Unit } from './types';
 import { hexDistance, neighborTile, neighbors } from '../../world/hex';
-import { canalPassage, isImpassable, isWater } from '../../world/query';
+import { hullPassage, isImpassable, isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
 import { FORMATION_CIVIC, FORMATION_MAX, UNITS, UNIT_TYPE_IDX } from '../data/units';
 import { PROMO_COLS } from '../data/promotions';
@@ -150,7 +150,7 @@ export function maskCtx(state: GameState, seat: number): MaskCtx {
 // ---- MOVE 0-5 ---------------------------------------------------------------
 
 /** May `u` step onto `to`? The GPU's `move` clause: terrain (a hull on water
- *  it may enter or a Canal's passage; a land unit on land, or on water it may
+ *  it may enter or a hull's passage, `hullPassage`; a land unit on land, or on water it may
  *  embark onto — Shipbuilding and a war with anyone, the ocean behind the
  *  seat's own ocean gate; a water-walker on either; the robot's jump; a
  *  tunnel), the stacking rule, a live enemy Encampment, the border, a cliff,
@@ -163,7 +163,7 @@ function moveOk(ctx: MaskCtx, u: Unit, here: Tile, to: Tile): boolean {
   const walks = waterWalks(u.type);
   const water = isWater(to);
   let terr: boolean;
-  if (naval) terr = water ? !isImpassable(to) && waterEnterable(state, to, u) : canalPassage(to);
+  if (naval) terr = water ? !isImpassable(to) && waterEnterable(state, to, u) : hullPassage(to);
   else if (walks) terr = !isImpassable(to);
   else if (water) {
     terr = !isImpassable(to) && ctx.anyWar && ownerHasTech(state, u, 'SHIPBUILDING')

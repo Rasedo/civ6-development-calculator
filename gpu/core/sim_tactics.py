@@ -244,7 +244,8 @@ class SimTactics:
         """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat` may
         enter (`enterable`): its domain's ground, no unit of a player at war
         with it (another player's unit it passes), no city centre but its
-        own, no live enemy Encampment, no major's ground closed to a
+        own (a hull's passage, `_hull_pass`, the NAVAL plane's too), no live
+        enemy Encampment, no major's ground closed to a
         city-state (`_tac_closed`), with `revealed_only` (the lists', not a
         path's) none it never revealed (`_tac_known`). The
         NAVAL plane is the water an embarking land unit takes too."""
@@ -257,7 +258,7 @@ class SimTactics:
             block = block | ~known
         cart = self._ocean_open(torch.full((self.B,), seat, dtype=torch.long, device=self.device))
         land = self.passable & ~block
-        naval = self.wpass & (~self.ocean_tile | cart.unsqueeze(1)) & ~block
+        naval = ((self.wpass & (~self.ocean_tile | cart.unsqueeze(1))) | self._hull_pass()) & ~block
         return land, naval
 
     def _tac_attack_planes(self, seat: int, revealed_only: bool = True, planning: bool = True,

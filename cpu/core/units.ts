@@ -21,7 +21,7 @@ export function formationCS(unit: Unit): number {
 export const FORTIFY_MAX_TURNS = 2;
 import { logUnitOrder } from './seatTurn';
 import { neighbors, neighborTile, hexDistance, directionTo, DIR_E, DIR_W } from '../../world/hex';
-import { isWater, isImpassable, isMountain, canalPassage, hullTile, naturalWonderAt } from '../../world/query';
+import { isWater, isImpassable, isMountain, hullPassage, hullTile, naturalWonderAt } from '../../world/query';
 import { canRemoveFeature, portalAt, type RuleResult } from './rules';
 import { IMPROVEMENTS } from '../data/improvements';
 import { tileAppeal } from './appeal';
@@ -201,8 +201,9 @@ export function moveCostInto(
   // dearer to enter than the flat step. Water only, so `terrainMp` — the half
   // the fixture ships to the GPU as a STATIC plane — stays untouched.
   if (isWater(tile)) return MP_SCALE * (improvementMoveCost(tile) ?? 1);
-  // a hull in a Canal's passage pays the water step, not the ground's
-  if (mover && UNITS[mover.type]?.naval && canalPassage(tile)) return MP_SCALE;
+  // a hull in a Canal's or a City Centre's passage pays the water step, not
+  // the ground's
+  if (mover && UNITS[mover.type]?.naval && hullPassage(tile)) return MP_SCALE;
   if (roadStep(from, tile)) return routeStepMp(state, from, tile);
   if (mover && religiousIgnoresTerrain(state, mover)) return MP_SCALE;
   return terrainMp(tile, mover);
@@ -701,8 +702,9 @@ export function tileFreeForUnit(
       if (!allowEmbark || !unit || !canEmbark(state, unit) || !waterEnterable(state, tile, unit)) return false;
     }
   } else {
-    // Land tile: a hull stands ashore only in a Canal's passage.
-    if (naval && !canalPassage(tile)) return false;
+    // Land tile: a hull stands ashore only in a Canal's or a City Centre's
+    // passage.
+    if (naval && !hullPassage(tile)) return false;
   }
   // A LIVE enemy Encampment garrison bars entry outright. The
   // beat-it-down path is the melee attack ON the tile, never a move.

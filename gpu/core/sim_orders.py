@@ -773,13 +773,13 @@ class SimOrders:
                 _tc1 = tc.unsqueeze(1)
                 _pass = self.passable.gather(1, _tc1).squeeze(1)
                 terr = _pass
-                _canal = self._canal_pass().gather(1, _tc1).squeeze(1)
+                _canal = self._hull_pass().gather(1, _tc1).squeeze(1)
                 if not torch.equal(_cart_fp, techs):
                     _cart_fp, _cart = techs.clone(), self._row_ocean_open(row)
                 cart = _cart
                 _wet = self.wpass.gather(1, _tc1).squeeze(1)
                 # ONE enterable-water plane for both readers: a HULL floats
-                # over it and through a Canal's passage, and an embarked LAND
+                # over it and through a hull's passage (a Canal, a city centre), and an embarked LAND
                 # unit takes the same water without the passage.
                 _open = ~self.ocean_tile.gather(1, _tc1).squeeze(1) | cart
                 _water = _wet & _open

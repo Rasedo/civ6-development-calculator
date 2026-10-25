@@ -2790,6 +2790,16 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // the order is the player's, through the engine's verb; the game's
         // new id names the same unit from here on
         ctx.upgradeInto.delete(d.into);
+        const r = b.units.find((x) => `${x.owner}:${x.id}` === d.into);
+        // a unit the engine's turn made and the player upgraded within it,
+        // which no record holds before: the engine's own, of the chassis that
+        // upgrades to the record's (runs/h1_dueld1128 t41: Hong Kong's Warrior
+        // 851968, trained and upgraded to the Swordsman 917509 in its turn)
+        const into = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
+        const mapped = new Set(ctx.units.values());
+        const made = unitOf(ctx, d.unit) ? undefined
+          : state.units.find((x) => x.seat === seatOfP(ctx, d.player) && !mapped.has(x) && !!into && UNITS[x.type]?.upgradesTo === into);
+        if (made) ctx.units.set(d.unit, made);
         const u = unitOf(ctx, d.unit);
         if (!u) {
           // a unit trained and upgraded within the turn, which no record
@@ -2805,7 +2815,6 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // the unit stood where the game added its upgrade, with moves to
         // spend (the order needs them); the record's steps before it are the
         // replay's, outside the engine's turn
-        const r = b.units.find((x) => `${x.owner}:${x.id}` === d.into);
         if (r) u.tileIndex = r.y * ctx.W + r.x;
         if (u.movesLeft <= 0) u.movesLeft = grantedMoves(state, u);
         // a city-state's upgrade is its AI's, through the minor's own verb
@@ -4613,7 +4622,18 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const fallen: [Unit, number][] = [];
       let before: number | undefined;
       holdMinorStart((_st, cs) => {
-        if (before !== undefined) syncUnits(ctx, b, before);
+        if (before !== undefined) {
+          syncUnits(ctx, b, before);
+          // ...its upgrades made in its turn, which no later look sees undone
+          // (runs/h1_dueld1128 t41: Hong Kong's Warrior upgraded to a
+          // Swordsman before Granada's turn, none of its records a Warrior)
+          const ups = ds.filter((d) => d.kind === 'upgrade' && d.player === before);
+          if (ups.length) {
+            const rng = state.rngState;
+            applyPhase(ctx, ups, 'after', b, b, new Set([before]));
+            state.rngState = rng;
+          }
+        }
         before = ctx.playerOfSeat.get(cs.seat)!;
         for (const [key, killer] of killedBy) {
           const u = killer < before ? ctx.units.get(key) : undefined;

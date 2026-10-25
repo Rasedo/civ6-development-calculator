@@ -3594,10 +3594,10 @@ class SimSeats:
                    | (r_naval & self._ocean_open_leif(seat)))
                 & (r_naval | self._seat_tech(seat, self._sailing_tech))
             )
-            # a hull comes ashore only in a Canal's passage, and a water-walking
+            # a hull comes ashore only in a hull's passage (a Canal, a city centre), and a water-walking
             # chassis takes both planes at once
             dry_ok = self.passable.gather(1, dc.unsqueeze(1)).squeeze(1) & (
-                ~r_naval | self._canal_pass().gather(1, dc.unsqueeze(1)).squeeze(1))
+                ~r_naval | self._hull_pass().gather(1, dc.unsqueeze(1)).squeeze(1))
             _rwalk = self.unit_water_walk[rt]
             if bool(_rwalk.count_nonzero()):
                 wet_ok = wet_ok | (_rwalk & self.wpass.gather(1, dc.unsqueeze(1)).squeeze(1))
@@ -13409,12 +13409,12 @@ class SimSeats:
         emb = self.unit_emb.gather(1, gs1).squeeze(1)
         dc1 = dest.clamp(min=0).unsqueeze(1)
         to_water = self.wpass.gather(1, dc1).squeeze(1)
-        # a hull in a Canal's passage pays the water step; a chassis water
+        # a hull in a hull's passage (a Canal, a city centre) pays the water step; a chassis water
         # is ground to never transitions at all. With no HULL stepping the
         # `naval &` term is False whatever the passage says, and
-        # `_canal_pass()` rebuilds a [B, T] plane to be asked.
+        # `_hull_pass()` rebuilds a [B, T] plane to be asked.
         if bool(naval.count_nonzero()):
-            to_water = to_water | (naval & self._canal_pass().gather(1, dc1).squeeze(1))
+            to_water = to_water | (naval & self._hull_pass().gather(1, dc1).squeeze(1))
         # a SHORE crossing is the two plots' water differing (`stepUnit`'s
         # `isWater(from) !== isWater(to)`), never the mover's own flag
         from_water = self.wpass.gather(1, hc.unsqueeze(1)).squeeze(1)

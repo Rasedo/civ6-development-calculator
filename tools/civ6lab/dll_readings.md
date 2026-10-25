@@ -4388,6 +4388,28 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   `_spawn_unit` / `_spawn_barb` `stack`, the occupancy plane keeping the unit
   already there (`_occ_set_new`) and taking the next of its class when it
   leaves (`_occ_clear`). --aiscore --to 60, the five dueld duels: knowledge.army 1184 -> 1207 of 1460, every other kind within one row; the CPU tests 2659 of 2659 before and after.
+- A HULL ON A CITY CENTRE (READ): 0x586360's domain test reads the unit's
+  domain (+0x650; DOMAIN_SEA 0, DOMAIN_LAND 2). A sea unit stands on water;
+  on a plot not of water only where a district stands (plot virtual +0x40)
+  whose info word +0x14 carries the water bit (0x81240 argument 0, bit 1); a
+  land unit the same with the land bit (argument 2, bit 4) on water it may
+  not embark onto. A City Centre's word answers both (the trade path reads
+  its plot neither land nor water, above), so a hull is placed on its
+  centre (runs/h1_dueld1128 t56: Rome's Galley 1245190 trained onto 42:20;
+  1121 t30: Ayutthaya's Galley 524294 onto 42:18) and steps through it as
+  through a Canal. The engines: `hullPassage` (a City Centre or a complete,
+  unpillaged Canal) wherever a hull may stand or step — `hullTile`,
+  `tileFreeForUnit`, the move mask, the step's cost, the tactical
+  `enterable` (its own centre alone) — and the GPU's `_hull_pass`
+  (`_centre_plane` with the Canal), the tactical NAVAL plane with it.
+  Who writes the word +0x14 is unread: an inland centre is reached by no
+  hull and trains none. --aiscore --to 60, the five dueld duels, with the next entry: knowledge.army 1207 -> 1212 of 1460, researchScore.minor 12814 -> 12844 of 15577, unit.trained compared 96 -> 94 (82 equal), cityState.move.plot 2053 -> 2052; the CPU tests 2659 of 2659.
+- A UNIT TRAINED AND UPGRADED IN ITS PLAYER'S TURN (the replay): the
+  engine's own unit of the chassis that upgrades to the record's is the
+  record's, and a city-state's upgrades land before the next city-state's
+  turn (runs/h1_dueld1128 t41: Hong Kong's Warrior 851968 trained and
+  upgraded to the Swordsman 917509 before Granada's look; Granada's record
+  a Swordsman, no Warrior).
 - THE FOUNDING SETTLER'S RECORD: a city-state's knowledge base holds the
   Settler that founded its city, a unit gone, aging as any record to 21
   (runs/h1_dueld1121 aimem: each city-state's SETTLER on its centre at age
