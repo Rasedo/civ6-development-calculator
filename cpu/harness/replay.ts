@@ -251,6 +251,8 @@ interface Ctx {
   upgradeInto: Set<string>;
   /** this pair's upgrade orders, the new unit's record key to the old's */
   upgradedFrom: Map<string, string>;
+  /** the road tier of the pair's first record, the one its minors move on */
+  roadTierWas?: number;
   /** the barbarian units' plots of this pair the record's steps entered,
    *  in their order, for their scouts' looks at the end of the barbarians'
    *  turn (`barbarianTurn`) */
@@ -1275,6 +1277,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     t.districtPillaged = r.districtPillaged;
     t.road = r.road;
   });
+  // ...on the roads' tier of the first record: a tier a player's era brings
+  // lands at the turn's end (runs/h1_duely1128 t145: China's Industrial era,
+  // the minors' planning on Medieval roads, Industrial ones from record 146)
+  if (ctx.roadTierWas === undefined) delete copy.roadTier;
+  else copy.roadTier = ctx.roadTierWas;
   for (const s of [...copy.cityStates, ...(copy.freeSeat ? [copy.freeSeat] : [])]) {
     const slots = copy.units.filter((c) => c.seat === s.seat).map((c) => c.slot ?? -1);
     s.unitPool = { size: Math.max(s === copy.freeSeat ? 0 : 1, ...slots.map((x) => x + 1)), free: [], dying: [] };
@@ -1401,6 +1408,26 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
  * for it in the turn, and the plot it ended on beside record t+1's — the
  * game's move taken (`minorAi:move` applied), or the record's imposed.
  */
+/** the job of the game's unit `id` that logs no tactical row of the turn,
+ *  by the game's AI memory: "Operation" for an operation's member at the
+ *  tactical turn's or the end look (its moves AI_Operation.csv's: runs/
+ *  h1_duely1127 t3, city-state 4's Warriors in Attack Barb Camp from its
+ *  start), "Upgrade Units" for a unit an "Upgrade Units" tree holds, else
+ *  "(no row)" */
+function gameJob(ctx: Ctx, turn: number, player: number, id: number): string {
+  const mem = ctx.gameMemory;
+  if (!mem) return '(no row)';
+  for (const site of ['tactical', 'endlook'] as const) {
+    if (mem.at(site, turn, player)?.ops?.some((o) => o.teams.some((t) => t.some((x) => x[0] === id)))) return 'Operation';
+  }
+  for (const site of ['log', 'endlook'] as const) {
+    const r = mem.at(site, turn, player);
+    const c = r?.assigned?.[String(id)];
+    if (c !== undefined && r?.trees?.[String(c)]?.name === UPGRADE_MOVE) return UPGRADE_MOVE;
+  }
+  return '(no row)';
+}
+
 function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<Unit, { move: string; plot: number }>,
   ended: ReadonlyMap<Unit, number>, opOf: ReadonlyMap<Unit, string>): void {
   const keyOf = new Map<Unit, string>();
@@ -1410,9 +1437,8 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: Readonl
   for (const [u, m] of moves) {
     const key = keyOf.get(u);
     if (!key) continue;
-    // a unit the "Upgrade Units" trees hold logs no tactical row (its turn
-    // the tree's: runs/h1_duelw1117 city-state 2's Warrior 131073 t43-44)
-    const game = rows ? tacticalCategory(rows.get(key) ?? (m.move === UPGRADE_MOVE ? UPGRADE_MOVE : '(no row)')) : undefined;
+    // a unit with no tactical row: its job in the game's AI memory
+    const game = rows ? tacticalCategory(rows.get(key) ?? gameJob(ctx, turn, ownerOf(key), Number(key.split(':')[1]))) : undefined;
     // the Free Cities' moves apart
     const label = `${u.seat === FREE_SEAT ? 'Free Cities: ' : ''}${game ?? m.move}`;
     const t = (ctx.minorTally[label] ??= { units: 0, move: 0, plot: 0, plotOf: 0 });
@@ -4579,6 +4605,7 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   }
   for (const key of Object.keys(state)) if (!(key in world)) delete (state as unknown as Record<string, unknown>)[key];
   Object.assign(state, world);
+  ctx.roadTierWas = state.roadTier;
   importedWorld(state, imp, a, history);
   ctx.retained = new Map();
 }

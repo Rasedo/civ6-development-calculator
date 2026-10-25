@@ -30,7 +30,7 @@ import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
 import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, COMPETITIONS } from '../data/seats';
 import { recordMoments } from './moments';
-import { foundingMoments, religionMoment, gameEraTurn, buildingDedications, dedicationEvent, goldenDedication, monumentalityBuyMult } from './eras';
+import { foundingMoments, religionMoment, gameEraTurn, raiseRoadTier, buildingDedications, dedicationEvent, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
@@ -1598,6 +1598,7 @@ export function endTurn(state: GameState): void {
  *  step, then the game era and Ages of the turn the starts open and its
  *  opening (`gameEraTurn`, `eraOpening`) */
 export function turnChange(state: GameState): void {
+  raiseRoadTier(state);
   if (state.disasters) disasterPhase(state);
   climateTurn(state);
   if (gameEraTurn(state, state.turn + 1)) eraOpening(state);

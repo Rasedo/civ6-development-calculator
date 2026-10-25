@@ -24,6 +24,7 @@ class SimStep:
         # the World Congress's Regular Session closing the turn the players
         # acted in (`worldCongress`: its draws the turn's last)
         self._world_congress()
+        self._raise_road_tier()
         if self.disasters:
             self._disaster_phase()
         self._climate_turn()

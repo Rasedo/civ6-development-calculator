@@ -227,18 +227,29 @@ export function eraCountdownStep(era: number, start: number, countdown: number, 
   return c >= 0 ? c : ERA_BEGINS;
 }
 
-/** A new GAME ERA begins: its index and first turn, the road tier it brings,
- *  and each major seat's Age, dedications and next bars (`ageBars`). */
+/** THE ROADS' TIER at the turn's change: the road a player's era brings
+ *  (Routes.PrereqEra) stands once any player — a major, a city-state, the
+ *  Free Cities — reaches that era by its techs and civics (runs/h1_duely1117
+ *  -1128: each seed's first Medieval, Industrial and Modern road in the
+ *  record of the turn the first player's era reaches Classical, Industrial,
+ *  Modern; 1128 t146 Industrial, the game era Industrial from t120) */
+export function raiseRoadTier(state: GameState): void {
+  let era = 0;
+  for (const s of [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
+    era = Math.max(era, civEraIndex(s.research.techs, s.research.civics));
+  }
+  let tier = 0;
+  for (let i = 0; i < ROAD_TIER_ERA.length; i++) if (era >= ROAD_TIER_ERA[i]) tier = i;
+  if (tier > (state.roadTier ?? 0)) state.roadTier = tier;
+}
+
+/** A new GAME ERA begins: its index and first turn, and each major seat's
+ *  Age, dedications and next bars (`ageBars`). */
 export function enterEra(state: GameState, turn = state.turn): void {
   const era = (state.gameEra ?? 0) + 1;
   state.gameEra = era;
   state.eraStartTurn = turn;
   state.eraCountdown = -1;
-  // CIV6: "all roads in your territory will upgrade to the next level
-  // automatically" on reaching the era that brings the tier.
-  let tier = 0;
-  for (let i = 0; i < ROAD_TIER_ERA.length; i++) if (era >= ROAD_TIER_ERA[i]) tier = i;
-  state.roadTier = Math.max(state.roadTier ?? 0, tier);
   for (let c = 0; c < state.seats.length; c++) {
     const seat = seatOf(state, c);
     if (!seat) continue;

@@ -1450,6 +1450,20 @@ class SimSeats:
         new = (self.game_era > 0) & (self.era_start == int(self.turn) + 1)
         return torch.where(new, self.game_era - 1, self.game_era)
 
+    def _raise_road_tier(self) -> None:
+        """`raiseRoadTier` at the turn's change: the road a player's era
+        brings stands once any player (a major row, a city-state, the Free
+        Cities) reaches that era by its techs and civics (`_civ_era`)"""
+        era = torch.zeros_like(self.road_tier)
+        for row in range(self.n_majors):
+            era = torch.maximum(era, self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]))
+        for row in range(self.citystate_techs.shape[1]):
+            era = torch.maximum(era, self._civ_era(self.citystate_techs[:, row], self.citystate_civics[:, row]))
+        tier = torch.zeros_like(era)
+        for _i, _e in enumerate(self._road_tier_era):
+            tier = torch.where(era >= _e, torch.full_like(tier, _i), tier)
+        self.road_tier.copy_(torch.maximum(self.road_tier, tier))
+
     def _game_era_turn(self, t: int) -> None:
         """`gameEraTurn` on the turn `t` opens, before its starts. Where no
         countdown runs, one starts once the era's minimum less the countdown
@@ -1476,17 +1490,13 @@ class SimSeats:
 
     def _enter_era(self, adv: torch.Tensor, t: int) -> None:
         """`enterEra` — the games `adv` [B] begin their next game era: its
-        index and first turn, the road tier it brings, and each major row's
+        index and first turn, and each major row's
         Age (its whole-game score against the bars the era before fixed),
         dedications and next bars (`ageBars`)."""
         new = torch.where(adv, self.game_era + 1, self.game_era)
         self.game_era.copy_(new)
         self.era_start.copy_(torch.where(adv, torch.full_like(self.era_start, t), self.era_start))
         self.era_countdown.copy_(torch.where(adv, torch.full_like(self.era_countdown, -1), self.era_countdown))
-        tier = torch.zeros_like(new)
-        for _i, _e in enumerate(self._road_tier_era):
-            tier = torch.where(new >= _e, torch.full_like(tier, _i), tier)
-        self.road_tier.copy_(torch.where(adv, torch.maximum(self.road_tier, tier), self.road_tier))
         a2 = adv.unsqueeze(1)
         sc = self.era_score
         # The PREVIOUS age, the Heroic test's substrate. CLONED because
