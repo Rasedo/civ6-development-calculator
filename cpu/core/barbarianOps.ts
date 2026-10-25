@@ -422,9 +422,8 @@ const SCOUT_NODES: Readonly<Record<string, BtHandler<ScoutCtx>>> = {
   // planning reaching a plot at To Range of the location this turn
   // (0x791300) SUCCESS, else RUNNING; none held, the unit whose planning
   // reaches the location itself this turn, with Movement left there first,
-  // else the one whose path (0x272a60: the planning's path finder, no zone
-  // of control, so a camp its defender holds is a goal) takes the fewest
-  // turns, is held — SUCCESS where it
+  // else the one whose path (0x272a60, `turnsToPlot`: a camp its defender
+  // holds is a goal) takes the fewest turns, is held — SUCCESS where it
   // reaches it with Movement left, else RUNNING; none FAILS. The execution:
   // the held unit's turn ends; it goes for the plot at To Range its planning
   // reaches this turn, else the location (a plot of danger only where Allow

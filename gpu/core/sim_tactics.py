@@ -406,7 +406,7 @@ class SimTactics:
 
     def _tac_search(self, rows: torch.Tensor, slots: torch.Tensor, seat: int, max_turns: int, zoc: bool,
                     dest: torch.Tensor | None = None, pre: str = "barb", plan: dict | None = None,
-                    full: bool = False, stand: bool = False) -> dict:
+                    full: bool = False, stand: bool = False, later_turns: bool = False) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
         the open nodes by (cost, tie) — a node inserted where its cost lies
@@ -425,7 +425,8 @@ class SimTactics:
         turn of every plot the search closed, those it only passes or attacks
         included. With `stand` (the danger map's search) an attack is struck
         only from the unit's own plot or one none of its own stacking units
-        holds."""
+        holds. With `later_turns` (the path's flag 0x1000) a path's turn may
+        end on a plot its own stacking unit holds after its first."""
         dev = self.device
         N, T = rows.shape[0], self.T
         NONE = _KEY_NONE
@@ -490,7 +491,8 @@ class SimTactics:
             zs = torch.where(naval.unsqueeze(1), self._tac_zoc(seat, sn, True)[rows], self._tac_zoc(seat, sn, False)[rows])
             zs = zs & ~self._tac_zoc_ignored(utype).unsqueeze(1)
         # a path's turn may not end on a plot its own stacking unit holds (the
-        # path validity 0x2720a0; `groundOf`'s full)
+        # path validity 0x2720a0; `groundOf`'s full; under flag 0x1000 its
+        # first turn alone)
         full_n = None
         if zoc or stand:
             me = (slots + self.POOL_LO[pre]).unsqueeze(1)
@@ -612,7 +614,10 @@ class SimTactics:
             moves = torch.where(a6, 0, moves)
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6) & (turns <= max_turns)
             if zoc:
-                ok = ok & ~(full_n.gather(1, b1) & (turns > bt))
+                stacked = full_n.gather(1, b1) & (turns > bt)
+                if later_turns:
+                    stacked = stacked & (bt <= 1)
+                ok = ok & ~stacked
             if zs is not None:
                 ok = ok & ~(zs.gather(1, b1) & (best != start).unsqueeze(1) & ~a6)
             if stand:

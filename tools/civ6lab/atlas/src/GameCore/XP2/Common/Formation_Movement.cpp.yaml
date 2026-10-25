@@ -7,7 +7,9 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/tactical.ts:reachPlots]
-  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  readings:
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...The planning's reach (AI Unit Planning 0x792c90 -> 0x791e00 -> the breadth-first search 0x26dcd0 for 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrappe...
@@ -24,6 +26,7 @@
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/st1/reading.md: ...herwise the larger of combat and ranged) onto the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd also onto the l..."
@@ -50,9 +53,11 @@
     - cpu/core/tactical.ts:before
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:planningSearch
+    - cpu/core/tactical.ts:turnsToPlot
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   context:
     - "...or 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrapper 0x26e570 refuses a node past the turn limit): the list at planning +0x30 (16-byte entries x, y,..."
     - "...centre, an Encampment) as a node whose step spends the Movement left (the valid wrapper 0x26e570: the attack's cost adds the Movement left, 0x1d0 += 0x1d4) and links nothing from it (a..."
@@ -73,6 +78,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...out); a land unit whose   player may embark it takes water (a turn starting on the domain's pool:   0x26e920's [r9 + 0x180 + domain*4]); the barbarians' land units take none   (0 of 6,269 of their AI_Planning..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...1121 and 1124 hold a   water plot; the majors' and the minors' do from t62-69). The step's cost   (0x26e920's rules 0x531660..0x530240): into a city at most   CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x..."
@@ -90,12 +96,27 @@
   context:
     - "...empt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x34 += x through 0xac650). A crossing is the terrain's cost plus 2 (`RIVER_CROSS_MP`..."
   review: imported
+- addr: 0x26f1d0
+  final: 0x1a76a0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 7
+      value: "runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from   39:20 beside China's Warrior and Scout, the planning's refusal shuts it   in (875 / 963 in the Warrior's zone), the path takes it ho"
+  impl: [cpu/core/tactical.ts:turnsToPlot]
+  readings: ["C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
+  context:
+    - "...f the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0x398, bit 8 where the finder's +0x4b8 is clear, 0x2000 f..."
+  review: imported
 - addr: 0x26f330
   final: 0x1a7840
   kind: function
   status: PARTLY
   impl: [cpu/core/tactical.ts:search]
-  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  readings:
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...er_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair is null), so a node's key is its cost. The op..."
@@ -229,5 +250,18 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x272880
+  final: 0x1aa680
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 7
+      value: "runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from   39:20 beside China's Warrior and Scout, the planning's refusal shuts it   in (875 / 963 in the Warrior's zone), the path takes it ho"
+  readings: ["C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
+  context:
+    - "- THE PATH 0x272a60 (READ): 0x272a60(path finder, plot, flags) -> 0x272880(0, finder, plot, flags): the unit's own plot 0; a plot off the map 0; the plot tested (..."
   review: imported

@@ -216,6 +216,18 @@
     - "...Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a MilitaryFormation argument (+0x90), compa..."
     - ...'s units from the last to the first; for each one not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's player is at w...
   review: imported
+- addr: 0x20a3c0
+  final: 0x15a8a0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 7
+      value: "runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from   39:20 beside China's Warrior and Scout, the planning's refusal shuts it   in (875 / 963 in the Warrior's zone), the path takes it ho"
+  readings: ["C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
+  context:
+    - "...s): the unit's own plot 0; a plot off the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0x398, bit 8 where the..."
+  review: imported
 - addr: 0x20bae0
   final: 0x15bd50
   kind: function

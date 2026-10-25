@@ -63,3 +63,15 @@
   context:
     - "...f its domain (+0x650), with Combat (0x56dc90), whose formation holds none of its class (0x266950): of those its planning reaches within two turns (0x791300) the strongest, else the n..."
   review: imported
+- addr: 0x2669d0
+  final: 0x1a41e0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 7
+      value: "runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from   39:20 beside China's Warrior and Scout, the planning's refusal shuts it   in (875 / 963 in the Warrior's zone), the path takes it ho"
+  readings: ["C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
+  context:
+    - "...(0, finder, plot, flags): the unit's own plot 0; a plot off the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0..."
+  review: imported

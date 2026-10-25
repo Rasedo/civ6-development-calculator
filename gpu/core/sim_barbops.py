@@ -1445,13 +1445,14 @@ class SimBarbOps:
             reach0m[rows] = self._op_reach_at(rows, su[rows], camp[rows], 1, True, torch.zeros_like(rows), rowof, res)
         reaches = fresh & planned & (reach0 >= 0)
         rest = fresh & ~reaches
-        # else the planning's path (0x272a60: no zone of control, no turn
-        # limit, stopped once the camp closes) standing on it in any turns
+        # else the path (0x272a60, `turnsToPlot`: the path's search under
+        # flag 0x1000, no turn limit, stopped once the camp closes) standing
+        # on it in any turns
         path = torch.zeros_like(rest)
         rows = rest.nonzero(as_tuple=True)[0]
         if rows.numel():
             cp = camp[rows].clamp(min=0)
-            turns = self._tac_search(rows, su[rows], BARB_SEAT, 1 << 30, False, cp)["turns"]
+            turns = self._tac_search(rows, su[rows], BARB_SEAT, 1 << 30, True, cp, later_turns=True)["turns"]
             path[rows] = turns[torch.arange(rows.shape[0], device=dev), cp] > 0
         picked = reaches | (rest & path)
         m4 = torch.where(fresh, torch.where(picked, torch.where(reaches & (reach0m >= 0), _S, _R), _F), m4)

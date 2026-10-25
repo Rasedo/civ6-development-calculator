@@ -2229,9 +2229,10 @@ class _MinorWorld:
         return sim.pair_dist[plots.clamp(min=0), plot.clamp(min=0).unsqueeze(1).expand_as(plots)].long()
 
     def _reach_turns(self, plot, among, max_turns: int, moves: bool):
-        """[B, U] per unit of `among` ([B, U]) the turns its planning (the
-        pathfinder within `max_turns`, no zone of control) takes to stand on
-        the plot, 0 none — with Movement left there where `moves` asks it"""
+        """[B, U] per unit of `among` ([B, U]) the turns it takes to stand on
+        the plot, 0 none — with Movement left there where `moves` asks it:
+        one turn its planning (`reachPlots`), no limit its path
+        (`turnsToPlot`: the path's search under flag 0x1000)"""
         sim = self.sim
         u = self.units()
         out = torch.zeros_like(u["id"])
@@ -2241,9 +2242,11 @@ class _MinorWorld:
             if not bool(m.count_nonzero()):
                 continue
             rows = m.nonzero(as_tuple=True)[0]
-            # one turn: the whole planning; no limit: stopped once the plot closes
-            res = sim._tac_search(rows, u["id"][rows, j] - lo, self.seat, max_turns, False,
-                                  None if max_turns == 1 else plot[rows], pre="major")
+            # one turn: the whole planning; no limit: the path, stopped once
+            # the plot closes
+            one = max_turns == 1
+            res = sim._tac_search(rows, u["id"][rows, j] - lo, self.seat, max_turns, not one,
+                                  None if one else plot[rows], pre="major", later_turns=not one)
             ar = torch.arange(rows.shape[0], device=sim.device)
             p = plot[rows]
             t = res["turns"][ar, p]

@@ -251,10 +251,12 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
  * the turn and Movement the step reaches it with, and whether it attacks —
  * the start first, linked from itself. Standing to attack (the danger map's
  * search): an attack is struck only from the unit's own plot or one none of
- * its own stacking units holds.
+ * its own stacking units holds. With laterTurns (the path's flag 0x1000) a
+ * path's turn may end on a plot its own stacking unit holds after its first.
  */
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
-  onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false): void {
+  onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false,
+  laterTurns = false): void {
   const { map } = state;
   const ground = groundOf(state, unit, !zoc, !zoc);
   const held = heldCostsOf(state, unit);
@@ -350,8 +352,8 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       if (turns > maxTurns) continue;
       // a path's turn may not end on a plot its own stacking unit holds (the
       // path validity 0x2720a0: each node where the next starts a turn,
-      // against the stacking limit)
-      if (zoc && turns > best.turns && ground.full(best.tile)) continue;
+      // against the stacking limit; under flag 0x1000 its first turn alone)
+      if (zoc && turns > best.turns && ground.full(best.tile) && (!laterTurns || best.turns <= 1)) continue;
       onLink?.(to.index, best.tile, turns, moves, attack);
       // the cost (0x270dd0): +4 where the step leaves no Movement, +3 more
       // off the unit's territory on a revealed plot; +2 a revealed plot, +3
@@ -399,16 +401,18 @@ export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reac
   return out;
 }
 
-/** the turns the unit's planning takes to stand on `dest` (0x272a60: the
- *  pathfinder with no zone of control, as `reachPlots` with no turn limit,
- *  stopped once `dest` closes); 0 where it cannot */
+/** the turns the unit's path takes to stand on `dest` (0x272a60 -> 0x26f1d0
+ *  under flag 0x1000: the path's search, its zone of control spending the
+ *  Movement — the planning's breadth-first refusal 0x26e570 is not its
+ *  validity —, a turn after the first free to end where its own stacking
+ *  unit stands; stopped once `dest` closes); 0 where it cannot */
 export function turnsToPlot(state: GameState, unit: Unit, dest: number): number {
   let turns = 0;
-  search(state, unit, Infinity, false, (n, ground) => {
+  search(state, unit, Infinity, true, (n, ground) => {
     if (n.tile !== dest) return false;
     if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) turns = n.turns;
     return true;
-  });
+  }, undefined, false, true);
   return turns;
 }
 

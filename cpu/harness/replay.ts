@@ -697,18 +697,23 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   barbSlots(state);
   barbarianAi(ctx, b, closing, before, from);
   // each unit looks from each plot the record's steps of the turn entered,
-  // after the AI's planning read the plots revealed as the turn opened; a
+  // after the AI's planning read the plots revealed as the turn opened, the
+  // units walking one after another in the record's order — those yet to
+  // walk where the pair's first record holds them, so a plot another sees is
+  // the one it sees then (runs/h1_duelw1110 t6: tribe 0's Scout reports 8:9
+  // from 10:8 before the other Scout at 10:7 walks to 8:7, which sees it); a
   // scout reports the cities it comes to see (`barbScoutLook`), its tree
   // ticking from the next turn
-  for (const { u, plots } of ctx.barbSteps.splice(0)) {
-    if (!state.units.includes(u)) continue;
-    const at = u.tileIndex;
+  const walks = ctx.barbSteps.splice(0).filter(({ u }) => state.units.includes(u));
+  const ends = new Map(walks.map(({ u }) => [u, u.tileIndex] as const));
+  for (const { u } of walks) u.tileIndex = from.get(u) ?? u.tileIndex;
+  for (const { u, plots } of walks) {
     for (const p of plots) {
       u.tileIndex = p;
       revealAround(state, u.seat, p, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
       barbScoutLook(state, u);
     }
-    u.tileIndex = at;
+    u.tileIndex = ends.get(u)!;
   }
   traceBarbOps(null);
   const barbPlayer = ctx.playerOfSeat.get(BARB_SEAT);

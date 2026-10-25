@@ -6414,18 +6414,45 @@ gpu/core/sim_tactics.py.
   Range of the location this turn (0x791300) SUCCESS, else RUNNING, a held
   unit with no planning FAILURE; none held, the unit whose planning reaches
   the location itself this turn — one with Movement left there first —,
-  else the one whose path (0x272a60 on the unit's path finder +0x1fb8, flag
-  0x1000: the planning's search with no zone of control) takes the fewest
-  turns (above 0, fewer than the best so far), is held: SUCCESS where it
-  reaches it with Movement left, else RUNNING; none FAILURE. A camp its own
-  defender holds is such a goal (runs/h1_duelw1121 camp 12:14: its Scout
-  reports 6:12 at t64, its zone-of-control path home is none from t65, the
-  planning's 8 turns; home at t73, Notify Owner lists 6:12 under the
+  else the one whose path (0x272a60 on the unit's path finder +0x1fb8,
+  flag 0x1000; see THE PATH 0x272a60 below) takes the fewest turns (above
+  0, fewer than the best so far), is held: SUCCESS where it reaches it with
+  Movement left, else RUNNING; none FAILURE. A camp its own defender holds
+  is such a goal (runs/h1_duelw1121 camp 12:14: its Scout reports 6:12 at
+  t64 and walks home round the mountains by row 19, where the tribe's own
+  Warriors stand at t65, home at t73; Notify Owner lists 6:12 under the
   running raid, and the tribe's turn after that raid's end starts the next
   on it — the game's t77 end, t78 start). Execution (0x7eeba0):
   the held unit's turn ends; it goes for the plot at To Range its planning
   reaches this turn, else the location (a plot of danger only where Allow
   Danger), woken (0x53e20) and moved (0x972880 / 0x962030).
+- THE PATH 0x272a60 (READ): 0x272a60(path finder, plot, flags) ->
+  0x272880(0, finder, plot, flags): the unit's own plot 0; a plot off the
+  map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path
+  generated (0x26f1d0: the flags to the instance's +0x398, bit 8 where the
+  finder's +0x4b8 is clear, 0x2000 for a unit +0x738 above 1 holding
+  0x2669d0 2 or 4; then the A* 0x7a630 over the callbacks 0x26f330 sets:
+  the validity 0x2720a0, the cost 0x26e920), its turns the answer. The
+  planning's breadth-first validity 0x26e570 (its zone-of-control refusal
+  under +0x398 & 0x200 clear, its attack-plot stop) is referenced only by
+  the breadth-first searches 0x26dcd0 / 0x26df90 — not this path's. Here
+  the zone of control is the cost's (0x26e920: +0x398 & 0x800 clear, so a
+  step into a zone spends the Movement). The validity 0x2720a0 walks the
+  chain back from the new node (0x272230..0x27235a: each node, its parent
+  +0x0, its turn +0x2c, the newest from the instance's +0x1dc); a node
+  ending a turn (+0x50 & 2) whose stacking count (+0x54) reaches the
+  limit (+0x1b0) is refused unless +0x51 & 4 with +0x1f8, or flags & 4;
+  with flags & 0x1000 (the validity's flag word +0xe0, 0x2721df) only
+  where that node's turn is 1 or less (0x27229b). So the Move Unit / the
+  minors' trees' path (Move Unit's 0x7f05a0: r8d 0x1000) is the path's own
+  search, a turn after the first free to end on the unit's own stacking
+  unit. runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from
+  39:20 beside China's Warrior and Scout, the planning's refusal shuts it
+  in (875 / 963 in the Warrior's zone), the path takes it home by 39:19 as
+  the game walked it, and both tribes' raids start at t11 as AI_Operation
+  logs. The engines: `turnsToPlot` (`search` zoc, `laterTurns`) /
+  `_tac_search(..., True, later_turns=True)` in the scout's Move Unit and
+  the minors' `turns_to`.
 - THE LOOK (0x153ef0, per plot newly visible to the barbarian player): the
   plot's owner (+0x1c) any player; for a scout (unit AI type +0x1c0 == 2,
   UNITAI_EXPLORE), the owner's throttle passed (@f28c78 +0x110, the game
