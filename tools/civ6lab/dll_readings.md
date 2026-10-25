@@ -3809,6 +3809,45 @@ this file do not carry over; the knowledge base's inner layout does.
   draws and every one of the 7,224 AI memory reads identical; the
   Dedication answered at t31, t61, t91, t121, t151, t181, t211, t241 in
   both.
+- THE VICTORY SCREEN AND THE BLOCKERS AT A FIXED POINT. The seat's
+  end-turn blockers (ENDTURN_BLOCKING_CIVIC among them) were answered by
+  `wait_turn` once a turn stood 15 s, which a victory screen standing made
+  happen on some recordings and not others (runs/h1_duelu1117 t143: the
+  seat's civic chosen in one, -1 in the other). `h1/dump.py` answers the
+  victory screen at the hold (`lab.answer_endgame`: One More Turn where the
+  end-game menu offers it) and `wait_turn(blockers=False)` answers no
+  blocker on a timer. MEASURED: seed 1117 recorded twice at once
+  (runs/h1_duelxA1117_20261025T080908Z, runs/h1_duelxB1117_20261025T080909Z):
+  every record section of the 250 (the AI memory's own `mem` and `memMs`
+  aside: heap addresses and timings), every one of the 23,363 draws and
+  every one of the 7,224 AI memory reads (the operations' raw bytes aside,
+  which hold heap addresses) identical; One More Turn answered at the
+  hold once in each.
+- AN OPERATION'S TEAM, FinalRelease (READ, live and runs/h1_duelx1121): the
+  0x118 bytes inline, the Release's layout: +0x10 every requirement's
+  minimum met, +0x11 ready, +0x12 ongoing; +0x18 the members' unit ids
+  ({items, capacity, count}: count +0x28); +0x30 per requirement (the
+  team's OpTeamRequirements in the database's order) the members carrying
+  its AI type, an int32 each (count +0x40: Attack Walled City's City Attack
+  Force 11, its naval team 4, Settle City Team 4); +0x48 the units taken in
+  (count +0x58); +0x90 engaged; +0xe8 + 8 x the slot the goals (Map Points,
+  -9999 none). +0x14 is not a unit type's index (Settle City Team 119,
+  Naval Superiority Force 7 with no member); the team holds no strength
+  (+0x94 is the operation's m_currentCombatStrength, 95 to the teams' 45).
+- THE NODE GRAPH (tree +0xe0, 0x14 bytes a node): parent, end (the node
+  after its subtree), first child, last child, the current child — a
+  Sequence's resume (Settle City Op node 3 [0, 28, 4, 27, 5]: node 4
+  succeeded, node 5 running); a decorator done past its child points at
+  its end. NODE FIELDS (the data's offset): Turn Limiter's first turn +0x30
+  (Raid City node 5: 6 at t6, 0x21 at t33, 0 before it ran); Recruit Units
+  +0x88 its done flag (set on every SUCCESS, clear on every RUNNING, over
+  every end look of the recording), +0x8c the unit it asked (-1 none), +0x80 /
+  +0x84 the units before and after its recruit.
+- THE NAMED FIELDS (`aimem_fields.py`): each player component's and city's
+  watched members, named by the constructor (`m_` string, then the member's
+  `lea`): a scalar's value at member +0x10; a vector's {items, capacity,
+  count} at +0x10 (PlayerCities m_aeSettledContinents: [19]). Read at each
+  record's hold into the record's `mem` (12 ms, 190 KB a record).
 
 ## H-1: a pillaged building's specialist, the centre's defence, three moments — READ
 

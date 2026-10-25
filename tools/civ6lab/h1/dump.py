@@ -9,7 +9,9 @@ A record is ONE JSON line per turn: `turn`, `seed` (GameCore's
 counter read before and after the dump; a record whose counter moved under
 it carries `moved: true` and no check reads it), `head`, `map` (one list per
 row y, one plot list per x — the layout `h1_dump_ig.lua` documents),
-`players`, `religions`, `congress` (the World Congress resolutions table,
+`players`, `mem` (per player its components' and cities' named fields
+read from the game's objects while the turn is held, `aimem.Reader.world`;
+`memMs` the read's cost), `religions`, `congress` (the World Congress resolutions table,
 raw), `events` (the random events of the turn and the one before),
 `greatPeople` (every recruited person by individual), `parks` (the
 National Parks' plots), `cities` (each with its `plots`: the map plots whose
@@ -222,7 +224,26 @@ def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
             rec["startsMoved"] = True
     if catalog is not None and map_lists is not None:
         catalog.update(map_lists)
+    # the players' and cities' named fields read from the game's objects
+    # while the turn is held (`aimem.Reader.world`): `mem`, its read in ms
+    if MEM.get("host"):
+        t0 = time.perf_counter()
+        try:
+            if MEM.get("reader") is None:
+                import aimem  # noqa: PLC0415
+                from procmem import ProcMem  # noqa: PLC0415
+                pm = ProcMem.of_host(MEM["host"])
+                MEM["reader"] = aimem.Reader(pm, pm.module(aimem.DLL))
+            rec["mem"] = MEM["reader"].world([p["id"] for p in rec["players"] if isinstance(p.get("id"), int)])
+        except Exception as e:  # noqa: BLE001 — the record stands without it
+            rec["memError"] = str(e)
+            MEM["reader"] = None
+        rec["memMs"] = round(1000 * (time.perf_counter() - t0), 1)
     return rec, catalog
+
+
+# the game's memory reader of the dump (`main` sets its host)
+MEM: dict = {}
 
 
 def write(out: pathlib.Path, rec: dict, catalog: dict | None) -> None:
@@ -300,7 +321,14 @@ def cmd_play(a, t: Tuner) -> int:
                 ded = lab.answer_dedication(t, lp)
                 if ded is not None:
                     log(f"    dedication -> {ded}")
-                lab.advance(t, "autoplay", lp, wait, log, one_more_turn=True, dedication=False)
+                # a victory screen standing at the hold: One More Turn, here;
+                # one raised in the turn holds the game until the turn's
+                # first look presses it. The seat's other blockers are its
+                # AI's, never answered on wait_turn's timer
+                more = lab.answer_endgame(t, lp)
+                if more is not None:
+                    log(f"    endgame -> {more}")
+                lab.advance(t, "autoplay", lp, wait, log, one_more_turn=True, blockers=False)
         except lab.TurnStalled as e:
             print(f"stalled: {e}")
             break
@@ -332,6 +360,7 @@ def main(argv=None) -> int:
     a.t0 = time.monotonic()
     h4.guard(a.deadline, a.cmd)
     a.out.parent.mkdir(parents=True, exist_ok=True)
+    MEM["host"] = a.host
     t = h4.connect(a.host)
     try:
         return a.fn(a, t)

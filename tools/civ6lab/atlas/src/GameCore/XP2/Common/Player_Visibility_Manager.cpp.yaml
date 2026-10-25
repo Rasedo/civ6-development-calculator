@@ -11,8 +11,10 @@
     - recording: h1_duelw1124
       turn: 1
       value: "Case (runs/h1_duelw1124, planning rows   t1-60, inside the replay): of the 123 plots the game listed that the   barbarians had not revealed, every one lies beside a revealed plot and   none within two"
+  impl: [cpu/core/barbarians.ts:plotsSeenNow, gpu/core/sim_barb.py:_barb_seen]
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - ...al 0x50d390 is reached from the visibility count change 0x508d50 alone for a barbarian (0x508330 is the diplomatic sharing, 0x50ccc0 the war / peace one, 0x50d080 RevealAllPlots and th...
   review: imported
@@ -26,6 +28,7 @@
     - "H-1: the raids — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2: the plot's visibility count fo..."

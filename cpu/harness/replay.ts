@@ -115,7 +115,7 @@ import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
 import { GameMemory, MemoryLogs, readGameMemory, readMemory, syncContracts, type ArmyLogged } from './aiMemory';
-import { importCityAi } from './gameAiImport';
+import { importCityAi, importOps } from './gameAiImport';
 import { NO_SCORE } from '../core/aiPolicyValue';
 
 /** what became of one decision */
@@ -3948,13 +3948,17 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
     const camps = (read.camps ?? []).map((c) => c[1] * ctx.W + c[0]);
     if (camps.length) s.campsKnown = camps;
     else delete s.campsKnown;
-    // a city-state's city AI whole — its city trees, their contracts and the
-    // holders (`importCityAi`); another seat's contracts take the game's
-    // progress, value and times (`syncContracts`)
-    const unitOf = (gameId: number) => ctx.units.get(`${pid}:${gameId}`)?.id;
-    if (world.cityStates.includes(s as CityState) && Object.values(read.trees ?? {}).some((t) => t.nodes?.[0]?.[4])) {
-      importCityAi(s as CityState, read, { names: ctx.cat, W: ctx.W, unitOf });
-    } else syncContracts(ctx.gameMemory!, ctx.cat, s, pid!, turn, ctx.W);
+    // the operations (`importOps`: a city-state's whole, the barbarians' and
+    // the Free Cities' those both hold); a city-state's city AI whole — its
+    // city trees, every tree's contracts and the holders (`importCityAi`);
+    // another seat's contracts take the game's progress, value and times
+    // (`syncContracts`)
+    const w = { names: ctx.cat, W: ctx.W, unitOf: (gameId: number) => ctx.units.get(`${pid}:${gameId}`)?.id, turnShift: s === world.barbSeat ? 1 : 0 };
+    const cityState = world.cityStates.includes(s as CityState);
+    const nodes = Object.values(read.trees ?? {}).some((t) => t.nodes?.[0]?.[4]);
+    const ops = nodes && s.ops ? importOps(s.ops, read, w, turn, cityState).ids : new Map<number, number>();
+    if (cityState && nodes) importCityAi(s as CityState, read, w, ops);
+    else syncContracts(ctx.gameMemory!, ctx.cat, s, pid!, turn, ctx.W);
   }
 }
 

@@ -81,6 +81,7 @@
   impl: [cpu/core/barbarians.ts:CAMP_SIGHT]
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - "...one for the barbarians), an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0: the plot and the six beside it, no line of sight), the scripted operations. A camp's..."
   review: imported

@@ -175,10 +175,20 @@ export interface GameOperation {
   enemy: number;
   targetX: number;
   targetY: number;
+  rallyX: number;
+  rallyY: number;
+  backupX: number;
+  backupY: number;
   opStrength: number;
   targetStrength: number;
+  /** its tree's control id */
+  treeControlId: number;
   /** per team its members: [unit id, type index, experience, level, promotion ready] */
   teams: [number, number | null, number | null, number | null, number | null][][];
+  /** per team the members carrying each requirement's AI type */
+  teamCounts: number[][];
+  /** per team its 0x118 bytes as hex */
+  teamsRaw: string[];
 }
 
 /** one read of the game's AI memory (`<stem>.aimem.jsonl`, aimem.py) */
@@ -205,8 +215,9 @@ export interface GameTree {
   operation?: number;
   contracts?: number[];
   /** at the end look: per node [status, shape, handler, its data as hex,
-   *  its TreeData values by DefnId: [DataTypes id, slot, value]] */
-  nodes?: [number, number, number, string, Record<string, [number, number, unknown]>][];
+   *  its TreeData values by DefnId: [DataTypes id, slot, value], its graph
+   *  entry: parent, end, first child, last child, current child] */
+  nodes?: [number, number, number, string, Record<string, [number, number, unknown]>, [number, number, number, number, number]?][];
 }
 
 /**

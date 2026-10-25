@@ -89,6 +89,7 @@
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — LAB"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   review: reviewed
 - addr: 0x58d1c0
   final: 0x3b5c00

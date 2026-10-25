@@ -102,6 +102,12 @@ OPERATION = {"controlId": (0x138, "i"), "enemy": (0x178, "i"), "targetX": (0x180
              "treeControlId": (0x2E0, "i"), "treeManagerId": (0x2F8, "i")}
 
 
+def CITYBUILD_FIELDS() -> list:
+    """the CityBuild's named fields (`aimem_fields`)"""
+    import aimem_fields  # noqa: PLC0415
+    return aimem_fields.load()["CityBuild"]["fields"]
+
+
 def ptr(v: int) -> int:
     """v where it can be a user-space pointer, else 0"""
     return v if 0x10000 <= v < 0x7FFFFFFF0000 else 0
@@ -212,8 +218,13 @@ class Reader:
         node = self.pm.u64(self.pm.u64(pl + 0x650) + 0x98)
         while node:
             cb = self.pm.u64(node)
+            # its named fields but the turn's analyses: the threat, the
+            # defenders, the plot reservations, the event trees and handles,
+            # the best plots and improvement, the default build's value
+            fields = self.fields(cb, [f for f in CITYBUILD_FIELDS() if "Evaluations" not in f[0] and "Yields" not in f[0]
+                                      and f[0] != "m_currentGpps"])
             out["cities"].append({"city": self.pm.i32(cb + 0xA8), "threat": self.pm.i32(cb + 0xD8),
-                                  "hand": self.pm.i32(cb + 0x15C), "list": self.handles(cb + 0x160)})
+                                  "hand": self.pm.i32(cb + 0x15C), "list": self.handles(cb + 0x160), "fields": fields})
             node = self.pm.u64(node + 0x10)
         for name, (comp, at) in HOLDERS.items():
             obj = self.pm.u64(pl + comp)
@@ -266,11 +277,15 @@ class Reader:
             return []
         st = struct.unpack(f"<{n}i", self.pm.read(st_p, 4 * n))
         blocks = self.pm.read(bl_p, 0xB8 * n)
+        # the node graph (+0xe0, 0x14 bytes a node: its parent first; the
+        # rest — the walk's resume, a Sequence's — as five ints)
+        gr_p = struct.unpack_from("<Q", b, 0xE0)[0]
+        graph = struct.unpack(f"<{5 * n}i", self.pm.read(gr_p, 0x14 * n)) if ptr(gr_p) else (0,) * (5 * n)
         out = []
         for k in range(n):
             blk = blocks[0xB8 * k:0xB8 * (k + 1)]
             shape, handler = struct.unpack_from("<ii", blk, 0)
-            out.append([st[k], shape, handler, blk[8:].rstrip(b"\0").hex(), self.node_data(blk[8:])])
+            out.append([st[k], shape, handler, blk[8:].rstrip(b"\0").hex(), self.node_data(blk[8:]), list(graph[5 * k:5 * k + 5])])
         return out
 
     def node_data(self, data: bytes) -> dict:
@@ -332,7 +347,7 @@ class Reader:
                 rec[name] = b[off] if ty == "b" else struct.unpack_from("<i", b, off)[0]
             # the teams, 0x118 bytes each, inline (op +0x150, their count +0x160);
             # a team's members are unit ids (+0x18, their count +0x28)
-            teams = []
+            teams, counts, raws = [], [], []
             tv, tn = struct.unpack_from("<Q", b, 0x150)[0], struct.unpack_from("<I", b, 0x160)[0]
             if ptr(tv) and 0 < tn < 64:
                 for k in range(tn):
@@ -340,7 +355,18 @@ class Reader:
                     ids_p, n = self.pm.u64(team + 0x18), self.pm.i32(team + 0x28)
                     ids = list(struct.unpack(f"<{n}i", self.pm.read(ids_p, 4 * n))) if ids_p and 0 < n < 256 else []
                     teams.append([self.unit(pl, i) for i in ids])
+                    # per requirement the members carrying its AI type (an
+                    # int32 each, +0x30, their count +0x40)
+                    c_p, cn = self.pm.u64(team + 0x30), self.pm.i32(team + 0x40)
+                    counts.append(list(struct.unpack(f"<{cn}i", self.pm.read(c_p, 4 * cn))) if ptr(c_p) and 0 < cn < 64 else [])
+                    raws.append(self.pm.read(team, 0x118).hex())
             rec["teams"] = teams
+            rec["teamCounts"] = counts
+            # the teams' and the operation's own bytes whole, their fields
+            # (goals, requirement counts, readiness; the operation's start,
+            # locks, trigger) decoded by the harness
+            rec["teamsRaw"] = raws
+            rec["raw"] = b.hex()
             tree = self.control(pl, rec["treeControlId"])
             if tree:
                 obj = self.pm.u64(tree + 0x10)
@@ -369,6 +395,61 @@ class Reader:
     def stats(self, pl: int) -> dict:
         return {"maxMelee": self.pm.i32(self.pm.u64(pl + 0x710) + 0xA0),
                 "citiesEc": self.pm.i32(self.pm.u64(pl + 0x6D0) + 0xEC)}
+
+    # -- the players' and cities' named fields (aimem_fields.json)
+    def fields(self, obj: int, table: list) -> dict:
+        """an object's named fields (`aimem_fields`): a scalar member (0x18)
+        its int at +0x10; a vector ({begin, capacity, count} at +0x10) its
+        items as int32s; any other member's value bytes as int32s
+        — the int lists sparse {index: value} where mostly zero"""
+        out = {}
+        size = max(o + s for _, o, s in table)
+        b = self.pm.read(obj, size)
+        for name, off, sz in table:
+            if sz == 0x18:
+                v = struct.unpack_from("<i", b, off + 0x10)[0]
+                out[name] = v & 0xFF if name.startswith("m_b") else v
+                continue
+            beg, cap, n = struct.unpack_from("<QQQ", b, off + 0x10) if sz >= 0x28 else (0, 0, 0)
+            if ptr(beg) and n <= cap <= 0x1000:
+                raw = self.pm.read(beg, 4 * n) if n else b""
+            else:
+                raw = b[off + 0x10:off + sz]
+            ints = struct.unpack(f"<{len(raw) // 4}i", raw[:len(raw) // 4 * 4])
+            nz = sum(1 for v in ints if v)
+            out[name] = list(ints) if nz * 2 > len(ints) else {k: v for k, v in enumerate(ints) if v} | {"n": len(ints)}
+        return out
+
+    def world(self, players: list[int]) -> dict:
+        """per player its components' named fields and its cities' (Player::
+        Cities +0xd0's list: node +0 the city, +0x10 the next), the moment
+        the dump holds"""
+        import aimem_fields  # noqa: PLC0415
+        tab = aimem_fields.load()
+        out = {}
+        for pid in players:
+            pl = self.player(pid)
+            if not ptr(pl):
+                continue
+            rec: dict = {}
+            for name, t in tab.items():
+                if t["component"] is None:
+                    continue
+                try:
+                    rec[name] = self.fields(self.pm.u64(pl + int(t["component"], 16)), t["fields"])
+                except MemError as e:
+                    rec.setdefault("errors", []).append(f"{name}: {e}")
+            cities = []
+            node = self.pm.u64(self.pm.u64(pl + 0x6D0) + 0xD0)
+            while ptr(node) and len(cities) < 64:
+                try:
+                    cities.append(self.fields(self.pm.u64(node), tab["City"]["fields"]))
+                except MemError as e:
+                    rec.setdefault("errors", []).append(f"city: {e}")
+                node = self.pm.u64(node + 0x10)
+            rec["cities"] = cities
+            out[pid] = rec
+        return out
 
     def full(self, pid: int, nodes: bool = False) -> dict:
         pl = self.player(pid)

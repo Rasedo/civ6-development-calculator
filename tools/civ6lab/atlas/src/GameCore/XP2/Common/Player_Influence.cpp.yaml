@@ -215,7 +215,10 @@
   kind: function
   name: Player_Influence
   status: PARTLY
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  impl: [cpu/core/barbarians.ts:plotsSeenNow]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - "- A suzerain CHANGE (Player_Influence 0x451b20, reached from the envoy setters 0x44a040 / 0x450fb0 / 0x451460; old != new or it return..."
   review: imported

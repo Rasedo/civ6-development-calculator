@@ -144,6 +144,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - "...rrying both (or neither) is neither land nor water. Without a district: land = not water (0x834d0). Who writes word +0x14 is unread; the records fix the answers (below)."
     - ...eveal condition) adds RESOURCE_COST when d <= 3, any other plot adds WATER_COST if water (0x834d0) and RING_COST when d > 3; an improvement adds RING_COST if it is the barbarian camp (0x3...
@@ -160,6 +161,7 @@
   impl: [cpu/core/barbarians.ts:CAMP_SIGHT]
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - "..., a plot's owner (0x84760, territory: none for the barbarians), an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0: the plot and the six beside it, no line of sig..."
   review: imported
@@ -178,6 +180,7 @@
   readings:
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes:
     - the new owner's visibility count raised on the plot and on each plot beside it (neighbour walk, vtable +0x58), no line of sight
   context:

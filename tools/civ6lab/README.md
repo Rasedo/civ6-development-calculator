@@ -532,7 +532,7 @@ One line each; the detail and the evidence are in `reports/`.
 | script | purpose |
 |---|---|
 | `watch.py`, `fleet.py` | play games forward with per-turn readers (`--lua` / `--state` pairs), one instance or a fleet; `--step` holds every observer turn (`turn_lock.lua`) |
-| `aimem.py`, `aimem_hook.py`, `procmem.py` | the AI memory reader: hooks written into a running instance's game DLL (the process only) hold the game thread at each player's turn start, tactical knowledge step, AI_Knowledge.csv's moment and end look while `aimem.py watch` reads the contracts, their holders, the behaviour trees, the operations and their members, the knowledge base's records, PlayerStats and the generator's state through ReadProcessMemory, one JSON line a moment to `<stem>.aimem.jsonl`; `h1/fleet.py run --aimem` runs it beside each game; offsets and sites in dll_readings.md "H-1: the AI memory reader" |
+| `aimem.py`, `aimem_hook.py`, `procmem.py` | the AI memory reader: hooks written into a running instance's game DLL (the process only) hold the game thread at each player's turn start, tactical knowledge step, AI_Knowledge.csv's moment and end look while `aimem.py watch` reads the contracts, their holders, the behaviour trees, the operations and their members, the knowledge base's records, PlayerStats and the generator's state (the trees with their node graphs, the operations with their teams' bytes and requirement counts) through ReadProcessMemory, one JSON line a moment to `<stem>.aimem.jsonl`; `aimem_fields.py` names every player component's and city's watched members (`aimem_fields.json`), which `h1/dump.py` reads into each record's `mem` at the hold; `h1/fleet.py run --aimem` runs it beside each game; offsets and sites in dll_readings.md "H-1: the AI memory reader" |
 | `h1/samegame.py` | whether two recordings of one seed play the same game: the first differing turn per record section, the first differing draw |
 | `logstore.py` | a recording's `<stem>.logs/` as one SQLite file `<stem>.logs.sqlite` (a table per log, AI_CityBuild's PLOT ANALYSIS blocks normalised); `build <stem>\|--all`, `query <stem> "<sql>"`; fleet.py builds it after saving a game's logs, the TS harness reads it through `cpu/harness/logStore.ts` |
 | `atlas.py`, `atlas_check.py` | the DLL atlas (`atlas/`): a function's record by address or name, `coverage`, `gen`; the check that every cited address has a record |
@@ -604,7 +604,7 @@ answered at once and logged by name (under Autoplay a blocker other than
 the Dedication, which the seat's AI answers itself, only after the turn has
 stood 15 s; the seat's AI never answers the Dedication, and `h1/dump.py`
 answers it itself after each record, before the seat's turn
-(`lab.answer_dedication`), with `wait_turn(dedication=False)`, so a
+(`lab.answer_dedication`), with `wait_turn(blockers=False)`: no blocker on a timer, so a
 recording never answers it on a timer) — the blocker by `unblock.lua` or
 `commemorate.lua`, a session by `close_sessions.lua` (or the caller's
 answer), a screen by the close its own script defines. The blind sweep

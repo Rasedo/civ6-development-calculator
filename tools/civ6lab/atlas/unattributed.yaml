@@ -1019,6 +1019,33 @@
   context:
     - "...647bb0: the met major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency 0x2a81f0 against GlobalParameters +0x268), the trust +0x6480 writer and +0x6420, the Gold weight..."
   review: imported
+- addr: 0x2ab4f0
+  kind: function
+  status: READ
+  cases:
+    - recording: Barbarians.csv
+      value: "Barbarians.csv logs it each turn (\"Land Plots\", \"No   Visibility\")."
+    - recording: 1128
+      turn: 25
+      value: "`cpu/harness/sightLab.ts` (the   engines' unseen land of each record against the log), the five dueld   duels' 1,245 turns: 206 equal without the share, 454 with the minors'   plots alone, 1,065 with "
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  context:
+    - "...e suzerain's update (0x451b20, \"Attempting to update the suzerain\") and by alliances (0x2ab4f0, \"Permanently Allied\" 0x2aba80): a major sees what each city-state it is suzerain of se..."
+  review: imported
+- addr: 0x2aba80
+  final: 0x1d3e50
+  kind: function
+  status: READ
+  cases:
+    - recording: Barbarians.csv
+      value: "Barbarians.csv logs it each turn (\"Land Plots\", \"No   Visibility\")."
+    - recording: 1128
+      turn: 25
+      value: "`cpu/harness/sightLab.ts` (the   engines' unseen land of each record against the log), the five dueld   duels' 1,245 turns: 206 equal without the share, 454 with the minors'   plots alone, 1,065 with "
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  context:
+    - "..., \"Attempting to update the suzerain\") and by alliances (0x2ab4f0, \"Permanently Allied\" 0x2aba80): a major sees what each city-state it is suzerain of sees, the minor's units' sight wi..."
+  review: imported
 - addr: 0x2d1f20
   final: 0x1ed940
   kind: function
@@ -1877,6 +1904,7 @@
     - "H-1: the raids — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights hold raises..."
