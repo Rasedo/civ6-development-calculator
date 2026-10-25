@@ -24,6 +24,8 @@
     - cpu/core/barbarianOps.ts:SCOUT_NODES
     - cpu/core/aiCityTrees.ts:execute
     - gpu/core/sim_citytrees.py:_x_move
+    - cpu/core/aiCityTrees.ts:moveUnit
+    - cpu/core/tactical.ts:walk
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
@@ -102,6 +104,7 @@
     - gpu/core/sim_barbops.py:_bop_scout_tick
     - cpu/core/aiCityTrees.ts:protectUnit
     - cpu/core/barbarianOps.ts:protectShare
+    - gpu/core/sim_citytrees.py:_u_protect
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"

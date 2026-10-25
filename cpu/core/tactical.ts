@@ -431,15 +431,15 @@ export function pathTo(state: GameState, unit: Unit, dest: number): number[] {
  *  ends it), the engine's step paying each; it walks through its own units
  *  but stops short of a plot of its own unit that stacks with it. A path
  *  ending on a plot it attacks into stops at its side, and with `strike`
- *  the unit strikes it there. */
-export function moveTo(state: GameState, unit: Unit, dest: number, strike = true): void {
+ *  the unit strikes it there; a walk whose end `avoid` names stays put. */
+export function moveTo(state: GameState, unit: Unit, dest: number, strike = true, avoid?: (tile: number) => boolean): void {
   let path = pathTo(state, unit, dest);
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
   const last = path.length ? path[path.length - 1] : -1;
   const into = last >= 0 && attackPlot(state, unit, last);
   if (into) path = path.slice(0, -1);
-  walk(state, unit, path);
+  walk(state, unit, path, avoid);
   if (into && strike && unit.movesLeft > 0 && attacksLeftOf(unit) > 0 && state.units.includes(unit)
     && plotDistance(state, unit.tileIndex, last) === 1) {
     meleeAttack(state, unit.id, last, unit.seat);
@@ -457,7 +457,7 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
 }
 
 /** the walk of a path as far as the unit's Movement carries it this turn */
-function walk(state: GameState, unit: Unit, path: number[]): void {
+function walk(state: GameState, unit: Unit, path: number[], avoid?: (tile: number) => boolean): void {
   const { tiles } = state.map;
   // how far its Movement carries it along the path this turn
   const full = unit.movesFull ?? unitFullMoves(state, unit);
@@ -473,6 +473,9 @@ function walk(state: GameState, unit: Unit, path: number[]): void {
     if (mp <= 0 || inEnemyZoc(state, p, unit)) break;
   }
   while (stop > 0 && (stackedAt(state, unit, path[stop - 1]) || foreignAt(state, unit, path[stop - 1]))) stop -= 1;
+  // a walk whose end `avoid` names is not taken (Move Unit's danger test,
+  // 0x7eed65)
+  if (avoid && stop > 0 && avoid(path[stop - 1])) return;
   for (let i = 0; i < stop; i++) {
     if (stepUnit(state, unit, tiles[path[i]]) !== 'moved') return;
   }

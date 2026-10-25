@@ -74,7 +74,7 @@ import { eruptionHazardTurns, floodHazardTurns } from './disasters';
 import { baseAdjacency, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
 import { builderHarvest, builderRemoveFeature, tileFreeForUnit } from './units';
-import { aiStrengths, moveTo, reachPlots, turnsToPlot } from './tactical';
+import { aiStrengths, dangerPlane, moveTo, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import { minorTradeList } from './aiTrade';
 import {
@@ -458,6 +458,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
   const spent = new Set<number>();
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id && u.seat === cs.seat);
   const owned = (plot: number) => tileSeat(state.map.tiles[plot]) === cs.seat;
+  let danger: Int16Array | undefined;
   return {
     turn: state.turn, seat: cs.seat, cities: [city],
     get units() {
@@ -499,6 +500,8 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     },
     plotOwner: (plot) => tileSeat(state.map.tiles[plot]),
     plotGround: (plot) => plotGroundOf(state, cs.seat, plot),
+    // its danger map as the trees first read it in the turn (`dangerPlane`)
+    danger: (plot) => (danger ??= dangerPlane(state, cs.seat))[plot],
     buildersMakeDistricts: false,
     buildersMakeWonders: false,
     districtTie: () => randRange(state, 2, 'City Build District Choice'),
@@ -511,11 +514,11 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     newTreeId: () => ai.nextTree++,
     log: () => undefined,
     clearProduction: () => minorSetItem(state, cs, null),
-    order: (u, kind, plot, imp) => {
+    order: (u, kind, plot, imp, safe) => {
       const unit = unitOf(u);
       if (!unit) return;
       if (kind === 'move') {
-        moveTo(state, unit, plot, false);
+        moveTo(state, unit, plot, false, safe ? (p) => (danger ??= dangerPlane(state, cs.seat))[p] > 0 : undefined);
         return;
       }
       if (unit.tileIndex !== plot) return;

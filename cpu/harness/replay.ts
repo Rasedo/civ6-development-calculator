@@ -4414,7 +4414,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       }
       const op = cs?.ops ? opsOf(cs.ops).find((o) => opUnits(o).includes(u.id))?.def : undefined;
       count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat),
-        `${u.type}${op ? ` for ${op}` : ''}`);
+        `${u.type}${paid ? ' bought' : ''}${op ? ` for ${op}` : ''}`);
+      if (TRACE.has('minorUnits')) console.error(`t${b.turn - 1} minorAi:unit p${ctx.playerOfSeat.get(u.seat)} ${u.type}${paid ? ' bought' : ' trained'}${op ? ` for ${op}` : ''}`);
     }
     undoMinorPlots(ctx, improvements, charges);
     minorBuilds(ctx, b, report.minorBuilds);

@@ -200,8 +200,11 @@ export interface CityTreeWorld {
   log(line: string): void;
   /** the city's production cleared (the contract listener 0x175d10) */
   clearProduction(city: ContractCity): void;
-  /** a unit order the tree gives (moved, improvement built) */
-  order(unit: number, kind: 'move' | 'improve' | 'clear', plot: number, improvement?: string): void;
+  /** a unit order the tree gives (moved, improvement built); a move with
+   *  `safe` is not taken where its walk would end on a plot of danger */
+  order(unit: number, kind: 'move' | 'improve' | 'clear', plot: number, improvement?: string, safe?: boolean): void;
+  /** the player's danger map at the plot (0x716a60) */
+  danger(plot: number): number;
   /** the unit still stands after the orders given (a Builder spending its
    *  last charge is gone) */
   unitAlive(unit: number): boolean;
@@ -731,8 +734,17 @@ function unitsOf(ctx: Ctx, run: BtRun, node: BtNode, name: string): TreeUnit[] {
   return ctx.w.units.filter((u) => pick.includes(u.id));
 }
 
-// PROTECT UNIT (0x7f07c0): SUCCESS
-const protectUnit: BtHandler<Ctx> = { update: () => BT_SUCCESS };
+// PROTECT UNIT (0x7f07c0): over the tree's units damaged at least its Damage
+// Percentage of their hit points (every city tree's 0: each unit), RUNNING
+// where one stands on a plot of the danger map (0x716a90), else SUCCESS;
+// FAILURE with none
+const protectUnit: BtHandler<Ctx> = {
+  update(node, run, ctx) {
+    const us = unitsOf(ctx, run, node, 'Unit ID List');
+    if (!us.length) return BT_FAILURE;
+    return us.some((u) => ctx.w.danger(u.plot) > 0) ? BT_RUNNING : BT_SUCCESS;
+  },
+};
 
 // MOVE UNIT (0x7f0020): the unit it moves (+0x50), kept across turns, whose
 // planning reaches the location this turn: SUCCESS, else RUNNING. With none
@@ -741,14 +753,24 @@ const protectUnit: BtHandler<Ctx> = { update: () => BT_SUCCESS };
 // else the one a path brings there soonest, is kept, RUNNING; none FAILURE.
 // SUCCESS this turn lets the nodes after it run in the same tick, their
 // executions after its own, which moves the units: a Builder lays (Build
-// Improvement) or clears (Clear Plot) on the turn it arrives
+// Improvement) or clears (Clear Plot) on the turn it arrives. Without Allow
+// Danger, a location on the player's danger map (0x7f040d) lets the kept unit
+// go once it reaches it (SUCCESS, none kept) and keeps no unit by its path,
+// and the execution takes no walk ending on a plot of danger (0x7eed65:
+// runs/h1_duelw1127 Mexico City's purchased Builder of t22 on its centre
+// to t39, beside its tree's Farm plot under the barbarians' threat)
 const moveUnit: BtHandler<Ctx> = {
   update(node, run, ctx) {
     const m = run.mem[node.index];
     const plot = tagOf(run, node, 'Location');
     if (typeof plot !== 'number' || plot < 0) return BT_FAILURE;
+    const safe = (dataBool(node, 'Allow Danger') ?? false) || ctx.w.danger(plot) <= 0;
     const kept = typeof m.unit === 'number' ? ctx.w.units.find((u) => u.id === m.unit) : undefined;
-    if (kept) return ctx.w.reachThisTurn(kept, plot, false) ? BT_SUCCESS : BT_RUNNING;
+    if (kept) {
+      if (!ctx.w.reachThisTurn(kept, plot, false)) return BT_RUNNING;
+      if (!safe) m.unit = -1;
+      return BT_SUCCESS;
+    }
     m.unit = -1;
     let pick: TreeUnit | undefined;
     let soon = Infinity;
@@ -762,6 +784,7 @@ const moveUnit: BtHandler<Ctx> = {
         soon = 1;
         continue;
       }
+      if (!safe) continue;
       const turns = ctx.w.turnsTo(u, plot);
       if (turns > 0 && turns < soon) {
         soon = turns;
@@ -778,7 +801,8 @@ const moveUnit: BtHandler<Ctx> = {
     // the execution (0x7eeba0): the kept unit, else each of its units
     const m = run.mem[node.index];
     const kept = typeof m.unit === 'number' && m.unit >= 0 ? ctx.w.units.filter((u) => u.id === m.unit) : null;
-    for (const u of kept ?? unitsOf(ctx, run, node, 'Unit ID List')) if (u.plot !== plot) ctx.w.order(u.id, 'move', plot);
+    const safe = !(dataBool(node, 'Allow Danger') ?? false);
+    for (const u of kept ?? unitsOf(ctx, run, node, 'Unit ID List')) if (u.plot !== plot) ctx.w.order(u.id, 'move', plot, undefined, safe);
   },
 };
 

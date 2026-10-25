@@ -11,7 +11,10 @@
     - recording: 1121
       turn: 23
       value: "Case:   1121 camp (3,19): its Scout reports at t23, takes 47 from China's   Warrior at t24, stands home at t25 three plots from it and raises no   raid (none at boldness 10 on t26 either);"
-  impl: [cpu/core/tactical.ts:heal, cpu/core/tactical.ts:dangerPlane]
+  impl:
+    - cpu/core/tactical.ts:heal
+    - cpu/core/tactical.ts:dangerPlane
+    - cpu/core/aiCityTrees.ts:protectUnit
   readings:
     - "H-1: the raids — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -22,6 +25,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no   danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queue's   moves: a unit not of the sea domain (+0x650: 0 sea, 1 air,..."
     - ".claude/scratchpad/st1/reading.md: ...water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence map below, 0x716a90); the Loyalty   pressure (0x19d470 >> 8); and per ring plot revealed: one owned by another   player..."

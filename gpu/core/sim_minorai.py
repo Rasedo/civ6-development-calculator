@@ -1911,6 +1911,8 @@ class _MinorWorld:
         self._ut = torch.stack(u, dim=1)
         self._evals = evals
         self._threat = threat
+        # its danger map as the trees first read it in the turn (`dangerPlane`)
+        self._danger = None
         # the units whose last charge an order took ([B] ids per order, -1 none)
         self._spent: list = []
         T = sim._cv_tables()
@@ -2262,7 +2264,17 @@ class _MinorWorld:
         (0x272a60), 0 none (MOVE UNIT)"""
         return self._reach_turns(plot, among, 1 << 30, False)
 
-    def order(self, uid, kind, plot, imp, mask):
+    def _danger_map(self):
+        if self._danger is None:
+            need = torch.ones(self.sim.B, self.sim.T, dtype=torch.bool, device=self.sim.device)
+            self._danger = self.sim._danger_plane(self.seat, need)
+        return self._danger
+
+    def danger(self, plot):
+        """[B] the danger map at the plot (0x716a60)"""
+        return self._danger_map().gather(1, plot.clamp(min=0).unsqueeze(1)).squeeze(1)
+
+    def order(self, uid, kind, plot, imp, mask, safe: bool = False):
         sim = self.sim
         lo = sim.POOL_LO["major"]
         g = uid.clamp(min=lo) - lo
@@ -2271,7 +2283,9 @@ class _MinorWorld:
         if not bool(alive.count_nonzero()):
             return
         if kind == "move":
-            sim._tac_move_to(alive, g, plot, pre="major", seat=self.seat, strike=False)
+            # a move with `safe` takes no walk ending on a plot of danger
+            sim._tac_move_to(alive, g, plot, pre="major", seat=self.seat, strike=False,
+                             avoid=(self._danger_map() > 0) if safe else None)
             sim._gen_ver += 1
             return
         here = alive & (sim.major_unit_tile.gather(1, g.unsqueeze(1)).squeeze(1) == plot)

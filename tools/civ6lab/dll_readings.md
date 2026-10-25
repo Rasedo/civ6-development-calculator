@@ -4585,7 +4585,22 @@ operations' contracts, the improvement values below, the purchases).
   0x7ec7b0; Cancel Contract 0x7f5200 / 0x7f4980; Protect Unit 0x7f07c0;
   Move Unit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670;
   Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
-- MOVE UNIT, READ (the danger test 0x716a60 unported). Update 0x7f0020: its
+- MOVE UNIT's DANGER (data "Allow Danger", every city tree's 0): the update
+  reads the location on the player's danger map (0x7f040d: 0x716a60 on
+  player +0x12d8, x + y x width into 0x716a90); a location of danger lets
+  the kept unit that reaches it go (+0x50 -1, SUCCESS), and a unit is kept
+  by its path only where the location is clear (0x7f057e). The execution
+  plans the unit's walk (0x791300, one turn) and, the location aside, takes
+  none ending on a plot of danger (0x7eed65 -> 0x7ef0bb). PROTECT UNIT
+  (0x7f07c0): over the tag's units, else the tree's job's (0x6092c0), each
+  damaged (+0xcf0) at least its Damage Percentage of its hit points
+  (COMBAT_MAX_HIT_POINTS; every city tree's 0) on a plot of danger counts
+  (+0x20): RUNNING with one, SUCCESS with none, FAILURE with no unit.
+  runs/h1_duelw1127 Mexico City: its Builder of contract 51, bought t22,
+  stood on the centre to t39 beside its tree's Farm plot (the game's Farm
+  there from t40), the barbarians about (City Defense t20-24, t32-33,
+  t36-37).
+- MOVE UNIT, READ. Update 0x7f0020: its
   kept unit (+0x50, kept across turns; an id of 0 or -1 none) alive with a
   planning: SUCCESS where the planning reaches the location within one turn
   (0x791300, the flag clear), else RUNNING. None kept: over its units in

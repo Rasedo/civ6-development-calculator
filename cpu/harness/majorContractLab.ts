@@ -40,6 +40,7 @@ import { BUILDINGS } from '../data/buildings';
 import { UNITS } from '../data/units';
 import { loadBuildLines, loadCityBuildCentre, loadCityBuildPlots, type BuildLine, type LoggedPlot } from './cityBuildLog';
 import { plotGroundOf } from '../core/minorCityAi';
+import { dangerPlane } from '../core/tactical';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const dump = args[0];
@@ -326,6 +327,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
       buildersMakeDistricts: false,
       buildersMakeWonders: false,
       plotGround: (plot) => plotGroundOf(state, seat, plot),
+      danger: (plot) => dangerPlane(state, seat)[plot],
       districtTie: () => turnDraws.shift() ?? 0,
       plotCity: (plot) => {
         const t = state.map.tiles[plot];

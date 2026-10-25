@@ -131,7 +131,7 @@ function runScenario(sc: Scenario, variant: { ties: number[] }): unknown[] {
     const spent = new Set<number>();
     const w: CityTreeWorld = {
       turn: t, seat: sc.seat, cities: [city], units: tree,
-      techHeld: (x) => techs.has(x), civicHeld: (x) => civics.has(x),
+      techHeld: (x) => techs.has(x), civicHeld: (x) => civics.has(x), danger: () => 0,
       canImprove: (plot, imp) => !improved.has(plot) && sc.canImprove.some(([p, i]) => p === plot && i === imp),
       builderType: () => 'UNIT_BUILDER',
       plotCity: (plot) => (sc.owned.includes(plot) ? sc.city : -1),

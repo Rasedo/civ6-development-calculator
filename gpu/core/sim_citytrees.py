@@ -1051,7 +1051,15 @@ def _units_of(c: _Ctx, i: int, name: str) -> torch.Tensor:
 
 
 def _u_protect(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
-    return torch.full_like(c.ref, BT_SUCCESS)
+    """PROTECT UNIT (0x7f07c0): over the tree's units damaged at least its
+    Damage Percentage (every city tree's 0: each unit), RUNNING where one
+    stands on a plot of the danger map, else SUCCESS; FAILURE with none"""
+    us = _units_of(c, i, "Unit ID List")
+    u = c.units()
+    hot = torch.zeros_like(us)
+    for j in us.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+        hot[:, j] = us[:, j] & (c.w.danger(u["plot"][:, j]) > 0)
+    return torch.where(~us.any(dim=1), BT_FAILURE, torch.where(hot.any(dim=1), BT_RUNNING, BT_SUCCESS))
 
 
 def _u_move(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
@@ -1059,10 +1067,13 @@ def _u_move(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     location this turn SUCCEEDS, else RUNS; none kept, over its units in
     order: the first reaching it this turn with Movement left SUCCEEDS and is
     kept; else the first reaching it this turn (none kept before), or the one
-    a path brings there soonest, is kept, RUNNING; none FAILURE"""
+    a path brings there soonest, is kept, RUNNING; none FAILURE. Without
+    Allow Danger a location on the danger map lets the kept unit go once it
+    reaches it and keeps no unit by its path"""
     plot = c.tag(i, "Location")
     none = (plot == NONE) | (plot < 0)
     p = torch.where(none, 0, plot)
+    safe = torch.ones_like(none) if c.tree.flag(i, "Allow Danger") else (c.w.danger(p) <= 0)
     u = c.units()
     kcol = u["valid"] & (u["id"] == c.ma[:, i].unsqueeze(1)) & (c.ma[:, i] >= 0).unsqueeze(1) & at.unsqueeze(1)
     kept = kcol.any(dim=1)
@@ -1081,26 +1092,29 @@ def _u_move(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
         moves = moves | b
         best = torch.where(a, 1, best)
         t = tt[:, j]
-        q = us[:, j] & ~r1[:, j] & (t > 0) & ((pick < 0) | (t < best))
+        q = us[:, j] & ~r1[:, j] & safe & (t > 0) & ((pick < 0) | (t < best))
         pick = torch.where(q, j, pick)
         best = torch.where(q, t, best)
     k_reach = (kcol & r1).any(dim=1)
     c.ma[:, i] = torch.where(at & ~kept, torch.where(pick >= 0, _pick(u["id"], pick), -1), c.ma[:, i])
+    c.ma[:, i] = torch.where(at & kept & k_reach & ~safe, -1, c.ma[:, i])
     st = torch.where(kept, torch.where(k_reach, BT_SUCCESS, BT_RUNNING),
                      torch.where(pick < 0, BT_FAILURE, torch.where(moves, BT_SUCCESS, BT_RUNNING)))
     return torch.where(none, BT_FAILURE, st)
 
 
 def _x_move(c: _Ctx, i: int, at: torch.Tensor) -> None:
-    """the execution (0x7eeba0): the kept unit, else each of its units"""
+    """the execution (0x7eeba0): the kept unit, else each of its units; without
+    Allow Danger no walk ending on a plot of danger (0x7eed65)"""
     plot = c.tag(i, "Location")
     go = at & (plot != NONE)
     u = c.units()
     kcol = u["valid"] & (u["id"] == c.ma[:, i].unsqueeze(1)) & (c.ma[:, i] >= 0).unsqueeze(1)
     us = torch.where(kcol.any(dim=1, keepdim=True), kcol, _units_of(c, i, "Unit ID List"))
     off = us & (u["plot"] != plot.unsqueeze(1)) & go.unsqueeze(1)
+    safe = not c.tree.flag(i, "Allow Danger")
     for j in off.any(dim=0).nonzero(as_tuple=True)[0].tolist():
-        c.w.order(u["id"][:, j], "move", plot, torch.full_like(plot, -1), off[:, j])
+        c.w.order(u["id"][:, j], "move", plot, torch.full_like(plot, -1), off[:, j], safe=safe)
 
 
 def _u_clear(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:

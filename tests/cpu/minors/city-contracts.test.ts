@@ -166,7 +166,7 @@ describe('the city events and trees (CityBuild.cpp, the tree nodes)', () => {
     const lines: string[] = [];
     let ids = 1;
     const w: CityTreeWorld = {
-      turn: 3, seat: 2, cities: [c], units: [], techHeld: () => true, civicHeld: () => true, canImprove: () => false,
+      turn: 3, seat: 2, cities: [c], units: [], techHeld: () => true, civicHeld: () => true, canImprove: () => false, danger: () => 0,
       builderType: () => 'UNIT_BUILDER', plotCity: () => 7, reachThisTurn: () => true, turnsTo: () => 1, canPlaceDistrict: () => false, plotOwner: () => 2,
       buildersMakeDistricts: false, buildersMakeWonders: false, districtTie: () => 0, distance: () => 1, plotGround: () => ({ feature: null, resource: null }),
       newContractId: () => ids++, newTreeId: () => 100 + ids++, log: (l) => lines.push(l), clearProduction: () => undefined,

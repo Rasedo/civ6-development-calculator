@@ -824,14 +824,15 @@ class SimTactics:
         return torch.where(naval, mp1, cost)
 
     def _tac_move_to(self, mask: torch.Tensor, us: torch.Tensor, dest: torch.Tensor, pre: str = "barb",
-                     seat: int = BARB_SEAT, strike: bool = True) -> None:
+                     seat: int = BARB_SEAT, strike: bool = True, avoid: torch.Tensor | None = None) -> None:
         """`moveTo` for the unit at local slot `us` [B] of pool `pre` (its
         player `seat`) in the games of `mask`: the pathfinder's path to `dest`
         with zones of control, walked as far as its Movement carries it this
         turn (a zone of control ends it); it walks through its own units and
         other players' but never ends on another player's unit or its own
         that stacks with it. A path ending on a plot it attacks into stops at
-        its side, and with `strike` (the barbarians') it strikes there."""
+        its side, and with `strike` (the barbarians') it strikes there; a walk
+        whose end `avoid` [B, T] names stays put."""
         if not bool(mask.count_nonzero()):
             return
         dev = self.device
@@ -910,6 +911,9 @@ class SimTactics:
             if not bool(back_off.count_nonzero()):
                 break
             stop = stop - back_off.long()
+        if avoid is not None:
+            end = path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)
+            stop = torch.where((stop > 0) & avoid[rows, end], torch.zeros_like(stop), stop)
         gslot = torch.zeros(B, dtype=torch.long, device=dev)
         gslot[rows] = sr + self.POOL_LO[pre]
         going = stop > 0
