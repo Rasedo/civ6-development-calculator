@@ -291,6 +291,49 @@ class SimMinors:
         self.citystate_kb_seq[rows, r, k] = nxt.to(self.citystate_kb_seq.dtype)
         self.citystate_kb_next[rows, r] = nxt + 1
 
+    def _kb_attacked(self, att: torch.Tensor, d_seat: torch.Tensor, g: torch.Tensor, a_seat: torch.Tensor,
+                     a_type: torch.Tensor, a_tile: torch.Tensor, a_hp: torch.Tensor) -> None:
+        """`recordAttacker` — after a unit-vs-unit combat in the games `att`
+        [B], the knowledge base of the defender's player `d_seat` [B] (a
+        city-state's row, the barbarians' `BK`, the Free Cities' `FK`; a
+        major's none) records the attacker still standing, merged slot `g`
+        [B] of `a_seat` and `a_type`, on the plot it stands on `a_tile` with
+        its health `a_hp` (player signal +0x78 -> 0x783570, no sight asked):
+        the record of its slot, owner and type rewritten, else a free one
+        numbered after the last added, at age 0 as of the row's last
+        ageing"""
+        S = self.citystate_kb_slot.shape[1] - 2
+        on = att & (((d_seat >= 100) & (d_seat < 100 + S)) | (d_seat == BARB_SEAT) | (d_seat == FREE_SEAT))
+        if not bool(on.count_nonzero()):
+            return
+        b = on.nonzero(as_tuple=True)[0]
+        ds = d_seat[b].long()
+        r = torch.where(ds == BARB_SEAT, torch.full_like(ds, self.BK),
+                        torch.where(ds == FREE_SEAT, torch.full_like(ds, self.FK), ds - 100))
+        gb, sb, tb = g[b].long(), a_seat[b].long(), a_type[b].long()
+        slot = self.citystate_kb_slot[b, r].long()
+        match = ((slot == gb.unsqueeze(1)) & (self.citystate_kb_owner[b, r].long() == sb.unsqueeze(1))
+                 & (self.citystate_kb_type[b, r].long() == tb.unsqueeze(1)))
+        has = match.any(dim=1)
+        free = slot == -2
+        if not bool((has | free.any(dim=1)).all()):
+            raise RuntimeError(f"_kb_attacked: more than KB_RECORDS={slot.shape[1]} army records")
+        k = torch.where(has, match.to(torch.int8).argmax(dim=1), free.to(torch.int8).argmax(dim=1))
+        aged = self.citystate_kb_aged[b, r]
+        hp_max = int(self.rules.combat["unitHp"])
+        self.citystate_kb_slot[b, r, k] = gb.to(self.citystate_kb_slot.dtype)
+        self.citystate_kb_owner[b, r, k] = sb.to(self.citystate_kb_owner.dtype)
+        self.citystate_kb_type[b, r, k] = tb.to(self.citystate_kb_type.dtype)
+        self.citystate_kb_seen[b, r, k] = torch.where(aged >= 0, aged, torch.full_like(aged, int(self.turn))).to(
+            self.citystate_kb_seen.dtype)
+        self.citystate_kb_plot[b, r, k] = a_tile[b].to(self.citystate_kb_plot.dtype)
+        self.citystate_kb_damage[b, r, k] = (hp_max - a_hp[b].long()).to(self.citystate_kb_damage.dtype)
+        nb, nr, nk = b[~has], r[~has], k[~has]
+        if nb.numel():
+            nxt = self.citystate_kb_next[nb, nr]
+            self.citystate_kb_seq[nb, nr, nk] = nxt.to(self.citystate_kb_seq.dtype)
+            self.citystate_kb_next[nb, nr] = nxt + 1
+
     def _minor_levy_return(self, s: int) -> None:
         """`minorLevyReturn` — CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS):
         the levied army "will return to the city-state after {2_TurnLimit}

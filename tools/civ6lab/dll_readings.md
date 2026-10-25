@@ -4293,6 +4293,38 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   turn younger 208 -> 73 rows). Left: 1117 t42 city-state 3's sight of
   China's units is the levied Warriors' return a pair late (the replay's
   levy clock).
+- THE DEFENDER'S RECORD OF ITS ATTACKER (READ): the combat log 0x20d280,
+  after its CombatLog.csv line, raises game signal +0x4c8 and player signal
+  +0x78 of the defender's owner (0x20d7e5: the unit's +0x2e0) with the
+  attacking unit (0x20d7f8). The signal's functor (vtable @d70448, entry
+  0x787fb0) calls 0x783570, which records the one unit through 0x5f0440
+  (its id +0x100, owner +0x2e0, type +0x160, plot +0x220) with no sight
+  asked: the record found takes age 0 and the plot, else one is added. The
+  plot is where the attacker stands once the combat is done, after a melee
+  victor's advance, and an attacker the combat killed is not recorded.
+  Cases: runs/h1_dueldA1117 t8 Caguana's Warrior 196610 kills the
+  barbarians' Scout on 42:10 and advances: the barbarians' t8 tactical read
+  (before the ageing) holds it on 42:10 at age 0, age 1 on their log (their
+  look does not see it); t10 / t11 China's Warrior 131073 strikes the
+  barbarians' Scout from 30:20, then kills it and advances to 29:20, their
+  record following; t22 the barbarians' Scout steps to 14:12, strikes
+  Valletta's Warrior and falls on the blow: Valletta's record of it stays
+  13:13, where its end look saw it; runs/h1_dueld1121 t22 Hunza's end look
+  sees the barbarians' Quadrireme on 8:3, which then strikes its Warrior
+  from 9:1: Hunza's t23 tactical read holds 9:1 at age 0. The engines:
+  `recordAttacker` / `_kb_attacked` on the melee unit arm (after the
+  advance), the ranged and the hostile ranged unit arms. The replay takes
+  a later player's blow on a city-state's or the Free Cities' unit after
+  their end looks (`lateBlows`), and lifts the units an earlier city-state
+  killed out of the later ones' turns (runs/h1_dueld1127 t39: the
+  barbarians' Slinger Hattusa killed on 7:10, out of Mexico's look; the
+  record's battles land after the minors' turns). --aiscore --to 60, the
+  five dueld duels: knowledge.army 64.9% -> 69.9% (another player's unit
+  on another plot at the same age 299 -> 46 rows). Left: a unit the
+  engine's battle killed and the game's did not, re-made under a new id,
+  holds a second record (1117 t50 China's Scout 983049, ours 58 damage,
+  the game's 53); the records of units a capture changed hands (1117 t33
+  China's Settler).
 - THE FOUNDING SETTLER'S RECORD: a city-state's knowledge base holds the
   Settler that founded its city, a unit gone, aging as any record to 21
   (runs/h1_dueld1121 aimem: each city-state's SETTLER on its centre at age

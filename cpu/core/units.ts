@@ -1685,6 +1685,26 @@ export function rangedCombatOf(unitType: string): number {
   return def?.ranged && def.bombard === undefined ? def.ranged.strength : 0;
 }
 
+/** THE DEFENDER'S RECORD OF ITS ATTACKER: after a unit-vs-unit combat the
+ *  combat log (0x20d280) raises player signal +0x78 of the defender's owner
+ *  with the attacking unit, one still standing (0x787fb0 -> 0x783570 ->
+ *  0x5f0440, no sight asked): the record of its id, owner and type takes
+ *  the plot it stands on, at age 0 as of the knowledge base's last ageing,
+ *  or one is added */
+export function recordAttacker(state: GameState, attacker: Unit, seat: number): void {
+  const holder = seatOf(state, seat);
+  if (!holder) return;
+  const seen = holder.armyAged ?? state.turn;
+  const damage = UNIT_HP - attacker.hp;
+  const recs = (holder.armyKnown ??= []);
+  const r = recs.find((x) => x.id === attacker.id && x.type === attacker.type && x.owner === attacker.seat);
+  if (r) {
+    r.seen = seen;
+    r.plot = attacker.tileIndex;
+    r.damage = damage;
+  } else recs.push({ id: attacker.id, owner: attacker.seat, type: attacker.type, seen, plot: attacker.tileIndex, damage });
+}
+
 /** `far`: a GRANT, which the game places on the nearest plot that takes the
  *  unit however far that is — past the anchor and its ring, the whole map by
  *  distance, the lower tile index on a tie. */

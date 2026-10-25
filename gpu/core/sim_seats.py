@@ -12612,6 +12612,10 @@ class SimSeats:
                                 self._promo_pool(atk_kind)[0][vr, u])
                 if major:
                     self._clear_camp_at(adv, ttc, a_seat[:, u], self._row_of(a_seat[:, u]))
+            # the defender's player records the attacker that stands, where
+            # its advance left it (`recordAttacker`)
+            self._kb_attacked(mil_att & ~atk_dead, d_seat_m, torch.full_like(here, a_lo + u), a_seat[:, u],
+                              a_type[:, u], a_tile[:, u], a_hp[:, u])
         if bool(civ_att.count_nonzero()):
             # no fighter stands there: the order is a MOVE onto the plot
             # (`meleeAttackInner`'s seizure arm). A plot the mover could not
@@ -15194,6 +15198,8 @@ class SimSeats:
                 self._ww_battle(unit_att, self._row_of(self._atk_seat(atk_kind, u)),
                                 self._row_of(d_seat), tgt,
                                 d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
+                self._kb_attacked(unit_att, d_seat, torch.full_like(ttc, u + self.POOL_LO[atk_kind]), a_seat,
+                                  _type_p[:, u], _tile_p[:, u], _hp_p[:, u])
                 self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
                                       unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), ut0,
                                       vict_form=self._form_tier(d_slot), killer_promos=a_promos)
@@ -15414,6 +15420,8 @@ class SimSeats:
             self._ww_battle(unit_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(d_seat), tgt,
                             d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
+            self._kb_attacked(unit_att, d_seat, torch.full_like(ttc, u + self.POOL_LO[atk_kind]), aseat,
+                              a_type[:, u], a_tile[:, u], a_hp[:, u])
             self._unit_kill_event(self._atk_seat(atk_kind, u), d_type, d_barb,
                                   unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0), at0,
                                   vict_form=self._form_tier(d_slot), killer_promos=a_promos)

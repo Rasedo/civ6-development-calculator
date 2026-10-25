@@ -27,7 +27,7 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
-import { drawAndPayGoody, raiseBestTrained, unitReligious, unitStackSlot } from './units';
+import { drawAndPayGoody, raiseBestTrained, recordAttacker, unitReligious, unitStackSlot } from './units';
 import { randRange } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
@@ -2056,6 +2056,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
 
   const defender = stackDefender(state, enemies, false);
   const defDef = UNITS[defender.type];
+  let struck: number | undefined;
 
   if ((defDef?.combat ?? 0) <= 0) {
     // no fighter stands there: the order is a MOVE onto the plot, which takes
@@ -2083,6 +2084,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       { ranged: false, aDied: attacker.hp <= 0, dDied: defender.hp <= 0 });
     warWearinessBattle(state, attacker.seat, defender.seat, targetIndex,
       { aDied: attacker.hp <= 0 && defender.hp > 0, dDied: defender.hp <= 0 });
+    struck = defender.seat;
     if (defender.hp <= 0) {
       if (captured) {
         // ...and no death for the kill event, the disciples, the dig and the
@@ -2123,6 +2125,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     revealAround(state, attacker.seat, targetIndex, unitSight(attacker, state), { seeThrough: unitSeesThrough(attacker) });
     clearCampFor(state, attacker, targetIndex); // every seat clears it
   }
+  // the defender's player records the attacker that stands, where its
+  // advance left it (runs/h1_dueldA1117 t8: Caguana's Warrior kills the
+  // barbarians' Scout and advances to 42:10, out of their sight, their t8
+  // line holding it there at age 1; t22: the barbarians' Scout falls on its
+  // blow, Valletta's record of it where its look saw it)
+  if (struck !== undefined && state.units.includes(attacker)) recordAttacker(state, attacker, struck);
   return ok;
 }
 
@@ -2499,6 +2507,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   });
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
+  recordAttacker(state, attacker, defender.seat);
   if (defender.hp <= 0) {
     unitKillEvent(state, unitSeat(attacker), attacker, defender);
     disciplesSpread(state, unitSeat(attacker), attacker, defender.seat, targetIndex);
@@ -2611,6 +2620,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   const { atk, def: defCS } = rangedUnitStrengths(state, attacker, targetIndex, defender, false);
   defender.hp -= damageRoll(state, atk - defCS, 'vrng', targetIndex);
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
+  recordAttacker(state, attacker, defender.seat);
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {
     unitKillEvent(state, unitSeat(attacker), attacker, defender);

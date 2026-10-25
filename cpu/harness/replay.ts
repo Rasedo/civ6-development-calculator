@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_IN_PROGRESS } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, FORTIFY_MAX_TURNS } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, FORTIFY_MAX_TURNS } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -217,6 +217,11 @@ interface Ctx {
    *  fighting those battles in its pass; each with its record key, which a
    *  unit the pair killed has left the replay's map by */
   minorBlows: Map<Unit, { snap: Unit; key: string }>;
+  /** this pair's battles a later player's unit fought on a city-state's or
+   *  the Free Cities' unit, the attacker as the battle left it standing: the
+   *  defender's record of it (`recordAttacker`) is taken after the
+   *  defender's own end look, as the game's turn order takes it */
+  lateBlows: { seat: number; attacker: Unit }[];
   /** the record's units this pair's upgrade orders make, keyed as the
    *  record keys them, until the order is applied: each is the upgraded
    *  unit, so no unit the engine's turn made stands for one
@@ -2903,12 +2908,16 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         ctx.stream.placed(true);
         const r = d.ranged ? rangedAttack(state, atk.id, d.at) : meleeAttack(state, atk.id, d.at, atk.seat);
         ctx.stream.placed(false);
+        const stood = state.units.includes(atk) ? { ...atk } : undefined;
         restore();
         if (TRACE.has('battleHp')) console.error(`t${traceTurn} battle ${d.attacker} ${atk.type} ${hp0[0]}->${atk.hp} vs ${d.defender} ${def.type} ${hp0[1]}->${def.hp} ${d.ranged ? 'ranged' : 'melee'} seq${d.seq} game[${d.dmg}] ours[${hp0[1] - def.hp},${hp0[0] - atk.hp}] ${r.ok ? '' : r.reason} ${((globalThis as { __cbLog?: string[] }).__cbLog ?? []).join(' | ')}`);
         if (!r.ok) { count(ctx, 'battle', 'refused', d.player, r.reason); break; }
         ctx.battled.add(d.attacker);
         ctx.battled.add(d.defender);
         for (const k of [d.attacker, d.defender]) if (!state.units.includes(ctx.units.get(k)!)) ctx.engineKilled.add(k);
+        if (stood && minorAiSeat(def.seat) && ctx.playerOfSeat.get(atk.seat)! > ctx.playerOfSeat.get(def.seat)!) {
+          ctx.lateBlows.push({ seat: def.seat, attacker: stood });
+        }
         count(ctx, 'battle', 'applied');
         break;
       }
@@ -4187,7 +4196,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), minorBlows: new Map(), lateBlows: [], upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies, majorCivicEntries: new Map(),
@@ -4285,6 +4294,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.steps = loggedSteps(b, ctx.W);
     ctx.barbBlows = new Map();
     ctx.minorBlows = new Map();
+    ctx.lateBlows = [];
     ctx.barbNew = [];
     ctx.lateEnvoys = [];
     ctx.undug = new Map();
@@ -4513,15 +4523,29 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // where their turn left them, as the record holds them: the game runs
       // them one at a time (runs/h1_dueld1121 t40: Ayutthaya's Galley out of
       // Antioch's sight before Antioch's look, its record the game's age 1)
+      // ...and without the units an earlier city-state's battles killed, the
+      // record's battles landing after the minors' turns (runs/h1_dueld1127
+      // t39: the barbarians' Slinger Hattusa killed on 7:10, out of Mexico's
+      // look)
+      const killedBy = new Map(ds.flatMap((d) => (d.kind === 'kill' && isCityStateSeat(seatOfP(ctx, d.player)) ? [[d.victimUnit, d.player] as const] : [])));
+      const fallen: [Unit, number][] = [];
       let before: number | undefined;
       holdMinorStart((_st, cs) => {
         if (before !== undefined) syncUnits(ctx, b, before);
-        before = ctx.playerOfSeat.get(cs.seat);
+        before = ctx.playerOfSeat.get(cs.seat)!;
+        for (const [key, killer] of killedBy) {
+          const u = killer < before ? ctx.units.get(key) : undefined;
+          const i = u ? state.units.indexOf(u) : -1;
+          if (i < 0) continue;
+          fallen.push([u!, i]);
+          state.units.splice(i, 1);
+        }
       });
       try {
         minorTurns(state);
       } finally {
         holdMinorStart(null);
+        for (const [u, i] of fallen.reverse()) state.units.splice(Math.min(i, state.units.length), 0, u);
       }
       ctx.minorLookTypes = new Map(state.units.map((u) => [u.id, gameTypeOf('unit', u.type, 'UNIT_')]));
       takeBarbs();
@@ -4659,6 +4683,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // the record shows is not one)
     const bought = new Set(ds.flatMap((d) => (d.kind === 'buyUnit' ? [d.unit] : [])));
     minorAi(ctx, b, a.turn, new Set([...ctx.units].filter(([k, u]) => minorAiSeat(u.seat) && !standing.has(u) && !bought.has(k)).map(([, u]) => u)));
+    // a later player's blow on a city-state's or the Free Cities' unit came
+    // after the defender's end look: its record of the attacker is the blow's
+    // (runs/h1_dueld1121 t22: Hunza's end look sees the barbarians'
+    // Quadrireme on 8:3, which then strikes its Warrior from 9:1; Hunza's
+    // t23 record of it 9:1)
+    for (const { seat, attacker } of ctx.lateBlows) recordAttacker(state, attacker, seat);
     barbarianTurn(ctx, b, a.turn);
     // the units the barbarians raised stand where the record holds them
     inTurn(state, a.turn, () => syncUnits(ctx, b));
