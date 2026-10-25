@@ -146,7 +146,7 @@ interface Ground {
   seenZoc: (i: number) => boolean;
 }
 
-function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true): Ground {
+function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, anyGround = true): Ground {
   const held = new Set<number>();
   const foes = new Set<number>();
   const own = new Set<number>();
@@ -218,9 +218,14 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     },
     attack: (t) => {
       if (!melee || !known(t.index) || isImpassable(t)) return false;
-      // in the planning, a unit at war that fights (0x26e570 -> 0x209dd0): a
-      // land mover's strike onto a ship's water as a ship's onto the shore
-      if (fighters.has(t.index) || (foes.has(t.index) && isWater(t) === naval)) return true;
+      // in the planning, a unit at war that fights (0x26e570 -> 0x209dd0):
+      // on the mover's own ground (land for a land mover, water for a ship)
+      // in the planning's reach — AI_Planning.csv lists no ship's water for a
+      // land unit (runs/h1_duelw1117 t16: city-state 4's Warrior at 28:4
+      // lists 27:4 (1/0) and not the barbarian Galley's 26:4) —, on any
+      // ground in the danger map's (`anyGround`: a land unit's strike onto a
+      // ship's water as a ship's onto the shore, runs/h1_duelw1117 t73)
+      if ((fighters.has(t.index) && (anyGround || isWater(t) === naval)) || (foes.has(t.index) && isWater(t) === naval)) return true;
       const owner = tileSeat(t);
       if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
       return !naval && encampmentBlocks(state, t, unit);
@@ -262,7 +267,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false,
   laterTurns = false): void {
   const { map } = state;
-  const ground = groundOf(state, unit, !zoc, !zoc);
+  const ground = groundOf(state, unit, !zoc, !zoc, standToAttack);
   const held = heldCostsOf(state, unit);
   const nodes = new Map<number, PNode>();
   // a turn starts on the full Movement of the domain its plot holds the unit
@@ -1870,14 +1875,16 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
   return ended;
 }
 
-/** an operation's attack in the pass: the assignment of the units (in pool
- *  order, as the pass walks them) over the pass's targets `keep` picks (their
+/** an operation's attack in the pass: the assignment of the units (in the
+ *  order `ids` lists them: an operation's its team's members' list, 0x80ceb0
+ *  walking the team's +0x18; runs/h1_duelw1117 t4: city-state 2's Attack Barb
+ *  Camp's Warrior 196610, recruited first, claims 12:11 and 131073 takes
+ *  13:11, as logged) over the pass's targets `keep` picks (their
  *  units still on the map), `exchange` and `survive` its filters, carried
  *  out (0x771f80): the assignments in the order their turns ended */
 export function passAttack(state: GameState, pass: Pass, ids: readonly number[], keep: (k: number) => boolean, exchange: boolean,
   survive: boolean, move: string): Assigned[] {
-  const units = ids.map((id) => state.units.find((u) => u.id === id)).filter((u): u is Unit => !!u && pass.plan.has(u.id))
-    .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+  const units = ids.map((id) => state.units.find((u) => u.id === id)).filter((u): u is Unit => !!u && pass.plan.has(u.id));
   const targets = pass.targets.filter((t, k) => keep(k) && (!t.unit || state.units.includes(t.unit)));
   const out = assignTo(state, pass, units, targets, exchange, survive);
   return carryOut(state, pass, out, move);

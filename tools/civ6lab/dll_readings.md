@@ -5582,7 +5582,16 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   unit ashore (runs/h1_duelw1117 t73 / t74: China's Spearman's 25 on the
   barbarians' Quadrireme and Galley beside Longxi in the danger map). With them
   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->
-  758 of 1,241, the game's plots within ours 862 -> 1,192.
+  758 of 1,241, the game's plots within ours 862 -> 1,192. The planning's
+  reach (flags 0x115 | 0x800 | 0x100) holds no such strike off the mover's
+  own ground, LAB (the domain test unread): AI_Planning.csv lists no ship's
+  water for a land unit nor a land unit's plot for a ship (runs/h1_duelw1117
+  t16: city-state 4's Warrior at 28:4 lists 27:4 (1/0), beside the
+  barbarian Galley on 26:4, and not 26:4). The engines: `groundOf`'s
+  `anyGround` / `_tac_attack_planes`' `any_ground`, the danger map's search
+  alone striking on any ground (--aiscore --to 60, eight duels:
+  barb.move.family 7900 -> 8019 of 8336, barb.move.plot 7345 -> 7446,
+  cityState.move.plot 3203 -> 3231).
 - THE PLANNING'S ZONE OF CONTROL (0x26e570 at 0x26e83e..0x26e8ae, READ;
   its exerters PARTLY READ): with the search's flag 0x200 clear (the
   planning's 0x115 | 0x800 | 0x100; the danger map's 0x311 sets it), a step
@@ -6115,7 +6124,11 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   a turn. Execution (0x80ceb0): none for a team neither in battle nor
   joined by a unit (+0x58: the count of the units added to the team, 0x737f90
   pushing each to the members +0x18 and to the list +0x48; the engines'
-  `OpTeam.joined` / the members a tribe's operation holds); per team its members alive, not done, able
+  `OpTeam.joined` / the members a tribe's operation holds); per team its
+  members, in the members' list's order (the assignment's units in that
+  order: runs/h1_duelw1117 t4, city-state 2's Attack Barb Camp's Warrior
+  196610, recruited first, claims 12:11 and 131073 13:11, as logged;
+  `passAttack` / `_tac_team_order`), alive, not done, able
   to act (0x56c690), on land (+0x738 == 1), a bombard unit only against a
   city of another player or as a DEFENDER (+0x1c0 == 4); the targets: the
   list's unit entries (0x80b9b0: CIVILIAN through HIGH) narrowed to those

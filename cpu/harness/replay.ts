@@ -943,6 +943,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
   const was = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
+  const hpWas = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, UNIT_HP - num(r.damage)]));
   // the units the minors' and the barbarians' battles of the pair struck (or
   // lost) stand as they were before the first blow: the game fought a
   // minor's in its own pass, the barbarians' after it (runs/h1_duelw1121 t9:
@@ -985,6 +986,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
     }
     if (at !== undefined) c.tileIndex = at;
     if (!minorAiSeat(c.seat) || !key) continue;
+    // its health the first record's: the game heals its units at the turn's
+    // end, after their pass (runs/h1_duelw1117 t10: city-state 3's Warrior
+    // 131073, 8 damage at the turn's start, takes Heal)
+    const r0 = hpWas.get(key);
+    if (r0 !== undefined && !ctx.minorBlows.has(u)) c.hp = r0;
     c.slot = Number(key.split(':')[1]) & 0xffff;
     c.attacksLeft = attacksPerTurn(c);
     mine.push(c);

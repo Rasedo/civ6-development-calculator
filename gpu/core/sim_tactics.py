@@ -260,11 +260,13 @@ class SimTactics:
         naval = self.wpass & (~self.ocean_tile | cart.unsqueeze(1)) & ~block
         return land, naval
 
-    def _tac_attack_planes(self, seat: int, revealed_only: bool = True, planning: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
+    def _tac_attack_planes(self, seat: int, revealed_only: bool = True, planning: bool = True,
+                           any_ground: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat`
         attacks into (`groundOf`'s attack): in the planning (`planning`) a
-        unit of a player at war with it that fights, on any ground (0x26e570
-        -> 0x209dd0); any such unit on ground of the mover's domain, a city
+        unit of a player at war with it that fights (0x26e570 -> 0x209dd0),
+        on the mover's own ground, on any with `any_ground` (the danger
+        map's); any such unit on ground of the mover's domain, a city
         centre of such a player, an Encampment that blocks a land mover — on
         plots it revealed."""
         foe = self._tac_hostile(seat)
@@ -280,8 +282,8 @@ class SimTactics:
         land = self.passable & ((foe & ~self.water) | ctr)
         if self._encamp_didx >= 0:
             land = land | (self.passable & self._encamp_block_plane(seat))
-        land = land | fight
-        naval = (self.wpass & foe) | (self.passable & ctr) | fight
+        land = land | (fight if any_ground else fight & ~self.water)
+        naval = (self.wpass & foe) | (self.passable & ctr) | (fight if any_ground else fight & self.water)
         known = self._tac_known(seat) if revealed_only else None
         if known is not None:
             land, naval = land & known, naval & known
@@ -451,11 +453,11 @@ class SimTactics:
         ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & embarks.unsqueeze(1)))  # [N, T]
         water_n = self.water[rows]
         # the plots each unit attacks into (`groundOf`'s attack): an enemy
-        # unit's of its own domain (the planning's: one that fights, on any
-        # ground), a hostile city centre, an Encampment for a land unit — the
+        # unit's of its own domain (the planning's: one that fights, on its own
+        # ground — on any in the danger map's), a hostile city centre, an Encampment for a land unit — the
         # path's end, the attack's step priced as any step and spending the
         # Movement it leaves
-        a_land, a_nav = self._tac_attack_planes(seat, not zoc, not zoc)
+        a_land, a_nav = self._tac_attack_planes(seat, not zoc, not zoc, stand)
         fights = self._type_combat.take(utype) > 0
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows]) & fights.unsqueeze(1) & ~ent_n
         cost_b = self._tac_cost()  # [B, T, 6]
@@ -1958,6 +1960,16 @@ class SimTactics:
             plain = torch.full((B,), kind != 3, dtype=torch.bool, device=dev)
             out = self._tac_assign(cand, order, ai, near, res, rowof, unit_pl, plain, kind != 3, tg["uk"], tg["uo"], peers, pre, seat)
             self._tac_carry_out(out, done, rowof, res, pre, seat)
+
+    def _tac_team_order(self, order: torch.Tensor, rank: torch.Tensor) -> torch.Tensor:
+        """[B, P] the pool's `order` with a team's members first by their place
+        in its list (`rank` [B, P], -1 none) — the units an operation's attack
+        walks (`passAttack`'s `ids`, 0x80ceb0 on the team's +0x18)"""
+        B, P = order.shape
+        inv = torch.empty_like(order)
+        inv.scatter_(1, order, torch.arange(P, device=self.device).unsqueeze(0).expand(B, P))
+        key = torch.where(rank >= 0, rank, (1 << 30) + inv)
+        return key.argsort(dim=1, stable=True)
 
     def _tac_assign(self, cand: torch.Tensor, order: torch.Tensor, ai: torch.Tensor, near: torch.Tensor,
                     res: dict, rowof: torch.Tensor, unit_pl: torch.Tensor, exchange: torch.Tensor,

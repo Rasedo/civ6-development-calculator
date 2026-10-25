@@ -37,6 +37,8 @@
     - gpu/core/sim_barbops.py:_bop_attack_units
     - cpu/core/operations/assault.ts:UNIT_TARGETS
     - gpu/core/sim_minorops.py:_x_attack_units
+    - cpu/core/tactical.ts:passAttack
+    - gpu/core/sim_tactics.py:_tac_team_order
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

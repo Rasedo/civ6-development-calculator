@@ -1920,7 +1920,8 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         for t in range(N_TEAMS):
             held |= sim._mops_member_mask(s, k, t)
         peers = sim._tac_peers(held & u["own"], pre)
-        out = sim._tac_assign(cand, op["order"], ai, near, op["res"], op["rowof"], uu, exch, True, uk, tg["uo"], peers, pre, seat)
+        order = sim._tac_team_order(op["order"], sim._mops_member_rank(s, k, ti))
+        out = sim._tac_assign(cand, order, ai, near, op["res"], op["rowof"], uu, exch, True, uk, tg["uo"], peers, pre, seat)
         sim._tac_carry_out(out, done, op["rowof"], op["res"], pre, seat)
 
 
@@ -2429,7 +2430,8 @@ def _x_attack_city(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         if not bool((units.any(dim=1) & near.any(dim=1)).any()):
             continue
         ai = torch.where(op["units"], torch.where(sim._mops_u(s, "defender"), _AI_DEFENDER, _AI_COMBAT), -1)
-        out = sim._tac_assign(units, op["order"], ai, near, op["res"], op["rowof"], tg["uu"], torch.zeros_like(on), True,
+        out = sim._tac_assign(units, sim._tac_team_order(op["order"], sim._mops_member_rank(s, k, ti)), ai, near, op["res"],
+                              op["rowof"], tg["uu"], torch.zeros_like(on), True,
                               torch.zeros_like(tg["dk"]), sim._arange_bt, sim._tac_peers(held & u["own"], pre), pre, seat,
                               district=True)
         sim._tac_carry_out(out, done, op["rowof"], op["res"], pre, seat)

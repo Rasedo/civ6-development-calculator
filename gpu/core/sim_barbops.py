@@ -1072,7 +1072,8 @@ class SimBarbOps:
         if not bool(near.count_nonzero()):
             return
         one = units.sum(dim=1) == 1
-        out = self._tac_assign(units, ctx["order"], ctx["ai"], near, res, rowof, unit_pl, one, True, kinds, tg["uo"],
+        out = self._tac_assign(units, self._tac_team_order(ctx["order"], self.barb_unit_join), ctx["ai"], near, res, rowof,
+                               unit_pl, one, True, kinds, tg["uo"],
                                self._tac_peers(mem))
         self._tac_carry_out(out, done, rowof, res)
 
@@ -1187,7 +1188,8 @@ class SimBarbOps:
                 & on.unsqueeze(1))
         if not bool((units.any(dim=1) & near.any(dim=1)).any()):
             return
-        out = self._tac_assign(units, ctx["order"], ctx["ai"], near, res, rowof, tg["uu"], torch.zeros_like(on), True,
+        out = self._tac_assign(units, self._tac_team_order(ctx["order"], self.barb_unit_join), ctx["ai"], near, res, rowof,
+                               tg["uu"], torch.zeros_like(on), True,
                                torch.zeros_like(tg["dk"]), self._arange_bt, self._tac_peers(mem), district=True)
         self._tac_carry_out(out, done, rowof, res)
 
