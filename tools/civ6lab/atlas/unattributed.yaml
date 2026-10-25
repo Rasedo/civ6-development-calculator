@@ -1454,6 +1454,7 @@
   final: 0x3439b0
   kind: function
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]

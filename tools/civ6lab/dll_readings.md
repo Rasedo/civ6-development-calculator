@@ -7999,16 +7999,27 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   player's religion entry (0x4979f0: the religion manager's +0xa0 entry of
   the player's +0x128 holding more than 0) — 0.1 x min(its Faith +0x100,
   150) as Gold weighted, discounted from the start, plus 0.2 x min(its Faith
-  yield, 100) as Gold weighted, between; the Amount unused. The others
-  (0xbcfe99b8 the per-city best project, GOLD_PURCHASES 0x7530bd65,
-  UNIT_PRODUCTION 0x3d5ff1a2, 0xc1a005d2) unread; GOLD_PURCHASES: 0.5 x the
+  yield, 100) as Gold weighted, between; the Amount unused.
+  GOVERNMENTBONUS_DISTRICT_PROJECTS (0xbcfe99b8: per city CityBuildAI's best
+  project, 0x5d1f10) unread. GOVERNMENTBONUS_OVERALL_PRODUCTION (0xc1a005d2): the player's
+  cities' Production (City::GetYield) x the Amount, as Production weighted,
+  between. GOVERNMENTBONUS_UNIT_PRODUCTION (0x3d5ff1a2): the Production of
+  the cities with a unit at their queue's head (0x179860 on +0x2170) x the
+  Amount x min(PSEUDOYIELD_UNIT_COMBAT of 1.0, 2.0), at most 75.0, as
+  Production weighted, between. GOLD_PURCHASES (0x7530bd65): 0.5 x the
   treasury (+0x13a0 +0xf8) x the Amount as Gold weighted, discounted from
-  the start, plus 0.5 x the Gold yield (0x4e0bf0, the player's gross:
-  cities, tributaries, deals, interest ...) x the Amount, between — not
-  ported (the gross Gold yield unread here). Port: `aiModifiers.ts`
-  (ENVOYS, WONDER_CONSTRUCTION, COMBAT_EXPERIENCE with GREAT_PEOPLE; a
-  city-state's Great Person points none, its player list holding no city;
-  the Free Cities' not read; FAITH_PURCHASES none for a city-state),
+  the start, plus 0.5 x the Gold yield (0x4e0bf0, the player's gross: its
+  cities' before their buildings' Maintenance, tributaries, deals,
+  interest ...) x the Amount, between (the treasury read as a raw 24.8 —
+  no record yet tells it from a whole count). Merchant Republic's bonus is
+  DISTRICT_PRODUCTION (0x0112d393), a type the switch holds no branch for:
+  none. Port: `aiModifiers.ts` (ENVOYS, WONDER_CONSTRUCTION,
+  COMBAT_EXPERIENCE with GREAT_PEOPLE, OVERALL_PRODUCTION, UNIT_PRODUCTION,
+  GOLD_PURCHASES; a city-state's Great Person points none, its player list
+  holding no city; the Free Cities' terms but ENVOYS / WONDER /
+  COMBAT not read; FAITH_PURCHASES none for a city-state; the minors' Gold
+  weight on the GPU, `_MinorFacts.yield_w`, the Economic AI's boost as the
+  TS's),
   `sim_policy.py`.
 - REQUIREMENT_CITY_HAS_X_POPULATION 0x6cfad0: the context's city (+0x70)
   of at least Amount citizens (+0x588). REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_

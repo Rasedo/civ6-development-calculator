@@ -354,6 +354,16 @@ export function aiView(state: GameState): AiView {
     },
     // its government's (a city-state's Chiefdom); the Free Cities accrue none
     influencePointsPerTurn: (i) => (i === FREE_SEAT ? 0 : govInfluence(seatGovernment(state, i)).points),
+    treasury: (i) => seatOf(state, i)?.treasury ?? 0,
+    // a city-state's item in hand a unit; another party's queue not read
+    cityTrainingUnit: (i) => {
+      const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      return !!cs?.prodItem?.startsWith('unit:');
+    },
+    grossGoldYield: (i) => seatCities(i).reduce((a, c) => {
+      const st = computeCityStats(state, c);
+      return a + st.total.gold + st.maintenance;
+    }, 0),
     // a city-state's table on its knowledge base's counts; a major's or the
     // Free Cities' on their own versions, the Free Cities knowing none
     unitProductionValue: (i, type) => {

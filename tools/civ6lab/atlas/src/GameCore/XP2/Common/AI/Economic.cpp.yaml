@@ -42,6 +42,7 @@
     - cpu/core/aiEconomic.ts:purchaseContracts
     - gpu/core/sim_minorai.py:_minor_contract_purchases
     - cpu/core/aiWeights.ts:yieldWeights
+    - gpu/core/sim_cityvalue.py:yield_w
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"

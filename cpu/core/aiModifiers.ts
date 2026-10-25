@@ -809,9 +809,16 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // term (0xf8705d00, which the branch runs on into): per class its points a
   // turn x the Amount as the class's pseudo-yield, likewise — a city-state's
   // none (its player list holds no city), the Free Cities' not read.
-  // FAITH_PURCHASES (0xc25143f9): none for a player whose religion entry
-  // (0x4979f0) holds none — a city-state's; with one, and the other types,
-  // not read
+  // OVERALL_PRODUCTION (0xc1a005d2): its cities' Production x the Amount at
+  // its weight, likewise; UNIT_PRODUCTION (0x3d5ff1a2): the cities' with a
+  // unit at their queue's head (0x179860), x the Amount x PSEUDOYIELD_UNIT_
+  // COMBAT of 1.0 (at most 2.0), at most 75.0, likewise. GOLD_PURCHASES
+  // (0x7530bd65): 0.5 x the treasury x the Amount as Gold at its weight,
+  // discounted from the start, and 0.5 x its gross Gold a turn (0x4e0bf0)
+  // x the Amount, likewise; the Free Cities' not read. FAITH_PURCHASES
+  // (0xc25143f9): none for a player whose religion entry (0x4979f0) holds
+  // none — a city-state's; with one, and DISTRICT_PROJECTS (0xbcfe99b8), not
+  // read
   EFFECT_ADJUST_FLAT_BONUS: (t, args) => {
     const a = pctOf(args);
     let sum = 0;
@@ -826,6 +833,30 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
         for (const c of t.view.cities(t.seat)) best = Math.max(best, fxOf(t.view.cityYield(t.seat, c.id, 'YIELD_PRODUCTION')));
         const pv = pseudoYieldValue(t.view, t.seat, a, 'PSEUDOYIELD_WONDER');
         sum = valueBetween(fmul(best, pv), t.start, t.horizon, t.rate);
+        break;
+      }
+      case 'GOVERNMENTBONUS_OVERALL_PRODUCTION':
+      case 'GOVERNMENTBONUS_UNIT_PRODUCTION': {
+        if (t.seat === FREE_SEAT) return 0;
+        const unitOnly = args.BonusType === 'GOVERNMENTBONUS_UNIT_PRODUCTION';
+        let prod = 0;
+        for (const c of t.view.cities(t.seat)) {
+          if (!unitOnly || t.view.cityTrainingUnit(t.seat, c.id)) prod += fxOf(t.view.cityYield(t.seat, c.id, 'YIELD_PRODUCTION'));
+        }
+        let x = fmul(a, prod);
+        if (unitOnly) {
+          const pv = Math.min(pseudoYieldValue(t.view, t.seat, FX, 'PSEUDOYIELD_UNIT_COMBAT'), 2 * FX);
+          x = Math.min(fmul(x, pv), 75 * FX);
+        }
+        sum = valueBetween(yieldValue(t.view, t.seat, x, 'YIELD_PRODUCTION'), t.start, t.horizon, t.rate);
+        break;
+      }
+      case 'GOVERNMENTBONUS_GOLD_PURCHASES': {
+        if (t.seat === FREE_SEAT) return 0;
+        const half = fxConst(0.5);
+        const banked = yieldValue(t.view, t.seat, fmul(fmul(fxOf(t.view.treasury(t.seat)), half), a), 'YIELD_GOLD');
+        const income = yieldValue(t.view, t.seat, fmul(fmul(fxOf(t.view.grossGoldYield(t.seat)), half), a), 'YIELD_GOLD');
+        sum = discounted(banked, t.rate, t.start) + valueBetween(income, t.start, t.horizon, t.rate);
         break;
       }
       case 'GOVERNMENTBONUS_COMBAT_EXPERIENCE':

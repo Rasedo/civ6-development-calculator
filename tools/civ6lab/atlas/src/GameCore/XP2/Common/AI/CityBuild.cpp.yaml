@@ -546,7 +546,9 @@
     - cpu/core/aiCityBuild.ts:defaultSpecialization
     - cpu/core/aiCityBuild.ts:specializationBests
     - gpu/core/sim_cityvalue.py:_cv_bests
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...= string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick building if bv>=uv && bv>=pv; else unit if u..."
   context:

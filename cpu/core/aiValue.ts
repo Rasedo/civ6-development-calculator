@@ -245,6 +245,12 @@ export interface AiValueView {
   unitUpgradeGolds(seat: number): readonly number[];
   /** the seat's Influence Points a turn (Player_Influence 0x44c6a0) */
   influencePointsPerTurn(seat: number): number;
+  /** the seat's treasury (Player_Treasury +0xf8) and its gross Gold a turn
+   *  (0x4e0bf0: its cities' Gold before their buildings' Maintenance) */
+  treasury(seat: number): number;
+  grossGoldYield(seat: number): number;
+  /** a unit at the head of the city's build queue (0x179860 on city +0x2170) */
+  cityTrainingUnit(seat: number, cityId: number): boolean;
   /** the seat's units in its list's order, their plot, UnitType, whole
    *  Movement (0x56e130) and level (the unit's experience +0x1bc0, its +0x10) */
   playerUnits(seat: number): readonly { plot: number; type: string; moves: number; level: number }[];

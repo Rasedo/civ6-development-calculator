@@ -563,6 +563,40 @@ class SimPolicy:
                 p = "PSEUDOYIELD_WONDER"
                 pv = self._cv_pseudo(full(pct), p, f0.pseudo_w(p))
                 return between(_fmul(best, pv)) >> 8
+            if bonus in ("GOVERNMENTBONUS_OVERALL_PRODUCTION", "GOVERNMENTBONUS_UNIT_PRODUCTION", "GOVERNMENTBONUS_GOLD_PURCHASES"):
+                # the Free Cities' not read
+                if ctx["s"] == self.FR:
+                    return zero
+                s = ctx["s"]
+
+                def fx(x):
+                    return torch.floor(torch.as_tensor(x, dtype=torch.float64, device=dev) * _FX + 0.5).long().expand(B)
+                if bonus == "GOVERNMENTBONUS_GOLD_PURCHASES":
+                    # 0.5 x the treasury x the Amount as Gold, discounted from
+                    # the start; 0.5 x the gross Gold a turn (the city's
+                    # before its buildings' Maintenance) x the Amount, between
+                    half = full(_fx_const(0.5))
+                    alive = self.citystate_alive[:, s]
+                    banked = _fmul(_fmul(fx(self.citystate_treasury[:, s]), half), full(pct))
+                    maint = self._seat_housing(ctx["row"])[0][:, 0].double()
+                    gross = torch.where(alive, torch.as_tensor(f0.city_yield("YIELD_GOLD"), dtype=torch.float64, device=dev) + maint,
+                                        torch.zeros(B, dtype=torch.float64, device=dev))
+                    income = _fmul(_fmul(fx(gross), half), full(pct))
+                    w = f0.yield_w("YIELD_GOLD")
+                    return (_discounted(self._cv_yield(banked, "YIELD_GOLD", w), T["rate"], t0)
+                            + between(self._cv_yield(income, "YIELD_GOLD", w))) >> 8
+                prod = fx(f0.city_yield("YIELD_PRODUCTION"))
+                prod = torch.where(self.citystate_alive[:, s], prod, zero)
+                x = _fmul(full(pct), prod)
+                if bonus == "GOVERNMENTBONUS_UNIT_PRODUCTION":
+                    # the cities with a unit in hand; x min(PSEUDOYIELD_UNIT_COMBAT
+                    # of 1.0, 2.0), at most 75.0
+                    it = self.citystate_item[:, s]
+                    x = torch.where((it >= 0) & (it < self._mk_b0), x, zero)
+                    p = "PSEUDOYIELD_UNIT_COMBAT"
+                    pv = self._cv_pseudo(full(_FX), p, f0.pseudo_w(p)).clamp(max=2 * _FX)
+                    x = _fmul(x, pv).clamp(max=75 * _FX)
+                return between(self._cv_yield(x, "YIELD_PRODUCTION", f0.yield_w("YIELD_PRODUCTION"))) >> 8
             if bonus == "GOVERNMENTBONUS_COMBAT_EXPERIENCE":
                 pre = "barb" if ctx["s"] == self.FR else "major"
                 n = (getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == ctx["seat"])).long().sum(dim=1)

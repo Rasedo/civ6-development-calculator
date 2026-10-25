@@ -1554,7 +1554,20 @@ class _MinorFacts:
     # the value view: a minor's yields at their DefaultValue, its district
     # pseudo-yield at 0.5 x its era's chronology
     def yield_w(self, y):
-        return 0
+        """`yieldWeights`: the Economic AI's Gold boost alone (0x687bf0, -0.2
+        x the gold a turn while it is below 0: the city's net Gold less its
+        units' Maintenance); a city-state carries no Yields list"""
+        if y != "YIELD_GOLD":
+            return 0
+
+        def build():
+            sim = self.sim
+            mine = self._mine()
+            up = (sim._unit_maintenance(sim.major_unit_type, sim.major_unit_formation, sim.major_unit_levied).double() * mine.double()).sum(dim=1)
+            gpt = self._total(2) - up
+            return torch.where(gpt < 0, _fmul(torch.full_like(gpt, _fx_const(-0.2), dtype=torch.long), _fx_const_t(gpt)),
+                               torch.zeros_like(gpt, dtype=torch.long))
+        return self._get("gold_w", build)
 
     def pseudo_w(self, p):
         if p == "PSEUDOYIELD_DISTRICT":
