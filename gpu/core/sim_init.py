@@ -4098,6 +4098,10 @@ class SimInit:
         self.tribe_name = torch.zeros(B, self.KT, dtype=torch.long, device=device)
         self.tribe_spawn = torch.zeros(B, self.KT, dtype=torch.long, device=device)
         self.tribe_scoutc = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        # each tribe's counts its turn reads (+0x34 its melee and ranged units,
+        # +0x28 its scouts): raised less lost in battle
+        self.tribe_unitn = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        self.tribe_scoutn = torch.zeros(B, self.KT, dtype=torch.long, device=device)
         self.n_tribes = torch.zeros(B, dtype=torch.long, device=device)
         self.barb_camps_begun = torch.zeros(B, dtype=torch.bool, device=device)
         self.barb_techs = torch.zeros(B, len(rules.t_cost), dtype=torch.bool, device=device)

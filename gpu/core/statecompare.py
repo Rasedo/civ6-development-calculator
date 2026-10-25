@@ -339,7 +339,7 @@ def _gov_values_row(sim, b: int, s: int) -> list:
 def _barb_tribes_row(sim, b: int) -> list[int]:
     """`barbTribes`: whether the camp step has added once, each tribe in order
     (plot, alive, kind, name, its two clocks, the living units and scouts it
-    raised), then the barbarians' techs and civics, each behind its length."""
+    raised, its two counts), then the barbarians' techs and civics, each behind its length."""
     lo, hi = sim.POOL_LO["barb"], sim.POOL_HI["barb"]
     alive = sim.unit_alive[b, lo:hi].tolist()
     tribe = sim.barb_unit_tribe[b].tolist()
@@ -349,7 +349,8 @@ def _barb_tribes_row(sim, b: int) -> list[int]:
         units = sum(1 for a, t, sc in zip(alive, tribe, scout) if a and t == k and not sc)
         scouts = sum(1 for a, t, sc in zip(alive, tribe, scout) if a and t == k and sc)
         row += [int(sim.tribe_plot[b, k]), int(sim.tribe_alive[b, k]), int(sim.tribe_kind[b, k]),
-                int(sim.tribe_name[b, k]), int(sim.tribe_spawn[b, k]), int(sim.tribe_scoutc[b, k]), units, scouts]
+                int(sim.tribe_name[b, k]), int(sim.tribe_spawn[b, k]), int(sim.tribe_scoutc[b, k]), units, scouts,
+                int(sim.tribe_unitn[b, k]), int(sim.tribe_scoutn[b, k])]
         # the raid and the city assault
         queue = [int(x) for x in sim.tribe_queue[b, k].tolist() if x >= 0]
         raidq = [int(x) for x in sim.tribe_raidq[b, k].tolist() if x >= 0]

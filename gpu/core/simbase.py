@@ -1168,7 +1168,7 @@ _MUTABLE = [
     "next_slot", "camp_tile", "n_camps", "game_over",
     # the barbarians' tribes, their techs and civics, and the tribe each of
     # their units was raised by (`cpu/core/barbarians.ts`)
-    "tribe_plot", "tribe_alive", "tribe_kind", "tribe_name", "tribe_spawn", "tribe_scoutc", "n_tribes",
+    "tribe_plot", "tribe_alive", "tribe_kind", "tribe_name", "tribe_spawn", "tribe_scoutc", "tribe_unitn", "tribe_scoutn", "n_tribes",
     "barb_camps_begun", "barb_techs", "barb_civics", "barb_unit_tribe", "barb_unit_scout",
     # their raids, city assaults and scouts' trees (`tribeTurn`, `barbarianOps.ts`, `barbScoutLook`)
     "tribe_bold", "tribe_every", "tribe_queue", "tribe_raidq", "tribe_assq", "tribe_home_slot", "tribe_home_seat",

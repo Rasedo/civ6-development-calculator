@@ -3,6 +3,15 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x143d80
+  final: 0xd9500
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...a support unit (formation class 1) +0x34 by one (no other write to +0x28 or +0x34 in 0x144000..0x156000). A unit gone any other way — disbanded, converted or captured — still counts..."
+  review: imported
 - addr: 0x144260
   final: 0xd98c0
   kind: function
@@ -20,6 +29,63 @@
   context:
     - "...own). Barbarian Recruit (0x7c7580) under a Turn Limiter (10 / 15): the force's counts (0x144610, each class the barbarians cannot raise dropped, 0x147e70); the units it finds join, su..."
   review: imported
+- addr: 0x144940
+  final: 0xd9f20
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...counts, not its living units: +0x34 (zeroed at the tribe's init 0x147fc0, the defender 0x144940 uncounted) grows by each unit the melee and ranged raises place (0x144b20 / 0x144bf0 at..."
+  review: imported
+- addr: 0x144b20
+  final: 0xda100
+  kind: function
+  status: PARTLY
+  impl: [cpu/harness/replay.ts:adoptByTribe]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the defender 0x144940 uncounted) grows by each unit the melee and ranged raises place (0x144b20 / 0x144bf0 at 0x144bb8 / 0x144c88), the operation's asked units (0x144fb0 straight, 0x1...
+  review: imported
+- addr: 0x144bf0
+  final: 0xda1d0
+  kind: function
+  status: PARTLY
+  impl: [cpu/harness/replay.ts:adoptByTribe]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...er 0x144940 uncounted) grows by each unit the melee and ranged raises place (0x144b20 / 0x144bf0 at 0x144bb8 / 0x144c88), the operation's asked units (0x144fb0 straight, 0x148af1) and...
+  review: imported
+- addr: 0x144cc0
+  final: 0xda2a0
+  kind: function
+  status: PARTLY
+  impl: [cpu/harness/replay.ts:adoptByTribe]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...and the siege and support raises (0x144e00 / 0x144ed0) uncounted; +0x28 by each scout 0x144cc0 places (0x144dc4). Only a battle lowers them (0x1540b0 -> 0x148e90, the dead unit the b...
+  review: imported
+- addr: 0x144e00
+  final: 0xda3e0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...operation's asked units (0x144fb0 straight, 0x148af1) and the siege and support raises (0x144e00 / 0x144ed0) uncounted; +0x28 by each scout 0x144cc0 places (0x144dc4). Only a battle lo...
+  review: imported
+- addr: 0x144ed0
+  final: 0xda4b0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...asked units (0x144fb0 straight, 0x148af1) and the siege and support raises (0x144e00 / 0x144ed0) uncounted; +0x28 by each scout 0x144cc0 places (0x144dc4). Only a battle lowers them...
+  review: imported
 - addr: 0x144fb0
   final: 0xda590
   kind: function
@@ -28,7 +94,9 @@
     - cpu/core/barbarians.ts:raise
     - cpu/core/barbarianOps.ts:missing
     - cpu/core/barbarians.ts:tribeTurn
-  readings: ["H-1: the raids — READ"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x147470
@@ -176,8 +244,14 @@
   final: 0xdce10
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:barbBattleBoldness, cpu/data/barbarians.ts:BARB_BOLD_TURN]
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
+  impl:
+    - cpu/core/barbarians.ts:barbBattleBoldness
+    - cpu/data/barbarians.ts:BARB_BOLD_TURN
+    - gpu/core/sim_barb.py:_barb_battle_boldness
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ARBARIAN_BOLDNESS_PER_TURN (2) each tribe turn (0x148ca3); a battle's dead (0x1540b0 -> 0x148e90: the defender dead, else the attacker): an enemy a tribe's unit killed +PER_KILL (15),..."

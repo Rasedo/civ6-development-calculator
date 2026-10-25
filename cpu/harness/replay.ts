@@ -630,10 +630,15 @@ function adoptByTribe(state: GameState, u: Unit): void {
     return;
   }
   // a galley is a naval tribe's scout where it lacks one, else its unit
-  if (scout && (def.recon || !best.scouts.some((id) => state.units.some((x) => x.id === id)))) best.scouts.push(u.id);
-  else {
+  // each counted as its tribe's raise counts it (0x144cc0 a scout, 0x144b20
+  // / 0x144bf0 a melee or ranged unit; a siege or support unit uncounted)
+  if (scout && (def.recon || !best.scouts.some((id) => state.units.some((x) => x.id === id)))) {
+    best.scouts.push(u.id);
+    best.scoutCount += 1;
+  } else {
     best.units.push(u.id);
     (best.fresh ??= []).push(u.id);
+    if (unitDomain(u.type) === 'military' && def.bombard === undefined) best.unitCount += 1;
   }
 }
 

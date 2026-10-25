@@ -1683,6 +1683,22 @@ clans' 0x8e1bf0 (no clans in these games).
   scaled) and resets; under 5 units "Barbarian Ranged unit roll" rand(100) <
   PercentRangedUnits (BARBARIAN_NAVAL_2 100) picks ranged, else melee; off a
   spawn turn a tribe short of its 1 scout counts 5 turns and raises one.
+  THE COUNTS (READ): "under 5 units" and "short of its scout" read the
+  tribe's own counts, not its living units: +0x34 (zeroed at the tribe's
+  init 0x147fc0, the defender 0x144940 uncounted) grows by each unit the
+  melee and ranged raises place (0x144b20 / 0x144bf0 at 0x144bb8 /
+  0x144c88), the operation's asked units (0x144fb0 straight, 0x148af1) and
+  the siege and support raises (0x144e00 / 0x144ed0) uncounted; +0x28 by
+  each scout 0x144cc0 places (0x144dc4). Only a battle lowers them
+  (0x1540b0 -> 0x148e90, the dead unit the barbarians'): a scout (AI type
+  +0x1c0 2) +0x28 by one and its wait +0x2c to 0; any other but a support
+  unit (formation class 1) +0x34 by one (no other write to +0x28 or +0x34
+  in 0x144000..0x156000). A unit gone any other way — disbanded, converted
+  or captured — still counts, so its tribe raises none in its place (runs/h1_dueld*
+  full games: the engines' extra recon units 92 of the barb.unit misses).
+  The engines: `BarbTribe.unitCount` / `scoutCount` (`tribeTurn`,
+  `raiseCamp`, `barbBattleBoldness`; the replay's `adoptByTribe` counts a
+  recorded raise) / `tribe_unitn` / `tribe_scoutn`.
 - Raids: "H-1: the raids" below.
 
 LAB: the max camps at +0x110 is taken as 3 per living major, a fit to the

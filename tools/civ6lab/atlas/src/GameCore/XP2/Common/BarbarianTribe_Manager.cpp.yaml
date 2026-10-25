@@ -269,7 +269,10 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/barbarians.ts:barbBattleBoldness]
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e +0x20): +BARBARIAN_BOLDNESS_PER_TURN (2) each tribe turn (0x148ca3); a battle's dead (0x1540b0 -> 0x148e90: the defender dead, else the attacker): an enemy a tribe's unit killed +PER..."

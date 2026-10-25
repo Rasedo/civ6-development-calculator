@@ -26,7 +26,7 @@ import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, allCities, campTiles, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
 import { losDisk, unitSight, unitSeesThrough } from './fog';
-import { spawnUnit, tileFreeForUnit } from './units';
+import { spawnUnit, tileFreeForUnit, unitDomain } from './units';
 import { UNITS } from '../data/units';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -286,7 +286,7 @@ export function foundTribe(state: GameState, plot: number, name: number): BarbTr
   const def = tribeKindAt(state, plot);
   const tribe: BarbTribe = {
     plot, alive: true, kind: def.kind, name,
-    spawnTurns: 0, scoutTurns: 0, units: [], scouts: [],
+    spawnTurns: 0, scoutTurns: 0, units: [], scouts: [], unitCount: 0, scoutCount: 0,
   };
   tribesOf(state).push(tribe);
   if (!state.barbSeat.camps.includes(plot)) state.barbSeat.camps.push(plot);
@@ -310,7 +310,9 @@ export function raiseCamp(state: GameState, plot: number): void {
   const name = names.length ? names[randRange(state, names.length, 'Barb Tribe Roll')] : 0;
   const tribe = foundTribe(state, plot, name);
   tribe.defender = raise(state, tribe, def.defenderTag, 0, 1)[0];
-  tribe.scouts.push(...raise(state, tribe, def.scoutTag, 3, BARB_MAX_SCOUTS));
+  const scouts = raise(state, tribe, def.scoutTag, 3, BARB_MAX_SCOUTS);
+  tribe.scouts.push(...scouts);
+  tribe.scoutCount += scouts.length;
 }
 
 /** the plots `radius` round `plot` in the game's ring order (0x69010): the
@@ -372,12 +374,6 @@ function raise(state: GameState, tribe: BarbTribe, tag: BarbTag, radius: number,
   return out;
 }
 
-/** a tribe's unit still stands AND is still the barbarians': one that
- *  changed sides (a conversion, a capture) is its new owner's unit, no
- *  longer the tribe's */
-const alive = (state: GameState, id: number) => state.units.some((u) => u.id === id && isBarbSeat(u.seat));
-const living = (state: GameState, ids: number[]) => ids.filter((id) => alive(state, id)).length;
-
 /** the tribe that raised a unit */
 function tribeOfUnit(state: GameState, id: number): BarbTribe | undefined {
   return tribesOf(state).find((tr) => tr.units.includes(id) || tr.scouts.includes(id));
@@ -397,11 +393,12 @@ export function raidBoldness(tribe: BarbTribe): number {
  * A TRIBE'S TURN (0x1488a0): its spawn clock runs; at its interval — the
  * tribe's TurnsToWarriorSpawn at the speed, or the SpawnRate its operation
  * set — it resets and raises the first unit its operation asked for (its
- * class's best unit now, 0x144fb0 -> 0x147470), else,
- * while the tribe holds fewer than its NumMilitary, one unit within a plot of
+ * class's best unit now, 0x144fb0 -> 0x147470, uncounted), else,
+ * while its count (+0x34) is under its NumMilitary, one unit within a plot of
  * the camp — ranged when "Barbarian Ranged unit roll" falls under
- * PercentRangedUnits, else melee. A turn the clock does not strike, a tribe
- * short of scouts counts toward one, raised within two plots on the fifth.
+ * PercentRangedUnits, else melee —, counted. A turn the clock does not
+ * strike, a tribe whose scout count (+0x28) is short counts toward one,
+ * raised within two plots on the fifth.
  * Then its Boldness grows, its operation is forgotten once gone, and the
  * cities it waits to go after are tried: a city assault at
  * CityAttackBoldness, else a raid at RaidingBoldness.
@@ -416,17 +413,20 @@ function tribeTurn(state: GameState, tribe: BarbTribe): void {
       const ids = raise(state, tribe, tribe.queue.shift()!, 1, 1);
       tribe.units.push(...ids);
       tribe.fresh.push(...ids);
-    } else if (living(state, tribe.units) < BARB_MAX_UNITS) {
+    } else if (tribe.unitCount < BARB_MAX_UNITS) {
       const pct = barbNameRangedPct(tribe.kind, tribe.name) ?? def.rangedPct;
       const ranged = randRange(state, 100, 'Barbarian Ranged unit roll') < pct;
       const ids = raise(state, tribe, ranged ? def.rangedTag : def.meleeTag, 1, 1);
       tribe.units.push(...ids);
       tribe.fresh.push(...ids);
+      tribe.unitCount += ids.length;
     }
-  } else if (living(state, tribe.scouts) < BARB_MAX_SCOUTS) {
+  } else if (tribe.scoutCount < BARB_MAX_SCOUTS) {
     tribe.scoutTurns += 1;
     if (tribe.scoutTurns >= BARB_SCOUT_WAIT) {
-      tribe.scouts.push(...raise(state, tribe, def.scoutTag, 2, 1));
+      const ids = raise(state, tribe, def.scoutTag, 2, 1);
+      tribe.scouts.push(...ids);
+      tribe.scoutCount += ids.length;
       tribe.scoutTurns = 0;
     }
   }
@@ -525,7 +525,17 @@ export function barbBattleBoldness(state: GameState, attacker: Unit, defender: U
     if (tr) tr.boldness = (tr.boldness ?? 0) + BARB_BOLD_KILL;
   } else if (isBarbSeat(victim.seat) && !isBarbSeat(killer.seat)) {
     const tr = tribeOfUnit(state, victim.id);
-    if (tr) tr.boldness = (tr.boldness ?? 0) + (tr.scouts.includes(victim.id) ? BARB_BOLD_SCOUT_LOST : BARB_BOLD_UNIT_LOST);
+    if (!tr) return;
+    // the counts its turn reads fall (0x148e90): a scout's, its wait begun
+    // again; any other's but a support unit's
+    if (tr.scouts.includes(victim.id)) {
+      tr.boldness = (tr.boldness ?? 0) + BARB_BOLD_SCOUT_LOST;
+      tr.scoutCount -= 1;
+      tr.scoutTurns = 0;
+    } else {
+      tr.boldness = (tr.boldness ?? 0) + BARB_BOLD_UNIT_LOST;
+      if (unitDomain(victim.type) !== 'support') tr.unitCount -= 1;
+    }
   }
 }
 

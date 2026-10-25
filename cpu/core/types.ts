@@ -648,6 +648,11 @@ export interface BarbTribe {
   /** the ids of the units and scouts it raised */
   units: number[];
   scouts: number[];
+  /** the tribe's counts its turn reads (+0x34, +0x28): each melee or ranged
+   *  unit and each scout it raised, less each lost in battle — a unit gone
+   *  any other way still counts */
+  unitCount: number;
+  scoutCount: number;
   /** the camp's defender it raised first (the AI's DEFENDER while the camp
    *  stands, which keeps the camp) */
   defender?: number;

@@ -571,6 +571,7 @@ const GAME: Record<string, Extractor> = {
     return [[s.barbCampsBegun ? 1 : 0, tribes.length, ...tribes.flatMap((t) => [t.plot, t.alive ? 1 : 0,
       BARB_TRIBES.findIndex((d) => d.kind === t.kind), t.name, t.spawnTurns, t.scoutTurns,
       t.units.filter((id) => live.has(id)).length, t.scouts.filter((id) => live.has(id)).length,
+      t.unitCount, t.scoutCount,
       // the raid and the city assault: Boldness, the interval set, the units
       // asked for, the cities waited for (their owners), the scout's tree
       // (`barbHomingRecord`)
