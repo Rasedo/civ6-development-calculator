@@ -25,6 +25,7 @@ import { isWater, isImpassable } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, allCities, campTiles, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
+import { suzerainOf } from './cityStates';
 import { losDisk, unitSight, unitSeesThrough } from './fog';
 import { spawnUnit, tileFreeForUnit, unitDomain } from './units';
 import { UNITS } from '../data/units';
@@ -63,11 +64,20 @@ export function barbarianTechs(state: GameState): void {
  * THE PLOTS THESE SEATS SEE NOW: each unit's sight across the plots its
  * line reaches (`losDisk`), each city's centre two plots round, each
  * owned plot with its ring, and — the barbarians' — each camp with its ring
- * (the improvement's owner, `CAMP_SIGHT`). A LAB reading: the camp step's exclusions fit it
- * (runs/h1_duelw1120-1124 camp draws' ranges), the game's sight rule unread.
+ * (the improvement's owner, `CAMP_SIGHT`). A seat sees what each city-state
+ * it is suzerain of sees: the suzerain update (0x451b20) adds the minor's
+ * outgoing visibility to it (0x508330, Lua AddOutgoingVisibility), its
+ * units' sight and its plots' alike (runs/h1_dueld1128: Barbarians.csv's
+ * "No Visibility" 267 -> 212 the turn China takes Hong Kong, t64, and 49 ->
+ * 88 below the engines' at Granada, t97; the five dueld duels' 1,245
+ * turns: 1,065 equal with the share, 206 without it, the minor's plots alone
+ * 454). A LAB reading: the camp step's exclusions fit it (runs/h1_duelw1120-1124
+ * camp draws' ranges), the game's sight rule unread.
  */
-export function plotsSeenNow(state: GameState, seats: ReadonlySet<number>): Uint8Array {
+export function plotsSeenNow(state: GameState, given: ReadonlySet<number>): Uint8Array {
   const { map } = state;
+  const seats = new Set(given);
+  for (const cs of state.cityStates) if (cs.centerIndex >= 0 && given.has(suzerainOf(cs))) seats.add(cs.seat);
   const seen = new Uint8Array(map.tiles.length);
   for (const u of state.units) {
     if (!seats.has(u.seat)) continue;

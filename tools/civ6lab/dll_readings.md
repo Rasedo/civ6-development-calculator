@@ -1714,11 +1714,34 @@ clans' 0x8e1bf0 (no clans in these games).
   (`campStep`'s `state.seats.length`; `n_majors`), the majors' and the Free
   Cities' sight (`plotsSeenNow` with FREE_SEAT; `_barb_seen("fullciv")`).
 
+- THE UNSEEN LAND (READ): the camp step counts the land plots (0x834d0 not
+  water) on which 0x50b2d0 finds no player of the class seeing: per living
+  player of the list (+0x50) its team's visibility (the visibility
+  manager's +0x30 by the player's team +0x128, or +0x48 / +0x50) count
+  array +0x290 above 0 at the plot — what the team sees now, not what it
+  revealed. Barbarians.csv logs it each turn ("Land Plots", "No
+  Visibility"). The counts' writers (0x508d50): a unit's sight walk
+  (0x58f3f0 -> 0x58b1d0), a plot's owner on the plot and its six
+  neighbours (SetOwner 0x84760), an improvement's owner (0x362ec0 ->
+  0x84340, the camp's ring); and a player's outgoing visibility added to
+  another's (0x508330, Lua AddOutgoingVisibility) by the suzerain's update
+  (0x451b20, "Attempting to update the suzerain") and by alliances
+  (0x2ab4f0, "Permanently Allied" 0x2aba80): a major sees what each
+  city-state it is suzerain of sees, the minor's units' sight with its
+  plots'. runs/h1_dueld1128: "No Visibility" 267 -> 212 the turn China
+  takes Hong Kong (t64), 49 -> 88 below the engines' when it takes Granada
+  (t97), the gap again at Bologna (t242). `cpu/harness/sightLab.ts` (the
+  engines' unseen land of each record against the log), the five dueld
+  duels' 1,245 turns: 206 equal without the share, 454 with the minors'
+  plots alone, 1,065 with their whole sight (the residue a turn's moves:
+  1128 t25's +28 the turn China's reveals take Hong Kong's centre and
+  ring). The engines:
+  `plotsSeenNow` (a seat's suzerain city-states join it), the GPU's
+  `_barb_seen` (`shared`, per game). Alliances' share is not ported (no
+  alliance in the recorded duels).
 LAB: the sight the score and the target read is the engines' line of sight
-plus each centre's two rings and each owned plot's ring — a fit.
-runs/h1_dueld1128 t162-t166: the engines' unseen land 187-196 of 363 against
-the 181 or fewer the game's no new camp needs (6 x unseen / 363 less the 2
-standing camps), each turn a camp the record never holds.
+plus each centre's two rings and each owned plot's ring and the shares
+above — a fit, its unit and plot writers read.
 
 ### The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported
 

@@ -45,11 +45,13 @@ class SimBarb:
         barbarians alone ("barbarians") or one seat (`who` its absolute seat)
         see now — each unit's sight across the plots its line reaches, each
         city centre two plots round, each owned plot with its ring, and the
-        barbarians' camps with theirs (`CAMP_SIGHT`)."""
+        barbarians' camps with theirs (`CAMP_SIGHT`); a seat sees what each
+        city-state it is suzerain of sees (the minor's outgoing visibility,
+        0x508330)."""
         B, T = self.B, self.T
         seen = torch.zeros(B, T, dtype=torch.bool, device=self.device)
 
-        def seer(seat: torch.Tensor) -> torch.Tensor:
+        def given(seat: torch.Tensor) -> torch.Tensor:
             if isinstance(who, int):
                 return seat == who
             if who == "majors":
@@ -59,6 +61,19 @@ class SimBarb:
             if who == "barbarians":
                 return seat == BARB_SEAT
             return seat >= 0
+
+        # the city-states a seat of `who` is suzerain of, per game: [B, S]
+        shared = (self.citystate_alive[:, :self.S] & (self.citystate_center[:, :self.S] >= 0)
+                  & given(self.citystate_suzerain[:, :self.S])) if self.S > 0 else None
+
+        def seer(seat: torch.Tensor) -> torch.Tensor:
+            out = given(seat)
+            if shared is not None and bool(shared.any()):
+                cs = seat - 100
+                inr = (cs >= 0) & (cs < self.S)
+                hit = shared.gather(1, cs.clamp(min=0, max=max(self.S - 1, 0)).reshape(B, -1)).reshape(seat.shape)
+                out = out | (inr & hit)
+            return out
 
         live = self.unit_alive & seer(self.unit_seat)
         for u in live.any(dim=0).nonzero(as_tuple=True)[0].tolist():
