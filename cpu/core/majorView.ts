@@ -934,7 +934,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       if (!city) return null;
       const hp = districtHealth(state, p);
       return {
-        defense: cityDefenseStrength(state, city), garrison: garrisonTerm(state, city), damaged: !!hp && hp.hp < hp.max,
+        defense: cityDefenseStrength(state, city, false), garrison: garrisonTerm(state, city), damaged: !!hp && hp.hp < hp.max,
         districts: city.districts.length, capital: held ? city.isCapital : true,
         wonder: city.wonders.some((w) => state.map.tiles[w.tileIndex].builtWonderComplete), population: city.population,
       };

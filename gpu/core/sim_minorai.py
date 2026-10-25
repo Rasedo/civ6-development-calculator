@@ -472,7 +472,8 @@ class SimMinorAi:
         B, dev = self.B, self.device
         T = self._cv_tables()
         rows = T["unit_rows"]
-        dcs = self._city_defense_cs(hrow, hcol)[0]
+        # D holds no garrison (GetDefenseStrength with its flag set)
+        dcs = self._city_defense_cs(hrow, hcol, False)[0]
         d = dcs * _FX
         # the centre's garrison term (0x24a180) the margin over a full civ
         # not hostile reads

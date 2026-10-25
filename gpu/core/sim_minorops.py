@@ -432,8 +432,8 @@ class SimMinorOps:
     def _mops_unit_rows(self, s: int, u: dict) -> dict:
         """`seatUnitRows` for holder `s` (the military AI's unit production
         entries as the unit choice reads them, `unitProductionEntries`): per
-        AI unit row [B, NU] the entry, obsolete, buildable, the at-war and
-        every player's sums (24.8), the strength"""
+        AI unit row [B, NU] the entry, obsolete, buildable, maintained, the
+        at-war and every player's sums (24.8), the strength"""
         T = self._cv_tables()
         rows = T["unit_rows"]
         E = T["engine"]
@@ -448,7 +448,10 @@ class SimMinorOps:
                                   dtype=torch.bool, device=dev)
             strength = torch.tensor([max(int(r["combat"]), int(r["rangedCombat"])) for r in rows], dtype=torch.long, device=dev)
             res = torch.tensor([E["resource"].get(r["resource"], -2) if r["resource"] else -1 for r in rows], dtype=torch.long, device=dev)
-            cache = self._mops_rows_static = {"version": version, "combat": combat, "strength": strength, "res": res}
+            mres = torch.tensor([E["resource"].get(r["maintenanceResource"], -2) if r["maintenanceResource"] else -1
+                                 for r in rows], dtype=torch.long, device=dev)
+            cache = self._mops_rows_static = {"version": version, "combat": combat, "strength": strength, "res": res,
+                                              "mres": mres}
         techs, civics = self.citystate_techs[:, s], self.citystate_civics[:, s]
 
         def holds(nm: str) -> torch.Tensor:
@@ -468,14 +471,30 @@ class SimMinorOps:
             for nm in (r["tech"], r["civic"]):
                 if nm:
                     buildable[:, k] &= holds(nm)
-        # a StrategicResource the minor owns a plot of
+        # a StrategicResource the minor's stock less its reservations holds
+        # (0x7989e0 at 0x798d11: 0x4aa790, ownership 0, the reservations off)
         res = cache["res"]
+        srow = self._CITY_MINOR0 + s
         if bool((res >= 0).any()):
-            seat = self._mops_seat(s)
-            mine = self.tile_seat == seat
+            free = self._stock_bank(srow) - self._stock_reserved(srow)
             for k in (res >= 0).nonzero(as_tuple=True)[0].tolist():
-                buildable[:, k] &= (mine & (self.res_id == int(res[k]))).any(dim=1)
+                slot = int(self._strat_slot_of[int(res[k])])
+                if slot >= 0:
+                    buildable[:, k] &= free[:, slot] > 0
+                else:
+                    buildable[:, k] = False
         buildable &= res != -2
+        # the maintenance resource's turn income above its units' fuel bill
+        # (0x79c277: Player_Resources +0x350 against 0x4ab270)
+        mres = cache["mres"]
+        maintained = torch.ones(B, nu, dtype=torch.bool, device=dev)
+        if bool((mres >= 0).any()):
+            income = self._seat_stock_income(srow)
+            bill = self._unit_upkeep_bill(srow)
+            for k in (mres >= 0).nonzero(as_tuple=True)[0].tolist():
+                slot = int(self._strat_slot_of[int(mres[k])])
+                if slot >= 0:
+                    maintained[:, k] &= income[:, slot] > bill[:, slot]
         # the minor's own units by row
         own = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
         own.scatter_add_(1, torch.where(u["own"] & (u["row"] >= 0), u["row"], torch.full_like(u["row"], nu)), u["own"].long())
@@ -494,20 +513,22 @@ class SimMinorOps:
         n_all = torch.where(opp, n_all, torch.zeros_like(n_all))
         n_war = torch.where(opp, n_war, torch.zeros_like(n_war))
         eff_t = T["eff"].to(dev).t()                                  # [opposing, entry]
-        return {"entry": entry, "obsolete": obsolete, "buildable": buildable, "all": n_all @ eff_t, "war": n_war @ eff_t,
+        return {"entry": entry, "obsolete": obsolete, "buildable": buildable, "maintained": maintained,
+                "all": n_all @ eff_t, "war": n_war @ eff_t,
                 "strength": cache["strength"].unsqueeze(0).expand(B, -1)}
 
     def _mops_fits(self, rows: dict, need: torch.Tensor, full: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """per entry [B, NU]: it may be chosen for the team's needed types
         `need` and full ones `full` ([B, NAT]) — standing, of a needed type, of
-        no full one — and whether a needed type it carries is a Priority one"""
+        no full one, maintained — and whether a needed type it carries is a
+        Priority one"""
         Tm = self._mops_tables()
         ua = Tm.unit_ai.to(self.device).to(torch.long)                  # [NU, NAT]
         pr = Tm.prio.to(self.device)
         matched = (need.long() @ ua.t()) > 0
         prio = ((need & pr.unsqueeze(0)).long() @ ua.t()) > 0
         fullh = (full.long() @ ua.t()) > 0
-        ok = rows["entry"] & rows["buildable"] & ~rows["obsolete"] & matched & ~fullh
+        ok = rows["entry"] & rows["buildable"] & ~rows["obsolete"] & matched & ~fullh & rows["maintained"]
         return ok, prio & ok
 
     def _mops_choose(self, rows: dict, need: torch.Tensor, full: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:

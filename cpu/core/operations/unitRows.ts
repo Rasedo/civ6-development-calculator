@@ -16,6 +16,7 @@ import { TECHS } from '../../data/techs';
 import { UNITS } from '../../data/units';
 import { engineId } from '../../data/aliases';
 import type { GameState } from '../types';
+import { stockFree, stockpileIncome, strategicSlot, unitUpkeepBill } from '../stockpile';
 
 /** a city-state's version of a unit (player +0x12e8 +0x1c0): a unit it may
  *  train of no trait that a major alone may not train */
@@ -42,8 +43,9 @@ function majorVersion(traits: readonly string[]): (u: string) => string | null {
 /** the entries of `seat` against its knowledge base's counts `knownBy` (per
  *  unit type and player), the game's players `players` and those it fights
  *  `atWar`. A unit is buildable where the seat holds its PrereqTech and
- *  PrereqCivic and owns a plot of its StrategicResource (0x4aa790's owned
- *  count above 0). */
+ *  PrereqCivic (0x4cb590, 0x39d490) and its StrategicResource's stock less
+ *  its reservations is above 0 (0x7989e0 at 0x798d11: 0x4aa790, ownership
+ *  0, the reservations off). */
 export function seatUnitRows(state: GameState, seat: number, knownBy: (unit: string, player: number) => number,
                              players: readonly number[], atWar: (player: number) => boolean): UnitProductionRow[] {
   const s = seatOf(state, seat);
@@ -61,8 +63,8 @@ export function seatUnitRows(state: GameState, seat: number, knownBy: (unit: str
     const t = installType('unit', u.type, 'UNIT_');
     own.set(t, (own.get(t) ?? 0) + 1);
   }
-  const owned = new Set<string>();
-  for (const t of state.map.tiles) if (t.ownerSeat === seat && t.resource) owned.add(t.resource);
+  const income = stockpileIncome(state, seat);
+  const bill = unitUpkeepBill(state, seat);
   return unitProductionEntries({
     isVersion: (u) => version(u) === u,
     obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
@@ -76,7 +78,12 @@ export function seatUnitRows(state: GameState, seat: number, knownBy: (unit: str
       if ((row.tech && !holds(row.tech)) || (row.civic && !holds(row.civic))) return false;
       if (!row.resource) return true;
       const id = engineId('resource', row.resource, 'RESOURCE_', RESOURCES);
-      return !!id && owned.has(id);
+      return !!id && stockFree(state, seat, id) > 0;
+    },
+    maintained: (res) => {
+      const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
+      const k = id ? strategicSlot(id) : -1;
+      return k < 0 || income[k] > bill[k];
     },
   });
 }

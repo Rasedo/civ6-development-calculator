@@ -1195,8 +1195,8 @@ export function districtGarrisonedStrength(state: GameState, city: City, plot: n
  *  paid only while the perimeter stands (runs/h1_duelw1116 t97-104: Beijing
  *  and Chengdu, no walls, read no Bastions; China's walled cities read +6).
  *  A city-state's centre stands on `centreStrength` alone. */
-export function cityDefenseStrength(state: GameState, city: City): number {
-  return centreStrength(state, city) + (outerPool(state, city) > 0 ? getModifiers(state, city.seat).cityDefense : 0)
+export function cityDefenseStrength(state: GameState, city: City, garrisoned = true): number {
+  return centreStrength(state, city, garrisoned) + (outerPool(state, city) > 0 ? getModifiers(state, city.seat).cityDefense : 0)
     + governorSum(state, city, (e) => e.cityDefense);
 }
 

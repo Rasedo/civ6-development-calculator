@@ -8675,7 +8675,12 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   (0x5eadb0) each by its unit row: s = max(Combat +0x48, RangedCombat
   +0x6c, Bombard + 20 where +0x40 is above 0), counted where it bombards,
   where ranged and s above D - 15.0, or s above D - 5.0 (D the centre's
-  GetDefenseStrength, 24.8), an explorer (PSEUDOYIELD_UNIT_EXPLORER) never,
+  GetDefenseStrength, 24.8, without its garrison: 0x5cbd72 calls 0x24ae80
+  with r8b set, which 0x24a180 takes as skipping the garrison term; the
+  garrison stands in the margin alone — runs/h1_dueld1128 Hong Kong
+  t144-148 holds threat 1 through its Man-at-Arms' garrison, its knowledge
+  base's records of China equal to the replay's: Trebuchet 9:8, Crossbowman
+  10:8, Courser 8:10), an explorer (PSEUDOYIELD_UNIT_EXPLORER) never,
   nor a barbarian's (0x484910) of a type in the barbarian manager's list
   (+0x298, its vector +0x2f0; 0x153e40), which its start (0x153720) fills
   with each Units row tagged CLASS_ANTI_CAVALRY — the camps' defenders
@@ -8770,7 +8775,7 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
 - THE UNIT CHOICE (0x79bd30; its check 0x79cba0): over the military AI's
   unit production table (+0x268, entries 0x168 bytes: +0x00 the unit, +0x08
   obsolete, +0x0e PrereqTech and PrereqCivic held and StrategicResource
-  owned, +0x18 max(Combat, RangedCombat), +0x24 the maintenance resource,
+  stocked, +0x18 max(Combat, RangedCombat), +0x24 the maintenance resource,
   +0x2c the at-war players' sum, +0x30 every player's, +0x38 per player),
   sorted (0x7976f0, comparator 0x79d3e0): buildable first, then against
   the player its per-player sum, the at-war sum, the all-player sum, the
@@ -8783,10 +8788,19 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   (the entry's row against the opposing unit's column): AI_Operation.csv's
   "Contract for" names the Warrior Monk where the value's way names the
   Scout (1128, 248 of 580 recruit lines equal against 7). The maintenance
-  resource's stockpile test (player +0x1320 +0x440 / +0x350) is unread.
+  resource's test (0x79c277, after the type tests): an entry whose +0x24
+  is a resource stands only where Player_Resources (player +0x1320) +0x350
+  of it, the turn's income, exceeds +0x440 of it plus the units' fuel bill
+  (0x4ab270: +0x12e8 +0x1168, << 8) — the same sum the turn (0x4a79e0, from
+  DoTurn) sets against +0x350 for its shortage. +0x440 is the power
+  plants' burn: 0x4a72c0, called only by the power pass 0x4a7cc0
+  (xExtraPowerAvailable), adds each burn << 8 to it, 0x4ade20 clears it.
+  The port sets the income against the units' bill alone: no city-state
+  of the five duels stands a power plant.
   The table's +0x0e (0x7989e0 at 0x798cc2): PrereqTech (0x4cb590 on player
   +0x1338), PrereqCivic (0x39d490 on +0x1310) held and the StrategicResource
-  (DB.Units +0x2c8 +0x14) stocked above 0 (0x4aa790); an entry whose
+  (DB.Units +0x2c8 +0x14) stocked above 0 (0x4aa790 at 0x798d11, ownership
+  0: the stock less its reservations), never a plot owned; an entry whose
   prerequisites are unheld is still listed where the signal +0x168
   (0x79ba50) answers. OPEN: runs/h1_duelw1121 city-state 3's Naval
   Superiority asks the Warrior Monk on an empty team (MELEE needed) and the

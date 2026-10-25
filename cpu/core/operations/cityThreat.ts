@@ -94,6 +94,10 @@ function campDefender(type: string): boolean {
  * reads it (0x5cdc50): runs/h1_duelw1103 Hattusa t46 and runs/h1_duelw1105
  * Bandar Brunei t16 cancel their builds with their centres whole.
  */
+/* D, the centre's defense, holds no garrison (0x5cbd72: 0x24ae80 with its
+ * flag set; runs/h1_duelw1128 Hong Kong t146, its Man-at-Arms garrisoned,
+ * stays threatened by China's Trebuchet and Crossbowman, 65 + 40 against
+ * 51 + 20, its knowledge base's records as the game's aimem holds them) */
 export function cityThreat(view: MajorView, seat: number, city: number, inp: ThreatInputs): CityThreat {
   const c = view.cityDefense(city);
   let near = false;

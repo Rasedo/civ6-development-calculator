@@ -45,8 +45,10 @@ export interface UnitProductionFacts {
   players?: readonly number[];
   atWar?(player: number): boolean;
   /** the unit's PrereqTech and PrereqCivic held and its StrategicResource
-   *  owned (0x4aa790) */
+   *  stocked (0x4aa790) */
   buildable?(unit: string): boolean;
+  /** the maintenance resource's income above its fuel bill (absent: yes) */
+  maintained?(resource: string): boolean;
 }
 
 export interface UnitProductionEntry {
@@ -67,6 +69,10 @@ export interface UnitProductionRow extends UnitProductionEntry {
   strength: number;
   /** its Units_XP2 maintenance resource (+0x24), null for none */
   maintenance: string | null;
+  /** the player's turn income of that resource (Player_Resources +0x350)
+   *  above its units' fuel bill of it (+0x12e8 +0x1168, 0x4ab270): the unit
+   *  choice's maintenance test; true for none */
+  maintained: boolean;
 }
 
 const COMBAT_PSEUDO = new Set(['PSEUDOYIELD_UNIT_COMBAT', 'PSEUDOYIELD_UNIT_NAVAL_COMBAT', 'PSEUDOYIELD_UNIT_AIR_COMBAT']);
@@ -123,6 +129,7 @@ export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow
       unit: u.type, value: v, obsolete: f.obsolete(u.type), buildable: f.buildable?.(u.type) ?? false,
       atWar: atWar.get(k)!, all: all.get(k)!, perPlayer: perPlayer.get(k)!, strength: Math.max(u.combat, u.rangedCombat),
       maintenance: u.maintenanceResource,
+      maintained: !u.maintenanceResource || (f.maintained?.(u.maintenanceResource) ?? true),
     };
   });
 }

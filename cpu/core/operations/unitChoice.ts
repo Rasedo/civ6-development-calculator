@@ -40,15 +40,18 @@ function fits(e: UnitProductionRow, need: readonly string[], full: readonly stri
     if (AI_UNIT_AI_PRIORITY.includes(t)) priority = true;
   }
   if (!matched || full.some((t) => hasAiType(e.unit, t))) return { ok: false, priority: false };
+  // the maintenance resource's test (0x79c277): the player's turn income of
+  // it (Player_Resources +0x350) above its units' fuel bill (0x4ab270)
+  if (!e.maintained) return { ok: false, priority: false };
   return { ok: true, priority };
 }
 
 /** 0x79bd30: in the order above against `player`, the first entry that
  *  fits; a later one replaces it where it is a priority one and the chosen
  *  is not, or, neither turning priority off, where both its at-war sum and
- *  its sum over every player pass the chosen's. The maintenance resource's
- *  stockpile test (player +0x1320 +0x440 / +0x350) is unread: every entry
- *  passes it. Null for none. */
+ *  its sum over every player pass the chosen's; an entry with a maintenance
+ *  resource only where the player's income of it passes its units' bill.
+ *  Null for none. */
 export function chooseUnit(rows: readonly UnitProductionRow[], need: readonly string[], full: readonly string[], player: number): string | null {
   let chosen: UnitProductionRow | null = null;
   let chosenPriority = false;

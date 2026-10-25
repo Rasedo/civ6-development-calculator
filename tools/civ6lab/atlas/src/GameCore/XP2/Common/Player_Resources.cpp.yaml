@@ -62,6 +62,21 @@
   context:
     - ...The extra amenities per owned luxury / bonus resource (+0x160 / +0x1c0, the effects' 0x4a7100 / 0x4a70c0) rebuild too.
   review: imported
+- addr: 0x4a72c0
+  final: 0x31e910
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      value: "The sums   the choice reads run the efficiency table the other way from the value's   (the entry's row against the opposing unit's column): AI_Operation.csv's   \"Contract for\" names the Warrior Monk w"
+    - recording: h1_duelw1121
+      turn: 92
+      value: "OPEN: runs/h1_duelw1121 city-state 3's Naval   Superiority asks the Warrior Monk on an empty team (MELEE needed) and the   Trebuchet with its Caravel (the had types), never the Caravel, the Pikeman   "
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  context:
+    - "...from DoTurn) sets against +0x350 for its shortage. +0x440 is the power plants' burn: 0x4a72c0, called only by the power pass 0x4a7cc0 (xExtraPowerAvailable), adds each burn << 8 to..."
+  review: imported
 - addr: 0x4a7400
   kind: function
   status: PARTLY
@@ -102,12 +117,29 @@
     - "- ChangeResourceAmount 0x4a7560 (resource, ownership, amount) rebuilds the allocation at once (0x4a77d4, unless the gam..."
     - "...owned resources off the old suzerain (0x4a91a0) and hands them to the new (0x4a6d90 -> 0x4a7560): a rebuild for the new one. A city-state's own resource change re-hands its copies to..."
   review: imported
+- addr: 0x4a79e0
+  final: 0x31eb90
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      value: "The sums   the choice reads run the efficiency table the other way from the value's   (the entry's row against the opposing unit's column): AI_Operation.csv's   \"Contract for\" names the Warrior Monk w"
+    - recording: h1_duelw1121
+      turn: 92
+      value: "OPEN: runs/h1_duelw1121 city-state 3's Naval   Superiority asks the Warrior Monk on an empty team (MELEE needed) and the   Trebuchet with its Caravel (the had types), never the Caravel, the Pikeman   "
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  context:
+    - "...it plus the units' fuel bill (0x4ab270: +0x12e8 +0x1168, << 8) — the same sum the turn (0x4a79e0, from DoTurn) sets against +0x350 for its shortage. +0x440 is the power plants' burn:..."
+  review: imported
 - addr: 0x4a7cc0
   final: 0x31ed80
   kind: function
   status: PARTLY
   impl: [cpu/core/stockpile.ts:resolveSeatPower, gpu/core/sim_seats.py:_resolve_seat_power]
-  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - ...resource skips it), the copies 0x44eff0 hands a resource's recipients, the power ledger 0x4a7cc0.
   review: imported
@@ -261,6 +293,7 @@
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/stockpile.ts:stockFree
     - gpu/core/sim_minorai.py:_cv_resource_value
+    - gpu/core/sim_minorops.py:_mops_unit_rows
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the goody hut's other gates and the Relic — READ"
@@ -364,8 +397,13 @@
   final: 0x320ba0
   kind: function
   status: PARTLY
+  impl:
+    - cpu/core/aiUnitProduction.ts:UnitProductionRow
+    - cpu/core/operations/unitChoice.ts:fits
+    - gpu/core/sim_minorops.py:_mops_unit_rows
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "...PARTLY READ: the strategic stockpile terms — Player_Resources +0x350 (0x4aa700) against 0x4ab270 (the player's +0x12e8 +0x1168) where their difference is negative, the cap 0x4aabe0 les..."
   review: imported
@@ -502,6 +540,21 @@
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - ...plot's extracted resource changing (0x4ab4d0 from the city, district and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource skips it), the copies 0x44eff0 hands a resource's...
+  review: imported
+- addr: 0x4ade20
+  final: 0x322770
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      value: "The sums   the choice reads run the efficiency table the other way from the value's   (the entry's row against the opposing unit's column): AI_Operation.csv's   \"Contract for\" names the Warrior Monk w"
+    - recording: h1_duelw1121
+      turn: 92
+      value: "OPEN: runs/h1_duelw1121 city-state 3's Naval   Superiority asks the Warrior Monk on an empty team (MELEE needed) and the   Trebuchet with its Caravel (the had types), never the Caravel, the Pikeman   "
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  context:
+    - "...lled only by the power pass 0x4a7cc0 (xExtraPowerAvailable), adds each burn << 8 to it, 0x4ade20 clears it. The port sets the income against the units' bill alone: no city-state of t..."
   review: imported
 - addr: 0x4ae4e0
   final: 0x322f00

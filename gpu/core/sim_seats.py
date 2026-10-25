@@ -13225,7 +13225,8 @@ class SimSeats:
             cs = cs + torch.where(minor, env * self._envoy_city_cs, torch.zeros_like(env))
         return cs
 
-    def _city_defense_cs(self, hrow: torch.Tensor, hcol: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _city_defense_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
+                         garrisoned: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
         """`cityDefenseStrength` for whichever row holds the city, [B] each:
         the centre's standing strength (`_centre_strength`) and — for a MAJOR
         — its government's city-defense effect and CIV6 (Redoubt): "Increase
@@ -13233,7 +13234,7 @@ class SimSeats:
         major = hrow < self.n_majors
         h0 = hrow.clamp(max=self.n_majors - 1)
         wtier = self._walls_tier_at(hrow, hcol)
-        def_cs = self._centre_strength(hrow, hcol)
+        def_cs = self._centre_strength(hrow, hcol, garrisoned)
         # Bastions is EFFECT_ADJUST_CITY_OUTER_DEFENSE: paid while the
         # perimeter stands (`outerPool` above 0)
         hc0 = hcol.clamp(min=0)

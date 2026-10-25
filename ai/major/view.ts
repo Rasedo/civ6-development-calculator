@@ -474,8 +474,9 @@ export interface MajorView extends AiValueView {
    *  city on the plot (the combat simulation 0x213e00 / 0x205720) */
   cityBlowFrom(unitId: number, plot: number): number;
   /** the city centre on the plot as its threat reads it: its defense
-   *  strength (GetDefenseStrength), its garrison term (0x24a180), its
-   *  damage above 0; its districts the centre included
+   *  strength without its garrison (GetDefenseStrength 0x24ae80 with its
+   *  flag set, which skips 0x24a180's garrison), its garrison term
+   *  (0x24a180), its damage above 0; its districts the centre included
    *  (+0x1a60), its capital flag (+0x5e8, a city-state's one city holding
    *  the Palace), a wonder built (0x18e930), its citizens (+0x588); null
    *  where no city stands there */

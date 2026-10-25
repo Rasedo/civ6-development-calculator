@@ -5,7 +5,7 @@ import { chooseUnit, choiceOrder, keepUnit } from '../../../cpu/core/operations/
 import type { UnitProductionRow } from '../../../cpu/core/aiUnitProduction';
 
 const row = (unit: string, over: Partial<UnitProductionRow> = {}): UnitProductionRow => ({
-  unit, value: 256, obsolete: false, buildable: true, atWar: 0, all: 0, perPlayer: new Map(), strength: 20, maintenance: null, ...over,
+  unit, value: 256, obsolete: false, buildable: true, atWar: 0, all: 0, perPlayer: new Map(), strength: 20, maintenance: null, maintained: true, ...over,
 });
 
 describe('the unit choice (0x79bd30)', () => {
