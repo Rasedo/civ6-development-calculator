@@ -140,6 +140,18 @@
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the at..."
   review: imported
+- addr: 0x206f40
+  final: 0x157af0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 9
+      value: "So the blow back reads the unit's own   fortification (runs/h1_duelw1117 t9: city-state 2's Warrior 131073 at 60   health, fortified 2 on 14:10 at the turn's start: 30 taken + 26 back, the   spot kept"
+  readings: ["C-95: Attack Units — READ, ported"]
+  context:
+    - "...ender, still on its own plot). 0x205720(combat, 1, 1) resolves it by the combat's kind (0x206f40 the melee one) on the units as they stand — their damage, promotions and fortification..."
+  review: imported
 - addr: 0x207080
   final: 0x157bb0
   kind: function

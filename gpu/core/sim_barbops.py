@@ -926,10 +926,9 @@ class SimBarbOps:
             ok &= self._type_bombard.take(ut) <= 0
             if not bool(ok.any()):
                 continue
-            rel = ok & ship
-            # a member released ends its turn in the walk that holds it
-            done[b, uc] = torch.where(rel, True, done[b, uc])
-            ok &= ~rel
+            # a ship is released, its turn not done (0x80e39f..0x80e3d8:
+            # collected for 0x73d1f0, no 0x570b40)
+            ok &= ~ship
             # a land unit afloat to its safe plot
             to_safe(us, ok & ~ship & wat)
             ok &= self._bop_live(us)

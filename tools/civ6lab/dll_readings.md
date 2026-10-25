@@ -5856,13 +5856,24 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   re-simulated (0x205720 with the combat's sides swapped through 0x213e00,
   the location the spot) into +0x94 / +0xac. MOVE TO SAFETY's test
   (0x77a4b0): a unit with damage, less than half lost, holds; half or more
-  flees unless `wins`. AGAINST THE LOG (unresolved, the simulation's inputs
-  unread): runs/h1_duelw1117 t9, city-state 2's Warrior 131073 at 60
-  health, ours 30 taken + 33 back against the camp's Warrior (19 damage),
-  the spot dropped; the game attacks (CombatLog t9). t10, the Warrior at 8
-  health beside the camp's Warrior at 27: ours deals 30 (10.82 against
-  10.73), `wins`, and holds; the game flees ("Move to safety, Current
-  Danger: 20").
+  flees unless `wins`. THE SIMULATION'S INPUTS (READ): the combat object
+  (0x213ab0) takes its two sides through 0x213e00(combat, side, unit) —
+  the unit, its owner and id (+0x2e0, +0x100) and its location, the plot it
+  stands on now (+0x220 / +0x224, at +0x90 + side x 0x48) — and the combat's
+  plot at +0x48: the forward blow the target's entry plot, the blow back
+  each spot in turn, the sides swapped (the target from combat +8 the
+  attacker, the unit the defender, still on its own plot). 0x205720(combat,
+  1, 1) resolves it by the combat's kind (0x206f40 the melee one) on the
+  units as they stand — their damage, promotions and fortification
+  untouched by the forward result. So the blow back reads the unit's own
+  fortification (runs/h1_duelw1117 t9: city-state 2's Warrior 131073 at 60
+  health, fortified 2 on 14:10 at the turn's start: 30 taken + 26 back, the
+  spot kept, the attack logged and fought, CombatLog t9). The replay's
+  minors' copy reads each unit's turn-start fortification from the first
+  record (`fortWas`). Unresolved: t10, the Warrior at 8 health on 13:11
+  beside the camp's Warrior at 27 on Floodplains (13:12, -2): ours deals 30
+  (10.82 against 10.73), `wins`, and holds; the game flees ("Move to
+  safety, Current Danger: 20"); record t10 holds neither fortified.
 - THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less
   its damage (1.1 in 24.8); for MEDIUM / LOW a spot whose received (taken +
   back taken) tops the dealt (dealt + back dealt), or the unit's health, is
@@ -6353,8 +6364,11 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   +0x1bc0) takes the best (0x7b5d70, "Promote"); a bombard unit stops
   there; a ship (+0x650 == 0) whose plot is not friendly ground
   (Rules_Movement 0x530880: 1 the player's own, a city-state it is
-  suzerain of, an ally's; 2 no one's; 3 another's) is collected and, after
-  the walk, released (0x73d1f0) — its later orders skipped. THE RELEASE
+  suzerain of, an ally's; 2 no one's; 3 another's) is collected
+  (0x80e39f..0x80e3d8, no 0x570b40: its turn not done) and, after the
+  walk, released (0x73d1f0, which sets no turn done either) — its later
+  orders skipped. The engines: `passDefend`'s `continue`, `_x_defend` /
+  `_bop_defend_exec` leaving `done` alone. THE RELEASE
   0x73d1f0 (READ): its assignment +0x778 to -1 (0x1e60f0); then per team
   of the operation (stride 0x118) the team is copy-constructed onto the
   stack (0x735110), the unit's id (+0x100) erased from the COPY's member

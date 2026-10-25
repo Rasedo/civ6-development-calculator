@@ -950,6 +950,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
   for (const [key, u] of ctx.units) keyOf.set(u, key);
   const was = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
   const hpWas = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}` as string, UNIT_HP - num(r.damage)]));
+  const fortWas = new Map(ctx.prev.units.flatMap((r) => (typeof r.fortify === 'number' ? [[`${r.owner}:${r.id}` as string, r.fortify] as const] : [])));
   const xpWas = new Map(ctx.prev.units.flatMap((r) => (typeof r.xp === 'number' ? [[`${r.owner}:${r.id}` as string, r.xp] as const] : [])));
   // the units the minors' and the barbarians' battles of the pair struck (or
   // lost) stand as they were before the first blow: the game fought a
@@ -1003,6 +1004,12 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>)
     // 196610, 8 experience at the turn's start, attacks with no promotion due)
     const x0 = xpWas.get(key);
     if (x0 !== undefined) c.xp = x0;
+    // ...and its fortification, which the planning's blow back on it reads
+    // (runs/h1_duelw1117 t9: city-state 2's Warrior 131073, fortified 2 on
+    // 14:10, attacks the camp's Warrior with 30 taken and 26 back against 60
+    // health)
+    const f0 = fortWas.get(key);
+    if (f0 !== undefined) c.fortifyTurns = f0;
     c.slot = Number(key.split(':')[1]) & 0xffff;
     c.attacksLeft = attacksPerTurn(c);
     mine.push(c);

@@ -59,6 +59,7 @@
     - cpu/core/operations/nodes.ts:operationDefendUnits
     - gpu/core/sim_minorops.py:_x_defend
     - gpu/core/sim_barbops.py:_bop_defend_exec
+    - gpu/core/sim_barbops.py:to_safe
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

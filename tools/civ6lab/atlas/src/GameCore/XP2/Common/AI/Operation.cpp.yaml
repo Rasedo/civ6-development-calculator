@@ -303,6 +303,7 @@
     - cpu/core/opsOrders.ts:us
     - gpu/core/sim_barbops.py:_bop_defend_exec
     - gpu/core/sim_minorops.py:_x_defend
+    - gpu/core/sim_barbops.py:to_safe
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
