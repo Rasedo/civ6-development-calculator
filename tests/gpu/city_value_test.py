@@ -720,14 +720,14 @@ def test_modifiers(v: Values) -> None:
 # per minor the valued rows' (count, sum) of the buildings, units and projects
 # tables and the pick (kind, row, value) — tests/cpu/minors/minor-tables.test.ts
 MINOR_TABLES = {
-    100: ([(1, 4850), (4, 13364), (1, 0)], ("BUILDING_MONUMENT", 4850)),
-    101: ([(1, 6156), (4, 13816), (1, 0)], ("BUILDING_MONUMENT", 6156)),
-    102: ([(1, 6667), (4, 14305), (1, 0)], ("BUILDING_MONUMENT", 6667)),
+    100: ([(1, 4850), (4, 8132), (1, 0)], ("BUILDING_MONUMENT", 4850)),
+    101: ([(1, 6156), (4, 8365), (1, 0)], ("BUILDING_MONUMENT", 6156)),
+    102: ([(1, 6667), (4, 8574), (1, 0)], ("BUILDING_MONUMENT", 6667)),
 }
 MINOR_TABLES_HELD = {
-    100: ([(0, 0), (4, 10771), (1, 0)], ("UNIT_WARRIOR", 4939)),
-    101: ([(0, 0), (4, 11316), (1, 0)], ("UNIT_WARRIOR", 5148)),
-    102: ([(0, 0), (4, 11316), (1, 0)], ("UNIT_WARRIOR", 5148)),
+    100: ([(0, 0), (4, 7371), (1, 0)], ("UNIT_WARRIOR", 4939)),
+    101: ([(0, 0), (4, 7580), (1, 0)], ("UNIT_WARRIOR", 5148)),
+    102: ([(0, 0), (4, 7580), (1, 0)], ("UNIT_WARRIOR", 5148)),
 }
 
 

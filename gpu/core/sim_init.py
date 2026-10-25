@@ -5044,6 +5044,19 @@ class SimInit:
                         self.civilian_at[(b, int(u_["tile"]))] = i
                     else:
                         self.military_at[(b, int(u_["tile"]))] = i
+                    if seat >= 100:
+                        # spawnUnit's birth record: the city-state's knowledge
+                        # base holds the unit it starts with, seen this turn
+                        # (`_kb_birth` with no ageing yet run)
+                        r_ = seat - 100
+                        k_ = int((self.citystate_kb_slot[b, r_] != -2).sum())
+                        self.citystate_kb_slot[b, r_, k_] = i + self.POOL_LO["major"]
+                        self.citystate_kb_owner[b, r_, k_] = seat
+                        self.citystate_kb_type[b, r_, k_] = ti
+                        self.citystate_kb_seen[b, r_, k_] = 1
+                        self.citystate_kb_plot[b, r_, k_] = int(u_["tile"])
+                        self.citystate_kb_seq[b, r_, k_] = int(self.citystate_kb_next[b, r_])
+                        self.citystate_kb_next[b, r_] += 1
                     if self.fog_of_war and seat < self.n_majors:
                         # spawnUnit's revealAround: the chassis's own sight,
                         # cut by the line of sight (`_los_disk`) — a fresh unit sees
