@@ -25,6 +25,16 @@
   impl: [cpu/core/units.ts:odds]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0x63fe30
+  final: 0x425f00
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: the unit efficiencies — READ (0x79a440's simulation, exchanges and range term), ported for every pair its terms cover"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...its damage over both (results +0x7c / +0xc4 words, << 8, at least 1.0), its exchanges 0x640000 / damage (100 / damage, 24.8, truncated); the range term (0x79ab16..0x79abeb): the earl..."
+  review: imported
 - addr: 0x69f6e0
   kind: function
   status: PARTLY

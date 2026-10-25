@@ -12,7 +12,7 @@
  *    the player and whose PseudoYieldType is none or a combat one, the count
  *    the knowledge base holds of it over every player (0x5eb650) — N in all;
  *  - per entry the sum of each such count times the efficiency of the entry
- *    against that type (`AI_UNIT_EFFICIENCY`, row the opposing type);
+ *    against that type (`unitEfficiency`, row the opposing type);
  *  - the entry's value N over that sum (1.0 for every entry where N is 0),
  *    x1.25 for a civilization's unique unit (TraitType).
  *
@@ -25,7 +25,8 @@
  * StrategicResource owned), its strength (+0x18: max(Combat,
  * RangedCombat)) and its maintenance resource (+0x24).
  */
-import { AI_UNITS, AI_UNIT_EFFICIENCY } from '../data/aiBuildTables';
+import { AI_UNITS } from '../data/aiBuildTables';
+import { unitEfficiency } from './aiUnitEfficiency';
 import { FX, fdiv, fmul, fxConst } from './aiValue';
 
 /** what the table reads of its player */
@@ -96,6 +97,7 @@ export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow
   const atWar = new Map<number, number>(entries.map((k) => [k, 0]));
   const perPlayer = new Map<number, Map<number, number>>(entries.map((k) => [k, new Map()]));
   const players = f.players ?? [];
+  const eff = unitEfficiency();
   let total = 0;
   AI_UNITS.forEach((u, i) => {
     if (u.combat === 0 || f.obsolete(u.type)) return;
@@ -106,18 +108,18 @@ export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow
     let w = 0;
     for (const p of players) if (f.atWar?.(p)) w += f.knownBy?.(u.type, p) ?? 0;
     for (const k of entries) {
-      sums.set(k, sums.get(k)! + AI_UNIT_EFFICIENCY[i][k] * n);
+      sums.set(k, sums.get(k)! + eff[i][k] * n);
       // the choice's sums read the table's other way (the entry's row
       // against the opposing unit's column): AI_Operation.csv's "Contract
       // for" names the Warrior Monk against Warriors and Spearmen, the
       // strongest; the value's way names the Scout
-      const eff = AI_UNIT_EFFICIENCY[k][i];
-      all.set(k, all.get(k)! + eff * n);
-      atWar.set(k, atWar.get(k)! + eff * w);
+      const e = eff[k][i];
+      all.set(k, all.get(k)! + e * n);
+      atWar.set(k, atWar.get(k)! + e * w);
       const per = perPlayer.get(k)!;
       for (const p of players) {
         const c = f.knownBy?.(u.type, p) ?? 0;
-        if (c > 0) per.set(p, (per.get(p) ?? 0) + eff * c);
+        if (c > 0) per.set(p, (per.get(p) ?? 0) + e * c);
       }
     }
   });

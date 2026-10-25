@@ -60,6 +60,7 @@
     - "H-1: a city's name, a citizen's name — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-98: the unit efficiencies — READ (0x79a440's simulation, exchanges and range term), ported for every pair its terms cover"
   context:
     - "...l falls 40, 39, 38 ... as storms and Spies take names. Which units: the unit's creation 0x4eeb70 calls 0x486bf0 → 0x486c20 where the unit info's Spy (+0x1ba bit 2) or ExtractsArtifac..."
   review: imported

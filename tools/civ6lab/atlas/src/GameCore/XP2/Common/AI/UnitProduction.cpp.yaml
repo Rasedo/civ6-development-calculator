@@ -56,17 +56,23 @@
 - addr: 0x79a440
   final: 0x5237a0
   kind: function
-  status: PARTLY
+  name: the unit efficiencies job
+  status: READ
   cases:
+    - recording: h1_duelv1117
+      turn: 2
+      value: Valletta's Heavy Chariot 3.33 / 5.67 at t2 / t3 on the job's Warrior row 137 (the printed 0.54's 138 gave 3.30 / 5.61); the Spearman 1.25 / 2.12 on 213
     - recording: AI_UnitEfficiency.csv
       value: "Logged once a game as   AI_UnitEfficiency.csv (\", %3.2f\"), the same in every recording;"
-  impl: [cpu/data/aiBuildTables.ts:AI_UNIT_EFFICIENCY]
+  impl: [cpu/core/aiUnitEfficiency.ts:unitEfficiency, cpu/data/aiBuildTables.ts:AI_UNIT_EFFICIENCY]
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "C-98: the unit efficiencies — READ (0x79a440's simulation, exchanges and range term), ported for every pair its terms cover"
+  notes: [AntiAirCombat's float terms (0x79b115..) unported]
   context:
     - "- THE EFFICIENCIES (0x79d040 allocates, the job 0x79a440 fills, \"Could not find a neutral player\"): per pair of Units rows both without strength..."
-  review: imported
+  review: reviewed
 - addr: 0x79b9c0
   final: 0x5242d0
   kind: function

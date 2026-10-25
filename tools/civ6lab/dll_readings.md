@@ -5551,6 +5551,44 @@ operations' contracts, the improvement values below, the purchases).
   Monument at 26.7, Granada / Mexico City / 1128 Bologna 18.1, 1124 Bologna
   30.2, the six others 24.0 — before it 9 of 15.
 
+## C-98: the unit efficiencies — READ (0x79a440's simulation, exchanges and range term), ported for every pair its terms cover
+
+- THE JOB 0x79a440 (once a game): the neutral player's units allocated off
+  the map (0x4eeb70 with plot -1, -1: no terrain, full health); per pair of
+  Units rows i < j (the inner loop from i + 1, 0x79a8b7) that both hold a
+  strength (max(Combat +0x48, RangedCombat +0x6c, Bombard +0x40) or
+  AntiAirCombat +0x34), two combat simulations (0x205720 with its flag set:
+  the damage law's expectation), each attacking the other; per unit its
+  damage over both (results +0x7c / +0xc4 words, << 8, at least 1.0), its
+  exchanges 0x640000 / damage (100 / damage, 24.8, truncated); the range
+  term (0x79ab16..0x79abeb): the earlier row's ceil((Range - 1) / the
+  other's BaseMoves +0x38) where its Range +0x68 is above the other's and
+  at least the other's moves, else the later row's ceil((its Range - 1) /
+  the earlier's moves) where its Range is at least those moves; neither
+  where the two differ in AntiAirCombat > 0 and in their domain (0x79aafa);
+  the term << 8 added to that unit's exchanges; M[i][j] = (ex_i << 8) /
+  ex_j, M[j][i] the other way (0x79af67, 0x79b064), both truncated. The
+  simulations' strengths: a melee blow at Combat against Combat, both
+  damaged; a ranged or bombard blow at RangedCombat (Bombard) against
+  Combat, the attacker undamaged, the domain term (`rangedDomainCS`, 17);
+  the class matchups (melee +5 on anti-cavalry, anti-cavalry +10 on
+  cavalry) for the attacker alone. AntiAirCombat's float terms
+  (0x79b115..) unported.
+- CHECKED against AI_UnitEfficiency.csv (", %3.2f"): every land and sea
+  melee, ranged and siege pair of the early and middle units agrees at
+  0.01; the misses are unique units' abilities (Berserker, Carolean,
+  Redcoat, Hoplite), anti-air and air units, the Giant Death Robot and the
+  late ships' range terms. The port (`unitEfficiency`, cpu/core/
+  aiUnitEfficiency.ts) takes the job's raw value wherever it lies within
+  1/256 of the printed table both ways, the printed table's elsewhere; the
+  GPU reads the exported table (`rules.unitEfficiency`).
+- CONFIRMED: runs/h1_duelv1117 Valletta t2 / t3 UNITS rows, Heavy Chariot
+  3.33 / 5.67 (the job's Warrior row 137, the printed 0.54's 138 gave
+  3.30 / 5.61), Spearman 1.25 / 2.12 (213 for 212); h1_duely1117 t3 p2
+  Wheel 153.9 and Bronze Working 212.7 as logged. MEASURED (five duely
+  duels, full length): researchScore.minor 47753 -> 49600 of 53807
+  (88.7% -> 92.2%), aimem 48104 -> 49984 (89.4% -> 92.9%).
+
 ## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)
 
 Ported in `cpu/core/aiTrade.ts` (`minorTradeList`, `minorTradeValue`; the

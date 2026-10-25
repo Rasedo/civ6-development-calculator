@@ -338,7 +338,8 @@ import { FREE_RAID_DEF } from '../core/freeOps';
 /** the operations the GPU twin runs, by index: the city-states', then the
  *  Free Cities' */
 const OP_DEFS = [...MINOR_OP_DEFS, FREE_RAID_DEF];
-import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS, AI_UNIT_EFFICIENCY } from '../data/aiBuildTables';
+import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
+import { unitEfficiency } from '../core/aiUnitEfficiency';
 import { minorDistrictVerdict } from '../core/minorCityAi';
 import { AI_YIELDS } from '../core/aiWeights';
 import type { Era } from '../data/techs';
@@ -1068,7 +1069,7 @@ export function buildRules() {
       buildings: AI_BUILDINGS,
       modifierReads: AI_MODIFIER_READS,
       units: AI_UNITS,
-      unitEfficiency: AI_UNIT_EFFICIENCY,
+      unitEfficiency: unitEfficiency(),
       // per engine unit (the GPU's unit index) its AI_UNITS row, -1 none: its
       // own install type, else the one its catalog tag names
       // per AI row its engine index (-1 none): the building in the city's
