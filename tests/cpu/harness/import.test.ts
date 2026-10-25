@@ -452,8 +452,9 @@ describe('the era checks', () => {
 });
 
 describe("a governor's envoys", () => {
-  it("come back out of the game's envoy count, which already holds them", () => {
-    // `GetTokensReceived` read 3 -> 5 the turn Amani established (runs/h1_duelw1105, Nalanda t63-67)
+  it("stand in the store as the game's envoy count holds them", () => {
+    // `GetTokensReceived` read 3 -> 5 the turn Amani established (runs/h1_duelw1105, Nalanda t63-67):
+    // her two are in the minor's store from her establishment (`governorClocks`)
     const r = record(10);
     r.players = [
       player(0, { governors: [[1, 2, 131072, true, 0, 0, [2]]] }), r.players[1],
@@ -462,7 +463,7 @@ describe("a governor's envoys", () => {
     const imp = importTurn(r, CAT);
     const cs = imp.state.cityStates[0];
     expect(imp.state.seats[0].governors![GOVERNOR_INDEX.AMANI].promotions).toBe(0);
-    expect(cs.envoys[0]).toBe(3);
+    expect(cs.envoys[0]).toBe(5);
     expect(envoysHere(imp.state, cs, 0)).toBe(5);
   });
 });

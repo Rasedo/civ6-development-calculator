@@ -43,7 +43,7 @@ import { isWater } from '../../world/query';
 import { FEATURE_ID, TERRAIN_BASE } from '../data/aliases';
 import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
-import { envoysWith } from '../core/cityStates';
+import { envoysReceived, envoysWith } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOVERNOR_PROMOTIONS, promotionBit, promotionBitValue } from '../data/governors';
 import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { BOOSTS } from '../data/boosts';
@@ -2390,7 +2390,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       minor.foodBox = num(c.food);
       minor.cultureBox = num(c.culture);
       minor.nextPlot = num(c.nextPlot);
-      minor.tilesAcquired = history?.cultureTaken.get(center) ?? 0;
+      // its ledger of plots taken since its founding ring (`envoyTiles`): a
+      // minor's culture box buys nothing, so every plot beyond the ring is
+      // one its envoys annexed; the envoys the record holds raise it below
+      const shape = { width: rec.head.W, height: rec.head.H, wrapX: bool(rec.head.wrapX) };
+      minor.tilesAcquired = c.plots.filter((q) => hexDistance(shape, c.x, c.y, q % rec.head.W, Math.floor(q / rec.head.W)) > 1).length;
       minor.hp = hp;
       minor.outerHp = outerHp;
       minor.buildings = buildings.filter((b) => b !== 'PALACE');
@@ -2560,21 +2564,26 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   // a city-state the record holds no city for (not yet founded, or taken) is
   // no engine city-state: the engine holds a minor only while its city stands
   state.cityStates = state.cityStates.filter((cs) => cs.centerIndex >= 0);
-  // the game's `GetTokensReceived` counts an established governor's envoys
-  // (Amani's 2 arrive the turn she establishes and leave with her), which the
-  // engine adds on top of its store (`envoysWith`): the store is the count
-  // with the governor's share taken back out
+  // the game's `GetTokensReceived` counts an established Amani's envoys
+  // (her 2 arrive the turn she establishes and leave with her), as the
+  // store does; a Puppeteer's doubling the engine lays on top of the store
+  // (`envoysWith`) is taken back out
   for (const cs of minorOfPlayer.values()) {
     for (const [k, read] of Object.entries(cs.envoys)) {
       const seat = Number(k);
-      const base = envoysWith(state, cs, seat, 0);
-      const step = envoysWith(state, cs, seat, 1) - base;
-      if (base === 0 && step === 1) continue;
+      const step = envoysWith(state, cs, seat, 1);
+      if (step === 1) continue;
       ctx.scopeSeat = seat;
-      if ((read - base) % step !== 0 || read < base) gap(ctx, 'envoys', cs.name);
-      else cs.envoys[seat] = (read - base) / step;
+      if (read % step !== 0) gap(ctx, 'envoys', cs.name);
+      else cs.envoys[seat] = read / step;
       ctx.scopeSeat = undefined;
     }
+    // every envoy the record holds has had its ground drawn, a draw the
+    // border refused included: the ledger stands at least at the count's
+    // claim, so only an envoy written after the record annexes (runs/h1_duelw1124
+    // Granada t59: three envoys, nine plots, Amani establishing at another
+    // minor annexes nothing there)
+    cs.tilesAcquired = Math.max(cs.tilesAcquired ?? 0, envoysReceived(cs) - 1);
   }
 
   // a resource the engine lacks on an owned plot is its owner's gap too: a

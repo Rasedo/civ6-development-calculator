@@ -2539,6 +2539,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         break;
       }
       case 'unitGone': {
+        // a civilian a seizure of the turn takes is the seizure's: it lands
+        // it under its captor (runs/h1_duelw1105 t39: China's Builder 851968,
+        // gone from China's record before the barbarians' turn seizes it)
+        if (ds.some((x) => x.kind === 'seize' && x.victim === d.unit)) { count(ctx, `unitGone:${d.why}`, 'applied'); break; }
         // a levied or returned unit leaves its old id alone
         const rekeyed = ds.some((x) => (x.kind === 'levy' || x.kind === 'levyEnd') && x.units.some(([f]) => f === d.unit));
         const u = rekeyed ? undefined : unitOf(ctx, d.unit);

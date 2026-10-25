@@ -1518,6 +1518,26 @@ function spreadCentres(state: GameState, here: Tile): Tile[] {
   return at.filter((t) => centres.has(t.index));
 }
 
+/** Hold every city-state's ground and citizens — each plot's owner and pin,
+ *  each minor's annex ledger, slots and idle citizens — and return what puts
+ *  them back. */
+function holdMinorGround(state: GameState): () => void {
+  const tiles = state.map.tiles.map((t) => [t.ownerSeat, t.ownerCity, t.locked] as const);
+  const minors = state.cityStates.map((cs) => [cs.tilesAcquired, cs.specialistPref, cs.idleCitizens] as const);
+  return () => {
+    state.map.tiles.forEach((t, i) => {
+      const [seat, city, locked] = tiles[i];
+      t.ownerSeat = seat;
+      t.ownerCity = city;
+      if (locked === undefined) delete t.locked;
+      else t.locked = locked;
+    });
+    state.cityStates.forEach((cs, i) => {
+      [cs.tilesAcquired, cs.specialistPref, cs.idleCitizens] = minors[i];
+    });
+  };
+}
+
 export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
   const key = (c: DumpCity) => `${c.owner}:${c.id}`;
   const before = new Map(a.cities.map((c) => [key(c), c]));
@@ -2357,8 +2377,15 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
         list.forEach(({ city }, j) => { city.parkAmenities = now[j]; });
       }
     };
-    // the governors' clocks, before the cities (`governorClocks`)
+    // the governors' clocks, before the cities (`governorClocks`); the ground
+    // a city-state annexes on the envoys an establishment writes is the
+    // record's, landed before its growth (`plotsGained`), so the engine's own
+    // draw does not stand (runs/h1_duelw1119 Babylon t97: Amani's 2 envoys,
+    // one plot annexed in the record, two drawn; runs/h1_duelw1131 Kandy t93:
+    // 847 annexed, 807 drawn)
+    const minorGround = holdMinorGround(state);
     governorClocks(state, seat);
+    minorGround();
     // a citizen the record caught idle stays idle through the processing: the
     // citizen manager places it only on a reassign (a growth, an annex, the
     // AI's focus change; runs/h1_duelw1123 Xi'an t175-181: one idle, the

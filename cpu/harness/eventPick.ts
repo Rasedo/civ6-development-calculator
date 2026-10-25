@@ -80,9 +80,10 @@ const num = (v: unknown): number => (typeof v === 'number' ? v : -1);
 
 /** What a major's own plots, cities and units show at a record's positions
  *  (`initFog`'s look: each plot it owns and its ring, which is its cities'
- *  look (`cityLook`), each unit its sight cut by the line of sight), marked
- *  into `acc`. */
-function sightIn(state: GameState, rec: TurnRecord, cat: Catalog, pid: number, seat: number, acc: Uint8Array): void {
+ *  look (`cityLook`), each unit its sight cut by the line of sight), and the
+ *  look of the Settler of each city founded since record `prev`, marked into
+ *  `acc`. */
+function sightIn(state: GameState, prev: TurnRecord, rec: TurnRecord, cat: Catalog, pid: number, seat: number, acc: Uint8Array): void {
   const { map } = state;
   const W = rec.head.W;
   const look = (q: number, radius: number, los?: Look) => {
@@ -92,6 +93,16 @@ function sightIn(state: GameState, rec: TurnRecord, cat: Catalog, pid: number, s
     else for (const n of tilesWithin(map, t.col, t.row, radius)) acc[n.index] = 1;
   };
   rec.map.forEach((row, y) => row.forEach((p, x) => { if (num(p[P.owner]) === pid) look(y * W + x, 1); }));
+  // a city founded since `prev`: its Settler looked from the centre before
+  // founding it, from the plot as it stood (runs/h1_duelw1123 Xi'an, founded
+  // at 611 after a step: plot 697 three out revealed, its river named at t3)
+  const had = new Set(prev.cities.map((c) => c.y * W + c.x));
+  const settler = { type: 'SETTLER', seat };
+  for (const c of rec.cities) {
+    const t = map.tiles[c.y * W + c.x];
+    if (c.owner !== pid || had.has(c.y * W + c.x) || !t) continue;
+    for (const n of losDisk(map, { ...t, district: null }, unitSight(settler, state), unitSeesThrough(settler))) acc[n] = 1;
+  }
   for (const u of rec.units) {
     if (u.owner !== pid) continue;
     const type = engineRowOf(cat, 'unit', u.type);
@@ -165,7 +176,7 @@ export class EventPicks {
       // look: runs/h1_duelw1128 t1, 14, 46, 74, 93, runs/h1_duelw1127 every
       // draw t1-t105)
       const pid = imp.playerOfSeat.get(s.seat);
-      if (next && pid !== undefined) sightIn(state, next, this.cat, pid, s.seat, acc);
+      if (next && pid !== undefined) sightIn(state, rec, next, this.cat, pid, s.seat, acc);
       s.explored = Array.from(acc);
     }
     riverLists(state.map).forEach((r, i) => {

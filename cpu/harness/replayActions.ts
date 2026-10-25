@@ -679,7 +679,12 @@ export class RecordedActions implements ActionSource {
         // pair's too (runs/h1_duelw1127 t27: Xi'an places Stonehenge on its
         // Farm at the turn start and China's Builder charges it, record t+1
         // reading 19)
-        const u = units1.get(`${n(r, 0)}:${n(r, 1)}`) ?? a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
+        // ...not the charge a capture takes, logged just before it
+        // (runs/h1_duelw1105 t39: China's Builder 851968, 1 -> 0, then
+        // UnitCaptured; the barbarians' captive holds the rest)
+        const at = ev.indexOf(r);
+        const captured = ev.slice(at + 1, at + 6).some((x) => x[2] === 'UnitCaptured' && n(x, 0) === n(r, 0) && n(x, 1) === n(r, 1));
+        const u = captured ? undefined : units1.get(`${n(r, 0)}:${n(r, 1)}`) ?? a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
         const plot = u ? u.y * W + u.x : -1;
         const placed = plot >= 0 && (plotAt(a, plot)[P.wonder] as number) < 0 && (plotAt(b, plot)[P.wonder] as number) >= 0;
         if (u && cat.units[u.type] === 'UNIT_BUILDER' && plot >= 0 && ((plotAt(a, plot)[P.wonder] as number) >= 0 || placed) && !plotAt(a, plot)[P.wonderComplete]) {
@@ -992,9 +997,21 @@ export class RecordedActions implements ActionSource {
         const onto = (x: ActionRow) => x[2] === 'UnitMoved' && n(x, 0) === by && n(x, 3) * W + n(x, 2) === plot;
         let j = ev.findIndex((x, k) => k > i && k <= i + 4 && onto(x));
         for (let k = i - 1; j < 0 && k >= Math.max(0, i - 12); k--) if (onto(ev[k])) j = k;
-        if (j < 0 || before[j] < 0) return;
-        out0.push({ kind: 'seize', phase: phaseOf(by), player: by, unit: `${by}:${n(ev[j], 1)}`, from: before[j], plot,
-          victim: `${n(r, 0)}:${n(r, 1)}`, ...(added ? { into: `${by}:${n(added, 1)}` } : {}) });
+        const victim = `${n(r, 0)}:${n(r, 1)}`;
+        const into = added ? { into: `${by}:${n(added, 1)}` } : {};
+        if (j >= 0 && before[j] >= 0) {
+          out0.push({ kind: 'seize', phase: phaseOf(by), player: by, unit: `${by}:${n(ev[j], 1)}`, from: before[j], plot, victim, ...into });
+          return;
+        }
+        // no step onto the plot the log names (runs/h1_duelw1128 t35: the
+        // barbarian Warrior 2490396 logged onto 15:13, record t+1 on 16:13
+        // with the captive China's Settler): the mover the one of the
+        // player's units record t+1 holds on the plot, from its record t plot
+        const mover = b.units.find((u) => u.owner === by && u.y * W + u.x === plot && (!added || u.id !== n(added, 1))
+          && a.units.some((x) => unitKey(x) === unitKey(u)));
+        if (!mover) return;
+        const was = a.units.find((x) => unitKey(x) === unitKey(mover))!;
+        out0.push({ kind: 'seize', phase: phaseOf(by), player: by, unit: unitKey(mover), from: was.y * W + was.x, plot, victim, ...into });
       });
     }
     // the unit each village rewarded: `GoodyHutReward` (player, unit, type,
