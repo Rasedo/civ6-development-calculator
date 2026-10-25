@@ -4762,6 +4762,22 @@ operations' contracts, the improvement values below, the purchases).
   contract 10 of t2, its tree gone by t9).
 - TryPurchaseUnits' threatened city (0x68c027): CityBuildAI +0x1b8's sign
   bit clear — a threat at or above 0.
+- THE THREATENED CITY'S PURCHASE GATE is the purchase request (0x977570)'s
+  placement: a land unit bought stands on the city's centre, refused where
+  a unit of its stacking class stands there (the majors' rule,
+  `purchaseSpotBlocked`); a Trader there holds no slot. The records: the
+  game's city threat (runs/h1_duelm1117 aimem, CityBuildAI +0x1b8)
+  Antananarivo 4 at t24-t26 with 121-138 Gold and the Archer at 120, a
+  Warrior on the centre: nothing bought, ours an Archer at t24; runs/
+  h1_duelw1124 Granada t20-t23 under City Defense with a Warrior on the
+  centre: none. Every logged military purchase of the five duels landed on a
+  centre with no military unit (a Trader or a Builder there allowed:
+  1117 Valletta t59, Caguana t73 / t102; 1124 Granada t72), a Galley beside
+  a Warrior (1121 Ayutthaya t30), a Builder beside a Trader (1117 Caguana
+  t42, 1124 Bologna t88). MEASURED (--aiscore --to 100, five duels):
+  unit.trained's compared rows 167 -> 147 (ours' purchases the records lack,
+  equal 117 both), unit.bought 17 -> 18 of 26 equal, cityState.build 1405
+  -> 1403 of 1470, knowledge.army 1422 -> 1483 of 2475.
 - 0x5d2810's walk starts its bests (+0x30, then +0x2c) at 0 (0x5d286c /
   0x5d2876) and stops at the first entry it may train ranked below them
   (0x5d2941 / 0x5d2947): an eligible first entry whose sums fall below 0

@@ -2537,6 +2537,16 @@ class SimMasks:
             out = out & ~(mine & shut)
         return out
 
+    def _purchase_blocked(self, ctr: torch.Tensor, seat, is_civilian, is_support=False) -> torch.Tensor:
+        """[B] bool — `purchaseSpotBlocked` for a land unit bought at the
+        centre `ctr` [B]: its stacking slot there taken, a Trader holding none"""
+        blocked = self._blocked_for(ctr.unsqueeze(1), seat, is_civilian=is_civilian, is_support=is_support).squeeze(1)
+        cu = self.civilian_at.gather(1, ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
+        trader = (cu >= 0) & (self.unit_type.gather(1, cu.clamp(min=0).unsqueeze(1)).squeeze(1) == self._trader_idx)
+        civ = is_civilian if isinstance(is_civilian, torch.Tensor) else torch.full_like(trader, bool(is_civilian))
+        sup = is_support if isinstance(is_support, torch.Tensor) else torch.full_like(trader, bool(is_support))
+        return blocked & ~(civ & ~sup & trader)
+
     def _blocked_for(
         self,
         tiles: torch.Tensor,

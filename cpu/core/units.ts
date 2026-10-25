@@ -2340,8 +2340,13 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
  *  unit is placed ON the city centre, and the purchase is REFUSED — "too many
  *  units of one class here" — when a unit of its stacking class already stands
  *  there. There is no spill to a neighbour, unlike a TRAINED unit's placement.
- *  Aircraft and Spies hold no plot; a hull is placed by its own water rule. */
+ *  Aircraft and Spies hold no plot; a hull is placed by its own water rule.
+ *  A Trader on the centre holds no slot a bought unit takes (runs/h1_duelw1117
+ *  t42 Caguana and runs/h1_duelw1124 t88 Bologna: a Builder bought onto a
+ *  centre that held the city-state's Trader). */
 export function purchaseSpotBlocked(state: GameState, city: { centerIndex: number }, seat: number, unitType: string): boolean {
   if (isAirUnit(unitType) || isSpy(unitType) || UNITS[unitType]?.naval) return false;
-  return !tileFreeForUnit(state, city.centerIndex, seat, { type: unitType, seat });
+  const slot = unitDomain(unitType);
+  return unitsAt(state, city.centerIndex).some((u) => !isAirUnit(u.type) && !isSpy(u.type) && !UNITS[u.type]?.trader
+    && (u.seat !== seat || unitStackSlot(u) === slot));
 }

@@ -2785,7 +2785,7 @@ class SimSeats:
             want_s = (kind == 1) & active & ext & ~bought & (n_cities > 0) \
                 & (pop_s >= self.rules.settler_pop_gate) & self._afford(self.civ_treasury[:, row], sett_price) \
                 & ~self._no_settlers(row) \
-                & ~self._blocked_for(ctr_s.unsqueeze(1), row, is_civilian=True).squeeze(1)  # purchaseSpotBlocked: the centre's civilian slot
+                & ~self._purchase_blocked(ctr_s, row, is_civilian=True)  # purchaseSpotBlocked: the centre's civilian slot
             if bool(want_s.count_nonzero()):
                 landed_s = self._spawn_unit(row, want_s, ctr_s, self._settler_idx)
                 self.civ_treasury[:, row] = torch.where(landed_s, self.civ_treasury[:, row] - sett_price, self.civ_treasury[:, row])

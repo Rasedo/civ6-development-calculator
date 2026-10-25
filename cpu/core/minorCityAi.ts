@@ -73,7 +73,7 @@ import { computeUnlocksIn, makeYieldCtx } from './effects';
 import { eruptionHazardTurns, floodHazardTurns } from './disasters';
 import { baseAdjacency, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
-import { builderHarvest, builderRemoveFeature, tileFreeForUnit } from './units';
+import { builderHarvest, builderRemoveFeature, purchaseSpotBlocked } from './units';
 import { aiStrengths, dangerPlane, moveTo, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import {
@@ -788,10 +788,18 @@ function minorPurchaseCity(state: GameState, cs: CityState, threat: number): Pur
     id: minorCity(cs).id,
     goldCost: price,
     threat,
+    // the purchase request (0x977570): the purse covers the price and the
+    // city's centre takes the unit (`purchaseSpotBlocked`) — a unit bought
+    // stands on the centre, so one of its stacking class there refuses it
+    // (runs/h1_duelw1124 Granada
+    // t20-t23 and runs/h1_duelm1117 Antananarivo t24-t26: threatened, the
+    // Gold there, a Warrior on the centre, nothing bought; every logged
+    // military purchase of the five duels bought onto a centre with no
+    // military unit)
     canPurchase: (u) => {
       if (!goldAffordable(cs.treasury, price(u))) return false;
-      const near = state.map.tiles[cs.centerIndex];
-      return [near, ...neighbors(state.map, near)].some((t) => tileFreeForUnit(state, t.index, cs.seat, { type: 'WARRIOR', seat: cs.seat }));
+      const id = engineId('unit', u, 'UNIT_', UNITS);
+      return !!id && !purchaseSpotBlocked(state, cs, cs.seat, id);
     },
   };
 }
