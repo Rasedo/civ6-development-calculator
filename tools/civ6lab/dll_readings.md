@@ -3513,6 +3513,180 @@ cleared by the wait); every job list now runs to its end before the
 game-core thread goes on, the only parallel work left is jobs of one list
 beside each other on the scheduler's two threads.
 
+## H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)
+
+`tools/civ6lab/aimem.py` (the reader), `aimem_hook.py` (the hooks),
+`procmem.py` (ReadProcessMemory / WriteProcessMemory / VirtualProtectEx);
+`h1/fleet.py run --aimem` runs it beside each game, `<stem>.aimem.jsonl`.
+Every offset below is the FinalRelease DLL's, read from its own code: the
+Release DLL lays out the Player, Targets and the watched fields of the AI
+objects differently (the Player's AI pointers sit 0xc20 higher, a watched
+field is 0x60 bytes against 0x18), so the Release offsets cited elsewhere in
+this file do not carry over; the knowledge base's inner layout does.
+
+- THE HOOKS. The game thread is held at a site while the reader reads: a
+  5-byte `jmp` over the site's first instructions into a stub in the .text
+  file slack past the replay patch's cave (FinalRelease 0x9b6660, the mailbox
+  FinalRelease 0x9b67c0: gate, lock, sequence, acknowledgement, the site
+  number, rcx, rdx, r8, r9, the return address, the stack pointer, the end
+  look's saved return and Targets). With the gate set the stub takes the lock,
+  stores the registers, increments the sequence and spins on PAUSE until the
+  reader acknowledges it (about 40 s at most), then runs the displaced
+  instructions; the gate clear, it costs a load and a branch. Written into
+  the process only, the process suspended (NtSuspendProcess) meanwhile; a
+  hosted game loads the DLL afresh and the reader re-arms it. The sites:
+  0x785f30 (FinalRelease 0x5146e0), the tactical turn's knowledge step bound
+  on player signal +0x1f8 (0x7864c0 (FinalRelease 0x514a60) binds it, the
+  Targets +0x98 the player): the signal reaches every player's Targets with
+  edx 4, 3, 2, 1, 0 and the step runs where r8b is set and edx is the
+  Targets' +0x108 (4); 0x5ed280 (FinalRelease 0x3f3e90), the knowledge base's
+  log, AI_Knowledge.csv's moment; 0x7877e0 (FinalRelease 0x515d70), the look,
+  the tactical step's own call returning to FinalRelease 0x51471a, any other
+  the end look on player signal +0x228, whose return the stub redirects to a
+  fourth site; 0x84ed50 (FinalRelease 0x5a8250), the raise of the Lua
+  PlayerTurnStarted (rdx the player), a player's turn start.
+- THE ORDER, MEASURED (runs/h1_duelm1117, every turn): a turn holds each
+  player's start (0, 1, 2, 3, 4, 62, 63), then per player in that order its
+  tactical step, its log, its end look; player 0's end look runs twice. A
+  city's contract SUBMITTED at turn T (AI_CityBuild.csv) is in the Control
+  Manager's list at T's end look, not at T's log moment (seed 1117 t9:
+  contracts 28, 29, 30): the log moment precedes the cities' submissions,
+  the end look follows them.
+- THE GLOBALS. The game: FinalRelease 0xb8aa68 (the turn +0xc0, the
+  synchronous generator at +0xf0: its state +0xf8, its draw count +0xfc;
+  0x9ccff0 (FinalRelease 0x6d77f0), Lua's GetRandomSeed, reads game +0xf0
+  +8 through 0x9c98d0 (FinalRelease 0x6d3ce0); game +0x240 is the players'
+  manager). The players: FinalRelease 0xb8e140, the players' manager, +0x20
+  the array of Players by id (0x37b760 (FinalRelease 0x26c770) reads it; the
+  game's own lookup 0x5d3e0 (FinalRelease 0x44f00) takes game +0x240 +0x20,
+  0x8a08a0 (FinalRelease 0x63d080)); a Player's id +0xd8, its signals +0x798.
+- THE PLAYER'S AI (vtables read off each pointer's constructor): +0x650 the
+  city AI manager (its +0 the Player; +0x98 a list, node +0 a CityBuild, +0x10
+  the next; walked by 0x5c2650 (FinalRelease 0x3d9130)), +0x658 CultureAi,
+  +0x660 Diplomatic, +0x668 Economic, +0x670 GrandStrategic, +0x678 Homeland,
+  +0x680 Military, +0x688 Research, +0x690 Tactical, +0x698 Targets, +0x6a0
+  the planning manager, +0x6a8 the behaviour tree manager, +0x6b0 the Control
+  Manager, +0x6b8 the influence map, +0x6c0 Player::Trade, +0x6c8
+  Player::Units, +0x6d0 Player::Cities, +0x6e0 PlayerDiplomacy, +0x6f0
+  PlayerCulture, +0x700 Player::Resources, +0x710 PlayerStats, +0x718
+  PlayerTechs, +0x720 PlayerReligion, +0x738 PlayerEras, +0x748
+  PlayerInfluence, +0x750 Player::Quests, +0x770 CulturalIdentity, +0x780
+  PlayerTreasury.
+- THE KNOWLEDGE BASE: Targets +0x270 (Release: +0x3e0); its layout is the
+  Release's (0x5ed280 (FinalRelease 0x3f3e90) reads +0x18, +0x638, +0x648,
+  +0x668, +0x6d8, +0x6e8 as 0x5ed280 does): +0x18 per owner id a 0x18-byte
+  vector (+0 the per-type array, +0x10 its count), a type's entry +0 its
+  records, +0x10 their count, a record 0x20 bytes (+0 the unit id, +0xc the
+  age, +0x10 / +0x14 x, y, +0x18 / +0x1c the plot's map ids); +0x638 the camps
+  (0x10 bytes: x, y, +0xc the value), their count +0x648; +0x6e8 its player.
+  MEASURED: at the log site the records' per-type counts and oldest ages are
+  AI_Knowledge.csv's ARMY lines on every player-turn (runs/h1_duelm1117: 1,744
+  of 1,744).
+- THE CONTRACTS: the Control Manager (Player +0x6b0) +0x170 a vector of every
+  live contract of the player, its count +0x180 (0x6072d0 (FinalRelease
+  0x4007d0) finds one by id there); +0x110 the controls' pages (8 entries of
+  0x18 a page, the entry's +0 the control: +0 its id, +4 its kind, +0x10 its
+  object; a free entry holds the next free index; 0x609060 (FinalRelease
+  0x4019f0) the lookup by id). A contract's watched fields (vtable, owner,
+  value at +0x10; the constructor FinalRelease 0x3fc9d0 names them): +0xb0
+  m_status (the progress: 0x5f4cd0 (FinalRelease 0x3f97e0) prints the name
+  0x600800 (FinalRelease 0x3fd780) takes for it), +0xc8 m_priority, +0xe0
+  m_timeLimit, +0xf8 m_timeEstimate, +0x110 m_id, +0x128 m_owner (the
+  control id of the tree that made it; its +0x10 object is the tree's control
+  interface, the tree's name the line prints), +0x140 m_player, +0x158
+  m_extraPresentValue (24.8 fixed point, the line's VALUE), +0x160 the handle
+  count (0x600b00 (FinalRelease 0x3fda30) releases a handle {pointer, owner,
+  id}). Its kinds by vtable: the build contract (FinalRelease 0x3f7480: +0x178
+  m_desiredUnit, +0x190 m_desiredBuilding, +0x1a8 m_desiredDistrict, +0x1c0
+  m_desiredLocation x, y, +0x1d8 m_requiredCity, +0x1f0 m_keepControl), the
+  tech contract (FinalRelease 0x3f7180: +0x178 m_goalTech, +0x190 m_nextTech,
+  +0x1a8 m_bestController), the civic contract (FinalRelease 0x3f6c00: +0x178
+  m_goalCivic, +0x190 m_nextCivic), the Purchase Plot contract (FinalRelease
+  0x3f7040: +0x178 m_purchasePlot x, y). The Release fields cited for the
+  contract (+0x100 progress, +0x1c0, +0x220, +0x3a0, +0x408, +0x468, +0x4c8,
+  +0x528, +0x588, +0x5e8) are these in order. A fifth kind, the diplomatic
+  action's (FinalRelease 0x3f6e20: +0x178 m_enemy, +0x190 m_action), stands
+  in Qin's list (runs/h1_duelm1117, contracts 427 and 429). MEASURED
+  (runs/h1_duelm1117): every CONTRACT line whose contract still stands at
+  that turn's end look carries its value (2,006 of 2,006; 125 more gone by
+  then); of the 967 contracts read, AI_CityBuild.csv never names 290: 109
+  goal techs, 11 goal civics, 48 Purchase Plots, 6 diplomatic actions, 116
+  build contracts.
+- THE HOLDERS: a CityBuild (constructor 0x5c4f40 (FinalRelease 0x3db2f0)):
+  +0xa8 m_cityId, +0xc0 m_playerOwner, +0xd8 m_cityThreat, +0x140
+  m_managedWorkingContract (the handle in hand at +0x150, its id +0x15c),
+  +0x160 m_managedContracts (a container: +0x10 a vector of 16-byte handles,
+  +0x18 their count). The same container in the Economic AI (+0x268, the
+  purchases), Research (0x75e7a0 (FinalRelease 0x4f70f0): +0x178), CultureAi
+  (0x6190d0 (FinalRelease 0x40e8c0): +0x218), Diplomatic (0x6419c0
+  (FinalRelease 0x4271a0): +0x6158) and each behaviour tree (+0x378). The
+  religious AI's (0x74af30 (FinalRelease 0x4e9d60), made by the religious
+  manager, not reached from the Player) is not read: its Warrior Monk
+  contracts stand in the Control Manager's list with no holder named. A
+  holder's handle is weak: it keeps the id of a contract the Control Manager
+  no longer holds (930 of runs/h1_duelm1117's 1,922 end-look records name
+  one).
+- THE BEHAVIOUR TREES: each control whose object's vtable is the tree's
+  control interface (the tree +0x218; its +8 the tree): the tree's watched
+  fields (constructor FinalRelease 0x53e4d0) +0x138 m_isActive, +0x150
+  m_isTemporary, +0x168 m_markForDestroy, +0x180 m_allowRecruiting, +0x1b0
+  m_controlId, +0x1c8 m_treeId, +0x1e0 m_requestPriority, +0x1f8
+  m_recruitPriority, +0x210 m_presentValue, +0x268 m_name (0x7cb930
+  (FinalRelease 0x540250) returns it for the contract line), +0x370
+  m_operationId, +0x378 m_managedContracts. The reset 0x7d3670 (FinalRelease
+  0x544020) sets +0x170's value to 1: the Release's "marked (+0x3c8)" is
+  m_allowRecruiting.
+- THE OPERATIONS: Military (Player +0x680) +0x1f0 a list (node +0 the
+  operation, +0x10 the next; 0x723cf0 (FinalRelease 0x4cf450) and the log
+  0x727510 (FinalRelease 0x4d26e0) walk it). An operation (constructor
+  0x733730 (FinalRelease 0x4d80b0)): +0xa8 m_opDefinition (its first bytes
+  the name, the "%s running" line), +0x138 m_controlId, +0x150 the teams
+  (0x118 bytes each, inline; their count +0x160: 0x73b360 (FinalRelease
+  0x4dee80)), +0x178 / +0x180 / +0x184 m_target (the enemy, x, y), +0x1a8
+  m_rallyPoint, +0x1c0 m_blockedTurns, +0x1d8 m_backupTarget, +0x208
+  m_forceTargetSwitch, +0x220 m_opStrength, +0x238 m_targetStrength, +0x250
+  m_currentCombatStrength, +0x268 m_forceReady, +0x280 m_warReady, +0x298
+  m_isEmergency, +0x2e0 m_treeControlId (0x73a840 (FinalRelease 0x4de360)
+  asks the Control Manager for it), +0x2f8 m_treeManagerId. A team: +0x18 its
+  members' unit ids, their count +0x28 (0x73b4f0 (FinalRelease 0x4def30)
+  prints them through Player::Units' lookup 0x4f2310 (FinalRelease 0x2c4360):
+  +0x98 the units' pages, as the controls'; a unit's type +0xc8). An
+  operation the military manager starts after the tactical step stands at
+  the end look, not at that step (runs/h1_duelm1117 t3, Qin's Settle New
+  City), and one started and completed in one turn at neither: the
+  operations at the tactical step are AI_Operation.csv's "running" lines on
+  789 of 836 player-turns.
+- A UNIT'S EXPERIENCE: m_kExperience at unit +0x960 (the Unit constructor
+  FinalRelease 0x39b140), its object +0x970 (the Release's +0x1bc0; 0x1fc100
+  (FinalRelease 0x14fa10) asks 0x116f80 (FinalRelease 0x2af30) of unit
+  +0x970): +8 the promotion flag, +0xc the experience points, +0x10 the level
+  (seed 1117 t21: Qin's Warrior 131073 at 11, as GetExperiencePoints; the
+  operations' members at the end look against the next record's units:
+  1,284 of 1,305, the rest gaining experience after the end look).
+- THE ONE-OFFS: PlayerStats (Player +0x710) +0xa0 m_iMaxMeleeStrengthTrained
+  (the Release's +0xf0; 0x4d9320 (FinalRelease 0x743c0) reads +0xa0; the
+  Free Cities' 0 at their start); Player::Cities (Player +0x6d0) +0xec, the
+  Release's "+0x12f0 +0xf4" (0x198310 (FinalRelease 0x111920) reads +0xec);
+  the generator's state and count at every site.
+- COST, MEASURED (runs/h1_duelm1117, 250 turns): 7,224 reads, the game
+  thread standing 7.9 s in all — 32 ms a turn, 1.1 ms a read, the stub's
+  spin and the reader's ReadProcessMemory calls together; 19 MB of lines.
+  Through t164 the turns took about 2 s each, as in the recording without
+  the reader (runs/h1_duelw1117).
+- THE REPLAY WITH THE READER ON (runs/h1_duelm1117 against
+  runs/h1_duelw1117, `h1/samegame.py`): every record section equal through
+  t164; at t165 player 0's Dedication (COMMEMORATION_EXPLORATION) and its
+  age change stand in the new record and not the old — the recorder's
+  `lab.wait_turn` answers the ENDTURN_BLOCKING_COMMEMORATION_AVAILABLE blocker
+  of the autoplayed seat only once a turn has stood 5 s, which t165 did in the
+  new recording (17 s, a World Congress screen) and not in the old (2 s; its
+  blocker answered at t168, under the victory screen); the records' seed
+  equal through t166, the draws through draw 11,833 (t166's Random Direction
+  then draws in 8 against 5); every section parts from t167. The two older
+  recordings of the seed (runs/h1_duelw1117, runs/h1_duelv1117) part the
+  same way at t245 (the Dedication answered there in one, not the other),
+  their draws equal to the end.
+
 ## H-1: a pillaged building's specialist, the centre's defence, three moments — READ
 
 - A plot's capacity (0x195940) counts a district's specialist slots as its

@@ -281,7 +281,10 @@
       turn: 53
       value: 1118 t53 woke 803 at index 0 of [803, 534], 1117 t154 827 at index 1 of [206, 827], each the generator's placement order;
   impl: [cpu/harness/eventPick.ts:followVolcanoes]
-  readings: ["C-74: the volcano roll's gate — READ", "H-1: the volcano roll's branches and order — READ"]
+  readings:
+    - "C-74: the volcano roll's gate — READ"
+    - "H-1: the volcano roll's branches and order — READ"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...is ≥ 200; at or above it, no draw without an active volcano. \"Choose Active Volcano Roll\" 0xa20f20 draws rand(N' − active) and walks the entries skipping the active and the unnamed. On run..."
     - "0x335040: the wake branch (active share under 70) draws \"Choose Active Volcano Roll\" (0xa20f20: the entries of the volcano vector +0x160, stride 0xa0, not active and named; the chosen..."

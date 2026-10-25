@@ -1550,3 +1550,71 @@
   context:
     - "...the AI's spawn waits: 0x4a10ed's tail jumps to a stub in the .text section's file slack (0x9b6630, VirtualSize raised to the raw size) that spawns the list and tail-jumps to the wait 0x4a..."
   review: imported
+- addr: 0x9b6660
+  binary: F
+  kind: global
+  name: the AI memory hooks' stubs
+  semantics: |
+    The .text file slack past the replay patch's cave: the common routine
+    (gate test, lock, the mailbox's registers, the sequence, the PAUSE spin
+    on the acknowledgement, about 40 s at most) and one stub per hooked site
+    (aimem_hook.py builds them; written into the process only).
+  status: READ
+  cases:
+    - recording: h1_duelm1117
+      value: every turn's start, tactical, log and end-look reads of all seven players, the game replaying runs/h1_duelw1117
+  impl: [tools/civ6lab/aimem_hook.py:build]
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- addr: 0x9b67c0
+  binary: F
+  kind: global
+  name: the AI memory hooks' mailbox
+  semantics: |
+    +0 gate, +4 lock, +8 sequence, +0xc acknowledgement, +0x10 the site, +0x18
+    rcx, +0x20 rdx, +0x28 r8, +0x30 r9, +0x38 the return address, +0x40 the
+    stack pointer, +0x48 the end look's saved return, +0x50 its Targets.
+  status: READ
+  cases:
+    - recording: h1_duelm1117
+      value: the reader's protocol (aimem.py watch)
+  impl: [tools/civ6lab/aimem_hook.py:MAIL]
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- addr: 0xb8aa68
+  binary: F
+  kind: global
+  name: the game
+  semantics: |
+    The game object's pointer: +0xc0 the game turn (the logs' turn column),
+    +0xf0 the synchronous generator (+0xf8 its state, the RandCalls seed
+    column after the draw; +0xfc its draw count), +0x240 the players'
+    manager.
+  status: READ
+  cases:
+    - recording: h1_duelm1117
+      turn: 1
+      value: +0xc0 1 at the first record; +0xf0 +8 equals Lua's Game.GetRandomSeed()
+  impl: [tools/civ6lab/aimem.py:G_GAME]
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- addr: 0xb8e140
+  binary: F
+  kind: global
+  name: the players' manager
+  semantics: |
+    +0x20 the array of Players by id (0..63); a Player's +0xd8 its id, +0x650..
+    +0x780 its AI and gameplay components (dll_readings.md "H-1: the AI memory
+    reader").
+  status: READ
+  cases:
+    - recording: h1_duelm1117
+      turn: 1
+      value: players 0-4, 62, 63 at their ids, each +0xd8 its own id
+  impl: [tools/civ6lab/aimem.py:G_PLAYERS]
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed

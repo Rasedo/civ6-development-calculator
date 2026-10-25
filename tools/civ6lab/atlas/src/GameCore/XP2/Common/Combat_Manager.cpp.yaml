@@ -25,6 +25,19 @@
   context:
     - "- An attack ends the attacker's fortification: 0x1fbae0 sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0)...."
   review: imported
+- addr: 0x1fc100
+  final: 0x14fa10
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 21
+      value: "0x1fc100   (FinalRelease 0x14fa10) asks 0x116f80 (FinalRelease 0x2af30) of unit   +0x970): +8 the promotion flag, +0xc the experience points, +0x10 the level   (seed 1117 t21: Qin's Warrior 131073 at "
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...(the Unit constructor FinalRelease 0x39b140), its object +0x970 (the Release's +0x1bc0; 0x1fc100 (FinalRelease 0x14fa10) asks 0x116f80 (FinalRelease 0x2af30) of unit +0x970): +8 the..."
+  review: imported
 - addr: 0x200e10
   kind: function
   status: PARTLY

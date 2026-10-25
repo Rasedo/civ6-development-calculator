@@ -171,7 +171,9 @@
     - recording: h1_duelw1130
       turn: 95
       value: "runs/h1_duelw1130   Rome t95 reads 18.671875 and t100 18.4375 with China's Taiyuan (8 at 9   tiles) and Handan (3, then 4, at 7) at 1.875 a citizen, the unraised term   reading the full 20 (`citizenPr"
-  readings: ["C-94: trade posts and cultural dominance — READ"]
+  readings:
+    - "C-94: trade posts and cultural dominance — READ"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...per-work pressure no install row writes), shifted to 24.8, times the per-citizen term (0x1a1370: base, capital, age); where the city's owner dominates the plot's owner (+0x1b8 again..."
   review: imported

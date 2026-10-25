@@ -15,6 +15,19 @@
   context:
     - "...the first offer (the units in no job, not done, alive) player signal +0x1c8 is raised (0x6075b0) with the recruit's priority (the tree's +0x5a8, else its operation's 0x723b90: the roo..."
   review: imported
+- addr: 0x609060
+  final: 0x4019f0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 11
+      value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...trol: +0 its id, +4 its kind, +0x10 its object; a free entry holds the next free index; 0x609060 (FinalRelease 0x4019f0) the lookup by id). A contract's watched fields (vtable, owner,..."
+  review: imported
 - addr: 0x6092c0
   final: 0x401ba0
   kind: function

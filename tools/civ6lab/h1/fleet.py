@@ -24,6 +24,9 @@ games or restart with one; the bytes a game wrote to each are copied to
 profile, `game.logs_dir`), so games on several hosts never mix rows.
 The instances must already stand at the main menu (`h4.py spawn` / `menu`),
 spawned through `game.spawn` so each runs in its host's profile.
+`--aimem` runs the AI memory reader beside each game (`aimem.py watch`,
+started before the host loads the game DLL, armed before the first turn):
+`<dump stem>.aimem.jsonl`, the manifest's `aimem` its path and last line.
 """
 from __future__ import annotations
 
@@ -43,8 +46,11 @@ ROOT = LAB.parents[1]
 RUNS = LAB / "runs"
 PY = sys.executable
 sys.path.insert(0, str(LAB))
+import aimem  # noqa: E402
+import aimem_hook  # noqa: E402
 import game  # noqa: E402
 import logstore  # noqa: E402
+import procmem  # noqa: E402
 
 
 # the AI's behaviour-tree trace runs to 150 MB a game and carries no rule
@@ -116,6 +122,55 @@ def bounded(cmd: list[str], seconds: float, log: pathlib.Path) -> tuple[int, str
     return rc, (out or "")[-2000:]
 
 
+class MemoryWatch:
+    """The AI memory reader beside one game (`aimem.py watch`): started
+    before the game is hosted, it arms the DLL the host loads, so its hooks
+    stand before the first turn (`wait_armed`); `stop` closes the gate
+    through the stop file and returns the reader's last line."""
+
+    def __init__(self, host: str, out: pathlib.Path, log: pathlib.Path):
+        self.out, self.stopfile = out, out.with_suffix(out.suffix + ".stop")
+        self.stopfile.unlink(missing_ok=True)
+        self.lines: list[str] = []
+        self.proc = subprocess.Popen([PY, str(LAB / "aimem.py"), "--host", host, "watch", "--out", str(out)],
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT, text=True,
+                                     encoding="utf-8", errors="replace")
+        self.log = log
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self) -> None:
+        for ln in self.proc.stdout:
+            self.lines.append(ln.rstrip())
+            with open(self.log, "a", encoding="utf-8") as fh:
+                fh.write(f"[aimem] {ln}")
+
+    def wait_armed(self, host: str, limit: float = 60.0) -> bool:
+        """the game's DLL (loaded afresh by the host) carries the hooks and an
+        open gate"""
+        t0 = time.monotonic()
+        pm = None
+        while time.monotonic() - t0 < limit:
+            try:
+                pm = pm or procmem.ProcMem.of_host(host)
+                base = pm.module(aimem.DLL)
+                if base and pm.u32(base + aimem_hook.MAIL + aimem_hook.GATE) == 1 \
+                        and pm.read(base + aimem_hook.SITES[0][1], 5) != aimem_hook.SITES[0][2]:
+                    return True
+            except procmem.MemError:
+                pm = None
+            time.sleep(0.2)
+        return False
+
+    def stop(self, wait: float = 60.0) -> str:
+        self.stopfile.touch()
+        try:
+            self.proc.wait(timeout=wait)
+        except subprocess.TimeoutExpired:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.proc.pid)], capture_output=True)
+        self.stopfile.unlink(missing_ok=True)
+        return self.lines[-1] if self.lines else ""
+
+
 def game_turn(tail: str) -> int | None:
     for ln in reversed(tail.splitlines()):
         if "the game is at turn" in ln:
@@ -134,12 +189,17 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
         rec.update(end="crash", why=f"no main menu: {tail[-300:]}")
         return rec
     log_start = log_sizes(host)  # the new game's set-up rows are its own
+    mem = MemoryWatch(host, dump.with_suffix(".aimem.jsonl"), log) if a.aimem else None
     rc, tail = bounded([PY, str(LAB / "game.py"), "--host", host, "new", "--config", a.config,
                         "--map-seed", str(seed), "--game-seed", str(seed + 1000), "--wait", str(a.chunk - 10)],
                        a.chunk + 10, log)
     if rc != 0 or "in game" not in tail:
+        if mem:
+            mem.stop()
         rec.update(end="crash", why=f"new game failed: {tail[-300:]}")
         return rec
+    if mem and not mem.wait_armed(host):
+        rec["aimem"] = {"armed": False}
     last, still = 0, 0
     while True:
         rc, tail = bounded([PY, str(HERE / "dump.py"), "--host", host, "--deadline", str(a.chunk), "play",
@@ -159,6 +219,8 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
             rec["end"] = "game_over"
             break
     rec["turn"] = last
+    if mem:
+        rec["aimem"] = {**rec.get("aimem", {}), "path": str(mem.out), "end": mem.stop()}
     bounded([PY, str(LAB / "h4.py"), "--host", host, "--deadline", "30", "lua", "--state", "InGame",
              "Events.ExitToMainMenu()"], 40, log)
     rec["logs"] = save_logs(host, log_start, dump)
@@ -248,6 +310,8 @@ def main(argv=None) -> int:
     s.add_argument("--chunk", type=float, default=170.0, help="wall seconds per game call")
     s.add_argument("--report-timeout", type=float, default=1800.0)
     s.add_argument("--keep-open", action="store_true", help="leave each instance running when its queue empties")
+    s.add_argument("--aimem", action="store_true",
+                   help="read the AI memory at the logs' moments beside each game (aimem.py, <dump stem>.aimem.jsonl)")
     s.set_defaults(fn=cmd_run)
     s = sub.add_parser("summary")
     s.add_argument("manifest")

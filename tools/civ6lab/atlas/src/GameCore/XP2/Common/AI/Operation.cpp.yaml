@@ -162,6 +162,7 @@
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t list (+0x60), the tribe's next turn starting it at CityAttackBoldness. The tree done, 0x73a840 finds the operation's tree gone and the manager ends it (\"Operation complete\", 0x725000..."
@@ -243,9 +244,19 @@
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ning lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
+  review: imported
+- addr: 0x73b4f0
+  final: 0x4def30
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...or it), +0x2f8 m_treeManagerId. A team: +0x18 its members' unit ids, their count +0x28 (0x73b4f0 (FinalRelease 0x4def30) prints them through Player::Units' lookup 0x4f2310 (FinalReleas..."
   review: imported
 - addr: 0x73b6c0
   final: 0x4df100

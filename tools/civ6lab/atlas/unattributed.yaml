@@ -200,6 +200,15 @@
   context:
     - "...dd70: the count 0x5cbc0(2) + 18 = 37, f(0) = 1, f(n) = f(n-1) + 6n; each plot through 0x5d1e0 -> 0x5d000, off the map or off any region skipped, one equal to the centre's skipped; e..."
   review: imported
+- addr: 0x5d3e0
+  final: 0x44f00
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - ...rray of Players by id (0x37b760 (FinalRelease 0x26c770) reads it; the game's own lookup 0x5d3e0 (FinalRelease 0x44f00) takes game +0x240 +0x20, 0x8a08a0 (FinalRelease 0x63d080)); a Pl...
+  review: imported
 - addr: 0x69010
   final: 0x4ddc0
   kind: function
@@ -557,6 +566,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
     - "C-99: a unit's experience is never spent — LAB on the records, ported"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...ion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv); 0x774970 then runs..."
   review: imported
@@ -1187,6 +1197,15 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...) and, on reaching the type's EstablishTurns (0x433180), raises \"Governor Established\" (0x35e5f0); then the neutralize clock (0x35e1f0 > 0 -> 0x35d220(-1), \"returning to service\" at..."
+  review: imported
+- addr: 0x37b760
+  final: 0x26c770
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...players: FinalRelease 0xb8e140, the players' manager, +0x20 the array of Players by id (0x37b760 (FinalRelease 0x26c770) reads it; the game's own lookup 0x5d3e0 (FinalRelease 0x44f00)..."
   review: imported
 - addr: 0x37b7a0
   kind: function
@@ -2058,6 +2077,19 @@
   impl: [cpu/core/aiContracts.ts:faithPurchasable]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0x600800
+  final: 0x3fd780
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 11
+      value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...them): +0xb0 m_status (the progress: 0x5f4cd0 (FinalRelease 0x3f97e0) prints the name 0x600800 (FinalRelease 0x3fd780) takes for it), +0xc8 m_priority, +0xe0 m_timeLimit, +0xf8 m_tim..."
+  review: imported
 - addr: 0x600b00
   final: 0x3fda30
   kind: function
@@ -2066,9 +2098,23 @@
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ugh the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8 holds weak handles, and 0x5d4d70's head skips an emptied one wit...
+  review: imported
+- addr: 0x6072d0
+  final: 0x4007d0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 11
+      value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - ...(Player +0x6b0) +0x170 a vector of every live contract of the player, its count +0x180 (0x6072d0 (FinalRelease 0x4007d0) finds one by id there); +0x110 the controls' pages (8 entries o...
   review: imported
 - addr: 0x610440
   final: 0x405b50
@@ -2950,6 +2996,7 @@
     - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   review: reviewed
 - addr: 0x723db0
   kind: function
@@ -4487,6 +4534,20 @@
   context:
     - "- Send Trade Route (0x84b520): the actor runs no route to the minor (0x54ff90 == 0); done when the actor starts on..."
   review: imported
+- addr: 0x84ed50
+  final: 0x5a8250
+  kind: function
+  name: PlayerTurnStarted's raise
+  semantics: "rdx the player: the Lua GameEvents.PlayerTurnStarted raised with its id (+0xd8); the AI memory reader's site 5 (a player's turn start)"
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: 0x5ed280 (FinalRelease 0x3f3e90), the knowledge base's   log, AI_Knowledge.csv's moment;
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - ...the end look on player signal +0x228, whose return the stub redirects to a fourth site; 0x84ed50 (FinalRelease 0x5a8250), the raise of the Lua PlayerTurnStarted (rdx the player), a pla...
+  review: imported
 - addr: 0x8808f0
   final: 0x5ccf90
   kind: function
@@ -4897,6 +4958,24 @@
   context:
     - "...tricts +0xe1 bit 4 — the Wonder district), is complete (District +0xb08, Lua IsComplete 0x9c83d0) and not pillaged (+0xc88, 0x24c3a0); AdjacentTerrain: the plot's terrain (+0x2c) alone..."
     - "...0, the district at the plot's id) is complete (district +0xb08, Lua `District:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers t..."
+  review: imported
+- addr: 0x9c98d0
+  final: 0x6d3ce0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...c; 0x9ccff0 (FinalRelease 0x6d77f0), Lua's GetRandomSeed, reads game +0xf0 +8 through 0x9c98d0 (FinalRelease 0x6d3ce0); game +0x240 is the players' manager). The players: FinalReleas..."
+  review: imported
+- addr: 0x9ccff0
+  final: 0x6d77f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...urn +0xc0, the synchronous generator at +0xf0: its state +0xf8, its draw count +0xfc; 0x9ccff0 (FinalRelease 0x6d77f0), Lua's GetRandomSeed, reads game +0xf0 +8 through 0x9c98d0 (Fin..."
   review: imported
 - addr: 0xa2ed80
   final: 0x7316e0
@@ -5638,6 +5717,19 @@
   context:
     - "...se). A card's modifiers attach on the \"policy added\" signal (GameSignals +0x11a0, handler 0xc97410, \"Policy Enacted - Attaching modifiers\") and detach on \"policy removed\" (+0x11b8, 0xc9778..."
   review: imported
+- addr: 0xcb67d0
+  final: 0x5ed260
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 3
+      value: "MEASURED: at the log site the records' per-type counts and oldest ages are   AI_Knowledge.csv's ARMY lines on every player-turn read (seed 1117, t3-t10:   56 of 56;"
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...0x5ed280 (FinalRelease 0x3f3e90) reads +0x18, +0x638, +0x648, +0x668, +0x6d8, +0x6e8 as 0x5ed280 does): +0x18 per owner id a 0x18-byte vector (+0 the per-type array, +0x10 its count),..."
+  review: imported
 - addr: 0xcc6080
   final: 0x991860
   kind: function
@@ -5687,6 +5779,108 @@
   context:
     - ...the rank, L = ceil(+0x6420 x 0.25) / ceil(+0x6420 x 0.5) / +0x6420 by the mode (ceilf, 0xcef33c; +0x6420 the majors met counted by 0x647f10, the owner among them), 0 where n > L, else...
   review: imported
+- addr: 0x39b140
+  binary: F
+  kind: function
+  name: Unit constructor
+  semantics: m_kExperience at +0x960, its object +0x970 (+8 the promotion flag, +0xc the points, +0x10 the level)
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 21
+      value: "0x1fc100   (FinalRelease 0x14fa10) asks 0x116f80 (FinalRelease 0x2af30) of unit   +0x970): +8 the promotion flag, +0xc the experience points, +0x10 the level   (seed 1117 t21: Qin's Warrior 131073 at "
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "- A UNIT'S EXPERIENCE: m_kExperience at unit +0x960 (the Unit constructor FinalRelease 0x39b140), its object +0x970 (the Release's +0x1bc0; 0x1fc100 (FinalRelease 0x14fa10) asks 0x116..."
+  review: imported
+- addr: 0x3f6c00
+  binary: F
+  kind: function
+  name: the civic contract's constructor
+  semantics: +0x168 m_goalCivic, +0x180 m_nextCivic (values +0x10 on); vtable 0x9fa870
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 11
+      value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...goalTech, +0x190 m_nextTech, +0x1a8 m_bestController), the civic contract (FinalRelease 0x3f6c00: +0x178 m_goalCivic, +0x190 m_nextCivic), the Purchase Plot contract (FinalRelease 0x..."
+  review: imported
+- addr: 0x3f6e20
+  binary: F
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_CityBuild.csv
+      value: "of the 967 contracts read, AI_CityBuild.csv never names 290: 109   goal techs, 11 goal civics, 48 Purchase Plots, 6 diplomatic actions, 116   build contracts."
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...+0x588, +0x5e8) are these in order. A fifth kind, the diplomatic action's (FinalRelease 0x3f6e20: +0x178 m_enemy, +0x190 m_action), stands in Qin's list (runs/h1_duelm1117, contracts 4..."
+  review: imported
+- addr: 0x3f7040
+  binary: F
+  kind: function
+  name: the Purchase Plot contract's constructor
+  semantics: "+0x168 m_purchasePlot (its value +0x178: x, y); vtable 0x9fa930"
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 11
+      value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...00: +0x178 m_goalCivic, +0x190 m_nextCivic), the Purchase Plot contract (FinalRelease 0x3f7040: +0x178 m_purchasePlot x, y). The Release fields cited for the contract (+0x100 progres..."
+  review: imported
+- addr: 0x3f7180
+  binary: F
+  kind: function
+  name: the tech contract's constructor
+  semantics: +0x168 m_goalTech, +0x180 m_nextTech, +0x198 m_bestController (values +0x10 on); vtable 0x9fa728
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 11
+      value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...ion x, y, +0x1d8 m_requiredCity, +0x1f0 m_keepControl), the tech contract (FinalRelease 0x3f7180: +0x178 m_goalTech, +0x190 m_nextTech, +0x1a8 m_bestController), the civic contract (Fi..."
+  review: imported
+- addr: 0x3f7480
+  binary: F
+  kind: function
+  name: the build contract's constructor
+  semantics: +0x168 m_desiredUnit, +0x180 m_desiredBuilding, +0x198 m_desiredDistrict, +0x1b0 m_desiredLocation, +0x1c8 m_requiredCity, +0x1e0 m_keepControl (values +0x10 on); vtable 0x9fa5e0
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 11
+      value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...s a handle {pointer, owner, id}). Its kinds by vtable: the build contract (FinalRelease 0x3f7480: +0x178 m_desiredUnit, +0x190 m_desiredBuilding, +0x1a8 m_desiredDistrict, +0x1c0 m_d..."
+  review: imported
+- addr: 0x3fc9d0
+  binary: F
+  kind: function
+  name: Control::Contract constructor
+  semantics: "names the contract's watched fields: +0xa0 m_status (value +0xb0), +0xb8 m_priority, +0xd0 m_timeLimit, +0xe8 m_timeEstimate, +0x100 m_id, +0x118 m_owner, +0x130 m_player, +0x148 m_extraPresentValue; each watched field 0x18 bytes, its value at +0x10"
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 11
+      value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...contract's watched fields (vtable, owner, value at +0x10; the constructor FinalRelease 0x3fc9d0 names them): +0xb0 m_status (the progress: 0x5f4cd0 (FinalRelease 0x3f97e0) prints the..."
+  review: imported
 - addr: 0x4136b0
   binary: F
   kind: function
@@ -5696,4 +5890,15 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...n: City Analysis (0x3e2590), Policy Tree / Civic Tree / Great Work Collection Analysis (0x4136b0), Espionage (0x45cf70), Governor Analyzer (0x4a79b0), Victory Conditions + Settle Cit..."
+  review: imported
+- addr: 0x53e4d0
+  binary: F
+  kind: function
+  name: BehaviorTree constructor
+  semantics: "the tree's watched fields: +0x128 m_isActive, +0x140 m_isTemporary, +0x158 m_markForDestroy, +0x170 m_allowRecruiting, +0x1a0 m_controlId, +0x1b8 m_treeId, +0x1d0 m_requestPriority, +0x1e8 m_recruitPriority, +0x200 m_presentValue, +0x258 m_name, +0x360 m_operationId (values +0x10 on), +0x378 m_managedContracts; its control interface at +0x218 (vtable 0xa0c238, +8 the tree)"
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...(the tree +0x218; its +8 the tree): the tree's watched fields (constructor FinalRelease 0x53e4d0) +0x138 m_isActive, +0x150 m_isTemporary, +0x168 m_markForDestroy, +0x180 m_allowRecrui..."
   review: imported

@@ -78,6 +78,17 @@
   context:
     - "- The research and civic overflows (`m_xResearchOverflow`, serializer 0x4c6dc2; `m_xCulturalOverflow`, 0x38a93a): only the members are read; the records fit the produ..."
   review: imported
+- addr: 0x5c4f40
+  final: 0x3db2f0
+  kind: function
+  name: AI::CityBuild constructor
+  semantics: "FinalRelease: +0x98 m_cityId (value +0xa8), +0xb0 m_playerOwner, +0xc8 m_cityThreat, +0x140 m_managedWorkingContract (the handle +0x150), +0x160 m_managedContracts (+0x10 the handles, +0x18 their count)"
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "- THE HOLDERS: a CityBuild (constructor 0x5c4f40 (FinalRelease 0x3db2f0)): +0xa8 m_cityId, +0xc0 m_playerOwner, +0xd8 m_cityThreat, +0x1..."
+  review: imported
 - addr: 0x5ff390
   kind: function
   status: READ
@@ -95,6 +106,16 @@
   context:
     - "...the vector of weak handles) + 0.5 (@d5aff0, @d20458). The base contract's constructor (0x5ff390) writes +0x160 0; its other writer is unread — LAB: read as 1 for a listed contract (..."
   review: imported
+- addr: 0x6190d0
+  final: 0x40e8c0
+  kind: function
+  name: CultureAi
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...x268, the purchases), Research (0x75e7a0 (FinalRelease 0x4f70f0): +0x178), CultureAi (0x6190d0 (FinalRelease 0x40e8c0): +0x218), Diplomatic (0x6419c0 (FinalRelease 0x4271a0): +0x6158..."
+  review: imported
 - addr: 0x6419c0
   final: 0x4271a0
   kind: function
@@ -104,6 +125,7 @@
       value: "On every   logged row the threat stands T is the weight (n = 1): solved from the   missions' paired desire and cost rows (`.claude/scratchpad` solveT.py) —   runs/h1_duelv1127 Qin toward Rome T = 10 o"
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - ...L = trunc(+0x6420 x 0.25 / 0.5) or +0x6420 by the mode (+0x6420 is 0 in the constructor 0x6419c0, its writer unread), 0 where n > L, else 10 / 20 / 40 x (L - n + 1) / L; negated withou...
   review: imported
@@ -142,6 +164,17 @@
   context:
     - "...LAB: +0x4b8's writer (the only displacement writes are the military AI's constructor 0x71a960 at 0x71b68a and 0x264296); the Free Cities Raid's target as an operation near the city..."
   review: imported
+- addr: 0x733730
+  final: 0x4d80b0
+  kind: function
+  name: AI::Operation constructor
+  semantics: "FinalRelease: +0x98 m_opDefinition (value +0xa8), +0x128 m_controlId, +0x140 m_teams (+0x150 the teams, 0x118 each; count +0x160), +0x168 m_target (+0x178 enemy, +0x180 x, +0x184 y), +0x198 m_rallyPoint, +0x1b0 m_blockedTurns, +0x1c8 m_backupTarget, +0x1f8 m_forceTargetSwitch, +0x210 m_opStrength, +0x228 m_targetStrength, +0x240 m_currentCombatStrength, +0x258 m_forceReady, +0x270 m_warReady, +0x288 m_isEmergency, +0x2d0 m_treeControlId, +0x2e8 m_treeManagerId"
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...450) and the log 0x727510 (FinalRelease 0x4d26e0) walk it). An operation (constructor 0x733730 (FinalRelease 0x4d80b0)): +0xa8 m_opDefinition (its first bytes the name, the \"%s runni..."
+  review: imported
 - addr: 0x74af30
   final: 0x4e9d60
   kind: function
@@ -151,6 +184,16 @@
       value: "Its log AI_Religious.csv (header 0x750500, writer 0x750e30: \"%d, %d, %s, %3.1f\" per entry)."
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - AI::Religious (the player AI's, constructor 0x74af30; members m_isInitialized, m_priority, m_favoredReligion +0x168 (data +0x1c0), m_mustFound...
+  review: imported
+- addr: 0x75e7a0
+  final: 0x4f70f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...their count). The same container in the Economic AI (+0x268, the purchases), Research (0x75e7a0 (FinalRelease 0x4f70f0): +0x178), CultureAi (0x6190d0 (FinalRelease 0x40e8c0): +0x218),..."
   review: imported
