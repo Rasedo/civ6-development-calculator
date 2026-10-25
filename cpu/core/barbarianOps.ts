@@ -252,7 +252,7 @@ export function barbOpRecord(state: GameState, tribe: BarbTribe): number[] {
   const members = opUnits(op);
   const living = members.filter((id) => unitOf(state, id)).length;
   return [tribe.op.assault ? 2 : 1, tribe.op.target.seat, op.target, op.rally, op.enemy, op.id,
-    at(m.seq, 'resume'), at(m.recruit, 'start'), at(m.raid, 'start'), living, members.length - living];
+    at(m.seq, 'resume'), at(m.recruit, 'start'), at(m.raid, 'start'), living, (op.killed ?? 0) + members.length - living];
 }
 
 /**
@@ -265,6 +265,16 @@ export function barbarianOpsTurn(state: GameState): void {
   const ai = state.barbSeat.ops;
   if (!ai || !opsOf(ai).length) return;
   const env = barbEnv(state, null);
+  // the members killed leave their teams, counted to their operation
+  for (const op of opsOf(ai)) {
+    for (const t of op.teams) {
+      const living = t.members.filter((id) => unitOf(state, id));
+      const gone = t.members.length - living.length;
+      if (!gone) continue;
+      t.members = living;
+      op.killed = (op.killed ?? 0) + gone;
+    }
+  }
   // a running operation's candidate names its backup (0x727510 -> 0x73e610,
   // before the operations' strengths are refreshed at 0x727c74): its target
   // from its own, at the strength its last refresh left (none on the turn

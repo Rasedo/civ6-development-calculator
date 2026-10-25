@@ -283,6 +283,9 @@ interface Ctx {
   gameMemory?: GameMemory;
   /** per seat its knowledge base as its last tactical turn logged it */
   armyLogged: Map<number, ArmyLogged>;
+  /** each unit's type as the city-states' and Free Cities' turns left the
+   *  units (the moment of their end looks), by id */
+  minorLookTypes: Map<number, string>;
   memoryClean: Map<number, boolean>;
   civicScores: Record<ResearchParty, ResearchScoreTally>;
   majorCivicEntries: Map<number, CivicEntry[]>;
@@ -4172,7 +4175,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies, majorCivicEntries: new Map(),
-    scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(),
+    scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), minorLookTypes: new Map(),
     // a game from its first turn opens on no memory, the game's as well
     memoryClean: new Map([...first.playerOfSeat].filter(([seat]) => minorAiSeat(seat) || isBarbSeat(seat)).map(([, p]) => [p, recs[0].turn <= 1] as const)),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
@@ -4491,6 +4494,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       } finally {
         holdMinorStart(null);
       }
+      ctx.minorLookTypes = new Map(state.units.map((u) => [u.id, gameTypeOf('unit', u.type, 'UNIT_')]));
       takeBarbs();
       worldCongress(state);
       turnClose(state);
@@ -4694,7 +4698,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         if (pid === undefined) continue;
         const logged = ctx.armyLogged.get(s.seat);
         const playerOf = (seat: number) => ctx.playerOfSeat.get(seat) ?? seat;
+        // a minor's members as its end look saw them, before the barbarians'
+        // turn; the barbarians' as their own turn left them
         const unitType = (id: number) => {
+          if (!isBarbSeat(s.seat)) return ctx.minorLookTypes.get(id);
           const u = state.units.find((x) => x.id === id);
           return u ? gameTypeOf('unit', u.type, 'UNIT_') : undefined;
         };
@@ -4704,8 +4711,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         for (const m of reads) {
           scoreDecision(report.memory, m.kind, a.turn, `p${pid}`, m.equal, m.ours, m.game);
           // REPLAY_TRACE=memory: each kind that differs
-          if (!m.equal && TRACE.has('memory')) console.error(`t${a.turn} memory p${pid} ${m.kind} ours ${m.ours} | log ${m.game}`);
-        }
+          if (!m.equal && TRACE.has('memory')) console.error(`t${a.turn} memory p${pid} ${m.kind} ours ${m.ours} | log ${m.game}`);        }
         clean.set(pid, reads.every((m) => m.equal));
       }
       ctx.memoryClean = clean;

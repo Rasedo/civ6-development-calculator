@@ -83,6 +83,8 @@ export interface Operation {
   /** the formations Make Formation made: a civilian and its escort, which
    *  move as one */
   formations: [number, number][];
+  /** the members killed that left its teams (the barbarians' operations) */
+  killed?: number;
 }
 
 /** the operation's AiOperationDefs row */
