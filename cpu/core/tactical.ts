@@ -90,14 +90,16 @@ function enterable(state: GameState, unit: Unit, t: Tile, foes: ReadonlySet<numb
   return !encampmentBlocks(state, t, unit);
 }
 
-/** a major's territory closed to a city-state's unit: the major holds the
- *  open-borders civic (Early Empire) and is not at war with it — the planning
- *  of a city-state's units leaves such plots out (runs/h1_duelw1117 t32-37:
- *  city-state 4's Warriors' AI_Planning.csv rows never take China's (32,11)
- *  and (33,10) beside its own plots) */
-function majorClosedToMinor(state: GameState, seat: number, t: Tile): boolean {
+/** another player's territory closed to a city-state's unit: a major's or
+ *  another city-state's whose owner holds the open-borders civic (Early
+ *  Empire) and is not at war with it — the planning of a city-state's units
+ *  leaves such plots out (runs/h1_duelw1117 t32-37: city-state 4's Warriors'
+ *  AI_Planning.csv rows never take China's (32,11) and (33,10) beside its own
+ *  plots; runs/h1_duely1128: Bologna's Warriors plan onto Hong Kong's 9:6 and
+ *  8:7 to t39, none from t41, Early Empire Hong Kong's in record 41) */
+function closedToMinor(state: GameState, seat: number, t: Tile): boolean {
   const owner = tileSeat(t);
-  if (!isCiv(owner)) return false;
+  if (owner === seat || !(isCiv(owner) || isCityStateSeat(owner))) return false;
   return !!seatOf(state, owner)?.research.civics.includes(OPEN_BORDERS_CIVIC) && !civsAtWar(state, seat, owner);
 }
 
@@ -231,7 +233,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       let v = enters.get(t.index);
       if (v === undefined) {
         enters.set(t.index, (v = enterable(state, unit, t, foes, embarks)
-          && !(minor && majorClosedToMinor(state, unit.seat, t))));
+          && !(minor && closedToMinor(state, unit.seat, t))));
       }
       return v;
     },
@@ -487,13 +489,16 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number): number 
 
 /** the plots from the unit's to `dest`, the unit's own left out, by the
  *  pathfinder's path (its parents once `dest` closes); empty where none */
-export function pathTo(state: GameState, unit: Unit, dest: number): number[] {
+export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false): number[] {
   let found = null as PNode | null;
   search(state, unit, Infinity, true, (n) => {
     if (n.tile !== dest) return false;
     found = n;
     return true;
-  });
+  }, undefined, false, laterTurns);
+  // under flag 0x1000 the path's first turn may not end on the destination
+  // its own stacking unit holds
+  if (laterTurns && found && (found as PNode).turns <= 1 && stackedAt(state, unit, dest)) return [];
   const out: number[] = [];
   for (let n: PNode | null = found; n && n.parent; n = n.parent) out.push(n.tile);
   return out.reverse();
@@ -504,9 +509,12 @@ export function pathTo(state: GameState, unit: Unit, dest: number): number[] {
  *  ends it), the engine's step paying each; it walks through its own units
  *  but stops short of a plot of its own unit that stacks with it. A path
  *  ending on a plot it attacks into stops at its side, and with `strike`
- *  the unit strikes it there; a walk whose end `avoid` names stays put. */
-export function moveTo(state: GameState, unit: Unit, dest: number, strike = true, avoid?: (tile: number) => boolean): void {
-  let path = pathTo(state, unit, dest);
+ *  the unit strikes it there; a walk whose end `avoid` names stays put. With
+ *  `laterTurns` (the order's path flag 0x1000) the path's turns after its
+ *  first may end on a plot its own stacking unit holds, its first not. */
+export function moveTo(state: GameState, unit: Unit, dest: number, strike = true, avoid?: (tile: number) => boolean,
+  laterTurns = false): void {
+  let path = pathTo(state, unit, dest, laterTurns);
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
   const last = path.length ? path[path.length - 1] : -1;
@@ -571,15 +579,19 @@ function foreignAt(state: GameState, unit: Unit, tile: number): boolean {
   return state.units.some((u) => u.tileIndex === tile && u.seat !== unit.seat && onMap(u));
 }
 
-/** a unit of the unit's player on the plot that stacks with it, the unit
- *  itself counted (0x585eb0) */
-/** UNITOPERATION_SWAP_UNITS onto `tile` (0x972880): with a unit of its own
- *  stacking with it on the plot beside it, the unit steps there with its
- *  Movement and the other takes its plot; none, nothing */
-function swapUnits(state: GameState, unit: Unit, tile: number): void {
-  if (unit.movesLeft <= 0 || tile < 0 || plotDistance(state, unit.tileIndex, tile) !== 1) return;
+/** UNITOPERATION_SWAP_UNITS onto `tile` (0x972880; its partner 0x972540):
+ *  with a unit of its own stacking with it on the plot beside it, both with
+ *  Movement left (0x56c690; one whose moves an order of the pass ended has
+ *  none), the unit steps there with its Movement and the other takes its
+ *  plot; none, nothing (runs/h1_duely1128 t146: Hong Kong's Warrior 2424833
+ *  on 9:6 stays beside its centre, whose City Defense garrison fortified;
+ *  Bologna t154: its Warrior 2228224 swaps with the Trebuchet its completed
+ *  City Defense let go) */
+export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number): void {
+  if (unit.movesLeft <= 0 || pass.ended.has(unit.id) || tile < 0 || plotDistance(state, unit.tileIndex, tile) !== 1) return;
   const dom = unitDomain(unit.type);
-  const other = state.units.find((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom);
+  const other = state.units.find((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom
+    && u.movesLeft > 0 && !pass.ended.has(u.id));
   if (!other) return;
   const from = unit.tileIndex;
   other.tileIndex = from;
@@ -587,6 +599,8 @@ function swapUnits(state: GameState, unit: Unit, tile: number): void {
   if (unit.tileIndex !== tile) other.tileIndex = tile;
 }
 
+/** a unit of the unit's player on the plot that stacks with it, the unit
+ *  itself counted (0x585eb0) */
 export function stackedAt(state: GameState, unit: Unit, tile: number): boolean {
   const dom = unitDomain(unit.type);
   return state.units.some((u) => u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom);
@@ -1864,7 +1878,7 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
     // holding the spot beside it; then, short of the spot, the move
     // (UNITOPERATION_MOVE_TO, 0x962030) where no unit at war (0x5862e0) nor
     // of its own stacking with it (0x585eb0) holds the spot
-    swapUnits(state, u, a.move);
+    swapUnits(state, pass, u, a.move);
     if (state.units.includes(u) && u.tileIndex !== a.move && !enemyAt(state, u, a.move) && !stackedAt(state, u, a.move)) {
       moveTo(state, u, a.move);
     }

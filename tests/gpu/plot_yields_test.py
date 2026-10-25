@@ -57,20 +57,12 @@ def fresh(rules, path) -> BatchSim:
     return warm_base(str(path), lambda: opened(rules, path), _STATIC)
 
 
-OPEN = ["DESERT", "PLAINS", "GRASSLAND", "TUNDRA"]  # `OPEN_TERRAINS`' order on the wire
+TERR = {"GRASSLAND": 0, "PLAINS": 1, "DESERT": 2, "TUNDRA": 3, "SNOW": 4}  # `TERRAIN_IDS`' order
 
 
 def terr_idx(sim, name: str) -> int:
-    """A terrain index off the wire: the open-terrain list, or Snow from
-    Laurier's own rows (the wire carries no terrain id list)."""
-    if name in OPEN:
-        return int(RULES["uniques"]["openTerrains"][OPEN.index(name)])
-    assert name == "SNOW"
-    tundra = terr_idx(sim, "TUNDRA")
-    laurier = [i for i, l in enumerate(RULES["uniques"]["leaders"]) if l == "LAURIER"][0]
-    snow = {int(t) for t, ld in zip(sim._py_terr.tolist(), sim._py_leader.tolist()) if ld == laurier and int(t) != tundra}
-    assert len(snow) == 1, snow
-    return snow.pop()
+    """A land terrain's `TERRAIN_IDS` index."""
+    return TERR[name]
 
 
 def own_plot(sim, row: int) -> int:

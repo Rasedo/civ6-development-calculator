@@ -278,7 +278,18 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
   notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x2726b0
+  final: 0x1aa510
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...cost (plot vt +0x18) << 8 needs 0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4). Start (0x972a50): the unit's formation to the target (flags | 4), then the p..."
   review: imported
 - addr: 0x272880
   final: 0x1aa680

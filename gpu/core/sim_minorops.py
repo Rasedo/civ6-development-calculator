@@ -1208,7 +1208,7 @@ class SimMinorOps:
         if not bool(on.any()):
             city_hook(_CITY_AI_PASS)
             if upg:
-                self._mops_upgrade_trees(s, act, done)
+                self._mops_upgrade_trees(s, act, op, done)
             return
         tg = op["tg"] if op["tg"] is not None else self._tac_targets(self._mops_seat(s), self._mops_kb(s))
         view = {"op": op, "done": done, "tg": tg, "rows": None, "world": None,
@@ -1237,14 +1237,14 @@ class SimMinorOps:
                     if bool(m.any()):
                         self._mops_tick(s, k, d, m, view)
             if upg and prio == Tm.upgrade_priority:
-                self._mops_upgrade_trees(s, act, done)
+                self._mops_upgrade_trees(s, act, op, done)
         city_hook(_CITY_AI_PASS)
         busy = self._mops_busy(s) & self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
         done |= busy & on.unsqueeze(1) & (op["rowof"] >= 0)
         if bool(view["ended"].any()):
             self.major_unit_mp.copy_(torch.where(view["ended"], view["ended_mp"], self.major_unit_mp))
 
-    def _mops_upgrade_trees(self, s: int, act: torch.Tensor, done: torch.Tensor) -> None:
+    def _mops_upgrade_trees(self, s: int, act: torch.Tensor, op: dict, done: torch.Tensor) -> None:
         """`upgradeTreesTick` for minor `s` where `act` (its pass, `done` its
         units' turns): where a tree runs or the trigger stands — Find
         Available Unit's offer (the units in no job, their turn not done, then
@@ -1366,7 +1366,7 @@ class SimMinorOps:
             if not bool(m.any()):
                 continue
             dest = target.gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self._mops_move(s, us, dest, m)
+            self._mops_upgrade_move(s, us, dest, m, op["danger"])
         done |= held
         self.mops_upg[:, s, :P] = torch.where(go.unsqueeze(1), held, self.mops_upg[:, s, :P])
         self.mops_upg_on[:, s] = torch.where(go, live, self.mops_upg_on[:, s])
@@ -1751,6 +1751,48 @@ class SimMinorOps:
         uc = us.clamp(min=0)
         m &= (self._mops_u(s, "tile")[b, uc] != dest) & (self._mops_u(s, "mp")[b, uc] > 0) & (dest >= 0)
         self._tac_move_to(m, uc, dest, self._mops_pre(s), self._mops_seat(s), strike=False)
+
+    def _mops_upgrade_move(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor,
+                           danger: torch.Tensor) -> None:
+        """`upgradeMove` (MOVE UNIT's execution with no Location, 0x7eeba0):
+        the tree unit at local slot `us` [B] with Movement off its target
+        `dest`: a target on the danger map [B, T] only where its planning
+        reaches it this turn with Movement left; then, its own unit there
+        beside it, the swap onto it where that one has Movement left
+        (0x972880), else the move there (0x962030) under the path flag
+        0x1000, whose first turn may not end on the target its own unit
+        holds"""
+        pre, seat = self._mops_pre(s), self._mops_seat(s)
+        b = torch.arange(self.B, device=self.device)
+        uc = us.clamp(min=0)
+        dc = dest.clamp(min=0)
+        tile = self._mops_u(s, "tile")
+        here = tile[b, uc].clamp(min=0)
+        m = mask & (us >= 0) & (dest >= 0) & (tile[b, uc] != dest) & (self._mops_u(s, "mp")[b, uc] > 0)
+        hot = m & (danger.gather(1, dc.unsqueeze(1)).squeeze(1) > 0)
+        if bool(hot.any()):
+            rows = hot.nonzero(as_tuple=True)[0]
+            res = self._tac_search(rows, uc[rows], seat, 1, False, None, pre=pre)
+            ar = torch.arange(rows.shape[0], device=self.device)
+            ok = (res["turns"][ar, dc[rows]] > 0) & (res["moves"][ar, dc[rows]] > 0)
+            m[rows[~ok]] = False
+        if not bool(m.any()):
+            return
+        occ = self.military_at[b, dc]
+        own = (occ >= 0) & (self.unit_seat[b, occ.clamp(min=0)] == seat)
+        mp = self._mops_u(s, "mp")
+        other = (occ.clamp(min=0) - self.POOL_LO[pre]).clamp(min=0, max=mp.shape[1] - 1)
+        beside = m & own & (self.pair_dist[here, dc].to(torch.long) == 1)
+        sw = beside & (mp[b, other] > 0)
+        if bool(sw.any()):
+            self.military_at[b[sw], dc[sw]] = -1
+            self._tac_move_to(sw, uc, dc, pre, seat, strike=False)
+            there = sw & (tile[b, uc] == dest)
+            back = sw & ~there
+            tile[b[there], other[there]] = here[there]
+            self.military_at[b[there], here[there]] = occ[there]
+            self.military_at[b[back], dc[back]] = occ[back]
+        self._tac_move_to(m & ~beside, uc, dc, pre, seat, strike=False, later_turns=True)
 
     def _mops_strike(self, s: int, us: torch.Tensor, plot: torch.Tensor, mask: torch.Tensor) -> None:
         """a member's blow on `plot` (`passOrders.strike`): a ranged unit within

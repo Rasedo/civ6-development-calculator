@@ -36,7 +36,7 @@ import { createRelic, gwHasRoom, placeGreatWork } from './greatWorks';
 import { GWO_ARTIFACT } from '../data/greatWorks';
 import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
-import { OPEN_TERRAINS, civUnitAllowed, civUpgradeTarget, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, UNIT_TYPE_IDX, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
+import { civUnitAllowed, civUpgradeTarget, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, UNIT_TYPE_IDX, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
 import {
   BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE, ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS,
 } from '../data/promotions';
@@ -826,8 +826,8 @@ export function gdrJump(state: GameState, unit: { type: string; seat: number } |
 }
 
 /** the Movement a chassis draws from the tile under it at the turn's start:
- *  CIV6 (Heavy Chariot / Maryannu Chariot Archer / War-Cart) "+N Movement if
- *  starting in Desert, Plains, Grassland, or Tundra" — flat ground;
+ *  CIV6 (Heavy Chariot / Maryannu Chariot Archer / War-Cart) +N Movement
+ *  starting on clear ground;
  *  (Berserker Movement) "+2 Movement if this unit starts in enemy
  *  territory"; (Longship Movement) "+1 Movement while in coastal waters";
  *  (Logistics) "+1 Movement if starting turn in friendly territory" — the
@@ -837,7 +837,12 @@ export function startTileMoves(state: GameState, unit: { type: string; seat: num
   if (!def || unit.tileIndex === undefined) return 0;
   const tile = state.map.tiles[unit.tileIndex];
   let m = 0;
-  if (def.openTerrainMoves && tile.elevation === 'FLAT' && OPEN_TERRAINS.includes(tile.terrain)) m += def.openTerrainMoves;
+  // EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT (unit +0x1924, read by
+  // GetMaxMoves 0x56e130 where the plot's movement cost is 1): no hills and
+  // no feature that slows, or a city's centre (runs/h1_duely1117 t70:
+  // Antananarivo's Heavy Chariot on its centre, Grassland Hills, 3 Movement;
+  // t72 on 33:7, Grassland Woods, 2)
+  if (def.openTerrainMoves && !isWater(tile) && (tile.district === 'CITY_CENTER' || terrainMp(tile) === MP_SCALE)) m += def.openTerrainMoves;
   if (def.enemyTerritoryMoves) {
     const owner = tileSeat(tile);
     if (owner >= 0 && owner !== unit.seat && civsAtWar(state, unit.seat, owner)) m += def.enemyTerritoryMoves;

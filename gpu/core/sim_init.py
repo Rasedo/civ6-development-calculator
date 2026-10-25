@@ -4519,7 +4519,6 @@ class SimInit:
         self._type_sea_domain = _uc("seaDomain", bool, torch.bool)
         _uq = rules.uniques
         self._civ_ids: list[str] = list(_uq["civs"])
-        self._open_terr = torch.tensor([int(t) for t in _uq["openTerrains"]], dtype=torch.long, device=device)
         self._coast_terr = int(_uq["coastTerrain"])
         self._park_cs_range = int(_uq["parkCsRange"])
         # `civReplacement` as a table: row c = civilization c's unique standing

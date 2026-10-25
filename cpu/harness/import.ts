@@ -194,6 +194,8 @@ export interface Imported {
 }
 
 const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(prefix.length) : s);
+/** the roads in Routes.xml's order, each one's index its road tier (`ROAD_TIER_MP`) */
+const ROAD_ROUTES = ['ROUTE_ANCIENT_ROAD', 'ROUTE_MEDIEVAL_ROAD', 'ROUTE_INDUSTRIAL_ROAD', 'ROUTE_MODERN_ROAD'];
 
 /** the plots a record city has taken with culture (`City.tilesAcquired`):
  *  its City's m_kCulture value (City +0xb90, FinalRelease 0x11aba0's
@@ -2037,6 +2039,15 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
   const state = createGameFromMap(map, num(rec.seed) >>> 0);
   state.turn = rec.turn;
+  // the road tier the record's routes carry: the most advanced road on the
+  // map (Routes.xml in its order, the Railroad apart; runs/h1_duely1128 t120:
+  // Bologna's roads are Medieval, a step 1 Movement, in the Renaissance)
+  let tier = -1;
+  for (let i = 0; i < W * H; i++) {
+    const r = plotAt(rec, i)[P.route] as number;
+    if (r >= 0) tier = Math.max(tier, ROAD_ROUTES.indexOf(cat.routes[r]));
+  }
+  if (tier > 0) state.roadTier = tier;
   if (history) {
     state.gameEra = history.gameEra;
     state.eraStartTurn = history.eraStartTurn;

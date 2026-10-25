@@ -23,12 +23,14 @@
     - cpu/core/operations/assault.ts:operationAttackExecute
     - cpu/core/tactical.ts:canAct
     - cpu/core/opsOrders.ts:us
+    - cpu/core/tactical.ts:swapUnits
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...6f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard s..."
@@ -206,11 +208,14 @@
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:playerUnits
     - gpu/core/sim_policy.py:_pol_units
+    - cpu/core/units.ts:startTileMoves
+    - gpu/core/sim_economy.py:_start_tile_mp
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-95: the clear-terrain start Movement — PARTLY READ, ported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...bard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The   type ids (0x5bcb80, each global the..."
   context:
@@ -255,6 +260,27 @@
     - "...ts'. The best ranged rises beside the best melee (0x4c1a30): the unit's ranged strength 0x56e3e0 (RangedCombat, row +0x6c, a Bombard is none) with its formation's; +0x1b0 the best Bomb..."
     - "...s), in list order, makes each LOW or MEDIUM unit that threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength within its range (0x56e3d0), any other nearer than twic..."
     - "..., each unit it sees now (0x5033a0) with a combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its strength (0x716400: bombard > 0 — the combat strength where it tops the..."
+  review: imported
+- addr: 0x56e760
+  final: 0x3a4000
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+    - "...0), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); (0x56e760 set: the path test 0x272a60 flag 4); over the units on the target's layer (0x75c50) one..."
+  review: imported
+- addr: 0x56e780
+  final: 0x3a4020
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...through it): the unit with Movement left (0x56c690), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); (0x56e760 set: the path test 0x272a60 flag 4); ov..."
   review: imported
 - addr: 0x56ee80
   final: 0x3a4730

@@ -106,7 +106,7 @@ def main() -> None:
     SX, ZG = I["SPHINX"], I["ZIGGURAT"]
     assert sim._imp_uniq[SX] == C["EGYPT"] and sim._imp_uniq[ZG] == C["SUMERIA"]
     assert sim._A_IMP[SX] >= 0 and sim._A_IMP[ZG] >= 0, "the BUILD columns exist for both rows"
-    grass = [int(t) for t in rules.uniques["openTerrains"]]
+    grass = [0, 1, 2, 3]  # `TERRAIN_IDS`: Grassland, Plains, Desert, Tundra
 
     # -- A: who lays what, where --------------------------------------------
     t = own_flat(sim, egypt)

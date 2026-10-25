@@ -3,6 +3,17 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0xc0a3a0
+  final: 0x8cca10
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1121
+      value: "1121-1128: Woods and Marsh   flat 2 (14 and 4 unit-turns), Desert / Plains / Grassland flat 3, Plains /   Desert Hills 2."
+  readings: ["C-95: the clear-terrain start Movement — PARTLY READ, ported"]
+  context:
+    - ...and the Light Chariot's HEAVYCHARIOT / LIGHTCHARIOT_FASTER_CLEAR_TERRAIN; the effect 0xc0a3a0, its unit apply 0xb76b20 adding Amount to the block 0x9034b0 of unit +0x18c8, field +4)...
+  review: imported
 - addr: 0xc97780
   final: 0x96b760
   kind: function

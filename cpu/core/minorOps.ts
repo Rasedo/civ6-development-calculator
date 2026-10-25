@@ -25,7 +25,7 @@ import type { ArmyRecord, CityState, GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiView } from './aiView';
-import { cityStateTactics, moveTo, passFinish, plotDistance, type Pass } from './tactical';
+import { cityStateTactics, moveTo, passFinish, plotDistance, reachPlots, stackedAt, swapUnits, type Pass } from './tactical';
 import { ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
@@ -233,9 +233,12 @@ const UPGRADE_TREE_PRIORITY = AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade
  *    Superiority at t89 as Cartography lands, the operation completing
  *    empty, home by t91, a Caravel from t92);
  *  - FIND UNIT TARGETS (0x7ed200, Nearest Owned City; its job 0x7eba40) and
- *    MOVE UNIT'S EXECUTION (0x7eeba0, no Location): each unit left goes for
- *    the minor's city centre, a ship for a coastal centre or else the city's
- *    Harbor; a unit with none, and every unit with none, the tree FAILS;
+ *    MOVE UNIT'S EXECUTION (0x7eeba0, no Location, `upgradeMove`): each unit
+ *    left goes for the minor's city centre, a ship for a coastal centre or
+ *    else the city's Harbor — by a swap with its own unit there beside it,
+ *    else a move none of its own holds the target against, a target in
+ *    danger only within its reach this turn; every unit with none, the tree
+ *    FAILS;
  *  - each unit the trees hold has its turn done (0x7d2190): no tactical
  *    move, no operation's offer (runs/h1_duelw1128 Hong Kong t144-250, its
  *    six units held from Gunpowder on with no Gold to upgrade: no tactical
@@ -302,12 +305,32 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
     }
     if (unupgradedDeleted(state, cs, u)) drop(u);
   }
-  for (const u of order(held)) {
-    const p = targets.get(u.id) ?? -1;
-    if (p >= 0 && u.tileIndex !== p && u.movesLeft > 0) moveTo(state, u, p, false);
-  }
+  for (const u of order(held)) upgradeMove(state, pass, u, targets.get(u.id) ?? -1);
   for (const u of order(held)) passFinish(pass, u, UPGRADE_MOVE, u.tileIndex);
   cs.upgrading = order(held).map((u) => u.id);
+}
+
+/** MOVE UNIT'S EXECUTION with no Location (0x7eeba0 from 0x7eee6a) for a
+ *  tree unit with a target (+0x830) off its plot: Allow Danger false, a
+ *  target on the danger map (0x716a60) is gone for only where the unit's
+ *  planning reaches it this turn with Movement left (0x791300); then the
+ *  swap onto it (0x972880: a unit of its own stacking with it on the target
+ *  beside it changes places), then the move there (0x962030) under the
+ *  path flag 0x1000 (the order's 0x100a), whose first turn may not end on
+ *  the target its own stacking unit holds (runs/h1_duely1128 t33: Hong
+ *  Kong's Warrior 131073 on 8:5, two plots from its centre 9:7 that a
+ *  Swordsman holds, stands, its Warrior 196610 on 7:5, three plots off,
+ *  goes to 9:6; Bologna t154: its Warrior 2228224 on 4:10 swaps onto its
+ *  centre with the Trebuchet, then its Warrior 2162692 on 5:8 swaps onto
+ *  it with the first) */
+function upgradeMove(state: GameState, pass: Pass, u: Unit, p: number): void {
+  if (p < 0 || u.tileIndex === p || u.movesLeft <= 0) return;
+  if (pass.danger[p] > 0 && !reachPlots(state, u, 1).some((e) => e.tile === p && e.moves > 0)) return;
+  if (plotDistance(state, u.tileIndex, p) === 1 && stackedAt(state, u, p)) {
+    swapUnits(state, pass, u, p);
+    return;
+  }
+  moveTo(state, u, p, false, undefined, true);
 }
 
 /** Upgrade Units' full test (0x58fff0 with r8 0): the research, the minor's

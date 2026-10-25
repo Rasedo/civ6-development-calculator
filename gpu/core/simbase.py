@@ -389,7 +389,7 @@ class Rules:
     disasters: dict  # the Flood (Civ6) severity tables + the weights of the turn's one event draw
     climate: dict  # the Climate (Civ6) arc: carbon rates, the seven phases, the deforestation bands
     units: list  # trainable roster [{id, cost, combat, maintenance, civilian, requiresTech}]
-    uniques: dict  # {civs, openTerrains, coastTerrain} — the unique-unit wire (cpu/export/rules.ts)
+    uniques: dict  # {civs, coastTerrain} — the unique-unit wire (cpu/export/rules.ts)
     citystate: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
     seats: dict  # seat pacing, loyalty, GP costs, belief-pool sizes (cpu/data/seats.ts)
     beliefs: dict  # dense pantheon/follower/founder effect tables (data-file key order = claim-draw order)

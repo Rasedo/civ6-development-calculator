@@ -170,15 +170,15 @@ def main() -> None:
 
     # -- D: the start-tile Movement ---------------------------------------
     mp = sim._mp_scale
-    open_t = [int(t) for t in sim._open_terr.tolist()]
+    # a chariot's bonus stands on a plot of movement cost 1 (no hills, no
+    # slowing feature) or a city centre
+    entry = sim._tac_entry()[0]
+    centre = sim._centre_plane()[0]
     flat = next(t for t in range(sim.T)
-                if int(sim.terrain[0, t]) in open_t and not bool(sim.hills[0, t])
+                if int(entry[t]) == mp and not bool(centre[t])
                 and not bool(sim.water[0, t]) and bool(sim.passable[0, t]))
     hill = next(t for t in range(sim.T)
-                if int(sim.terrain[0, t]) in open_t and bool(sim.hills[0, t]) and bool(sim.passable[0, t]))
-    snow = next((t for t in range(sim.T)
-                 if int(sim.terrain[0, t]) not in open_t and not bool(sim.hills[0, t])
-                 and not bool(sim.water[0, t]) and bool(sim.passable[0, t])), -1)
+                if bool(sim.hills[0, t]) and not bool(centre[t]) and bool(sim.passable[0, t]))
 
     def full(row, uid, tile):
         v = stand(sim, row, U[uid], tile)
@@ -186,8 +186,6 @@ def main() -> None:
 
     assert full(rome, "HEAVY_CHARIOT", flat) == 3.0
     assert full(rome, "HEAVY_CHARIOT", hill) == 2.0
-    if snow >= 0:
-        assert full(rome, "HEAVY_CHARIOT", snow) == 2.0
     assert full(egypt, "MARYANNU_CHARIOT_ARCHER", flat) == 4.0
     assert full(rome, "WAR_CART", flat) == 4.0
     assert full(rome, "WARRIOR", flat) == 2.0

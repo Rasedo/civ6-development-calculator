@@ -111,17 +111,21 @@ describe('the chariot classes', () => {
 });
 
 describe('start-of-turn Movement from the tile', () => {
-  it('open flat terrain pays the chariots, hills and forest ground do not', () => {
+  it('a plot of movement cost 1 pays the chariots, hills and woods do not', () => {
     const state = makeState(makeMap(8, 8, 'GRASSLAND'));
     const flat = tileAtCoords(state.map, 2, 2);
     const hills = tileAtCoords(state.map, 3, 2);
     hills.elevation = 'HILLS';
-    const snow = tileAtCoords(state.map, 4, 2);
+    const woods = tileAtCoords(state.map, 4, 2);
+    woods.feature = 'WOODS';
+    const snow = tileAtCoords(state.map, 5, 2);
     snow.terrain = 'SNOW';
     const u = (type: string, t: { index: number }) => ({ type, seat: 0, tileIndex: t.index });
     expect(startTileMoves(state, u('HEAVY_CHARIOT', flat))).toBe(1);
     expect(startTileMoves(state, u('HEAVY_CHARIOT', hills))).toBe(0);
-    expect(startTileMoves(state, u('HEAVY_CHARIOT', snow))).toBe(0);
+    expect(startTileMoves(state, u('HEAVY_CHARIOT', woods))).toBe(0);
+    // a plot of movement cost 1 pays, whatever its terrain
+    expect(startTileMoves(state, u('HEAVY_CHARIOT', snow))).toBe(1);
     expect(startTileMoves(state, u('MARYANNU_CHARIOT_ARCHER', flat))).toBe(2);
     expect(startTileMoves(state, u('WAR_CART', flat))).toBe(1);
     expect(startTileMoves(state, u('WARRIOR', flat))).toBe(0);

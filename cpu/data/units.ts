@@ -3851,9 +3851,6 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
 export const UNIT_CLASSES = ['melee', 'ranged', 'antiCavalry', 'cavalry', 'naval', 'recon', 'settler', 'builder', 'spy'] as const;
 export type UnitClass = (typeof UNIT_CLASSES)[number];
 
-/** CIV6 (EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT): the open terrains
- *  a chariot's start-of-turn Movement reads. */
-export const OPEN_TERRAINS: readonly string[] = ['DESERT', 'PLAINS', 'GRASSLAND', 'TUNDRA'];
 
 /** may this civilization train the chassis? A unique unit trains for its
  *  civilization alone, and the chassis it replaces is gone there. */

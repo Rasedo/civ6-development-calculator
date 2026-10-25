@@ -35,6 +35,7 @@
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: an event's civilian kill spares a Trader — PARTLY READ"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
   context:
     - "...x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0: combat, ranged or bombard above 0) — no doma..."
   review: imported

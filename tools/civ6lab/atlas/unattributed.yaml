@@ -30,6 +30,7 @@
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...the player's first city (+0x158). Of its planning reach   the plots of turn 1 within 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted..."
   context:
@@ -871,6 +872,7 @@
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with a path to it (0x272a60), not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area..."
@@ -1961,6 +1963,7 @@
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -3179,7 +3182,10 @@
   cases:
     - recording: AI_Tactical.csv
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
-  impl: [cpu/core/aiCityTrees.ts:CityTreeWorld, gpu/core/sim_minorai.py:danger]
+  impl:
+    - cpu/core/aiCityTrees.ts:CityTreeWorld
+    - gpu/core/sim_minorai.py:danger
+    - cpu/core/minorOps.ts:upgradeMove
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -3187,6 +3193,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the..."
   context:
@@ -4928,6 +4935,17 @@
   context:
     - "...rn or the last (city +0x2600 + 1 >= the game turn; +0x2600 is m_iTurnFounded, the field 0x8ea750's CitiesFounded / TurnFounded reads: runs/h1_duelw1117 Caguana t34 keeps the Warrior..."
   review: imported
+- addr: 0x9034b0
+  final: 0x72a920
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1121
+      value: "1121-1128: Woods and Marsh   flat 2 (14 and 4 unit-turns), Desert / Plains / Grassland flat 3, Plains /   Desert Hills 2."
+  readings: ["C-95: the clear-terrain start Movement — PARTLY READ, ported"]
+  context:
+    - ..._CLEAR_TERRAIN; the effect 0xc0a3a0, its unit apply 0xb76b20 adding Amount to the block 0x9034b0 of unit +0x18c8, field +4); GetMaxMoves (0x56e130) adds unit +0x1924 where the unit's...
+  review: imported
 - addr: 0x93d570
   final: 0x64d740
   kind: function
@@ -5082,6 +5100,45 @@
     - ".claude/scratchpad/mu1/readings_c96.md: ...SIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify   (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside   its own territory heads for its player's nearest city (first of equals) —   wher..."
   context:
     - "...AVAL_UNIT_LEVEL) holds its plot — fortify (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside its own territory heads for its player's nearest city (first of equals..."
+  review: imported
+- addr: 0x9724c0
+  final: 0x67c2d0
+  kind: function
+  name: CanStart
+  status: PARTLY
+  readings:
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved int..."
+  review: imported
+- addr: 0x972540
+  final: 0x67c350
+  kind: function
+  name: swapPartner
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      value: t154 Bologna's Warriors 2228224 and 2162692 swap onto its centre in turn; t146 Hong Kong's Warrior 2424833 stays beside its centre, the fortified garrison there with no Movement
+  impl:
+    - cpu/core/tactical.ts:swapUnits
+    - gpu/core/sim_tactics.py:_tac_carry_out
+    - gpu/core/sim_minorops.py:_mops_upgrade_move
+  readings:
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit w..."
+  review: reviewed
+- addr: 0x972a50
+  final: 0x67c860
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (..."
   review: imported
 - addr: 0x975920
   final: 0x67f1f0
@@ -5799,6 +5856,16 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "...leeStrengthTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), r..."
+  review: imported
+- addr: 0xb76b20
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1121
+      value: "1121-1128: Woods and Marsh   flat 2 (14 and 4 unit-turns), Desert / Plains / Grassland flat 3, Plains /   Desert Hills 2."
+  readings: ["C-95: the clear-terrain start Movement — PARTLY READ, ported"]
+  context:
+    - ...s HEAVYCHARIOT / LIGHTCHARIOT_FASTER_CLEAR_TERRAIN; the effect 0xc0a3a0, its unit apply 0xb76b20 adding Amount to the block 0x9034b0 of unit +0x18c8, field +4); GetMaxMoves (0x56e130)...
   review: imported
 - addr: 0xb7eee0
   kind: function

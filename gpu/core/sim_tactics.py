@@ -226,19 +226,29 @@ class SimTactics:
         return out
 
     def _tac_closed(self, seat: int) -> torch.Tensor:
-        """[B, T] bool — `majorClosedToMinor`: for a city-state's `seat`, a
-        major's territory where the major holds the open-borders civic and is
-        not at war with it; nothing for any other seat."""
+        """[B, T] bool — `closedToMinor`: for a city-state's `seat`, a major's
+        or another city-state's territory whose owner holds the open-borders
+        civic and is not at war with it; nothing for any other seat."""
         zero = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
-        if not (100 <= seat < 100 + self.S) or self._open_borders_civic < 0 or self.n_majors == 0:
+        if not (100 <= seat < 100 + self.S) or self._open_borders_civic < 0:
             return zero
         R = self.n_majors
         own = self.tile_seat
-        maj = (own >= 0) & (own < R)
-        oc = own.clamp(min=0, max=R - 1)
-        civic = self.civ_civics[:, :R, self._open_borders_civic].gather(1, oc)
-        war = self.war[:, self._CITY_MINOR0 + seat - 100, :R].gather(1, oc)
-        return maj & civic & ~war
+        me = self._CITY_MINOR0 + seat - 100
+        out = zero
+        if R > 0:
+            maj = (own >= 0) & (own < R)
+            oc = own.clamp(min=0, max=R - 1)
+            civic = self.civ_civics[:, :R, self._open_borders_civic].gather(1, oc)
+            war = self.war[:, me, :R].gather(1, oc)
+            out = maj & civic & ~war
+        if self.S <= 1:
+            return out
+        minor = (own >= 100) & (own < 100 + self.S) & (own != seat)
+        mc = (own - 100).clamp(min=0, max=self.S - 1)
+        civic = self.citystate_civics[:, :self.S, self._open_borders_civic].gather(1, mc)
+        war = self.war[:, me, self._CITY_MINOR0:self._CITY_MINOR0 + self.S].gather(1, mc)
+        return out | (minor & civic & ~war)
 
     def _tac_known(self, seat: int) -> torch.Tensor | None:
         """[B, T] bool — `revealedOf`: the plots `seat` revealed (a major's
@@ -259,7 +269,7 @@ class SimTactics:
         enter (`enterable`): its domain's ground, no unit of a player at war
         with it (another player's unit it passes), no city centre but its
         own (a hull's passage, `_hull_pass`, the NAVAL plane's too), no live
-        enemy Encampment, no major's ground closed to a
+        enemy Encampment, no major's or city-state's ground closed to a
         city-state (`_tac_closed`), with `revealed_only` (the lists', not a
         path's) none it never revealed (`_tac_known`). The
         NAVAL plane is the water an embarking land unit takes too."""
@@ -945,7 +955,8 @@ class SimTactics:
         return torch.where(naval, mp1, cost)
 
     def _tac_move_to(self, mask: torch.Tensor, us: torch.Tensor, dest: torch.Tensor, pre: str = "barb",
-                     seat: int = BARB_SEAT, strike: bool = True, avoid: torch.Tensor | None = None) -> None:
+                     seat: int = BARB_SEAT, strike: bool = True, avoid: torch.Tensor | None = None,
+                     later_turns: bool = False) -> None:
         """`moveTo` for the unit at local slot `us` [B] of pool `pre` (its
         player `seat`) in the games of `mask`: the pathfinder's path to `dest`
         with zones of control, walked as far as its Movement carries it this
@@ -953,7 +964,9 @@ class SimTactics:
         other players' but never ends on another player's unit or its own
         that stacks with it. A path ending on a plot it attacks into stops at
         its side, and with `strike` (the barbarians') it strikes there; a walk
-        whose end `avoid` [B, T] names stays put."""
+        whose end `avoid` [B, T] names stays put. With `later_turns` (the
+        order's path flag 0x1000) the path's turns after its first may end on
+        a plot its own stacking unit holds, its first not."""
         if not bool(mask.count_nonzero()):
             return
         dev = self.device
@@ -961,7 +974,7 @@ class SimTactics:
         rows = mask.nonzero(as_tuple=True)[0]
         sr = us[rows]
         dr = dest[rows].clamp(min=0)
-        res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre)
+        res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre, later_turns=later_turns)
         par = res["parent"]
         start = res["start"]
         R = rows.shape[0]
@@ -1035,6 +1048,11 @@ class SimTactics:
         if avoid is not None:
             end = path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)
             stop = torch.where((stop > 0) & avoid[rows, end], torch.zeros_like(stop), stop)
+        if later_turns:
+            # its first turn may not end on the destination its own stacking
+            # unit holds: no path
+            first = res["found"] & (res["closed"][ar, dr] <= 1) & own_same[ar, dr]
+            stop = torch.where(first, torch.zeros_like(stop), stop)
         gslot = torch.zeros(B, dtype=torch.long, device=dev)
         gslot[rows] = sr + self.POOL_LO[pre]
         going = stop > 0
@@ -2307,16 +2325,18 @@ class SimTactics:
                 continue
             mc = move[:, r].clamp(min=0)
             # UNITOPERATION_SWAP_UNITS first (`swapUnits`): with the unit of
-            # its own holding the spot beside it, it steps there and the
-            # other takes its plot
+            # its own holding the spot beside it, both with Movement left,
+            # it steps there and the other takes its plot
             here = tile_p[bidx, u_b].clamp(min=0)
             occ = self.military_at[bidx, mc]
             ut_r = ut_all[bidx, u_b]
+            mp_pool = getattr(self, f"{pre}_unit_mp")
+            other = (occ.clamp(min=0) - self.POOL_LO[pre]).clamp(min=0, max=mp_pool.shape[1] - 1)
             sw = (go & (move[:, r] >= 0) & (self.pair_dist[here, mc].to(torch.long) == 1) & (occ >= 0)
-                  & (self.unit_seat[bidx, occ.clamp(min=0)] == seat) & (getattr(self, f"{pre}_unit_mp")[bidx, u_b] > 0)
+                  & (self.unit_seat[bidx, occ.clamp(min=0)] == seat) & (mp_pool[bidx, u_b] > 0)
+                  & (mp_pool[bidx, other] > 0)
                   & ~self._type_civilian.take(ut_r) & ~self._type_support.take(ut_r))
             if bool(sw.count_nonzero()):
-                other = occ.clamp(min=0) - self.POOL_LO[pre]
                 self.military_at[bidx[sw], mc[sw]] = -1
                 self._tac_move_to(sw, u_b, mc, pre, seat, strike=False)
                 there = sw & (tile_p[bidx, u_b] == mc)

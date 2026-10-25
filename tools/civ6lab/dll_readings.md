@@ -9344,6 +9344,78 @@ execution families) on runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128.
   strength") and completing each turn t167-183. A minor's upgrade is
   `MINOR_UPGRADE_GOLD` (the census; 0x590520 at the minors' 100% discount).
 
+## C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread
+
+`upgradeMove` (cpu/core/minorOps.ts), `swapUnits` / `moveTo(laterTurns)` /
+`pathTo` (cpu/core/tactical.ts); `_mops_upgrade_move` (gpu/core/sim_minorops.py),
+`_tac_carry_out`'s swap and `_tac_move_to(later_turns)` (gpu/core/sim_tactics.py).
+
+- MOVE UNIT'S EXECUTION with no Location (0x7eeba0 from 0x7eee6a): over the
+  tree's units in the player's order (0x6092c0), each with a target (+0x830 /
+  +0x834 valid) off its plot (+0x220 / +0x224): its turn done (0x570b40, dl
+  1: the flag +0x530, no Movement spent); with Allow Danger false (the node's
+  byte, rbp+0x50) a target on the danger map (0x716a60) is gone for only where
+  the unit has a planning (+0x1fc0) and it reaches the target this turn with
+  Movement left (0x791300, r8 1, r9b 1); then UNITOPERATION_SWAP_UNITS onto
+  it (0x972880) and UNITOPERATION_MOVE_TO there (0x962030), both with the
+  flags 0x100a (0x1000 with Allow Danger).
+- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0
+  and Start 0x972a50 through it): the unit with Movement left (0x56c690), not
+  moved into a zone of control (0x56e780), the target at distance 1
+  (0x1deb0); (0x56e760 set: the path test 0x272a60 flag 4); over the units on
+  the target's layer (0x75c50) one of the same owner (+0x2e0) and relation
+  (vt +0xc8 on +0x160) with Movement left, not moved into a zone of control,
+  (its Movement +0xdb0 under the unit's plot's cost (plot vt +0x18) << 8
+  needs 0x56e760 clear), and the destinations valid both ways (0x2726b0
+  flag 4). Start (0x972a50): the unit's formation to the target (flags | 4),
+  then the partner's to the unit's plot. A unit whose moves an order of the
+  pass ended reads none (`pass.ended`; the GPU zeroes them through the run).
+- THE MOVE ORDER'S FIRST TURN: under the path flag 0x1000 the validity
+  0x2720a0 (the search's reading above) holds the first turn's end alone
+  against the stacking limit — the destination too: a target its own
+  stacking unit holds reached within the first turn is no path; reached
+  later, the walk goes its first turn's way.
+- MEASURED (runs/h1_duely1128): t33 Hong Kong's Warrior 131073 on 8:5, two
+  plots from its centre 9:7 that a Warrior then a Swordsman holds, stands
+  t33-34 and goes in at t35; its Warrior 196610 on 7:5, three plots off,
+  goes to 9:6 at t33; t146 its Warrior 2424833 on 9:6 stays beside its
+  centre, the City Defense garrison there fortified (moves ended); Bologna
+  t154: its Warrior 2228224 on 4:10 swaps onto its centre with the
+  Trebuchet its completed City Defense let go, then its Warrior 2162692 on
+  5:8 swaps onto it with the first (record t+1: 2162692 on 4:9, 2228224 on
+  5:8, the Trebuchet's Wander 4:10 -> 5:10). Seed 1128 cityState.move.plot
+  1831 -> 2118 of 2472; the five duely duels with the replay's fixes (the
+  copy's clock, upgraded units, the minors before a pass on record t+1,
+  the road tier from the record) and the two rules below: cityState.move.plot
+  7232 / 9905 -> 8324 / 10079 (73.0% -> 82.6%), barb.move.plot 16754 -> 16763.
+
+## C-95: the clear-terrain start Movement — PARTLY READ, ported
+
+`startTileMoves` (cpu/core/units.ts), `_start_tile_mp` (gpu/core/sim_economy.py).
+
+- EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT (the Heavy Chariot's and
+  the Light Chariot's HEAVYCHARIOT / LIGHTCHARIOT_FASTER_CLEAR_TERRAIN; the
+  effect 0xc0a3a0, its unit apply 0xb76b20 adding Amount to the block 0x9034b0
+  of unit +0x18c8, field +4); GetMaxMoves (0x56e130) adds unit +0x1924 where
+  the unit's plot answers 1 to its vt +0x18 — PARTLY READ: taken as the
+  plot's movement cost, a city's centre 1 (the replay's DBG cases): runs/
+  h1_duely1117 city-state 4's Heavy Chariot 589825 3 Movement on its centre
+  32:5 (Grassland Hills, t70-71), 2 on 33:7 (Grassland Woods, t72-73) and on
+  34:7 (Grassland Hills, t74), 3 on 36:8 (Plains); 1121-1128: Woods and Marsh
+  flat 2 (14 and 4 unit-turns), Desert / Plains / Grassland flat 3, Plains /
+  Desert Hills 2. The text's "Desert, Plains, Grassland, or Tundra" is not
+  the rule.
+- Unread: plot vt +0x18 itself (whether a road makes it 1 off a city).
+
+## C-95: a city-state's ground closed to another city-state — ported
+
+`closedToMinor` (cpu/core/tactical.ts), `_tac_closed` (gpu/core/sim_tactics.py):
+the open-borders civic (Early Empire) closes a city-state's territory to the
+other city-states' units as a major's (not at war). runs/h1_duely1128:
+Bologna's Warriors plan onto Hong Kong's 9:6 and 8:7 t10-39, none from t41,
+Early Empire Hong Kong's in record 41; h1_duely1127 city-state 3's units onto
+city-state 4's to t50, Early Empire its in record 51 (AI_Planning.csv).
+
 ## C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread
 
 The one operation manager is `cpu/core/operations/` (manager.ts,

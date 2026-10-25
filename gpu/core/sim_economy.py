@@ -6514,8 +6514,8 @@ class SimEconomy:
     def _start_tile_mp(self, pre: str, typ: torch.Tensor) -> torch.Tensor:
         """[B, U] long `startTileMoves` — the Movement a chassis draws from the
         tile under it at the turn's start: CIV6 (Heavy Chariot / Maryannu
-        Chariot Archer / War-Cart) "+N Movement if starting in Desert, Plains,
-        Grassland, or Tundra" — flat ground; (Berserker Movement) "+2 Movement
+        Chariot Archer / War-Cart, EFFECT_ADJUST_UNIT_CLEAR_TERRAIN_START_MOVEMENT)
+        +N Movement on a plot of movement cost 1; (Berserker Movement) "+2 Movement
         if this unit starts in enemy territory"; (Longship Movement) "+1
         Movement while in coastal waters"; (Logistics) "+1 Movement if
         starting turn in friendly territory" — a civilization's unit on its
@@ -6525,8 +6525,11 @@ class SimEconomy:
         out = torch.zeros_like(typ)
         terr = self.terrain.gather(1, tile)
         if bool((self._type_open_mp > 0).count_nonzero()):
-            flat = ~self.hills.gather(1, tile) & ~self.water.gather(1, tile) & self.passable.gather(1, tile)
-            out = out + self._type_open_mp.take(typ) * (flat & torch.isin(terr, self._open_terr)).long()
+            # the plot's movement cost 1 (GetMaxMoves 0x56e130): no hills and
+            # no feature that slows, or a city's centre
+            clear = (self._tac_entry().gather(1, tile) == self._mp_scale) | self._centre_plane().gather(1, tile)
+            clear = clear & ~self.water.gather(1, tile)
+            out = out + self._type_open_mp.take(typ) * clear.long()
         if pre == "major" and bool((self._type_enemy_mp > 0).count_nonzero()):
             seat = getattr(self, f"{pre}_unit_seat")
             owner = self.tile_seat.gather(1, tile)
