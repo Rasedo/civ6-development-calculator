@@ -15,6 +15,7 @@
     - cpu/core/tactical.ts:exploreLand
     - cpu/core/tactical.ts:passMoveExec
     - cpu/core/tactical.ts:supportFormation
+    - cpu/core/tactical.ts:ended
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
@@ -24,6 +25,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: Attack Units — READ, ported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...+0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the   move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none:   FindAlternateLocation (0x585940) rou..."
   context:

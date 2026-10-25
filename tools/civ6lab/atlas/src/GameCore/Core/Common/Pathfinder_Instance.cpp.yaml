@@ -74,7 +74,7 @@
   kind: function
   name: UpdateOpenNode
   status: PARTLY
-  impl: [cpu/core/tactical.ts:search]
+  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:reparent]
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -87,7 +87,13 @@
   kind: function
   name: UpdateParents
   status: PARTLY
-  readings: ["H-1: the trade path's search, its score and the Canal — READ"]
+  impl:
+    - cpu/core/tactical.ts:search
+    - cpu/core/tactical.ts:from
+    - gpu/core/sim_tactics.py:update_parents
+  readings:
+    - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ICTLY cheaper cost (UpdateOpenNode 0x79560), a closed one likewise with UpdateParents 0x79660, a new one opened. The trade path's callbacks (0x557e40): the destination test 0x271490..."

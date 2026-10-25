@@ -5401,6 +5401,21 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   DirectionTypes order (0xeff730: (0,1) (1,0) (1,-1) (0,-1) (-1,0) (-1,1)
   in the game's (x - y//2, y) — NE, E, SE, SW, W, NW), each the valid
   callback admits (LinkChild 0x78750).
+- UPDATEPARENTS (0x79660, READ), from LinkChild where a CLOSED child is
+  made strictly cheaper: a stack (+0x110, empty at entry) from the child;
+  each node popped has its children (+0x38, count +0x4a, six inline) priced
+  again from it by the cost callback (+0x48: the step's cost onto the
+  child's +0x1c known cost, saturating), the node's own parent skipped
+  ("parent->m_pParent != kid"); a child strictly cheaper takes the new known
+  cost and total (+0x1c / +0x18, the heuristic +0x24 << 8 none here), the
+  node as its parent (+0), an open one re-keyed (UpdateOpenNode 0x79560),
+  the notify callback (+0x68, type 3) told, and it is pushed once. The
+  validity callback is not asked again. The engines: `search`'s `kids`
+  and the walk after a closed child's re-parenting / `_tac_search`'s
+  `linked6` and `update_parents` (the links landing one by one in a step
+  that re-parents a closed child). Measured (--aiscore --to 60, eight
+  duels): cityState.move.plot 3112 -> 3139 of 4021; the barbarians'
+  families unchanged.
 - THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of
   0x26e570): each node records (0x271be0) whether its player sees its plot
   (+0x50 bit 2) and the count of the unit's own stacking units on it, the
@@ -5723,9 +5738,22 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   target), the knapsack 0x61ddb0 at capacity 1 (the first largest positive),
   the move λ 0x770710. The results sorted by 0x7704e0 through EASTL's merge
   sort (halves n / 2).
-- THE EXECUTION (0x771f80): the moves (retried where not blocked), the
-  bombard strikes, the ranged strikes (unless a melee one is stronger and
-  reaches this turn), the move-and-attack onto the attack plot; turns end.
+- THE EXECUTION (0x771f80): the moves, the bombard strikes, the ranged
+  strikes (unless a melee one is stronger and reaches this turn), the
+  move-and-attack onto the attack plot; turns end. THE MOVES (READ,
+  0x771ff0..0x77219b): per entry (stride 0x38) valid (+0x2c >= 0) whose unit
+  lives (+0x770 clear) and stands off its spot: UNITOPERATION_SWAP_UNITS to
+  the spot (0x972880, hash 0x7fa205d1, pushed through the unit's operation
+  queue +0x60); still off it: nothing where a unit at war holds the spot
+  (0x5862e0) or one of its own stacking with it (0x585eb0 on its path
+  finder, itself not counted), else UNITOPERATION_MOVE_TO (0x962030, hash
+  0x580f2f68). The swap's own rule (CanStart) is unread: the engines take it
+  as the unit beside the spot stepping there and the other taking its plot
+  (`swapUnits` / `_tac_carry_out`). runs/h1_duelw1121 t15: the Horse
+  Archer 983054 on 34:11 holds the Horseman 720906's spot, which stays on
+  31:9 as recorded, and the Horse Archer 1048591 ends on 34:10 as recorded.
+  Measured on top of UpdateParents: barb.move.plot 7329 -> 7345 of 8324,
+  cityState.move.plot 3139 -> 3136.
 - THE GPU TWIN predicts a pass's blows as a batch of their own
   (`_GameRows`: each job a game, the per-game planes taken by rows), the
   strength routines unchanged.

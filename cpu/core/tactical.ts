@@ -66,6 +66,9 @@ interface PNode {
   /** a plot the unit attacks into: the path ends there */
   attack?: boolean;
   parent: PNode | null;
+  /** the nodes it linked (the node's children, CvAStar +0x38), each with
+   *  its step's DirectionTypes index */
+  kids?: { node: PNode; di: number }[];
 }
 
 /** may the unit enter this plot at all (Pathfinder valid 0x2720a0, the
@@ -235,8 +238,9 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
  * from the unit's plot — no heuristic (the pool's default, 0x26f330) — over
  * the open nodes by (cost, tie): a node inserted where its cost lies nearer
  * the cheapest open node goes before its equals, else after them (0x775a0),
- * a node made cheaper goes after its new equals (0x79560); each closed node
- * links its neighbours in DirectionTypes order (0xeff730). A step's turns and
+ * a node made cheaper goes after its new equals (0x79560), a closed one made
+ * cheaper re-prices its children from it (UpdateParents 0x79660); each closed
+ * node links its neighbours in DirectionTypes order (0xeff730). A step's turns and
  * Movement (0x26e920): a node reached with no Movement starts the next turn
  * at full; a step dearer than the Movement left waits for the next turn,
  * unless it leaves the unit's own plot unmoved, where it spends everything; a
@@ -323,66 +327,99 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // from a plot the unit may stand on, its own or one none of its own
       // stacking units holds
       if (attack && standToAttack && best !== start && ground.full(best.tile)) continue;
-      let pm = best.moves;
-      let turns = best.turns;
-      if (pm <= 0) {
-        turns += 1;
-        pm = !naval && isWater(from) ? fullSea : fullLand;
-      }
-      let cost = Math.floor(stepCostHeld(state, unit, from, to, di, held) * FIX / MP_SCALE);
-      let moves = pm - cost;
-      if (moves < 0) {
-        moves = 0;
-        if (best === start && unmoved) cost = pm;
-        else if (best.turns === turns) turns += 1;
-        else cost = pm > 0 ? pm : FIX;
-      }
-      if (attack) {
-        // the attack's step priced as any step — a river's 2 above the
-        // Movement left waits for the next turn (runs/h1_duelv1121 t4: city-state
-        // 4's Warrior at 32:22 lists 32:23 (1/1) and the barbarian Scout's
-        // 33:23 across the river (2/0), AI_Planning.csv) — then spends the
-        // Movement it leaves (0x26e570: the cost adds it)
-        cost += moves;
-        moves = 0;
-      } else if (zoc && moves > 0 && ground.zoc(to)) {
-        cost = pm;
-        moves = 0;
-      }
-      if (turns > maxTurns) continue;
+      const s = price(best, to, di, attack);
+      if (s.turns > maxTurns) continue;
       // a path's turn may not end on a plot its own stacking unit holds (the
       // path validity 0x2720a0: each node where the next starts a turn,
       // against the stacking limit; under flag 0x1000 its first turn alone)
-      if (zoc && turns > best.turns && ground.full(best.tile) && (!laterTurns || best.turns <= 1)) continue;
-      onLink?.(to.index, best.tile, turns, moves, attack);
-      // the cost (0x270dd0): +4 where the step leaves no Movement, +3 more
-      // off the unit's territory on a revealed plot; +2 a revealed plot, +3
-      // an unrevealed one
-      const seen = ground.known(to.index);
-      const ends = moves <= 0 ? 4 + (seen && tileSeat(to) !== unit.seat ? 3 : 0) : 0;
-      const g = best.g + cost * 1000 + (ends + (seen ? 2 : 3)) * FIX;
+      if (zoc && s.turns > best.turns && ground.full(best.tile) && (!laterTurns || best.turns <= 1)) continue;
+      onLink?.(to.index, best.tile, s.turns, s.moves, attack);
       const c = nodes.get(to.index);
       if (!c) {
-        const n: PNode = { tile: to.index, g, tie: 0, moves, turns, closed: false, parent: best, attack };
-        if (lo && hi && g >= lo.g && g <= hi.g) n.tie = Math.abs(g - lo.g) <= Math.abs(g - hi.g) ? -++seq : ++seq;
+        const n: PNode = { tile: to.index, g: s.g, tie: 0, moves: s.moves, turns: s.turns, closed: false, parent: best, attack };
+        if (lo && hi && s.g >= lo.g && s.g <= hi.g) n.tie = Math.abs(s.g - lo.g) <= Math.abs(s.g - hi.g) ? -++seq : ++seq;
         nodes.set(n.tile, n);
+        (best.kids ??= []).push({ node: n, di });
         open.push(n);
         if (!lo || before(n, lo)) lo = n;
         if (!hi || before(hi, n)) hi = n;
-      } else if (g < c.g) {
-        c.g = g;
-        c.moves = moves;
-        c.turns = turns;
-        c.parent = best;
-        if (!c.closed) {
-          c.tie = ++seq;
-          if (!lo || before(c, lo)) lo = c;
-          if (c === hi) {
-            hi = open[0];
-            for (const o of open) if (before(hi, o)) hi = o;
-          }
+        continue;
+      }
+      (best.kids ??= []).push({ node: c, di });
+      if (s.g >= c.g) continue;
+      reparent(c, best, s);
+      // a closed child made cheaper takes its children along (UpdateParents
+      // 0x79660): each linked from a node so re-parented is priced again
+      // from it and re-parented where strictly cheaper, the walk going on
+      // through those (a stack, each node once)
+      if (!c.closed) continue;
+      const stack: PNode[] = [c];
+      while (stack.length) {
+        const p = stack.pop()!;
+        for (const k of p.kids ?? []) {
+          if (p.parent === k.node) continue;
+          const kt = map.tiles[k.node.tile];
+          const ks = price(p, kt, k.di, !!k.node.attack);
+          onLink?.(kt.index, p.tile, ks.turns, ks.moves, !!k.node.attack);
+          if (ks.g >= k.node.g) continue;
+          reparent(k.node, p, ks);
+          if (!stack.includes(k.node)) stack.push(k.node);
         }
       }
+    }
+  }
+
+  /** a step's turns, Movement and cost from the node `p` onto `to` (the cost
+   *  callback 0x26e920 and 0x270dd0) */
+  function price(p: PNode, to: Tile, di: number, attack: boolean): { g: number; moves: number; turns: number } {
+    const from = map.tiles[p.tile];
+    let pm = p.moves;
+    let turns = p.turns;
+    if (pm <= 0) {
+      turns += 1;
+      pm = !naval && isWater(from) ? fullSea : fullLand;
+    }
+    let cost = Math.floor(stepCostHeld(state, unit, from, to, di, held) * FIX / MP_SCALE);
+    let moves = pm - cost;
+    if (moves < 0) {
+      moves = 0;
+      if (p === start && unmoved) cost = pm;
+      else if (p.turns === turns) turns += 1;
+      else cost = pm > 0 ? pm : FIX;
+    }
+    if (attack) {
+      // the attack's step priced as any step — a river's 2 above the
+      // Movement left waits for the next turn (runs/h1_duelv1121 t4: city-state
+      // 4's Warrior at 32:22 lists 32:23 (1/1) and the barbarian Scout's
+      // 33:23 across the river (2/0), AI_Planning.csv) — then spends the
+      // Movement it leaves (0x26e570: the cost adds it)
+      cost += moves;
+      moves = 0;
+    } else if (zoc && moves > 0 && ground.zoc(to)) {
+      cost = pm;
+      moves = 0;
+    }
+    // the cost (0x270dd0): +4 where the step leaves no Movement, +3 more
+    // off the unit's territory on a revealed plot; +2 a revealed plot, +3
+    // an unrevealed one
+    const seen = ground.known(to.index);
+    const ends = moves <= 0 ? 4 + (seen && tileSeat(to) !== unit.seat ? 3 : 0) : 0;
+    return { g: p.g + cost * 1000 + (ends + (seen ? 2 : 3)) * FIX, moves, turns };
+  }
+
+  /** a node made cheaper from `p`: an open one re-keyed after its new
+   *  equals (0x79560) */
+  function reparent(c: PNode, p: PNode, s: { g: number; moves: number; turns: number }): void {
+    c.g = s.g;
+    c.moves = s.moves;
+    c.turns = s.turns;
+    c.parent = p;
+    if (c.closed) return;
+    c.tie = ++seq;
+    if (!lo || before(c, lo)) lo = c;
+    if (c === hi) {
+      hi = open[0];
+      for (const o of open) if (before(hi, o)) hi = o;
     }
   }
 }
@@ -504,6 +541,20 @@ function foreignAt(state: GameState, unit: Unit, tile: number): boolean {
 
 /** a unit of the unit's player on the plot that stacks with it, the unit
  *  itself counted (0x585eb0) */
+/** UNITOPERATION_SWAP_UNITS onto `tile` (0x972880): with a unit of its own
+ *  stacking with it on the plot beside it, the unit steps there with its
+ *  Movement and the other takes its plot; none, nothing */
+function swapUnits(state: GameState, unit: Unit, tile: number): void {
+  if (unit.movesLeft <= 0 || tile < 0 || plotDistance(state, unit.tileIndex, tile) !== 1) return;
+  const dom = unitDomain(unit.type);
+  const other = state.units.find((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom);
+  if (!other) return;
+  const from = unit.tileIndex;
+  other.tileIndex = from;
+  moveTo(state, unit, tile, false);
+  if (unit.tileIndex !== tile) other.tileIndex = tile;
+}
+
 export function stackedAt(state: GameState, unit: Unit, tile: number): boolean {
   const dom = unitDomain(unit.type);
   return state.units.some((u) => u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom);
@@ -1760,7 +1811,8 @@ function mergeSort<T>(a: T[], before: (x: T, y: T) => boolean): T[] {
 
 /**
  * THE ASSIGNMENT CARRIED OUT (0x771f80), in its order: every unit to its
- * spot (a move order, again where it stopped short and no unit at war or of
+ * spot (a swap with its own unit holding the spot beside it, then — still
+ * short of it — the move where no unit at war or of
  * its own stands there); a siege unit strikes its attack; a ranged unit
  * strikes it unless its melee is the stronger and it can reach the plot this
  * turn; then every unit moves onto its attack (the attack flag) — a
@@ -1774,7 +1826,11 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
   for (const a of out) {
     const u = a.unit;
     if (!state.units.includes(u) || u.tileIndex === a.move) continue;
-    moveTo(state, u, a.move);
+    // UNITOPERATION_SWAP_UNITS first (0x972880): with the unit of its own
+    // holding the spot beside it; then, short of the spot, the move
+    // (UNITOPERATION_MOVE_TO, 0x962030) where no unit at war (0x5862e0) nor
+    // of its own stacking with it (0x585eb0) holds the spot
+    swapUnits(state, u, a.move);
     if (state.units.includes(u) && u.tileIndex !== a.move && !enemyAt(state, u, a.move) && !stackedAt(state, u, a.move)) {
       moveTo(state, u, a.move);
     }
