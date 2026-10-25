@@ -667,7 +667,16 @@ export class RecordedActions implements ActionSource {
       } else if (name === 'UnitUpgraded') {
         // the unit the game removed just before it added the upgrade
         if (removed && removed.startsWith(`${n(r, 0)}:`)) {
-          out0.push({ kind: 'upgrade', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: removed, into: `${n(r, 0)}:${n(r, 1)}` });
+          const into = `${n(r, 0)}:${n(r, 1)}`;
+          // the promotions the new unit carries over, logged between its add
+          // and the upgrade, are the upgrade's, not picks (runs/h1_dueldA1117
+          // t45: city-state 2's Warrior 131073 upgraded to the Swordsman
+          // 458755, its Battlecry logged again on 458755 before UnitUpgraded)
+          for (let i = out0.length - 1; i >= 0; i--) {
+            const d = out0[i];
+            if (d.kind === 'promote' && d.unit === into) out0.splice(i, 1);
+          }
+          out0.push({ kind: 'upgrade', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: removed, into });
         }
       } else if (name === 'UnitPromoted') {
         const u0 = a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
