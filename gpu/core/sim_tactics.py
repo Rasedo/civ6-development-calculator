@@ -262,14 +262,15 @@ class SimTactics:
         return land, naval
 
     def _tac_attack_planes(self, seat: int, revealed_only: bool = True, planning: bool = True,
-                           any_ground: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
-        """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat`
-        attacks into (`groundOf`'s attack): in the planning (`planning`) a
-        unit of a player at war with it that fights (0x26e570 -> 0x209dd0),
-        on the mover's own ground, on any with `any_ground` (the danger
-        map's); any such unit on ground of the mover's domain, a city
+                           any_ground: bool = True) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """[B, T] bool three times — the plots a LAND and a NAVAL unit of
+        `seat` attacks into (`groundOf`'s attack): in the planning
+        (`planning`) a unit of a player at war with it that fights (0x26e570
+        -> 0x209dd0), on the mover's own ground, on any with `any_ground` (the
+        danger map's); any such unit on ground of the mover's domain, a city
         centre of such a player, an Encampment that blocks a land mover — on
-        plots it revealed."""
+        plots it revealed; and the fighters' water a land unit its player
+        may embark attacks into too."""
         foe = self._tac_hostile(seat)
         fight = torch.zeros_like(foe)
         for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at) if planning else ():
@@ -285,10 +286,11 @@ class SimTactics:
             land = land | (self.passable & self._encamp_block_plane(seat))
         land = land | (fight if any_ground else fight & ~self.water)
         naval = (self.wpass & foe) | (self.passable & ctr) | (fight if any_ground else fight & self.water)
+        fight_w = fight & self.water
         known = self._tac_known(seat) if revealed_only else None
         if known is not None:
-            land, naval = land & known, naval & known
-        return land, naval
+            land, naval, fight_w = land & known, naval & known, fight_w & known
+        return land, naval, fight_w
 
     def _tac_zoc(self, seat: int, seen: torch.Tensor | None = None, naval: bool | None = None) -> torch.Tensor:
         """[B, T] bool — `inEnemyZoc` for a military mover of `seat` at every
@@ -458,9 +460,10 @@ class SimTactics:
         # ground — on any in the danger map's), a hostile city centre, an Encampment for a land unit — the
         # path's end, the attack's step priced as any step and spending the
         # Movement it leaves
-        a_land, a_nav = self._tac_attack_planes(seat, not zoc, not zoc, stand)
+        a_land, a_nav, a_fw = self._tac_attack_planes(seat, not zoc, not zoc, stand)
         fights = self._type_combat.take(utype) > 0
-        atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows]) & fights.unsqueeze(1) & ~ent_n
+        atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows] | (a_fw[rows] & embarks.unsqueeze(1))) \
+            & fights.unsqueeze(1) & ~ent_n
         cost_b = self._tac_cost()  # [B, T, 6]
         # the land/water steps priced (`stepCost`'s transition) where a unit
         # embarks or strikes a plot across the shore

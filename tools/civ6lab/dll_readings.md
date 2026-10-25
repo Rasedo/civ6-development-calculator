@@ -5925,8 +5925,14 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   own ground, LAB (the domain test unread): AI_Planning.csv lists no ship's
   water for a land unit nor a land unit's plot for a ship (runs/h1_duelw1117
   t16: city-state 4's Warrior at 28:4 lists 27:4 (1/0), beside the
-  barbarian Galley on 26:4, and not 26:4). The engines: `groundOf`'s
-  `anyGround` / `_tac_attack_planes`' `any_ground`, the danger map's search
+  barbarian Galley on 26:4, and not 26:4) — but where the mover's player
+  may embark it the ship's water is its own ground too, LAB (a fit:
+  runs/h1_dueld1121 t69, city-state 2's Swordsman at 10:7, which its
+  player may embark, lists the barbarian Quadrireme's 8:5 (2/0), and Chase
+  Target takes the Quadrireme for it and the Horseman beside it, "Move To:
+  8 5"). The engines: `groundOf`'s `anyGround` and its `embarks` /
+  `_tac_attack_planes`' `any_ground` and its third plane (the fighters'
+  water a land unit that embarks attacks into), the danger map's search
   alone striking on any ground (--aiscore --to 60, eight duels:
   barb.move.family 7900 -> 8019 of 8336, barb.move.plot 7345 -> 7446,
   cityState.move.plot 3203 -> 3231).

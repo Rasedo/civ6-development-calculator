@@ -220,13 +220,17 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     attack: (t) => {
       if (!melee || !known(t.index) || isImpassable(t)) return false;
       // in the planning, a unit at war that fights (0x26e570 -> 0x209dd0):
-      // on the mover's own ground (land for a land mover, water for a ship)
-      // in the planning's reach — AI_Planning.csv lists no ship's water for a
-      // land unit (runs/h1_duelw1117 t16: city-state 4's Warrior at 28:4
-      // lists 27:4 (1/0) and not the barbarian Galley's 26:4) —, on any
+      // on ground the mover may take (land for a land mover, and water where
+      // its player may embark it; water for a ship) in the planning's reach —
+      // AI_Planning.csv lists no ship's water for a land unit that may not
+      // embark (runs/h1_duelw1117 t16: city-state 4's Warrior at 28:4 lists
+      // 27:4 (1/0) and not the barbarian Galley's 26:4) and lists it for one
+      // that may (runs/h1_dueld1121 t69: city-state 2's Swordsman at 10:7
+      // lists the barbarian Quadrireme's 8:5 (2/0) and chases it) —, on any
       // ground in the danger map's (`anyGround`: a land unit's strike onto a
       // ship's water as a ship's onto the shore, runs/h1_duelw1117 t73)
-      if ((fighters.has(t.index) && (anyGround || isWater(t) === naval)) || (foes.has(t.index) && isWater(t) === naval)) return true;
+      if ((fighters.has(t.index) && (anyGround || isWater(t) === naval || (embarks && isWater(t))))
+        || (foes.has(t.index) && isWater(t) === naval)) return true;
       const owner = tileSeat(t);
       if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
       return !naval && encampmentBlocks(state, t, unit);
