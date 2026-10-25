@@ -3105,6 +3105,9 @@ class SimSeats:
                         & army.any(dim=1) & self._afford(self.civ_treasury[:, row], levy_cost))
                 if bool(do_l.count_nonzero()):
                     m = army & do_l.unsqueeze(1)
+                    # each unit made anew under the suzerain (`unitMadeAnew`)
+                    _lb, _lu = m.nonzero(as_tuple=True)
+                    self._kb_unit_anew(_lb, _lu + self.POOL_LO["major"])
                     self.major_unit_seat[m] = row
                     self.major_unit_levied[m] = True
                     self.major_unit_levy_src[m] = (100 + sl).unsqueeze(1).expand_as(m)[m]

@@ -65,7 +65,7 @@ import { logDistrictCost } from './difflog';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, adjacentPlotRowOk, adjacentPlotTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons } from './units';
+import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons } from './units';
 import { killUnit } from './combat';
 import { adoptBeliefs, itemCost, unitProdCost, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -417,6 +417,8 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
     seatOf(state, seat)!.treasury -= cost;
   }
   for (const u of army) {
+    // the game removes it and adds it anew under the suzerain
+    unitMadeAnew(state, u);
     u.seat = seat;
     // the mark the Raven King's clauses read (its +2 Movement, +5 Combat and
     // 75% upgrade discount) and what brings the unit home

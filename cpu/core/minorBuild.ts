@@ -51,7 +51,7 @@ import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorTrade, tradeCapacity } from './trade';
 import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitIsMilitary } from './units';
+import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitIsMilitary, unitMadeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { knowledgeLook } from './tactical';
@@ -186,9 +186,9 @@ export function holdMinorStart(fn: ((state: GameState, cityState: CityState) => 
  *  each unit and makes it anew under the minor (runs/h1_duelw1117 t42:
  *  China's three levied Warriors removed, three Warriors of city-state 3
  *  added on their plots), so the minor's knowledge base records each as a
- *  unit it made (0x7874a0), the record it held of the unit before the levy
- *  that of a unit gone, aging on: its own Warrior records 5 -> 8 on the
- *  turn's line */
+ *  unit it made (0x7874a0), and every knowledge base's record of the unit
+ *  before is that of a unit gone, aging on (`unitMadeAnew`): its own Warrior
+ *  records 5 -> 8 on the turn's line */
 function sendLevyHome(state: GameState, cityState: CityState): void {
   for (const u of state.units) if (u.leviedFrom === cityState.seat) levyUnitHome(state, cityState, u);
   delete cityState.levySeat;
@@ -199,7 +199,7 @@ function sendLevyHome(state: GameState, cityState: CityState): void {
 function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
   u.seat = cityState.seat;
   delete u.leviedFrom;
-  for (const r of cityState.armyKnown ?? []) if (r.id === u.id && r.owner === cityState.seat) r.id = -1;
+  unitMadeAnew(state, u);
   (cityState.armyKnown ??= []).push({ id: u.id, owner: cityState.seat, type: u.type, seen: cityState.armyAged ?? state.turn,
     plot: u.tileIndex, damage: 0 });
 }

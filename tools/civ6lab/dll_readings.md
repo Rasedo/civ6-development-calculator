@@ -4529,8 +4529,10 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   purchase is
   refused where a unit of its class stands (`purchaseSpotBlocked`), so a
   bought unit stands on a centre its class leaves free. The engines:
-  `spawnUnit`'s 'stack' (`tileFreeForUnit`'s `stacks`: the owner's units
-  block none) for the majors' trained units, Settlers, copies and twins,
+  `spawnUnit`'s 'stack' (`tileFreeForUnit`'s `stacks`: a hostile defender
+  alone blocks — another's civilian on the centre none, runs/h1_duely1127
+  t69: Mexico City's Heavy Chariot made onto 8:10 under city-state 3's
+  Trader) for the majors' trained units, Settlers, copies and twins,
   the city-states' and the Free Cities' trained units; the GPU's
   `_spawn_unit` / `_spawn_barb` `stack`, the occupancy plane keeping the unit
   already there (`_occ_set_new`) and taking the next of its class when it
@@ -4572,6 +4574,62 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   4,391 of 6,173 (57.8% -> 71.1%), the decisions within a few rows. Left
   (rows of a single class): another player's unit only the engines hold
   (252), on another plot (238), at another age (145).
+- A UNIT MADE ANEW (the replay's records, no DLL reading): a levy and its
+  return remove each unit and add one of a new id under the other owner, so
+  every knowledge base keeps its records of the old unit as a gone unit's,
+  aging on beside the new one's (runs/h1_duely1117: city-state 3's Warriors
+  levied by China at t28, home at t42, levied again at t45 — the
+  barbarians hold China's 655365, 720902 and 786439 at 32:15, 33:12 and
+  35:13 aging to 21 beside the new 1376263, 1441798 and 1507333, and city-
+  state 3's own 327683 at 41:9 aging beside the returned 655361). The
+  engines: `unitMadeAnew` (every holder's record of the unit's id a gone
+  unit's) at `levyUnits` and the return (`levyUnitHome`); the GPU's
+  `_kb_unit_anew` (every row's record of the pool slot -1) at the levy and
+  `_minor_levy_return`.
+- THE LOOKS AGAINST THE LOG'S ORDER (the replay): every look sees the units
+  the game held when it ran, read off the action log's order: the
+  barbarians' turn closes turn t, so it sees no unit the next turn's start
+  made (runs/h1_duely1117 t7: China's Warrior 262146, added at its start of
+  t8) and every other player's unit, and each of theirs their camps raised,
+  where the log's last step before their turn opens put it (h1_duely1121
+  t85: China's Great Scientist on 6:17, teleported to 6:12 after their
+  turn; h1_duely1124 t17: their Scout added on 42:7); a unit the game holds
+  as their turn opens that the replay's battles killed or its record took
+  off stands for it with the log's damage (h1_duely1128 t33: their Warrior
+  on 32:8 struck to 98 by city-state 4's Horseman, falling in their turn;
+  t50: China's Warrior on 15:11 at 86). No look sees a major's unit no record
+  unit is, the engine's own production (h1_duely1121 t149-t173: a Settler
+  on 12:15 and a Field Cannon on 6:12 China's engine cities made each turn),
+  and a major's unit stands where the log's last step before the look put
+  it (h1_duely1121 t134: China's Great Scientist on 13:10, teleported to
+  12:9 after Hunza's end look). A city-state's look sees, before its
+  turn opens: its own and a later city-state's unit where a teleport put it
+  (h1_duely1121 t67: Hunza's Warrior on 10:11, the plot China's in China's
+  start, teleported to 9:8); no unit another's capture took (h1_duely1117
+  t113: the barbarians' Builder on 33:10 taken by China's Knight — a
+  removal is a unit made anew only where the addition is its own player's
+  or the same unit); a unit the log removes only after its turn opens
+  (h1_duely1127 t43: city-state 4's Builder on 8:11, spent in its own turn
+  after Hattusa's); an earlier city-state's trained unit where record t+1
+  holds it (h1_duely1124 t201: city-state 3's Builder trained on 41:12,
+  stepping to 42:12). A city-state's end look sees a unit its pass's blows
+  killed on the copy that record t+1 holds (h1_duely1127 t4: the
+  barbarians' Scout on 5:12 at 90 damage), a unit the copy spent or the
+  record took off that the log removes after its turn (h1_duely1127 t43),
+  another city-state's unit the log adds before its turn's end that the
+  copy's pass leaves out (h1_duely1128 t105: city-state 2's Archer upgraded
+  to the Crossbowman 1769474 on 9:9), each of record t+1's type
+  (h1_duely1121 t84: city-state 3's Swordsman upgraded to a Man-at-Arms on
+  42:18),
+  and a civilian the barbarians seize in their turn as its owner's where
+  the seizure took it (h1_duely1124 t46: city-state 3's Builder on
+  41:11). `--memory aimem` takes the barbarians' records one turn ahead
+  (their turn runs after the engine's turn change). --aiscore full length,
+  the five duely duels against 070feffa, with the made-anew records and the
+  city's placement above: knowledge.army 4,865 -> 5,584 of 6,173 (78.8% ->
+  90.5%), barb.move.plot 16,754 -> 16,804, cityState.move.plot 7,232 ->
+  7,251, policyScore.minor 25,162 -> 25,211, ops.strength 5,685 -> 5,717,
+  contracts 4,587 -> 4,586.
 - A DROUGHT IN THE PLOT ANALYSIS (the PLOT ANALYSIS LOG of the verbose
   recordings): an improvement a drought on the plot bars (the drought's
   list, `droughtBars`), which the plot's ground takes otherwise, is valued

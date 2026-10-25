@@ -2625,8 +2625,8 @@ class SimMasks:
         enterable WATER (wpass; OCEAN needs the owner's CARTOGRAPHY, passed as
         cart [B]) instead of the land plane, so ships land on water.
         `stack`: a unit a city makes (`spawnUnit`'s 'stack') takes the anchor
-        wherever its terrain, borders and the units of other seats allow it,
-        the owner's own units there whatever their class.
+        wherever its terrain and borders allow it and no hostile defender
+        stands there, any other unit there whatever its class.
         `utype` [B] is the chassis spawning: a CLOSED border refuses a plot as
         `tileFreeForUnit`'s `borderClosedTo` does, the chassis' own exemptions
         (a Trader, a religious unit) included.
@@ -2644,8 +2644,8 @@ class SimMasks:
     def _spot_free(self, cand7: torch.Tensor, seat: int, civ_mask: torch.Tensor | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None, sup_mask: torch.Tensor | None = None, utype: torch.Tensor | None = None, stacks: bool = False) -> torch.Tensor:
         """[B, K] bool — `tileFreeForUnit` for the spawn probe over any
         candidate tiles [B, K] (-1 = none), the arguments `_first_free_spot`'s;
-        `stacks`: the owner's own units block none (`tileFreeForUnit`'s
-        `stacks`), another seat's still do."""
+        `stacks`: a hostile defender alone blocks (`tileFreeForUnit`'s
+        `stacks`)."""
         okc = cand7.clamp(min=0)
         # The SAME stacking rule the movement probe uses, keyed on the spawning
         # seat; the barbarian seat needs no special case, because "hostile to
@@ -2655,12 +2655,14 @@ class SimMasks:
         # tileFreeForUnit (units.ts), which calls encampmentBlocks — so the
         # Encampment wall belongs here too.
         if stacks:
+            # a unit a city makes is refused by a hostile defender alone
+            # (the location test 0x586360), never by another's civilian
             tcs = cand7.clamp(min=0)
             blocked = self._encamp_block(cand7, seat)
-            for plane in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+            for plane in (self.military_at, self.embarked_at):
                 held = plane.gather(1, tcs)
-                who = self.unit_seat.gather(1, held.clamp(min=0))
-                blocked = blocked | ((held >= 0) & (who != seat))
+                who = torch.where(held >= 0, self.unit_seat.gather(1, held.clamp(min=0)), torch.full_like(held, -1))
+                blocked = blocked | ((held >= 0) & self._seats_hostile(seat, who))
         else:
             blocked = self._blocked_for(cand7, seat,
                                         is_civilian=False if civ_mask is None else civ_mask,

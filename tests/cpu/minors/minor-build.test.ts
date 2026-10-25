@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
+import { BARB_SEAT, emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { minorBuild, minorPhase } from '../../../cpu/core/minorBuild';
 import { cityPlots, minorPlotEvals } from '../../../cpu/core/minorCityAi';
@@ -212,11 +212,11 @@ describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
     expect(cs2.prodProgress).toBe(p2);
   });
 
-  it('a unit with no free tile on or beside the centre is not paid for', () => {
+  it('a unit with no free tile on or beside the centre (hostile units on each) is not paid for', () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12);
     for (const t of tilesWithin(state.map, 12, 12, 1)) {
-      expect(spawnUnit(state, 'WARRIOR', t.index, 0)?.tileIndex).toBe(t.index);
+      expect(spawnUnit(state, 'WARRIOR', t.index, BARB_SEAT)?.tileIndex).toBe(t.index);
     }
     state.turn = 1;
     const cost = builderCost(state, cs.seat);

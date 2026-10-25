@@ -294,6 +294,15 @@ class SimMinors:
         self.citystate_kb_seq[rows, r, k] = nxt.to(self.citystate_kb_seq.dtype)
         self.citystate_kb_next[rows, r] = nxt + 1
 
+    def _kb_unit_anew(self, rows: torch.Tensor, g: torch.Tensor) -> None:
+        """`unitMadeAnew` — global units `g` [N] of the games `rows` [N]
+        made anew under another owner (a levy, its return home): every
+        knowledge base's record of each is a gone unit's (slot -1), aging on"""
+        slot = self.citystate_kb_slot
+        for bi, gi in zip(rows.tolist(), g.tolist()):
+            sb = slot[bi]
+            sb[sb == gi] = -1
+
     def _kb_attacked(self, att: torch.Tensor, d_seat: torch.Tensor, g: torch.Tensor, a_seat: torch.Tensor,
                      a_type: torch.Tensor, a_tile: torch.Tensor, a_hp: torch.Tensor) -> None:
         """`recordAttacker` — after a unit-vs-unit combat in the games `att`
@@ -360,11 +369,8 @@ class SimMinors:
             # a record of the unit it made
             b, u = m.nonzero(as_tuple=True)
             g = u + self.POOL_LO["major"]
-            slot = self.citystate_kb_slot[:, s]
-            own = self.citystate_kb_owner[:, s]
-            for j, (bi, gi) in enumerate(zip(b.tolist(), g.tolist())):
-                gone = (slot[bi] == gi) & (own[bi] == 100 + s)
-                slot[bi][gone] = -1
+            self._kb_unit_anew(b, g)
+            for j in range(int(b.numel())):
                 self._kb_birth(s, 100 + s, b[j:j + 1], g[j:j + 1])
         self.citystate_levy_seat[:, s] = torch.where(back, torch.full_like(ls, -1), ls)
         self.citystate_levy_ends[:, s] = torch.where(back, torch.full_like(ls, -1), self.citystate_levy_ends[:, s])

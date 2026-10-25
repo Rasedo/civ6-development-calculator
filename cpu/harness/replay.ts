@@ -47,7 +47,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_IN_PROGRESS } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, FORTIFY_MAX_TURNS } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
@@ -198,6 +198,9 @@ interface Ctx {
    *  it, `barbStart`): the barbarians' AI takes its turn from there
    *  (`barbarianAi`) */
   barbBlows: Map<Unit, Unit>;
+  /** the units the pair's record took off (`unitGone`), by key: the
+   *  barbarians' turn may open before the game's loss (`barbarianAi`) */
+  gone: Map<string, Unit>;
   /** the civilians the barbarians seized in this pair, each as it stood
    *  before (its owner, id and plot): their tactical turn's look sees it
    *  so, the seizure coming after (`barbarianAi`) */
@@ -556,6 +559,26 @@ function cityAt(state: GameState, plot: number): City | undefined {
   return state.freeSeat?.cities.find((c) => c.centerIndex === plot);
 }
 
+/** the units' plots in the pair's log: `at(key, ord)` is a unit's last step
+ *  or teleport before `ord`, else where the pair's first record holds it */
+function logPlots(ctx: Ctx, acts: readonly unknown[][]): (key: string, ord: number) => number | undefined {
+  const steps = new Map<string, [number, number][]>();
+  for (const x of acts) {
+    if (x[2] !== 'UnitMoved' && x[2] !== 'UnitTeleported') continue;
+    const key = `${x[3]}:${x[4]}`;
+    (steps.get(key) ?? (steps.set(key, []), steps.get(key)!)).push([x[0] as number, (x[6] as number) * ctx.W + (x[5] as number)]);
+  }
+  const start = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
+  return (key, ord) => {
+    let at = start.get(key);
+    for (const [o, p] of steps.get(key) ?? []) {
+      if (o >= ord) break;
+      at = p;
+    }
+    return at;
+  };
+}
+
 /** a barbarian's unit as the barbarians' turn found it, before its moves:
  *  on its plot in the pair's first record, else (raised in the pair) where a
  *  blow found it (runs/h1_dueldA1117 t22: the barbarians' Scout on 13:13
@@ -676,10 +699,13 @@ function campsTaken(ctx: Ctx, b: TurnRecord, turn: number): void {
   }
 }
 
-/** the units record t+1 holds that its next turn's start made (its log's
- *  rows of that turn: a city's production at the active player's start),
- *  which no look of turn t sees (runs/h1_duely1121 t5: Rome's Scout made on
- *  35:14 at the start of turn 5, in no knowledge base at turn 4's end) */
+/** the units no look of turn t sees: those record t+1 holds that its next
+ *  turn's start made (its log's rows of that turn: a city's production at
+ *  the active player's start; runs/h1_duely1121 t5: Rome's Scout made on
+ *  35:14 at the start of turn 5, in no knowledge base at turn 4's end), and
+ *  a major's unit no record unit is, the engine's own (h1_duely1121
+ *  t149-t173: a Settler and a Field Cannon each turn on 12:15 and 6:12 that
+ *  China's engine cities made) */
 function unbornUnits(ctx: Ctx, b: TurnRecord): Set<Unit> {
   const out = new Set<Unit>();
   for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
@@ -687,6 +713,8 @@ function unbornUnits(ctx: Ctx, b: TurnRecord): Set<Unit> {
     const u = ctx.units.get(`${x[3]}:${x[4]}`);
     if (u) out.add(u);
   }
+  const recorded = new Set(ctx.units.values());
+  for (const u of ctx.state.units) if (isCiv(u.seat) && !recorded.has(u)) out.add(u);
   return out;
 }
 
@@ -805,6 +833,38 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   const copy = deserialize(serialize(state));
   const twin = new Map<Unit, Unit>();
   state.units.forEach((u, i) => twin.set(copy.units[i], u));
+  // their turn closes turn t: no unit the next turn's start made stands in
+  // it (runs/h1_duely1117 t7: China's Warrior 262146 added at its start of
+  // t8, out of the barbarians' t7 records)
+  const unborn = unbornUnits(ctx, b);
+  copy.units = copy.units.filter((c) => !unborn.has(twin.get(c)!));
+  // ...and every other player's unit, and each of theirs their camps raised,
+  // where the log's last step before their turn opens put it, not a later
+  // teleport's plot (runs/h1_duely1121 t85: China's Great Scientist walks to
+  // 6:17, the barbarians' record of it there at age 0, and is teleported to
+  // 6:12 after their turn; h1_duely1124 t17: their Scout added on 42:7)
+  const acts = (b as { actions?: unknown[][] }).actions ?? [];
+  const barbP = ctx.playerOfSeat.get(BARB_SEAT);
+  const open = acts.find((x) => x[2] === 'PlayerTurnActivated' && x[3] === barbP && x[1] === closing)?.[0] as number | undefined;
+  // each unit's last plot, damage and removal in the log before their turn
+  // opens
+  const last = new Map<string, number>();
+  const damage = new Map<string, number>();
+  const lived = new Set(ctx.prev.units.map((r) => `${r.owner}:${r.id}`));
+  for (const x of open === undefined ? [] : acts) {
+    if ((x[0] as number) >= open!) break;
+    const key = `${x[3]}:${x[4]}`;
+    if (x[2] === 'UnitMoved' || x[2] === 'UnitTeleported') last.set(key, (x[6] as number) * ctx.W + (x[5] as number));
+    if (x[2] === 'UnitDamageChanged') damage.set(key, x[5] as number);
+    if (x[2] === 'UnitAddedToMap') lived.add(key);
+    if (x[2] === 'UnitRemovedFromMap') lived.delete(key);
+  }
+  const keyOf = new Map([...ctx.units].map(([k, u]) => [u, k] as const));
+  for (const c of copy.units) {
+    const u = twin.get(c);
+    const at = u && (!isBarbSeat(u.seat) || !before.has(u)) ? last.get(keyOf.get(u) ?? '') : undefined;
+    if (at !== undefined) c.tileIndex = at;
+  }
   // the plots stand as the barbarians' turn opens: their pillages of the
   // turn, which the record's actions landed, not yet made
   for (const { plot, was } of ctx.barbPillaged.splice(0)) {
@@ -832,6 +892,24 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     }
     c.hp = snap.hp;
     c.tileIndex = snap.tileIndex;
+  }
+  // a unit the game holds as their turn opens that the replay's battles
+  // killed or its record took off stands on its plot with the log's damage
+  // (runs/h1_duely1128 t33: the barbarians' Warrior on 32:8, struck to 98 by
+  // city-state 4's Horseman, on their record at age 0 before it falls
+  // attacking in their turn)
+  const standing = new Set([...twin.values()]);
+  for (const key of open === undefined ? [] : lived) {
+    const u = ctx.units.get(key) ?? ctx.gone.get(key);
+    if (!u || standing.has(u) || state.units.includes(u)) continue;
+    standing.add(u);
+    const r = ctx.prev.units.find((x) => `${x.owner}:${x.id}` === key);
+    const at = last.get(key) ?? (r ? r.y * ctx.W + r.x : undefined);
+    if (at === undefined) continue;
+    const c = Object.assign(structuredClone(u), { tileIndex: at, hp: UNIT_HP - (damage.get(key) ?? num(r?.damage)) });
+    copy.units.push(c);
+    twin.set(c, u);
+    if (isBarbSeat(u.seat)) acting.add(c.id);
   }
   for (const [c, u] of twin) {
     const at = from.get(u);
@@ -1498,6 +1576,17 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
   keyOf: ReadonlyMap<Unit, string>, upgraded: ReadonlySet<Unit>): void {
   const { state } = ctx;
   const startAt = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}` as string, r.y * ctx.W + r.x] as const));
+  const heldB = new Set(b.units.map((r) => `${r.owner}:${r.id}`));
+  const typeB = new Map(b.units.map((r) => [`${r.owner}:${r.id}` as string, engineRowOf(ctx.cat, 'unit', r.type)] as const));
+  const typeA = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}` as string, engineRowOf(ctx.cat, 'unit', r.type)] as const));
+  const acts = (b as { actions?: unknown[][] }).actions ?? [];
+  const removedAt = new Map<string, number>();
+  const addedAt = new Map<string, number>();
+  for (const x of acts) {
+    if (x[2] === 'UnitRemovedFromMap') removedAt.set(`${x[3]}:${x[4]}`, x[0] as number);
+    if (x[2] === 'UnitAddedToMap' && !addedAt.has(`${x[3]}:${x[4]}`)) addedAt.set(`${x[3]}:${x[4]}`, x[0] as number);
+  }
+  const plotAt = logPlots(ctx, acts);
   // their units' AI type as their operations' recruits left it
   for (const [x, u] of twin) {
     if (!minorAiSeat(x.seat) || !copy.units.includes(x) || !state.units.includes(u)) continue;
@@ -1529,15 +1618,77 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
     // t18, is past the age its t17 Attack Barb Camp odds read)
     if (c.centerIndex >= 0) {
       const held: [Unit, number, number][] = [];
+      // a unit the pass's own blows killed on the copy that record t+1 holds
+      // stands for the look (runs/h1_duely1127 t4: the barbarians' Scout on
+      // 5:12, struck to 10 HP by city-state 3's Warrior, in Mexico's end look
+      // at age 0), and so does a unit the copy spent that the log takes off
+      // after its turn (runs/h1_duely1127 t43: city-state 4's Builder on 8:11,
+      // spent in its own turn after Hattusa's)
+      const pid = ctx.playerOfSeat.get(c.seat)!;
+      const end = acts.find((x) => x[2] === 'PlayerTurnDeactivated' && x[3] === pid && x[1] === turn)?.[0] as number | undefined;
+      // a civilian the barbarians seize in their turn is its owner's still,
+      // where the seizure took it (runs/h1_duely1124 t46: city-state 3's
+      // Builder on 41:11)
+      const back = new Map([...twin].map(([x, u]) => [u, x] as const));
+      const seized: [Unit, Pick<Unit, 'id' | 'seat' | 'type' | 'tileIndex'>][] = [];
+      const kept = new Set(copy.units);
+      for (const { u, was } of ctx.barbSeized) {
+        const x = back.get(u);
+        if (!x) continue;
+        if (!copy.units.includes(x)) copy.units.push(x);
+        seized.push([x, { id: x.id, seat: x.seat, type: x.type, tileIndex: x.tileIndex }]);
+        Object.assign(x, { id: was.id, seat: was.seat, type: was.type, tileIndex: was.tileIndex });
+      }
+      const twins = new Set(twin.values());
+      for (const [key, u] of end === undefined ? [] : ctx.gone) {
+        const off = removedAt.get(key);
+        if (off === undefined || off < end! || twins.has(u)) continue;
+        const at = plotAt(key, Math.min(off, end!));
+        if (at === undefined) continue;
+        const x = Object.assign(structuredClone(u), { tileIndex: at });
+        copy.units.push(x);
+        seized.push([x, { id: x.id, seat: x.seat, type: x.type, tileIndex: x.tileIndex }]);
+      }
+      const revived = [...twin].filter(([x, u]) => {
+        if (copy.units.includes(x)) return false;
+        if (x.hp <= 0 && state.units.includes(u)) return true;
+        // a unit the log adds before its turn's end that the copy's pass
+        // left out, its turn being the first record's (runs/h1_duely1128
+        // t105: city-state 2's Archer upgraded to the Crossbowman 1769474 on
+        // 9:9 in its turn, in Bologna's end look)
+        const on = addedAt.get(keyOf.get(u) ?? '');
+        if (x.seat !== c.seat && state.units.includes(u) && end !== undefined && on !== undefined && on < end
+          && removedAt.get(keyOf.get(u) ?? '') === undefined) return true;
+        const off = removedAt.get(keyOf.get(u) ?? '');
+        return end !== undefined && off !== undefined && off > end;
+      }).map(([x]) => x);
+      copy.units.push(...revived);
+      // every record unit of its type as the game held it then: the
+      // record's upgrades of the turn made, a later city-state's yet to come,
+      // the copy's own none (runs/h1_duely1121 t84: city-state 3's Swordsman
+      // upgraded to a Man-at-Arms on 42:18; h1_duely1128 t57: Hong Kong's new
+      // Warrior on 11:8, which the copy's pass upgraded to a Swordsman)
       for (const [x, u] of twin) {
         if (!copy.units.includes(x)) continue;
-        if (!state.units.includes(u)) {
+        const key = keyOf.get(u) ?? '';
+        const later = minorAiSeat(x.seat) && ctx.playerOfSeat.get(x.seat)! > pid;
+        const t = later ? typeA.get(key) : typeB.get(key);
+        if (!t || t === x.type) continue;
+        seized.push([x, { id: x.id, seat: x.seat, type: x.type, tileIndex: x.tileIndex }]);
+        x.type = t;
+      }
+      for (const [x, u] of twin) {
+        if (!copy.units.includes(x)) continue;
+        const lost = keyOf.has(u) && !heldB.has(keyOf.get(u)!);
+        if (!state.units.includes(u) || (x.seat === c.seat && lost)) {
           // its unit record t+1 lost stands where the log's steps of the
           // turn left it, else where its turn found it: its last plot the
           // look sees it on (runs/h1_dueld1117 t8: Valletta's Warrior walks
           // to 13:12 and falls after the look, its record the game's 13:12 at
           // age 1; h1_dueld1124 t21: Cardiff's Warrior strikes from 8:14 without
-          // a step and falls in the barbarians' turn, its record 8:14)
+          // a step and falls in the barbarians' turn, its record 8:14;
+          // h1_duely1124 t46: city-state 3's Builder steps to 41:11, which
+          // the barbarians seize in their turn)
           if (x.seat !== c.seat) continue;
           const key = keyOf.get(u) ?? '';
           const steps = ctx.paths.get(key);
@@ -1552,6 +1703,10 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
         if (x.seat === c.seat) x.tileIndex = u.tileIndex;
         else {
           x.hp = u.hp;
+          // a major's where the log's last step before its turn's end put it
+          // (runs/h1_duely1121 t134: China's Great Scientist on 13:10,
+          // teleported to 12:9 after Hunza's look)
+          if (isCiv(x.seat) && end !== undefined) x.tileIndex = plotAt(keyOf.get(u) ?? '', end) ?? u.tileIndex;
           if (minorAiSeat(x.seat)) {
             const first = startAt.get(keyOf.get(u) ?? '');
             x.tileIndex = ctx.playerOfSeat.get(x.seat)! < ctx.playerOfSeat.get(c.seat)! ? u.tileIndex : first ?? u.tileIndex;
@@ -1570,7 +1725,8 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
       const all = copy.units;
       copy.units = all.filter((x) => !unborn.has(twin.get(x)!) && !upgraded.has(x));
       minorKnowledge(copy, c, false);
-      copy.units = all;
+      copy.units = all.filter((x) => !revived.includes(x) && !seized.some(([y]) => y === x && !kept.has(y)));
+      for (const [x, f] of seized) Object.assign(x, f);
       copy.turn = now;
       for (const [x, at, hp] of held) {
         x.tileIndex = at;
@@ -2547,6 +2703,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           if (!u) continue;
           ctx.units.set(to, u);
           if (!res.ok) {
+            unitMadeAnew(state, u);
             u.seat = seat;
             u.leviedFrom = cs.seat;
           }
@@ -2861,6 +3018,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // a levied or returned unit leaves its old id alone
         const rekeyed = ds.some((x) => (x.kind === 'levy' || x.kind === 'levyEnd') && x.units.some(([f]) => f === d.unit));
         const u = rekeyed ? undefined : unitOf(ctx, d.unit);
+        const was = ctx.units.get(d.unit);
+        if (was && !rekeyed) ctx.gone.set(d.unit, was);
         ctx.units.delete(d.unit);
         if (!u) { count(ctx, `unitGone:${d.why}`, 'applied'); break; }
         disbandUnit(state, u.id);
@@ -3258,14 +3417,15 @@ function killBoosts(ctx: Ctx, read: Imported): void {
 }
 
 /** the engine's units the turn made, matched to the record's new units of the
- *  same seat and type, nearest first; a record unit a pending upgrade order
+ *  same seat and type, nearest first (`only`: one player's); a record unit a pending upgrade order
  *  makes is the upgraded unit's, never another's (runs/h1_duelw1127 t94:
  *  Mexico City's Archer upgraded to a Crossbowman, which the Crossbowman the
  *  engine's City Defense bought must not stand for) */
-function matchNewUnits(ctx: Ctx, b: TurnRecord): void {
+function matchNewUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
   const mapped = new Set([...ctx.units.values()]);
   const free = ctx.state.units.filter((u) => !mapped.has(u));
   for (const r of b.units) {
+    if (only !== undefined && r.owner !== only) continue;
     const key = `${r.owner}:${r.id}`;
     if (unitOf(ctx, key) || ctx.upgradeInto.has(key)) continue;
     const seat = seatOfP(ctx, r.owner);
@@ -4276,6 +4436,9 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
     const pid = imp.playerOfSeat.get(s.seat);
     const read = pid === undefined ? undefined : ctx.gameMemory!.at('endlook', turn, pid);
     if (!read) continue;
+    // the barbarians' turn runs after the engine's turn change: their
+    // records' turns are one ahead of the game's
+    const at = turn + (s === world.barbSeat ? 1 : 0);
     const recs: ArmyRecord[] = [];
     for (const [owner, per] of Object.entries(read.army ?? {})) {
       const seat = imp.seatOfPlayer.get(Number(owner));
@@ -4285,13 +4448,13 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
         if (!type) continue;
         for (const r of rows) {
           const u = ctx.units.get(`${owner}:${r[0]}`);
-          recs.push({ id: u ? u.id : fresh--, owner: seat, type, seen: turn - r[3], plot: r[5] * ctx.W + r[4], damage: r[1] });
+          recs.push({ id: u ? u.id : fresh--, owner: seat, type, seen: at - r[3], plot: r[5] * ctx.W + r[4], damage: r[1] });
         }
       }
     }
     if (recs.length) s.armyKnown = recs;
     else delete s.armyKnown;
-    s.armyAged = turn;
+    s.armyAged = at;
     const camps = (read.camps ?? []).map((c) => c[1] * ctx.W + c[0]);
     if (camps.length) s.campsKnown = camps;
     else delete s.campsKnown;
@@ -4482,7 +4645,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbSeized: [], minorBlows: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorClearUnits: [], minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorClearUnits: [], minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -4581,6 +4744,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.walked = new Set();
     ctx.steps = loggedSteps(b, ctx.W);
     ctx.barbBlows = new Map();
+    ctx.gone = new Map();
     ctx.barbSeized = [];
     ctx.minorBlows = new Map();
     ctx.minorBuys = [];
@@ -4807,22 +4971,36 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const killedBy = new Map(ds.flatMap((d) => (d.kind === 'kill' && isCityStateSeat(seatOfP(ctx, d.player)) ? [[d.victimUnit, d.player] as const] : [])));
       // ...and without another player's units the log takes off the map before
       // its turn opens that record t+1 lost — a removal the log follows
-      // with an addition on the unit's plot is a unit made anew (a free
-      // upgrade, a levy), no loss (runs/h1_dueld1124 t212: China's seven units
-      // removed in China's turn, none in Granada's records)
+      // with an addition on the unit's plot, of its own player or the same
+      // unit, is a unit made anew (a free upgrade, a levy), no loss
+      // (runs/h1_dueld1124 t212: China's seven units removed in China's turn,
+      // none in Granada's records); a capture's addition is the captor's
+      // unit (runs/h1_duely1117 t113: the barbarians' Builder on 33:10 taken
+      // by China's Knight, out of Antananarivo's look)
       const acts = (b as { actions?: unknown[][] }).actions ?? [];
       const heldAfter = new Set(b.units.map((x) => `${x.owner}:${x.id}`));
       const lastPlot = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
       const opens = new Map<number, number>();
       const removed: { ord: number; key: string; owner: number }[] = [];
+      // ...and with a city-state's or Free City's unit the log teleports
+      // before its turn opens where the teleport put it — a plot another's
+      // borders took (runs/h1_duely1121 t67: Hunza's Warrior on 10:11, the
+      // plot China's in China's start, teleported to 9:8 before Hunza's look);
+      // an addition's own teleport is the unit's birth
+      const teleports: { ord: number; key: string; owner: number; plot: number }[] = [];
       for (let j = 0; j < acts.length; j++) {
         const x = acts[j];
         const key = `${x[3]}:${x[4]}`;
+        const born = acts[j - 1]?.[2] === 'UnitAddedToMap' && `${acts[j - 1][3]}:${acts[j - 1][4]}` === key;
+        if (x[2] === 'UnitTeleported' && !born && minorAiSeat(seatOfP(ctx, x[3] as number))) {
+          teleports.push({ ord: x[0] as number, key, owner: x[3] as number, plot: (x[6] as number) * ctx.W + (x[5] as number) });
+        }
         if (x[2] === 'PlayerTurnActivated' && !opens.has(x[3] as number)) opens.set(x[3] as number, x[0] as number);
         if (x[2] === 'UnitMoved' || x[2] === 'UnitTeleported') lastPlot.set(key, (x[6] as number) * ctx.W + (x[5] as number));
         if (x[2] !== 'UnitRemovedFromMap' || heldAfter.has(key)) continue;
         const at = lastPlot.get(key);
-        const remade = acts.slice(j + 1).some((y) => y[2] === 'UnitAddedToMap' && (y[6] as number) * ctx.W + (y[5] as number) === at);
+        const remade = acts.slice(j + 1).some((y) => y[2] === 'UnitAddedToMap' && (y[6] as number) * ctx.W + (y[5] as number) === at
+          && (y[3] === x[3] || (ctx.units.has(key) && ctx.units.get(`${y[3]}:${y[4]}`) === ctx.units.get(key))));
         if (!remade) removed.push({ ord: x[0] as number, key, owner: x[3] as number });
       }
       const fallen: [Unit, number][] = [];
@@ -4831,6 +5009,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const ended = (player: number): void => {
         const seat = ctx.seatOfPlayer.get(player);
         ctx.minorUnits.push(...state.units.filter((u) => u.seat === seat).map((u) => structuredClone(u)));
+        // ...its units its turn made among them, the record's (runs/h1_duely1124
+        // t201: city-state 3's Builder trained on 41:12 steps to 42:12, out of
+        // Granada's look)
+        matchNewUnits(ctx, b, player);
         syncUnits(ctx, b, player, true);
         // ...its upgrades made in its turn, which no later look sees undone
         // (runs/h1_dueld1128 t41: Hong Kong's Warrior upgraded to a
@@ -4842,7 +5024,21 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
           state.rngState = rng;
         }
       };
+      // ...and with the units the record took off that the log removes after
+      // its turn opens, on their plot then (runs/h1_duely1127 t43: city-state
+      // 4's Builder on 8:11, spent in its own turn after Hattusa's)
+      const removedOrd = new Map<string, number>();
+      for (const x of acts) if (x[2] === 'UnitRemovedFromMap') removedOrd.set(`${x[3]}:${x[4]}`, x[0] as number);
+      const plotAt = logPlots(ctx, acts);
+      const restored: Unit[] = [];
+      const unrestore = () => {
+        for (const u of restored.splice(0)) {
+          const i = state.units.indexOf(u);
+          if (i >= 0) state.units.splice(i, 1);
+        }
+      };
       holdMinorStart((_st, cs) => {
+        unrestore();
         if (before !== undefined) ended(before);
         before = ctx.playerOfSeat.get(cs.seat)!;
         for (const [key, killer] of killedBy) {
@@ -4863,6 +5059,36 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
           fallen.push([u!, i]);
           state.units.splice(i, 1);
         }
+        // ...and without a major's unit no record unit is (`unbornUnits`)
+        for (const u of unbornUnits(ctx, b)) {
+          const i = state.units.indexOf(u);
+          if (i < 0) continue;
+          fallen.push([u, i]);
+          state.units.splice(i, 1);
+        }
+        for (const t of open === undefined ? [] : teleports) {
+          if (t.ord >= open! || t.owner < before) continue;
+          const u = unitOf(ctx, t.key);
+          if (u) u.tileIndex = t.plot;
+        }
+        // ...and the majors' units where the log's last step before its turn
+        // opens put them, not a later teleport's plot
+        for (const r of open === undefined ? [] : b.units) {
+          const key = `${r.owner}:${r.id}`;
+          const u = unitOf(ctx, key);
+          if (!u || !isCiv(u.seat)) continue;
+          const at = plotAt(key, open!);
+          if (at !== undefined) u.tileIndex = at;
+        }
+        for (const [key, u] of open === undefined ? [] : ctx.gone) {
+          const off = removedOrd.get(key);
+          if (off === undefined || off < open! || state.units.includes(u)) continue;
+          const at = plotAt(key, open!);
+          if (at === undefined) continue;
+          u.tileIndex = at;
+          state.units.push(u);
+          restored.push(u);
+        }
       });
       try {
         minorTurns(state);
@@ -4872,9 +5098,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         // trained and upgraded in that turn is the record's (runs/h1_duelu1117
         // t160: Antananarivo, the last city-state, its Scout trained and
         // upgraded to the Skirmisher 2097158 as Industrialization lands)
+        unrestore();
         if (before !== undefined) ended(before);
         ctx.minorGround = state.map.tiles.map(groundOf);
       } finally {
+        unrestore();
         holdMinorStart(null);
         for (const [u, i] of fallen.reverse()) state.units.splice(Math.min(i, state.units.length), 0, u);
       }

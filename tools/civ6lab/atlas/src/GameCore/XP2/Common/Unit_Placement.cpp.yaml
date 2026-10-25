@@ -51,7 +51,12 @@
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
+    - recording: 1127
+      turn: 69
+      value: "With no flag a unit a city makes is refused by a hostile defender alone: Mexico City's Heavy Chariot 720899 made onto its centre 8:10 under city-state 3's Trader 458755 (runs/h1_duely1127)."
   impl:
+    - cpu/core/units.ts:tileFreeForUnit
+    - gpu/core/sim_masks.py:_spot_free
     - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:passMoveExec
     - cpu/core/tactical.ts:moveBarred
@@ -115,7 +120,12 @@
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
+    - recording: 1127
+      turn: 69
+      value: "With no flag a unit a city makes is refused by a hostile defender alone: Mexico City's Heavy Chariot 720899 made onto its centre 8:10 under city-state 3's Trader 458755 (runs/h1_duely1127)."
   impl:
+    - cpu/core/units.ts:tileFreeForUnit
+    - gpu/core/sim_masks.py:_spot_free
     - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:enemyAt
     - cpu/core/tactical.ts:moveBarred
@@ -144,13 +154,19 @@
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
+    - recording: 1127
+      turn: 69
+      value: "With no flag a unit a city makes is refused by a hostile defender alone: Mexico City's Heavy Chariot 720899 made onto its centre 8:10 under city-state 3's Trader 458755 (runs/h1_duely1127)."
   impl:
+    - cpu/core/units.ts:tileFreeForUnit
+    - gpu/core/sim_masks.py:_spot_free
     - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:alternateLocation
     - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:bestIn
     - gpu/core/sim_tactics.py:_op_move_exec
     - cpu/core/units.ts:spawnUnit
+    - cpu/core/units.ts:domain
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"

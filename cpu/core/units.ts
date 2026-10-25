@@ -718,8 +718,16 @@ export function tileFreeForUnit(
     : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
     if (u.id === unit?.id || isAirUnit(u.type) || isSpy(u.type)) continue;
+    // a unit a city makes (`stacks`, the location test 0x586360) is refused
+    // by a hostile defender alone, never by another's civilian (runs/h1_duely1127
+    // t69: Mexico City's Heavy Chariot onto its centre 8:10, city-state 3's
+    // Trader on it)
+    if (stacks) {
+      if (u.seat !== side && unitIsMilitary(u.type) && unitsHostile(state, { seat: side }, u)) return false;
+      continue;
+    }
     if (u.seat !== side) return false; // foreign occupied
-    if (!stacks && unitStackSlot(u) === domain) return false; // same-slot ally
+    if (unitStackSlot(u) === domain) return false; // same-slot ally
   }
   return true;
 }
@@ -1722,6 +1730,18 @@ export function recordAttacker(state: GameState, attacker: Unit, seat: number): 
     r.plot = attacker.tileIndex;
     r.damage = damage;
   } else recs.push({ id: attacker.id, owner: attacker.seat, type: attacker.type, seen, plot: attacker.tileIndex, damage });
+}
+
+/** A UNIT MADE ANEW under another owner (a levy, its return home: the game
+ *  removes each unit and adds one of a new id): every knowledge base's
+ *  record of it is a gone unit's, aging on (runs/h1_duely1117: city-state
+ *  3's Warriors levied by China at t28, home at t42, levied again at t45 —
+ *  the barbarians keep the records of 655365, 720902 and 786439 as China's
+ *  beside the new 1376263, 1441798 and 1507333) */
+export function unitMadeAnew(state: GameState, u: Unit): void {
+  for (const h of [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : []), state.barbSeat]) {
+    for (const r of h.armyKnown ?? []) if (r.id === u.id) r.id = -1;
+  }
 }
 
 /** `place`: where the unit lands —
