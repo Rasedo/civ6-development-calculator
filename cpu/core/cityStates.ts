@@ -26,12 +26,16 @@ import { warWearinessPeace } from './weariness';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
+/** a city-state's founding on `centerIndex`; `settlerSeen` the turn its
+ *  knowledge base last saw the Settler that founded it (the founding turn
+ *  where the setup founds it) */
 export function placeCityStateAt(
   state: GameState,
   id: number,
   name: string,
   type: CityStateType,
   centerIndex: number,
+  settlerSeen = state.turn,
 ): CityState {
   const tile = state.map.tiles[centerIndex];
   const cityState: CityState = {
@@ -46,6 +50,10 @@ export function placeCityStateAt(
     envoys: {},
     met: [],
     suzerain: -1,
+    // its knowledge base holds the Settler that founded the city, a unit
+    // gone, aging out as any record (runs/h1_dueld1121 aimem: each
+    // city-state's SETTLER on its centre at age 1 on t2's log, 2 on t3's)
+    armyKnown: [{ id: -1, owner: seatOfCityState(id), type: 'SETTLER', seen: settlerSeen, plot: centerIndex, damage: 0 }],
   };
   // CIV6: a city-state's founding is a major's — a city of one citizen on
   // its centre and the whole first ring (runs/h1_duelw1103–1118: 48 of 48

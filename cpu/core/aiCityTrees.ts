@@ -92,17 +92,18 @@ export const newCityAi = (): CityAi => ({
 });
 
 /** the tech and civic contracts whose goal the player now holds COMPLETED,
- *  the one under research IN PROGRESS (CLAIMED again when the research moves
- *  off it), and the plot contracts whose plot it now owns COMPLETED (the
- *  research and civics AIs' and the Economic AI's turns, before the cities') */
+ *  the one under research IN PROGRESS (ACCEPTED again when the research moves
+ *  off it: the research AI's check 0x5f5940), and the plot contracts whose
+ *  plot it now owns COMPLETED (the research and civics AIs' and the Economic
+ *  AI's turns, before the cities') */
 export function goalsReached(
   ai: CityAi, held: (goal: string) => boolean, researching: (goal: string) => boolean, owns: (plot: number) => boolean,
 ): void {
   for (const c of ai.contracts) {
     const goal = ai.techContracts[c.id];
-    if (goal !== undefined && (c.progress === CP_CLAIMED || c.progress === CP_IN_PROGRESS)) {
+    if (goal !== undefined && (c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS)) {
       if (held(goal)) c.progress = CP_COMPLETED;
-      else c.progress = researching(goal) ? CP_IN_PROGRESS : CP_CLAIMED;
+      else c.progress = researching(goal) ? CP_IN_PROGRESS : CP_ACCEPTED;
       continue;
     }
     if (c.progress !== CP_CLAIMED && c.progress !== CP_ACCEPTED) continue;
@@ -639,7 +640,7 @@ const addGoalTech: BtHandler<Ctx> = {
     if (ids.some((id) => treeContract(ctx, id))) return;
     const c: AiContract = {
       id: ctx.w.newContractId(), tree: ctx.tree.id, treeName: ctx.tree.name, unit: null, building: null, district: null, plot: -1,
-      value: (Number(tagOf(run, node, 'Tech Value')) || 0) * FX, city: -1, maxTurns: 0, turns: -1, progress: CP_CLAIMED, assign: false,
+      value: (Number(tagOf(run, node, 'Tech Value')) || 0) * FX, city: -1, maxTurns: 0, turns: -1, progress: CP_ACCEPTED, assign: false,
     };
     ctx.ai.contracts.push(c);
     ctx.ai.techContracts[c.id] = goal;

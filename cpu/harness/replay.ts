@@ -1906,7 +1906,10 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
   if (minor) {
     ctx.pendingMinors.delete(d.player);
     // a city-state's founding (`placeCityStateAt`, the engine's setup step)
-    const placed = placeCityStateAt(state, minor.id, minor.name, minor.type, d.plot);
+    // — its Settler last seen at the minor's look of the turn before, the
+    // game founding it in its start of the record's turn (runs/h1_dueld1121
+    // aimem: each city-state's SETTLER at age 1 on t2's log)
+    const placed = placeCityStateAt(state, minor.id, minor.name, minor.type, d.plot, state.turn - 1);
     // its purse as the record's player held it before its city (runs/h1_duelw1124
     // t1: every city-state's 5 Gold at no yield)
     Object.assign(placed, { envoys: minor.envoys, met: minor.met, suzerain: minor.suzerain, research: minor.research,

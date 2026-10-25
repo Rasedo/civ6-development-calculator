@@ -4259,6 +4259,16 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   end look (player signal +0x228). A record's age is the count of ageings
   since it was last seen (+0xc reset to 0 by a sight or a birth): a unit
   made before the turn's ageing reads age 1 on that turn's line.
+- THE FOUNDING SETTLER'S RECORD: a city-state's knowledge base holds the
+  Settler that founded its city, a unit gone, aging as any record to 21
+  (runs/h1_dueld1121 aimem: each city-state's SETTLER on its centre at age
+  1 on t2's log, 2 on t3's). The engines: `placeCityStateAt` (its
+  `settlerSeen`: the replay's founding the turn before), the GPU's t0 load
+  (slot -1). --aiscore --to 60, the five dueld duels: knowledge.army 42.1%
+  -> 59.5%. Left: a record's plot where the unit last stood (the replay's
+  copy puts a unit the record lost where its turn found it: 1117 t9
+  Valletta's Warrior last seen at 12:11, the game's 13:12, both at age 1),
+  ages one off (1121 t40 city-state 4's record of player 3's Galley, 0 / 1).
 - LAYER 0 FOR EVERY PLAYER: no ARMY line of runs/h1_duelw1117-1128 names a
   Missionary, Apostle, Inquisitor or Guru, nor another player's Trader; a
   player's own Trader is on its line from its birth, never refreshed, its
@@ -4934,8 +4944,13 @@ operations' contracts, the improvement values below, the purchases).
   posts Bronze Working, Tech Contract 7 at the tree's 104.0).
 - A tech contract (Add Goal Tech) is IN PROGRESS while the tech is the
   research (AI_Research.csv prints it alive while RESEARCHING), ACCEPTED
-  off it (the research AI's check 0x5f5940; the engines' trees hold it
-  CLAIMED), COMPLETED when held. The AI's view at turn T: the record of T,
+  off it (the research AI's check 0x5f5940) and from its posting, COMPLETED
+  when held: the game's memory (runs/h1_dueld* aimem, the city-states'
+  contracts at the end look) holds no goal tech or civic CLAIMED — status 3
+  on its first read (35 tech and 3 civic contracts of 1117), then 5, 7 or 4.
+  The engines post it ACCEPTED (`addGoalTech`, `_x_add_goal_tech`) and
+  hold it ACCEPTED off the research (`goalsReached`); --aiscore --to 60,
+  the five dueld duels: contracts.progress 52.7% -> 88.7%. The AI's view at turn T: the record of T,
   plus what the player's turn start completes (the research's tech or
   civic, the buildings built, the units trained and bought); the districts
   placed as the record of T has them, refused for good only complete.

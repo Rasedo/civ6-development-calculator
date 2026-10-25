@@ -5030,6 +5030,18 @@ class SimInit:
             _owners = [(int(cv["seat"]), cv["units"]) for cv in f["civs"]]
             _owners += [(100 + int(cs_["id"]), cs_.get("units", [])) for cs_ in f.get("cityStates", [])]
             for seat, _units in _owners:
+                if seat >= 100 and self._settler_idx >= 0:
+                    # `placeCityStateAt`: the knowledge base's record of the
+                    # Settler that founded the city, a unit gone
+                    r_ = seat - 100
+                    k_ = int((self.citystate_kb_slot[b, r_] != -2).sum())
+                    self.citystate_kb_slot[b, r_, k_] = -1
+                    self.citystate_kb_owner[b, r_, k_] = seat
+                    self.citystate_kb_type[b, r_, k_] = self._settler_idx
+                    self.citystate_kb_seen[b, r_, k_] = 1
+                    self.citystate_kb_plot[b, r_, k_] = int(self.citystate_center[b, r_])
+                    self.citystate_kb_seq[b, r_, k_] = int(self.citystate_kb_next[b, r_])
+                    self.citystate_kb_next[b, r_] += 1
                 for u_ in _units:
                     i = int(self.unit_next[b])
                     ti = int(u_["type"])

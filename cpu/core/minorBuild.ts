@@ -41,7 +41,7 @@ import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost, selectResearch } from './economy';
-import { CP_CLAIMED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
+import { CP_ACCEPTED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw } from './aiCivics';
 import { minorCity, minorPlaceCitizens, minorReplaceCitizens, suzerainOf } from './cityStates';
@@ -228,7 +228,7 @@ export function minorPower(state: GameState, cityState: CityState): void {
 }
 
 /** the minor's Tech Contracts (its city AI's Add Goal Tech contracts): each
- *  goal technology, the contract's value, live while claimed or in progress */
+ *  goal technology, the contract's value, live while accepted or in progress */
 function minorTechContracts(cityState: CityState): TechContract[] {
   const ai = cityState.cityAi;
   if (!ai) return [];
@@ -236,7 +236,7 @@ function minorTechContracts(cityState: CityState): TechContract[] {
   for (const c of ai.contracts) {
     const goal = ai.techContracts[c.id];
     const tech = goal === undefined ? null : engineId('tech', goal, 'TECH_', TECHS);
-    if (tech) out.push({ tech, value: c.value, live: c.progress === CP_CLAIMED || c.progress === CP_IN_PROGRESS });
+    if (tech) out.push({ tech, value: c.value, live: c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS });
   }
   return out;
 }

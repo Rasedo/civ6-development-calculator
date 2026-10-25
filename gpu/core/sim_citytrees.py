@@ -537,7 +537,7 @@ def reap_contracts(ai: CityAi, s: int, w) -> None:
 
 def goals_reached(ai: CityAi, s: int, w, mask: torch.Tensor) -> None:
     """`goalsReached` where `mask`: the tech and civic contracts whose goal
-    the seat holds COMPLETED, the one under research IN PROGRESS (CLAIMED
+    the seat holds COMPLETED, the one under research IN PROGRESS (ACCEPTED
     again off it), the plot contracts whose plot it owns COMPLETED"""
     m = mask.unsqueeze(1) & (ai.c_id[:, s] >= 0)
     prog = ai.c_progress[:, s]
@@ -545,8 +545,8 @@ def goals_reached(ai: CityAi, s: int, w, mask: torch.Tensor) -> None:
     goal = ai.c_goal[:, s]
     held = torch.where(kind == GOAL_TECH, _b(w.tech_held(goal), goal), _b(w.civic_held(goal), goal))
     res = torch.where(kind == GOAL_TECH, _b(w.researching_tech(goal), goal), _b(w.researching_civic(goal), goal))
-    tc = m & ((kind == GOAL_TECH) | (kind == GOAL_CIVIC)) & ((prog == CP_CLAIMED) | (prog == CP_IN_PROGRESS))
-    new = torch.where(held, CP_COMPLETED, torch.where(res, CP_IN_PROGRESS, CP_CLAIMED))
+    tc = m & ((kind == GOAL_TECH) | (kind == GOAL_CIVIC)) & ((prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS))
+    new = torch.where(held, CP_COMPLETED, torch.where(res, CP_IN_PROGRESS, CP_ACCEPTED))
     prog = torch.where(tc, new, prog)
     pc = m & (kind == GOAL_PLOT) & ((prog == CP_CLAIMED) | (prog == CP_ACCEPTED)) & _b(w.owns(ai.c_plot[:, s]), goal)
     ai.c_progress[:, s] = torch.where(pc, torch.full_like(prog, CP_COMPLETED), prog)
@@ -925,7 +925,7 @@ def _u_add_goal_tech(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 
 def _x_add_goal_tech(c: _Ctx, i: int, at: torch.Tensor) -> None:
-    """ADD GOAL TECH's execution (0x7e7200): a CLAIMED contract on its goal,
+    """ADD GOAL TECH's execution (0x7e7200): an ACCEPTED contract on its goal,
     where the tree holds none of the tag's"""
     tech, civic = c.ma[:, i], c.mb[:, i]
     go = at & ((tech != NONE) | (civic != NONE))
@@ -936,7 +936,7 @@ def _x_add_goal_tech(c: _Ctx, i: int, at: torch.Tensor) -> None:
     val = torch.where(val == NONE, 0, val) * _FX
     kind = torch.where(tech != NONE, GOAL_TECH, GOAL_CIVIC)
     goal = torch.where(tech != NONE, tech, civic)
-    j = new_contract(c.ai, c.s, go, tree=c.ref, goal_kind=kind, goal=goal, value=val, progress=CP_CLAIMED, in_tree=True)
+    j = new_contract(c.ai, c.s, go, tree=c.ref, goal_kind=kind, goal=goal, value=val, progress=CP_ACCEPTED, in_tree=True)
     c.set_tag(i, "Contract ID", _cget(c.ai.c_id, c.s, j), go)
 
 

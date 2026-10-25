@@ -121,14 +121,14 @@ const evalAt = (plot: number, over: Partial<PlotEval> = {}): PlotEval => ({
 });
 
 describe('the city events and trees (CityBuild.cpp, the tree nodes)', () => {
-  it('a tech contract is IN PROGRESS while researched, CLAIMED off it, COMPLETED once held', () => {
+  it('a tech contract is IN PROGRESS while researched, ACCEPTED off it, COMPLETED once held', () => {
     const ai = newCityAi();
-    ai.contracts.push(contract({ id: 4, building: null }));
+    ai.contracts.push(contract({ id: 4, building: null, progress: CP_ACCEPTED }));
     ai.techContracts[4] = 'TECH_MASONRY';
     goalsReached(ai, () => false, (g) => g === 'TECH_MASONRY', () => false);
     expect(ai.contracts[0].progress).toBe(CP_IN_PROGRESS);
     goalsReached(ai, () => false, () => false, () => false);
-    expect(ai.contracts[0].progress).toBe(CP_CLAIMED);
+    expect(ai.contracts[0].progress).toBe(CP_ACCEPTED);
     goalsReached(ai, (g) => g === 'TECH_MASONRY', () => false, () => false);
     expect(ai.contracts[0].progress).toBe(CP_COMPLETED);
   });
