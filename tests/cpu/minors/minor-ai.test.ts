@@ -42,5 +42,5 @@ function run(): unknown[] {
 describe("the city-states' city AI on a world", () => {
   it('plays the opening as pinned', () => {
     matchPins('minor-ai-pins.json', run());
-  }, 60000);
+  });
 });

@@ -548,7 +548,7 @@ describe('the flood\'s row walk', () => {
       const want = Math.floor(((100 - FLOOD_MITIGATED_YIELD_REDUCTION) * pct(kinds[k]) * 100) / 100) / 100;
       expect(Math.abs(r - want)).toBeLessThan(0.03);
     });
-  }, 60000);
+  });
 });
 
 describe('the turn\'s one random event', () => {
@@ -685,7 +685,7 @@ describe('the turn\'s one random event', () => {
     expect(boosted).toBe(26 + 19 + 13);
     expect(Math.abs(rate(true) - boosted / SPAN)).toBeLessThan(0.0025);
     expect(Math.abs(rate(false) - 45 / SPAN)).toBeLessThan(0.0025);
-  }, 60000);
+  });
 
   it('a flood pair is boosted first, then warmed', () => {
     const flood = eventRows(0, AREA).find((r) => r.family === 'flood' && r.sev === 0)!;
@@ -884,7 +884,7 @@ describe('the turn\'s one random event', () => {
     }
     expect(pNear).toBeGreaterThan(0.01);
     expect(Math.abs(hits / N - pNear)).toBeLessThan(0.01);
-  }, 60000);
+  });
 
   it('no candidate, no drought and no draw', () => {
     // bare Grassland beside the Coast everywhere: no plot's ring is dry

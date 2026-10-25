@@ -20,5 +20,13 @@ export default defineConfig({
     // turn the battery's vitest lane red spuriously. Excluded here rather than
     // per-invocation so `npm test` and the battery agree.
     exclude: ['**/node_modules/**', '**/dist/**', '**/.claude/**'],
+    // ONE TIMEOUT FOR THE WHOLE SUITE, sized for a loaded box. The suite is
+    // deterministic pure logic, so a timeout catches only a hang; it is never
+    // a measure. Its tests run from milliseconds to ~30 s on a quiet box and
+    // several times that while the box runs a battery, replays or a second
+    // suite, so vitest's default 5 s (and any per-test figure sized on a
+    // quiet box) fails tests that would pass. No test sets its own.
+    testTimeout: 600_000,
+    hookTimeout: 600_000,
   },
 });

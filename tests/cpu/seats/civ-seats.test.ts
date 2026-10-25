@@ -160,7 +160,7 @@ describe('civ district/tile registry coherence', () => {
     const civCity = civ.cities[0];
     setTileOwner(state.map.tiles[civCity.centerIndex], civ.seat, civCity.id + 999);
     expect(() => assertCityRegistryCoherent(state)).toThrow(/registry incoherence/);
-  }, 60_000); // eighty whole turns, the barbarians' AI in each
+  });
 
   it('the scan catches a district tile registered to a SIBLING civCity', () => {
     const state = makeState();
@@ -417,7 +417,7 @@ describe('determinism', () => {
     }
     // the saved games' content, not their key order (a key cleared and set again lands last)
     expect(JSON.parse(serialize(a))).toEqual(JSON.parse(serialize(b)));
-  }, 60000);
+  });
 });
 
 describe('civ trade routes', () => {

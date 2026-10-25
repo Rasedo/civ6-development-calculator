@@ -48,5 +48,5 @@ function minorOpsRun(world: string, turns: number): unknown[] {
 describe("the city-states' operations on a world", () => {
   it('play the opening as pinned', () => {
     matchPins('minor-ops-pins.json', Object.fromEntries(Object.entries(MINOR_OPS_WORLDS).map(([world, turns]) => [world, minorOpsRun(world, turns)])));
-  }, 60000);
+  });
 });

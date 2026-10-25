@@ -248,7 +248,7 @@ describe('Volcanic Soil', () => {
     const w = [4, 2.5, 1.5];
     const mean = w.reduce((a, x, s) => a + x * VOLCANO_PAINT_P[s], 0) / 8;
     expect(Math.abs(painted / plots - mean)).toBeLessThan(0.04);
-  }, 60000);
+  });
 
   it('the eight eruption rows are the install\'s paint chances, in the live table\'s order', () => {
     // Eyjafjallajokull CATASTROPHIC / MEGACOLOSSAL, Kilimanjaro GENTLE /

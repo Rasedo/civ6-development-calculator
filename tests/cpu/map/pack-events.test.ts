@@ -106,7 +106,7 @@ describe('the Meteor Shower', () => {
     const p = Math.floor(60 * 14 * 14 / STANDARD_MAP_AREA) / (10 * TURN_LIMIT);
     expect(p).toBe(2 / 2500);
     expect(Math.abs(meteors / N - p)).toBeLessThan(0.001);
-  }, 60000);
+  });
 
   it('grants the Heavy Cavalry one past the seat\'s research in its nearest city, burning no fuel', () => {
     const state = makeState(makeMap(16, 16));
@@ -324,7 +324,7 @@ describe('the fires', () => {
     const p = Math.floor(60 * 14 * 14 / STANDARD_MAP_AREA) / (10 * TURN_LIMIT);
     expect(Math.abs(forest / N - p)).toBeLessThan(0.001);
     expect(Math.abs(jungle / N - p)).toBeLessThan(0.001);
-  }, 60000);
+  });
 });
 
 describe('the natural wonders\' eruptions', () => {
@@ -373,7 +373,7 @@ describe('the natural wonders\' eruptions', () => {
     }
     expect(Math.abs(eyj / N - 6.5 / 240)).toBeLessThan(0.006);
     expect(Math.abs(ves / N - 7 / 240)).toBeLessThan(0.006);
-  }, 60000);
+  });
 
   it('Vesuvius\'s MEGACOLOSSAL costs every ring city a citizen and bands its land units 70-90', () => {
     const state = makeState(makeMap(18, 18));
@@ -487,7 +487,7 @@ describe('Eyjafjallajokull and Vesuvius on the map', () => {
       'GREAT_BARRIER_REEF', 'YOSEMITE', 'TORRES_DEL_PAINE', 'CLIFFS_OF_DOVER']) {
       expect(seen[id], id).toBeGreaterThan(0);
     }
-  }, 60000);
+  });
 
   it('a locked world holding Vesuvius offers its row a real site', () => {
     const files = readdirSync('seeder/worlds').filter((f) => /^seed\d+\.world\.json$/.test(f)).sort();

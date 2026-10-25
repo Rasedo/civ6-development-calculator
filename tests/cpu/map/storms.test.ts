@@ -297,7 +297,7 @@ describe('the eight storms are the install\'s table', () => {
     for (let i = 0; i < 400; i++) rows.add(stormStart(sea, cat5)!.row);
     expect(rows.has(0) || rows.has(15)).toBe(false);
     expect(rows.has(1) && rows.has(14)).toBe(true);
-  }, 30_000); // 40,000 whole-map draws: past the default 5 s on a loaded box
+  });
 
   it('the footprint walks the centre then DirectionTypes (0x28d6b0)', () => {
     const map = makeMap(16, 16);

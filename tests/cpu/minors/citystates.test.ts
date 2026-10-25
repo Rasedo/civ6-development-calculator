@@ -208,7 +208,7 @@ describe('determinism', () => {
       endTurn(b);
     }
     expect(serialize(a)).toBe(serialize(b));
-  }, 60000);
+  });
 });
 
 describe('civ envoys and the suzerain contest', () => {
