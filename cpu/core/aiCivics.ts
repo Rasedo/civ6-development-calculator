@@ -1,8 +1,8 @@
 /**
  * THE CIVICS AI (GameCore_XP2 AI/CultureAi.cpp; `tools/civ6lab/dll_readings.md`
  * "H-1: the civics AI"). Every party that studies civics picks its next one
- * through it: the city-states inside the engine's turn (`minorResearch`), the
- * majors' AI through `civicAiChoice`.
+ * through it: the city-states and the Free Cities inside the engine's turn
+ * (`minorResearch`).
  *
  * THE ANALYSIS (the "Civic Tree Analysis" job, 0x621a20 on each entry, one
  * per civic in table order): an owned row is spent; any other walks its
@@ -34,7 +34,7 @@ import { AI_BUILDINGS } from '../data/aiBuildTables';
 import { AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_UNIT_COMBAT, PSEUDOYIELD_WONDER } from '../data/aiValue';
 import { CIVIC_AI_FAVORED, CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
 import { AI_CIVIC_MODIFIERS } from '../data/aiTables';
-import { AI_GOVERNMENTS } from '../../ai/major/tables';
+import { AI_GOVERNMENTS } from '../data/aiTables';
 import { gameTypeOf } from '../data/aliases';
 import { FORMATION_CIVIC } from '../data/units';
 import { researchCost } from './economy';
@@ -43,8 +43,8 @@ import { leaderOf, seatOf } from './seats';
 import { AI_RATE, FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
 import { modifiersValue } from './aiModifiers';
 import { getModifiers } from './effects';
-import { majorView } from './majorView';
-import { pseudoYieldWeights, type AiWeightInputs } from './aiWeights';
+import { aiView } from './aiView';
+import { pseudoYieldWeights } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
 export interface CivicEntry {
@@ -139,7 +139,7 @@ const UNLOCKS = new Map(Object.values(CIVICS).map((c) => {
  * Equestrian Orders' 37.0, Civil Service 29.5 -> 71.5 on Civil Prestige's
  * 62.0, as logged; a seat that writes none, the floor); its modifiers (CivicModifiers)
  * analysed from landing to the horizon (0x7a4b20) on `view` (the
- * state's `majorView` where none is given). The governments it unlocks
+ * state's `aiView` where none is given). The governments it unlocks
  * add, bare, max(v - v(current), v / 2) of the government values its civics
  * AI's last turn wrote (`ResearchState.civicGovValues`, +0xb38; none before
  * the first, and v(current) 0 with no government), before the era count.
@@ -153,7 +153,7 @@ export function civicValue(state: GameState, seat: number, id: string, turns: nu
   let v = fromLanding(pseudoYield(PSEUDOYIELD_CIVIC, FX, w('PSEUDOYIELD_CIVIC')), turns);
   const govs = researchOf(state, seat).civicGovValues;
   if (govs) {
-    const vw = view ?? majorView(state);
+    const vw = view ?? aiView(state);
     const now = vw.government(seat);
     const cur = now ? govs[now] ?? 0 : 0;
     for (const g of GOVERNMENTS_OF.get(gameTypeOf('civic', id, 'CIVIC_')) ?? []) {
@@ -173,7 +173,7 @@ export function civicValue(state: GameState, seat: number, id: string, turns: nu
     + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
     + formations * pseudoYield(PSEUDOYIELD_UNIT_COMBAT, fxConst(CIVIC_AI_FORMATION_UNITS), w('PSEUDOYIELD_UNIT_COMBAT'))
     + Math.max(fxConst(CIVIC_AI_POLICY_FLOOR), researchOf(state, seat).civicPolicyBest?.[gameTypeOf('civic', id, 'CIVIC_')] ?? 0)
-    + (mods.length ? modifiersValue({ view: view ?? majorView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0);
+    + (mods.length ? modifiersValue({ view: view ?? aiView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0);
 }
 
 /** per install civic the governments it unlocks, in database order */
@@ -223,19 +223,18 @@ function researchOf(state: GameState, seat: number): ResearchState {
 }
 
 /** THE ANALYSIS: every civic's entry, in table order, valued and
- *  propagated; `culture` is the seat's Culture a turn, `weights` what a
- *  major's AI follows (`aiWeights.ts`), `cityTerm` the value's terms its
+ *  propagated; `culture` is the seat's Culture a turn, `cityTerm` the value's terms its
  *  cities give (the unlocked units') where the seat's facts give them */
-export function civicAnalysis(state: GameState, seat: number, culture: number, weights: AiWeightInputs = {},
+export function civicAnalysis(state: GameState, seat: number, culture: number,
   cityTerm?: (civic: string, turns: number) => number): CivicEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(culture);
-  const pw = pseudoYieldWeights(state, seat, weights);
+  const pw = pseudoYieldWeights(state, seat);
   let view: AiValueView | undefined;
   const entries: CivicEntry[] = CIVIC_TABLE_ORDER.filter((id) => CIVICS[id]).map((id) => {
     if (owned(r, id)) return { civic: id, next: id, turns: -1, owned: true, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
-    const base = turns < 0 ? 0 : civicValue(state, seat, id, turns, pw, view ??= majorView(state)) + (cityTerm && turns < AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
+    const base = turns < 0 ? 0 : civicValue(state, seat, id, turns, pw, view ??= aiView(state)) + (cityTerm && turns < AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
     return { civic: id, next, turns, owned: false, base, score: base };
   });
   const leader = leaderOf(state, seat);
@@ -277,14 +276,4 @@ export function civicChoice(state: GameState, seat: number, entries: readonly Ci
   if (!open.length) return null;
   const k = draw(open.length);
   return k >= 0 ? open[k] : null;
-}
-
-/** THE MAJORS' AI's civic: the completion's choice over the entries its last
- *  turn left (`entries`; a fresh analysis where none), with `done` the
- *  completed civic, or the turn's over a fresh analysis (`culture` its
- *  Culture a turn) */
-export function civicAiChoice(state: GameState, seat: number, culture: number, done: string | null, entries: readonly CivicEntry[] | null, draw: CivicDraw,
-                              weights: AiWeightInputs = {}): string | null {
-  if (done) return civicChoice(state, seat, entries ?? civicAnalysis(state, seat, culture, weights), done, draw);
-  return civicChoice(state, seat, civicAnalysis(state, seat, culture, weights), null, draw);
 }

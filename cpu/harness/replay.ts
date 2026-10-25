@@ -35,14 +35,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { ArmyRecord, BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Tile, Unit } from '../core/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
-import { NO_SEAT, type Governor } from '../core/types';
+import { NO_SEAT } from '../core/types';
 import { advanceTurn, minorTurns, turnChange, turnClose, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
   serialize, deserialize, itemCost } from '../core/game';
 import { completeQueueItem } from '../core/production';
 import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
-  placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
+  placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
   seatPhase, worldCongress } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_IN_PROGRESS } from '../core/aiContracts';
@@ -53,8 +53,8 @@ import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governm
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
 import { computeCityStats } from '../core/city';
 import { getModifiers } from '../core/effects';
-import { researchAiChoice, researchAnalysis, type ResearchEntry } from '../core/aiResearch';
-import { civicAiChoice, civicAnalysis, type CivicEntry } from '../core/aiCivics';
+import type { ResearchEntry } from '../core/aiResearch';
+import type { CivicEntry } from '../core/aiCivics';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
 import { recordMoments } from '../core/moments';
 import { applyGovernorActions, governorsOf } from '../core/governors';
@@ -81,9 +81,9 @@ import { PROJECTS } from '../data/projects';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES } from '../data/policies';
-import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_IDS, RELIGION_INITIAL_BELIEFS, RELIGION_TYPES, beliefIdAt, gainPopulationPressure } from '../data/religion';
+import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_IDS, RELIGION_TYPES, gainPopulationPressure } from '../data/religion';
 import { missionOf, missionPayable } from '../core/deals';
-import { DEAL_MISSION, DELEGATION_COST, EMBASSY_COST } from '../data/seats';
+import { DEAL_MISSION } from '../data/seats';
 import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
@@ -107,26 +107,10 @@ import { buildingTable } from '../core/aiCityBuild';
 import { replayEvents } from './eventReplay';
 import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog';
 import { streamHold, type StreamHold } from './streamHold';
-import { holdRng, randRange, rngHold } from '../core/rand';
+import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId, gameHash, gameTypeOf } from '../data/aliases';
-import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
-import { ReligionProbe, religionAiMarkdown, type ReligionActions, type ReligionAiTally } from './religionAi';
-import { GovernorProbe, applyGovernorTurn, governorAiMarkdown, type GovernorAiTally } from './governorAi';
-import { CongressProbe, congressAiMarkdown, type CongressAiTally } from './congressAi';
-import { GreatPeopleProbe, greatPeopleAiMarkdown, type GreatPeopleAiTally } from './greatPeopleAi';
-import { CityBuildProbe, cityBuildAiMarkdown, type CityBuildAiTally } from './majorCityBuildAi';
-import { majorItemType } from '../core/majorCityBuild';
-import { holdCongressBallots } from '../core/congress';
-import { enhanceRecord, foundingRecord, pantheonRecord } from '../../ai/major/religion';
-import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
-import { DiploSender, senderMarkdown, type SenderTally } from './diploSender';
-import { answerAction } from '../../ai/major/diploState';
-import { majorView, type MajorViewInputs } from '../core/majorView';
-import type { PickedAction } from '../../ai/major/diploActions';
-import { SettleProbe, settleMarkdown, type SettleTallies } from './settleAi';
-import { StrategyProbe, recordMilitary, strategyMarkdown, type ContactTally, type StrategyTally } from './strategyAi';
-import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsAi';
+import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsScore';
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
@@ -157,11 +141,6 @@ const LAB_HANDICAP = DIFFICULTIES.indexOf('WARLORD');
 /** the engine-side bookkeeping the replay carries across turns */
 interface Ctx {
   state: GameState;
-  /** the AI majors' religion port: their seats, the probe holding their
-   *  scores, the strategies they follow this pair, the turns the port
-   *  founded each one's pantheon */
-  religionPort: { seats: ReadonlySet<number>; probe: ReligionProbe; inputs: MajorViewInputs; pantheonTurn: Map<number, number>;
-    mustFound: Set<number> };
   /** the pair's Fortify orders: unit -> the order's place in the log and the
    *  fortification record t+1 shows, null for a unit record t+1 no longer
    *  holds (`dugIn`) */
@@ -274,8 +253,7 @@ interface Ctx {
    *  log names the civic chosen), each seat's civic as the pair opened, the
    *  game's AI log of civics (`<dump>.logs/AI_GovtPolicies.csv`, per
    *  `${turn}:${player}` every Civic row it scored), its analysis against
-   *  it, and each major's analysis of the pair before (what a completion's
-   *  choice reads) */
+   *  it */
   civicAi: Record<ResearchParty, ResearchAiTally>;
   civicBefore: Map<number, string | null>;
   aiCivicLog: Map<string, Map<string, { score: number; turns: number }>>;
@@ -299,28 +277,21 @@ interface Ctx {
   minorLookTypes: Map<number, string>;
   memoryClean: Map<number, boolean>;
   civicScores: Record<ResearchParty, ResearchScoreTally>;
-  majorCivicEntries: Map<number, CivicEntry[]>;
   /** the game's city build value tables (`<dump>.logs/AI_CityBuild.csv`'s
    *  PLOT ANALYSIS LOG, the verbose recordings) and the city-states' tables
    *  of the engine's analysis against them, in all and per building */
   cityBuildLog: Map<string, number[]>;
   cityBuild: CityBuildTally;
   cityBuildPer: Map<string, CityBuildTally>;
-  /** the majors' governor AI, whose turn an AI major's `governors` decision
-   *  lands (`GovernorProbe`) */
-  governorAi: GovernorProbe;
-  /** the majors' city production AI, asked at each production decision of
-   *  an AI major's empty city (`CityBuildProbe`) */
-  cityBuildAi: CityBuildProbe;
   /** the operations measured (`OperationsProbe`), and the city-states'
    *  operation lines and candidate lines of the pair, by seat */
-  operationsAi: OperationsProbe;
+  operations: OperationsProbe;
   minorOps: Map<number, { lines: string[]; evals: string[] }>;
 }
 
 /** THE RESEARCH AI MEASURED: the choices the engine's research AI made (a
- *  city-state's, in its turn) or would make (a major's, at each research
- *  decision of the record), how many the record's research took, how many
+ *  city-state's or the Free Cities', in its turn), how many the record's
+ *  research took, how many
  *  the game's AI log names (its RESEARCHING row of the turn, where it logs
  *  the player), and the first that differs from the record */
 export interface ResearchAiTally {
@@ -423,9 +394,8 @@ function policyScoreAgainstLog(ctx: Ctx, kind: ResearchParty, turn: number, play
   }
 }
 
-/** the research and civics AIs' parties: the majors, the city-states, the
- *  Free Cities */
-type ResearchParty = 'major' | 'minor' | 'free';
+/** the research and civics AIs' parties: the city-states, the Free Cities */
+type ResearchParty = 'minor' | 'free';
 
 /** a civics AI analysis against the log's rows of the turn (the log lists
  *  every row with turns at least 0) */
@@ -764,7 +734,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   }
   traceBarbOps(null);
   const barbPlayer = ctx.playerOfSeat.get(BARB_SEAT);
-  if (barbPlayer !== undefined) ctx.operationsAi.minorTurn(closing, barbPlayer, opLines, []);
+  if (barbPlayer !== undefined) ctx.operations.minorTurn(closing, barbPlayer, opLines, []);
   barbSlotsDying(state);
   // the barbarians' units look round where the record holds them (their
   // moves are the record's, set without a step)
@@ -1295,12 +1265,12 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
     const player = ctx.playerOfSeat.get(cs.seat);
     if (player === undefined) continue;
     const got = ctx.minorOps.get(cs.seat);
-    ctx.operationsAi.minorTurn(turn, player, got?.lines ?? [], got?.evals ?? []);
+    ctx.operations.minorTurn(turn, player, got?.lines ?? [], got?.evals ?? []);
     for (const op of c.ops ? opsOf(c.ops) : []) {
       for (const id of opUnits(op)) {
         const u = copy.units.find((x) => x.id === id);
         const key = u ? keyOf.get(twin.get(u)!) : undefined;
-        if (u && key) ctx.operationsAi.minorEnd(b, op.def, player, turn, key, u.tileIndex, gameTypeOf('unit', u.type, 'UNIT_'));
+        if (u && key) ctx.operations.minorEnd(b, op.def, player, turn, key, u.tileIndex, gameTypeOf('unit', u.type, 'UNIT_'));
       }
     }
   }
@@ -1312,12 +1282,12 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
     if (free.cityAi) state.freeSeat.cityAi = free.cityAi;
     const player = ctx.playerOfSeat.get(FREE_SEAT);
     if (player !== undefined) {
-      ctx.operationsAi.minorTurn(turn, player, ctx.minorOps.get(FREE_SEAT)?.lines ?? [], []);
+      ctx.operations.minorTurn(turn, player, ctx.minorOps.get(FREE_SEAT)?.lines ?? [], []);
       for (const op of free.ops ? opsOf(free.ops) : []) {
         for (const id of opUnits(op)) {
           const u = copy.units.find((x) => x.id === id && x.seat === FREE_SEAT);
           const key = u ? keyOf.get(twin.get(u)!) : undefined;
-          if (u && key) ctx.operationsAi.minorEnd(b, op.def, player, turn, key, u.tileIndex, gameTypeOf('unit', u.type, 'UNIT_'));
+          if (u && key) ctx.operations.minorEnd(b, op.def, player, turn, key, u.tileIndex, gameTypeOf('unit', u.type, 'UNIT_'));
         }
       }
     }
@@ -1453,8 +1423,6 @@ function applyQueue(ctx: Ctx, d: Extract<Decision, { kind: 'queue' }>): void {
     return;
   }
   const items = d.items.map((s) => ({ s, q: queueItem(ctx, seat, city, s) })).filter((x): x is { s: QueueSpec; q: QueueItem } => !!x.q);
-  // an AI major's empty city: its production AI's pick beside the record's
-  ctx.cityBuildAi.decide(ctx.state, ctx.state.turn, city, recordCityName(ctx, seat, city.id), majorItemType(items[0]?.q));
   const head = city.queue[0];
   const keep = head && items[0] && itemKey(head) === itemKey(items[0].q);
   for (const q of city.queue.slice(keep ? 1 : 0)) if (q.progress > 0) ctx.retained.set(`${city.centerIndex}|${itemKey(q)}`, q.progress);
@@ -1486,24 +1454,6 @@ function applyResearch(ctx: Ctx, player: number, row: number, civic: boolean): v
     return;
   }
   const r = s.research;
-  if (!civic) {
-    // the major's research AI asked at the record's decision: after the
-    // research the pair opened on completed, the completion's choice, else
-    // the turn's; a random pick is taken as none
-    const was = ctx.researchBefore.get(s.seat) ?? null;
-    const done = was && r.techs.includes(was) ? was : null;
-    const c = researchAiChoice(ctx.state, s.seat, s.sciRate ?? 0, done, () => -1);
-    tallyResearchAi(ctx, 'major', ctx.state.turn, player, c?.tech ?? r.tech, id);
-  } else {
-    // the major's civics AI asked at the record's decision: after the civic
-    // the pair opened on completed, the completion's choice over its
-    // analysis of the pair before, else the turn's; a random pick is taken
-    // as none
-    const was = ctx.civicBefore.get(s.seat) ?? null;
-    const done = was && r.civics.includes(was) ? was : null;
-    const c = civicAiChoice(ctx.state, s.seat, s.culRate ?? 0, done, ctx.majorCivicEntries.get(s.seat) ?? null, () => -1);
-    tallyCivicAi(ctx, 'major', ctx.state.turn, player, c ?? r.civic, id);
-  }
   if ((civic ? r.civics : r.techs).includes(id)) {
     count(ctx, kind, 'refused', player, 'already complete in the engine');
     return;
@@ -1568,16 +1518,12 @@ function readMissions(dumpPath: string): Map<number, MissionEvent[]> {
   return out;
 }
 
-/** THE TURN'S MISSIONS of the record's human majors as the two majors'
- *  actions on the engine's table: the sender's offer of its MISSION
- *  (`putOffer`), then the receiver's answer — its acceptance (`answerOffer`)
- *  where the record's receiver accepted, none where it refused (the offer
- *  lapses). The receiver's own AI answers beside every proposal of the record
- *  (`DiplomacyProbe.answer`); an AI major's proposals are its port's own
- *  (`applySenderPicks`), not fed. What the engine's table cannot carry is
- *  laid as the record holds it. */
-function applyMissions(ctx: Ctx, events: readonly MissionEvent[], probe: DiplomacyProbe,
-                       inputs: MajorViewInputs, fed: (seat: number) => boolean): void {
+/** THE TURN'S MISSIONS of the record's majors as the two majors' actions on
+ *  the engine's table: the sender's offer of its MISSION (`putOffer`), then
+ *  the receiver's answer — its acceptance (`answerOffer`) where the record's
+ *  receiver accepted, none where it refused (the offer lapses). What the
+ *  engine's table cannot carry is laid as the record holds it. */
+function applyMissions(ctx: Ctx, events: readonly MissionEvent[]): void {
   const { state } = ctx;
   for (const e of events) {
     const a = seatOfP(ctx, e.from);
@@ -1589,8 +1535,6 @@ function applyMissions(ctx: Ctx, events: readonly MissionEvent[], probe: Diploma
       continue;
     }
     const want = e.kind === 'embassy' ? MISSION_EMBASSY : MISSION_DELEGATION;
-    probe.answer(state, b, a, want, e.accepted, inputs);
-    if (!fed(a)) continue;
     const why = missionOf(state, a) !== want ? `the sender's mission is the other kind`
       : !missionPayable(state, a, b) ? `not payable: held ${delegationWith(state, a, b)} treasury ${Math.round(sender.treasury ?? 0)}` : undefined;
     const offered = !why && putOffer(state, sender, [b, [[DEAL_MISSION, 0, 0]], []]);
@@ -1602,84 +1546,6 @@ function applyMissions(ctx: Ctx, events: readonly MissionEvent[], probe: Diploma
     const ok = offered && answerOffer(state, receiver, a) && delegationWith(state, a, b) === want;
     if (!ok) setDelegationWith(state, a, b, want);
     count(ctx, 'diplo:missionAnswer', ok ? 'applied' : 'fallback', e.to, ok ? undefined : `${e.kind} ${e.from}->${e.to}`);
-  }
-}
-
-/** THE AI MAJORS' PANTHEONS (ai/major/religion.ts `pantheonRecord`): at its
- *  AI turn an AI major that may found one founds the pantheon its scores
- *  pick, through the engine's verb (`foundPantheon`) */
-function portPantheons(ctx: Ctx, rec: TurnRecord): void {
-  const { state } = ctx;
-  const rp = ctx.religionPort;
-  const view = majorView(state, rp.inputs);
-  for (const seat of rp.seats) {
-    // m_mustFoundPantheon: raised at an AI turn the seat may found one, acted
-    // on at its next
-    const raised = rp.mustFound.has(seat);
-    if (!view.pantheonOpen(seat)) {
-      rp.mustFound.delete(seat);
-      continue;
-    }
-    rp.mustFound.add(seat);
-    if (!raised) continue;
-    const pick = pantheonRecord(view, seat, rp.probe.scoresFor(state, seat));
-    if (pick.pantheon === undefined || pick.pantheon === null) continue;
-    const res = foundPantheon(state, seat, pick.pantheon);
-    count(ctx, 'religionAi:pantheon', res.ok ? 'applied' : 'refused', ctx.playerOfSeat.get(seat), res.ok ? undefined : res.reason);
-    if (!res.ok) continue;
-    rp.pantheonTurn.set(seat, state.turn - 1);
-    matchNewUnits(ctx, rec);
-  }
-}
-
-/** THE AI MAJORS' OWN MISSIONS (`DiploSender`): each pick's offer goes on
- *  the engine's table as its sender's action; the receiver answers as the
- *  record's did where the record holds the same proposal, else by its own
- *  AI (`answerAction`); the sender records the answer. */
-function applySenderPicks(ctx: Ctx, picks: readonly (PickedAction & { owner: number })[], record: readonly MissionEvent[],
-                          sender: DiploSender, probe: DiplomacyProbe, inputs: MajorViewInputs): void {
-  const { state } = ctx;
-  const view = majorView(state, inputs);
-  for (const p of picks) {
-    const from = seatOf(state, p.owner) as Seat | undefined;
-    const to = seatOf(state, p.target) as Seat | undefined;
-    if (!from || !to) continue;
-    const kind = p.action === 'DIPLOACTION_RESIDENT_EMBASSY' ? 'embassy' : 'delegation';
-    const pf = ctx.playerOfSeat.get(p.owner);
-    const pt = ctx.playerOfSeat.get(p.target);
-    const rec = record.find((r) => r.from === pf && r.to === pt && r.kind === kind);
-    const accepted = rec ? rec.accepted
-      : answerAction(view, probe.stateOf(p.target, p.owner), p.target, p.owner, p.action, kind === 'embassy' ? EMBASSY_COST : DELEGATION_COST);
-    const { offer } = sender.perform(state, p.owner, p);
-    const offered = !!offer && putOffer(state, from, offer);
-    count(ctx, 'diplo:portOffer', offered ? 'applied' : 'refused', pf);
-    const landed = offered && accepted && answerOffer(state, to, p.owner);
-    count(ctx, `diplo:portAnswer:${rec ? 'record' : 'port'}`, 'applied');
-    sender.answered(p.owner, p.action, !!landed);
-  }
-}
-
-/** THE AI MAJORS' TRANSITIONS' ACTIONS (ai/major/diploState): a friendship
- *  offered goes on the engine's table as the sender's offer, answered by an AI
- *  receiver's own answer (`answerFriendship`) — a human seat of the record
- *  struck none; a denouncement lands through the engine's verb. */
-function applyTransitions(ctx: Ctx, probe: DiplomacyProbe, sender: DiploSender, inputs: MajorViewInputs): void {
-  const { state } = ctx;
-  for (const x of probe.sent) {
-    if (!sender.isSender(x.owner)) continue;
-    const pf = ctx.playerOfSeat.get(x.owner);
-    if (x.kind === 'denounce') {
-      count(ctx, 'diplo:portDenounce', denounce(state, x.owner, x.other) ? 'applied' : 'refused', pf);
-      continue;
-    }
-    const from = seatOf(state, x.owner) as Seat | undefined;
-    const to = seatOf(state, x.other) as Seat | undefined;
-    if (!from || !to) continue;
-    const { offer } = sender.offerFriendship(state, x.owner, x.other);
-    const offered = !!offer && putOffer(state, from, offer);
-    count(ctx, 'diplo:portFriendship', offered ? 'applied' : 'refused', pf);
-    const accepted = sender.isSender(x.other) && probe.answerFriendship(state, x.other, x.owner, inputs);
-    if (offered && accepted) answerOffer(state, to, x.owner);
   }
 }
 
@@ -2422,19 +2288,6 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const s = seatOf(state, seatOfP(ctx, d.player));
         const id = engineId('belief', ctx.cat.beliefs[d.belief], 'BELIEF_', PANTHEONS);
         if (!s || !id) { count(ctx, 'pantheon', 'refused', d.player); break; }
-        const rp = ctx.religionPort;
-        if (rp.seats.has(s.seat)) {
-          // an AI major's pantheon is its port's (`portPantheons`), taken at
-          // its own turn: the record's is the score
-          const at = rp.pantheonTurn.get(s.seat);
-          rp.probe.actions.pantheons++;
-          if (at === state.turn - 1) rp.probe.actions.pantheonsTurnEqual++;
-          if (s.religion.pantheon === id) rp.probe.actions.pantheonsBeliefEqual++;
-          else if (rp.probe.actions.misses.length < 30) {
-            rp.probe.actions.misses.push(`t${state.turn - 1} pantheon: ours ${s.religion.pantheon ?? '-'}${at !== undefined ? ` at t${at}` : ''} record ${id}`);
-          }
-          if (s.religion.pantheon !== null) { count(ctx, 'pantheon', 'applied'); break; }
-        }
         const had = s.religion.pantheon;
         if (had === id) { count(ctx, 'pantheon', 'applied'); break; }
         // the player's pick as its action (`foundPantheon`, the record's
@@ -2487,27 +2340,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           }
         }
         // the founding's religion, the player's choice (the record's type)
-        let religion = r.type ? RELIGION_TYPES.indexOf(r.type) : -1;
-        let chosen: [number, number][] = picks;
-        const rp = ctx.religionPort;
-        if (rp.seats.has(seat) && (s.religion.founded || r.founded)) {
-          // an AI major's choices are its port's (ai/major/religion.ts): the
-          // founding's religion and beliefs, each belief added
-          const view = majorView(state, rp.inputs);
-          const scores = rp.probe.scoresFor(state, seat);
-          const port: Pick<SeatActionRecord, 'religion' | 'beliefs'> = s.religion.founded ? enhanceRecord(view, seat, scores)
-            : foundingRecord(view, seat, scores, RELIGION_INITIAL_BELIEFS, (n) => randRange(state, n, 'Random Religion Choice'));
-          if (port.beliefs?.length) {
-            const named = (xs: readonly (readonly [number, number])[]) => xs.map(([c, k]) => beliefIdAt(c, k)).sort().join(' ');
-            rp.probe.choice('beliefs', named(port.beliefs), named(picks), state.turn - 1);
-            chosen = port.beliefs.map(([c, k]) => [c, k] as [number, number]);
-          }
-          if (!s.religion.founded && port.religion !== undefined && port.religion !== null) {
-            rp.probe.choice('religion', RELIGION_TYPES[port.religion], r.type ?? '-', state.turn - 1);
-            religion = port.religion;
-          }
-        }
-        const adopted = chosen.length && (s.religion.founded || r.founded) ? adoptBeliefs(state, seat, chosen, religion, holyAt) : { ok: false, reason: 'no belief to adopt' };
+        const religion = r.type ? RELIGION_TYPES.indexOf(r.type) : -1;
+        const adopted = picks.length && (s.religion.founded || r.founded) ? adoptBeliefs(state, seat, picks, religion, holyAt) : { ok: false, reason: 'no belief to adopt' };
         if (adopted.ok) { count(ctx, 'religion', 'applied'); break; }
         const founding = !s.religion.founded && r.founded;
         // the founding's moment, as the engine's own founding pays it
@@ -2533,36 +2367,23 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const g = seatOf(next.state, seat)?.governors;
         if (!s || !g) { count(ctx, 'governors', 'refused', d.player); break; }
         const roster = governorsOf(s);
-        // an AI major's governors are its AI's: the port's turn through the
-        // engine's verbs, the record's roster where it differs
-        const port = ctx.governorAi.turnOf(seat);
-        const was = roster.map((e) => ({ ...e }));
-        if (port) applyGovernorTurn(state, seat, port);
-        let changed = 0;
-        let equal = 0;
         g.forEach((x, i) => {
           const from = x.cityId >= 0 ? next.state.seats[seat]?.cities.find((c) => c.id === x.cityId) : undefined;
           const to = from ? cityAt(state, from.centerIndex) : undefined;
           const cityId = to && to.seat === seat ? to.id : -1;
           const e = roster[i];
-          const sameAs = (r: Governor) => x.appointed === r.appointed && x.promotions === r.promotions
-            && cityId === r.cityId && x.minorId === r.minorId;
-          const same = () => sameAs(e);
-          if (sameAs(was[i]) && same()) return;
-          changed++;
-          if (!port) {
-            const verbs: [number, number, number][] = [];
-            if (x.appointed && !e.appointed) verbs.push([GOV_APPOINT, i, 0]);
-            for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
-              if (promotionBit(x.promotions, p) && !promotionBit(e.promotions, p)) verbs.push([GOV_PROMOTE, i, p]);
-            }
-            if ((cityId >= 0 || x.minorId >= 0) && (cityId !== e.cityId || x.minorId !== e.minorId)) {
-              verbs.push(x.minorId >= 0 ? [GOV_ASSIGN_MINOR, i, x.minorId] : [GOV_ASSIGN_CITY, i, to!.centerIndex]);
-            }
-            applyGovernorActions(state, seat, verbs);
+          const same = () => x.appointed === e.appointed && x.promotions === e.promotions && cityId === e.cityId && x.minorId === e.minorId;
+          if (same()) return;
+          const verbs: [number, number, number][] = [];
+          if (x.appointed && !e.appointed) verbs.push([GOV_APPOINT, i, 0]);
+          for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
+            if (promotionBit(x.promotions, p) && !promotionBit(e.promotions, p)) verbs.push([GOV_PROMOTE, i, p]);
           }
+          if ((cityId >= 0 || x.minorId >= 0) && (cityId !== e.cityId || x.minorId !== e.minorId)) {
+            verbs.push(x.minorId >= 0 ? [GOV_ASSIGN_MINOR, i, x.minorId] : [GOV_ASSIGN_CITY, i, to!.centerIndex]);
+          }
+          applyGovernorActions(state, seat, verbs);
           if (same()) {
-            equal++;
             count(ctx, 'governors', 'applied');
             return;
           }
@@ -2570,9 +2391,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           // stands (a record reads an unestablished governor's full count)
           const kept = e.appointed && e.cityId === cityId && e.minorId === x.minorId && cityId + x.minorId > -2;
           roster[i] = { ...x, cityId, establishTurns: kept ? e.establishTurns : x.establishTurns };
-          count(ctx, 'governors', 'fallback', d.player, port ? 'the port roster differs' : undefined);
+          count(ctx, 'governors', 'fallback', d.player);
         });
-        if (port) ctx.governorAi.rosterCheck(state.turn, d.player, changed, equal, 'the port roster differs from record t+1');
         break;
       }
       case 'routes': {
@@ -3798,7 +3618,7 @@ export interface ReplayReport {
   stopped?: string;
   /** why the engine refused the decisions it refused, by kind and reason */
   refusals: Record<string, Record<string, number>>;
-  /** the research AI's choices, majors' and city-states' (`ResearchAiTally`) */
+  /** the research AI's choices, the city-states' and the Free Cities' (`ResearchAiTally`) */
   researchAi: Record<ResearchParty, ResearchAiTally>;
   /** the research AI's analysis against the game's AI log (`ResearchScoreTally`) */
   researchScores: Record<ResearchParty, ResearchScoreTally>;
@@ -3810,24 +3630,8 @@ export interface ReplayReport {
    *  (`CityBuildTally`), in all and per building */
   cityBuild?: CityBuildTally;
   cityBuildPer?: Record<string, CityBuildTally>;
-  /** the majors' AI's government and card choices beside the record's */
-  strategies?: { engine: StrategyTally; record: StrategyTally };
-  contacts?: ContactTally;
-  majorAi?: MajorAiTally;
-  religionAi?: ReligionAiTally;
-  governorAi?: GovernorAiTally;
-  congressAi?: CongressAiTally;
-  greatPeopleAi?: GreatPeopleAiTally;
-  cityBuildAi?: CityBuildAiTally;
-  /** the majors' opinion of each other beside the game's diplomacy log */
-  diplomacy?: DiplomacyTally;
-  /** the AI majors' own diplomatic sending */
-  sender?: SenderTally;
-  /** the AI majors' own religion choices against the record's */
-  religionActions?: ReligionActions;
-  settleAi?: SettleTallies;
-  /** the majors' operations beside the game's operation log */
-  operationsAi?: OperationsTally;
+  /** the minors' and the barbarians' operations beside the game's operation log */
+  operations?: OperationsTally;
   /** the AI's decisions one by one against the game's, by decision kind
    *  (`aiScore.ts`) */
   scores: DecisionScores;
@@ -4215,10 +4019,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const combat = loadCombatLog(dumpPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
   if (combat) for (const r of recs) r.combatLog = combat.filter((x) => x.turn === r.turn - 1 || x.turn === r.turn);
   const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, cleanEvery: 0, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {},
-    researchAi: { major: newResearchTally(), minor: newResearchTally(), free: newResearchTally() },
-    researchScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } },
-    civicAi: { major: newResearchTally(), minor: newResearchTally(), free: newResearchTally() },
-    civicScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } }, barbTactics: {},
+    researchAi: { minor: newResearchTally(), free: newResearchTally() },
+    researchScores: { minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } },
+    civicAi: { minor: newResearchTally(), free: newResearchTally() },
+    civicScores: { minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } }, barbTactics: {},
     minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 }, minorBuilds: { turns: 0, same: 0, byKind: {}, samples: [] }, minorResearch: { rows: [], majors: [], food: [] },
     scores: newScores(), memory: newScores(), ...(opts.aiScore ? { perTurnWorld: true } : {}) };
   if (recs.length < 2) return report;
@@ -4255,55 +4059,33 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // their knowledge bases hold the look of the import's turn, which their
   // military AI reads on the next
   for (const cs of state.cityStates) if (cs.centerIndex >= 0) minorKnowledge(state, cs, false);
-  // the AI majors: every major the record's first turn names no human
-  const aiSeats = new Map<number, number>();
+  // the majors: every major seat the record's first turn names
   const majorSeats = new Map<number, number>();
   for (const p of recs[0].players) {
     const seat = first.seatOfPlayer.get(p.id);
     if (seat === undefined || seat >= state.seats.length) continue;
     majorSeats.set(p.id, seat);
-    if (!bool(p.human)) aiSeats.set(seat, p.id);
   }
-  const diplomacy = new DiplomacyProbe(dumpPath, first.playerOfSeat, first.seatOfPlayer);
-  diplomacy.setup(state, history.randLog, recs[0].players.map((p) => p.id).sort((x, y) => x - y));
-  const strategies = new StrategyProbe(dumpPath, new Map([...majorSeats].map(([pid, seat]) => [seat, pid] as const)),
-    (seat) => diplomacy.agendasOf(seat));
-  // what the majors' AI reads of its own: the strategies its victory manager
-  // follows, the agendas its diplomacy carries
-  const aiInputs = (turn: number): MajorViewInputs => ({ strategies: strategies.followedBefore(turn),
-    agendas: new Map([...majorSeats.values()].map((seat) => [seat, diplomacy.agendasOf(seat)] as const)) });
-  const majorAi = new MajorAiProbe(dumpPath, aiSeats, aiInputs);
-  const settleAi = new SettleProbe(dumpPath, aiSeats, aiInputs);
-  const religionAi = new ReligionProbe(dumpPath, aiSeats, (seat) => strategies.knownCities(seat));
-  const sender = new DiploSender(dumpPath, aiSeats, first.playerOfSeat);
-  const congressAi = new CongressProbe(dumpPath, aiSeats, first.playerOfSeat);
-  const greatPeopleAi = new GreatPeopleProbe(dumpPath, aiSeats, cat);
-  diplomacy.attach(aiInputs, (seat) => strategies.knownCities(seat), sender);
   const missions = readMissions(dumpPath);
-  // the operations of every AI party with a manager: the AI majors, the
-  // city-states and the Free Cities
-  const opsSeats = new Map([...aiSeats, ...[...first.minorOfPlayer].map(([player, cs]) => [cs.seat, player] as [number, number])]);
+  // the operations of every AI party with a manager: the city-states and
+  // the Free Cities
+  const opsSeats = new Map([...first.minorOfPlayer].map(([player, cs]) => [cs.seat, player] as [number, number]));
   const freePlayer = first.playerOfSeat.get(FREE_SEAT);
   if (freePlayer !== undefined) opsSeats.set(FREE_SEAT, freePlayer);
-  const operationsAi = new OperationsProbe(dumpPath, opsSeats, cat, first.seatOfPlayer, aiInputs);
+  const operations = new OperationsProbe(dumpPath, opsSeats, first.seatOfPlayer);
   const govtLog = loadAiCivicLog(dumpPath);
-  // the wars of the AI majors' diplomatic sending read their operations' AI
-  if (operationsAi.active) sender.war = operationsAi.warHooks();
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
     engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), barbSeized: [], minorBlows: new Map(), lateBlows: [], upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
-    civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies, majorCivicEntries: new Map(),
+    civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
     scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), minorLookTypes: new Map(),
     // a game from its first turn opens on no memory, the game's as well
     memoryClean: new Map([...first.playerOfSeat].filter(([seat]) => minorAiSeat(seat) || isBarbSeat(seat)).map(([, p]) => [p, recs[0].turn <= 1] as const)),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
-    governorAi: new GovernorProbe(dumpPath, aiSeats, () => strategies.followedNow()),
-    cityBuildAi: new CityBuildProbe(dumpPath, aiSeats, aiInputs),
-    operationsAi, minorOps: new Map(),
-    religionPort: { seats: new Set(aiSeats.keys()), probe: religionAi, inputs: {}, pantheonTurn: new Map(), mustFound: new Set() },
+    operations, minorOps: new Map(),
   };
   // the city-states' operation lines, gathered over the pair: their
   // military AI's turn in the engine's turn, their run in their units' turn
@@ -4317,9 +4099,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // moment the game writes its ARMY lines
   traceKnowledge(armyLog(ctx));
   // the operations each AI party started, against the log's
-  operationsAi.onStarts = (turn, player, log, ours) => {
+  operations.onStarts = (turn, player, log, ours) => {
     const seat = ctx.seatOfPlayer.get(player) ?? NO_SEAT;
-    const party = isCityStateSeat(seat) ? 'cityState' : seat === FREE_SEAT ? 'freeCities' : isBarbSeat(seat) ? 'barbarians' : 'major';
+    const party = isCityStateSeat(seat) ? 'cityState' : seat === FREE_SEAT ? 'freeCities' : 'barbarians';
     const same = log.length === ours.length && log.every((l, k) => l === ours[k]);
     score(ctx, `op.start.${party}`, turn, player, `p${player}`, same, ours.join('; ') || 'none', log.join('; ') || 'none');
   };
@@ -4360,8 +4142,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // every check the per-turn harness fails, by subject, on the records so far
   const baseFails = new Map<string, Set<string>>();
   let prev: TurnRecord | undefined;
-  // record t as the importer reads it (the settle probe's second source)
-  let recordState: GameState | null = null;
   for (let i = 0; i + 1 < recs.length; i++) {
     const a = recs[i];
     const b = recs[i + 1];
@@ -4399,15 +4179,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.applied = new Set();
     minorBought.clear();
     traceTurn = b.turn;
-    const holders = [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])];
+    const holders = [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])];
     ctx.researchBefore = new Map(holders.map((s) => [s.seat, s.research.tech]));
     ctx.civicBefore = new Map(holders.map((s) => [s.seat, s.research.civic]));
     const ds = source.decisions(a, b, cat);
     ctx.upgradeInto = new Set(ds.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
-    // the AI majors' governor turns, on the state their AI turn t reads:
-    // the active player's as the pair opens
-    ctx.governorAi.clear();
-    ctx.governorAi.aiTurn(state, a.turn, (p) => p === activePlayer(a), (s, id) => recordCityName(ctx, s, id));
     stream.actions(a.turn);
     syncDedications(ctx, new Set([seatOfP(ctx, activePlayer(a))]));
     applyPhase(ctx, ds, 'before', b, a);
@@ -4417,15 +4193,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     activeBoosts(ctx, b, activePlayer(a));
     stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
-    // the AI majors' ballots of the session the engine's turn holds
-    if (congressAi.active) congressAi.arm(a.turn, aiInputs(a.turn), (x) => diplomacy.agendasOf(x));
-    majorAi.preTurn(state);
-    strategies.preTurn(state, recordA.state, turnStartCompletions(ctx, b, a.turn), recordMilitary(a, cat, ctx.seatOfPlayer));
-    diplomacy.preTurn(state, recordA.state, read.state);
-    strategies.recordContacts(b, ctx.seatOfPlayer);
-    settleAi.preTurn(state, recordState);
-    operationsAi.preTurn(a, recordA.state, b, read.state);
-    recordState = read.state;
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);
     const standing = new Set(state.units);
@@ -4559,29 +4326,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       syncDedications(ctx, new Set(others));
       const live = new Set(state.units);
       ctx.engineKilled = new Set([...ctx.units].filter(([, u]) => !live.has(u)).map(([k]) => k));
-      {
-        // their governor turns: their starts' civics stand before their AI turns
-        const starts = turnStartCompletions(ctx, b, a.turn);
-        ctx.governorAi.aiTurn(state, a.turn, (p) => p !== activeP, (s, id) => recordCityName(ctx, s, id),
-          (seat) => new Set([...(seatOf(state, seat)?.research.civics ?? []), ...(starts.get(seat)?.civics ?? [])]
-            .filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))));
-      }
-      {
-        // THE MAJORS' DIPLOMATIC SENDING: the record's human majors' missions
-        // fed, the AI majors' their port's own
-        const recMissions = missions.get(a.turn) ?? [];
-        const strat = aiInputs(a.turn);
-        applyMissions(ctx, recMissions, diplomacy, strat, (seat) => !sender.isSender(seat));
-        applyTransitions(ctx, diplomacy, sender, strat);
-        const picks = sender.turn(state, a.turn, strat, (o, x) => diplomacy.stateOf(o, x), (x) => diplomacy.agendasOf(x),
-          (x) => strategies.knownCities(x), (o, x) => diplomacy.opinionOf(o, x));
-        sender.compare(a.turn, picks, recMissions);
-        applySenderPicks(ctx, picks, recMissions, sender, diplomacy, strat);
-        sender.close(state, (o, x) => diplomacy.opinionOf(o, x));
-        greatPeopleAi.turn(state, a, b, strat, sender.memory);
-        ctx.religionPort.inputs = strat;
-        portPantheons(ctx, b);
-      }
+      // their missions of the turn, the record's
+      applyMissions(ctx, missions.get(a.turn) ?? []);
       applyPhase(ctx, ds, 'after', b, b, otherMajors);
       // their units stand where their actions left them: their looks reveal
       // and meet in their turn (runs/h1_duelv1127: China meets Rome at t61,
@@ -4705,15 +4451,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const healedOn = new Map(state.units.map((u) => [u, healPlot(state, u)]));
     state.units.push(...barbs);
     verifyPolicies(ctx, staged);
-    settleAi.postTurn(b);
-    operationsAi.postTurn(b);
-    majorAi.postTurn(state, (seat) => {
-      const d = staged.find((x) => seatOfP(ctx, x.player) === seat);
-      if (!d) return null;
-      const { gid, ids } = policyIds(ctx, d);
-      return { government: gid, policies: ids };
-    });
-    religionAi.postTurn(state);
     matchNewUnits(ctx, b);
     // a unit the engine's own city-state, Free City or barbarian scripts made
     // that the record's players did not: their decision, undone — a
@@ -4765,12 +4502,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // the city-states', Free Cities' and barbarians' decisions, and what
     // record t+1 shows of every unit (its loss, its health)
     applyPhase(ctx, ds, 'after', b, b);
-    // an AI major's governor turn where record t+1 holds its roster as it
-    // was: the record's
-    for (const p of ctx.governorAi.actedAlone(new Set(ds.filter((d) => d.kind === 'governors').map((d) => d.player)))) {
-      count(ctx, 'governors:alone', 'fallback', p, 'the port acted, the record did not');
-      ctx.governorAi.rosterCheck(a.turn, p, 1, 0, 'the port acted, the record did not');
-    }
     for (const u of struckHp.keys()) {
       if (!state.units.includes(u) || u.hp >= UNIT_HP) continue;
       const rest = { ...u };
@@ -4840,13 +4571,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     recordMoments(state);
     killBoosts(ctx, read);
     holdResearchEra(null);
-    // the research AI's analysis of the turn, past its Science, against the
-    // game's AI log of the turn: a city-state's own (its turn's), a major's
-    // made here
-    for (const s of state.seats) {
-      const pid = ctx.playerOfSeat.get(s.seat);
-      if (pid !== undefined) scoreAgainstLog(ctx, 'major', a.turn, pid, researchAnalysis(state, s.seat, s.sciRate ?? 0));
-    }
+    // the research AI's analysis of each minor's turn, past its Science,
+    // against the game's AI log of the turn
     for (const { s, party } of minorHolders(state)) {
       const pid = ctx.playerOfSeat.get(s.seat);
       if (pid !== undefined && s.research.aiEntries) scoreAgainstLog(ctx, party, a.turn, pid, s.research.aiEntries);
@@ -4911,16 +4637,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       tallyResearchAi(ctx, party, a.turn, pid, ours, rec);
       if (ours && !s.research.goal) ctx.researchAi[party].random += 1;
     }
-    // the civics AI's analysis of the turn against the log of the turn: a
-    // city-state's own (its turn's), a major's made here and kept for its
-    // next completion; then the city-states' choices against the civic
-    // record t+1 shows
-    for (const s of state.seats) {
-      const pid = ctx.playerOfSeat.get(s.seat);
-      const ents = civicAnalysis(state, s.seat, s.culRate ?? 0);
-      ctx.majorCivicEntries.set(s.seat, ents);
-      if (pid !== undefined) civicScoreAgainstLog(ctx, 'major', a.turn, pid, ents);
-    }
+    // the civics AI's analysis of each minor's turn against the log of the
+    // turn; then the city-states' choices against the civic record t+1 shows
     for (const { s, party } of minorHolders(state)) {
       const pid = ctx.playerOfSeat.get(s.seat);
       if (pid !== undefined && s.research.civicAiEntries) civicScoreAgainstLog(ctx, party, a.turn, pid, s.research.civicAiEntries);
@@ -5005,22 +4723,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdCityStrikes(false);
   traceMinorPurchases(null);
   traceMinorPolicyScores(null);
-  holdCongressBallots(null);
-  if (strategies.active) {
-    report.strategies = strategies.tally;
-    report.contacts = strategies.contacts(state);
-  }
-  if (majorAi.active) report.majorAi = majorAi.tally;
-  if (religionAi.active) report.religionAi = religionAi.tally;
-  if (ctx.governorAi.active) report.governorAi = ctx.governorAi.tally;
-  if (congressAi.active) report.congressAi = congressAi.tally;
-  report.greatPeopleAi = greatPeopleAi.tally;
-  report.cityBuildAi = ctx.cityBuildAi.tally;
-  report.religionActions = religionAi.actions;
-  if (diplomacy.active) report.diplomacy = diplomacy.tally;
-  report.sender = sender.tally;
-  if (settleAi.active) report.settleAi = settleAi.tally;
-  if (operationsAi.active) report.operationsAi = operationsAi.tally;
+  if (operations.active) report.operations = operations.tally;
   if (ctx.cityBuildLog.size) {
     report.cityBuild = ctx.cityBuild;
     report.cityBuildPer = Object.fromEntries(ctx.cityBuildPer);
@@ -5051,7 +4754,7 @@ export function replayMarkdown(r: ReplayReport): string {
     const ks = Object.entries(p.imposed);
     if (ks.length) out.push(`| ${p.turn} | ${ks.map(([k, n]) => `${k} ×${n}`).join(', ')} |`);
   }
-  out.push('', '## The research AI', '', 'A city-state\'s choices its turn made (or the record changed), a major\'s at each research decision of the record;',
+  out.push('', '## The research AI', '', 'A city-state\'s or the Free Cities\' choices its turn made (or the record changed);',
     'the record\'s and the game\'s AI log\'s (its RESEARCHING row of the turn) research against the engine\'s.', '',
     '| party | choices | as the record | logged | as the log | random picks | first differing (turn player ours / record / log) |',
     '|---|---:|---:|---:|---:|---:|---|');
@@ -5103,7 +4806,7 @@ export function replayMarkdown(r: ReplayReport): string {
     out.push('', `"Random Direction": ${d.paired} of ${d.turns} turns pair the log's draws with its rows; ${d.draws} draws taken on the log's own, `
       + `${d.sameRange} over the log's range (first other t${d.firstOff ?? '-'}).`);
   }
-  out.push('', '## The civics AI', '', 'A city-state\'s choices its turn made (or the record changed), a major\'s at each civic decision of the record, against the record\'s civic:', '',
+  out.push('', '## The civics AI', '', 'A city-state\'s or the Free Cities\' choices its turn made (or the record changed), against the record\'s civic:', '',
     '| party | choices | as the record | first differing (turn player ours / record) |', '|---|---:|---:|---|');
   for (const [k, x] of Object.entries(r.civicAi ?? {})) {
     const f = x.first;
@@ -5128,16 +4831,6 @@ export function replayMarkdown(r: ReplayReport): string {
     out.push('', '## Recorded events no reader takes', '');
     for (const [k, n] of Object.entries(r.unread)) out.push(`- ${k}: ${n}`);
   }
-  if (r.strategies) out.push(...strategyMarkdown(r.strategies, r.contacts));
-  if (r.majorAi) out.push(...majorAiMarkdown(r.majorAi));
-  if (r.religionAi) out.push(...religionAiMarkdown(r.religionAi, r.religionActions));
-  if (r.governorAi) out.push(...governorAiMarkdown(r.governorAi));
-  if (r.congressAi) out.push(...congressAiMarkdown(r.congressAi));
-  if (r.greatPeopleAi) out.push(...greatPeopleAiMarkdown(r.greatPeopleAi));
-  if (r.cityBuildAi) out.push(...cityBuildAiMarkdown(r.cityBuildAi));
-  if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
-  if (r.sender) out.push(...senderMarkdown(r.sender));
-  if (r.settleAi) out.push(...settleMarkdown(r.settleAi));
-  if (r.operationsAi) out.push(...operationsMarkdown(r.operationsAi));
+  if (r.operations) out.push(...operationsMarkdown(r.operations));
   return out.join('\n') + '\n';
 }

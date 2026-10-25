@@ -395,8 +395,8 @@
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
   impl:
-    - ai/major/view.ts:MajorAttackView
-    - ai/major/view.ts:MajorView
+    - cpu/core/aiViewTypes.ts:AiAttackView
+    - cpu/core/aiViewTypes.ts:AiView
     - cpu/core/tactical.ts:ATTACK_TARGETS_RANGE
     - cpu/core/tactical.ts:assignTo
     - cpu/core/tactical.ts:districtHealth

@@ -10,6 +10,7 @@
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...y the score lines they miss, with their analyzers and whether they reach CityBuildAI (0xa5c20): `.claude` analysis `anlist.py` / `ancalls.py`."

@@ -14,7 +14,6 @@
 - addr: 0x340490
   kind: function
   status: PARTLY
-  impl: [ai/major/religion.ts:religionChoice]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
@@ -56,7 +55,6 @@
     - recording: h1_duelw1117
       turn: 205
       value: the Merchant starts on Handan, the Resource Manager on Xiurong
-  impl: [ai/major/governors.ts:governorAssignment]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:

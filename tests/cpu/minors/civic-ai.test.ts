@@ -3,7 +3,7 @@ import { emptySeat, seatOfCityState } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { civicAnalysis, civicChoice, civicValue } from '../../../cpu/core/aiCivics';
 import { spawnUnit } from '../../../cpu/core/units';
-import { storeUnitStrength } from '../../../cpu/core/majorView';
+import { storeUnitStrength } from '../../../cpu/core/aiView';
 import type { CityState, GameState } from '../../../cpu/core/types';
 
 // THE CIVICS AI (tools/civ6lab/dll_readings.md "H-1: the civics AI"); the

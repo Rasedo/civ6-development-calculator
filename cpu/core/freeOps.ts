@@ -29,7 +29,7 @@
  *    city (`freeOpNear`, 0x723cf0) — the raid names none.
  */
 import type { City, GameState, Unit } from './types';
-import { majorView } from './majorView';
+import { aiView } from './aiView';
 import { passOrders, passView, ownAiType } from './opsOrders';
 import { recentOf } from './minorOps';
 import { newOpsAi, operationsRun, opsOf, startOperationAt, type OpsAi, type OpsEnv } from './operations/manager';
@@ -39,7 +39,7 @@ import { newCityAi, type CityAi } from './aiCityTrees';
 import { FREE_SEAT, freeSeatOf, isCiv, seatOf } from './seats';
 import { freeCityTactics, passFinish, passPillage, plotDistance, type Pass } from './tactical';
 import { installType } from './minorBuild';
-import type { MajorUnitView, MajorView } from '../../ai/major/view';
+import type { AiUnitView, AiView } from './aiViewTypes';
 
 /** the definition the Free Cities run (Leaders.OperationList "Free Cities
  *  Operations") */
@@ -63,14 +63,14 @@ export const freeFights = (i: number, j: number): boolean => (i === FREE_SEAT &&
 /** the Free Cities' view: their units in their pool's order, the full civs
  *  at war with them; in their tactical pass, the pass's target list,
  *  planning reaches, spots and blows (`passView`) */
-function freeView(state: GameState, pass: Pass | null): MajorView {
-  const base = majorView(state);
-  const own = (): MajorUnitView[] => {
+function freeView(state: GameState, pass: Pass | null): AiView {
+  const base = aiView(state);
+  const own = (): AiUnitView[] => {
     const ids = state.units.filter((u) => u.seat === FREE_SEAT).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0)).map((u) => u.id);
     const byId = new Map(base.units(FREE_SEAT).map((u) => [u.id, u]));
     return ids.map((id) => byId.get(id)!).filter(Boolean);
   };
-  const v: MajorView = { ...base, units: (i) => (i === FREE_SEAT ? own() : base.units(i)), atWar: (i, j) => freeFights(i, j) || base.atWar(i, j) };
+  const v: AiView = { ...base, units: (i) => (i === FREE_SEAT ? own() : base.units(i)), atWar: (i, j) => freeFights(i, j) || base.atWar(i, j) };
   return pass ? passView(state, FREE_SEAT, pass, v) : v;
 }
 
@@ -92,7 +92,7 @@ const unitOf = (state: GameState, id: number): Unit | undefined => state.units.f
 function freeEnv(state: GameState, pass: Pass | null): OpsEnv {
   const free = freeSeatOf(state);
   const book = freeCitiesBook(state);
-  let view: MajorView | null = null;
+  let view: AiView | null = null;
   const fresh = () => (view ??= freeView(state, pass));
   const changed = () => {
     view = null;

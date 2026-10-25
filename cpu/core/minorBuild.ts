@@ -34,7 +34,7 @@ import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, gameProgre
 import { detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, urbanDefensesFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
-import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './majorCityBuild';
+import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
 import { freeCityThreat, minorAiTurn, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
 import { applyTrainingGrants, cityStrikeStrength } from './combat';
@@ -71,7 +71,7 @@ import { defensiveCancel } from './aiCityTrees';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
-import { cityGrowth, majorView, storeUnitStrength } from './majorView';
+import { cityGrowth, aiView, storeUnitStrength } from './aiView';
 import { civicPolicyBest, governmentValues, policyScores } from './aiPolicyValue';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
@@ -341,7 +341,7 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
     if (!r.techs.includes(cur)) r.techs.push(cur);
     delete r.techRetained[cur];
     r.tech = null;
-    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, terms()?.tech, contracts), cur,
+    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, terms()?.tech, contracts), cur,
       researchDraw(state), contracts));
     r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
     if (cur === URBAN_DEFENSES_TECH) urban();
@@ -357,7 +357,7 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
     if (!r.civics.includes(civ)) r.civics.push(civ);
     delete r.civicRetained[civ];
     r.civic = null;
-    takeCivic(r, civicChoice(state, seat, r.civicAiEntries ?? civicAnalysis(state, seat, culture, {}, terms()?.civic), civ, civicDraw(state)));
+    takeCivic(r, civicChoice(state, seat, r.civicAiEntries ?? civicAnalysis(state, seat, culture, terms()?.civic), civ, civicDraw(state)));
   }
   return gained;
 }
@@ -376,7 +376,7 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   terms: () => ReturnType<typeof minorResearchTerms> | undefined, contracts: readonly TechContract[]): void {
   let held: ReturnType<typeof minorResearchTerms> | undefined | null = null;
   const city = () => (held === null ? (held = terms()) : held);
-  r.aiEntries = researchAnalysis(state, seat, science, {}, city()?.tech, contracts);
+  r.aiEntries = researchAnalysis(state, seat, science, city()?.tech, contracts);
   r.aiLeftSeen = r.aiLeft ?? 0;
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
   r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
@@ -386,8 +386,8 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   // 0x623b90) the next turn's analysis reads (runs/h1_duelv1121 Hunza t45:
   // Civil Service first valued above 0 that turn, its Civil Prestige scored
   // that turn, 62.0 as logged)
-  r.civicAiEntries = civicAnalysis(state, seat, culture, {}, city()?.civic);
-  const view = majorView(state);
+  r.civicAiEntries = civicAnalysis(state, seat, culture, city()?.civic);
+  const view = aiView(state);
   const scores = policyScores(view, seat);
   policyTracer?.(seat, scores);
   r.civicGovValues = governmentValues(view, seat, scores);
@@ -1157,7 +1157,7 @@ export function minorCombatDesire(state: GameState, cityState: CityState, turn: 
     // above 0), and what its standing army lacked then (+0x2d8) at
     // PSEUDOYIELD_STANDING_ARMY_VALUE each
     threatened: (cityState.threat ?? -1) >= 0,
-    standingArmy: fmul(pseudoYieldValue(majorView(state), cityState.seat, FX, 'PSEUDOYIELD_STANDING_ARMY_VALUE'),
+    standingArmy: fmul(pseudoYieldValue(aiView(state), cityState.seat, FX, 'PSEUDOYIELD_STANDING_ARMY_VALUE'),
       (cityState.standingArmyShort ?? 0) * FX),
   });
 }
@@ -1237,7 +1237,7 @@ export function minorResourceFacts(state: GameState, cityState: CityState): Reso
   const r = cityState.research;
   const era = civEraIndex(r.techs, r.civics);
   const stats = computeCityStats(state, minorCity(cityState));
-  const view = majorView(state);
+  const view = aiView(state);
   const key: Record<string, YieldKey> = {
     YIELD_FOOD: 'food', YIELD_PRODUCTION: 'production', YIELD_GOLD: 'gold', YIELD_SCIENCE: 'science', YIELD_CULTURE: 'culture', YIELD_FAITH: 'faith',
   };
@@ -1401,7 +1401,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
   const city = minorCity(cityState);
   const stats = computeCityStats(state, city);
   const r = cityState.research;
-  const view = majorView(state);
+  const view = aiView(state);
   const current = minorItemType(cityState);
   const key: Record<string, YieldKey> = {
     YIELD_FOOD: 'food', YIELD_PRODUCTION: 'production', YIELD_GOLD: 'gold', YIELD_SCIENCE: 'science', YIELD_CULTURE: 'culture', YIELD_FAITH: 'faith',

@@ -201,7 +201,6 @@
   final: 0x3eae80
   kind: function
   status: PARTLY
-  impl: [ai/major/knowledge.ts:yieldAdvantage]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
@@ -222,7 +221,6 @@
     - recording: h1_duelv1127
       turn: 62
       value: Rome toward Qin 10.16 = (0.5 - 0.398) x 100 at t63 - t96
-  impl: [ai/major/diploActions.ts:threat, ai/major/diploActions.ts:DesireInputs]
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -237,7 +235,6 @@
     - recording: 1127
       turn: 192
       value: "Neutral -> Friendly adds Open Borders and   Request Assistance, so Qin moves at opinion >= -5 when its Open Borders   desire turns positive (1127 t192, 1124 t108, 1128 t167, 1117 t235: 0 at   234, no "
-  impl: [ai/major/diploState.ts:requiredBound, ai/major/diploState.ts:allowedBand]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -276,7 +273,6 @@
     - recording: h1_duelv1124
       turn: 71
       value: "the game turns later (runs/h1_duelv1124: Qin's Naval at t71, the port's   at t48), so the +0x12f0 list and the visibility word are unread."
-  impl: [ai/major/strategies.ts:islandTurn]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -414,7 +410,6 @@
       turn: 37
       value: Antananarivo 657.3 (ours 657.1), 665.4 (665.2) at t38
   impl:
-    - ai/major/governors.ts:governorValue
     - cpu/core/operations/cityValue.ts:axialDistance
     - cpu/core/operations/cityValue.ts:cityValue
     - cpu/core/operations/evaluate.ts:enemyCities
@@ -442,7 +437,6 @@
     - recording: 1109
       turn: 200
       value: "The record's six   wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,   1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not   run."
-  impl: [ai/major/warValue.ts:balance]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -461,7 +455,6 @@
     - recording: 1109
       turn: 200
       value: "The record's six   wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,   1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not   run."
-  impl: [ai/major/warValue.ts:spoils]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -515,7 +508,6 @@
   kind: function
   name: PLAYER_YIELD_LEAD
   status: PARTLY
-  impl: [ai/major/diplomacy.ts:leads]
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:

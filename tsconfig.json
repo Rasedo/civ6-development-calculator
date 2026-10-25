@@ -21,7 +21,6 @@
     ]
   },
   "include": [
-    "ai",
     "cpu",
     "seeder",
     "world",

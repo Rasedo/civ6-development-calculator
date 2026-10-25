@@ -1486,7 +1486,6 @@
   cases:
     - recording: AI_SiteEval.csv
       value: "AI_SiteEval.csv logs no score below 0:   the port clamps there."
-  impl: [ai/major/settle.ts:term]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:
@@ -1537,7 +1536,6 @@
 - addr: 0xffd8f1
   kind: global
   status: PARTLY
-  impl: [ai/major/settle.ts:FEATURE_RANGE]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x9b6630
@@ -1546,6 +1544,7 @@
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the AI's spawn waits: 0x4a10ed's tail jumps to a stub in the .text section's file slack (0x9b6630, VirtualSize raised to the raw size) that spawns the list and tail-jumps to the wait 0x4a..."

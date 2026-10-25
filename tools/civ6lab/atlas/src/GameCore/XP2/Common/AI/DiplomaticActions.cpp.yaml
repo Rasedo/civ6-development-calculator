@@ -13,7 +13,6 @@
     - recording: h1_duelv1124
       turn: 196
       value: Qin toward Rome 35.0:-5.0 = Friendly -15 - 20 + 30 (a war operation ready)
-  impl: [ai/major/diploActions.ts:actionCost, cpu/harness/majorDiplomacy.ts:answerFriendship]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -31,7 +30,6 @@
     - recording: h1_duelv1128
       turn: 150
       value: Demand Tribute's cost on the replay's rows
-  impl: [ai/major/diploActions.ts:actionCost]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -49,7 +47,6 @@
     - recording: h1_duelv1127
       turn: 68
       value: Rome's logged cost toward China 58.0 (Delegation) / 72.5 (Embassy) in Unfriendly = 75 / 100 - 0.5 x 10 / 25 x 1.4 - 10
-  impl: [ai/major/diploState.ts:answerAction, ai/major/diploActions.ts:actionCost]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
@@ -71,7 +68,6 @@
     - recording: h1_duelv1121
       turn: 129
       value: Qin's Delegation cost -20 = 2 x (0 - T 10), favoured
-  impl: [ai/major/diploActions.ts:actionCost]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -100,7 +96,6 @@
     - recording: h1_duelv1127
       turn: 100
       value: -10.8
-  impl: [ai/major/diploActions.ts:actionCost, ai/major/diploActions.ts:allianceRankTerm]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
@@ -113,7 +108,6 @@
     - recording: h1_duelv1121
       turn: 129
       value: Qin's Open Borders cost 0, favoured
-  impl: [ai/major/diploActions.ts:actionCost]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -146,7 +140,6 @@
     - recording: h1_duelv1127
       turn: 115
       value: -39.2 = -40 + 0.8 (Unfriendly, no focus)
-  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -159,7 +152,6 @@
   final: 0x4427b0
   kind: function
   status: PARTLY
-  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -186,7 +178,6 @@
   final: 0x442bf0
   kind: function
   status: PARTLY
-  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -201,7 +192,6 @@
   final: 0x442d70
   kind: function
   status: PARTLY
-  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -218,7 +208,6 @@
     - recording: h1_duelv1127
       turn: 100
       value: DENOUNCE and the promises log 0.0 on every row
-  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
@@ -231,7 +220,6 @@
     - recording: h1_duelv1127
       turn: 100
       value: 10.8 = 0 (no row in Neutral) + 0.8 + 5 x (2 - 1 + 1)
-  impl: [ai/major/diploActions.ts:desire, ai/major/diploActions.ts:allianceRankTerm]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
@@ -240,10 +228,6 @@
   kind: function
   name: the city-state war's desire
   status: PARTLY
-  impl:
-    - ai/major/diploActions.ts:ENVOY_WORTH_START
-    - ai/major/diploActions.ts:minorWarDesire
-    - cpu/harness/diploSender.ts:strike
   readings:
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
@@ -258,7 +242,6 @@
     - recording: h1_duelv1127
       turn: 100
       value: Open Borders 53 / 53 desires on the replay with T(1, -)
-  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -289,7 +272,6 @@
     - recording: h1_duelv1127
       turn: 63
       value: 5.0 at rank 1 while X is -9999; -9999 at rank 2 (t62); 798 at t94
-  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -314,10 +296,6 @@
     - recording: h1_duelv1127
       turn: 68
       value: Rome's logged cost toward China 58.0 (Delegation) / 72.5 (Embassy) in Unfriendly = 75 / 100 - 0.5 x 10 / 25 x 1.4 - 10
-  impl:
-    - ai/major/diploState.ts:answerAction
-    - ai/major/diploActions.ts:actionCost
-    - ai/major/diploActions.ts:stateRow
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
@@ -332,7 +310,6 @@
   kind: function
   name: stateWorth
   status: PARTLY
-  impl: [ai/major/diploActions.ts:stateRow]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -351,7 +328,6 @@
     - recording: h1_duelv1127
       turn: 68
       value: "Rome toward Qin: the receiver's T = 10 (count 2, L 1, n 1)"
-  impl: [ai/major/diploActions.ts:threatTerm]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
@@ -373,7 +349,6 @@
     - recording: h1_duelv1127
       turn: 100
       value: "Rome toward Qin: the trust 2.00 gives the friendship's and the alliance's 0.8"
-  impl: [ai/major/diploActions.ts:trustTerm]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
@@ -445,7 +420,6 @@
   kind: function
   name: an action ready (the not-ready flag, the can-do functor)
   status: PARTLY
-  impl: [ai/major/diploActions.ts:pickActions]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -464,7 +438,6 @@
     - recording: h1_duelv1127
       turn: 62
       value: SET_DELEGATION at t61, 68, 79
-  impl: [ai/major/diploActions.ts:canDo]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
@@ -480,7 +453,6 @@
   final: 0x446da0
   kind: function
   status: PARTLY
-  impl: [ai/major/diploActions.ts:canDo]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -519,7 +491,6 @@
     - recording: h1_duelv1128
       turn: 196
       value: Qin's Surprise War after the war operation stood (the friendship cost's +30 t182 - t195)
-  impl: [ai/major/diploActions.ts:canDo, cpu/core/operations/manager.ts:surpriseWarReady]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -536,11 +507,6 @@
     - recording: h1_duelv1117
       turn: 18
       value: China's positive war desire toward Caguana, its first war candidate t20
-  impl:
-    - ai/major/diploActions.ts:bestFavoured
-    - ai/major/diploActions.ts:pickActions
-    - cpu/core/operations/manager.ts:notReadyHook
-    - cpu/harness/diploSender.ts:WarHooks
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -582,7 +548,6 @@
     - recording: 1117
       turn: 20
       value: eleven pairs over the five verbose duels), and   it stays (1117 China's candidates against Caguana t20 ..
-  impl: [ai/major/diploActions.ts:pickActions]
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -599,7 +564,6 @@
     - recording: h1_duelv1127
       turn: 100
       value: no friendship sent
-  impl: [ai/major/diploActions.ts:performFriendship]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -631,7 +595,6 @@
     - recording: h1_duelv1127
       turn: 62
       value: DiplomacyManager SET_DELEGATION at t61, 68, 79
-  impl: [ai/major/diploActions.ts:performAction]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
@@ -647,7 +610,6 @@
   final: 0x447f00
   kind: function
   status: PARTLY
-  impl: [ai/major/diploActions.ts:performAction]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"

@@ -17,7 +17,7 @@
  */
 import type { BarbHoming, BarbTarget, BarbTribe, GameState, Unit } from './types';
 import { BARB_SEAT, isBarbSeat } from './seats';
-import { majorView } from './majorView';
+import { aiView } from './aiView';
 import { passOrders, passView } from './opsOrders';
 import { recentOf } from './minorOps';
 import { newOpsAi, operationsRefresh, opsOf, startOperationAt, tickOperation, type OpsAi, type OpsEnv } from './operations/manager';
@@ -31,7 +31,7 @@ import { barbUnitFor, handicapOf, raidBoldness } from './barbarians';
 import { BARB_TAG_UNITS, barbForce, type BarbTag } from '../data/barbarians';
 import { gameTypeOf } from '../data/aliases';
 import { UNIT_HP } from '../data/units';
-import type { MajorUnitView, MajorView } from '../../ai/major/view';
+import type { AiUnitView, AiView } from './aiViewTypes';
 
 /** the definitions the tribes start */
 export const BARB_RAID_DEF = 'Barbarian Attack';
@@ -55,14 +55,14 @@ export function barbOp(state: GameState, id: number): Operation | null {
 
 /** the barbarians' view: their units in their pool's order; in their
  *  tactical pass, the pass's target list, planning reaches, spots, blows */
-function barbView(state: GameState, pass: Pass | null): MajorView {
-  const base = majorView(state);
-  const own = (): MajorUnitView[] => {
+function barbView(state: GameState, pass: Pass | null): AiView {
+  const base = aiView(state);
+  const own = (): AiUnitView[] => {
     const ids = state.units.filter((u) => isBarbSeat(u.seat)).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0)).map((u) => u.id);
     const byId = new Map(base.units(BARB_SEAT).map((u) => [u.id, u]));
     return ids.map((id) => byId.get(id)!).filter(Boolean);
   };
-  const v: MajorView = { ...base, units: (i) => (i === BARB_SEAT ? own() : base.units(i)) };
+  const v: AiView = { ...base, units: (i) => (i === BARB_SEAT ? own() : base.units(i)) };
   return pass ? passView(state, BARB_SEAT, pass, v) : v;
 }
 
@@ -157,7 +157,7 @@ const outsidePass: Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'm
 };
 
 function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
-  let view: MajorView | null = null;
+  let view: AiView | null = null;
   const fresh = () => (view ??= barbView(state, pass));
   const changed = () => {
     view = null;

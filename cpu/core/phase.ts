@@ -32,7 +32,7 @@ import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, 
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, suzerainGpCultureMult, meetCityState } from './cityStates';
 import { LEVY_TURNS, govInfluence, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
-import { storeUnitStrength } from './majorView';
+import { storeUnitStrength } from './aiView';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { plotDistance, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
@@ -234,8 +234,7 @@ export function seatProximity(state: GameState, a: number, b: number): number {
  * THE GATES a war of `kind` (-1: `defaultWarKind`) from `declarer` on `target`
  * must pass, read without a change: the pair met, at peace, neither friends
  * nor allies, no peace treaty binding, the casus belli held and no ban on
- * the kind. `declareWar` asks them first; the majors' AI reads them as the
- * game's CanDeclareWarOn.
+ * the kind. `declareWar` asks them first.
  */
 export function warGate(state: GameState, declarer: number, target: number, kind = -1, agreed = false): RuleResult {
   if (!seatOf(state, declarer) || !seatOf(state, target) || declarer === target) return no('No such civilization.');
@@ -2808,7 +2807,6 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
   for (const actor of state.seats) {
     if (only && !only.seats.has(actor.seat)) continue;
     atRngPoint(state, { kind: 'seat', seat: actor.seat, turn: state.turn });
-    storeUnitStrength(state, actor.seat);
     const recU = state.seatActions?.[state.turn - 1]?.[actor.seat];
     if (actor.cities.length === 0) {
       // No city means no economy — but the UNITS still walk. A settler start

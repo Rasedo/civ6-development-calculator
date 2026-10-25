@@ -1,45 +1,35 @@
 /**
- * THE MAJORS' AI'S VIEW OF THIS ENGINE (ai/major/view.ts): one seat-agnostic
+ * THE AI'S VIEW OF THIS ENGINE (cpu/core/aiViewTypes.ts): one seat-agnostic
  * read-only view over a GameState, in the game's type names. Nothing here
  * writes the state; the slot rebuild a government change would make is laid
  * on copies (`carryLayout`).
  */
-import type { MajorCityDefenceView, MajorCityView, MajorGovernorView, MajorKnownCityView, MajorPlotView, MajorSlotView, MajorUnitView, MajorView } from '../../ai/major/view';
-import { DIRECTION_TYPES, directionTo, hexDistance, neighborTile, tilesWithin } from '../../world/hex';
-import { hasFreshWater, isCoastalLand, isImpassable, isWater } from '../../world/query';
+import type { AiCityDefenceView, AiKnownCityView, AiMapPlotView, AiUnitView, AiView } from './aiViewTypes';
+import { DIRECTION_TYPES, hexDistance, neighborTile, tilesWithin } from '../../world/hex';
+import { isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { FX, fmul, fxOf, turnsAt, type AiCityView, type AiDistrictView, type AiPlotView } from './aiValue';
-import { AI_YIELDS, type AiWeightInputs, followedStrategies, pseudoYieldWeights, yieldWeights } from './aiWeights';
+import { AI_YIELDS, pseudoYieldWeights, yieldWeights } from './aiWeights';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
-import { cityStateSight, isExplored } from './fog';
-import { CITY_STRIKE_RANGE, denounceOpen, loyaltyPerTurn, plotPressure, plotPressureLead, warGate } from './phase';
-import { governedCityIds, governorPromotionOpen, governorSum, governorsOf, governorTitlesAvailable } from './governors';
-import { GOVERNORS, GOVERNOR_INSTALL_ID, GOVERNOR_PROMOTIONS, GOVERNOR_TITLE_CIVICS, PROMO_INSTALL_ID, promotionBit } from '../data/governors';
+import { isExplored } from './fog';
+import { CITY_STRIKE_RANGE, plotPressureLead } from './phase';
+import { governorSum } from './governors';
 import { CITY_STATE_SUZERAIN_BONUS } from '../data/cityStates';
-import { BARB_SEAT, FREE_SEAT, borderTurnsFrom, campTiles, cityStateOfSeat, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
-import { aiStrengths, assignTo, dangerDistricts, districtHealth, pathTo, planUnit, reachPlots, tacticalTargets, type Pass, type Target } from './tactical';
+import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf } from './seats';
+import { aiStrengths, districtHealth, planUnit, reachPlots, tacticalTargets, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
 import { cityDefenseStrength, cityStrikeStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
 import { outerPool, wallsTier } from './rules';
-import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, trainableUnits, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
+import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
-import { CITY_MIN_STRIKE_CS, COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
-import { snipeRing, snipeRing3 } from './unitOrders';
-import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
-import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST, type SlotKind } from '../data/policies';
-import { congressVoter, preference as congressPreference } from './congress';
-import { congressTargets, congressTargetsOf } from './congressTargets';
+import { COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
+import { GP_CLASSES } from '../data/greatPeople';
+import { GOVERNMENT_LIST } from '../data/policies';
 import { DIPLO_VICTORY_POINTS } from '../data/seats';
-import { GWO_COUNT } from '../data/greatWorks';
-import { gwCountsByObj } from './greatWorks';
-import { UNIT_PROMO_CLASS } from '../data/promotions';
-import { availableBuildings } from './rules';
-import { carryLayout, darkAgeEra, getModifiers, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment, type YieldCtx,
-  unlockedPolicyIds } from './effects';
-import { gpCapped, gpOffer, gpOfferCost, greatPersonPointsPerTurn, patronageCost } from './greatPeople';
-import { gpActivateOk } from './gpAbility';
+import { getModifiers, governmentBit, inDarkAge, makeYieldCtx, seatGovernment } from './effects';
+import { gpOffer, greatPersonPointsPerTurn } from './greatPeople';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, Unit, YieldKey } from './types';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
@@ -47,7 +37,6 @@ import { UNIT_HP, UNITS } from '../data/units';
 import { IMPROVEMENTS } from '../data/improvements';
 import type { ImprovementId } from './types';
 import { computeUnlocks } from './effects';
-import type { ContractCity } from './aiContracts';
 import { civicAnalysis } from './aiCivics';
 import { AI_UNIT_INDEX, growthForecast, housingValue, type CityGrowth } from './aiCityBuild';
 import { AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
@@ -55,40 +44,18 @@ import { unitProductionTable } from './aiUnitProduction';
 import { resourceValue } from './aiResource';
 import { stockFree } from './stockpile';
 import { minorItemTurns, minorKnownUnits, minorResourceFacts, minorUnitExpected, minorUnitProduction, minorUnitVersion } from './minorBuild';
-import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './majorCityBuild';
-import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, hasMet, minorCity, minorWarGate, suzerainOf, suzerainProjectMult } from './cityStates';
+import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './freeCityBuild';
+import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
-import { buildingPillaged, buildingVariantAdjacency, effectiveAdjacency, tileYields } from './yields';
+import { buildingPillaged, buildingVariantAdjacency, effectiveAdjacency } from './yields';
 import { civEraIndex, computeCityStats } from './city';
-import { scoreLines } from './score';
-import { domesticTourists, touristsDrawn } from './seatTurn';
 import { PROJECTS } from '../data/projects';
-import { BELIEF_CATALOGS, BELIEF_SLOTS, PANTHEON_FAITH_COST, PANTHEON_IDS, RELIGION_TYPES, beliefClassOf } from '../data/religion';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
-import { availableProjects, beliefPicks, canFoundReligion, districtCost, districtScaledBase, itemCost, projectCost, settlerCost, unitProdCost } from './game';
-import { alliancePayable, dealItemPayable, friendshipPayable, missionOf, missionPayable } from './deals';
-import { DEAL_OPEN_BORDERS } from '../data/seats';
-import { WAR_KIND_FORMAL, WAR_KIND_SURPRISE } from '../data/warKinds';
+import { availableProjects, districtCost, districtScaledBase, projectCost, settlerCost, unitProdCost } from './game';
 
-/** What the view takes from the majors' AI itself: per major the strategies
- *  it follows (ai/major/strategies.ts), which its weights and its civic list
- *  read (`aiWeights.ts`); and the civics a seat holds where the caller's
- *  state is not the moment the AI reads. */
-export interface MajorViewInputs {
-  strategies?: ReadonlyMap<number, ReadonlySet<string>>;
-  /** per major the agendas its diplomacy carries (ai/major/diplomacy.ts),
-   *  which its weights read */
-  agendas?: ReadonlyMap<number, readonly string[]>;
-  civicsHeld?: (seat: number) => ReadonlySet<string>;
-  /** the seat's era (an index into AI_ERAS), where the caller's state is not
-   *  the moment the AI reads */
-  playerEra?: (seat: number) => number;
-}
-
-const slotType = (k: SlotKind): string => `SLOT_${k.toUpperCase()}`;
 const districtType = (id: string): string => `DISTRICT_${id}`;
 
 /** a district's yield of a kind (0x24b5a0): its adjacency yield of that
@@ -113,26 +80,7 @@ const YIELD_KEY: Readonly<Record<string, YieldKey>> = {
 };
 const AI_YIELD_KEYS: readonly YieldKey[] = AI_YIELDS.map((y) => YIELD_KEY[y]);
 const govType = (id: string): string => gameTypeOf('government', id, 'GOVERNMENT_');
-const policyType = (id: string): string => gameTypeOf('policy', id, 'POLICY_');
-const govId = (type: string): string | null => engineId('government', type, 'GOVERNMENT_', GOVERNMENTS);
-
 const UNIT_ACTION = unitActionIndex(IMPROVEMENT_IDS);
-
-/** the engine's promotion classes whose install type is not PROMOTION_CLASS_ + id */
-const PROMO_INSTALL: Readonly<Record<string, string>> = {
-  ANTICAV: 'PROMOTION_CLASS_ANTI_CAVALRY', LIGHT_CAV: 'PROMOTION_CLASS_LIGHT_CAVALRY',
-  HEAVY_CAV: 'PROMOTION_CLASS_HEAVY_CAVALRY', ESPIONAGE: 'PROMOTION_CLASS_SPY',
-};
-
-/** a city's strength, its strike (walls standing) and the strike's reach */
-const cityDefence = (state: GameState, c: City): MajorCityDefenceView => ({
-  plot: c.centerIndex, strength: cityDefenseStrength(state, c),
-  ranged: outerPool(state, c) > 0 ? cityStrikeStrength(state, c) : 0, range: CITY_STRIKE_RANGE,
-});
-
-const districtDefence = (d: { plot: number; def: number; strike: number }): MajorCityDefenceView => ({
-  plot: d.plot, strength: d.def, ranged: d.strike, range: CITY_STRIKE_RANGE,
-});
 
 /** a city's growth as the growth forecast reads it (`CityGrowth`) */
 export function cityGrowth(state: GameState, city: City): CityGrowth {
@@ -146,48 +94,26 @@ export function cityGrowth(state: GameState, city: City): CityGrowth {
   };
 }
 
-export function majorView(state: GameState, inputs: MajorViewInputs = {}): MajorView {
+export function aiView(state: GameState): AiView {
   const seat = (i: number) => {
     const s = seatOf(state, i);
-    if (!s) throw new Error(`majorView: no seat ${i}`);
+    if (!s) throw new Error(`aiView: no seat ${i}`);
     return s;
-  };
-  const slottable = (i: number, gov: string | null): Set<string> => {
-    const s = seat(i);
-    if (!gov) return new Set();
-    return unlockedPolicyIds(s.research, darkAgeEra(state, i), s.government.held, gov);
-  };
-  const metTurn = (i: number, j: number): number | null => {
-    if (isCityStateSeat(j)) {
-      const cs = seatOf(state, j) as CityState | undefined;
-      return cs && hasMet(cs, i) ? 1 : null;
-    }
-    if (isCityStateSeat(i)) {
-      const cs = seatOf(state, i) as CityState | undefined;
-      return cs && hasMet(cs, j) ? 1 : null;
-    }
-    return isCiv(i) && isCiv(j) ? metTurnWith(state, i, j) : null;
-  };
-  const weightInputs = (i: number): AiWeightInputs => ({ strategies: inputs.strategies?.get(i) ?? new Set(), agendas: inputs.agendas?.get(i) ?? [] });
-  const slotsOf = (i: number): MajorSlotView[] => {
-    const cards = seat(i).government.policies;
-    return governmentSlots(state, i).map((k, j) => ({ slot: slotType(k), policy: cards[j] ? policyType(cards[j]!) : null }));
   };
   const weights = new Map<number, Record<string, number>>();
   const weightsOf = (i: number): Record<string, number> => {
     let w = weights.get(i);
-    if (!w) weights.set(i, (w = yieldWeights(state, i, weightInputs(i))));
+    if (!w) weights.set(i, (w = yieldWeights(state, i)));
     return w;
   };
   const pseudo = new Map<number, Map<string, number>>();
   const pseudoOf = (i: number): Map<string, number> => {
     let w = pseudo.get(i);
-    if (!w) pseudo.set(i, (w = pseudoYieldWeights(state, i, weightInputs(i))));
+    if (!w) pseudo.set(i, (w = pseudoYieldWeights(state, i)));
     return w;
   };
   const { map } = state;
-  let plots: MajorPlotView[] | null = null;
-  let mapCities: MajorCityView[] | null = null;
+  let plots: AiMapPlotView[] | null = null;
   // a seat's tactical target list on this state
   const targetLists = new Map<number, Target[]>();
   const targetsOf = (i: number): Target[] => {
@@ -195,8 +121,6 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     if (!t) targetLists.set(i, (t = tacticalTargets(state, i, plotsSeenNow(state, new Set([i])), null, [])));
     return t;
   };
-  const seenBy = new Map<number, ReadonlySet<number>>();
-  const yctx = new Map<number, YieldCtx>();
   const unitTables = new Map<number, ReadonlyMap<string, { value: number }>>();
   const hidden = new Map<number, ReadonlySet<string>>();
   const hiddenOf = (i: number) => {
@@ -223,12 +147,11 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     .flatMap((s) => s.cities.map((c) => c.centerIndex)));
   for (const cs of state.cityStates) if (cs.centerIndex >= 0) centres.add(cs.centerIndex);
   return {
-    plots: () => (plots ??= map.tiles.map((t): MajorPlotView => ({
-      index: t.index, x: t.col, y: t.row, water: isWater(t), impassable: isImpassable(t),
-      feature: t.feature ? `FEATURE_${t.feature}` : null, resource: t.resource ? `RESOURCE_${t.resource}` : null,
+    plots: () => (plots ??= map.tiles.map((t): AiMapPlotView => ({
+      index: t.index, x: t.col, y: t.row, water: isWater(t),
       owner: tileSeat(t), district: !!t.district || centres.has(t.index), city: centres.has(t.index),
-      area: t.area ?? -1, region: t.region ?? -1, continent: t.continent ?? -1,
-      coastal: isCoastalLand(map, t), freshWater: hasFreshWater(map, t), lake: t.terrain === 'LAKE',
+      area: t.area ?? -1, region: t.region ?? -1,
+      coastal: isCoastalLand(map, t), lake: t.terrain === 'LAKE',
     }))),
     plotsWithin: (p, r) => {
       const t = map.tiles[p];
@@ -240,41 +163,20 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const tb = map.tiles[b];
       return hexDistance(map, ta.col, ta.row, tb.col, tb.row);
     },
-    revealed: (i, p) => isExplored(state, i, p),
-    campPlots: () => [...campTiles(state)],
-    plotYield: (i, p, type) => {
-      let ctx = yctx.get(i);
-      if (!ctx) yctx.set(i, (ctx = makeYieldCtx(state, i)));
-      const key = YIELD_KEY[type];
-      return key ? tileYields(ctx, map.tiles[p])[key] : 0;
-    },
-    resourceVisible: (i, r) => !hiddenOf(i).has(r.replace(/^RESOURCE_/, '')),
     resourceHeld: (i, r) => {
       const id = r.replace(/^RESOURCE_/, '');
       return map.tiles.filter((t) => t.resource === id && tileSeat(t) === i && t.improvement && !t.pillaged).length;
     },
     cityPlots: (i) => seatCities(i).map((c) => c.centerIndex),
-    homeContinent: (i) => homeContinent(state, i),
-    pressureAt: (i, p) => plotPressure(state, i, map.tiles[p]),
-    strategies: (i) => new Set(followedStrategies(i, weightInputs(i))),
     leaderType: (i) => {
       const l = leaderOf(state, i);
       return l ? gameTypeOf('leader', l, 'LEADER_') : null;
-    },
-    civilizationType: (i) => {
-      const c = civOf(state, i);
-      return c ? gameTypeOf('civilization', c, 'CIVILIZATION_') : null;
     },
     units: (i) => unitsOf(state, i).map((u) => unitView(state, u)),
     unitReach: (id, turns) => {
       const u = state.units.find((x) => x.id === id);
       return u ? reachPlots(state, u, turns).map((r) => ({ plot: r.tile, turns: r.turns, moves: r.moves })) : [];
     },
-    unitPath: (id, p) => {
-      const u = state.units.find((x) => x.id === id);
-      return u ? pathTo(state, u, p) : [];
-    },
-    stepDirection: (a, b) => directionTo(map, map.tiles[a], map.tiles[b]),
     unitActionColumn: (name) => UNIT_ACTION[name] ?? -1,
     hostileUnits: (i) => {
       const seen = plotsSeenNow(state, new Set([i]));
@@ -291,49 +193,25 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     hostileCities: (i) => {
       const seen = plotsSeenNow(state, new Set([i]));
       return cityHolders(state).filter((s) => unitsHostile(state, { seat: i }, s))
-        .flatMap((s) => s.cities.filter((c) => seen[c.centerIndex]).map((c) => cityDefence(state, c)));
+        .flatMap((s) => s.cities.filter((c) => seen[c.centerIndex]).map((c): AiCityDefenceView => ({ plot: c.centerIndex })));
     },
-    hostileDistricts: (i) => {
-      const seen = plotsSeenNow(state, new Set([i]));
-      const held = [...cityHolders(state).filter((s) => unitsHostile(state, { seat: i }, s)).flatMap((s) => s.cities),
-        ...state.cityStates.filter((cs) => cs.centerIndex >= 0 && unitsHostile(state, { seat: i }, cs)).map(minorCity)];
-      return held.flatMap((c) => dangerDistricts(state, c)).filter((d) => seen[d.plot]).map(districtDefence);
-    },
-    districtDefences: (i) => citiesOf(state, i).flatMap((c) => dangerDistricts(state, c)).map(districtDefence),
-    turn: state.turn,
     costMultiplierPct: COST_MULTIPLIER_PCT,
     gameEra: state.gameEra ?? 0,
     cityStates: state.cityStates.length,
-    civicsHeld: (i) => inputs.civicsHeld?.(i) ?? new Set(seat(i).research.civics.filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))),
+    civicsHeld: (i) => new Set(seat(i).research.civics.filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))),
     // the civics AI's last analysis (a city-state's and the Free Cities' kept
     // on their research, none before their first; a major's taken now), its
     // rows whose score the analysis job left above 0 — the row's own value,
     // the turn's propagation not yet run (runs/h1_duelw1121: a city-state's
     // Charismatic Leader first scores the turn after Political Philosophy
     // comes within the horizon, 102 of 105; none of its cards at t1)
-    civicList: (i) => new Set((seat(i).research.civicAiEntries ?? (isCiv(i) ? civicAnalysis(state, i, seat(i).culRate ?? 0, weightInputs(i)) : []))
+    civicList: (i) => new Set((seat(i).research.civicAiEntries ?? (isCiv(i) ? civicAnalysis(state, i, seat(i).culRate ?? 0) : []))
       .filter((e) => e.base > 0).map((e) => gameTypeOf('civic', e.civic, 'CIVIC_'))),
     government: (i) => {
       const g = seatGovernment(state, i);
       return g ? govType(g) : null;
     },
     governmentsHeld: (i) => new Set(GOVERNMENT_LIST.filter((g) => seat(i).government.held & governmentBit(g.id)).map((g) => govType(g.id))),
-    governmentsUnlocked: (i) => new Set(governmentsOpen(state, i).map((k) => govType(GOVERNMENT_LIST[k].id))),
-    slots: slotsOf,
-    slotsUnder: (i, type) => {
-      const g = govId(type);
-      if (!g || g === seatGovernment(state, i)) return slotsOf(i);
-      const before = governmentSlots(state, i);
-      const old = seat(i).government.policies;
-      const after = governmentSlots(state, i, g);
-      const open = slottable(i, g);
-      const laid = carryLayout(before.map((k, j) => [k, old[j] ?? null] as const), after, (c) => open.has(c));
-      return after.map((k, j) => ({ slot: slotType(k), policy: laid[j] ? policyType(laid[j]!) : null }));
-    },
-    policiesSlottableUnder: (i, type) => {
-      const g = type ? govId(type) : null;
-      return new Set([...slottable(i, g)].map(policyType));
-    },
     darkAge: (i) => inDarkAge(state, i),
     goldenAge: (i) => seat(i).age === 2,
     fullCiv: (i) => isCiv(i),
@@ -532,67 +410,15 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       }
       return sum;
     },
-    policyColumn: (type) => {
-      const id = engineId('policy', type, 'POLICY_', POLICIES);
-      return id ? POLICY_LIST.findIndex((p) => p.id === id) : -1;
-    },
-    governmentColumn: (type) => {
-      const id = govId(type);
-      return id ? GOVERNMENT_LIST.findIndex((g) => g.id === id) : -1;
-    },
-    pantheonColumn: (type) => PANTHEON_IDS.indexOf(type.replace(/^BELIEF_/, '')),
-    beliefColumn: (type) => {
-      const id = type.replace(/^BELIEF_/, '');
-      const c = beliefClassOf(id);
-      return c >= 0 ? [c, Object.keys(BELIEF_CATALOGS[c]).indexOf(id)] as const : null;
-    },
-    religionColumn: (type) => RELIGION_TYPES.indexOf(type.replace(/^RELIGION_/, '')),
-    religionsFounded: () => new Set(state.seats.flatMap((s) => (s.religion.type ? [`RELIGION_${s.religion.type}`] : []))),
-    pantheonOpen: (i) => {
-      const s = seatOf(state, i);
-      return !!s && isCiv(i) && s.religion.pantheon === null && (s.faith ?? 0) >= PANTHEON_FAITH_COST
-        && PANTHEON_IDS.some((id) => !state.claimedPantheons.includes(id));
-    },
-    religionOpen: (i) => canFoundReligion(state, i).ok,
-    beliefPicks: (i) => beliefPicks(state, i),
     majors: () => state.seats.filter((s) => isCiv(s.seat) && (s.cities.length > 0 || unitsOf(state, s.seat).length > 0)).map((s) => s.seat),
     players: () => [...new Set([...state.seats.map((s) => s.seat), ...state.cityStates.map((c) => c.seat), ...(state.freeSeat ? [state.freeSeat.seat] : []), BARB_SEAT])]
       .sort((a, b) => a - b),
-    leader: (i) => {
-      const l = leaderOf(state, i);
-      return l ? gameTypeOf('leader', l, 'LEADER_') : null;
-    },
-    metTurn,
     atWar: (i, j) => civsAtWar(state, i, j),
-    peaceTurns: (i, j) => {
-      const since = peaceTurnWith(state, i, j) ?? metTurn(i, j);
-      return since === null ? 0 : state.turn - since;
-    },
-    hasDelegation: (i, j) => delegationWith(state, i, j) === MISSION_DELEGATION,
-    hasEmbassy: (i, j) => delegationWith(state, i, j) === MISSION_EMBASSY,
-    hasOpenBorders: (i, j) => borderTurnsFrom(state, i, j) > 0,
     playerYield: (i, type) => {
       const key = YIELD_KEY[type];
       return key ? citiesOf(state, i).reduce((a, c) => a + computeCityStats(state, c).total[key], 0) : 0;
     },
-    population: (i) => citiesOf(state, i).reduce((a, c) => a + c.population, 0),
-    wondersBuilt: (i) => citiesOf(state, i).reduce((a, c) => a + c.wonders.length, 0),
-    greatPeopleEarned: (i) => seat(i).gpEarned.length,
-    plotsOwned: (i) => state.map.tiles.reduce((a, t) => a + (tileSeat(t) === i ? 1 : 0), 0),
     religionFounded: (i) => (seat(i).religion.founded ? i : null),
-    majorityReligion: (i) => {
-      const r = majorityReligionOf(state, i);
-      return r >= 0 ? r : null;
-    },
-    beliefsHeld: () => new Set([...state.claimedPantheons, ...state.claimedBeliefs].map((b) => `BELIEF_${b}`)),
-    religionBeliefs: (i) => {
-      const r = seat(i).religion;
-      return r.founded ? BELIEF_SLOTS.flatMap((k) => (r[k] ? [`BELIEF_${r[k]}`] : [])) : [];
-    },
-    tradeRoutesBetween: (i, j) => {
-      const runs = (a: number, b: number) => (seatOf(state, a)?.tradeRoutes ?? []).filter((r) => r.toSeat === b).length;
-      return runs(i, j) + runs(j, i);
-    },
     cityStateSeats: () => state.cityStates.map((c) => c.seat),
     // GetTokensReceived (0x44c860): the store and the tokens a governor
     // posted there brings (0x44caa0)
@@ -608,81 +434,14 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       if (domain === 'DOMAIN_SEA') return !!d.naval;
       return !d.air && !d.naval;
     }).length,
-    mapCities: () => (mapCities ??= allCities(state)),
-    plotsSeen: (i) => {
-      let v = seenBy.get(i);
-      if (!v) {
-        // a city-state's look is its own (`cityStateSight`)
-        const seen = isCityStateSeat(i) ? cityStateSight(state, i) : plotsSeenNow(state, new Set([i]));
-        const out = new Set<number>();
-        seen.forEach((x, k) => { if (x) out.add(k); });
-        seenBy.set(i, (v = out));
-      }
-      return v;
-    },
-    startPlots: () => startPlots(state),
     handicap: (i) => seatOf(state, i)?.handicap ?? DEFAULT_HANDICAP,
-    playerEra: (i) => inputs.playerEra?.(i) ?? civEraIndex(seat(i).research.techs, seat(i).research.civics),
-    techCount: (i) => seat(i).research.techs.length,
+    playerEra: (i) => civEraIndex(seat(i).research.techs, seat(i).research.civics),
     techsHeld: (i) => new Set(seat(i).research.techs.map((t) => gameTypeOf('tech', t, 'TECH_'))),
     militaryStrength: (i) => militaryStrength(state, i),
     domainStrength: (i) => seatOf(state, i)?.unitStrength ?? 0,
-    treasury: (i) => seatOf(state, i)?.treasury ?? 0,
-    actionOpen: (i, j, action) => {
-      if (!isCiv(i) || !isCiv(j) || civsAtWar(state, i, j)) return false;
-      if (action === 'DIPLOACTION_DIPLOMATIC_DELEGATION' || action === 'DIPLOACTION_RESIDENT_EMBASSY') {
-        return missionPayable(state, i, j) && (missionOf(state, i) === MISSION_EMBASSY) === (action === 'DIPLOACTION_RESIDENT_EMBASSY');
-      }
-      if (action === 'DIPLOACTION_OPEN_BORDERS') return dealItemPayable(state, i, j, [DEAL_OPEN_BORDERS, 0, 0]);
-      if (action === 'DIPLOACTION_DECLARE_FRIENDSHIP') return friendshipPayable(state, i, j);
-      if (action === 'DIPLOACTION_ALLIANCE') return alliancePayable(state, i, j, 0);
-      if (action === 'DIPLOACTION_DENOUNCE') return denounceOpen(state, i, j);
-      return null;
-    },
-    warOpen: (i, j, formal) => (isCityStateSeat(j) ? minorWarGate(state, cityStateOfSeat(j), i).ok
-      : warGate(state, i, j, formal ? WAR_KIND_FORMAL : WAR_KIND_SURPRISE).ok),
     declaredFriends: (i, j) => seatsFriends(state, i, j),
     allied: (i, j) => seatsAllied(state, i, j),
     denouncing: (i, j) => denounceActive(state, i, j),
-    favor: (i) => seatOf(state, i)?.diplomaticFavor ?? 0,
-    congressTarget: (i, r) => congressPreference(state, r, i, congressVoter(state, i)).target,
-    congressTargets: (i, r) => congressTargets(state, i, r),
-    congressTargetsOf: (i, type) => congressTargetsOf(state, i, type),
-    cityStateBonus: (cs) => {
-      const c = seatOf(state, cs) as CityState | undefined;
-      return c ? `MINOR_CIV_BONUS_${c.type.toUpperCase()}` : null;
-    },
-    suzerain: (cs) => {
-      const c = seatOf(state, cs) as CityState | undefined;
-      return c ? suzerainOf(c) : -1;
-    },
-    greatWorksByObject: (i) => {
-      const out = new Array<number>(GWO_COUNT).fill(0);
-      for (const c of citiesOf(state, i)) gwCountsByObj(c).forEach((n, o) => { out[o] += n; });
-      return out;
-    },
-    cityHousing: (i, id) => {
-      const city = citiesOf(state, i).find((c) => c.id === id);
-      return city ? computeCityStats(state, city).housing : 0;
-    },
-    greatPersonPoints: (i, cls) => seat(i).gpp[cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass] ?? 0,
-    greatPersonPrice: (cls) => {
-      const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
-      return GP_CLASSES.includes(c) ? gpOfferCost(state, c) : Infinity;
-    },
-    religionFollowers: (i) => {
-      const r = seat(i).religion.type;
-      return r ? cityHolders(state).flatMap((s) => s.cities).filter((c) => c.followedReligion === i).length : 0;
-    },
-    cityBuildable: (i, id) => {
-      const city = citiesOf(state, i).find((c) => c.id === id);
-      return new Set(city ? availableBuildings(state, city).map((b) => gameTypeOf('building', b.id, 'BUILDING_')) : []);
-    },
-    unitPromotionClass: (type) => {
-      const id = engineId('unit', type, 'UNIT_', UNITS);
-      const c = id ? UNIT_PROMO_CLASS[id] : undefined;
-      return c ? PROMO_INSTALL[c] ?? `PROMOTION_CLASS_${c}` : null;
-    },
     // a city-state's one city stands on its home continent, the Free Cities
     // hold no capital: no city-state
     // nor any major lists Colonial Taxes (runs/h1_duelw1117 / 1121 / 1124 /
@@ -723,126 +482,14 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const p = engineId('project', type, 'PROJECT_', PROJECTS);
       return !!city && !!p && availableProjects(state, city).some((x) => x.id === p);
     },
-    missionOpen: (i, j) => (isCiv(i) && isCiv(j) && missionPayable(state, i, j)
-      ? (missionOf(state, i) === MISSION_EMBASSY ? 'DIPLOACTION_RESIDENT_EMBASSY' : 'DIPLOACTION_DIPLOMATIC_DELEGATION') : null),
-    score: (i) => scoreLines(state, seat(i)).reduce((a, b) => a + b, 0),
-    greatPeopleOfClass: (i, cls) => {
-      const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
-      return GP_CLASSES.includes(c) ? seat(i).gpEarned.filter((id) => GREAT_PEOPLE[c].some((g) => g.id === id)).length : 0;
-    },
-    greatPersonOffered: (cls) => {
-      const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
-      return GP_CLASSES.includes(c) && gpOffer(state, c) !== -2;
-    },
-    greatPersonPatronage: (i, cls, currency) => {
-      const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
-      const k = GP_CLASSES.indexOf(c);
-      const s = seatOf(state, i);
-      if (k < 0 || !s || gpOffer(state, c) < 0 || gpCapped(s, c) || (state.gpPassedBy?.[k] ?? -1) === i) return -1;
-      const cost = patronageCost(state, i, c, currency === 'gold');
-      const purse = currency === 'gold' ? s.treasury ?? 0 : s.faith;
-      return Number.isFinite(cost) && purse >= cost ? cost : -1;
-    },
-    faith: (i) => seatOf(state, i)?.faith ?? 0,
-    greatPersonUsable: (i, cls) => {
-      const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
-      const at = GP_CLASSES.includes(c) ? gpOffer(state, c) : -1;
-      const s = seatOf(state, i);
-      if (at < 0 || !s) return false;
-      const person = { type: c, seat: i, gpAt: at, charges: 1, tileIndex: 0 } as Unit;
-      return state.map.tiles.some((_t, k) => (s.explored?.[k] ?? 0) > 0 && ((person.tileIndex = k), gpActivateOk(state, person)));
-    },
-    greatWorksMade: (i) => cityHolders(state).reduce((n, h) => n + h.cities.reduce((m, c) =>
-      m + (c.greatWorks ?? []).filter((w) => w.seat === i).length, 0), 0),
-    domesticTourists: (i) => domesticTourists(state.seats, seat(i)),
-    visitingTourists: (i) => state.seats.reduce((n, o) => n + (o.seat !== i && metTurn(i, o.seat) !== null
-      ? touristsDrawn(state.seats, seat(i), o) : 0), 0),
-    scienceWonders: (i) => citiesOf(state, i).reduce((n, c) => n + c.wonders.filter((w) => (BUILDINGS[w.id]?.yields?.science ?? 0) > 0).length, 0),
-    spaceProjects: (i) => seat(i).projectsDone.filter((id) => PROJECTS[id]?.victory).length,
-    cityBuilds: (i) => seatCities(i).map((c) => {
-      const head = c.queue[0];
-      const unit = head?.kind === 'settler' ? 'UNIT_SETTLER' : head?.kind === 'unit' ? gameTypeOf('unit', head.unit, 'UNIT_') : null;
-      if (!head || !unit) return { city: c.id, plot: c.centerIndex, unitType: null, turnsLeft: -1 };
-      const prod = Math.max(1, computeCityStats(state, c).total.production);
-      return { city: c.id, plot: c.centerIndex, unitType: unit, turnsLeft: Math.max(0, Math.ceil((itemCost(head, state, c) - head.progress) / prod)) };
-    }),
-    contractCities: (i) => seatCities(i).map((c): ContractCity => {
-      const head = c.queue[0];
-      const current = !head ? null
-        : head.kind === 'settler' ? { unit: 'UNIT_SETTLER', building: null, district: null }
-          : head.kind === 'unit' ? { unit: gameTypeOf('unit', head.unit, 'UNIT_'), building: null, district: null }
-            : head.kind === 'building' ? { unit: null, building: gameTypeOf('building', head.building, 'BUILDING_'), district: null }
-              : head.kind === 'district' ? { unit: null, building: null, district: gameTypeOf('district', head.district, 'DISTRICT_') }
-                : null;
-      const trainable = new Set(trainableUnits(state, i, c).map((d) => gameTypeOf('unit', d.id, 'UNIT_')));
-      const prod = Math.max(1, computeCityStats(state, c).total.production);
-      return {
-        id: c.id, underThreat: false, current, foundedTurn: c.foundedTurn, currentValue: 0,
-        buildingBlocked: () => false, districtBlocked: () => false,
-        canTrain: (u) => trainable.has(u),
-        trainsSea: [...trainable].some((u) => !!UNITS[engineId('unit', u, 'UNIT_', UNITS) ?? '']?.naval),
-        // the queue's turns left (0x17bb40): the item in production counts
-        // its progress
-        buildTurns: (item) => {
-          const id = item.unit ? engineId('unit', item.unit, 'UNIT_', UNITS) : undefined;
-          if (!id) return 0;
-          const done = head && current?.unit === item.unit ? head.progress : 0;
-          return Math.max(0, Math.ceil((unitProdCost(state, i, id, UNITS[id].cost) - done) / prod));
-        },
-        itemValue: () => 0,
-        unitRow: (u) => {
-          const d = UNITS[engineId('unit', u, 'UNIT_', UNITS) ?? ''];
-          return { combat: d?.combat ?? 0, buildCharges: d?.charges ?? 0, sea: !!d?.naval, mustPurchase: false, recon: false };
-        },
-        buildingRow: () => ({ defensive: false, mustPurchase: false }),
-        districtDefensive: () => false,
-      };
-    }),
     bestCombatStrength: (i) => seatOf(state, i)?.bestMeleeCS ?? 0,
-    knownUnits: (i, j) => {
-      if (i === j) return unitsOf(state, j).map((u) => unitView(state, u));
-      const seen = isCityStateSeat(i) ? cityStateSight(state, i) : plotsSeenNow(state, new Set([i]));
-      return unitsOf(state, j).filter((u) => seen[u.tileIndex] && unitVisibleTo(state, u, i)).map((u) => unitView(state, u));
-    },
     barbarianCamps: (i) => [...campTiles(state)].filter((p) => isExplored(state, i, p)).sort((a, b) => a - b),
     barbarianSeat: () => BARB_SEAT,
-    plotForeignUnits: (i, p) => state.units.filter((u) => u.tileIndex === p && u.seat !== i && !unitsHostile(state, { seat: i }, u)).length,
     cityPopulation: (p) => cityHolders(state).flatMap((s) => s.cities).find((c) => c.centerIndex === p)?.population
       ?? state.cityStates.find((cs) => cs.centerIndex === p)?.population ?? 0,
-    governors: (i): MajorGovernorView[] => governorsOf(seat(i)).map((g, k) => {
-      const minor = g.minorId >= 0 ? state.cityStates.find((m) => m.id === g.minorId) : undefined;
-      const promotions = new Set<string>();
-      if (g.appointed) {
-        GOVERNOR_PROMOTIONS.forEach((p, j) => {
-          if (p.governor === GOVERNORS[k].id && (p.tier === 0 || promotionBit(g.promotions, j))) promotions.add(PROMO_INSTALL_ID[p.id]);
-        });
-      }
-      return {
-        type: GOVERNOR_INSTALL_ID[GOVERNORS[k].id], appointed: g.appointed, promotions,
-        city: g.cityId >= 0 ? { seat: i, id: g.cityId } : minor ? { seat: minor.seat, id: -1 } : null,
-      };
-    }),
     // the engine's roster is the seven governors every seat may appoint
-    governorAvailable: (_i, type) => GOVERNORS.some((g) => GOVERNOR_INSTALL_ID[g.id] === type),
     // a title civic the caller's moment holds and the state does not yet
     // grants its title too
-    governorTitles: (i) => {
-      const held = inputs.civicsHeld?.(i);
-      const own = seat(i).research.civics;
-      return governorTitlesAvailable(state, i)
-        + (held ? GOVERNOR_TITLE_CIVICS.filter((c) => !own.includes(c) && held.has(gameTypeOf('civic', c, 'CIVIC_'))).length : 0);
-    },
-    governorCanPromote: (i, type, promotion) => {
-      const k = GOVERNORS.findIndex((g) => GOVERNOR_INSTALL_ID[g.id] === type);
-      const p = GOVERNOR_PROMOTIONS.findIndex((x) => PROMO_INSTALL_ID[x.id] === promotion);
-      return k >= 0 && p >= 0 && governorPromotionOpen(state, i, k, p);
-    },
-    cityLoyaltyPerTurn: (i, id) => {
-      const city = citiesOf(state, i).find((c) => c.id === id);
-      if (!city) return 0;
-      const stats = computeCityStats(state, city);
-      return fxOf(loyaltyPerTurn(state, city, stats.amenities.tier.name, governedCityIds(seat(i)).has(id), stats.foodSurplus < 0));
-    },
     minorCivilization: (cs) => {
       const minor = seatOf(state, cs) as CityState | undefined;
       if (!minor || !isCityStateSeat(cs)) return null;
@@ -909,10 +556,6 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const kept = city.queue.find((q) => q.kind === 'project' && q.project === id)?.progress ?? 0;
       return turnsAt(fxOf(projectCost(state, i, id, city) - kept - (city.productionBank ?? 0)), rate);
     },
-    cityStateHasCity: (cs) => {
-      const minor = seatOf(state, cs) as CityState | undefined;
-      return !!minor && !!minorCity(minor);
-    },
     knownCities: (i) => knownCities(state, i),
     pressureLead: (i, p) => plotPressureLead(state, i, map.tiles[p]),
     borderClosed: (i, p) => borderClosedTo(state, i, map.tiles[p]),
@@ -954,47 +597,6 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       type: t.type, plot: t.tile, owner: t.seat, unitType: t.unit ? gameTypeOf('unit', t.unit.type, 'UNIT_') : null,
       range: t.unit ? unitAttackRange(t.unit) : t.type === 'COMBAT_DISTRICT' ? CITY_STRIKE_RANGE : 0,
     })),
-    attackAssignment: (i, ids, keep, even, survive) => {
-      // the seat's pass over the units asked: each one's planning against the
-      // seat's target list (the assignment reads no other unit's)
-      const units = ids.map((id) => state.units.find((u) => u.id === id)).filter((u): u is Unit => !!u);
-      const targets = targetsOf(i);
-      const pass: Pass = { seat: i, strike: false, units, reach: new Map(), done: new Set(), ended: new Set(), ai: new Map(units.map((u) => [u.id, AI_COMBAT_UNIT])),
-        targets, plan: new Map(), danger: new Int16Array(0), regions: new Set() };
-      for (const u of units) {
-        const p = planUnit(state, u, targets);
-        pass.plan.set(u.id, p);
-        pass.reach.set(u.id, p.reach);
-      }
-      // a unit target the turn's blows already took is gone from the list
-      return assignTo(state, pass, units, targets.filter((t, k) => keep(k) && (!t.unit || state.units.includes(t.unit))), even, survive)
-        .map((a) => ({ unit: a.unit.id, from: a.from, move: a.move, attack: a.attack }));
-    },
-    strikeColumn: (id, p) => {
-      const u = state.units.find((x) => x.id === id);
-      if (!u) return -1;
-      const here = map.tiles[u.tileIndex];
-      const d = hexDistance(map, here.col, here.row, map.tiles[p].col, map.tiles[p].row);
-      if (d === 1) return UNIT_ACTION[`ATTACK_${directionTo(map, here, map.tiles[p])}`] ?? -1;
-      const k2 = d === 2 ? snipeRing(state, here).indexOf(p) : -1;
-      if (k2 >= 0) return UNIT_ACTION[`SNIPE_${k2}`] ?? -1;
-      const k3 = d === 3 ? snipeRing3(state, here).indexOf(p) : -1;
-      return k3 >= 0 ? UNIT_ACTION[`SNIPE3_${k3}`] ?? -1 : -1;
-    },
-    capturedAs: (type) => {
-      const id = engineId('unit', type, 'UNIT_', UNITS);
-      const to = id ? UNITS[id].capturedAs : undefined;
-      return to ? gameTypeOf('unit', to, 'UNIT_') : null;
-    },
-    militaryYardstick: (i) => {
-      const s = seatOf(state, i);
-      return Math.max(1, s?.bestMeleeCS ?? 0, Math.max(s?.bestRangedCS ?? 0, CITY_MIN_STRIKE_CS));
-    },
-    wmdCount: (i) => (seatOf(state, i)?.wmd ?? []).reduce((a, b) => a + b, 0),
-    suzerainOf: (cs) => {
-      const c = seatOf(state, cs) as CityState | undefined;
-      return c ? suzerainOf(c) : -1;
-    },
     planSpot: (id, p, turns, needMoves, range) => {
       const u = state.units.find((x) => x.id === id);
       if (!u) return -1;
@@ -1054,23 +656,14 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     exertsZoc: (id) => {
       const u = state.units.find((x) => x.id === id);
       return !!u && unitExertsZoc(u);
-    },
-    mostEnvoys: (cs) => {
-      const c = seatOf(state, cs) as CityState | undefined;
-      if (!c) return 0;
-      return Math.max(0, ...state.seats.map((s) => envoysHere(state, c, s.seat)));
-    },
+    }
   };
 }
 
-/** the AI type the majors' attack assignment gives every unit: a fighter
- *  (tactical.ts's AI_COMBAT), none a camp's defender */
-const AI_COMBAT_UNIT = 3;
-
 /** the cities the seat has revealed the centre of, as its knowledge base
  *  records them (0x5efaf0): the centre its one defensible district */
-function knownCities(state: GameState, seat: number): MajorKnownCityView[] {
-  const out: MajorKnownCityView[] = [];
+function knownCities(state: GameState, seat: number): AiKnownCityView[] {
+  const out: AiKnownCityView[] = [];
   const add = (c: City, originalCapital: boolean) => {
     if (!isExplored(state, seat, c.centerIndex)) return;
     const t = computeCityStats(state, c).total;
@@ -1085,46 +678,11 @@ function knownCities(state: GameState, seat: number): MajorKnownCityView[] {
     out.push({
       plot: c.centerIndex, owner: c.seat, id: c.id, population: c.population, originalCapital, capital: c.isCapital,
       yields: AI_YIELD_KEYS.map((k) => Math.trunc(t[k])), wonders: c.wonders.length,
-      districts: [{ plot: c.centerIndex, defense, walls: walled ? defense : 0, strike: walled ? cityStrikeStrength(state, c) : 0 }],
-      resources: [...resources].map(([resource, count]) => ({ resource, count })), greatWorks: (c.greatWorks ?? []).length,
+      districts: [{ plot: c.centerIndex, defense, walls: walled ? defense : 0, strike: walled ? cityStrikeStrength(state, c) : 0 }]
     });
   };
   for (const h of cityHolders(state)) for (const c of h.cities) add(c, (c.origCapitalSeat ?? -1) >= 0);
   for (const cs of state.cityStates) if (cs.centerIndex >= 0) add({ ...minorCity(cs), isCapital: true }, true);
-  return out;
-}
-
-/** every city on the map with what the AI's knowledge records of it: the
- *  majors', the Free Cities' and the city-states' */
-function allCities(state: GameState): MajorCityView[] {
-  const out: MajorCityView[] = [];
-  const add = (c: City, religion: number) => {
-    const t = computeCityStats(state, c).total;
-    out.push({ plot: c.centerIndex, owner: c.seat, id: c.id, capital: c.isCapital, yields: AI_YIELD_KEYS.map((k) => t[k]), religion,
-      originalCapital: (c.origCapitalSeat ?? -1) >= 0, originalOwner: c.founderSeat ?? c.seat });
-  };
-  for (const h of cityHolders(state)) for (const c of h.cities) add(c, c.followedReligion ?? -1);
-  for (const cs of state.cityStates) {
-    if (cs.centerIndex >= 0) add({ ...minorCity(cs), isCapital: true, origCapitalSeat: cs.seat, founderSeat: cs.seat }, majorityReligionOf(state, cs.seat));
-  }
-  return out;
-}
-
-/** the start plot of each player that has one: a major's capital, else its
- *  first founder unit; a city-state's centre, else its first unit */
-function startPlots(state: GameState): { plot: number; seat: number }[] {
-  const out: { plot: number; seat: number }[] = [];
-  const first = (seat: number, founder: boolean) => state.units.find((u) => u.seat === seat && (!founder || !!UNITS[u.type]?.settler));
-  for (const s of state.seats) {
-    if (!isCiv(s.seat)) continue;
-    const cap = citiesOf(state, s.seat).find((c) => c.isCapital);
-    const plot = cap ? cap.centerIndex : first(s.seat, true)?.tileIndex;
-    if (plot !== undefined) out.push({ plot, seat: s.seat });
-  }
-  for (const cs of state.cityStates) {
-    const plot = cs.centerIndex >= 0 ? cs.centerIndex : first(cs.seat, false)?.tileIndex;
-    if (plot !== undefined) out.push({ plot, seat: cs.seat });
-  }
   return out;
 }
 
@@ -1169,8 +727,8 @@ export function storeUnitStrength(state: GameState, seat: number): void {
   s.unitStrength = sum >> 8;
 }
 
-/** a unit as the majors' AI reads it */
-function unitView(state: GameState, u: Unit): MajorUnitView {
+/** a unit as the AI reads it */
+function unitView(state: GameState, u: Unit): AiUnitView {
   const d = UNITS[u.type];
   return { id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_'), plot: u.tileIndex, founder: !!d?.settler,
     combat: aiStrengths(state, u).melee, ranged: d?.ranged?.strength ?? 0, range: d?.ranged?.range ?? 0, damage: UNIT_HP - u.hp,

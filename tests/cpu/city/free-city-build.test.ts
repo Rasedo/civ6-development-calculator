@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { loadWorld } from '../../../cpu/world/load';
-import { freeCityBuildFacts } from '../../../cpu/core/majorCityBuild';
+import { freeCityBuildFacts } from '../../../cpu/core/freeCityBuild';
 import { buildingTable, unitTable } from '../../../cpu/core/aiCityBuild';
 import { FX_MIN } from '../../../cpu/core/aiValue';
 import { spawnUnit } from '../../../cpu/core/units';

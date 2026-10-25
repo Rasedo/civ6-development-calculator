@@ -4,11 +4,10 @@
  * every winning-combo voter, refund tiers, the always-3rd Diplomatic Victory
  * resolution) are sourced verbatim at the catalog (data/seats.ts).
  *
- * A Regular Session draws its slate when it sits and votes on it then. The
- * ballots come from the decider `holdCongressBallots` installs (the majors'
- * AI on the replay): one [outcome, target, extra votes, cast order] per
- * slot; a seat it gives none, and every seat without a decider, votes the
- * AI line (`preference`, the Diplomatic Victory pile-on). A ballot naming
+ * A Regular Session draws its slate when it sits and votes on it then
+ * (`congressVotes`). A seat's ballot is one [outcome, target, extra votes,
+ * cast order] per slot; a seat with none votes the AI line (`preference`,
+ * the Diplomatic Victory pile-on). A ballot naming
  * target -1 takes a "Random congress resolution target" draw over the
  * targets the resolution offers the seat (`congressTargets`), as the game's
  * AI does where its hint is not among them (0x611140 ..): seats in order,
@@ -83,16 +82,6 @@ export type CongressBallot = ([number, number, number, number] | null)[];
  *  Diplomatic Victory resolution sits, and the competition it starts
  *  (a COMPETITIONS index, -1 none). */
 export interface CongressSlate { slate: readonly number[]; dv: boolean; competition: number }
-
-/** The decider asked for every seat's ballot once the slate is drawn. */
-export type CongressDecider = (state: GameState, slate: CongressSlate) => readonly (CongressBallot | null)[];
-
-let congressDecider: CongressDecider | null = null;
-
-/** Install (or clear, with null) the decider of the Regular Sessions' ballots. */
-export function holdCongressBallots(fn: CongressDecider | null): void {
-  congressDecider = fn;
-}
 
 /** The DIPLOMATIC VICTORY resolution's slot in the vote head — the always-3rd
  * resolution, which stands outside the two-slot rotating slate. */
@@ -268,15 +257,6 @@ export function preference(state: GameState, res: number, seat: number,
 export function voteCost(n: number): number {
   const a = Math.abs(n);
   return CONGRESS_VOTE_PRICE * (a - 1) * a;
-}
-
-/** THE VOTES `favor` buys (0x527d80): 1 for none, else
- *  whole((sqrt(4 x favor / s + 1) + 1) x 0.5) in single precision */
-export function votesFor(favor: number): number {
-  if (favor <= 0) return 1;
-  const f = Math.fround;
-  const root = f(Math.sqrt(f(f(f(favor) * 4) / CONGRESS_VOTE_PRICE) + 1));
-  return Math.trunc(f(f(root + 1) * 0.5));
 }
 
 /**
@@ -520,11 +500,10 @@ export function drawCongressSlate(state: GameState, worldEra: number): CongressS
 /** One Regular Session, after the barbarians' turn closes the turn every
  * player acted in (the game's draw log: the session's draws the last of the
  * turn, before the next turn's random-event step; runs/h1_duelv1127 t61):
- * the slate drawn (`drawCongressSlate`), the decider's ballots, then
- * `congressVotes`. */
+ * the slate drawn (`drawCongressSlate`), then `congressVotes`, every seat
+ * on the AI line. */
 export function congressSession(state: GameState, worldEra: number): void {
-  const at = drawCongressSlate(state, worldEra);
-  congressVotes(state, at, congressDecider ? congressDecider(state, at) : []);
+  congressVotes(state, drawCongressSlate(state, worldEra), []);
 }
 
 /** The votes on a drawn slate: the ballots' target draws (`drawTargets`),

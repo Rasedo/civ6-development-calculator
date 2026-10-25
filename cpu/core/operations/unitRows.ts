@@ -7,7 +7,7 @@
 import { AI_UNITS } from '../../data/aiBuildTables';
 import { AI_UNIT_INDEX } from '../aiCityBuild';
 import { unitProductionEntries, type UnitProductionRow } from '../aiUnitProduction';
-import { majorTraits } from '../majorCityBuild';
+import { majorTraits } from '../freeCityBuild';
 import { installType } from '../minorBuild';
 import { isCityStateSeat, seatOf } from '../seats';
 import { CIVICS } from '../../data/civics';

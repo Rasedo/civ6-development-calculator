@@ -27,7 +27,7 @@ import { minorCity } from '../core/cityStates';
 import { minorBuildFacts, minorKnownUnits, minorResearchTerms, minorResourceCounts } from '../core/minorBuild';
 import { unitTable } from '../core/aiCityBuild';
 import { loadCityBuildCentre } from './cityBuildLog';
-import { AI_POLICIES } from '../../ai/major/tables';
+import { AI_POLICIES } from '../data/aiTables';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const dump = args[0];
@@ -92,8 +92,8 @@ const newTally = (): Tally => ({ n: 0, turns: 0, score: 0, scoreAtTurns: 0, atTu
 const total = { tech: newTally(), civic: newTally() };
 /** a row researchable now (every prerequisite held): the log's score is its
  *  own value, against ours at the log's turns */
-type OwnTree = 'tech' | 'civic' | 'major tech' | 'major civic';
-const OWN_TREES: readonly OwnTree[] = ['tech', 'civic', 'major tech', 'major civic'];
+type OwnTree = 'tech' | 'civic';
+const OWN_TREES: readonly OwnTree[] = ['tech', 'civic'];
 const own = Object.fromEntries(OWN_TREES.map((t) => [t, newTally()])) as Record<OwnTree, Tally>;
 const ownPer = Object.fromEntries(OWN_TREES.map((t) => [t, new Map<string, Tally>()])) as Record<OwnTree, Map<string, Tally>>;
 const dumpOwn = args.includes('--own') ? Number(args[args.indexOf('--own') + 1]) : null;
@@ -150,24 +150,6 @@ for (let i = 0; i + 1 < recs.length; i++) {
   advanceHistory(history, b, cat);
   const imp = importTurn(b, cat, history);
   const state = imp.state;
-  // the majors' own values (no city terms): the rows researchable now
-  for (const s of state.seats) {
-    const player = imp.playerOfSeat.get(s.seat);
-    if (player === undefined || imp.minorOfPlayer.has(player)) continue;
-    const key = `${turn}:${player}`;
-    const pw = pseudoYieldWeights(state, s.seat, {});
-    for (const [type, l] of only !== 'civic' ? techLog.get(key) ?? [] : []) {
-      const id = type.slice(5);
-      if (!TECHS[id] || s.research.techs.includes(id) || l[1] < 0 || !TECHS[id].prereqs.every((x) => s.research.techs.includes(x))) continue;
-      tallyOwn('major tech', type, l, techValue(state, s.seat, id, l[1], pw) + Math.round((contracts.get(key)?.get(type) ?? 0) * 256), `t${turn} p${player}`);
-    }
-    for (const [type, l] of only !== 'tech' ? civicLog.get(key) ?? [] : []) {
-      const id = type.slice(6);
-      if (!CIVICS[id] || s.research.civics.includes(id) || l[1] < 0 || !CIVICS[id].prereqs.every((x) => s.research.civics.includes(x))) continue;
-      tallyOwn('major civic', type, l, civicValue(state, s.seat, id, l[1], pw)
-        + (logPolicies === null ? 0 : policyTerm(`${turn + logPolicies}:${player}`, id)), `t${turn} p${player}`);
-    }
-  }
   for (const [player, cs] of imp.minorOfPlayer) {
     const y = computeCityStats(state, minorCity(cs)).total;
     const key = `${turn}:${player}`;
@@ -176,11 +158,11 @@ for (let i = 0; i + 1 < recs.length; i++) {
     if (only !== 'civic' && techLog.has(key)) {
       const logged = techLog.get(key)!;
       const terms = minorResearchTerms(state, cs, loggedUnits ?? unitTable(minorBuildFacts(state, cs, minorKnownUnits(cs))), minorResourceCounts(state, cs));
-      for (const e of researchAnalysis(state, cs.seat, y.science, {}, terms.tech)) {
+      for (const e of researchAnalysis(state, cs.seat, y.science, terms.tech)) {
         const l = logged.get(`TECH_${e.tech}`);
         if (l && !e.owned) tally('tech', `TECH_${e.tech}`, turn, player, l, e);
         if (l && !e.owned && l[1] >= 0 && TECHS[e.tech].prereqs.every((x) => cs.research.techs.includes(x))) {
-          tallyOwn('tech', `TECH_${e.tech}`, l, techValue(state, cs.seat, e.tech, l[1], pseudoYieldWeights(state, cs.seat, {})) + (l[1] <= 50 ? terms.tech(e.tech, l[1]) : 0)
+          tallyOwn('tech', `TECH_${e.tech}`, l, techValue(state, cs.seat, e.tech, l[1], pseudoYieldWeights(state, cs.seat)) + (l[1] <= 50 ? terms.tech(e.tech, l[1]) : 0)
             + Math.round((contracts.get(key)?.get(`TECH_${e.tech}`) ?? 0) * 256), `t${turn} p${player}`);
         }
       }
@@ -188,11 +170,11 @@ for (let i = 0; i + 1 < recs.length; i++) {
     if (only !== 'tech' && civicLog.has(key)) {
       const logged = civicLog.get(key)!;
       const terms = minorResearchTerms(state, cs, loggedUnits ?? unitTable(minorBuildFacts(state, cs, minorKnownUnits(cs))), minorResourceCounts(state, cs));
-      for (const e of civicAnalysis(state, cs.seat, y.culture, {}, terms.civic)) {
+      for (const e of civicAnalysis(state, cs.seat, y.culture, terms.civic)) {
         const l = logged.get(`CIVIC_${e.civic}`);
         if (l && !e.owned) tally('civic', `CIVIC_${e.civic}`, turn, player, l, e);
         if (l && !e.owned && l[1] >= 0 && CIVICS[e.civic].prereqs.every((x) => cs.research.civics.includes(x))) {
-          tallyOwn('civic', `CIVIC_${e.civic}`, l, civicValue(state, cs.seat, e.civic, l[1], pseudoYieldWeights(state, cs.seat, {})) + (l[1] < 50 ? terms.civic(e.civic, l[1]) : 0)
+          tallyOwn('civic', `CIVIC_${e.civic}`, l, civicValue(state, cs.seat, e.civic, l[1], pseudoYieldWeights(state, cs.seat)) + (l[1] < 50 ? terms.civic(e.civic, l[1]) : 0)
             + (logPolicies === null ? 0 : policyTerm(`${turn + logPolicies}:${player}`, e.civic)), `t${turn} p${player}`);
         }
       }

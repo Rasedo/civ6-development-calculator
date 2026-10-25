@@ -57,8 +57,8 @@ import { cityContracts, contractBuilt, inHandCheck, queueContract, takesTurn, ty
 import { newEconomicMemory, purchaseContracts, purchaseTurn, purchasePick, savingsTurn, type PurchaseCity, type PurchaseEntry } from './aiEconomic';
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat, type CityThreat } from './operations/cityThreat';
-import { majorView } from './majorView';
-import { AI_GREAT_PERSON_CLASSES } from '../../ai/major/tables';
+import { aiView } from './aiView';
+import { AI_GREAT_PERSON_CLASSES } from '../data/aiTables';
 import { minorJobUnits, minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart } from './minorOps';
 import { freeOpNear } from './freeOps';
 import { ARMY_READ_AGE } from './operations/knowledge';
@@ -640,7 +640,7 @@ export function minorStandingArmy(state: GameState, cs: CityState): number {
   if (cs.centerIndex < 0) return 0;
   const root = Math.fround(Math.sqrt(cs.population));
   const fl = Math.floor(root);
-  const quota = fmul(pseudoYieldValue(majorView(state), cs.seat, FX, 'PSEUDOYIELD_STANDING_ARMY_NUMBER'),
+  const quota = fmul(pseudoYieldValue(aiView(state), cs.seat, FX, 'PSEUDOYIELD_STANDING_ARMY_NUMBER'),
     fl * FX + Math.trunc(Math.fround(Math.fround(root - fl) * 256))) >> 8;
   const busy = new Set(minorJobUnits(cs));
   const coastal = isCoastalLand(state.map, state.map.tiles[cs.centerIndex]);
@@ -674,7 +674,7 @@ export function minorStandingArmy(state: GameState, cs: CityState): number {
  *  and the game starts no City Defense) and its running operations
  *  (`minorOpNear`) */
 export function minorThreat(state: GameState, cs: CityState): CityThreat {
-  return knownThreat(majorView(state) as unknown as Parameters<typeof cityThreat>[0], cs, cs.seat, cs.centerIndex,
+  return knownThreat(aiView(state) as unknown as Parameters<typeof cityThreat>[0], cs, cs.seat, cs.centerIndex,
     (p, plot, dist) => minorOpNear(state, cs, p, plot, dist));
 }
 
@@ -729,7 +729,7 @@ function knownThreat(view: Parameters<typeof cityThreat>[0], holder: Seat, seat:
  *  the city-states not; the Free Cities' running operations against a
  *  player (their raids, `freeOpNear`) */
 export function freeCityThreat(state: GameState, city: City): CityThreat {
-  const view = majorView(state) as unknown as Parameters<typeof cityThreat>[0];
+  const view = aiView(state) as unknown as Parameters<typeof cityThreat>[0];
   const fights = (i: number, j: number): boolean => (i === FREE_SEAT && isCiv(j)) || (j === FREE_SEAT && isCiv(i));
   const free: typeof view = Object.assign(Object.create(view), { atWar: (i: number, j: number) => fights(i, j) || view.atWar(i, j) });
   return knownThreat(free, freeSeatOf(state), FREE_SEAT, city.centerIndex, (p, plot, dist) => freeOpNear(state, p, plot, dist));
@@ -772,7 +772,7 @@ export function minorMilitaryTurn(state: GameState, cs: CityState): void {
 /** a Great Person class is available in the game (0x2f7eb0, the majors'
  *  `greatPersonClassAvailable` over the AI's classes) */
 export function minorGreatPersonClass(state: GameState): boolean {
-  const view = majorView(state);
+  const view = aiView(state);
   return AI_GREAT_PERSON_CLASSES.some((c) => view.greatPersonClassAvailable(c));
 }
 

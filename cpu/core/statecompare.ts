@@ -37,7 +37,7 @@
  * the browser build
 imports this.
  */
-import { AI_GOVERNMENTS } from '../../ai/major/tables';
+import { AI_GOVERNMENTS } from '../data/aiTables';
 import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { installType } from './minorBuild';

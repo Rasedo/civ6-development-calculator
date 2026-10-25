@@ -11,7 +11,6 @@
     - recording: h1_duelv1124
       turn: 40
       value: "A natural wonder row adds its   value to ITS OWN feature once per natural wonder in the database (the loop   over the features indexes the row's feature, [r15+0x14], not the loop's):   FEATURE_DEAD_SE"
-  impl: [ai/major/settle.ts:e]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:
@@ -23,6 +22,5 @@
   final: 0x500800
   kind: function
   status: PARTLY
-  impl: [ai/major/settle.ts:PlotEval]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported

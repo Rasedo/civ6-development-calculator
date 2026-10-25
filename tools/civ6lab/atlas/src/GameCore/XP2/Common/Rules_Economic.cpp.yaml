@@ -37,7 +37,6 @@
   impl:
     - cpu/data/aiValue.ts:AI_POLICY_HORIZON
     - cpu/data/seats.ts:missionPrice
-    - ai/major/congress.ts:CONGRESS_HORIZON
     - cpu/data/seats.ts:CONGRESS_VOTE_PRICE
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
@@ -74,7 +73,6 @@
     - cpu/core/operations/cityValue.ts:MARCH_TURNS
     - cpu/core/operations/nodes.ts:child
     - cpu/core/trade.ts:PLUNDER_ROUTE_TURNS
-    - cpu/data/aiValue.ts:AI_BELIEF_HORIZON
     - cpu/data/aiValue.ts:AI_POLICY_HORIZON
     - cpu/data/barbarians.ts:BarbTribeDef
     - cpu/data/cityStates.ts:LEVY_TURNS
@@ -226,9 +224,6 @@
     - cpu/data/seats.ts:DELEGATION_COST
     - cpu/data/seats.ts:EMBASSY_COST
     - cpu/data/seats.ts:missionPrice
-    - ai/major/diploActions.ts:price
-    - ai/major/diploActions.ts:DesireInputs
-    - ai/major/diploState.ts:answerAction
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
@@ -246,10 +241,7 @@
     - recording: h1_duelv1127
       turn: 121
       value: 7 votes cost 84 (85 -> 5 with the turn's +4)
-  impl:
-    - ai/major/congress.ts:voteCost
-    - cpu/core/congress.ts:voteCost
-    - cpu/data/seats.ts:CONGRESS_VOTE_PRICE
+  impl: [cpu/core/congress.ts:voteCost, cpu/data/seats.ts:CONGRESS_VOTE_PRICE]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -354,7 +346,6 @@
     - recording: h1_duelv1127
       turn: 61
       value: 29 favor buys 4 votes
-  impl: [ai/major/congress.ts:votesFor, cpu/core/congress.ts:votesFor]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed

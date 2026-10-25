@@ -99,7 +99,7 @@
   impl:
     - cpu/core/combat.ts:garrisonCS
     - cpu/harness/checks.ts:luxAtRebuild
-    - ai/major/view.ts:cityDefense
+    - cpu/core/aiViewTypes.ts:cityDefense
     - cpu/core/combat.ts:districtGarrisonedStrength
     - cpu/core/tactical.ts:dangerDistricts
     - gpu/core/sim_seats.py:_garrison_cs
@@ -170,7 +170,7 @@
     - cpu/core/combat.ts:districtGarrisonedStrength
     - gpu/core/sim_tactics.py:_danger_districts
     - cpu/core/operations/cityThreat.ts:cityThreat
-    - ai/major/view.ts:cityDefense
+    - cpu/core/aiViewTypes.ts:cityDefense
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -246,7 +246,7 @@
   impl:
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:AiValueView
-    - cpu/core/majorView.ts:districtYieldOf
+    - cpu/core/aiView.ts:districtYieldOf
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:

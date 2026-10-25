@@ -9,7 +9,7 @@
 import { AI_UNITS } from '../../data/aiBuildTables';
 import { AI_UNIT_INDEX } from '../aiCityBuild';
 import { FX } from '../aiValue';
-import type { MajorView } from '../../../ai/major/view';
+import type { AiView } from '../aiViewTypes';
 import type { KnownUnit } from './knowledge';
 
 /** the range a full civ's units threaten from, and a city-state's or the
@@ -98,7 +98,7 @@ function campDefender(type: string): boolean {
  * flag set; runs/h1_duelw1128 Hong Kong t146, its Man-at-Arms garrisoned,
  * stays threatened by China's Trebuchet and Crossbowman, 65 + 40 against
  * 51 + 20, its knowledge base's records as the game's aimem holds them) */
-export function cityThreat(view: MajorView, seat: number, city: number, inp: ThreatInputs): CityThreat {
+export function cityThreat(view: AiView, seat: number, city: number, inp: ThreatInputs): CityThreat {
   const c = view.cityDefense(city);
   let near = false;
   if (!c) return { level: -1, near };

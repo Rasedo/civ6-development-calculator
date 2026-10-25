@@ -190,7 +190,6 @@
   cases:
     - recording: AI_Planning.csv
       value: "- The first turn settler (0x70d250, the player with no city): of the   settler's planning reach (unit +0x1fc0, AI_Planning.csv) the plots of   this turn (turns <= 1), the one whose region list scores "
-  impl: [ai/major/settle.ts:firstTurnSettlePlot]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:

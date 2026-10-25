@@ -17,7 +17,7 @@ import { NO_PLOT, type OpTeam, type Operation } from './operation';
 import { generalizedAssignment } from '../aiAssignment';
 import { holdsUnits, moveTo, opUnits, targetGone, unitsById, xy } from './operation';
 import type { OpsContext } from './nodes';
-import type { MajorAttackTargetView, MajorUnitView, MajorView } from '../../../ai/major/view';
+import type { AiAttackTargetView, AiUnitView, AiView } from '../aiViewTypes';
 
 
 /** a datum's value where the node holds the datum, `absent` where not (the
@@ -36,7 +36,7 @@ const WEIGHED = new Set(['CIVILIAN', 'LOW', 'MEDIUM', 'HIGH', 'COMBAT_DISTRICT',
 const half = (y: number): number => Math.floor(y / 2);
 
 /** the plot at offset coordinates, -1 off the map */
-function plotAt(view: MajorView, x: number, y: number): number {
+function plotAt(view: AiView, x: number, y: number): number {
   const plots = view.plots();
   const hit = plots.find((p) => p.x === x && p.y === y);
   return hit ? hit.index : NO_PLOT;
@@ -48,7 +48,7 @@ const roundf = (v: number): number => Math.fround(Math.sign(v) * Math.round(Math
 /** a float cube position rounded to a plot (0x38070: each component
  *  rounded; where they no longer sum to 0, the one rounded furthest — by the
  *  sum's sign — rebuilt from the other two) */
-function cubePlot(view: MajorView, q: number, y: number, z: number): number {
+function cubePlot(view: AiView, q: number, y: number, z: number): number {
   const f = Math.fround;
   let rq = roundf(q);
   let ry = roundf(y);
@@ -73,7 +73,7 @@ function cubePlot(view: MajorView, q: number, y: number, z: number): number {
  *  units in — the seat's own, no one's, or one whose borders stand open to
  *  it; the rally where none is before it; with no enemy or at war, the
  *  target */
-function marchPoint(view: MajorView, seat: number, op: Operation, t: OpTeam): number {
+function marchPoint(view: AiView, seat: number, op: Operation, t: OpTeam): number {
   const rally = t.goals[0];
   const target = t.goals[1];
   if (op.enemy < 0 || view.atWar(seat, op.enemy)) return target;
@@ -106,7 +106,7 @@ function marchPoint(view: MajorView, seat: number, op: Operation, t: OpTeam): nu
  *  the centre to the average of the targets within twice a member's base
  *  Movement of it (the sums' unsigned quotients) — with the team engaged
  *  where it has such targets */
-export function updateTeam(view: MajorView, seat: number, op: Operation, t: OpTeam, targets: readonly MajorAttackTargetView[]): void {
+export function updateTeam(view: AiView, seat: number, op: Operation, t: OpTeam, targets: readonly AiAttackTargetView[]): void {
   const units = unitsById(view, seat);
   const P = view.plots();
   let n = 0;
@@ -231,12 +231,12 @@ function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], 
   const city = op.target;
   if (city === NO_PLOT) return;
   const units = unitsById(view, ctx.seat);
-  let garrison: MajorUnitView | null = null;
+  let garrison: AiUnitView | null = null;
   let gRanged = 0;
   let gCombat = 0;
   let bestRanged = 0;
   let bestCombat = 0;
-  let pick: MajorUnitView | null = null;
+  let pick: AiUnitView | null = null;
   // the operation's units as the unit evaluator lists them by job
   // (0x6092c0): in the player's unit order, not the teams' (runs/h1_duelw1121
   // Hunza t13: of City Defense's Warriors, recruited 196610 first, the older
@@ -418,8 +418,8 @@ const UNIT_TARGETS = new Set(['CIVILIAN', 'RELIGIOUS', 'TRADER', 'LOW', 'MEDIUM'
  *  target (the axial dot product above 0); else Attack Near Target — targets
  *  of players at war with the seat within 3 + their reach of the target;
  *  else all */
-function pickTargets(node: Parameters<BtHandler<OpsContext>['update']>[0], view: MajorView, seat: number, op: Operation,
-  t: OpTeam, members: readonly MajorUnitView[], targets: readonly MajorAttackTargetView[]): (k: number) => boolean {
+function pickTargets(node: Parameters<BtHandler<OpsContext>['update']>[0], view: AiView, seat: number, op: Operation,
+  t: OpTeam, members: readonly AiUnitView[], targets: readonly AiAttackTargetView[]): (k: number) => boolean {
   const P = view.plots();
   const axial = (p: number): [number, number, number] => {
     const q = P[p].x - half(P[p].y);
@@ -472,7 +472,7 @@ function attackUnitsExecute(node: Parameters<BtHandler<OpsContext>['update']>[0]
     const v = ctx.view();
     const units = unitsById(v, ctx.seat);
     const paired = new Set(op.formations.flat());
-    const members = t.members.map((id) => units.get(id)).filter((u): u is MajorUnitView =>
+    const members = t.members.map((id) => units.get(id)).filter((u): u is AiUnitView =>
       !!u && u.movesLeft > 0 && !paired.has(u.id) && (u.bombard <= 0 || enemyCity));
     const targets = v.attackTargets(ctx.seat);
     const keep = pickTargets(node, v, ctx.seat, op, t, members, targets);
@@ -509,7 +509,7 @@ function attackCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0]
   for (const t of op.teams) {
     const v = ctx.view();
     const units = unitsById(v, ctx.seat);
-    const members = t.members.map((id) => units.get(id)).filter((u): u is MajorUnitView => !!u && u.movesLeft > 0);
+    const members = t.members.map((id) => units.get(id)).filter((u): u is AiUnitView => !!u && u.movesLeft > 0);
     const targets = v.attackTargets(ctx.seat);
     const out = ctx.attack(members.map((u) => u.id),
       (k) => targets[k].type === 'COMBAT_DISTRICT' && v.plotDistance(targets[k].plot, op.target) <= CITY_ATTACK_RANGE, false, true);
@@ -548,12 +548,12 @@ function airAssaultExecute(node: Parameters<BtHandler<OpsContext>['update']>[0],
   const { op } = ctx;
   if (op.target === NO_PLOT) return;
   const v = ctx.view();
-  const bomber = (u: MajorUnitView) => u.domain === 'air' && u.bombard > 0 && u.movesLeft > 0;
+  const bomber = (u: AiUnitView) => u.domain === 'air' && u.bombard > 0 && u.movesLeft > 0;
   const inOps = new Set(ctx.others().flatMap(opUnits));
   const own = op.teams.flatMap((t) => t.members);
   const units = unitsById(v, ctx.seat);
   const bombers = [
-    ...own.map((id) => units.get(id)).filter((u): u is MajorUnitView => !!u && bomber(u)),
+    ...own.map((id) => units.get(id)).filter((u): u is AiUnitView => !!u && bomber(u)),
     ...v.units(ctx.seat).filter((u) => bomber(u) && !inOps.has(u.id) && !own.includes(u.id) && v.plotDistance(u.plot, op.target) <= u.range),
   ];
   if (!bombers.length) return;
@@ -633,7 +633,7 @@ function pillageExecute(node: Parameters<BtHandler<OpsContext>['update']>[0], _r
     const goody = g.type === 'GOODY';
     if (!((improvements && g.type === 'IMPROVEMENT') || (districts && g.type === 'PASSIVE_DISTRICT') || (goodies && goody))) continue;
     if (owner >= 0 && P[g.plot].owner !== owner) continue;
-    let best: MajorUnitView | null = null;
+    let best: AiUnitView | null = null;
     let bestD = 0;
     let spot = NO_PLOT;
     for (const t of op.teams) {
@@ -674,7 +674,7 @@ function pillageExecute(node: Parameters<BtHandler<OpsContext>['update']>[0], _r
  *  river between — the count of units ringing it (+0x10) and its holder */
 interface SiegeSlot { plot: number; sea: boolean; next: boolean; prev: boolean; count: number; holder: number }
 
-function siegeSlots(view: MajorView, city: number): SiegeSlot[] {
+function siegeSlots(view: AiView, city: number): SiegeSlot[] {
   const P = view.plots();
   return [0, 1, 2, 3, 4, 5].map((i) => {
     const plot = view.adjacentPlot(city, i);
@@ -719,7 +719,7 @@ function siegeCityExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0],
     return;
   }
   const slots = siegeSlots(v, target);
-  const units = opUnits(op).map((id) => now(id)).filter((u): u is MajorUnitView => !!u && u.movesLeft > 0 && u.bombard <= 0);
+  const units = opUnits(op).map((id) => now(id)).filter((u): u is AiUnitView => !!u && u.movesLeft > 0 && u.bombard <= 0);
   const reach = units.map((u) => (s: SiegeSlot) => (s.plot >= 0 && (u.domain === 'sea') === s.sea && u.domain !== 'air' ? v.reachOf(u.id, s.plot) : null));
   const zoc = units.map((u) => v.exertsZoc(u.id));
   const ring = (j: number, d: number) => {
@@ -801,7 +801,7 @@ const SIEGE_PASSES = 3;
 
 /** a unit onto a plot (UNITOPERATION_MOVE_TO): a blow where a hostile unit
  *  or city stands there, else the move */
-function moveOnto(ctx: OpsContext, u: MajorUnitView, plot: number): void {
+function moveOnto(ctx: OpsContext, u: AiUnitView, plot: number): void {
   const v = ctx.view();
   const hostile = v.hostileUnits(ctx.seat).some((h) => h.plot === plot) || v.hostileCities(ctx.seat).some((c) => c.plot === plot);
   if (hostile) ctx.strike(u.id, plot);
@@ -824,7 +824,7 @@ function moveOnto(ctx: OpsContext, u: MajorUnitView, plot: number): void {
 function operationAttackExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], _run: unknown, ctx: OpsContext): void {
   const { op } = ctx;
   const now = (id: number) => ctx.view().units(ctx.seat).find((x) => x.id === id);
-  const line = (kind: string, u: MajorUnitView, at: number, rest = '') =>
+  const line = (kind: string, u: AiUnitView, at: number, rest = '') =>
     ctx.log(`${op.def}, ${kind}, ${u.type}, At ${xy(ctx.view(), at)}${rest}`);
   for (const t of op.teams) {
     const target = t.goals[1];

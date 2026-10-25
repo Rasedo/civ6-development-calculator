@@ -11,7 +11,6 @@
     - recording: h1_duelw1117
       turn: 205
       value: Merchant Handan 46 -> Xiurong 69 outgains the Resource Manager's 20, which takes Chengdu (the log's two assignments)
-  impl: [ai/major/governors.ts:assignmentSlots, ai/major/governors.ts:governorAssignment]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -37,7 +36,6 @@
     - recording: h1_duelw1117
       turn: 23
       value: China appoints the Ambassador at its 112 over the Educator's 59; t52 / t57 the Educator's Connoisseur / Researcher; t84 the Defender
-  impl: [ai/major/governors.ts:governorChoice, ai/major/governors.ts:governorTurn]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -53,7 +51,6 @@
     - recording: h1_duelw1117
       turn: 2
       value: Defender, Cardinal, Builder, Resource Manager 20 on the capital, Ibrahim 0 (not open to China)
-  impl: [ai/major/governors.ts:GOVERNOR_HORIZON, ai/major/governors.ts:governorAnalysis]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -69,10 +66,6 @@
     - recording: h1_duelw1117
       turn: 24
       value: Messenger 112 once Amani sits at Caguana, 10 before
-  impl:
-    - ai/major/governors.ts:GOVERNOR_HORIZON
-    - ai/major/governors.ts:PROMOTION_START
-    - ai/major/governors.ts:promotionScore
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -88,7 +81,6 @@
     - recording: h1_duelw1117
       turn: 2
       value: every governor's analysis and every promotion's score of the turn
-  impl: [ai/major/governors.ts:governorScores]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -138,7 +130,6 @@
     - recording: h1_duelw1117
       turn: 1
       value: each governor's best slot value and its promotions' scores, player 0's block written twice
-  impl: [ai/major/governors.ts:governorLogLine, cpu/harness/governorAi.ts:readScores]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -152,7 +143,6 @@
     - recording: h1_duelw1124
       turn: 55
       value: an unmet city-state's slot reads -1
-  impl: [ai/major/governors.ts:governorAssignment]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:

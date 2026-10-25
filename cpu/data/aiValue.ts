@@ -24,15 +24,6 @@ export const AI_POLICY_HORIZON = srcConst('aiValue.policyHorizon', 25, {
   derived: '50 x the online CostMultiplier / 100 (0x6dd9a0 -> 0x5254d0); at the 4 percent discount the city-states\' Urban Planning 14 and God King 21 are their weight-0 values (AI_GovtPolicies.csv, 29 duels)',
   inputs: [xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CostMultiplier')],
 });
-
-/** The horizon a belief's value runs to (the belief scores 0x7500d0 pass
- *  `m_valueHorizons`[2]): the filler 0x6dd9a0 writes speed(200) there, 200 x
- *  the speed's CostMultiplier / 100 — 100 at the online speed. */
-export const AI_BELIEF_HORIZON = srcConst('aiValue.beliefHorizon', 100, {
-  derived: '200 x the online CostMultiplier / 100 (0x6dd9a0 -> 0x5254d0); Choral Music 75 and Feed the World 68 on one city at 4 percent (AI_Religious.csv, runs/h1_duelv1124 t2)',
-  inputs: [xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CostMultiplier')],
-});
-
 /** The discount the value's present value runs at, in percent per turn: the
  *  GlobalAI's +0x290 (its initializer 0x6ddb40..0x6ddba3), AI_DISCOUNT_RATE
  *  through the speed's multiplier (0x525590: x 100 / CostMultiplier) —

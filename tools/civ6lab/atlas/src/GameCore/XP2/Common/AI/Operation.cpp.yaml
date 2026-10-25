@@ -193,10 +193,7 @@
   kind: function
   name: an operation ready
   status: PARTLY
-  impl:
-    - cpu/core/operations/manager.ts:warOperationReady
-    - cpu/core/operations/nodes.ts:paired
-    - cpu/core/tactical.ts:passMoveExec
+  impl: [cpu/core/operations/nodes.ts:paired, cpu/core/tactical.ts:passMoveExec]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"

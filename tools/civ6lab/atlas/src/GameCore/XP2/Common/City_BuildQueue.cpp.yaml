@@ -38,7 +38,7 @@
     - recording: 1108
       turn: 95
       value: "A city   yield's one modifier (0xaa740) truncates toward zero: 1108 Xi'an t95, 16   Production at −10% reads 14.40234375 (floor would read 14.3984375)."
-  impl: [ai/major/congress.ts:over, cpu/core/aiModifiers.ts:ANALYZERS]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "H-1: the citizen pressure term — PARTLY READ"
     - "C-94: the growth modifier — READ (the accumulator's writer unread)"
@@ -212,6 +212,15 @@
   readings:
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
+- addr: 0x175730
+  final: 0xfb520
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  context:
+    - "- A UNIT A CITY MAKES (READ): the train order (0x175730, \"pFront->eDirective == ORDER_TRAIN\") makes each unit through the city's create 0x1e657..."
+  review: imported
 - addr: 0x175d10
   final: 0xfb9b0
   kind: function
@@ -440,10 +449,9 @@
       value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
   impl:
     - cpu/core/aiContracts.ts:ContractCity
-    - cpu/core/majorView.ts:prod
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:AiValueView
-    - cpu/core/majorCityBuild.ts:majorItemTurns
+    - cpu/core/freeCityBuild.ts:majorItemTurns
     - cpu/core/minorBuild.ts:minorItemTurns
     - gpu/core/sim_cityvalue.py:item_turns
     - cpu/core/minorBuild.ts:minorItemTurns

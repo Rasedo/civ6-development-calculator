@@ -10,9 +10,7 @@
  * (each share the change x the weight's fraction of the total, the fraction
  * truncated to 1/256), a slot below 0 cleared, the PLOTS slot held at 150
  * with the excess to the SLUSH_FUND, and with no Great Person class
- * available (0x2f7eb0) the GREAT_PEOPLE slot joined to the SLUSH_FUND; a
- * major's turn closes on the Gold patronage (`goldPatronage`,
- * ai/major/greatPeople.ts). A spend (0x68acd0) takes its slot, the
+ * available (0x2f7eb0) the GREAT_PEOPLE slot joined to the SLUSH_FUND. A spend (0x68acd0) takes its slot, the
  * overflow from slot 0, and lowers the balance; the can-afford (0x6874d0)
  * asks the slot for the price x (1 - frac) and slot 0 + the slot for the
  * price.
@@ -67,12 +65,6 @@ export function savingsTurn(e: EconomicMemory, treasury: number, classAvailable:
     e.savings[SLOT_GREAT_PEOPLE] = 0;
   }
   e.balance = treasury;
-}
-
-/** the can-afford (0x6874d0): the slot holds amount x (1 - frac), slot 0 and
- *  the slot together the amount */
-export function canAfford(e: EconomicMemory, amount: number, slot: number, frac: number): boolean {
-  return e.savings[slot] >= amount - Math.trunc(amount * frac) && e.savings[SLOT_SLUSH] + e.savings[slot] >= amount;
 }
 
 /** a spend (0x68acd0): the overflow from slot 0, the slot no lower than 0,

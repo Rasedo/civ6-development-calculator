@@ -12,10 +12,10 @@
     - recording: h1_duelw1124
       value: "A player   reads, as its last turn start before its own activation left them, this   turn's values for the players up to itself and last turn's for the   players after it (runs/h1_duelw1124: Rome, fir"
   impl:
-    - cpu/core/majorView.ts:militaryStrength
-    - ai/major/view.ts:MajorView
+    - cpu/core/aiView.ts:militaryStrength
+    - cpu/core/aiViewTypes.ts:AiView
     - cpu/core/aiValue.ts:AiValueView
-    - cpu/core/majorView.ts:storeUnitStrength
+    - cpu/core/aiView.ts:storeUnitStrength
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-95: the danger map and Move to Safety — READ, ported"
@@ -26,7 +26,6 @@
 - addr: 0x4bc720
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:militaryStrengths]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x4bca20
@@ -88,8 +87,8 @@
   impl:
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiValue.ts:AiValueView
-    - cpu/core/majorView.ts:domainStrength
-    - cpu/core/majorView.ts:storeUnitStrength
+    - cpu/core/aiView.ts:domainStrength
+    - cpu/core/aiView.ts:storeUnitStrength
     - cpu/core/types.ts:Seat
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
@@ -182,7 +181,6 @@
   final: 0x5147d0
   kind: function
   status: PARTLY
-  impl: [ai/major/warValue.ts:KNOWN_WMD]
   readings:
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]

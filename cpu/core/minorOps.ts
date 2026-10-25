@@ -24,7 +24,7 @@
 import type { ArmyRecord, CityState, GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
-import { majorView } from './majorView';
+import { aiView } from './aiView';
 import { cityStateTactics, moveTo, passFinish, plotDistance, type Pass } from './tactical';
 import { ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
@@ -45,7 +45,7 @@ import { AI_MINOR_TRIGGERS, AI_TRIGGERED_TREES } from '../data/aiOperations';
 import { cityStateSight } from './fog';
 import type { ContractCity } from './aiContracts';
 import type { UnitProductionRow } from './aiUnitProduction';
-import type { MajorUnitView, MajorView } from '../../ai/major/view';
+import type { AiUnitView, AiView } from './aiViewTypes';
 
 /** the definitions a city-state runs */
 export const MINOR_OP_DEFS: readonly string[] = ['Attack Barb Camp', 'Barb Camp Tech Boost', 'Civilian Builder Capture', 'City Defense',
@@ -60,14 +60,14 @@ export function traceMinorOps(fn: ((seat: number, line: string, candidate: boole
 
 /** the minor's view: its units in its pool's order; in its tactical pass,
  *  the pass's target list, planning reaches, spots and blows (`passView`) */
-function minorView(state: GameState, cs: CityState, pass: Pass | null): MajorView {
-  const base = majorView(state);
-  const own = (): MajorUnitView[] => {
+function minorView(state: GameState, cs: CityState, pass: Pass | null): AiView {
+  const base = aiView(state);
+  const own = (): AiUnitView[] => {
     const ids = state.units.filter((u) => u.seat === cs.seat).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0)).map((u) => u.id);
     const byId = new Map(base.units(cs.seat).map((u) => [u.id, u]));
     return ids.map((id) => byId.get(id)!).filter(Boolean);
   };
-  const v: MajorView = { ...base, units: (i) => (i === cs.seat ? own() : base.units(i)) };
+  const v: AiView = { ...base, units: (i) => (i === cs.seat ? own() : base.units(i)) };
   return pass ? passView(state, cs.seat, pass, v) : v;
 }
 
@@ -105,7 +105,7 @@ export function minorCampsLook(state: GameState, cs: CityState): void {
 
 function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
   const ai = (cs.cityAi ??= newCityAi());
-  let view: MajorView | null = null;
+  let view: AiView | null = null;
   const fresh = () => (view ??= minorView(state, cs, pass));
   const changed = () => {
     view = null;
@@ -319,4 +319,4 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
 }
 
 /** a minor's unit as the operations see it (the team's join) */
-export const minorUnitView = (u: Unit): Pick<MajorUnitView, 'id' | 'type'> => ({ id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_') });
+export const minorUnitView = (u: Unit): Pick<AiUnitView, 'id' | 'type'> => ({ id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_') });

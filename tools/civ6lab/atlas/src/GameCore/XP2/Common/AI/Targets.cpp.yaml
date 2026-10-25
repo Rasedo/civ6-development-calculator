@@ -40,7 +40,7 @@
   impl:
     - cpu/core/tactical.ts:tacticalTargets
     - cpu/core/tactical.ts:pillage
-    - ai/major/view.ts:MajorAttackTargetView
+    - cpu/core/aiViewTypes.ts:AiAttackTargetView
     - cpu/core/tactical.ts:Pass
     - cpu/core/tactical.ts:seenRegions
     - gpu/core/sim_tactics.py:_tac_seen_regions
@@ -221,7 +221,6 @@
   impl:
     - cpu/core/fog.ts:cityStateSight
     - cpu/core/minorBuild.ts:minorKnowledge
-    - cpu/core/operations/knowledge.ts:lookArmy
     - cpu/core/operations/knowledge.ts:lookCamps
     - cpu/core/tactical.ts:knowledgeLook
     - cpu/core/operations/knowledge.ts:lookCamps

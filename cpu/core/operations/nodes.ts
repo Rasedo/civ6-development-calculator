@@ -22,7 +22,7 @@ import { armyStrength } from './evaluate';
 import type { KnownUnit } from './knowledge';
 import { ASSAULT_NODES, attackUnitsExecute, operationAttackExecute, updateTeam } from './assault';
 import { BARBARIAN_NODES, type BarbarianHooks } from './barbarian';
-import type { MajorAttackView, MajorUnitView, MajorView } from '../../../ai/major/view';
+import type { AiAttackView, AiUnitView, AiView } from '../aiViewTypes';
 import type { MoveStore } from '../tactical';
 import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, buildUnitNode, contractManagerNode, submitContract,
   treeContractOf, type AiContract, type ContractNodeWorld } from '../aiContracts';
@@ -58,7 +58,7 @@ export interface OpsContext {
   seat: number;
   turn: number;
   /** the view as the actions so far left the game */
-  view(): MajorView;
+  view(): AiView;
   /** carry out the seat's unit action rows now */
   act(rows: number[][]): void;
   /** the unit's move to the plot as far as its Movement carries it this
@@ -71,7 +71,7 @@ export interface OpsContext {
    *  seat's tactical targets `keep` picks — `even` refusing a losing
    *  exchange, `survive` a blow that kills the unit — carried out
    *  (0x771f80); the assignments */
-  attack(ids: readonly number[], keep: (k: number) => boolean, even: boolean, survive: boolean): readonly MajorAttackView[];
+  attack(ids: readonly number[], keep: (k: number) => boolean, even: boolean, survive: boolean): readonly AiAttackView[];
   /** OPERATION MOVE's update for a team (0x81a130): its members, the node's
    *  store for it, the goal, whether the goal is the target, Range to goal
    *  and Unit distance — its status, arrived, the store kept, and win: the
@@ -305,7 +305,7 @@ const recruitUnits: BtHandler<OpsContext> = {
     const offer = view.units(ctx.seat).filter((u) => !busy.has(u.id));
     recruitOperation(view, ctx.seat, op, offer, inProgress, range, units, (l) => ctx.log(l));
     const lower = ctx.others().filter((o) => o !== op && !o.locked && opDef(o).priority < opDef(op).priority);
-    const freed = lower.flatMap(opUnits).map((id) => units.get(id)).filter((u): u is MajorUnitView => !!u);
+    const freed = lower.flatMap(opUnits).map((id) => units.get(id)).filter((u): u is AiUnitView => !!u);
     if (freed.length) {
       const taken = recruitOperation(view, ctx.seat, op, [...freed], inProgress, range, units, (l) => ctx.log(l));
       for (const u of taken) {
@@ -403,7 +403,7 @@ export function refreshStrengths(ctx: OpsContext): void {
   op.strength = total;
 }
 
-function enemyStrengthAbout(ctx: OpsContext, view: MajorView): number {
+function enemyStrengthAbout(ctx: OpsContext, view: AiView): number {
   const { op } = ctx;
   const barb = view.barbarianSeat();
   const counts = (p: number): boolean => p !== ctx.seat && (p === op.enemy || (op.enemy < 0 && (view.atWar(ctx.seat, p) || p === barb || ctx.seat === barb)));
@@ -500,7 +500,7 @@ const lockUnits: BtHandler<OpsContext> = {
  *  Combat Unit type that fight, the one whose planning reaches the
  *  civilian's plot in the fewest turns (then the least Movement spent, the
  *  first of equals); they meet on the civilian's plot */
-function planFormations(view: MajorView, seat: number, op: Operation, civ: string, combat: string): { pairs: [number, number, number][]; near: boolean } {
+function planFormations(view: AiView, seat: number, op: Operation, civ: string, combat: string): { pairs: [number, number, number][]; near: boolean } {
   const units = unitsById(view, seat);
   const paired = new Set(op.formations.flat());
   const pairs: [number, number, number][] = [];

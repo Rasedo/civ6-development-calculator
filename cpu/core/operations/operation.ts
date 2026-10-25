@@ -13,7 +13,7 @@
 import { AI_OP_DEFS, AI_OP_TEAMS, AI_TEAM_REQS, AI_UNIT_AI } from '../../data/aiOperations';
 import type { AiOpDef, AiOpTeam, AiTeamReq } from './types';
 import type { BtMemory } from '../behaviorTree';
-import type { MajorUnitView, MajorView } from '../../../ai/major/view';
+import type { AiUnitView, AiView } from '../aiViewTypes';
 import type { OpsContext } from './nodes';
 
 export const NO_PLOT = -1;
@@ -100,7 +100,7 @@ export const teamReqs = (t: OpTeam): readonly AiTeamReq[] => AI_TEAM_REQS[t.team
 export const unitAiTypes = (unitType: string): readonly string[] => AI_UNIT_AI[unitType] ?? [];
 export const hasAiType = (unitType: string, ai: string): boolean => unitAiTypes(unitType).includes(ai);
 
-export function newTeams(def: AiOpDef, view: MajorView, target: number): OpTeam[] {
+export function newTeams(def: AiOpDef, view: AiView, target: number): OpTeam[] {
   return (AI_OP_TEAMS[def.name] ?? []).filter((t) => teamApplies(t, view, target)).map((t) => {
     const reqs = AI_TEAM_REQS[t.team] ?? [];
     return { team: t.team, members: [], counts: reqs.map(() => 0), goals: [NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT], engaged: false,
@@ -109,7 +109,7 @@ export function newTeams(def: AiOpDef, view: MajorView, target: number): OpTeam[
 }
 
 /** a team's Condition: IsCoastalTarget, the target beside water */
-function teamApplies(t: AiOpTeam, view: MajorView, target: number): boolean {
+function teamApplies(t: AiOpTeam, view: AiView, target: number): boolean {
   if (!t.condition) return true;
   if (t.condition === 'IsCoastalTarget') return target >= 0 && view.plotsWithin(target, 1).some((p) => view.plots()[p].water);
   return false;
@@ -117,17 +117,17 @@ function teamApplies(t: AiOpTeam, view: MajorView, target: number): boolean {
 
 /** a unit's strength as a team member (0x73fba0): the larger of its combat
  *  and ranged strengths, less a tenth of its damage */
-export function memberStrength(u: MajorUnitView): number {
+export function memberStrength(u: AiUnitView): number {
   return Math.max(u.combat, u.ranged) - Math.trunc(u.damage * 0.1);
 }
 
 /** a unit's strength as the recruits weigh it (0x73c7c0): the larger of its
  *  combat and ranged strengths */
-export const unitStrength = (u: MajorUnitView): number => Math.max(u.combat, u.ranged);
+export const unitStrength = (u: AiUnitView): number => Math.max(u.combat, u.ranged);
 
 /** add a unit to a team (0x737f90): its id joins the members, each
  *  requirement it meets counts it */
-export function addMember(team: OpTeam, u: Pick<MajorUnitView, 'id' | 'type'>): void {
+export function addMember(team: OpTeam, u: Pick<AiUnitView, 'id' | 'type'>): void {
   if (team.members.includes(u.id)) return;
   team.members.push(u.id);
   team.joined++;
@@ -172,14 +172,14 @@ export function targetGone(ctx: OpsContext, op: Operation): boolean {
 
 /** a unit's move to a plot (the seat's move order, as far as its Movement
  *  carries it this turn), its formation's other unit with it */
-export function moveTo(ctx: OpsContext, u: MajorUnitView, dest: number): void {
+export function moveTo(ctx: OpsContext, u: AiUnitView, dest: number): void {
   if (u.plot === dest || u.movesLeft <= 0) return;
   const pair = ctx.op.formations.find((f) => f.includes(u.id));
   ctx.move(u.id, dest, pair ? (pair[0] === u.id ? pair[1] : pair[0]) : -1);
 }
 
 /** a plot as the operation logs write it, x:y (-9999:-9999 for none) */
-export const xy = (view: MajorView, p: number): string => (p < 0 ? '-9999:-9999' : `${view.plots()[p].x}:${view.plots()[p].y}`);
+export const xy = (view: AiView, p: number): string => (p < 0 ? '-9999:-9999' : `${view.plots()[p].x}:${view.plots()[p].y}`);
 
 /** the seat's units by id */
-export const unitsById = (view: MajorView, seat: number): Map<number, MajorUnitView> => new Map(view.units(seat).map((u) => [u.id, u]));
+export const unitsById = (view: AiView, seat: number): Map<number, AiUnitView> => new Map(view.units(seat).map((u) => [u.id, u]));

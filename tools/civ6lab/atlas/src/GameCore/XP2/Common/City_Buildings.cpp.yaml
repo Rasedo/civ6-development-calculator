@@ -59,7 +59,7 @@
   final: 0x10c3f0
   kind: function
   status: PARTLY
-  impl: [ai/major/view.ts:cityDefense]
+  impl: [cpu/core/aiViewTypes.ts:cityDefense]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - ...count, 0x197ff0's array), +2 for a capital (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), population / 5 + 1, +2 at war (0x3dcf50), the city's CityBuildAI +0x1b8 where above -...

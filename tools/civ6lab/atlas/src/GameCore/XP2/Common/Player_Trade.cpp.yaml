@@ -24,8 +24,8 @@
       turn: 18
       value: China's 20 (its starting Warrior)
   impl:
-    - ai/major/view.ts:MajorView
-    - cpu/core/majorView.ts:majorView
+    - cpu/core/aiViewTypes.ts:AiView
+    - cpu/core/aiView.ts:aiView
     - cpu/core/aiDistrictValue.ts:riverPlots
     - cpu/core/aiCityBuild.ts:unitValue
     - cpu/core/aiValue.ts:AiValueView

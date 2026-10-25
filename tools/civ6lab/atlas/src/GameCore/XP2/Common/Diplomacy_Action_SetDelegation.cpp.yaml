@@ -9,10 +9,7 @@
   cases:
     - recording: h1_duelv1127
       value: "Confirmed on every answer   of the five verbose duels (20 / 20): accepted exactly where the   receiver's own logged cost of the action toward the sender is <= 0 —   every refusal in Unfriendly (Cost 7"
-  impl:
-    - cpu/core/deals.ts:missionPayable
-    - gpu/core/sim_deals.py:_mission_ok
-    - ai/major/diploState.ts:answerAction
+  impl: [cpu/core/deals.ts:missionPayable, gpu/core/sim_deals.py:_mission_ok]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"

@@ -74,7 +74,7 @@
     - recording: h1_duelw1118
       turn: 33
       value: runs/h1_duelw1118 t33 (Armagh's two), t66, t113, t148 (Kumasi's two before China's seven cities).
-  impl: [ai/major/view.ts:MajorView]
+  impl: [cpu/core/aiViewTypes.ts:AiView]
   readings: ["H-1: the envoy annex — READ (settles the extra border picks)"]
   context:
     - ...ation level CanAnnexTilesWithReceivedInfluence (+0x28 bit 4), with E the envoys it holds (0x44c4b0, every giver) and A its annexed count past its starting tiles (+0xc less 0x1ab460, Starti...
@@ -104,7 +104,7 @@
   impl:
     - cpu/core/aiModifiers.ts:EVALUATORS
     - cpu/core/aiValue.ts:AiValueView
-    - cpu/core/majorView.ts:centres
+    - cpu/core/aiView.ts:centres
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
@@ -118,7 +118,7 @@
     - recording: h1_duelw1117
       turn: 20
       value: "The   suzerain requirements are not in the registry, so a suzerain bonus's set   keeps its peace term alone (runs/h1_duelw1117 t20..t27: Caguana 112 for two   envoys, t28 186 with Amani's two counted)"
-  impl: [cpu/core/majorView.ts:centres]
+  impl: [cpu/core/aiView.ts:centres]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:

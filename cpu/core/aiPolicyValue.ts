@@ -4,15 +4,51 @@
  * its value (0x7b26b0), the best card per slot type (0x620110) and a
  * government's value (0x7b0330), on any party's view (a city-state's one
  * city its capital, its civilization level barring great people and
- * Influence); the majors' policy choice (`ai/major/policies.ts`) and a
- * minor's civics AI turn (`governmentValues`, read by `civicValue`) take them.
+ * Influence); a minor's civics AI turn (`governmentValues`, read by
+ * `civicValue`) takes them. The install rows they read (cpu/data/aiTables.ts)
+ * are the game's database's: type names, not the engine's ids.
  */
-import { AI_GOVERNMENTS, AI_POLICIES, AI_SLOT_TYPES } from '../../ai/major/tables';
-import type { AiPolicy } from '../../ai/major/types';
-import type { MajorView } from '../../ai/major/view';
+import { AI_GOVERNMENTS, AI_POLICIES, AI_SLOT_TYPES } from '../data/aiTables';
+import type { AiModifier } from './aiModifiers';
+import type { AiView } from './aiViewTypes';
 import { AI_POLICY_HORIZON, AI_VALUE_HORIZON } from '../data/aiValue';
 import { AI_RATE, FX_MIN, fdiv, presentValue, pseudoYieldValue } from './aiValue';
 import { modifiersValue, type ValueTerms } from './aiModifiers';
+
+export interface AiPolicy {
+  type: string;
+  slot: string;
+  civic: string | null;
+  darkAge: boolean;
+  goldenAge: boolean;
+  /** Policies_XP1's game era bounds as indices into the Eras in their
+   *  ChronologyIndex order, -1 for none */
+  minEra: number;
+  maxEra: number;
+  /** Policy_GovernmentExclusives_XP2: the one government that may slot it */
+  government: string | null;
+  /** ObsoletePolicies: the card that obsoletes it, the great person class it
+   *  needs available */
+  obsolete: readonly { policy: string | null; gpClass: string | null }[];
+  modifiers: readonly AiModifier[];
+}
+
+export interface AiGovernment {
+  type: string;
+  civic: string | null;
+  slots: readonly { slot: string; n: number }[];
+  favor: number;
+  /** InfluencePointsThreshold: the Influence points a token costs in it, at
+   *  Standard speed */
+  influenceThreshold: number;
+  modifiers: readonly AiModifier[];
+}
+
+export interface AiSlotType {
+  type: string;
+  /** AllowsAnyPolicy: the Wildcard */
+  any: boolean;
+}
 
 /** a job that never ran, or whose card the player cannot reach: -1.0 */
 export const NO_SCORE = -256;
@@ -29,7 +65,7 @@ export const SLOT_ANY = new Map(AI_SLOT_TYPES.map((s) => [s.type, s.any] as cons
  *  player cannot earn the great person class it needs (0x2f1ed0: its
  *  civilization level's CanEarnGreatPeople, 0x43a980 — a city-state's and the
  *  Free Cities' levels lack it — or the class is spent) */
-export function policyObsolete(view: MajorView, seat: number, p: AiPolicy): boolean {
+export function policyObsolete(view: AiView, seat: number, p: AiPolicy): boolean {
   const held = view.civicsHeld(seat);
   for (const o of p.obsolete) {
     if (o.policy) {
@@ -41,7 +77,7 @@ export function policyObsolete(view: MajorView, seat: number, p: AiPolicy): bool
   return false;
 }
 
-function terms(view: MajorView, seat: number, horizon: number): ValueTerms {
+function terms(view: AiView, seat: number, horizon: number): ValueTerms {
   return { view, seat, start: 0, horizon, rate: AI_RATE };
 }
 
@@ -53,7 +89,7 @@ function terms(view: MajorView, seat: number, horizon: number): ValueTerms {
  * for an obsolete card; 250 for a Dark Age card in a Dark Age or a Golden Age
  * card in a Golden Age; plus its modifiers' sum.
  */
-export function policyScore(view: MajorView, seat: number, p: AiPolicy): number {
+export function policyScore(view: AiView, seat: number, p: AiPolicy): number {
   if (!p.darkAge) {
     if (!p.civic) return NO_SCORE;
     if (!view.civicsHeld(seat).has(p.civic) && !view.civicList(seat).has(p.civic)) return NO_SCORE;
@@ -69,7 +105,7 @@ export function policyScore(view: MajorView, seat: number, p: AiPolicy): number 
 }
 
 /** every policy's score, in database order (the AI turn's policy jobs) */
-export function policyScores(view: MajorView, seat: number): PolicyScores {
+export function policyScores(view: AiView, seat: number): PolicyScores {
   return new Map(AI_POLICIES.map((p) => [p.type, policyScore(view, seat, p)] as const));
 }
 
@@ -109,7 +145,7 @@ export function slotTypeBest(scores: PolicyScores): ReadonlyMap<string, number> 
  * PSEUDOYIELD_DIPLOMATIC_FAVOR from the start to the horizon, plus its
  * modifiers' sum.
  */
-export function governmentValue(view: MajorView, seat: number, gov: string, best: ReadonlyMap<string, number>,
+export function governmentValue(view: AiView, seat: number, gov: string, best: ReadonlyMap<string, number>,
                                 horizon: number): number {
   const t = terms(view, seat, horizon);
   if (t.start >= t.horizon) return FX_MIN;
@@ -136,7 +172,7 @@ export function governmentValue(view: MajorView, seat: number, gov: string, best
  *  +0xb38 [gov] = 0x7b0330(gov, the rate, start 0, valueHorizons[1])): every
  *  government's value on the best card per slot type of the seat's policy
  *  scores, by GOVERNMENT_ type */
-export function governmentValues(view: MajorView, seat: number, scores: PolicyScores = policyScores(view, seat)): Record<string, number> {
+export function governmentValues(view: AiView, seat: number, scores: PolicyScores = policyScores(view, seat)): Record<string, number> {
   const best = slotTypeBest(scores);
   return Object.fromEntries(AI_GOVERNMENTS.map((g) => [g.type, governmentValue(view, seat, g.type, best, AI_VALUE_HORIZON)]));
 }

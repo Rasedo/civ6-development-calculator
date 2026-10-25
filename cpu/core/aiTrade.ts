@@ -29,7 +29,7 @@
  * order.
  */
 import { fxOf, yieldValue } from './aiValue';
-import { majorView } from './majorView';
+import { aiView } from './aiView';
 import { civsAtWar } from './seats';
 import { minorRouteOriginYields } from './trade';
 import { routeInRange } from './tradePath';
@@ -83,7 +83,7 @@ const ROUTE_YIELDS: readonly [keyof Yields, string][] = [
 /** 0x5e9b20: the minor's route value K (raw, `CityState.tradeValue`) */
 export function minorTradeValue(state: GameState, cs: CityState): void {
   const listed = new Set(cs.tradeCities ?? []);
-  const view = majorView(state);
+  const view = aiView(state);
   let best = 0;
   for (const k of knownTradeCities(state, cs)) {
     if (!listed.has(k.centre) || civsAtWar(state, cs.seat, k.holder)) continue;

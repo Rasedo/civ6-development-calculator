@@ -13,7 +13,7 @@
  */
 import { FX, fdiv, fmul, fxConst, pseudoYieldValue, yieldValue } from '../aiValue';
 import { LOYALTY_PRESS_MAX_LOYALTY } from '../../data/seats';
-import type { MajorKnownCityView, MajorView } from '../../../ai/major/view';
+import type { AiKnownCityView, AiView } from '../aiViewTypes';
 import { armyStrength, type ArmyUnit } from './evaluate';
 
 /** the turns of the 25 the march term scales by (0x5254d0(0x19): x the game
@@ -28,7 +28,7 @@ const WAR_RECORD_TERM = 0;
  *  `all`, per district its walls' strength (the strongest district's, + 10)
  *  where its walls stand, else its defense; without, the strongest of each
  *  district's defense - 10 and its walls */
-export function cityDefense(k: MajorKnownCityView, all: boolean): number {
+export function cityDefense(k: AiKnownCityView, all: boolean): number {
   let top = 0;
   for (const d of k.districts) top = Math.max(top, d.defense - 10, d.walls);
   if (!all) return top;
@@ -48,7 +48,7 @@ function axialDistance(ax: number, ay: number, bx: number, by: number): number {
 }
 
 /** 0x7a0ac0: the city's worth to the seat */
-export function cityWorth(view: MajorView, seat: number, k: MajorKnownCityView): number {
+export function cityWorth(view: AiView, seat: number, k: AiKnownCityView): number {
   const py = (amount: number, pseudo: string) => pseudoYieldValue(view, seat, amount, pseudo);
   let w = py(Math.trunc(k.population / 5) * FX, 'PSEUDOYIELD_CITY_POPULATION');
   w += py(FX, 'PSEUDOYIELD_CITY_BASE');
@@ -71,7 +71,7 @@ export function cityWorth(view: MajorView, seat: number, k: MajorKnownCityView):
 
 /** 0x79fef0: the value of the known city to the seat (24.8), 0 where the
  *  knowledge base lacks it */
-export function cityValue(view: MajorView, seat: number, k: MajorKnownCityView, cities: readonly MajorKnownCityView[],
+export function cityValue(view: AiView, seat: number, k: AiKnownCityView, cities: readonly AiKnownCityView[],
   army: (player: number) => readonly ArmyUnit[]): number {
   const plots = view.plots();
   const owner = k.owner;

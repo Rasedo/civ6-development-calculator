@@ -42,7 +42,7 @@ import type { KnownUnit } from './knowledge';
 import type { AiOpDef, OpsSettle } from './types';
 import type { BarbarianHooks } from './barbarian';
 import type { UnitProductionRow } from '../aiUnitProduction';
-import type { MajorAttackView, MajorKnownCityView, MajorUnitView, MajorView } from '../../../ai/major/view';
+import type { AiAttackView, AiKnownCityView, AiUnitView, AiView } from '../aiViewTypes';
 
 export interface OpsAi {
   seat: number;
@@ -71,7 +71,7 @@ export interface OpsEnv {
   /** the units those trees hold, out of the operations' offers */
   held?: () => readonly number[];
   /** the view as the actions so far left the game */
-  view(): MajorView;
+  view(): AiView;
   /** the definitions the seat runs (null: its leader's list, `allowedOps`) */
   defs: readonly string[] | null;
   /** the knowledge base: a player's army records (the seat's own, where its
@@ -79,7 +79,7 @@ export interface OpsEnv {
    *  records as the turn before left them */
   army(player: number): readonly KnownUnit[];
   camps(): readonly number[];
-  known(): readonly MajorKnownCityView[];
+  known(): readonly AiKnownCityView[];
   /** a city's threat by its plot (CityBuildAI +0x1b8), -1 none */
   threat(plot: number): number;
   /** the seat's contract book, its next contract's id, its cities as the
@@ -100,7 +100,7 @@ export interface OpsEnv {
   act(rows: number[][]): void;
   move(id: number, dest: number, mate: number): void;
   strike(id: number, plot: number): void;
-  attack(ids: readonly number[], keep: (k: number) => boolean, even: boolean, survive: boolean): readonly MajorAttackView[];
+  attack(ids: readonly number[], keep: (k: number) => boolean, even: boolean, survive: boolean): readonly AiAttackView[];
   /** Operation Move's update and execution for a team (`OpsContext`) */
   moveUpdate: OpsContext['moveUpdate'];
   moveExec: OpsContext['moveExec'];
@@ -122,62 +122,6 @@ export interface OpsEnv {
 }
 
 export const newOpsAi = (seat: number): OpsAi => ({ seat, slots: [], free: [], prepareForWar: [], diplomacy: [], pick: null });
-
-/** PrepareForWarWith (0x724f30): the seat prepares for war with the player,
- *  or no longer */
-export function prepareForWarWith(ai: OpsAi, player: number, on: boolean): void {
-  ai.prepareForWar = ai.prepareForWar.filter((p) => p !== player);
-  if (on) ai.prepareForWar.push(player);
-}
-
-/** THE WAR DECLARATIONS' NOT-READY HOOK (0x6742d0): the seat prepares for
- *  war with `player` where the majors it fights or prepares for war with
- *  number at most half the living majors, and `player` is neither its
- *  declared friend nor its ally */
-export function notReadyHook(ai: OpsAi, view: MajorView, player: number): void {
-  const majors = view.majors();
-  const n = majors.filter((q) => q !== ai.seat && (view.atWar(ai.seat, q) || ai.prepareForWar.includes(q))).length;
-  if (n > majors.length >> 1) return;
-  if (view.declaredFriends(ai.seat, player) || view.allied(ai.seat, player)) return;
-  prepareForWarWith(ai, player, true);
-}
-
-/** the diplomatic AI's handler 0x650890 (a game signal between the seat and
- *  the player: the port takes it for their peace): the seat prepares for
- *  war with the player no more (its completion of the operations whose
- *  enemy it no longer fights, op +0x138 below 4, unported) */
-export function peaceMade(ai: OpsAi, player: number): void {
-  prepareForWarWith(ai, player, false);
-}
-
-/** THE WAR OPERATION READY (0x723db0): the first running operation against
- *  `player` that is ready where `needReady` asks (its teams' minimums met,
- *  or its units may be built for it) decides — with no goal slot asked, yes;
- *  else whether a member of a team stands within `dist` of the team's goal
- *  of `slot`. The Surprise War asks (true, 2, the march point) */
-export function warOperationReady(ai: OpsAi, view: MajorView, player: number, needReady: boolean, dist: number, slot: number): boolean {
-  const units = new Map(view.units(ai.seat).map((u) => [u.id, u]));
-  for (const op of opsOf(ai)) {
-    if (op.enemy !== player) continue;
-    if (needReady && !(op.teams.every((t) => t.ready) || op.allowUnitConstruction)) continue;
-    if (slot < 0) return true;
-    for (const t of op.teams) {
-      const g = t.goals[slot] ?? NO_PLOT;
-      for (const id of t.members) {
-        const u = units.get(id);
-        if (u && g !== NO_PLOT && view.plotDistance(u.plot, g) <= dist) return true;
-      }
-    }
-    return false;
-  }
-  return false;
-}
-
-/** the wars' can-do (0x673800): a war operation ready, a member within 2 of
- *  its march point (0x723db0(p, 1, 2, 5)) */
-export const surpriseWarReady = (ai: OpsAi, view: MajorView, player: number): boolean =>
-  warOperationReady(ai, view, player, true, 2, 5);
-
 /** the running operations in slot order */
 export const opsOf = (ai: OpsAi): Operation[] => ai.slots.filter((o): o is Operation => o !== null);
 
@@ -209,16 +153,13 @@ export function allowedOps(leader: string | null): AiOpDef[] {
 
 /** the seat's operation limits by OperationType (AiOperationTypes and
  *  PerWarOperationTypes lists: its leader trait's — a major's
- *  TRAIT_LEADER_MAJOR_CIV, a city-state's MINOR_CIV_DEFAULT_TRAIT — and a
- *  major's of the strategies it follows) */
-function limitsOf(view: MajorView, seat: number): { base: Map<string, number>; perWar: Map<string, number> } {
+ *  TRAIT_LEADER_MAJOR_CIV, a city-state's MINOR_CIV_DEFAULT_TRAIT) */
+function limitsOf(view: AiView, seat: number): { base: Map<string, number>; perWar: Map<string, number> } {
   const base = new Map<string, number>();
   const perWar = new Map<string, number>();
-  const followed = view.majors().includes(seat) ? view.strategies(seat) : new Set<string>();
   const trait = view.majors().includes(seat) ? 'TRAIT_LEADER_MAJOR_CIV' : view.cityStateSeats().includes(seat) ? 'MINOR_CIV_DEFAULT_TRAIT' : null;
   for (const l of AI_OP_LIMIT_LISTS) {
-    const applies = (l.trait !== null && l.trait === trait) || (!l.trait && !l.agenda && l.strategies.length > 0 && l.strategies.every((s) => followed.has(s)));
-    if (!applies) continue;
+    if (l.trait === null || l.trait !== trait) continue;
     const into = l.system === 'PerWarOperationTypes' ? perWar : base;
     for (const [k, v] of Object.entries(l.items)) into.set(k, (into.get(k) ?? 0) + v);
   }
@@ -226,7 +167,7 @@ function limitsOf(view: MajorView, seat: number): { base: Map<string, number>; p
 }
 
 /** the seat's staging plots a candidate's rally is chosen from: its cities */
-const stagingPlots = (view: MajorView, seat: number): readonly number[] => view.cityPlots(seat);
+const stagingPlots = (view: AiView, seat: number): readonly number[] => view.cityPlots(seat);
 
 /** start an operation (0x73a120): a pool slot, its teams, target and rally,
  *  its tree */
@@ -297,7 +238,7 @@ const assigned = (ai: OpsAi): Set<number> => new Set(opsOf(ai).flatMap(opUnits))
  *  operation's first team, where no operation holds it already (the
  *  completion signal 0x5f5650, Release Unit When Built unset); false where
  *  no running operation made the contract */
-export function joinBuilt(ai: OpsAi, tree: number, unit: Pick<MajorUnitView, 'id' | 'type'>): boolean {
+export function joinBuilt(ai: OpsAi, tree: number, unit: Pick<AiUnitView, 'id' | 'type'>): boolean {
   const op = opsOf(ai).find((o) => o.id === tree);
   if (!op) return false;
   if (op.teams.length && !assigned(ai).has(unit.id)) addMember(op.teams[0], unit);
@@ -468,25 +409,4 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     barbarian: env.barbarian ?? null,
     log: env.log,
   };
-}
-
-/** remap the seat's unit ids (a caller whose engine renumbers units between
- *  turns): an id the map lacks leaves its operation */
-export function remapUnits(ai: OpsAi, map: (id: number) => number | undefined): void {
-  const ids = (xs: readonly number[]): number[] => xs.flatMap((id) => {
-    const n = map(id);
-    return n === undefined ? [] : [n];
-  });
-  for (const op of opsOf(ai)) {
-    for (const t of op.teams) t.members = ids(t.members);
-    op.triggerUnits = ids(op.triggerUnits);
-    op.formations = op.formations.flatMap(([a, b]) => {
-      const x = map(a);
-      const y = map(b);
-      return x === undefined || y === undefined ? [] : [[x, y] as [number, number]];
-    });
-    for (const [k, v] of Object.entries(op.bb)) {
-      if (Array.isArray(v) && v.every((x) => typeof x === 'number')) op.bb[k] = ids(v as number[]);
-    }
-  }
 }

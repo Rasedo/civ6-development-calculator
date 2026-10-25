@@ -1,8 +1,8 @@
 /**
  * THE RESEARCH AI (GameCore_XP2 AI/Research.cpp; `tools/civ6lab/dll_readings.md`
  * "H-1: the research AI"). Every party that researches technologies picks its
- * next one through it: the city-states inside the engine's turn
- * (`minorResearch`), the majors' AI through `researchAiChoice`.
+ * next one through it: the city-states and the Free Cities inside the
+ * engine's turn (`minorResearch`).
  *
  * THE ANALYSIS (the "Tech Tree Analysis" job, 0x761170, one entry per
  * technology in table order): an owned row is spent; any other walks its
@@ -48,8 +48,8 @@ import { leaderOf, seatOf } from './seats';
 import { AI_RATE, FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
 import { AI_TECH_MODIFIERS } from '../data/aiTables';
 import { modifiersValue } from './aiModifiers';
-import { majorView } from './majorView';
-import { pseudoYieldWeights, type AiWeightInputs } from './aiWeights';
+import { aiView } from './aiView';
+import { pseudoYieldWeights } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
 /** the seat's prerequisites of `id` in the install's order */
@@ -153,7 +153,7 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
  * pseudo-yield at the seat's weight `pw` (`aiWeights.ts`). A space race
  * project's term (0x7b8a30) is not read: none. Then the row's modifiers
  * (TechnologyModifiers) analysed from landing to the horizon (0x7a4b20) on
- * `view` (the state's `majorView` where none is given). Past the horizon
+ * `view` (the state's `aiView` where none is given). Past the horizon
  * -9999.
  */
 export function techValue(state: GameState, seat: number, id: string, turns: number, pw: ReadonlyMap<string, number>,
@@ -175,7 +175,7 @@ export function techValue(state: GameState, seat: number, id: string, turns: num
     + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
     + n.projects * fromLanding(fxConst(AI_PROJECT_SHARE), turns)
     + n.weapons * fromLanding(pseudoYield(PSEUDOYIELD_NUCLEAR_WEAPON, FX, w('PSEUDOYIELD_NUCLEAR_WEAPON')), turns)
-    + (mods.length ? modifiersValue({ view: view ?? majorView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0);
+    + (mods.length ? modifiersValue({ view: view ?? aiView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0);
 }
 
 /** what a technology unlocks that its value counts: the buildings and
@@ -243,17 +243,17 @@ function researchOf(state: GameState, seat: number): ResearchState {
  *  Contracts, each adding its value (raw) to its row's score before the
  *  propagation where the row is unowned and its score not negative
  *  (0x760980's contract walk, 0x5f36e0 -> 0x761980) */
-export function researchAnalysis(state: GameState, seat: number, science: number, weights: AiWeightInputs = {},
+export function researchAnalysis(state: GameState, seat: number, science: number,
   cityTerm?: (tech: string, turns: number) => number, contracts: readonly TechContract[] = []): ResearchEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(science);
-  const pw = pseudoYieldWeights(state, seat, weights);
+  const pw = pseudoYieldWeights(state, seat);
   let view: AiValueView | undefined;
   const entries: ResearchEntry[] = TECH_TABLE_ORDER.filter((id) => TECHS[id]).map((id) => {
     const leaf = !REQUIRED.has(id);
     if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
-    const base = turns < 0 ? 0 : techValue(state, seat, id, turns, pw, view ??= majorView(state)) + (cityTerm && turns <= AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
+    const base = turns < 0 ? 0 : techValue(state, seat, id, turns, pw, view ??= aiView(state)) + (cityTerm && turns <= AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
     return { tech: id, next, turns, owned: false, leaf, base, score: base };
   });
   addContracts(entries, contracts);
@@ -359,12 +359,4 @@ export function researchCompletionChoice(state: GameState, seat: number, entries
   }
   addContracts(entries, contracts.filter((c) => c.live));
   return researchChoice(state, seat, entries, done, draw);
-}
-
-/** THE MAJORS' AI's research: the choice its turn makes over a fresh analysis
- *  (`science` its Science a turn), or after `done` completed */
-export function researchAiChoice(state: GameState, seat: number, science: number, done: string | null, draw: ResearchDraw,
-                                 weights: AiWeightInputs = {}): ResearchChoice | null {
-  const entries = researchAnalysis(state, seat, science, weights);
-  return done ? researchCompletionChoice(state, seat, entries, done, draw) : researchTurnChoice(state, seat, entries, draw);
 }

@@ -84,10 +84,6 @@
     - recording: h1_duelv1127
       turn: 81
       value: Border Control option 2
-  impl:
-    - ai/major/congress.ts:adjacentEmpire
-    - ai/major/congress.ts:ADJACENT_RANGE
-    - ai/major/congress.ts:h
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -170,7 +166,6 @@
     - recording: h1_duelv1127
       turn: 62
       value: the Embassy's attempts at 142 and 146
-  impl: [ai/major/diploActions.ts:canDo]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
@@ -229,8 +224,8 @@
       turn: 101
       value: the denounced weight of the luxury ban
   impl:
-    - ai/major/view.ts:MajorView
-    - cpu/core/majorView.ts:denounced
+    - cpu/core/aiViewTypes.ts:AiView
+    - cpu/core/aiView.ts:denounced
     - cpu/core/aiModifiers.ts:ANALYZERS
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
@@ -272,7 +267,7 @@
   kind: function
   name: may enter the player's territory (open borders, alliance)
   status: PARTLY
-  impl: [cpu/core/majorView.ts:borderClosed]
+  impl: [cpu/core/aiView.ts:borderClosed]
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -350,7 +345,7 @@
     - recording: h1_duelv1128
       turn: 197
       value: "Qin at war with Rome: the friendship's +20 and the cost's -5"
-  impl: [ai/major/diploActions.ts:desire, ai/major/diploActions.ts:warsOf, cpu/core/aiPlotValue.ts:n]
+  impl: [cpu/core/aiPlotValue.ts:n]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -367,7 +362,6 @@
     - recording: h1_duelv1127
       turn: 62
       value: the missions' retries four or more turns apart
-  impl: [ai/major/diploActions.ts:performAction, ai/major/diploActions.ts:SenderMemory]
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
   review: reviewed

@@ -95,7 +95,6 @@
     - recording: h1_duelv1127
       turn: 99
       value: the trust 0.00 -> 2.00 on the deal
-  impl: [ai/major/diploActions.ts:dealStruck]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
@@ -123,7 +122,6 @@
   final: 0x2bf180
   kind: function
   status: PARTLY
-  impl: [ai/major/congress.ts:congressHint]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
@@ -190,7 +188,6 @@
     - recording: h1_duelv1127
       turn: 61
       value: Qin's listed Trade Treaty takes the 4 votes, World Religion 1
-  impl: [ai/major/congress.ts:allocateVotes, ai/major/congress.ts:castOrder]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -204,11 +201,6 @@
     - recording: h1_duelv1127
       turn: 62
       value: +20 at the focus on 172 / 185 rows where Rome's opinion of Qin at t-1 is above 0
-  impl:
-    - ai/major/diploActions.ts:focusTurn
-    - cpu/harness/majorDiplomacy.ts:Lane
-    - cpu/harness/majorDiplomacy.ts:closeView
-    - ai/major/diploActions.ts:SenderMemory
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
@@ -238,7 +230,6 @@
     - recording: h1_duelv1127
       turn: 221
       value: "Global Energy Treaty: two draws over 3"
-  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -259,7 +250,6 @@
     - recording: h1_duelw1117
       turn: 205
       value: the Resource Manager unseated from Xiurong takes Chengdu
-  impl: [ai/major/governors.ts:governorAssignment]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -269,7 +259,6 @@
   final: 0x4b0120
   kind: function
   status: PARTLY
-  impl: [ai/major/settle.ts:RING, ai/major/settle.ts:evaluatePlot]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:
@@ -295,7 +284,6 @@
   final: 0x4b25d0
   kind: function
   status: PARTLY
-  impl: [ai/major/settle.ts:evaluatePlot]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:
@@ -380,7 +368,7 @@
 - addr: 0x715ff0
   kind: function
   status: PARTLY
-  impl: [ai/major/danger.ts:out, cpu/core/tactical.ts:dangerPlane]
+  impl: [cpu/core/tactical.ts:dangerPlane]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"
@@ -403,7 +391,6 @@
     - cpu/core/tactical.ts:unitDanger
     - cpu/core/tactical.ts:dangerPlane
     - gpu/core/sim_tactics.py:_danger_plane
-    - ai/major/danger.ts:unitDanger
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"
@@ -452,7 +439,6 @@
       turn: 213
       value: "the Free Cities (player 62): t200-t201 no city 0.5 (two majors at war), t203 3.5 = (160 - 90) x 0.05 uncapped (a threatened city), t213-t215 capped at 2.0 (no war footing)"
   impl:
-    - ai/major/warValue.ts:regionalStrength
     - cpu/core/aiMilitary.ts:combatDesire
     - gpu/core/sim_cityvalue.py:_cv_combat_desire
     - cpu/core/aiWeights.ts:pseudoYieldWeights
@@ -497,7 +483,7 @@
     - recording: h1_duelv1117
       turn: 20
       value: China's candidates against Caguana from t20 to t56, its war desires positive at t18
-  impl: [cpu/core/operations/manager.ts:OpsAi, cpu/core/operations/manager.ts:prepareForWarWith]
+  impl: [cpu/core/operations/manager.ts:OpsAi]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"

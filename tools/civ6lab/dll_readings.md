@@ -6972,9 +6972,7 @@ gpu/core/sim_tactics.py.
   `uo` each entry's place in the list), so a remembered unit on a plot the
   walk gave a revealed camp, goody hut or improvement takes its own entry.
   LAB: a plot holds one unit entry on the GPU — a second record's unit on
-  it takes none (the TS list takes both). The majors' lists
-  (`MajorView.attackTargets`) carry none (their knowledge base is
-  ai/major's).
+  it takes none (the TS list takes both).
 - MEASURED (the action replay, 5 seeds, against main e46f1ae3): barb:move
   imposed 1117 404 -> 401, 1121 1,069 -> 1,066, 1124 1,017 -> 1,003, 1128
   772 -> 766, 1127 535 -> 586; Attack Civilian rows taking the game's move
@@ -7633,8 +7631,7 @@ unread). The other analyzers (EFFECT_ADJUST_CITY_YIELD_MODIFIER 0xd63490
 
 The policy AI (the player AI's civics part, the object 0x620110 runs on;
 its log AI_GovtPolicies.csv). Check: `dll_govtpolicies.py` (the choice on
-the logged scores), the action replay's majors' AI section
-(`cpu/harness/majorAi.ts`). Port: `ai/major/` (TS only).
+the logged scores). The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents).
 
 - The lists. Civics at +0x978 (0x50 each: +0x14 score, +0x18 turns; the
   "Civic" lines, logged while turns >= 0); policies at +0x9e8 in DATABASE
@@ -7792,9 +7789,7 @@ summed (24.8 fixed point, the log's number the sum >> 8): AI_Diplomacy.csv
 (the writer 0x652bb0: per player and per player it has met, in player
 order, "opinion:state" from +0x330 / +0x2f58 of the player's diplomacy, and
 "Threat and Trust" as threat:n:trust from +0x6560 / 0x650550 / +0x6480,
-24.8). Port: `ai/major/diplomacy.ts` (tables `tools/install/ai_diplomacy_tables.py`);
-check: the action replay's diplomacy section (`cpu/harness/majorDiplomacy.ts`,
-the port on the record's state and on the replayed engine's).
+24.8). The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents).
 
 - The set-up draws ("Random Diplomatic Value", the diplomacy object's
   constructor 0x3ffdd0): every player slot in use, in player order, draws
@@ -7909,9 +7904,7 @@ the port on the record's state and on the replayed engine's).
 ## C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)
 
 AI::GrandStrategic (GrandStrategic.cpp, the player AI's +0x1290) and
-SiteEvaluator. Ported in `ai/major/settle.ts` and `ai/major/danger.ts`;
-measured by the replay's settle probe (`cpu/harness/settleAi.ts`) against
-AI_Operation.csv, AI_Planning.csv and, on the verbose re-recording
+SiteEvaluator. The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents). Its logs: AI_Operation.csv, AI_Planning.csv and, on the verbose re-recording
 runs/h1_duelv1124 (`h1_duelv1124_20261010T215402Z`), AI_SiteEval.csv: every
 region's plots with their scores, per turn and player.
 
@@ -7999,8 +7992,7 @@ region's plots with their scores, per turn and player.
   down by its strength to 1 at least (0x716080). Features' DangerValue last
   (the burning Woods and Rainforest 80, the Bermuda Triangle 10).
 - PARTLY READ: the unit flag +0x18bd (CanRaid: "C-95: the danger map
-  and Move to Safety"; ai/major/danger.ts takes it as a unit with no ranged
-  or bombard strength), the units' strengths (the install's base, the
+  and Move to Safety"), the units' strengths (the install's base, the
   routines' modifiers unread), the plot yield 0x538a60 (the engine's
   `tileYields` for the seat), ownership type 0 (taken as the improved plots
   of the resource in the player's territory: the +4 new resources at
@@ -8035,9 +8027,7 @@ region's plots with their scores, per turn and player.
 ## C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)
 
 AI/VictoryStrategy.cpp, the player's victory manager at GrandStrategic
-+0x508. Ported in `ai/major/strategies.ts` (TS only, over `MajorView`);
-measured by the replay's strategy probe (`cpu/harness/strategyAi.ts`)
-against AI_Victories.csv ("%d, %d, %s, %s", the writer 0x7bec80: the turn,
++0x508. The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents). Its log: AI_Victories.csv ("%d, %d, %s, %s", the writer 0x7bec80: the turn,
 the player, the strategy, Following / Exclusive / Stopped / Forbidden; one
 line per strategy changed), on the engine's state and on the record's.
 
@@ -8131,8 +8121,7 @@ own turn start, after the record, reaches the yield the game reads), Naval
 ## C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)
 
 AI::Knowledge at player +0x12b8; its log AI_Knowledge.csv (per turn "START
-LOG" with mean +/- deviation per yield, then a CITY line per entry). Ported
-in `ai/major/knowledge.ts`.
+LOG" with mean +/- deviation per yield, then a CITY line per entry). The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents).
 
 - The defaults (GlobalAI 0x6df230, once a game): per yield the mean and the
   sample deviation (24.8) of the plot yields of every non-barbarian
@@ -8591,9 +8580,7 @@ AI_Knowledge.csv).
 
 ## C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread
 
-Ported in `ai/major/warValue.ts` (the war value),
-`ai/major/diploActions.ts` (the Surprise War's and the city-state war's
-desires, the pick's not-ready hook), `cpu/core/operations/manager.ts`
+The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents). Ported for the minors in `cpu/core/operations/manager.ts`
 (PrepareForWarWith from the hook, the readiness 0x723db0, the contracts on
 `cpu/core/aiContracts.ts`), `cpu/core/operations/assault.ts` (the
 executions), `cpu/core/aiAssignment.ts` (the generalized assignment) and
@@ -9053,10 +9040,7 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
 ## C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ
 
 AI::Diplomatic (player +0x1280; DiplomaticActions.cpp, DiplomaticState.cpp,
-Diplomatic.cpp). Port: `ai/major/diploState.ts` (the state turn); check:
-the action replay's diplomacy section (`cpu/harness/majorDiplomacy.ts`:
-state lines on the port's opinion and, the state turn alone, on the log's
-own opinions). Evidence: the verbose recordings runs/h1_duelv1117 / 1121 /
+Diplomatic.cpp). The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents). Evidence: the verbose recordings runs/h1_duelv1117 / 1121 /
 1124 / 1127 / 1128 (AI_Diplomacy.csv's action rows, DiplomacyManager.csv,
 DiplomacySummary.csv).
 
@@ -9181,9 +9165,7 @@ m_priority, m_favoredReligion +0x168 (data +0x1c0), m_mustFoundPantheon
 +0x1c8 (+0x220), m_isReligionComplete +0x228 (+0x280), m_onlyConvertOwnCities
 +0x288 (+0x2e0), m_yieldPriorityBoost +0x2e8 (+0x340), m_beliefAnalyzers,
 m_managedContracts, m_religiousUnitContract). Its log AI_Religious.csv
-(header 0x750500, writer 0x750e30: "%d, %d, %s, %3.1f" per entry). Port:
-`ai/major/religion.ts`; measure: the action replay's religion section
-(`cpu/harness/religionAi.ts`).
+(header 0x750500, writer 0x750e30: "%d, %d, %s, %3.1f" per entry). The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents).
 
 - The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0,
   the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start
@@ -9309,10 +9291,9 @@ m_managedContracts, m_religiousUnitContract). Its log AI_Religious.csv
 Ports: the missions, the friendship, the alliance and open borders are deal
 items (`cpu/core/deals.ts` MISSION / FRIENDSHIP / ALLIANCE, `sim_deals.py`),
 put on the table by the proposer's `offer` and answered by the receiver's
-`accept`; the receiver's AI answer is `ai/major/diploState.ts` answerAction;
-the pantheon, the religion founded and its beliefs are the record's
-`pantheon`, `religion` and `beliefs` (`foundPantheon`, `adoptBeliefs`;
-`ai/major/religion.ts` pantheonRecord / foundingRecord / enhanceRecord).
+`accept`; the pantheon, the religion founded and its beliefs are the
+record's `pantheon`, `religion` and `beliefs` (`foundPantheon`,
+`adoptBeliefs`).
 
 - THE PRICE (0x527610, from the handlers 0x237c60 / 0x238330 and the
   evaluator): the DiplomaticActions row's Cost (+0x20) through the game speed
@@ -9347,10 +9328,7 @@ the pantheon, the religion founded and its beliefs are the record's
 
 AI::Governors (AI/Governors.cpp, the player AI's; its log AI_Governors.csv,
 opener 0x6eef10, header "Game Turn, Player, Governor, Assignment,
-Promotions"). Port: `ai/major/governors.ts` over `MajorView`; measure: the
-action replay's governor section (`cpu/harness/governorAi.ts`), which lands
-an AI major's `governors` decision through the port's turn and imposes the
-record's roster only where it differs. MEASURED on the replayed state
+Promotions"). The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents). MEASURED on the replayed state
 (runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128): appointments and
 promotions as the log's on 8/19, 6/18, 9/21, 6/17, 8/11 turns; assignments
 6/9, 4/10, 4/12, 9/10, 5/6. The misses trace to the replayed inputs (the
@@ -9513,9 +9491,7 @@ weights, the cities' yields) and to the analyzers below left unread.
 
 ## C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ
 
-Port: `ai/major/diploActions.ts` (TS only); the replay's AI majors send their
-own missions (`cpu/harness/diploSender.ts`), scored against the record's
-proposals and the verbose recordings' logged desires, costs and threats.
+The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents).
 
 - THE THREAT (+0x6428, its data +0x6480 per player; the writer 0x647f10, each
   diplomatic AI turn): zeroed, then per met player p the sum of (a) its
@@ -9575,7 +9551,7 @@ proposals and the verbose recordings' logged desires, costs and threats.
   major's DefaultYieldBias 0.2 + CLASSICAL_CHANGES 0.2 + MoneyGrubber's 0.2,
   solved from its mission rows; Rome's 0.4 with no gold agenda.
 - THE STATE TURN'S ALLOWED ROWS weigh s(a) = the desire where CanDoAction
-  lets the action be taken, else 0 (`ai/major/diploState.ts`): runs/
+  lets the action be taken, else 0: runs/
   h1_duelv1127 t100 - t105 Rome toward Qin at opinion 5 holds Demand Tribute
   10 and Open Borders 21 (logged), Open Borders shut (Rome without Early
   Empire): Neutral -> Friendly weighs 0, Neutral -> Unfriendly 10 — the
@@ -9595,11 +9571,7 @@ proposals and the verbose recordings' logged desires, costs and threats.
 
 ## C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ
 
-Port: `ai/major/diploActions.ts` (the desires, the costs, the trust),
-`ai/major/diploState.ts` (the triggers, the checks, the transitions' actions);
-the replay lands what the AI majors' transitions send
-(`cpu/harness/replay.ts` applyTransitions) and scores every logged action
-row the port reads (`cpu/harness/diploSender.ts`).
+The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents).
 
 - THE FUNCTORS' MODES (the calls to T 0x671b80 and U 0x671ef0, mode and
   sign flag): the missions' desire T(0, +), their cost (0x66b590) Cost -
@@ -9712,17 +9684,9 @@ row the port reads (`cpu/harness/diploSender.ts`).
 
 ## C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ
 
-Port: `ai/major/congress.ts` (TS only; tables `AI_RESOLUTIONS`,
-`AI_RESOLUTION_LISTS*`, `AI_DISTRICTS`, `AI_PROMOTION_CLASSES` from
-`tools/install/ai_tables.py`); the analyzers in the shared value layer
-(`cpu/core/aiModifiers.ts`); the valid targets and the target draw in both
-engines (`cpu/core/congressTargets.ts`, `drawTargets` / `_congress_targets`,
-`_congress_target_draws`; `cpu/data/congressTargets.ts`). The replay's AI
-majors cast the engine's Regular Session's ballots through its decider
-(`holdCongressBallots`), and their ballots on the game's own slate, on the
-game's favor and Diplomatic Victory points of the session's turn
-(Player_Stats_2.csv), are scored against World_Congress.csv
-(`cpu/harness/congressAi.ts`).
+The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents). Ported: the valid targets and the target draw in both engines
+(`cpu/core/congressTargets.ts`, `drawTargets` / `_congress_targets`,
+`_congress_target_draws`; `cpu/data/congressTargets.ts`).
 
 - THE SESSION'S PLACE: its draws are the turn's last — the slate's "World
   Congress Resolutions" draws, then the targets' — after every player's and
@@ -9878,11 +9842,7 @@ game's favor and Diplomatic Victory points of the session's turn
 
 ## C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ
 
-Port: `ai/major/greatPeople.ts` (TS only; `AI_GREAT_PERSON_CLASSES` from
-`tools/install/ai_tables.py`, the GreatPersonClasses table in database
-order); the replay runs it at each AI turn's close and lands it through the
-engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
-`buyFaith` kind 15) (`cpu/harness/greatPeopleAi.ts`).
+The majors' AI is not ported (the replay imposes the recording's majors, training seats RL agents).
 
 - THE GOLD PATRONAGE (0x6898b0, AI::Economic, called from the savings turn
   0x687bf0 at its close): K = 0.5 (@d20458, fixed). Over the classes

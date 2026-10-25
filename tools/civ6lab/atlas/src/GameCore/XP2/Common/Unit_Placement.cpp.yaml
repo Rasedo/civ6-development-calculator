@@ -18,6 +18,7 @@
     - gpu/core/sim_tactics.py:_tac_alt_table
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none:   FindAlternateLocation (0x585940) round the city within 3, moved to with   flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...'s ASK).   Their logs hold 23 such rows (runs/h1_duelw1114, 1123, 1130). - FIND ALTERNATE LOCATION (0x585940): over the game's axial steps (dx, dy),   dx outer from -range to range, dy inner, the plot at the..."
@@ -146,6 +147,7 @@
     - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:bestIn
     - gpu/core/sim_tactics.py:_op_move_exec
+    - cpu/core/units.ts:spawnUnit
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -153,6 +155,7 @@
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
@@ -189,12 +192,13 @@
   final: 0x3b11b0
   kind: function
   status: PARTLY
-  impl: [cpu/core/fog.ts:majorLookMeets]
+  impl: [cpu/core/fog.ts:majorLookMeets, cpu/core/units.ts:spawnUnit]
   readings:
     - "H-1: the raids — READ"
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
     - "H-1: the raids — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."

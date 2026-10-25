@@ -1,26 +1,22 @@
 """THE AI TABLES — the install rows the game's AI reads, written as TS.
 
-    python tools/install/ai_tables.py            # write ai/major/tables.ts, cpu/data/aiTables.ts, aiBuildTables.ts, congressTargets.ts
-    python tools/install/ai_tables.py --check    # exit 1 when either file is stale
+    python tools/install/ai_tables.py            # write cpu/data/aiTables.ts, aiBuildTables.ts, congressTargets.ts
+    python tools/install/ai_tables.py --check    # exit 1 when a file is stale
 
 The game's AI reads its own database, not the engine's catalogs.
-ai/major/tables.ts (the majors' AI): the policies and governments in
+cpu/data/aiTables.ts (the value layer every party reads, cpu/core/aiValue.ts):
+the Yields' and PseudoYields' DefaultValue, the great person classes' pseudo
+yields, each government's InfluencePointsThreshold, and the AI lists the
+weights sum: per trait (a leader's through its InheritFrom chain, its
+civilization's; System Yields / YieldSensitivities), each item with its
+difficulty bounds; the difficulties' order; the policies and governments in
 DATABASE ORDER (the index the AI's loops walk and its ties fall to; the
 order checked against every AI_GovtPolicies.csv beside the H-1 recordings,
 whose score lines run in it), each policy's slot, civic, Policies_XP1 terms,
 government exclusivity, obsolescence and its modifiers as DynamicModifiers
 resolve them (collection, effect, arguments, requirement sets); each
-government's slot rows, Favor and modifiers; the slot types; the eras' order;
-the settle site evaluation's conditions, its PlotEvaluations lists by leader,
-civilization and strategy, the features' Settlement and NaturalWonder flags,
-the resources' classes, the GlobalParameters the settle and danger code reads.
-cpu/data/aiTables.ts (the value layer every party reads, cpu/core/aiValue.ts):
-the Yields' and PseudoYields' DefaultValue, the great person classes' pseudo
-yields, each government's InfluencePointsThreshold, and the AI lists the
-weights sum: per trait (a leader's through its InheritFrom chain, its
-civilization's; System Yields / YieldSensitivities), per strategy
-(Strategy_Priorities; those and System PseudoYields), each item with its
-difficulty bounds; Strategy_YieldPriorities; the difficulties' order.
+government's slot rows, Favor and modifiers; the slot types; the great
+person classes.
 Read through `xml_check.Install` (the layered install, the game's load
 order, Update and Delete applied).
 """
@@ -37,7 +33,6 @@ import sys
 from xml_check import Install
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
-OUT = ROOT / "ai" / "major" / "tables.ts"
 # the value layer's tables every AI party reads (cpu/core/aiValue.ts)
 OUT_CORE = ROOT / "cpu" / "data" / "aiTables.ts"
 # the city build AI's tables (cpu/core/aiCityBuild.ts)
@@ -46,10 +41,8 @@ OUT_CITY = ROOT / "cpu" / "data" / "aiBuildTables.ts"
 OUT_CONGRESS = ROOT / "cpu" / "data" / "congressTargets.ts"
 # the game's own database, as it last loaded the ruleset: its row order
 GAME_DB = pathlib.Path(os.path.expandvars(r"%LOCALAPPDATA%/Firaxis Games/Sid Meier's Civilization VI/Cache/DebugGameplay.sqlite"))
-# the systems the yield weight reads by trait and by strategy, and the one the
-# pseudo-yield weight reads by strategy alone
+# the systems the yield weight reads by trait
 WEIGHT_SYSTEMS = ("Yields", "YieldSensitivities")
-STRATEGY_SYSTEMS = WEIGHT_SYSTEMS + ("PseudoYields",)
 # the recordings live in the checkout (a worktree under .claude/worktrees reads its parent's)
 RUNS = next((p / "tools" / "civ6lab" / "runs" for p in (ROOT, *ROOT.parents[2:3])
              if any((p / "tools" / "civ6lab" / "runs").glob("h1_duelw11*_20261007T232459Z.logs"))),
@@ -181,9 +174,9 @@ def build() -> str:
 
     influence = {g["type"]: g["influenceThreshold"] for g in governments}
 
-    # the AI lists the yield weight sums: each list's items, the traits and
-    # strategies that carry such a list
-    ai_lists = [c for c in rows("AiLists") if c.get("ListType") and c.get("System") in STRATEGY_SYSTEMS]
+    # the AI lists the yield weight sums: each list's items, the traits that
+    # carry such a list
+    ai_lists = [c for c in rows("AiLists") if c.get("ListType") and c.get("System") in WEIGHT_SYSTEMS]
     items: dict[str, list] = collections.defaultdict(list)
     for c in rows("AiFavoredItems"):
         if c.get("ListType") and c.get("Item"):
@@ -193,7 +186,7 @@ def build() -> str:
     trait_lists: dict[str, list] = collections.defaultdict(list)
     for c in ai_lists:
         owner = c.get("LeaderType") or c.get("AgendaType")
-        if owner and c["System"] in WEIGHT_SYSTEMS:
+        if owner:
             trait_lists[owner].append({"list": c["ListType"], "system": c["System"],
                                                  "minDifficulty": c.get("MinDifficulty"),
                                                  "maxDifficulty": c.get("MaxDifficulty")})
@@ -217,239 +210,11 @@ def build() -> str:
 
     leader_w = {lt: [t for t in leader_traits(lt) if t in trait_lists] for lt in sorted(inherit)}
     civ_w = {ct: [t for t in ts if t in trait_lists] for ct, ts in sorted(ctraits.items())}
-    # an agenda's traits (AgendaTraits) that carry a weight list
-    atraits: dict[str, list] = collections.defaultdict(list)
-    for c in rows("AgendaTraits"):
-        if c.get("AgendaType") and c.get("TraitType") in trait_lists and c["TraitType"] not in atraits[c["AgendaType"]]:
-            atraits[c["AgendaType"]].append(c["TraitType"])
-    plain = {c["ListType"]: c["System"] for c in ai_lists if not c.get("LeaderType") and not c.get("AgendaType")}
-    strat_lists: dict[str, list] = collections.defaultdict(list)
-    for c in rows("Strategy_Priorities"):
-        if c.get("StrategyType") and c.get("ListType") in plain:
-            strat_lists[c["StrategyType"]].append({"list": c["ListType"], "system": plain[c["ListType"]]})
-    strat_yields = [{"strategy": c.get("StrategyType"), "yield": c.get("YieldType"),
-                     "pct": int(c.get("PercentageDelta", 0) or 0)} for c in rows("Strategy_YieldPriorities")]
-    wanted = {x["list"] for v in trait_lists.values() for x in v} | {x["list"] for v in strat_lists.values() for x in v}
+    wanted = {x["list"] for v in trait_lists.values() for x in v}
     difficulties = [c["DifficultyType"] for c in keyed(rows("Difficulties"), "DifficultyType").values()]
-
-    # the settle site evaluation: PlotEvalConditions by their index (Value),
-    # the PlotEvaluations lists' items, the lists each leader and
-    # civilization carries (AiLists LeaderType: a trait of the leader's chain
-    # through InheritFrom, of its civilization; AgendaType: a trait of the
-    # leader's historical agenda; Strategy_Priorities: a strategy's), the
-    # features' Settlement and NaturalWonder
-    # flags and the resources' classes
-    conds = sorted(((int(c["Value"]), c["ConditionType"]) for c in rows("PlotEvalConditions")))
-    lists = keyed(rows("AiLists"), "ListType")
-    pe_lists = {k for k, c in lists.items() if c.get("System") == "PlotEvaluations"}
-    pe_items: dict[str, list] = collections.defaultdict(list)
-    for c in rows("AiFavoredItems"):
-        if c.get("ListType") in pe_lists:
-            pe_items[c["ListType"]].append({"condition": c["Item"], "favored": c.get("Favored", "").lower() == "true",
-                                            "value": int(c.get("Value", 0) or 0), "stringVal": c.get("StringVal")})
-    atraits: dict[str, list[str]] = collections.defaultdict(list)
-    for c in rows("AgendaTraits"):
-        if "AgendaType" in c:
-            atraits[c["AgendaType"]].append(c["TraitType"])
-    hist = {c["LeaderType"]: c["AgendaType"] for c in rows("HistoricalAgendas") if "LeaderType" in c}
-
-    def bound(col, traits):
-        ts = set(traits)
-        return [k for k in sorted(pe_lists, key=list(lists).index) if lists[k].get(col) in ts and pe_items.get(k)]
-
-    by_leader = {}
-    for lt in inherit:
-        got = bound("LeaderType", leader_traits(lt)) + bound("AgendaType", atraits.get(hist.get(lt, ""), []))
-        if got:
-            by_leader[lt] = got
-    by_civ = {cv: bound("LeaderType", ts) for cv, ts in ctraits.items() if bound("LeaderType", ts)}
-    by_strategy: dict[str, list[str]] = collections.defaultdict(list)
-    for c in rows("Strategy_Priorities"):
-        if c.get("ListType") in pe_items:
-            by_strategy[c["StrategyType"]].append(c["ListType"])
-    features = [{"type": k, "settlement": c.get("Settlement", "true") != "false",
-                 "naturalWonder": c.get("NaturalWonder", "").lower() == "true"}
-                for k, c in keyed(rows("Features"), "FeatureType").items()]
-    res_class = {k: c.get("ResourceClassType") for k, c in keyed(rows("Resources"), "ResourceType").items()}
-    # the victory manager's strategies (Strategies) in database order, each
-    # with its StrategyConditions in database order; the Strategies-system
-    # AiLists a leader's traits (through InheritFrom) and a civilization's
-    # carry, each item a bias on the strategy's conditions needed
-    sconds: dict[str, list] = collections.defaultdict(list)
-    for c in rows("StrategyConditions"):
-        if c.get("StrategyType"):
-            sconds[c["StrategyType"]].append({
-                "fn": c.get("ConditionFunction"), "threshold": int(c.get("ThresholdValue", 0) or 0),
-                "string": c.get("StringValue"), "disqualifier": c.get("Disqualifier") in ("true", "1"),
-                "exclusive": c.get("Exclusive") in ("true", "1"), "forbidden": c.get("Forbidden") in ("true", "1")})
-    strategies = [{"type": k, "victory": c.get("VictoryType"), "needed": int(c.get("NumConditionsNeeded", 1) or 1),
-                   "conditions": sconds[k]} for k, c in keyed(rows("Strategies"), "StrategyType").items()]
-    st_lists = {c["ListType"]: c for c in rows("AiLists") if c.get("ListType") and c.get("System") == "Strategies"}
-    st_items: dict[str, list] = collections.defaultdict(list)
-    for c in rows("AiFavoredItems"):
-        if c.get("ListType") in st_lists and c.get("Item"):
-            st_items[c["ListType"]].append(c)
-
-    def strategy_bias(traits):
-        out = []
-        for lt, c in st_lists.items():
-            if c.get("LeaderType") not in traits:
-                continue
-            for it in st_items[lt]:
-                out.append({"strategy": it["Item"], "value": int(it.get("Value", 0) or 0),
-                            "minDifficulty": it.get("MinDifficulty") or c.get("MinDifficulty"),
-                            "maxDifficulty": it.get("MaxDifficulty") or c.get("MaxDifficulty")})
-        return out
-
-    bias_leader = {lt: strategy_bias(set(leader_traits(lt))) for lt in sorted(inherit)}
-    bias_civ = {cv: strategy_bias(set(ts)) for cv, ts in sorted(ctraits.items())}
-    gps = keyed(rows("GlobalParameters"), "Name")
-    globals_ = {k: int(float(gps[k]["Value"])) for k in ("CITY_MIN_RANGE", "COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER",
-                                                         "AI_ISLAND_COAST_PERCENTAGE")}
-
-    # the religion AI: the beliefs in database order (the AI's belief list,
-    # AI_Religious.csv's lines, run in it) with their class and modifiers;
-    # the religions in database order with the Pantheon and
-    # RequiresCustomName flags; FavoredReligions by leader and civilization
-    bmods: dict[str, list[str]] = collections.defaultdict(list)
-    for c in rows("BeliefModifiers"):
-        if c.get("BeliefType"):
-            bmods[c["BeliefType"]].append(c.get("ModifierID") or c.get("ModifierId"))
-    beliefs = [{"type": b, "class": c.get("BeliefClassType"), "modifiers": [modifier(m) for m in bmods[b]]}
-               for b, c in in_game_order("Beliefs", "BeliefType", keyed(rows("Beliefs"), "BeliefType"))]
-    religions = [{"type": r, "pantheon": c.get("Pantheon", "").lower() == "true", "customName": c.get("RequiresCustomName", "").lower() == "true"}
-                 for r, c in in_game_order("Religions", "ReligionType", keyed(rows("Religions"), "ReligionType"))]
-    fav_leader: dict[str, list[str]] = collections.defaultdict(list)
-    fav_civ: dict[str, list[str]] = collections.defaultdict(list)
-    for c in rows("FavoredReligions"):
-        if c.get("LeaderType"):
-            fav_leader[c["LeaderType"]].append(c["ReligionType"])
-        if c.get("CivilizationType"):
-            fav_civ[c["CivilizationType"]].append(c["ReligionType"])
-
-    # the governor AI: the governors and the promotions in database order
-    # (the game's governor and promotion lists, AI_Governors.csv's lines, run
-    # in it); a governor's promotions are its GovernorPromotionSets rows in
-    # that order; its own modifiers are its BaseAbility promotions' (the
-    # analysis's query, GlobalAI +0x39c0), a promotion's its
-    # GovernorPromotionModifiers rows ordered by ModifierId (+0x39d8)
-    gov_rows = in_game_order("Governors", "GovernorType", keyed(rows("Governors"), "GovernorType"))
-    promo_rows = in_game_order("GovernorPromotions", "GovernorPromotionType", keyed(rows("GovernorPromotions"), "GovernorPromotionType"))
-    gp_mods: dict[str, list[str]] = collections.defaultdict(list)
-    for c in rows("GovernorPromotionModifiers"):
-        if c.get("GovernorPromotionType"):
-            gp_mods[c["GovernorPromotionType"]].append(c["ModifierId"])
-    gp_sets: dict[str, set[str]] = collections.defaultdict(set)
-    for c in rows("GovernorPromotionSets"):
-        if c.get("GovernorType"):
-            gp_sets[c["GovernorType"]].add(c["GovernorPromotion"])
-    gov_xp2 = keyed(rows("Governors_XP2"), "GovernorType")
-    gov_promos = []
-    for p, c in promo_rows:
-        gov_promos.append({
-            "type": p, "level": int(c.get("Level", 0) or 0), "baseAbility": c.get("BaseAbility", "").lower() == "true",
-            "governors": [g for g, _ in gov_rows if p in gp_sets[g]],
-            "modifiers": [modifier(m) for m in sorted(gp_mods[p])],
-        })
-    # the World Congress AI: each resolution in database order, its option
-    # effects (ResolutionEffects WhichEffect 1 / 2, ordered by the row id) and
-    # its target chooser; the Resolutions lists (AiLists System Resolutions)
-    # and the traits and strategies that own them
-    eff: dict[str, list[list[tuple[int, str]]]] = collections.defaultdict(lambda: [[], []])
-    for c in rows("ResolutionEffects"):
-        if c.get("ResolutionType") and c.get("ModifierId"):
-            k = int(c.get("WhichEffect", 1) or 1) - 1
-            if k in (0, 1):
-                eff[c["ResolutionType"]][k].append((int(c.get("ResolutionEffectId", 0) or 0), c["ModifierId"]))
-    resolutions_ai = [{
-        "type": r, "targetKind": c.get("TargetKind"), "chooser": c.get("AITargetChooser"),
-        "effects": [[modifier(m) for _i, m in sorted(eff[r][k])] for k in (0, 1)],
-    } for r, c in in_game_order("Resolutions", "ResolutionType", keyed(rows("Resolutions"), "ResolutionType"))]
-    res_lists = {k: c for k, c in keyed(rows("AiLists"), "ListType").items() if c.get("System") == "Resolutions"}
-    res_items: dict[str, list] = collections.defaultdict(list)
-    for c in rows("AiFavoredItems"):
-        if c.get("ListType") in res_lists and c.get("Item"):
-            res_items[c["ListType"]].append({"resolution": c["Item"],
-                                             "favored": (c.get("Favored") or "true").lower() not in ("false", "0")})
-    res_by_trait: dict[str, list[str]] = collections.defaultdict(list)
-    for k, c in res_lists.items():
-        t = c.get("LeaderType") or c.get("AgendaType")
-        if t and res_items.get(k):
-            res_by_trait[t].append(k)
-    ag_traits: dict[str, list[str]] = collections.defaultdict(list)
-    for c in rows("AgendaTraits"):
-        if c.get("AgendaType") and c.get("TraitType") in res_by_trait and c["TraitType"] not in ag_traits[c["AgendaType"]]:
-            ag_traits[c["AgendaType"]].append(c["TraitType"])
-    res_leader = {lt: [t for t in leader_traits(lt) if t in res_by_trait] for lt in sorted(inherit)}
-    res_by_strategy: dict[str, list[str]] = collections.defaultdict(list)
-    for c in rows("Strategy_Priorities"):
-        if c.get("ListType") in res_lists and res_items.get(c["ListType"]):
-            res_by_strategy[c["StrategyType"]].append(c["ListType"])
-
-    governors_ai = []
-    for g, c in gov_rows:
-        mine = [p for p, _ in promo_rows if p in gp_sets[g]]
-        governors_ai.append({
-            "type": g, "identityPressure": int(c.get("IdentityPressure", 0) or 0),
-            "assignCityState": c.get("AssignCityState", "").lower() == "true",
-            "assignToMajor": gov_xp2.get(g, {}).get("AssignToMajor", "").lower() == "true",
-            "trait": c.get("TraitType"), "promotions": mine,
-            "modifiers": [modifier(m) for p in mine if dict(promo_rows)[p].get("BaseAbility", "").lower() == "true" for m in gp_mods[p]],
-        })
 
     def lit(name, value, typ):
         return f"export const {name}: {typ} = {json.dumps(value, indent=1)};\n"
-
-    major = (
-        "/**\n * THE MAJORS' AI TABLES, written by tools/install/ai_tables.py from the\n"
-        " * layered install (`--check` reports a stale file). Policies and governments\n"
-        " * run in DATABASE ORDER, the index the game's AI loops walk.\n */\n"
-        "import type {\n  AiBelief, AiFeature, AiGovernment, AiGovernor, AiGovernorPromotion, AiPlotEvalItem, AiPolicy, AiReligion, AiResolution, AiSlotType,\n  AiStrategy, AiStrategyBias,\n} from './types';\n\n"
-        + lit("AI_POLICIES", policies, "readonly AiPolicy[]")
-        + lit("AI_GOVERNMENTS", governments, "readonly AiGovernment[]")
-        + lit("AI_SLOT_TYPES", slots, "readonly AiSlotType[]")
-        + lit("AI_ERAS", [e["EraType"] for e in eras], "readonly string[]")
-        + lit("AI_PLOT_EVAL_CONDITIONS", [t for _, t in conds], "readonly string[]")
-        + lit("AI_PLOT_EVAL_LISTS", {k: pe_items[k] for k in sorted(pe_items)}, "Readonly<Record<string, readonly AiPlotEvalItem[]>>")
-        + lit("AI_PLOT_EVAL_BY_LEADER", by_leader, "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_PLOT_EVAL_BY_CIV", by_civ, "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_PLOT_EVAL_BY_STRATEGY", dict(by_strategy), "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_FEATURES", features, "readonly AiFeature[]")
-        + lit("AI_RESOURCE_CLASS", res_class, "Readonly<Record<string, string>>")
-        + lit("AI_GLOBALS", globals_, "Readonly<Record<string, number>>")
-        + lit("AI_STRATEGIES", strategies, "readonly AiStrategy[]")
-        + lit("AI_STRATEGY_BIAS_BY_LEADER", {k: v for k, v in bias_leader.items() if v},
-              "Readonly<Record<string, readonly AiStrategyBias[]>>")
-        + lit("AI_STRATEGY_BIAS_BY_CIV", {k: v for k, v in bias_civ.items() if v},
-              "Readonly<Record<string, readonly AiStrategyBias[]>>")
-        + lit("AI_BELIEFS", beliefs, "readonly AiBelief[]")
-        + lit("AI_RELIGIONS", religions, "readonly AiReligion[]")
-        + lit("AI_FAVORED_RELIGIONS_BY_LEADER", dict(sorted(fav_leader.items())), "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_FAVORED_RELIGIONS_BY_CIV", dict(sorted(fav_civ.items())), "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_GOVERNORS", governors_ai, "readonly AiGovernor[]")
-        + lit("AI_RESOLUTIONS", resolutions_ai, "readonly AiResolution[]")
-        + lit("AI_RESOLUTION_LISTS", {k: res_items[k] for k in sorted(res_items)},
-              "Readonly<Record<string, readonly { resolution: string; favored: boolean }[]>>")
-        + lit("AI_RESOLUTION_LISTS_BY_TRAIT", dict(sorted(res_by_trait.items())), "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_RESOLUTION_LISTS_BY_STRATEGY", dict(sorted(res_by_strategy.items())), "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_RESOLUTION_LEADER_TRAITS", {k: v for k, v in res_leader.items() if v}, "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_RESOLUTION_AGENDA_TRAITS", dict(sorted(ag_traits.items())), "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_GOVERNOR_PROMOTIONS", gov_promos, "readonly AiGovernorPromotion[]")
-        + lit("AI_DISTRICTS", [{"type": k, "base": not c.get("TraitType") and (c.get("InternalOnly") or "false").lower() not in ("true", "1"),
-                                "cityCenter": (c.get("CityCenter") or "false").lower() in ("true", "1")}
-                               for k, c in in_game_order("Districts", "DistrictType", keyed(rows("Districts"), "DistrictType"))],
-              "readonly { type: string; base: boolean; cityCenter: boolean }[]")
-        + lit("AI_PROJECTS", [{"type": k, "spaceRace": (c.get("SpaceRace") or "false").lower() in ("true", "1"),
-                               "wmd": (c.get("WMD") or "false").lower() in ("true", "1"), "cost": int(float(c.get("Cost") or 0))}
-                              for k, c in congress_order("Projects", "ProjectType", keyed(rows("Projects"), "ProjectType"))],
-              "readonly { type: string; spaceRace: boolean; wmd: boolean; cost: number }[]")
-        + lit("AI_PROMOTION_CLASSES", [k for k, _ in in_game_order("UnitPromotionClasses", "PromotionClassType",
-                                                                    keyed(rows("UnitPromotionClasses"), "PromotionClassType"))],
-              "readonly string[]")
-        + lit("AI_GREAT_PERSON_CLASSES", [k for k, _ in in_game_order("GreatPersonClasses", "GreatPersonClassType",
-                                                                       keyed(rows("GreatPersonClasses"), "GreatPersonClassType"))],
-              "readonly string[]")
-    )
     # each city-state's modifiers its envoys are worth (the diplomatic AI's
     # +0x6868 list, 0x651490): its leader's traits through the InheritFrom
     # chain and its civilization's (the query 0xe261e0), ordered by
@@ -504,12 +269,14 @@ def build() -> str:
         " * stale file): the yields' and pseudo-yields' DefaultValue, the great\n"
         " * person classes' pseudo-yields, the governments' InfluencePointsThreshold,\n"
         " * and the AI lists the weights sum: System Yields and YieldSensitivities by\n"
-        " * trait — a leader's traits through its InheritFrom chain, a civilization's,\n"
-        " * an agenda's (AgendaTraits) —, those and PseudoYields by strategy\n"
-        " * (Strategy_Priorities); the city-states' modifiers their envoys reach,\n"
-        " * the civics' modifiers (CivicModifiers), the technologies' modifiers\n"
-        " * (TechnologyModifiers).\n */\n"
-        "import type { AiModifier } from '../core/aiModifiers';\nimport type { AiListRef, AiListItem } from '../core/aiValue';\n\n"
+        " * trait — a leader's traits through its InheritFrom chain, a\n"
+        " * civilization's; the city-states' modifiers their envoys reach, the\n"
+        " * civics' modifiers (CivicModifiers), the technologies' modifiers\n"
+        " * (TechnologyModifiers); the policies and governments in DATABASE ORDER\n"
+        " * (the index the game's AI loops walk), the slot types, the great person\n"
+        " * classes.\n */\n"
+        "import type { AiModifier } from '../core/aiModifiers';\nimport type { AiListRef, AiListItem } from '../core/aiValue';\n"
+        "import type { AiGovernment, AiPolicy, AiSlotType } from '../core/aiPolicyValue';\n\n"
         + lit("AI_YIELD_DEFAULT", yields, "Readonly<Record<string, number>>")
         + lit("AI_PSEUDOYIELD_DEFAULT", pseudo, "Readonly<Record<string, number>>")
         + lit("AI_GP_CLASS_PSEUDOYIELD", gpc, "Readonly<Record<string, string>>")
@@ -518,10 +285,6 @@ def build() -> str:
         + lit("AI_TRAIT_LISTS", dict(sorted(trait_lists.items())), "Readonly<Record<string, readonly AiListRef[]>>")
         + lit("AI_LEADER_TRAITS", {k: v for k, v in leader_w.items() if v}, "Readonly<Record<string, readonly string[]>>")
         + lit("AI_CIVILIZATION_TRAITS", {k: v for k, v in civ_w.items() if v}, "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_AGENDA_TRAITS", dict(sorted(atraits.items())), "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_STRATEGY_LISTS", dict(sorted(strat_lists.items())), "Readonly<Record<string, readonly AiListRef[]>>")
-        + lit("AI_STRATEGY_YIELD_PRIORITIES", strat_yields,
-              "readonly { strategy: string; yield: string; pct: number }[]")
         + lit("AI_DIFFICULTIES", difficulties, "readonly string[]")
         + lit("AI_MINOR_INFLUENCE_MODIFIERS", dict(sorted(minor_influence.items())), "Readonly<Record<string, readonly AiModifier[]>>")
         + lit("AI_CIVIC_MODIFIERS", {k: [modifier(m) for m in v] for k, v in sorted(civic_mods.items())},
@@ -531,9 +294,15 @@ def build() -> str:
         + lit("AI_SPACE_RACE_PROJECTS", [k for k, c in keyed(rows("Projects"), "ProjectType").items() if c.get("SpaceRace", "").lower() == "true"],
               "readonly string[]")
         + lit("AI_DEFAULT_SAVINGS", savings, "readonly { saving: string; weight: number }[]")
+        + lit("AI_POLICIES", policies, "readonly AiPolicy[]")
+        + lit("AI_GOVERNMENTS", governments, "readonly AiGovernment[]")
+        + lit("AI_SLOT_TYPES", slots, "readonly AiSlotType[]")
+        + lit("AI_GREAT_PERSON_CLASSES", [k for k, _ in in_game_order("GreatPersonClasses", "GreatPersonClassType",
+                                                                       keyed(rows("GreatPersonClasses"), "GreatPersonClassType"))],
+              "readonly string[]")
     )
     city = build_city(rows, modifier)
-    return major, core, city, build_congress(rows)
+    return core, city, build_congress(rows)
 
 
 def congress_order(table: str, key: str, have: dict[str, dict]) -> list[tuple[str, dict]]:
@@ -954,22 +723,20 @@ def order_check(policies: list[str]) -> tuple[int, int]:
 
 
 def main() -> int:
-    text, core, city, congress = build()
+    core, city, congress = build()
     if "--check" in sys.argv:
         bad = 0
-        for path, want in ((OUT, text), (OUT_CORE, core), (OUT_CITY, city), (OUT_CONGRESS, congress)):
+        for path, want in ((OUT_CORE, core), (OUT_CITY, city), (OUT_CONGRESS, congress)):
             stale = not path.exists() or path.read_text(encoding="utf-8") != want
             print(path.relative_to(ROOT).as_posix(), "STALE" if stale else "OK")
             bad |= stale
         return 1 if bad else 0
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(text, encoding="utf-8", newline="\n")
     OUT_CORE.write_text(core, encoding="utf-8", newline="\n")
     OUT_CITY.write_text(city, encoding="utf-8", newline="\n")
     OUT_CONGRESS.write_text(congress, encoding="utf-8", newline="\n")
-    names = [line.split('"')[3] for line in text.splitlines() if line.startswith('  "type": "POLICY_')]
+    names = [line.split('"')[3] for line in core.splitlines() if line.startswith('  "type": "POLICY_')]
     seen, bad = order_check(names)
-    print(f"wrote {OUT} ({len(text)} bytes); logged score lines {seen}, out of database order {bad}")
+    print(f"wrote {OUT_CORE} ({len(core)} bytes); logged score lines {seen}, out of database order {bad}")
     return 0
 
 

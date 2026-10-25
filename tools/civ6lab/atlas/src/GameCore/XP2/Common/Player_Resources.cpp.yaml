@@ -283,10 +283,9 @@
     - cpu/core/aiCityBuild.ts:CityBuildFacts
     - cpu/core/goodyHuts.ts:goodyEligible
     - cpu/core/aiModifiers.ts:ANALYZERS
-    - ai/major/congress.ts:h
     - cpu/core/aiUnitProduction.ts:UnitProductionFacts
     - cpu/core/operations/unitRows.ts:seatUnitRows
-    - cpu/core/majorCityBuild.ts:seatResearchTurns
+    - cpu/core/freeCityBuild.ts:seatResearchTurns
     - cpu/core/minorBuild.ts:amenity
     - cpu/core/aiResource.ts:ResourceFacts
     - cpu/core/aiResource.ts:take

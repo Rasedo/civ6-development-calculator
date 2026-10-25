@@ -12,7 +12,7 @@
  * team takes leave the offer.
  */
 import { NO_PLOT, addMember, hasAiType, teamDef, teamReqs, unitStrength, type Operation, type OpTeam } from './operation';
-import type { MajorUnitView, MajorView } from '../../../ai/major/view';
+import type { AiUnitView, AiView } from '../aiViewTypes';
 
 export interface RecruitLog {
   (line: string): void;
@@ -42,10 +42,10 @@ function passesOthers(team: OpTeam, unitType: string, skip: number, extra: numbe
  *  (the first of equals). Returns whether every minimum could be met and the
  *  units taken, in the order taken (a unit may be taken for two
  *  requirements; it joins once). */
-export function recruitMinimums(view: MajorView, team: OpTeam, offer: readonly MajorUnitView[], log: RecruitLog | null, opName: string): { met: boolean; taken: MajorUnitView[] } {
+export function recruitMinimums(view: AiView, team: OpTeam, offer: readonly AiUnitView[], log: RecruitLog | null, opName: string): { met: boolean; taken: AiUnitView[] } {
   if (offer.length === 0) return { met: team.ready, taken: [] };
   let met = true;
-  const out: MajorUnitView[] = [];
+  const out: AiUnitView[] = [];
   const members = team.members.length;
   teamReqs(team).forEach((r, i) => {
     let need = r.min ?? 0;
@@ -87,9 +87,9 @@ export function recruitMinimums(view: MajorView, team: OpTeam, offer: readonly M
  *  offered unit that fits a requirement and breaks no maximum — of those
  *  the last whose type has a build entry, else the nearest the rally —
  *  joins. Returns whether the strength was reached and the units taken. */
-export function recruitStrength(view: MajorView, team: OpTeam, offer: readonly MajorUnitView[], taken: readonly MajorUnitView[],
+export function recruitStrength(view: AiView, team: OpTeam, offer: readonly AiUnitView[], taken: readonly AiUnitView[],
   enemyStrength: number, desired: number, log: RecruitLog | null, opName: string,
-  units: ReadonlyMap<number, MajorUnitView>): { reached: boolean; taken: MajorUnitView[] } {
+  units: ReadonlyMap<number, AiUnitView>): { reached: boolean; taken: AiUnitView[] } {
   const target = enemyStrength + desired;
   if (target <= 0 || offer.length === 0) return { reached: true, taken: [] };
   let current = 0;
@@ -112,7 +112,7 @@ export function recruitStrength(view: MajorView, team: OpTeam, offer: readonly M
     }
     return matched;
   });
-  const out: MajorUnitView[] = [];
+  const out: AiUnitView[] = [];
   const rally = team.goals[0];
   while (current < Math.trunc(target) && eligible.length) {
     let best = 0;
@@ -139,7 +139,7 @@ export function recruitStrength(view: MajorView, team: OpTeam, offer: readonly M
  *  minus the enemy strength; any other, the advantage times the smaller of
  *  the two players' best combat strengths (the operation's own where it has
  *  no enemy) */
-export function desiredStrength(view: MajorView, seat: number, enemy: number, advantage: number, enemyStrength: number): number {
+export function desiredStrength(view: AiView, seat: number, enemy: number, advantage: number, enemyStrength: number): number {
   if (advantage <= -5) return -enemyStrength;
   const ours = view.bestCombatStrength(seat);
   const theirs = enemy >= 0 ? view.bestCombatStrength(enemy) : ours;
@@ -149,9 +149,9 @@ export function desiredStrength(view: MajorView, seat: number, enemy: number, ad
 /** One recruit (0x738050): each team takes from the offer, its minimums then
  *  its strength; the units taken join it and leave the offer. Returns every
  *  unit recruited. */
-export function recruitOperation(view: MajorView, seat: number, op: Operation, offer: MajorUnitView[], inProgress: boolean, range: number,
-  units: ReadonlyMap<number, MajorUnitView>, log: RecruitLog | null): MajorUnitView[] {
-  const all: MajorUnitView[] = [];
+export function recruitOperation(view: AiView, seat: number, op: Operation, offer: AiUnitView[], inProgress: boolean, range: number,
+  units: ReadonlyMap<number, AiUnitView>, log: RecruitLog | null): AiUnitView[] {
+  const all: AiUnitView[] = [];
   for (const team of op.teams) {
     let pool = offer;
     const goal = inProgress ? team.goals[1] : team.goals[0];
@@ -176,4 +176,4 @@ export function recruitOperation(view: MajorView, seat: number, op: Operation, o
   return all;
 }
 
-const dedupe = (us: readonly MajorUnitView[]): MajorUnitView[] => us.filter((u, i) => us.indexOf(u) === i);
+const dedupe = (us: readonly AiUnitView[]): AiUnitView[] => us.filter((u, i) => us.indexOf(u) === i);

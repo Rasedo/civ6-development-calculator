@@ -2875,7 +2875,7 @@
           "planes": [
             "citystate_unit_strength"
           ],
-          "note": "the minor's strength over every domain as its turn start stored it (`storeUnitStrength`), the civics AI's combat-adjacency term; 0 before its first. A major's is read only by the majors' AI, which runs on TS alone"
+          "note": "the minor's strength over every domain as its turn start stored it (`storeUnitStrength`), the civics AI's combat-adjacency term; 0 before its first."
         },
         {
           "name": "minorArmyAged",

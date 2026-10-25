@@ -70,6 +70,7 @@
     - cpu/core/operations/cityThreat.ts:NEAR_RANGE
     - cpu/core/operations/cityThreat.ts:cityThreat
     - gpu/core/sim_minorai.py:_known_threat
+    - cpu/core/operations/knowledge.ts:KnownUnit
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -132,7 +133,6 @@
     - recording: h1_duelv1124
       turn: 43
       value: minor 3 Regional 20 / Enemy 30 -> desire 0.5 + 0.2 standing army = 0.7 (AI_Military.csv)
-  impl: [ai/major/warValue.ts:regionalStrength]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
@@ -177,7 +177,7 @@
   kind: function
   name: a known city's wonders
   status: PARTLY
-  impl: [ai/major/view.ts:MajorKnownCityView, cpu/core/operations/cityValue.ts:cityWorth]
+  impl: [cpu/core/aiViewTypes.ts:AiKnownCityView, cpu/core/operations/cityValue.ts:cityWorth]
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
@@ -220,10 +220,8 @@
   kind: function
   status: PARTLY
   impl:
-    - ai/major/knowledge.ts:knowledgeTurn
     - cpu/core/tactical.ts:ARMY_RECORD_AGE
     - cpu/core/minorBuild.ts:minorKnowledge
-    - cpu/core/operations/knowledge.ts:lookArmy
     - cpu/core/operations/knowledge.ts:lookCamps
     - cpu/core/tactical.ts:ARMY_RECORD_AGE
     - cpu/core/tactical.ts:knowledgeLook
@@ -325,7 +323,7 @@
   final: 0x3f56e0
   kind: function
   status: PARTLY
-  impl: [ai/major/view.ts:MajorCityView, ai/major/view.ts:MajorKnownCityView]
+  impl: [cpu/core/aiViewTypes.ts:AiKnownCityView]
   readings:
     - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
   context:
@@ -341,9 +339,9 @@
       turn: 18
       value: Caguana one district, defense 19, no walls
   impl:
-    - ai/major/view.ts:MajorKnownCityView
-    - ai/major/view.ts:MajorKnownDistrictView
-    - cpu/core/majorView.ts:knownCities
+    - cpu/core/aiViewTypes.ts:AiKnownCityView
+    - cpu/core/aiViewTypes.ts:AiKnownDistrictView
+    - cpu/core/aiView.ts:knownCities
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:

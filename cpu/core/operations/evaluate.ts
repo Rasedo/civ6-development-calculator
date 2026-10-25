@@ -4,7 +4,7 @@
  * walk 0x747230, the knowledge base's army strength 0x5eadb0; the reading is
  * tools/civ6lab/dll_readings.md "C-97: the operations").
  *
- * Each turn of an AI major the manager lists its candidates: one per running
+ * Each turn of an AI party the manager lists its candidates: one per running
  * operation (its own definition and enemy, its target as the fixed rally, its
  * teams' strength as the fixed strength of ours), then one per allowed
  * definition against no enemy. A candidate walks its definition's targets;
@@ -19,7 +19,7 @@ import { NO_PLOT, type Operation } from './operation';
 import type { AiOpDef, OpsSettle } from './types';
 import { cityValue } from './cityValue';
 import type { KnownUnit } from './knowledge';
-import type { MajorKnownCityView, MajorView } from '../../../ai/major/view';
+import type { AiKnownCityView, AiView } from '../aiViewTypes';
 
 /** one candidate (the 0x70-byte entries at manager +0x328) */
 export interface Candidate {
@@ -53,7 +53,7 @@ export type ArmyUnit = Pick<KnownUnit, 'plot' | 'combat' | 'ranged' | 'damage'>;
  *  larger of combat and ranged strength, less its damage x
  *  COMBAT_WOUNDED_DAMAGE_MULTIPLIER (10) x -0.01 cut toward 0; a unit whose
  *  larger strength is below `minStrength` left out */
-export function armyStrength(view: MajorView, units: readonly ArmyUnit[], plot: number, radius: number, minStrength = -Infinity): number {
+export function armyStrength(view: AiView, units: readonly ArmyUnit[], plot: number, radius: number, minStrength = -Infinity): number {
   let s = 0;
   for (const u of units) {
     if (view.plotDistance(u.plot, plot) > radius || Math.max(u.combat, u.ranged) < minStrength) continue;
@@ -92,7 +92,7 @@ interface Target {
 }
 
 /** the targets of a candidate's definition (0x747230), in the walk's order */
-function targetsOf(view: MajorView, seat: number, c: Candidate, inputs: EvalInputs): Target[] {
+function targetsOf(view: AiView, seat: number, c: Candidate, inputs: EvalInputs): Target[] {
   const { def } = c;
   switch (def.targetType) {
     // the best settle site but the running operation's target, its score's
@@ -151,7 +151,7 @@ function targetsOf(view: MajorView, seat: number, c: Candidate, inputs: EvalInpu
  *  known units within 3 its strength where the seat's best combat strength
  *  passes the enemy's by more than 30, else none; above the definition's
  *  MaxTargetDefense (where it has one) left out */
-function enemyCities(view: MajorView, seat: number, c: Candidate, inputs: EvalInputs): Target[] {
+function enemyCities(view: AiView, seat: number, c: Candidate, inputs: EvalInputs): Target[] {
   const { def } = c;
   const cities = inputs.known();
   const outclassed = view.bestCombatStrength(c.enemy) + 30 < view.bestCombatStrength(seat);
@@ -173,7 +173,7 @@ function enemyCities(view: MajorView, seat: number, c: Candidate, inputs: EvalIn
 
 /** a target's distance limit from a rally (0x746920): MaxTargetDistInRegion
  *  in the same region, InArea in the same area, else InWorld; -1 none */
-function distLimit(view: MajorView, def: AiOpDef, rally: number, target: number): number {
+function distLimit(view: AiView, def: AiOpDef, rally: number, target: number): number {
   const plots = view.plots();
   if (plots[rally].area !== plots[target].area) return def.maxTargetDistInWorld;
   return plots[rally].region === plots[target].region ? def.maxTargetDistInRegion : def.maxTargetDistInArea;
@@ -190,14 +190,14 @@ export interface EvalInputs {
   taken: ReadonlySet<number>;
   /** the camps the knowledge base holds */
   camps: readonly number[];
-  known(): readonly MajorKnownCityView[];
+  known(): readonly AiKnownCityView[];
   /** a player's army as the knowledge base holds it (the seat's own: its
    *  units) */
   army: (player: number) => readonly ArmyUnit[];
 }
 
 /** evaluate a candidate (0x746920): its target, rally, odds and value */
-export function evaluate(view: MajorView, seat: number, c: Candidate, rallies: readonly number[], inputs: EvalInputs): void {
+export function evaluate(view: AiView, seat: number, c: Candidate, rallies: readonly number[], inputs: EvalInputs): void {
   const { def } = c;
   c.valid = false;
   c.target = NO_PLOT;

@@ -7,10 +7,7 @@
   final: 0x4ec000
   kind: function
   status: PARTLY
-  impl:
-    - ai/major/religion.ts:pantheonPick
-    - ai/major/religion.ts:pantheonRecord
-    - cpu/core/phase.ts:seatPhase
+  impl: [cpu/core/phase.ts:seatPhase]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
@@ -66,7 +63,6 @@
   final: 0x4eda50
   kind: function
   status: PARTLY
-  impl: [cpu/data/aiValue.ts:AI_BELIEF_HORIZON, ai/major/religion.ts:beliefScore]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
@@ -127,11 +123,7 @@
   final: 0x4ee820
   kind: function
   status: PARTLY
-  impl:
-    - ai/major/religion.ts:foundingBeliefs
-    - ai/major/religion.ts:religionChoice
-    - ai/major/religion.ts:foundingRecord
-    - cpu/core/game.ts:adoptBeliefs
+  impl: [cpu/core/game.ts:adoptBeliefs]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"

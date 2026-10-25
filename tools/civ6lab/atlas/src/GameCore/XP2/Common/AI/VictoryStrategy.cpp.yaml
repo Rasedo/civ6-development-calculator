@@ -38,7 +38,6 @@
   final: 0x536ee0
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:condition]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
@@ -48,7 +47,6 @@
   final: 0x536f60
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
@@ -58,14 +56,12 @@
   final: 0x537150
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x7bd1c0
   final: 0x5372f0
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
@@ -75,7 +71,6 @@
   final: 0x537340
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
@@ -103,7 +98,6 @@
   final: 0x538c20
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
@@ -125,7 +119,6 @@
   final: 0x538f20
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:

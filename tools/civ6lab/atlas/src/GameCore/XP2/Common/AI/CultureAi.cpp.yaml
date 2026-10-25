@@ -123,7 +123,6 @@
     - recording: h1_duelv1127
       turn: 101
       value: "Qin's Airpower disfavours Mercenary Companies: outcome 2"
-  impl: [ai/major/congress.ts:evaluateResolutions, ai/major/congress.ts:CONGRESS_HORIZON]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -162,7 +161,6 @@
   status: PARTLY
   impl:
     - cpu/core/aiModifiers.ts:ValueTerms
-    - ai/major/congress.ts:bestPolicy
     - cpu/core/aiCivics.ts:civicValue
     - cpu/core/aiPolicyValue.ts:civicPolicyBest
     - cpu/core/minorBuild.ts:minorResearchTurn
@@ -207,7 +205,7 @@
     - recording: 1103
       turn: 12
       value: "A COMPLETION fires the delegate 0x6293e0 — the   government pass 0x625d70, then 0x626600 with the completed civic as the   key — over the entries the AI's last turn left, before this turn's   analysis"
-  impl: [cpu/data/aiValue.ts:AI_POLICY_HORIZON, ai/major/policies.ts:choosePolicies]
+  impl: [cpu/data/aiValue.ts:AI_POLICY_HORIZON]
   readings:
     - "C-94: the slot rebuild — READ"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
@@ -250,7 +248,6 @@
     - recording: h1_duelv1127
       turn: 101
       value: Qin 9 votes on Mercenary Companies from 149 favor
-  impl: [ai/major/congress.ts:allocateVotes, ai/major/congress.ts:hintTarget]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed

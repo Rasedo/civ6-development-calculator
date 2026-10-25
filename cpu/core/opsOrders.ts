@@ -23,21 +23,21 @@ import { NO_SEAT, type City } from './types';
 import { cityStateAt, minorCity } from './cityStates';
 import { COMBAT_MAX_HIT_POINTS } from '../data/constants';
 import { isWater } from '../../world/query';
-import type { MajorAttackTargetView, MajorView } from '../../ai/major/view';
+import type { AiAttackTargetView, AiView } from './aiViewTypes';
 
 /** `base` as `seat`'s operations read it in its pass: the pass's target list
  *  (the one its attack assignment walks), and its units' planning — their
  *  reach, the plot at a range, the spots and the blow on a target (0x791300
  *  taken as the pass opened) — and its units with no Movement left where an
  *  order ended their moves */
-export function passView(state: GameState, seat: number, pass: Pass, base: MajorView): MajorView {
+export function passView(state: GameState, seat: number, pass: Pass, base: AiView): AiView {
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id);
   const reach = (id: number) => pass.plan.get(id)?.reach ?? null;
   return {
     ...base,
     units: (i) => (i !== seat || !pass.ended.size ? base.units(i)
       : base.units(i).map((u) => (pass.ended.has(u.id) ? { ...u, movesLeft: 0 } : u))),
-    attackTargets: (i) => (i !== seat ? base.attackTargets(i) : pass.targets.map((t): MajorAttackTargetView => ({
+    attackTargets: (i) => (i !== seat ? base.attackTargets(i) : pass.targets.map((t): AiAttackTargetView => ({
       type: t.type, plot: t.tile, owner: t.seat, unitType: t.unit ? gameTypeOf('unit', t.unit.type, 'UNIT_') : null,
       range: t.unit ? unitAttackRange(t.unit) : t.type === 'COMBAT_DISTRICT' ? CITY_STRIKE_RANGE : 0,
     }))),

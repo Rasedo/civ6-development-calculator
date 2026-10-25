@@ -104,10 +104,7 @@
     - recording: h1_duelv1127
       turn: 161
       value: the port's option values against World_Congress.csv's OPTIONS and VOTES
-  impl:
-    - cpu/core/aiModifiers.ts:ANALYZERS
-    - cpu/core/aiModifiers.ts:SETS
-    - ai/major/congress.ts:bestPolicy
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiModifiers.ts:SETS]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed

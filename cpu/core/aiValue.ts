@@ -8,7 +8,7 @@
  * pseudo-yield's value to a player (0x7a6690, 0x7a60d0) over the view every
  * AI party's value reads (`AiValueView`). The yield weight is `aiWeights.ts`,
  * the modifier evaluator `aiModifiers.ts`; every AI party (the city-states'
- * research and civics, the majors' AI in ai/major) values through these.
+ * and the Free Cities' research, civics and city builds) values through these.
  */
 import { AI_DISCOUNT_PCT, AI_VALUE_HORIZON } from '../data/aiValue';
 import { AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
@@ -147,7 +147,7 @@ export interface AiCityView {
 /**
  * THE STATE AS THE AI'S VALUE READS IT, in the game's type names: what the
  * modifier analyzers and the yield value take from a player. The engine
- * implements it (cpu/core/majorView.ts); the majors' AI view extends it.
+ * implements it (cpu/core/aiView.ts); the AI view (`AiView`) extends it.
  */
 export interface AiValueView {
   /** the game speed's CostMultiplier, a percent */

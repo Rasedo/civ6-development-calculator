@@ -15,7 +15,6 @@
 - addr: 0x392cb0
   kind: function
   status: PARTLY
-  impl: [ai/major/policies.ts:choosePolicies]
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - "...n (+0x700 -> +0x758) and returns. The government: every one CanChangeGovernment admits (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to..."
@@ -24,7 +23,6 @@
   final: 0x27ba20
   kind: function
   status: PARTLY
-  impl: [ai/major/policies.ts:choosePolicies]
   readings:
     - "C-94: the slot rebuild — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
@@ -50,7 +48,6 @@
   kind: function
   name: CanSlot
   status: PARTLY
-  impl: [ai/major/policies.ts:choosePolicies]
   readings:
     - "C-94: the slot rebuild — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
@@ -280,7 +277,7 @@
   final: 0x2805b0
   kind: function
   status: PARTLY
-  impl: [cpu/core/seatTurn.ts:visitingTourists, ai/major/view.ts:MajorView]
+  impl: [cpu/core/seatTurn.ts:visitingTourists, cpu/core/aiViewTypes.ts:AiView]
   readings:
     - "C-94: trade posts and cultural dominance — READ"
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
@@ -309,7 +306,7 @@
     - recording: 1124
       turn: 3
       value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
-  impl: [cpu/core/majorCityBuild.ts:seatResearchTurns, cpu/core/minorBuild.ts:turns]
+  impl: [cpu/core/freeCityBuild.ts:seatResearchTurns, cpu/core/minorBuild.ts:turns]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...x621920): the civics AI's entry turns plus the turns left on the civic in hand, live (0x39c1f0; -1 with none)."

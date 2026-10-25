@@ -79,7 +79,7 @@
   final: 0x114c80
   kind: function
   status: PARTLY
-  impl: [ai/major/view.ts:MajorView]
+  impl: [cpu/core/aiViewTypes.ts:AiView]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -94,7 +94,7 @@
     - recording: h1_duelv1117
       turn: 18
       value: China at Caguana a lead of 4
-  impl: [ai/major/view.ts:MajorView, cpu/core/phase.ts:plotPressureLead]
+  impl: [cpu/core/aiViewTypes.ts:AiView, cpu/core/phase.ts:plotPressureLead]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -204,7 +204,7 @@
     - cpu/core/phase.ts:pressureTerm
     - gpu/core/sim_phase.py:_pressure_term
     - cpu/core/phase.ts:plotPressureLead
-    - ai/major/view.ts:MajorView
+    - cpu/core/aiViewTypes.ts:AiView
   readings:
     - "H-1: the citizen pressure term — PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"

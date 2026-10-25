@@ -263,8 +263,6 @@
       turn: 20
       value: Caguana 112 for two envoys
   impl:
-    - ai/major/diploActions.ts:ENVOY_WORTH_START
-    - ai/major/diploActions.ts:minorWarDesire
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiModifiers.ts:ValueTerms
     - cpu/core/aiModifiers.ts:envoyValue
@@ -301,9 +299,7 @@
       value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
   impl:
     - cpu/core/aiModifiers.ts:modifiersValue
-    - ai/major/religion.ts:beliefValue
     - cpu/core/aiModifiers.ts:envoyValue
-    - ai/major/governors.ts:governorValue
     - gpu/core/sim_cityvalue.py:SimCityValue
     - gpu/core/sim_cityvalue.py:_cv_modifiers
     - cpu/core/aiCivics.ts:civicValue
@@ -419,7 +415,6 @@
   status: PARTLY
   impl:
     - cpu/core/aiValue.ts:yieldValue
-    - ai/major/diploState.ts:answerAction
     - gpu/core/sim_cityvalue.py:_cv_yield
     - cpu/core/minorBuild.ts:minorUnitTerm
   readings:
@@ -503,10 +498,7 @@
   final: 0x52b7d0
   kind: function
   status: PARTLY
-  impl:
-    - cpu/core/aiModifiers.ts:ValueTerms
-    - ai/major/religion.ts:evaluationReligion
-    - ai/major/religion.ts:beliefValue
+  impl: [cpu/core/aiModifiers.ts:ValueTerms]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
@@ -622,10 +614,6 @@
     - recording: h1_duelw1117
       turn: 28
       value: Connoisseur 160 = 7 citizens x 22.8
-  impl:
-    - ai/major/governors.ts:NEW_POSTING_TURNS
-    - ai/major/governors.ts:PROMOTION_FLOOR
-    - ai/major/governors.ts:promotionScore
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -640,11 +628,6 @@
     - recording: h1_duelw1117
       turn: 3
       value: Merchant 23 = 20 + Land Acquisition 3; Educator 30 = 20 + Librarian 10
-  impl:
-    - ai/major/governors.ts:GOVERNOR_HORIZON
-    - ai/major/governors.ts:NEW_POSTING_TURNS
-    - ai/major/governors.ts:NO_CITY_BASE_MAJOR
-    - ai/major/governors.ts:governorValue
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -730,7 +713,7 @@
     - recording: h1_duelv1127
       turn: 161
       value: the port's option values against World_Congress.csv's OPTIONS and VOTES
-  impl: [ai/major/congress.ts:optionValue, cpu/core/aiModifiers.ts:ValueTerms]
+  impl: [cpu/core/aiModifiers.ts:ValueTerms]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed

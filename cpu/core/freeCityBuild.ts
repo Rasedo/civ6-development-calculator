@@ -1,10 +1,10 @@
 /**
- * THE CITY BUILD AI'S VIEW OF A MAJOR'S CITY (`aiCityBuild.ts`): the facts
- * the value tables read (`majorBuildFacts`), what the Default
- * Specialization pick reads beside them (`majorPickFacts`), an item's price
- * and the turns to it at the city's Production, and the production column
- * an item takes (`majorItemColumn`). The minors' twins are
- * `minorBuildFacts` / `minorPickFacts` (`minorBuild.ts`).
+ * THE CITY BUILD AI'S VIEW OF A FREE CITY (`aiCityBuild.ts`): the facts the
+ * value tables read (`freeCityBuildFacts`: a major's city's, over the Free
+ * Cities' seat), an item's price and the turns to it at the city's
+ * Production, the traits and the unit versions a major's or the Free
+ * Cities' seat holds. The city-states' twins are `minorBuildFacts` /
+ * `minorPickFacts` (`minorBuild.ts`).
  */
 import type { City, DistrictId, GameState, QueueItem, YieldKey } from './types';
 import { BUILDINGS } from '../data/buildings';
@@ -21,12 +21,12 @@ import { engineId } from '../data/aliases';
 import { RESOURCES } from '../../world/resources';
 import { hasRiver } from '../../world/query';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, constructibleNow, growthForecast, type AmenityCity, type CityBuildFacts, type PickFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, growthForecast, type AmenityCity, type CityBuildFacts } from './aiCityBuild';
 import { FX, fmul, fxOf, turnsAt } from './aiValue';
 import { unitProductionTable } from './aiUnitProduction';
 import { researchAnalysis } from './aiResearch';
 import { civicAnalysis } from './aiCivics';
-import { cityGrowth, majorView, type MajorViewInputs } from './majorView';
+import { cityGrowth, aiView } from './aiView';
 import { analysedTurns, installType, promotionWeight } from './minorBuild';
 import { civEraIndex, computeCityStats } from './city';
 import { researchCost } from './economy';
@@ -39,7 +39,7 @@ import { builderCost, cityNavalCapable, traderCost } from './units';
 import { districtCost, projectCost, settlerCost, unitStepCost, unitsAcquired } from './game';
 import { handicapOf } from './barbarians';
 import { productionObs, unitGates } from './decideObsCities';
-import { prodLayout, queueItemColumn } from './prodLayout';
+import { queueItemColumn } from './prodLayout';
 
 const YIELD_KEY: Readonly<Record<string, YieldKey>> = {
   YIELD_FOOD: 'food', YIELD_PRODUCTION: 'production', YIELD_GOLD: 'gold', YIELD_SCIENCE: 'science', YIELD_CULTURE: 'culture', YIELD_FAITH: 'faith',
@@ -93,7 +93,7 @@ const keyOf = (q: QueueItem): string => (q.kind === 'building' ? `b:${q.building
   : q.kind === 'settler' ? 's' : q.kind === 'district' ? `d:${q.district}` : q.kind === 'project' ? `p:${q.project}` : `w:${q.wonder}`);
 
 /** the install type of a major's queue item, null for a wonder */
-export function majorItemType(q: QueueItem | undefined): string | null {
+function majorItemType(q: QueueItem | undefined): string | null {
   if (!q) return null;
   if (q.kind === 'building') return installType('building', q.building, 'BUILDING_');
   if (q.kind === 'unit') return installType('unit', q.unit, 'UNIT_');
@@ -118,13 +118,12 @@ export function majorUnitVersion(traits: readonly string[], u: string): string |
 
 /** THE CITY BUILD AI'S VIEW OF A MAJOR'S CITY, its knowledge base's unit
  *  counts `known` */
-export function majorBuildFacts(state: GameState, city: City, known: (unit: string) => number,
-                                inputs?: MajorViewInputs): CityBuildFacts {
+function majorBuildFacts(state: GameState, city: City, known: (unit: string) => number): CityBuildFacts {
   const seat = city.seat;
   const s = seatOf(state, seat)!;
   const stats = computeCityStats(state, city);
   const r = s.research;
-  const view = majorView(state, inputs);
+  const view = aiView(state);
   const traits = majorTraits(state, seat);
   const own = citiesOf(state, seat);
   const amenityOf = (c: City): AmenityCity => {
@@ -283,45 +282,6 @@ export function majorUnitExpected(state: GameState, city: City, type: string): n
   return col >= 0 && open.includes(col) ? FX / 2 : 0;
 }
 
-/** What the Default Specialization pick reads of a major's city: the
- *  building held or in hand, CanConstruct (`constructibleNow` on the facts,
- *  and the engine's own offer), CanTrain and the projects (the engine's
- *  production columns open, `productionObs`), the favoured items none, the
- *  plain pick (the defensive one's inputs unread). */
-export function majorPickFacts(state: GameState, city: City, facts: CityBuildFacts): PickFacts {
-  const s = seatOf(state, city.seat)!;
-  const L = prodLayout();
-  const open = new Set(productionObs(state, s, { ...city, queue: [] }, unitGates(state, city.seat)).prodOpen);
-  const inHand = majorItemType(city.queue[0]);
-  const held = city.buildings;
-  const col = (type: string): number => queueItemColumn(majorQueueItem(state, city.seat, city, type) ?? undefined);
-  return {
-    buildingHeld: (b) => {
-      const id = engineId('building', b, 'BUILDING_', BUILDINGS);
-      return inHand === b || (!!id && held.includes(id));
-    },
-    canConstruct: (b) => {
-      const c = col(b);
-      return c >= 0 && c < L.NB && open.has(c) && constructibleNow(facts, AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]);
-    },
-    reasonsClear: (b) => {
-      const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
-      if (row.district && !facts.hasDistrict(row.district)) return false;
-      return !row.prereqs.length || row.prereqs.some((p) => facts.hasBuilding(p));
-    },
-    canTrain: (u) => {
-      const c = col(u);
-      return c >= 0 && open.has(c);
-    },
-    canProduce: (p) => {
-      const c = col(p);
-      return c >= 0 && open.has(c);
-    },
-    favored: () => 0,
-    defense: false,
-  };
-}
-
 /** THE CITY BUILD AI'S VIEW OF A FREE CITY: a major's view of the city
  *  over the Free Cities' seat, but no full civilization, its trait
  *  TRAIT_LEADER_FREE_CITIES' promotion lists, its research and civics turns
@@ -340,9 +300,4 @@ export function freeCityBuildFacts(state: GameState, city: City): CityBuildFacts
       return !!id && tilesWithin(state.map, centre.col, centre.row, 3).some((t) => t.resource === id);
     },
   };
-}
-
-/** the production column of an install type in a major's city (-1 none) */
-export function majorItemColumn(state: GameState, city: City, type: string): number {
-  return queueItemColumn(majorQueueItem(state, city.seat, city, type) ?? undefined);
 }

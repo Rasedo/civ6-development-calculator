@@ -8,7 +8,6 @@
   kind: function
   name: Rules_Cities
   status: PARTLY
-  impl: [ai/major/settle.ts:canFoundAt]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:

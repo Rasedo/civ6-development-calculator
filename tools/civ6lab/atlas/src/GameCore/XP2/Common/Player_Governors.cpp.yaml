@@ -15,7 +15,6 @@
   final: 0x2dd760
   kind: function
   status: PARTLY
-  impl: [ai/major/governors.ts:governorChoice]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -34,7 +33,7 @@
   final: 0x2ddbb0
   kind: function
   status: PARTLY
-  impl: [ai/major/view.ts:MajorView]
+  impl: [cpu/core/aiViewTypes.ts:AiView]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -49,7 +48,7 @@
     - recording: h1_duelw1117
       turn: 1
       value: Ibrahim (TRAIT_LEADER_SULEIMAN_GOVERNOR) scores 0 for China
-  impl: [ai/major/view.ts:MajorView]
+  impl: [cpu/core/aiViewTypes.ts:AiView]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:

@@ -70,8 +70,8 @@ export interface AiTriggeredTree {
   priority: number;
 }
 
-/** what a seat's settling AI gives its operations (a major's from
- *  ai/major/settle.ts; none for a party that never settles) */
+/** what a seat's settling AI gives its operations (none for a party that
+ *  never settles: a city-state, the Free Cities, the barbarians) */
 export interface OpsSettle {
   /** the best region top but `exclude` (0x6fe2b0): its plot and its score,
    *  fixed point; null for none */

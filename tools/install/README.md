@@ -22,14 +22,15 @@ attributes; a line grep for `ModifierType="..."` returns nothing there and
 reads as "no such modifier exists". This parses the XML and prints each
 modifier's arguments and what attaches it.
 
-### `ai_tables.py` — the majors' AI tables
+### `ai_tables.py` — the AI tables
 
-    python tools/install/ai_tables.py            # write ai/major/tables.ts
-    python tools/install/ai_tables.py --check    # exit 1 when the file is stale
+    python tools/install/ai_tables.py            # write cpu/data/aiTables.ts, aiBuildTables.ts, congressTargets.ts
+    python tools/install/ai_tables.py --check    # exit 1 when a file is stale
 
 The rows the game's AI reads, in DATABASE ORDER (its loops' index; checked
 against every AI_GovtPolicies.csv score list): the policies with their slot,
 civic, Policies_XP1 terms, exclusivity, obsolescence and modifiers as
 DynamicModifiers resolve them; the governments with their slots, Favor,
 Influence threshold and modifiers; the slot types; the Yields' and
-PseudoYields' DefaultValue; the eras.
+PseudoYields' DefaultValue; the trait lists the weights sum; the city build
+AI's tables; the World Congress's valid targets.

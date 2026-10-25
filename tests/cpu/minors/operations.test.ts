@@ -1,23 +1,21 @@
-// The majors' war operations (cpu/core/operations): the city's defense the
-// city value reads, the knowledge base's army records' ageing, the march
-// point and battle line of the team update, and Is At War.
+// The operations (cpu/core/operations): the city's defense the city value
+// reads, the knowledge base's army records' ageing, the march point and
+// battle line of the team update, Is At War, the generalized assignment and
+// the city's threat.
 import { describe, expect, it } from 'vitest';
 import { cityDefense } from '../../../cpu/core/operations/cityValue';
-import { knownArmy, lookArmy, type ArmyRecords } from '../../../cpu/core/operations/knowledge';
 import { updateTeam, ASSAULT_NODES } from '../../../cpu/core/operations/assault';
 import { compileTree, newRun, BT_FAILURE, BT_SUCCESS } from '../../../cpu/core/behaviorTree';
-import type { MajorKnownCityView, MajorPlotView, MajorUnitView, MajorView } from '../../../ai/major/view';
+import type { AiKnownCityView, AiMapPlotView, AiUnitView, AiView } from '../../../cpu/core/aiViewTypes';
 import type { OpTeam, Operation } from '../../../cpu/core/operations/operation';
 import type { OpsContext } from '../../../cpu/core/operations/nodes';
-import { balance, regionalStrength, type WarValueInputs } from '../../../ai/major/warValue';
 import { generalizedAssignment } from '../../../cpu/core/aiAssignment';
-import { FX } from '../../../cpu/core/aiValue';
 import type { KnownUnit } from '../../../cpu/core/operations/knowledge';
 import { cityThreat } from '../../../cpu/core/operations/cityThreat';
 
 const W = 12;
 const H = 12;
-const plots: MajorPlotView[] = Array.from({ length: W * H }, (_v, i) => ({
+const plots: AiMapPlotView[] = Array.from({ length: W * H }, (_v, i) => ({
   index: i, x: i % W, y: Math.floor(i / W), water: false, impassable: false, feature: null, resource: null,
   owner: -1, district: false, city: false, area: 0, region: 0, continent: 0, coastal: false, freshWater: false, lake: false,
 }));
@@ -31,16 +29,16 @@ function dist(a: number, b: number): number {
   return Math.max(Math.abs(ax - bx), Math.abs(az - bz), Math.abs(ax + az - bx - bz));
 }
 
-const unit = (id: number, plot: number, over: Partial<MajorUnitView> = {}): MajorUnitView => ({
+const unit = (id: number, plot: number, over: Partial<AiUnitView> = {}): AiUnitView => ({
   id, type: 'UNIT_WARRIOR', plot, founder: false, combat: 20, ranged: 0, range: 0, damage: 0, movesLeft: 512, baseMoves: 2, bombard: 0, domain: 'land', ...over,
 });
 
-function view(over: Partial<MajorView>): MajorView {
-  return { plots: () => plots, plotDistance: dist, players: () => [0, 1, 2], ...over } as unknown as MajorView;
+function view(over: Partial<AiView>): AiView {
+  return { plots: () => plots, plotDistance: dist, players: () => [0, 1, 2], ...over } as unknown as AiView;
 }
 
 describe('the city value\'s defense (0x5eb2c0)', () => {
-  const city = (districts: MajorKnownCityView['districts']) => ({ districts }) as MajorKnownCityView;
+  const city = (districts: AiKnownCityView['districts']) => ({ districts }) as AiKnownCityView;
   it('sums the districts, the walled ones at the strongest + 10', () => {
     expect(cityDefense(city([{ plot: 0, defense: 28, walls: 0, strike: 3 }]), true)).toBe(28);
     expect(cityDefense(city([{ plot: 0, defense: 28, walls: 28, strike: 3 }]), true)).toBe(38);
@@ -48,20 +46,6 @@ describe('the city value\'s defense (0x5eb2c0)', () => {
   it('without its byte, the strongest of defense - 10 and walls', () => {
     expect(cityDefense(city([{ plot: 0, defense: 28, walls: 0, strike: 3 }]), false)).toBe(18);
     expect(cityDefense(city([{ plot: 0, defense: 28, walls: 28, strike: 3 }]), false)).toBe(28);
-  });
-});
-
-describe('the knowledge base\'s army records', () => {
-  it('records what the seat sees and drops a record past age 21', () => {
-    const records: ArmyRecords = new Map();
-    let seen = [unit(5, at(3, 3))];
-    const v = view({ knownUnits: (_s: number, p: number) => (p === 1 ? seen : []) });
-    lookArmy(records, v, 0, 1);
-    seen = [];
-    lookArmy(records, v, 0, 22);
-    expect(knownArmy(records, 1).map((r) => r.id)).toEqual([5]);
-    lookArmy(records, v, 0, 23);
-    expect(knownArmy(records, 1)).toEqual([]);
   });
 });
 
@@ -107,22 +91,6 @@ describe('Is At War (0x7edde0)', () => {
   it('counts the operation\'s enemy alone', () => {
     expect(ASSAULT_NODES['Is At War'].update(nodes[0], run, ctx([2], 1))).toBe(BT_FAILURE);
     expect(ASSAULT_NODES['Is At War'].update(nodes[0], run, ctx([1, 2], 1))).toBe(BT_SUCCESS);
-  });
-});
-
-describe('the war value\'s balance (0x7b7830)', () => {
-  const rec = (plot: number, combat: number, seen: number): KnownUnit => ({ id: plot, owner: 1, type: 'UNIT_WARRIOR', plot, combat, ranged: 0, damage: 0, seen });
-  const inputs = (records: KnownUnit[]): WarValueInputs => ({ army: () => [], records: () => records, turn: 10 });
-  const strengths = (s: number, t: number) => view({
-    militaryStrength: (q: number) => (q === 0 ? s : t), cityPlots: () => [at(1, 1)], militaryYardstick: () => 20,
-  });
-  it('the regional strength sums the records seen within two turns that pass the yardstick less 20', () => {
-    expect(regionalStrength(strengths(0, 0), 0, 1, inputs([rec(at(2, 2), 30, 9), rec(at(3, 3), 25, 7), rec(at(4, 4), 0, 10)]))).toBe(30);
-  });
-  it('a weak region costs its own strength, else the smaller army where the target is within 30', () => {
-    expect(balance(strengths(100, 80), 0, 1, inputs([]))).toBe((-0 + 20) * FX);
-    expect(balance(strengths(100, 80), 0, 1, inputs([rec(at(2, 2), 30, 10)]))).toBe((-80 + 20) * FX);
-    expect(balance(strengths(100, 200), 0, 1, inputs([rec(at(2, 2), 60, 10)]))).toBe((-100 - 200) * FX);
   });
 });
 

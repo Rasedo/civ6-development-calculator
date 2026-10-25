@@ -221,7 +221,7 @@
     - cpu/core/barbarians.ts:ringPlots
     - gpu/core/sim_init.py:__init__
     - gpu/core/simbase.py:barb_ring_table
-    - ai/major/view.ts:MajorView
+    - cpu/core/aiViewTypes.ts:AiView
   readings:
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
@@ -298,7 +298,6 @@
   final: 0x4f890
   kind: function
   status: PARTLY
-  impl: [ai/major/settle.ts:CITY_MIN_RANGE]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:
@@ -450,7 +449,9 @@
   final: 0x5e890
   kind: function
   status: PARTLY
-  readings: ["C-20 tail: the trade path's land and water tests and the switch — READ"]
+  readings:
+    - "C-20 tail: the trade path's land and water tests and the switch — READ"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...rtual +0x40 holds (a district stands there), they read the plot info's word +0x14 through 0x81240 — argument 0 tests bit 1, 1 bit 2, 2 bit 4: land = bit 4 and not bit 1, water = bit 1 and..."
@@ -711,7 +712,6 @@
   final: 0x144810
   kind: function
   status: PARTLY
-  impl: [ai/major/settle.ts:canFoundAt]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:
@@ -767,7 +767,7 @@
     - recording: h1_duelv1128
       turn: 73
       value: runs/h1_duelv1128 China's Attack Enemy City of t73 on a city that raised   its defenses turns INVALID at t76 with no team member;
-  impl: [ai/major/view.ts:MajorView]
+  impl: [cpu/core/aiViewTypes.ts:AiView]
   readings:
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: Attack Units — READ, ported"
@@ -1146,7 +1146,6 @@
   final: 0x2436b0
   kind: function
   status: PARTLY
-  impl: [ai/major/religion.ts:beliefScore]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
@@ -1156,7 +1155,6 @@
   final: 0x243730
   kind: function
   status: PARTLY
-  impl: [ai/major/religion.ts:beliefScore]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
@@ -1166,7 +1164,6 @@
   final: 0x243780
   kind: function
   status: PARTLY
-  impl: [ai/major/religion.ts:religionBeliefPick]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
@@ -1996,10 +1993,7 @@
     - recording: h1_duelv1124
       turn: 84
       value: Granada's Harbor contract CANCELLED
-  impl:
-    - cpu/core/aiContracts.ts:inHandCheck
-    - cpu/harness/operationsAi.ts:updateContracts
-    - cpu/harness/operationsAi.ts:updateContracts
+  impl: [cpu/core/aiContracts.ts:inHandCheck]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -2268,7 +2262,7 @@
     - recording: h1_duelw1117
       turn: 205
       value: the first largest gain above 0 takes the slot
-  impl: [ai/major/governors.ts:governorAssignment, cpu/core/aiAssignment.ts:generalizedAssignment]
+  impl: [cpu/core/aiAssignment.ts:generalizedAssignment]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
@@ -2303,7 +2297,6 @@
   final: 0x436f60
   kind: function
   status: PARTLY
-  impl: [ai/major/diploActions.ts:DesireInputs]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -2366,7 +2359,6 @@
     - recording: h1_duelv1127
       turn: 81
       value: Border Control option 2 names the other player
-  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -2382,7 +2374,6 @@
     - recording: 1127
       turn: 192
       value: "Neutral -> Friendly adds Open Borders and   Request Assistance, so Qin moves at opinion >= -5 when its Open Borders   desire turns positive (1127 t192, 1124 t108, 1128 t167, 1117 t235: 0 at   234, no "
-  impl: [ai/major/diploState.ts:CHECKS, ai/major/diploActions.ts:friendshipSpaced]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -2400,7 +2391,6 @@
     - recording: h1_duelv1127
       turn: 100
       value: "no denouncement: the opinion never reached -25 in Unfriendly"
-  impl: [ai/major/diploState.ts:CHECKS]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
@@ -2409,7 +2399,6 @@
   name: CanGoToWar
   semantics: An AI owner; fewer than three wars (0x3dfae0); the military AI's war operation against the other (0x723cf0(other, 1, 5)); the Formal War not disfavoured (@f2e5ac); 0x64a560 >= 0; CanDeclareWarOn(0x73b8c966).
   status: PARTLY
-  impl: [ai/major/diploState.ts:CHECKS]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
@@ -2422,7 +2411,6 @@
     - recording: h1_duelv1127
       turn: 161
       value: "Diplomatic Victory: option 1 names the player itself (OPTIONS 1, 1)"
-  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -2435,7 +2423,6 @@
     - recording: h1_duelv1127
       turn: 1117 t181
       value: Public Works option 1 names project 26 / 24
-  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -2448,7 +2435,6 @@
     - recording: h1_duelv1127
       turn: 61
       value: "World Religion option 1 without a religion: a draw over the 1 founded"
-  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -2461,7 +2447,6 @@
     - recording: h1_duelv1127
       turn: 181
       value: "Espionage Pact: two draws over 10"
-  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -2474,7 +2459,6 @@
     - recording: h1_duelv1127
       turn: 61
       value: "Trade Treaty: each AI names the other player (OPTIONS 1 / 0)"
-  impl: [ai/major/congress.ts:congressHint]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -2487,7 +2471,6 @@
     - recording: h1_duelv1127
       turn: 101
       value: "Mercenary Companies option 2: the most of Production / Gold"
-  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
@@ -2785,7 +2768,6 @@
     - recording: h1_duelw1117
       turn: 205
       value: the Merchant's gain at Xiurong 69 - 46 = 23 over the Resource Manager's 20
-  impl: [ai/major/governors.ts:governorAssignment]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
@@ -2865,10 +2847,7 @@
     - recording: 1124
       turn: 28
       value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
-  impl:
-    - ai/major/settle.ts:bestSettleSite
-    - cpu/core/operations/evaluate.ts:targetsOf
-    - cpu/core/operations/types.ts:OpsSettle
+  impl: [cpu/core/operations/evaluate.ts:targetsOf, cpu/core/operations/types.ts:OpsSettle]
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -2924,7 +2903,6 @@
   final: 0x4b4ff0
   kind: function
   status: UNREAD
-  impl: [ai/major/congress.ts:h]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   context:
@@ -2937,7 +2915,6 @@
   cases:
     - recording: AI_SiteEval.csv
       value: "AI_SiteEval.csv logs no score below 0:   the port clamps there."
-  impl: [ai/major/settle.ts:plotScore]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:
@@ -2949,7 +2926,6 @@
   final: 0x4c4f30
   kind: function
   status: PARTLY
-  impl: [ai/major/danger.ts:ring]
   readings: ["C-95: the danger map and Move to Safety — READ, ported"]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
@@ -2957,7 +2933,7 @@
   final: 0x4c4fe0
   kind: function
   status: PARTLY
-  impl: [ai/major/danger.ts:dangerMap, cpu/core/tactical.ts:dangerPlane]
+  impl: [cpu/core/tactical.ts:dangerPlane]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:
@@ -3053,7 +3029,6 @@
   semantics: "The military AI's operations (+0x318): one of the type (5) against the player (+0x2a0)."
   status: PARTLY
   impl:
-    - ai/major/diploState.ts:CHECKS
     - cpu/core/operations/cityThreat.ts:OWN_OPERATION_RANGE
     - cpu/core/operations/cityThreat.ts:ThreatInputs
     - cpu/core/operations/cityThreat.ts:cityThreat
@@ -3075,12 +3050,6 @@
   name: warOperationReady
   semantics: "The military AI's operations (+0x318): one of the type (5) against the player (+0x2a0) past its state; the operation's states unread."
   status: PARTLY
-  impl:
-    - ai/major/diploActions.ts:DesireInputs
-    - ai/major/diploActions.ts:canDo
-    - cpu/core/operations/manager.ts:surpriseWarReady
-    - cpu/core/operations/manager.ts:warOperationReady
-    - cpu/harness/diploSender.ts:WarHooks
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -3127,7 +3096,6 @@
   impl:
     - cpu/core/aiCityTrees.ts:CityTreeWorld
     - cpu/core/operations/manager.ts:operationsRun
-    - cpu/harness/operationsAi.ts:cityDefense
     - cpu/core/minorOps.ts:minorOpsStart
     - cpu/core/operations/manager.ts:startOperationNamed
     - cpu/core/operations/manager.ts:operationsEvaluate
@@ -3251,11 +3219,6 @@
   final: 0x4eebd0
   kind: function
   status: PARTLY
-  impl:
-    - ai/major/religion.ts:religionBeliefPick
-    - ai/major/religion.ts:foundingBeliefs
-    - ai/major/religion.ts:foundingRecord
-    - ai/major/religion.ts:enhanceRecord
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
@@ -3271,7 +3234,6 @@
     - recording: h1_duelv1127
       turn: 30
       value: Faith patronage of Zoroaster (the record's purse)
-  impl: [ai/major/greatPeople.ts:faithPatronage, cpu/harness/greatPeopleAi.ts:GreatPeopleProbe]
   readings:
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
   review: reviewed
@@ -3430,7 +3392,7 @@
     - cpu/core/tactical.ts:reachAt
     - gpu/core/sim_tactics.py:_barb_reach_at
     - cpu/core/tactical.ts:strikers
-    - ai/major/view.ts:MajorView
+    - cpu/core/aiViewTypes.ts:AiView
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
@@ -3452,7 +3414,7 @@
   final: 0x51dd50
   kind: function
   status: PARTLY
-  impl: [ai/major/view.ts:MajorView]
+  impl: [cpu/core/aiViewTypes.ts:AiView]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x793400
@@ -3593,12 +3555,6 @@
   name: warValue
   semantics: "The war value: 0x7b7ab0 (855 instructions: the plots, units and cities) + 0x7b7830 unless the flag + 0x7b87b0 (PSEUDOYIELD_DIPLOMATIC_BONUS) where a casus belli is named; the parts unread."
   status: PARTLY
-  impl:
-    - ai/major/diploActions.ts:DesireInputs
-    - ai/major/diploActions.ts:desire
-    - ai/major/diploActions.ts:worth
-    - ai/major/warValue.ts:warValue
-    - cpu/harness/diploSender.ts:WarHooks
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -3658,7 +3614,6 @@
   final: 0x535f90
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
@@ -3668,7 +3623,6 @@
   final: 0x536130
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
@@ -3678,7 +3632,6 @@
   final: 0x536310
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
@@ -3688,14 +3641,12 @@
   final: 0x5393f0
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x7bff10
   final: 0x5394b0
   kind: function
   status: PARTLY
-  impl: [ai/major/strategies.ts:fn]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
@@ -4839,7 +4790,7 @@
   final: 0x669c50
   kind: function
   status: PARTLY
-  impl: [cpu/harness/replay.ts:dugIn, cpu/harness/replay.ts:recordState]
+  impl: [cpu/harness/replay.ts:dugIn, cpu/harness/replay.ts:prev]
   readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
@@ -5490,7 +5441,6 @@
   kind: function
   name: NOT_COMPETING_MINORS
   status: PARTLY
-  impl: [ai/major/diplomacy.ts:REQUIREMENTS]
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
@@ -5531,7 +5481,6 @@
   cases:
     - recording: 1114
       value: "Two majors: +5, 0, -8, -13 (1114 Trajan of Qin: -8 at 27, 0 at 32, +5 at   36)."
-  impl: [ai/major/diplomacy.ts:VALUES]
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
@@ -5544,7 +5493,6 @@
   cases:
     - recording: 1114
       value: "Two majors: +5, 0, -8, -13 (1114 Trajan of Qin: -8 at 27, 0 at 32, +5 at   36)."
-  impl: [ai/major/diplomacy.ts:VALUES]
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
@@ -5557,7 +5505,6 @@
   cases:
     - recording: h1_duelw1104
       value: "the field's writer is unread — the port counts   the seat's military units of the domain (runs/h1_duelw1104: Rome 43+ land   units to Qin's 8, Trajan's Standing Army -6 at 106 = the meeting + 30)."
-  impl: [ai/major/diplomacy.ts:REQUIREMENTS]
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
@@ -5567,7 +5514,6 @@
   kind: function
   name: COMPETING_MINORS
   status: PARTLY
-  impl: [ai/major/diplomacy.ts:REQUIREMENTS]
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
@@ -5595,7 +5541,6 @@
   cases:
     - recording: h1_duelw1110
       value: "- NEW_WARMONGER (0xb7eee0, arguments 0xb81dd0): the owner's grievances   against the subject (0x3d8d20), -PercentOfGrievances (20) % of them, no   lower than LowerLimit (-60): the logged -30 after eac"
-  impl: [ai/major/diplomacy.ts:VALUES]
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
@@ -5608,7 +5553,6 @@
   cases:
     - recording: h1_duelw1110
       value: "- NEW_WARMONGER (0xb7eee0, arguments 0xb81dd0): the owner's grievances   against the subject (0x3d8d20), -PercentOfGrievances (20) % of them, no   lower than LowerLimit (-60): the logged -30 after eac"
-  impl: [ai/major/diplomacy.ts:VALUES]
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
@@ -5665,7 +5609,6 @@
   kind: function
   name: TRADE_RELATIONS
   status: PARTLY
-  impl: [ai/major/diplomacy.ts:VALUES]
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
@@ -5675,7 +5618,6 @@
   final: 0x8f42e0
   kind: function
   status: PARTLY
-  impl: [ai/major/diplomacy.ts:VALUES]
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:

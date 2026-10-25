@@ -26,7 +26,7 @@
     - recording: 1121
       turn: 40
       value: every minor turn the game lists Bastions equal (1121 t40-75, 1117 t32-75).
-  impl: [cpu/core/majorView.ts:centres]
+  impl: [cpu/core/aiView.ts:centres]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"

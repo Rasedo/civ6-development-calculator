@@ -22,7 +22,6 @@
     - recording: h1_duelv1124
       turn: 40
       value: "A natural wonder row adds its   value to ITS OWN feature once per natural wonder in the database (the loop   over the features indexes the row's feature, [r15+0x14], not the loop's):   FEATURE_DEAD_SE"
-  impl: [ai/major/settle.ts:PlotEvalEntry]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:
@@ -37,10 +36,7 @@
   cases:
     - recording: h1_duelw1110
       value: "Player 0 of   runs/h1_duelw1110, 1112 and 1115 reads Diplomatic League 93 / 140 / 234   and Charismatic Leader 18: its agenda's Influence row at 1.25 (the   pseudo-yield weight above)."
-  impl:
-    - cpu/data/aiValue.ts:AI_POLICY_HORIZON
-    - cpu/data/aiValue.ts:AI_BELIEF_HORIZON
-    - cpu/data/aiValue.ts:AI_DISCOUNT_PCT
+  impl: [cpu/data/aiValue.ts:AI_POLICY_HORIZON, cpu/data/aiValue.ts:AI_DISCOUNT_PCT]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
@@ -56,7 +52,6 @@
   kind: function
   name: GlobalAI
   status: PARTLY
-  impl: [ai/major/knowledge.ts:yieldDefaults]
   readings:
     - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
   context:
