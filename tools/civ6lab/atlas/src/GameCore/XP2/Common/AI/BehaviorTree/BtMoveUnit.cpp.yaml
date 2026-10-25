@@ -24,6 +24,7 @@
     - cpu/core/barbarianOps.ts:SCOUT_NODES
     - cpu/core/aiCityTrees.ts:execute
     - gpu/core/sim_citytrees.py:_x_move
+    - cpu/core/minorOps.ts:upgradeTreesTick
     - cpu/core/aiCityTrees.ts:moveUnit
     - cpu/core/tactical.ts:walk
   readings:
@@ -32,6 +33,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
@@ -59,6 +61,18 @@
   context:
     - ...0 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the target is gon...
   review: imported
+- addr: 0x7ef850
+  final: 0x557910
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/minorOps.ts:upgradeTreesTick]
+  readings:
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...s tables): Find Unit Targets update 0x7ed200, Upgrade Units update 0x7f0ea0 / execution 0x7ef850."
+    - "...UNITS: update (0x7f0ea0) SUCCESS with the tree holding a unit, else FAILURE. Execution (0x7ef850), a player no human drives, over the tree's units in the player's order (0x6092c0): the..."
+  review: imported
 - addr: 0x7efd70
   final: 0x557e40
   kind: function
@@ -85,6 +99,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.

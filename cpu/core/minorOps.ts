@@ -25,16 +25,23 @@ import type { ArmyRecord, CityState, GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { majorView } from './majorView';
-import { cityStateTactics, passFinish, plotDistance, type Pass } from './tactical';
+import { cityStateTactics, moveTo, passFinish, plotDistance, type Pass } from './tactical';
 import { ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
-import { NO_PLOT, opUnits } from './operations/operation';
+import { NO_PLOT, opDef, opUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
-import { installType, minorSetItem } from './minorBuild';
+import { installType, minorCanUpgrade, minorSetItem, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
 import { minorContractCity } from './minorCityAi';
 import { campTiles } from './seats';
+import { goldAffordable } from './game';
+import { FX } from './aiValue';
+import { newEconomicMemory, upgradePurchase } from './aiEconomic';
+import { minorCity } from './cityStates';
+import { isCoastalLand } from '../../world/query';
+import { MINOR_UPGRADE_GOLD } from '../data/cityStates';
+import { AI_MINOR_TRIGGERS, AI_TRIGGERED_TREES } from '../data/aiOperations';
 import { cityStateSight } from './fog';
 import type { ContractCity } from './aiContracts';
 import type { UnitProductionRow } from './aiUnitProduction';
@@ -181,6 +188,102 @@ export function minorOpNear(state: GameState, cs: CityState, player: number, plo
 /** the units the minor's running operations hold */
 export const minorOpUnits = (cs: CityState): number[] => (cs.ops ? opsOf(cs.ops).flatMap(opUnits) : []);
 
+/** the units in a job of the minor (unit +0x7d0): its running operations'
+ *  and its "Upgrade Units" trees' */
+export const minorJobUnits = (cs: CityState): number[] => [...minorOpUnits(cs), ...(cs.upgrading ?? [])];
+
+/** the "Upgrade Units" trees' priority (TriggeredBehaviorTrees, both triggers) */
+const UPGRADE_TREE_PRIORITY = AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade Units' && AI_MINOR_TRIGGERS.includes(t.trigger))?.priority ?? 0;
+
+/**
+ * THE CITY-STATE'S "UPGRADE UNITS" TREES (MinorCivTriggeredTrees:
+ * TRIGGER_TECH_UPGRADE / TRIGGER_CIVIC_UPGRADE, Priority 3, no operation;
+ * `tools/civ6lab/dll_readings.md` "C-99: the upgrade trees"), their tick in
+ * the operations' run. The trigger (0x800c60) starts a tree per technology
+ * or civic gained; the trees' units are one list (`CityState.upgrading`, in
+ * the player's unit order), a tree running while it holds a unit: Concurrent
+ * over Find Available Unit, Find Unit Targets, Upgrade Units and Move Unit.
+ *  - FIND AVAILABLE UNIT (0x7ec7b0, Upgradeable Units): the evaluator's offer
+ *    (0x60a8c0) — the minor's units in no operation (a city tree's are its
+ *    Builders, which have no upgrade), their turn not done, then
+ *    those of its unlocked operations of a lower priority, which leave them —
+ *    each whose upgrade its research unlocks (0x58fff0, the visible test)
+ *    joining; none held, the tree FAILS and ends;
+ *  - UPGRADE UNITS' EXECUTION (0x7ef850): each whose upgrade may go now
+ *    (0x58fff0's full test, the treasury covering the price) the economic
+ *    AI buys (0x68c940, `upgradePurchase`) upgrades — a new unit, out of the
+ *    trees (runs/h1_duelw1121 city-state 3's Galley, taken from Naval
+ *    Superiority at t89 as Cartography lands, the operation completing
+ *    empty, home by t91, a Caravel from t92);
+ *  - FIND UNIT TARGETS (0x7ed200, Nearest Owned City; its job 0x7eba40) and
+ *    MOVE UNIT'S EXECUTION (0x7eeba0, no Location): each unit left goes for
+ *    the minor's city centre, a ship for a coastal centre or else the city's
+ *    Harbor; a unit with none, and every unit with none, the tree FAILS;
+ *  - each unit the trees hold has its turn done (0x7d2190): no tactical
+ *    move, no operation's offer (runs/h1_duelw1128 Hong Kong t144-250, its
+ *    six units held from Gunpowder on with no Gold to upgrade: no tactical
+ *    row, City Defense recruiting none and completing each turn).
+ * Unported: the deletion of an excess obsolete unit (Can Delete, 0x591000).
+ */
+export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): void {
+  const own = (id: number) => state.units.find((u) => u.id === id && u.seat === cs.seat);
+  const trig = !!cs.upgradeTrigger;
+  delete cs.upgradeTrigger;
+  if (!cs.upgrading && !trig) return;
+  const held = new Set((cs.upgrading ?? []).filter((id) => own(id)));
+  const order = (ids: Iterable<number>) => [...ids].map(own).filter((u): u is Unit => !!u).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+  // Find Available Unit: the free units, then the lower-priority operations'
+  const busy = new Set(minorOpUnits(cs));
+  for (const u of order(state.units.filter((x) => x.seat === cs.seat).map((x) => x.id))) {
+    if (held.has(u.id) || busy.has(u.id) || pass.done.has(u.id)) continue;
+    if (minorUpgradeVisible(cs, u)) held.add(u.id);
+  }
+  const ops = cs.ops ? opsOf(cs.ops) : [];
+  for (const op of ops) {
+    if (op.locked || opDef(op).priority >= UPGRADE_TREE_PRIORITY) continue;
+    for (const t of op.teams) {
+      for (const id of t.members) {
+        const u = own(id);
+        if (u && !pass.done.has(id) && minorUpgradeVisible(cs, u)) held.add(id);
+      }
+      t.members = t.members.filter((id) => !held.has(id));
+    }
+  }
+  if (!held.size) {
+    delete cs.upgrading;
+    return;
+  }
+  // Find Unit Targets: none of the units with a target, the tree FAILS
+  const targets = new Map(order(held).map((u) => [u.id, upgradeTarget(state, cs, u)] as const));
+  if (![...targets.values()].some((p) => p >= 0)) {
+    delete cs.upgrading;
+    return;
+  }
+  // Upgrade Units' execution, then Move Unit's
+  const eco = (cs.economy ??= newEconomicMemory());
+  for (const u of order(held)) {
+    if (!minorCanUpgrade(state, cs, u) || !goldAffordable(cs.treasury, MINOR_UPGRADE_GOLD)) continue;
+    if (!upgradePurchase(eco, MINOR_UPGRADE_GOLD * FX)) continue;
+    if (minorUpgradeUnit(state, cs, u)) held.delete(u.id);
+  }
+  for (const u of order(held)) {
+    const p = targets.get(u.id) ?? -1;
+    if (p >= 0 && u.tileIndex !== p && u.movesLeft > 0) moveTo(state, u, p, false);
+  }
+  for (const u of order(held)) passFinish(pass, u, 'Operation', u.tileIndex);
+  cs.upgrading = order(held).map((u) => u.id);
+}
+
+/** Find Unit Targets' plot for a unit (the job 0x7eba40, a city-state's one
+ *  city): its centre; a ship's the centre where coastal, else its Harbor's
+ *  plot; -1 none */
+function upgradeTarget(state: GameState, cs: CityState, u: Unit): number {
+  if (cs.centerIndex < 0) return -1;
+  if (!UNITS[u.type]?.naval) return cs.centerIndex;
+  if (isCoastalLand(state.map, state.map.tiles[cs.centerIndex])) return cs.centerIndex;
+  return minorCity(cs).districts.find((d) => d.type === 'HARBOR')?.tileIndex ?? -1;
+}
+
 /**
  * C: A CITY-STATE'S UNITS' TURN — its tactical pass (`cityStateTactics`),
  * its operations run once the pass has its units' planning: each operation
@@ -189,7 +292,9 @@ export const minorOpUnits = (cs: CityState): number[] => (cs.ops ? opsOf(cs.ops)
 export function cityStateMilitary(state: GameState, cs: CityState): void {
   cityStateTactics(state, cs, (pass) => {
     const ops = opsOfMinor(cs);
-    operationsRun(ops, minorEnv(state, cs, pass));
+    const env = minorEnv(state, cs, pass);
+    operationsRun(ops, { ...env, trees: [{ priority: UPGRADE_TREE_PRIORITY, tick: () => upgradeTreesTick(state, cs, pass) }],
+      held: () => cs.upgrading ?? [] });
     for (const id of opsOf(ops).flatMap(opUnits)) {
       const u = state.units.find((x) => x.id === id && x.seat === cs.seat);
       if (u) passFinish(pass, u, 'Operation', u.tileIndex);

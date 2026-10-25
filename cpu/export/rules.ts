@@ -331,7 +331,7 @@ const namesOf = (kind: string, id: string, prefix: string, known: object): strin
 import { AI_MODIFIER_READS, unitEraIndex } from '../core/aiModifiers';
 import { promotionWeight } from '../core/minorBuild';
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS, AI_CITY_EVENT_TYPES, AI_CITY_TREES } from '../data/aiCityTrees';
-import { AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_TEAMS, AI_TEAM_REQS, AI_TREES, AI_UNIT_AI, AI_UNIT_AI_PRIORITY } from '../data/aiOperations';
+import { AI_MINOR_TRIGGERS, AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_TEAMS, AI_TEAM_REQS, AI_TREES, AI_TRIGGERED_TREES, AI_UNIT_AI, AI_UNIT_AI_PRIORITY } from '../data/aiOperations';
 import { MINOR_OP_DEFS } from '../core/minorOps';
 import { FREE_RAID_DEF } from '../core/freeOps';
 
@@ -1133,6 +1133,8 @@ export function buildRules() {
       trees: Object.fromEntries([...new Set(OP_DEFS.map((n) => AI_OP_DEFS[n].tree ?? ''))].filter(Boolean).map((t) => [t, AI_TREES[t]])),
       unitAi: AI_UNITS.map((u) => AI_UNIT_AI[u.type] ?? []),
       priority: AI_UNIT_AI_PRIORITY,
+      // the city-states' "Upgrade Units" trees' priority (`upgradeTreesTick`)
+      upgradeTreePriority: AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade Units' && AI_MINOR_TRIGGERS.includes(t.trigger))?.priority ?? 0,
       // the odds' decay term (0x746920) by its exponent: 0.97 ^ e in single
       // precision, as the engine's Math.pow takes it
       oddsDecay: Array.from({ length: 1024 }, (_v, e) => Math.fround(Math.pow(Math.fround(0.97), e))),
@@ -1208,7 +1210,7 @@ export function buildRules() {
       militaryProdPct: MINOR_MILITARY_PROD_PCT,
       smallMilitary: MINOR_SMALL_MILITARY,
       excludedUnitClasses: MINOR_EXCLUDED_UNIT_CLASSES.map((c) => PROMO_CLASSES.indexOf(c)),
-      // a minor's upgrade price (`minorUpgrades`)
+      // a minor's upgrade price (`minorUpgradeUnit`)
       upgradeGold: MINOR_UPGRADE_GOLD,
       // Suzerain perks modeled as RULES — `effects` is the code order the
       // per-CS `suzCode` plane indexes.

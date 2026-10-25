@@ -1147,6 +1147,13 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
     if (!cs) continue;
     if (c.ops) cs.ops = c.ops;
     if (c.cityAi) cs.cityAi = c.cityAi;
+    // its "Upgrade Units" trees as its units' turn left them, and the savings
+    // their upgrades spent
+    if (c.upgrading) cs.upgrading = c.upgrading;
+    else delete cs.upgrading;
+    if (c.upgradeTrigger) cs.upgradeTrigger = true;
+    else delete cs.upgradeTrigger;
+    if (c.economy) cs.economy = c.economy;
     // its knowledge base's look after its units' turn (`minorPhase`'s last),
     // in the pair's turn and before the barbarians' turn: its units on the
     // plots record t+1 holds them on, the others where the turn found them
@@ -3828,7 +3835,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * the minors' catch-up counts. Per city-state: its city AI's item value, its
  * Food focus, trade list and value, UNITS table, resource counts, economic
  * memory (savings), threat, enemy at the gates, growth forecast, revealed
- * plots, standing army's lack. Per Free City: its threat, enemy at the gates
+ * plots, standing army's lack, "Upgrade Units" trees. Per Free City: its threat, enemy at the gates
  * and raid. Per unit: its id, its pool slot, its DEFENDER type. The
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
@@ -3837,7 +3844,7 @@ const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'camps
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'aiLeft', 'aiLeftSeen',
   'techCatchUp', 'civicCatchUp'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'unitValues', 'resourceCounts',
-  'economy', 'threat', 'threatNear', 'aiGrowth', 'revealed', 'standingArmyShort', 'explored'] as const;
+  'economy', 'threat', 'threatNear', 'aiGrowth', 'revealed', 'standingArmyShort', 'explored', 'upgrading', 'upgradeTrigger'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid'] as const;
 const UNIT_MEMORY = ['slot', 'aiDefender'] as const;
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;

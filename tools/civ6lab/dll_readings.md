@@ -6225,10 +6225,10 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   espionage AI (0x695660), a retreat (0x212500), and the unit-created
   handler 0x60a440 (player signals +0x60, raised by the unit's creation
   0x4eeb70) for an AI player whose Control Manager's job list (+0x2b8)
-  holds an entry with +8 == 0. Why 1128's city-state 2 offers its six
-  units none at t167-183 (its City Defense started and completed each turn,
-  no tactical row for them) stays unread: no setter before the operations'
-  tick names them.
+  holds an entry with +8 == 0. 1128's city-state 2 offers its six units
+  none at t167-183 (its City Defense started and completed each turn, no
+  tactical row for them): its "Upgrade Units" trees hold them ("C-99: the
+  upgrade trees").
 - THE UNIT'S ASSIGNMENT (the field at +0x778, its value +0x7d0): the job
   the unit is in — the tactical pass's, the homeland's, an operation's
   (`addMember` 0x737e80 writes the operation's id +0x720) — listed by job
@@ -6248,8 +6248,8 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   its end (a unit is the operation's while a live operation's team holds
   it); 1117 city-state 2's Warrior 131073, its Attack Barb Camp complete at
   t9 after the Warrior's attack, offered to no recruit at t9 and taking
-  tactical moves from t10, agrees. Why 1128's city-state 2 offers its
-  units none at t167-183 stays unread.
+  tactical moves from t10, agrees. 1128's city-state 2 offers its units
+  none at t167-183: its "Upgrade Units" trees hold them.
 - NOTIFY OWNER (0x7c6fa0 -> the player signals +0x288 -> 0x148270): the
   tree's tribe; the raid's tree (+0x3c) offers its city to the city assault
   (0x1497d0), which refuses while the raid stands (+0x3c or +0x40 set): the
@@ -8335,6 +8335,82 @@ execution families) on runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128.
   +0xc's writer (every WAR line logs 0.00); 0x650890's signal (taken as the
   peace); Siege City's first part (the ZOC-ignoring units' adjacent move);
   the air units' contract.
+
+## C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported
+
+`upgradeTreesTick` (cpu/core/minorOps.ts, `CityState.upgrading` /
+`upgradeTrigger`), `upgradePurchase` (cpu/core/aiEconomic.ts);
+`_mops_upgrade_trees`, `_cv_upgrade_purchase`, `_minor_upgrade_unit`
+(gpu/core/sim_minorops.py, sim_cityvalue.py, sim_minors.py; `mops_upg`,
+`mops_upg_on`, `mops_upg_trig`).
+
+- THE TRIGGER: MinorCivTriggeredTrees (Leaders.xml, the list
+  MINOR_CIV_DEFAULT_TRAIT binds to the system TriggeredTrees) holds
+  TRIGGER_TECH_UPGRADE and TRIGGER_CIVIC_UPGRADE, both the tree "Upgrade
+  Units" at Priority 3 with no operation (TriggeredBehaviorTrees). The
+  event handler 0x800c60 (the trigger row +0x388): a row with no operation
+  makes a tree in the manager (0x7fef20, its nodes 0x7faa60; none, it is
+  dropped) and starts it at the row's priority (0x7cb230) — one tree per
+  technology or civic gained, no test of a tree already running.
+- THE TREE: Concurrent 0 over Find Available Unit 1 (Upgradeable Units
+  true, Found Unit the tag Upgrades), Find Unit Targets 2 (Nearest Owned
+  City), Upgrade Units 3, Move Unit 4 (Allow Danger false). The handlers
+  (registration 0x7db850: the k-th name's id stored at the mov after the
+  next name's lea; 0x7cbca0's tables): Find Unit Targets update 0x7ed200,
+  Upgrade Units update 0x7f0ea0 / execution 0x7ef850.
+- FIND AVAILABLE UNIT, Upgradeable Units (0x7ec7b0): the tree's units of a
+  desired type or, upgradeable, each whose upgrade passes the visible test
+  (0x58fff0 with r8 1) are found; found none, or upgradeable, the
+  evaluator (0x60a8c0, the tree's priority 0x723b90, its job id) offers the
+  player's units in no job (+0x7d0 -1) with their turn not done, then those
+  of its unlocked operations of a lower priority — Naval Superiority's at
+  2 under the trees' 3, City Defense's at 4 never — and each the test (the
+  lambda @d74188, the visible test) passes joins the tree (addMember
+  0x737e80), leaving its operation. None found: FAILURE.
+- FIND UNIT TARGETS (0x7ed200, "Nearest City Search"): a job per tree unit
+  (its vtable @d741d8, run 0x7eba40); a plot found becomes the unit's
+  target (+0x7d8 -> +0x830, 0x7eb220). The job for a unit that is no Great
+  Person: over the player's cities (+0x12f0 +0xd8) the nearest by plot
+  distance — its centre; for a unit of domain 0 (the sea) whose centre is
+  not coastal land (0x82a10), the city's Harbor (0xcbecc739) plot
+  (0x1ae530), the plot water or coastal land; an upgrade asking a
+  district (DB.Units +0x2c8 +0x14) the city lacks (0x510d30) skipped.
+  SUCCESS where some unit has a target, else FAILURE.
+- UPGRADE UNITS: update (0x7f0ea0) SUCCESS with the tree holding a unit,
+  else FAILURE. Execution (0x7ef850), a player no human drives, over the
+  tree's units in the player's order (0x6092c0): the full test (0x58fff0,
+  r8 0: the research, the territory "MUST_BE_IN_TERRITORY", the Gold
+  "INSUFFICIENT_FUNDS", Movement) passing, the economic AI's upgrade
+  (0x68c940) — else, with Can Delete (no data: true), the deletion
+  (UNITCOMMAND_DELETE, 0x73cd1698) of an excess obsolete unit: no
+  district asked by its upgrade (0x591000 -1), or at most one promotion and
+  more than 10 of its type (0x4f2c90); the full test failing and the
+  visible one too: released (+0x778 -1, its turn done 0x570b40) and, Can
+  Delete, deleted; the visible one passing: Can Delete, on its own ground
+  and no district asked, deleted.
+- THE ECONOMIC AI'S UPGRADE (0x68c940): the cost (0x590520, << 8): the
+  UNITS (+0x540 slot 1) and SLUSH (slot 0) slots together at the cost or
+  more spend the UNITS slot, the rest from SLUSH; else a balance (+0x1b8)
+  above the cost takes from each slot in order what it holds; the balance
+  lowered by what was taken; then UNITCOMMAND_UPGRADE (0x9576d0) where it
+  may start (vt +0x48 / +0x58). Bought: 1, else 0.
+- MOVE UNIT with no Location (0x7f0020 from 0x7f067c): over the tree's
+  units, each with a target (+0x830) reaching it within a turn with
+  Movement left (0x791300, the flag set) or whose target holds danger
+  (0x716a60, Allow Danger false) passes; one with no planning (+0x1fc0
+  null) or none reaching it RUNNING, else SUCCESS. The tree's units have
+  their turn done each tick (0x7d2190), so they plan no move: the tree
+  RUNS while it holds a unit, its execution (0x7eeba0) moving each to its
+  target.
+- MEASURED: runs/h1_duelw1121 city-state 3's Galley in Naval Superiority
+  (priority 2) leaves it at t89 as Cartography lands ("Operation Recruit,
+  0 units", "Operation complete"; Naval Superiority Started t90), goes
+  home, a Caravel from t92; the Caravel leaves the next at t177 as Steam
+  Power lands. runs/h1_duelw1128 Hong Kong from Gunpowder at t144 holds its
+  six units with 0 Gold (Player gold 0, its yield 9.6): no tactical row
+  t144-250 but four, City Defense recruiting none ("No recruits to match
+  strength") and completing each turn t167-183. A minor's upgrade is
+  `MINOR_UPGRADE_GOLD` (the census; 0x590520 at the minors' 100% discount).
 
 ## C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread
 

@@ -1299,6 +1299,7 @@ _MUTABLE = [
     "mops_mins", "mops_ready", "mops_ong", "mops_unit", "mops_tstr", "mops_join", "mops_mvs", "mops_mvg", "mops_free", "mops_nfree",
     "mops_size", "mops_pick", "mops_pick_target", "mops_pick_rally", "mops_camps", "barb_camps_known", "mops_revealed",
     "mops_enemy",
+    "mops_upg", "mops_upg_on", "mops_upg_trig",  # its "Upgrade Units" trees: their units, running, the trigger
     "citystate_kb_seq", "citystate_kb_next", "citystate_kb_aged",  # the records' order, the last ageing
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on

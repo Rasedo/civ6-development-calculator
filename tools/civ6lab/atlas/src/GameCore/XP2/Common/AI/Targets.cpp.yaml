@@ -99,6 +99,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   context:
     - "- THE AGEING (0x5ebb30, the first step of the tactical AI's turn 0x785f30 on player signal +0x1f8): every record's age + 1; one whose age before the step was a..."
     - "...877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785f30 and again on player signal +0x228): over every plot the player's visibility count (+0x2..."
@@ -141,14 +142,12 @@
   final: 0x514a60
   kind: function
   status: PARTLY
-  cases:
-    - recording: AI_Knowledge.csv
-      value: 0x5ed280 (FinalRelease 0x3f3e90), the knowledge base's   log, AI_Knowledge.csv's moment;
   readings:
-    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
-    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
-  context:
     - "...nalRelease 0x5146e0), the tactical turn's knowledge step bound on player signal +0x1f8 (0x7864c0 (FinalRelease 0x514a60) binds it, the Targets +0x98 the player): the signal reaches eve..."
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "...ement (plot +0x44 the barbarians') -> 0x5f0110. Player signal +0xc0 (0x7874a0, bound in 0x7864c0 at 0x786b25) records a unit of the player's own through 0x5f0440 with no sight asked: t..."
   review: imported
 - addr: 0x786d50
@@ -198,7 +197,10 @@
   name: armyRecordOwnUnit
   semantics: "player signal +0xc0: one unit into the records outside the look"
   status: PARTLY
-  impl: [cpu/core/units.ts:holder, gpu/core/sim_minors.py:_kb_birth]
+  impl:
+    - cpu/core/units.ts:holder
+    - gpu/core/sim_minors.py:_kb_birth
+    - cpu/core/minorBuild.ts:sendLevyHome
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"

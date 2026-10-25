@@ -983,6 +983,7 @@ CITY_STATE = {
                 sim.citystate_kb_type[b, s].tolist(), sim.citystate_kb_seen[b, s].tolist(),
                 sim.citystate_kb_plot[b, s].tolist(), sim.citystate_kb_damage[b, s].tolist()) if k != -2) for x in r] for s in rows],
     "minorOps": lambda sim, b, rows: [_minor_ops(sim, b, s) for s in rows],
+    "minorUpgrading": lambda sim, b, rows: [_minor_upgrading(sim, b, s) for s in rows],
     "minorCampsKnown": lambda sim, b, rows: [[int(x) for x in sim.mops_camps[b, s].tolist() if x >= 0] for s in rows],
     "minorProjectYield": lambda sim, b, rows: [
         [int(sim.city_proj_yield[b, sim._CITY_MINOR0 + s, 0]), float(sim.city_proj_conv[b, sim._CITY_MINOR0 + s, 0])]
@@ -1147,6 +1148,20 @@ def _minor_ops(sim, b: int, s: int) -> list[int]:
                     int(bool(sim.mops_ready[b, s, k, ti])), int(bool(sim.mops_ong[b, s, k, ti])),
                     int(sim.mops_unit[b, s, k, ti]), int(sim.mops_tstr[b, s, k, ti])]
     return out
+
+
+def _minor_upgrading(sim, b: int, s: int) -> list[int]:
+    """minor `s`'s "Upgrade Units" trees as `minorUpgrading` reads them:
+    running, the trigger, their units' pool slots ascending"""
+    lo = sim.POOL_LO["major"]
+    seat = 100 + s
+    slots = []
+    P = sim.major_unit_alive.shape[1]
+    for u in sim.mops_upg[b, s, :P].nonzero(as_tuple=True)[0].tolist():
+        g = u + lo
+        if bool(sim.unit_alive[b, g]) and int(sim.unit_seat[b, g]) == seat and int(sim.unit_pslot[b, g]) >= 0:
+            slots.append(int(sim.unit_pslot[b, g]))
+    return [int(bool(sim.mops_upg_on[b, s])), int(bool(sim.mops_upg_trig[b, s]))] + sorted(slots)
 
 
 def _ai_contracts(sim, b: int, s: int) -> list[int]:

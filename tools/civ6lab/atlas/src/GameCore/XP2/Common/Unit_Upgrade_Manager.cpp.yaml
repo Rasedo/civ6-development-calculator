@@ -1,0 +1,22 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x58fff0
+  kind: function
+  name: minorCanUpgrade
+  status: PARTLY
+  impl:
+    - cpu/core/minorBuild.ts:minorCanUpgrade
+    - cpu/core/minorBuild.ts:minorUpgradeVisible
+    - cpu/core/minorOps.ts:upgradeTreesTick
+    - gpu/core/sim_minors.py:_minor_upgrade_visible
+    - gpu/core/sim_minors.py:_minor_can_upgrade
+  readings:
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...units of a desired type or, upgradeable, each whose upgrade passes the visible test (0x58fff0 with r8 1) are found; found none, or upgradeable, the evaluator (0x60a8c0, the tree's p...
+    - "...no human drives, over the tree's units in the player's order (0x6092c0): the full test (0x58fff0, r8 0: the research, the territory \"MUST_BE_IN_TERRITORY\", the Gold \"INSUFFICIENT_FUN..."
+  review: imported

@@ -995,6 +995,10 @@ const CITY_STATE_G: Record<string, Extractor> = {
     .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage])
     .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()),
   minorOps: overCityStates((cityState, state) => minorOpsRecord(cityState, state)),
+  // its "Upgrade Units" trees: running, the trigger, their units' pool slots
+  minorUpgrading: overCityStates((cityState, state) => [cityState.upgrading ? 1 : 0, cityState.upgradeTrigger ? 1 : 0,
+    ...(cityState.upgrading ?? []).map((id) => state.units.find((u) => u.id === id && u.seat === cityState.seat)?.slot ?? -1)
+      .filter((s) => s >= 0).sort((a, b) => a - b)]),
   minorCampsKnown: overCityStates((cityState) => [...(cityState.campsKnown ?? [])]),
   minorProjectYield: overCityStates((cityState) => projectYieldCols(cityState.projectYield)),
   minorTreasury: overCityStates((cityState) => cityState.treasury),

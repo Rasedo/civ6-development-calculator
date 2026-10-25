@@ -84,6 +84,26 @@ export function spend(e: EconomicMemory, amount: number, slot: number): void {
   e.balance -= amount;
 }
 
+/** THE UPGRADE'S PURCHASE (0x68c940) at `cost` (raw 24.8): the UNITS and
+ *  SLUSH slots together at the cost or more spend the UNITS slot then the
+ *  SLUSH slot; else a balance above the cost takes from each slot in order;
+ *  the balance lowered by what was taken. Whether it bought. */
+export function upgradePurchase(e: EconomicMemory, cost: number): boolean {
+  if (e.savings[SLOT_SLUSH] + e.savings[SLOT_UNITS] >= cost) {
+    spend(e, cost, SLOT_UNITS);
+    return true;
+  }
+  if (e.balance <= cost) return false;
+  let left = cost;
+  for (let i = 0; i < e.savings.length && left > 0; i++) {
+    const take = Math.min(left, e.savings[i]);
+    e.savings[i] -= take;
+    left -= take;
+    e.balance -= take;
+  }
+  return true;
+}
+
 /** What TryPurchaseUnits reads of a city it may buy in */
 export interface PurchaseCity {
   id: number;

@@ -47,7 +47,8 @@ class SimMinors:
             self._minor_combat_desire(s)
             self._minor_military_turn(s)
             self._minor_knowledge(s, True)
-            self._minor_upgrades(s, gained)
+            # its "Upgrade Units" trees' trigger: a technology or civic gained
+            self.mops_upg_trig[:, s] |= alive & (gained > 0)
             # its city AI ran before this turn (the City Analysis job's list
             # takes none the turn the city is founded)
             ran = self.citystate_ai_on[:, s].clone()
@@ -1671,61 +1672,61 @@ class SimMinors:
                            join=lambda tree, unit, m: self._mops_join(s, tree, unit - self.POOL_LO["major"], m))
         return fin
 
-    def _minor_upgrades(self, s: int, gained: torch.Tensor) -> None:
-        """`minorUpgrades` — CIV6 (Leaders.xml, MinorCivTriggeredTrees): a
-        minor's "Upgrade Units" tree runs on a technology or civic gained; the
-        census reads one upgrade per completion at `upgradeGold` each. Each of
-        the turn's completions (`gained`, [B]) upgrades the first unit in slot
-        order whose chassis' upgrade the minor's research unlocks, standing on
-        the minor's ground with Movement left, while the treasury covers the
-        price; the minor asks no strategic resource, paying the new chassis'
-        cost where its stock covers it. The upgrade spends the unit's turn."""
-        alive = self.citystate_alive[:, s]
-        top = int((gained * alive.long()).max())
-        if top <= 0:
-            return
-        seat = 100 + s
-        techs, civics = self.citystate_techs[:, s], self.citystate_civics[:, s]
-        for n in range(top):
-            act = alive & (gained > n) & self._afford(self.citystate_treasury[:, s], self._mb_upgrade_gold)
-            if not bool(act.count_nonzero()):
-                return
-            mine = self.major_unit_alive & (self.major_unit_seat == seat)
-            ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-            nxt = self._type_up_to[ut]
-            nc = nxt.clamp(min=0)
-            rt, rc = self._type_tech[nc], self._type_civic[nc]
-            ok_t = (rt < 0) | techs.gather(1, rt.clamp(min=0))
-            ok_c = (rc < 0) | civics.gather(1, rc.clamp(min=0))
-            tile = self.major_unit_tile.clamp(min=0)
-            own = self.tile_seat.gather(1, tile) == seat
-            cand = mine & (nxt >= 0) & ok_t & ok_c & own & (self.major_unit_mp > 0)
-            go = act & cand.any(dim=1)
-            if not bool(go.count_nonzero()):
-                return
-            first = cand.long().argmax(dim=1)
-            rr = go.nonzero(as_tuple=True)[0]
-            u = first[rr]
-            self.citystate_treasury[rr, s] -= self._mb_upgrade_gold
-            # the new chassis' strategic cost where its stock covers it, none
-            # where both rungs ask the same resource (a city-state upgrades
-            # without it)
-            if self._n_strategic:
-                was, to = ut[rr, u], nxt[rr, u].clamp(min=0)
-                k = self._type_res_slot.take(to)
-                n_res = self._type_res_cost.take(to)
-                bank = self.citystate_stockpile[rr, s]
-                have = bank.gather(1, k.clamp(min=0).unsqueeze(1)).squeeze(1)
-                pay = (k >= 0) & (n_res > 0) & (k != self._type_res_slot.take(was)) & (have >= n_res)
-                if bool(pay.count_nonzero()):
-                    bank.scatter_add_(1, k.clamp(min=0).unsqueeze(1), -(pay.long() * n_res).unsqueeze(1))
-                    self.citystate_stockpile[rr, s] = bank
-            self.major_unit_type[rr, u] = nxt[rr, u]
-            self.major_unit_mp[rr, u] = 0
-            self._gen_ver += 1
-            # the upgraded chassis raises the minor's base (`raiseBestTrained`)
-            self._raise_best_trained(self._CITY_MINOR0 + s, go, nxt.gather(1, first.unsqueeze(1)).squeeze(1),
-                                   formation=self.major_unit_formation.gather(1, first.unsqueeze(1)).squeeze(1))
+    def _minor_upgrade_visible(self, s: int) -> torch.Tensor:
+        """[B, P] `minorUpgradeVisible` over the major pool: the unit has an
+        upgrade minor `s`'s research unlocks (0x58fff0, the visible test)"""
+        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        nxt = self._type_up_to[ut]
+        nc = nxt.clamp(min=0)
+        rt, rc = self._type_tech[nc], self._type_civic[nc]
+        ok_t = (rt < 0) | self.citystate_techs[:, s].gather(1, rt.clamp(min=0))
+        ok_c = (rc < 0) | self.citystate_civics[:, s].gather(1, rc.clamp(min=0))
+        return (nxt >= 0) & ok_t & ok_c
+
+    def _minor_can_upgrade(self, s: int) -> torch.Tensor:
+        """[B, P] `minorCanUpgrade` (0x58fff0, the full test): the visible
+        test, on the minor's ground with Movement left"""
+        tile = self.major_unit_tile.clamp(min=0)
+        own = self.tile_seat.gather(1, tile) == 100 + s
+        return self._minor_upgrade_visible(s) & own & (self.major_unit_mp > 0)
+
+    def _minor_upgrade_unit(self, s: int, go: torch.Tensor, first: torch.Tensor) -> torch.Tensor:
+        """`minorUpgradeUnit` for the unit at major pool slot `first` [B] where
+        `go`: the treasury covering `upgradeGold` and the full test passing,
+        it pays; the minor asks no strategic resource, paying the new chassis'
+        cost where its stock covers it; the upgrade spends the unit's turn.
+        [B] whether it upgraded."""
+        fc = first.clamp(min=0)
+        ok = (self._minor_can_upgrade(s).gather(1, fc.unsqueeze(1)).squeeze(1)
+              & self._afford(self.citystate_treasury[:, s], self._mb_upgrade_gold))
+        go = go & (first >= 0) & ok
+        if not bool(go.count_nonzero()):
+            return go
+        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        nxt = self._type_up_to[ut]
+        rr = go.nonzero(as_tuple=True)[0]
+        u = first[rr]
+        self.citystate_treasury[rr, s] -= self._mb_upgrade_gold
+        # the new chassis' strategic cost where its stock covers it, none
+        # where both rungs ask the same resource (a city-state upgrades
+        # without it)
+        if self._n_strategic:
+            was, to = ut[rr, u], nxt[rr, u].clamp(min=0)
+            k = self._type_res_slot.take(to)
+            n_res = self._type_res_cost.take(to)
+            bank = self.citystate_stockpile[rr, s]
+            have = bank.gather(1, k.clamp(min=0).unsqueeze(1)).squeeze(1)
+            pay = (k >= 0) & (n_res > 0) & (k != self._type_res_slot.take(was)) & (have >= n_res)
+            if bool(pay.count_nonzero()):
+                bank.scatter_add_(1, k.clamp(min=0).unsqueeze(1), -(pay.long() * n_res).unsqueeze(1))
+                self.citystate_stockpile[rr, s] = bank
+        self.major_unit_type[rr, u] = nxt[rr, u]
+        self.major_unit_mp[rr, u] = 0
+        self._gen_ver += 1
+        # the upgraded chassis raises the minor's base (`raiseBestTrained`)
+        self._raise_best_trained(self._CITY_MINOR0 + s, go, self.major_unit_type.gather(1, fc.unsqueeze(1)).squeeze(1),
+                               formation=self.major_unit_formation.gather(1, fc.unsqueeze(1)).squeeze(1))
+        return go
 
     def _naval_capable_minor(self, s: int) -> torch.Tensor:
         """[B] — `cityNavalCapable` for minor `s`'s city: enterable water

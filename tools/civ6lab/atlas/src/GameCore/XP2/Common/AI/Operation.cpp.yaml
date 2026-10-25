@@ -46,6 +46,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "H-1: the raids — READ"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   context:
     - "...job the unit is in — the tactical pass's, the homeland's, an operation's (`addMember` 0x737e80 writes the operation's id +0x720) — listed by job through 0x6092c0. The tactical pass (..."
   review: imported

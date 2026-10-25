@@ -59,7 +59,7 @@ import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat, type CityThreat } from './operations/cityThreat';
 import { majorView } from './majorView';
 import { AI_GREAT_PERSON_CLASSES } from '../../ai/major/tables';
-import { minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart, minorOpUnits } from './minorOps';
+import { minorJobUnits, minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart } from './minorOps';
 import { freeOpNear } from './freeOps';
 import { ARMY_READ_AGE } from './operations/knowledge';
 import { joinBuilt } from './operations/manager';
@@ -642,7 +642,7 @@ export function minorStandingArmy(state: GameState, cs: CityState): number {
   const fl = Math.floor(root);
   const quota = fmul(pseudoYieldValue(majorView(state), cs.seat, FX, 'PSEUDOYIELD_STANDING_ARMY_NUMBER'),
     fl * FX + Math.trunc(Math.fround(Math.fround(root - fl) * 256))) >> 8;
-  const busy = new Set(minorOpUnits(cs));
+  const busy = new Set(minorJobUnits(cs));
   const coastal = isCoastalLand(state.map, state.map.tiles[cs.centerIndex]);
   const own = state.units.filter((u) => u.seat === cs.seat).sort((a, b) => (a.slot ?? Infinity) - (b.slot ?? Infinity));
   const list = own.filter((u) => u.aiDefender);

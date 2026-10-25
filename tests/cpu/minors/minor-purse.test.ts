@@ -7,13 +7,12 @@
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { BARB_SEAT, emptySeat, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
+import { BARB_SEAT, emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
-import { minorEconomy, minorUpgrades } from '../../../cpu/core/minorBuild';
+import { minorEconomy } from '../../../cpu/core/minorBuild';
 import { minorAiTurn, minorMilitaryTurn, minorThreat } from '../../../cpu/core/minorCityAi';
 import { computeCityStats } from '../../../cpu/core/city';
 import { spawnUnit } from '../../../cpu/core/units';
-import { MINOR_UPGRADE_GOLD } from '../../../cpu/data/cityStates';
 import { UNITS } from '../../../cpu/data/units';
 import { hexDistance, tilesWithin } from '../../../world/hex';
 import type { CityState, GameState, Unit } from '../../../cpu/core/types';
@@ -80,41 +79,5 @@ describe("a city-state's purse", () => {
     expect(cs.threat).toBe(-1);
     expect(army(state, cs)).toEqual([]);
     expect(cs.treasury).toBe(2000);
-  });
-});
-
-describe("a city-state's upgrades", () => {
-  it('upgrades one unit per research completion, first in unit order, for the flat price', () => {
-    const { state, cs } = scene();
-    cs.research.techs.push('BRONZE_WORKING', 'MINING', 'IRON_WORKING');
-    const a = spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat)!;
-    const b = spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat)!;
-    cs.treasury = 20;
-    minorUpgrades(state, cs, 1);
-    expect(a.type).toBe(UNITS.WARRIOR.upgradesTo);
-    expect(a.movesLeft).toBe(0);
-    expect(b.type).toBe('WARRIOR');
-    expect(cs.treasury).toBe(20 - MINOR_UPGRADE_GOLD);
-    // two completions: the next, and none past the treasury
-    cs.treasury = MINOR_UPGRADE_GOLD - 1;
-    minorUpgrades(state, cs, 2);
-    expect(b.type).toBe('WARRIOR');
-    cs.treasury = 100;
-    minorUpgrades(state, cs, 2);
-    expect(b.type).toBe(UNITS.WARRIOR.upgradesTo);
-    expect(cs.treasury).toBe(100 - MINOR_UPGRADE_GOLD);
-  });
-
-  it('asks the minor research for the new chassis, and its own ground under the unit', () => {
-    const { state, cs } = scene();
-    const a = spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat)!;
-    cs.treasury = 100;
-    minorUpgrades(state, cs, 1);
-    expect(a.type).toBe('WARRIOR');
-    cs.research.techs.push('BRONZE_WORKING', 'MINING', 'IRON_WORKING');
-    const off = state.map.tiles.find((t) => tileSeat(t) < 0 && hexDistance(state.map, t.col, t.row, 6, 6) === 4)!;
-    a.tileIndex = off.index;
-    minorUpgrades(state, cs, 1);
-    expect(a.type).toBe('WARRIOR');
   });
 });

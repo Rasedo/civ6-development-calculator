@@ -640,9 +640,11 @@
     - cpu/core/aiCityTrees.ts:findAvailableUnit
     - cpu/core/operations/nodes.ts:findAvailableUnit
     - gpu/core/sim_citytrees.py:_u_find_unit
+    - cpu/core/minorOps.ts:upgradeTreesTick
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   context:
     - "...rength gates over 0x723ab0 — WEAK to the backup, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the f..."
   review: imported

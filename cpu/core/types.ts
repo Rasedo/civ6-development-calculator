@@ -873,6 +873,12 @@ export interface Seat {
   opsNext?: number;
   treeSlots?: number;
   treeFree?: number[];
+  /** the units a city-state's "Upgrade Units" trees hold (`upgradeTreesTick`):
+   *  present while a tree runs, empty where it holds none */
+  upgrading?: number[];
+  /** a city-state's technology or civic gained since its "Upgrade Units"
+   *  trees last ticked (TRIGGER_TECH_UPGRADE / TRIGGER_CIVIC_UPGRADE) */
+  upgradeTrigger?: boolean;
   /**
    * THIS SEAT'S CITIES — one field on one interface, so a rule that touches
    * a seat's cities cannot be written twice and drift.

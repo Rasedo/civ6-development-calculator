@@ -1556,15 +1556,19 @@ function strikers(state: GameState, pass: Pass, plot: number): Unit[] {
   return out;
 }
 
-/** the pass's own job in `jobOf` */
+/** the pass's own job in `jobOf`, a city-state's "Upgrade Units" trees' */
 const PASS_JOB = -2;
+const UPGRADE_JOB = -3;
 
 /** the job a unit is in (unit +0x7d0): its operation's id in its player's
- *  operation manager (the barbarians', a city-state's), else the pass's
- *  where the pass holds it, else -1 (a unit raised this turn among them) */
+ *  operation manager (the barbarians', a city-state's), a city-state's
+ *  "Upgrade Units" trees', else the pass's where the pass holds it, else -1
+ *  (a unit raised this turn among them) */
 function jobOf(state: GameState, pass: Pass, u: Unit): number {
-  const ai = isBarbSeat(u.seat) ? state.barbSeat.ops : state.cityStates.find((c) => c.seat === u.seat)?.ops;
+  const cs = isBarbSeat(u.seat) ? undefined : state.cityStates.find((c) => c.seat === u.seat);
+  const ai = isBarbSeat(u.seat) ? state.barbSeat.ops : cs?.ops;
   if (ai) for (const o of opsOf(ai)) if (opUnits(o).includes(u.id)) return o.id;
+  if (cs?.upgrading?.includes(u.id)) return UPGRADE_JOB;
   return pass.units.includes(u) ? PASS_JOB : -1;
 }
 

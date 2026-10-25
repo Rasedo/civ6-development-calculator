@@ -64,6 +64,12 @@ export interface OpsAi {
 /** what the manager reads and does beside its own state */
 export interface OpsEnv {
   turn: number;
+  /** the seat's triggered trees with no operation (a city-state's "Upgrade
+   *  Units", `upgradeTreesTick`): each ticks in the run beside the
+   *  operations' trees by its priority, after the operations of its own */
+  trees?: readonly { priority: number; tick: () => void }[];
+  /** the units those trees hold, out of the operations' offers */
+  held?: () => readonly number[];
   /** the view as the actions so far left the game */
   view(): MajorView;
   /** the definitions the seat runs (null: its leader's list, `allowedOps`) */
@@ -384,7 +390,12 @@ export function operationsEvaluate(ai: OpsAi, env: OpsEnv): void {
 export function operationsRun(ai: OpsAi, env: OpsEnv): void {
   operationsRefresh(ai, env);
   const order = opsOf(ai).map((op, k) => ({ op, k })).sort((a, b) => opDef(b.op).priority - opDef(a.op).priority || a.k - b.k);
-  for (const { op } of order) tickTree(ai, env, op);
+  const trees = [...(env.trees ?? [])].sort((a, b) => b.priority - a.priority);
+  for (const { op } of order) {
+    while (trees.length && trees[0].priority > opDef(op).priority) trees.shift()!.tick();
+    tickTree(ai, env, op);
+  }
+  for (const t of trees) t.tick();
 }
 
 /** the operations' run before the trees tick: each operation's target and
@@ -436,7 +447,11 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     pillage: env.pillage,
     ownAiType: env.ownAiType,
     op,
-    assigned: () => assigned(ai),
+    assigned: () => {
+      const out = assigned(ai);
+      for (const id of env.held?.() ?? []) out.add(id);
+      return out;
+    },
     others: () => opsOf(ai),
     contractWorld: () => contractWorld(ai, env, op),
     diplomacy: ai.diplomacy,

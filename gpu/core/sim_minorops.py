@@ -112,6 +112,8 @@ class MinorOpsTables:
                 pr[self.ai_index[t]] = True
         self.prio = pr
         self.limits = {k: int(v) for k, v in ao["limits"].items()}
+        # the "Upgrade Units" trees' priority (TriggeredBehaviorTrees)
+        self.upgrade_priority = int(ao["upgradeTreePriority"])
         self.n_nodes = max([t.n for t in self.trees.values()] + [1])
         self.n_tags = max([len(t.tags) for t in self.trees.values()] + [1])
         # each tree's Operation Move nodes, by node, their store
@@ -287,6 +289,12 @@ class SimMinorOps:
         # the plots its knowledge base's looks have seen or a meeting revealed
         # (`CityState.revealed`)
         self.mops_revealed = torch.zeros(B, S, self.T, dtype=torch.bool, device=device)
+        # the "Upgrade Units" trees (`CityState.upgrading`): their units over
+        # the holder's pool, whether a tree runs, a technology or civic gained
+        # since their last tick
+        self.mops_upg = torch.zeros(B, S, P, dtype=torch.bool, device=device)
+        self.mops_upg_on = torch.zeros(B, S, dtype=torch.bool, device=device)
+        self.mops_upg_trig = torch.zeros(B, S, dtype=torch.bool, device=device)
 
     # -- the minor's units --------------------------------------------------
 
@@ -560,12 +568,13 @@ class SimMinorOps:
         return out[:, :P]
 
     def _mops_held(self, s: int) -> torch.Tensor:
-        """[B, P] the units any of holder `s`'s operations' teams list"""
+        """[B, P] the units in a job of holder `s` but the pass's (`jobOf`):
+        any of its operations' teams lists, its "Upgrade Units" trees hold"""
         P = self._mops_u(s, "alive").shape[1]
         m = self.mops_mem[:, s].reshape(self.B, -1)
         out = torch.zeros(self.B, P + 1, dtype=torch.bool, device=self.device)
         out.scatter_(1, torch.where(m >= 0, m, P), True)
-        return out[:, :P]
+        return out[:, :P] | self.mops_upg[:, s, :P]
 
     def _mops_add_member(self, s: int, k: int, ti: int, uid: torch.Tensor, mask: torch.Tensor) -> None:
         """`addMember` where `mask`: the unit [B] joins the team's members, each
@@ -933,6 +942,12 @@ class SimMinorOps:
         return hit.any(-1).reshape(ids.shape)
 
     def _mops_busy(self, s: int) -> torch.Tensor:
+        """[B, P] the units in a job of holder `s` (unit +0x7d0, `minorJobUnits`):
+        listed in any of its running operations, held by its "Upgrade Units"
+        trees"""
+        return self._mops_op_units(s) | self.mops_upg[:, s, :self._mops_u(s, "alive").shape[1]]
+
+    def _mops_op_units(self, s: int) -> torch.Tensor:
         """[B, P] the units listed in any running operation of holder `s`"""
         P = self._mops_u(s, "alive").shape[1]
         m = torch.where((self.mops_def[:, s] >= 0).unsqueeze(2).unsqueeze(3), self.mops_mem[:, s], torch.full_like(self.mops_mem[:, s], -1))
@@ -1134,7 +1149,10 @@ class SimMinorOps:
         order); the operations' units' turns end"""
         Tm = self._mops_tables()
         on = act & ((self.mops_def[:, s] >= 0).any(dim=1) | (self.mops_pick[:, s] >= 0))
+        upg = s != self.FR and bool((act & (self.mops_upg_on[:, s] | self.mops_upg_trig[:, s])).any())
         if not bool(on.any()):
+            if upg:
+                self._mops_upgrade_trees(s, act, done)
             return
         tg = op["tg"] if op["tg"] is not None else self._tac_targets(self._mops_seat(s), self._mops_kb(s))
         view = {"op": op, "done": done, "tg": tg, "rows": None, "world": None}
@@ -1148,8 +1166,10 @@ class SimMinorOps:
                 self._mops_start(s, d, self.mops_pick_target[:, s], self.mops_pick_rally[:, s], pick)
         self.mops_pick[:, s] = torch.where(on, -1, self.mops_pick[:, s])
         # the trees by priority, the highest first, of equals in slot order
-        # (`operationsRun`: the tree manager's tick per priority)
-        for prio in sorted({int(Tm.defs[d]["priority"]) for d in Tm.trees}, reverse=True):
+        # (`operationsRun`: the tree manager's tick per priority), the
+        # "Upgrade Units" trees after the operations of their own
+        prios = {int(Tm.defs[d]["priority"]) for d in Tm.trees} | ({Tm.upgrade_priority} if upg else set())
+        for prio in sorted(prios, reverse=True):
             for k in range(N_OPS):
                 for d in Tm.trees:
                     if int(Tm.defs[d]["priority"]) != prio:
@@ -1157,8 +1177,101 @@ class SimMinorOps:
                     m = on & (self.mops_def[:, s, k] == d)
                     if bool(m.any()):
                         self._mops_tick(s, k, d, m, view)
+            if upg and prio == Tm.upgrade_priority:
+                self._mops_upgrade_trees(s, act, done)
         busy = self._mops_busy(s) & self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
         done |= busy & on.unsqueeze(1) & (op["rowof"] >= 0)
+
+    def _mops_upgrade_trees(self, s: int, act: torch.Tensor, done: torch.Tensor) -> None:
+        """`upgradeTreesTick` for minor `s` where `act` (its pass, `done` its
+        units' turns): where a tree runs or the trigger stands — Find
+        Available Unit's offer (the units in no job, their turn not done, then
+        those of its operations of a lower priority, which leave them) each
+        whose upgrade its research unlocks joining, none held ending the
+        trees; Find Unit Targets (the city centre, a ship's a coastal centre
+        or else the Harbor's plot), none ending the trees; Upgrade Units'
+        execution (in pool order, the full test and the treasury, the
+        economic AI's purchase); Move Unit's (each left for its target); the
+        units' turns done"""
+        Tm = self._mops_tables()
+        trig = act & self.mops_upg_trig[:, s]
+        self.mops_upg_trig[:, s] &= ~act
+        go = act & (self.mops_upg_on[:, s] | trig)
+        if not bool(go.any()):
+            return
+        u = self._mops_units(s)
+        P = u["own"].shape[1]
+        own = u["own"]
+        held = self.mops_upg[:, s, :P] & own & go.unsqueeze(1)
+        vis = self._minor_upgrade_visible(s)[:, :P]
+        # Find Available Unit: the free units, then the lower-priority operations'
+        free = own & ~self._mops_op_units(s) & ~held & ~done & go.unsqueeze(1)
+        held = held | (free & vis)
+        for k in range(N_OPS):
+            low = torch.zeros_like(go)
+            for dd, dfn in enumerate(Tm.defs):
+                if int(dfn["priority"]) < Tm.upgrade_priority:
+                    low |= self.mops_def[:, s, k] == dd
+            low &= go
+            if not bool(low.any()):
+                continue
+            for ti in range(N_TEAMS):
+                mem = self.mops_mem[:, s, k, ti]
+                mc = mem.clamp(min=0)
+                take = (mem >= 0) & low.unsqueeze(1) & own.gather(1, mc) & ~done.gather(1, mc) & vis.gather(1, mc)
+                if bool(take.any()):
+                    rows = take.nonzero(as_tuple=True)
+                    held[rows[0], mem[rows]] = True
+                gone = (mem >= 0) & held.gather(1, mc)
+                self._mops_compact(s, k, ti, ~gone, low)
+        some = held.any(dim=1)
+        # Find Unit Targets: the city centre; a ship's a coastal centre, else
+        # the city's Harbor
+        centre = self.citystate_center[:, s]
+        cc = centre.clamp(min=0)
+        coastal = self.coastal_land.gather(1, cc.unsqueeze(1)).squeeze(1)
+        harbor = torch.full_like(centre, -1)
+        if self._harbor_didx >= 0:
+            harbor = self.city_dist_tile[:, self._CITY_MINOR0 + s, 0, self._harbor_didx]
+        naval = self.unit_naval.take(self._mops_u(s, "type").clamp(min=0, max=self.NU - 1))
+        sea_t = torch.where(coastal, centre, harbor)
+        target = torch.where(naval, sea_t.unsqueeze(1), centre.unsqueeze(1))
+        target = torch.where(centre.unsqueeze(1) >= 0, target, torch.full_like(target, -1))
+        aimed = (held & (target >= 0)).any(dim=1)
+        live = go & some & aimed
+        held &= live.unsqueeze(1)
+        # Upgrade Units' execution, then Move Unit's, in pool order
+        order, _n = self._mops_in_order(held, u["key"])
+        cost = torch.full_like(self.citystate_balance[:, s], int(self._mb_upgrade_gold * _FX))
+        for j in range(order.shape[1]):
+            us = order[:, j]
+            m = live & (us >= 0)
+            if not bool(m.any()):
+                continue
+            uc = us.clamp(min=0)
+            can = (self._minor_can_upgrade(s)[:, :P].gather(1, uc.unsqueeze(1)).squeeze(1)
+                   & self._afford(self.citystate_treasury[:, s], self._mb_upgrade_gold) & m)
+            if not bool(can.any()):
+                continue
+            sv, bal, bought = self._cv_upgrade_purchase(self.citystate_savings[:, s], self.citystate_balance[:, s], cost)
+            bought &= can
+            self.citystate_savings[:, s] = torch.where(bought.unsqueeze(1), sv, self.citystate_savings[:, s])
+            self.citystate_balance[:, s] = torch.where(bought, bal, self.citystate_balance[:, s])
+            up = self._minor_upgrade_unit(s, bought, us)
+            if bool(up.any()):
+                rr = up.nonzero(as_tuple=True)[0]
+                held[rr, us[rr]] = False
+        order, _n = self._mops_in_order(held, u["key"])
+        for j in range(order.shape[1]):
+            us = order[:, j]
+            m = live & (us >= 0)
+            if not bool(m.any()):
+                continue
+            dest = target.gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
+            self._mops_move(s, us, dest, m)
+        done |= held
+        self.mops_upg[:, s, :P] = torch.where(go.unsqueeze(1), held, self.mops_upg[:, s, :P])
+        self.mops_upg_on[:, s] = torch.where(go, live, self.mops_upg_on[:, s])
 
     def _mops_tick(self, s: int, k: int, d: int, act: torch.Tensor, view: dict) -> None:
         """ONE TICK of slot `k`'s tree (definition `d`) where `act` (the

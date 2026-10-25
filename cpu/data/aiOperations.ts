@@ -5977,6 +5977,68 @@ export const AI_TREES: Readonly<Record<string, readonly AiTreeNode[]>> = {
    "jumpTo": 0,
    "data": {}
   }
+ ],
+ "Upgrade Units": [
+  {
+   "id": 0,
+   "type": "Concurrent",
+   "shape": 0,
+   "jumpTo": 5,
+   "data": {}
+  },
+  {
+   "id": 1,
+   "type": "Find Available Unit",
+   "shape": 2,
+   "jumpTo": 0,
+   "data": {
+    "Desired Units": {
+     "defn": 0
+    },
+    "Found Unit": {
+     "defn": 2,
+     "tag": "Upgrades"
+    },
+    "Upgradeable Units": {
+     "defn": 3,
+     "value": "true"
+    },
+    "Unit Type": {
+     "defn": 4
+    }
+   }
+  },
+  {
+   "id": 2,
+   "type": "Find Unit Targets",
+   "shape": 2,
+   "jumpTo": 0,
+   "data": {
+    "Nearest Owned City": {
+     "defn": 0,
+     "value": "true"
+    }
+   }
+  },
+  {
+   "id": 3,
+   "type": "Upgrade Units",
+   "shape": 1,
+   "jumpTo": 0,
+   "data": {}
+  },
+  {
+   "id": 4,
+   "type": "Move Unit",
+   "shape": 1,
+   "jumpTo": 0,
+   "data": {
+    "Allow Danger": {
+     "defn": 3,
+     "value": "false"
+    }
+   }
+  }
  ]
 };
 
@@ -6851,4 +6913,10 @@ export const AI_TRIGGERED_TREES: readonly AiTriggeredTree[] = [
   "event": "AI_EVENT_NEEDS_RAILROAD",
   "priority": 2
  }
+];
+
+/** the city-states' triggers (MinorCivTriggeredTrees) */
+export const AI_MINOR_TRIGGERS: readonly string[] = [
+ "TRIGGER_TECH_UPGRADE",
+ "TRIGGER_CIVIC_UPGRADE"
 ];

@@ -1421,6 +1421,16 @@
   context:
     - "- a resource entry per resource the player holds (0x510960), resource index order: reach = the resource's per-copy reach (0x527a50); a no-cap reso..."
   review: imported
+- addr: 0x510d30
+  final: 0x35fa60
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...r or coastal land; an upgrade asking a district (DB.Units +0x2c8 +0x14) the city lacks (0x510d30) skipped. SUCCESS where some unit has a target, else FAILURE.
+  review: imported
 - addr: 0x5112f0
   final: 0x360020
   kind: function
@@ -1795,6 +1805,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -1833,7 +1844,9 @@
     - recording: h1_duelw1117
       turn: 25
       value: "Check: runs/h1_duelw1117 China t25, Slinger (17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30."
-  readings: ["H-1: the upgrade's gold — READ"]
+  readings:
+    - "H-1: the upgrade's gold — READ"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   context:
     - "Unit_Upgrade_Manager's cost 0x5376d0 (via 0x590520; \"Upgraded unit is cheaper than current unit\", \"iNetProduction >= 0\"), in 24.8: UPGRADE_B..."
   review: imported
@@ -1850,6 +1863,17 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...irection's wander, the air moves), the homeland (0x70a440), Defend Units, a conversion (0x590a30), the espionage AI (0x695660), a retreat (0x212500), and the unit-created handler 0x6...
+  review: imported
+- addr: 0x591000
+  final: 0x3b8620
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/minorOps.ts:upgradeTreesTick]
+  readings:
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...MMAND_DELETE, 0x73cd1698) of an excess obsolete unit: no district asked by its upgrade (0x591000 -1), or at most one promotion and more than 10 of its type (0x4f2c90); the full test fa..."
   review: imported
 - addr: 0x5bbf80
   final: 0x3d4270
@@ -2908,6 +2932,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the..."
   context:
@@ -2972,6 +2997,7 @@
       value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   context:
     - "...raised (0x6075b0) with the recruit's priority (the tree's +0x5a8, else its operation's 0x723b90: the root tree's +0x548, its definition's Priority, 0x73a120 -> 0x7cb230), its value, i..."
   review: imported
@@ -3743,6 +3769,7 @@
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x5cd4e0; then 0x5d4d70 where the queue is empty. A tree is made (0x7ff9a0) and seeded (0x7cb230) by its event, never ticked there: no city-tree contract of the five logs is SUBMITTED..."
@@ -3757,6 +3784,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...RS (the dispatcher 0x7cbca0 storing each type's functions under the id the registration 0x7db850 gives it, the k-th id stored the k-th name, @d5b198 one unnamed): Operation Move update..."
@@ -3858,9 +3886,21 @@
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...tribe +0x10): the target to op +0x2a8, the rally through the autovariable at op +0x2c0 (0x7eb220) to op +0x318, then each team's goals, slot 0 (+0xe8) the rally and slot 1 (+0xf0) th..."
+  review: imported
+- addr: 0x7eba40
+  final: 0x553ea0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/minorOps.ts:upgradeTreesTick, cpu/core/minorOps.ts:upgradeTarget]
+  readings:
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...TARGETS (0x7ed200, \"Nearest City Search\"): a job per tree unit (its vtable @d741d8, run 0x7eba40); a plot found becomes the unit's target (+0x7d8 -> +0x830, 0x7eb220). The job for a un..."
   review: imported
 - addr: 0x7edde0
   final: 0x555ee0
@@ -3877,6 +3917,17 @@
   context:
     - "- THE NODES: IS AT WAR (0x7edde0) — at war with at least Minimum Number (1 absent) players, the barbarians only with Inc..."
   review: reviewed
+- addr: 0x7f0ea0
+  final: 0x558e90
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...name's lea; 0x7cbca0's tables): Find Unit Targets update 0x7ed200, Upgrade Units update 0x7f0ea0 / execution 0x7ef850."
+    - "- UPGRADE UNITS: update (0x7f0ea0) SUCCESS with the tree holding a unit, else FAILURE. Execution (0x7ef850), a player no..."
+  review: imported
 - addr: 0x7f1500
   kind: function
   status: PARTLY
@@ -4057,22 +4108,19 @@
 - addr: 0x7fef20
   final: 0x563070
   kind: function
-  status: READ
-  cases:
-    - recording: h1_duelw1110
-      turn: 42
-      value: "The military AI's part (each running   operation logged and its team refreshed) follows the tribes' turn:   AI_Operation.csv prints a tribe's start before the running operations'   lines and the new o"
-    - recording: h1_duelw1105
-      turn: 12
-      value: "So a tree started in the walk ticks in it   only where its slot lies past the one ticking: runs/h1_duelw1105 log t12,   tribe 4's scout's tree (slot 1) starts the raid on 12:14 in slot 0 (tribe   0's "
+  status: PARTLY
   impl:
     - cpu/core/barbarianOps.ts:TREE_SLOT
     - cpu/core/barbarianOps.ts:newBarbTreeId
     - gpu/core/sim_barbops.py:_bop_next_id
   readings:
-    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
-  context:
     - "...irst). THE TREE POOL (the manager +0x3a0, READ): 0x7ff7b0 makes a tree in the pool by 0x7fef20 — the slot its free list's head (+0x2c, each entry's +8 the next) names, else a new blo..."
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x800c60 (the trigger row +0x388): a row with no operation makes a tree in the manager (0x7fef20, its nodes 0x7faa60; none, it is dropped) and starts it at the row's priority (0x7cb230..."
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   review: imported
 - addr: 0x7ffdd0
   final: 0x5639b0
@@ -4113,11 +4161,12 @@
   kind: function
   name: AI_EVENT_DESIRE_SETTLE
   status: PARTLY
-  impl: [cpu/core/barbarianOps.ts:barbarianCaptures]
+  impl: [cpu/core/barbarianOps.ts:barbarianCaptures, cpu/core/minorOps.ts:upgradeTreesTick]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's..."
@@ -4676,6 +4725,17 @@
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - "...the upgrade's PrereqTech and PrereqCivic held, the upgrade the actor's own), its era (0x93e6c0: the later of its PrereqTech's and PrereqCivic's, none for a unit with neither) the a..."
+  review: imported
+- addr: 0x9576d0
+  final: 0x663280
+  kind: function
+  name: UNITCOMMAND_UPGRADE
+  status: PARTLY
+  readings:
+    - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...n order what it holds; the balance lowered by what was taken; then UNITCOMMAND_UPGRADE (0x9576d0) where it may start (vt +0x48 / +0x58). Bought: 1, else 0."
   review: imported
 - addr: 0x959830
   final: 0x665200

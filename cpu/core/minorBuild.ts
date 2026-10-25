@@ -123,7 +123,8 @@ export function minorPhase(state: GameState): void {
     const fresh = !cityState.cityAi;
     minorMilitaryTurn(state, cityState);
     minorKnowledge(state, cityState, true);
-    if (!ordersHeld) minorUpgrades(state, cityState, gained);
+    // its "Upgrade Units" trees' trigger: a technology or civic gained
+    if (gained > 0) cityState.upgradeTrigger = true;
     minorAiTurn(state, cityState, fresh);
     minorTrade(state, cityState, !ordersHeld);
     const city = minorCity(cityState);
@@ -530,31 +531,12 @@ function takeCivic(r: ResearchState, civic: string | null): void {
   if (civic) selectResearch(r, civic, true);
 }
 
-/**
- * THE UPGRADE TRIGGER. CIV6 (Leaders.xml, MinorCivTriggeredTrees): a minor's
- * "Upgrade Units" tree runs on TRIGGER_TECH_UPGRADE and TRIGGER_CIVIC_UPGRADE
- * — a technology or a civic gained. The census reads ONE upgrade per such turn
- * (1,356 of the 1,608 upgrade turns upgrade one unit, 222 two: a tech and a
- * civic together), the same chassis' remaining units following on later
- * triggers, at `MINOR_UPGRADE_GOLD` each. So each completion upgrades the
- * first unit in unit order that may: the chassis' upgrade unlocked by the
- * minor's own research, standing on the minor's ground with Movement left
- * (CIV6, Unit: "in friendly territory", "more than 0 Movement"), the treasury
- * covering the price. A minor ignores the strategic resource the new chassis
- * asks (`CivilizationLevels.IgnoresUnitStrategicResourceRequirements`,
- * CITY_STATE true), paying its cost where its stock covers it. Which unit goes first is unmeasured. The upgrade spends
- * the unit's turn, as every upgrade here does.
- */
-export function minorUpgrades(state: GameState, cityState: CityState, gained: number): void {
-  for (let n = 0; n < gained; n++) {
-    const u = state.units.find((x) => x.seat === cityState.seat && minorCanUpgrade(state, cityState, x));
-    if (!u || !minorUpgradeUnit(state, cityState, u)) return;
-  }
-}
-
 /** A MINOR UPGRADES ONE UNIT: one `minorCanUpgrade` passes, for
  *  `MINOR_UPGRADE_GOLD` from a treasury that covers it; the upgrade spends
- *  the unit's turn. Returns whether it upgraded. */
+ *  the unit's turn. A minor ignores the strategic resource the new chassis
+ *  asks (`CivilizationLevels.IgnoresUnitStrategicResourceRequirements`,
+ *  CITY_STATE true), paying its cost where its stock covers it. Returns
+ *  whether it upgraded. */
 export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit): boolean {
   if (!goldAffordable(cityState.treasury, MINOR_UPGRADE_GOLD) || !minorCanUpgrade(state, cityState, u)) return false;
   cityState.treasury -= MINOR_UPGRADE_GOLD;
@@ -572,14 +554,24 @@ export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit
   return true;
 }
 
-function minorCanUpgrade(state: GameState, cityState: CityState, u: Unit): boolean {
+/** the unit's upgrade may go now (0x58fff0, the full test): its upgrade
+ *  unlocked by the minor's research (`minorUpgradeVisible`), on the minor's
+ *  ground with Movement left (CIV6, Unit: "in friendly territory", "more
+ *  than 0 Movement") */
+export function minorCanUpgrade(state: GameState, cityState: CityState, u: Unit): boolean {
+  if (!minorUpgradeVisible(cityState, u) || u.movesLeft <= 0) return false;
+  return tileSeat(state.map.tiles[u.tileIndex]) === cityState.seat;
+}
+
+/** the unit has an upgrade the minor's research unlocks (0x58fff0, the
+ *  visible test) */
+export function minorUpgradeVisible(cityState: CityState, u: Unit): boolean {
   const next = UNITS[u.type]?.upgradesTo;
   const def = next ? UNITS[next] : undefined;
-  if (!def || u.movesLeft <= 0) return false;
+  if (!def) return false;
   const r = cityState.research;
   if (def.requiresTech && !r.techs.includes(def.requiresTech)) return false;
-  if (def.requiresCivic && !r.civics.includes(def.requiresCivic)) return false;
-  return tileSeat(state.map.tiles[u.tileIndex]) === cityState.seat;
+  return !def.requiresCivic || r.civics.includes(def.requiresCivic);
 }
 
 /** A unit's purchase price for the minor: its Production cost (a Builder's

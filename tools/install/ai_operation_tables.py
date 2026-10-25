@@ -171,10 +171,16 @@ def build() -> str:
 
     triggered = [{"trigger": c["TriggerType"], "tree": c["TreeName"], "operation": c.get("OperationName") or None,
                   "event": c["AIEvent"], "priority": num(c.get("Priority"))} for c in rows("TriggeredBehaviorTrees")]
-    # the operations' trees, the triggered operations' and the barbarian
-    # tribes' scouting trees (BarbarianTribes.ScoutingBehaviorTree)
+    # the city-states' triggers (the AiFavoredItems of MinorCivTriggeredTrees,
+    # the list MINOR_CIV_DEFAULT_TRAIT binds to the system TriggeredTrees)
+    minor_triggers = [c["Item"] for c in rows("AiFavoredItems") if c.get("ListType") == "MinorCivTriggeredTrees" and c.get("Item")]
+    # the operations' trees, the triggered operations', the city-states'
+    # triggered trees and the barbarian tribes' scouting trees
+    # (BarbarianTribes.ScoutingBehaviorTree)
     scouting = {c["ScoutingBehaviorTree"] for c in rows("BarbarianTribes") if c.get("ScoutingBehaviorTree")}
-    tree_names = sorted({d["tree"] for d in defs.values() if d["tree"]} | {t["tree"] for t in triggered if t["operation"]} | scouting)
+    minor_trees = {t["tree"] for t in triggered if t["trigger"] in minor_triggers}
+    tree_names = sorted({d["tree"] for d in defs.values() if d["tree"]} | {t["tree"] for t in triggered if t["operation"]} | scouting
+                        | minor_trees)
     node_defs = {k[0]: c for k, c in keyed(rows("NodeDefinitions"), "NodeType").items()}
     data_defs = {(k[0], int(k[1])): c for k, c in keyed(rows("NodeDataDefinitions"), "NodeType", "DefnId").items()}
     tree_nodes: dict[str, list] = {}
@@ -270,6 +276,9 @@ def build() -> str:
         f"export const AI_UNIT_AI: Readonly<Record<string, readonly string[]>> = {js(unit_ai)};",
         "",
         f"export const AI_TRIGGERED_TREES: readonly AiTriggeredTree[] = {js(triggered)};",
+        "",
+        "/** the city-states' triggers (MinorCivTriggeredTrees) */",
+        f"export const AI_MINOR_TRIGGERS: readonly string[] = {js(minor_triggers)};",
         "",
     ]
     city = [

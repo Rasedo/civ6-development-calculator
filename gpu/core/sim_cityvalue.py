@@ -715,6 +715,26 @@ class SimCityValue:
             left = left - take
         return out, torch.where(buy, balance - c, balance), buy
 
+    def _cv_upgrade_purchase(self, savings: torch.Tensor, balance: torch.Tensor, cost: torch.Tensor):
+        """0x68c940, `upgradePurchase` at `cost` (raw 24.8): the UNITS and
+        SLUSH slots together at the cost or more spend the UNITS slot then the
+        SLUSH slot; else a balance above the cost takes from each slot in
+        order; the balance lowered by what was taken; whether it bought"""
+        s0, s1 = savings[..., _SLOT_SLUSH], savings[..., _SLOT_UNITS]
+        saved = s0 + s1 >= cost
+        emerg = ~saved & (balance > cost)
+        out = savings.clone()
+        out[..., _SLOT_SLUSH] = torch.where(saved, s0 - (cost - s1).clamp(min=0), out[..., _SLOT_SLUSH])
+        out[..., _SLOT_UNITS] = torch.where(saved, (s1 - cost).clamp(min=0), out[..., _SLOT_UNITS])
+        bal = torch.where(saved, balance - cost, balance)
+        left = torch.where(emerg, cost, torch.zeros_like(cost))
+        for i in range(out.shape[-1]):
+            take = torch.minimum(left, out[..., i]).clamp(min=0)
+            out[..., i] = out[..., i] - take
+            left = left - take
+            bal = bal - take
+        return out, bal, saved | emerg
+
     # -- the military AI's unit production table (aiUnitProduction.ts) ------
 
     def _cv_unit_production(self, version: torch.Tensor, obsolete: torch.Tensor, owned: torch.Tensor,
