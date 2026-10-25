@@ -73,6 +73,7 @@
       value: AI_Planning.csv t10   lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one   Movement left;
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   context:
     - "...he formation +0x518): the plot entered (the fifth argument: x, y, the formation's layer 0x2665b0 — 3 the religious one) is in a zone where, first, the functor 0x52f710 over its ring..."
   review: imported
@@ -120,7 +121,9 @@
     - recording: h1_duelw1128
       turn: 7
       value: "runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from   39:20 beside China's Warrior and Scout, the planning's refusal shuts it   in (875 / 963 in the Warrior's zone), the path takes it ho"
-  readings: ["C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
+  readings:
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   context:
     - "...(0, finder, plot, flags): the unit's own plot 0; a plot off the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0..."
   review: imported

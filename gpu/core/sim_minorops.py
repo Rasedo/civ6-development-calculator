@@ -807,7 +807,9 @@ class SimMinorOps:
         theirs = near & (rec["owner"] == enemy.unsqueeze(1)) & (enemy >= 0).unsqueeze(1)
         enemy_units = torch.where(theirs, term, torch.zeros_like(term)).sum(dim=1)
         garrison = (enemy >= 0) & (enemy >= self.n_majors)
-        known = self._tac_known(seat)
+        # the cities whose centre the player has explored (`knownCities`'
+        # `isExplored`: every one for a city-state)
+        known = None if 100 <= seat < 100 + self.S else self._tac_known(seat)
         bidx = self._bidx
         order = list(range(self.n_majors)) + [self._CITY_MINOR0 + s for s in range(self.S)] + [self.FREE_ROW]
         for row in order:

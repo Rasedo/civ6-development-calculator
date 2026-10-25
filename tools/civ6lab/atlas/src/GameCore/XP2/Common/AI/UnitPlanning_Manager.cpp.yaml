@@ -156,6 +156,7 @@
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- \"AI Unit Planning\" (0x792c90) is a fork-join: N = min(units, the path finder pool's count) chunks; N <= 1 plans each..."

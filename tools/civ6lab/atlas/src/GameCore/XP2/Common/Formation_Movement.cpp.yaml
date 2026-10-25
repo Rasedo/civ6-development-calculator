@@ -10,6 +10,7 @@
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...The planning's reach (AI Unit Planning 0x792c90 -> 0x791e00 -> the breadth-first search 0x26dcd0 for 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrappe...
@@ -117,6 +118,7 @@
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...er_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair is null), so a node's key is its cost. The op..."
@@ -203,9 +205,11 @@
     - cpu/core/tactical.ts:from
     - cpu/core/tactical.ts:price
     - gpu/core/sim_tactics.py:price6
+    - cpu/core/tactical.ts:seen
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The cost (0x270dd0): 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no..."
@@ -221,6 +225,19 @@
   context:
     - "- The path is the least-cost path within that budget (A*, heuristic 0x271490), not a greedy step, and the range is the budget, not a hex distance between the ends."
     - "...0x79660, a new one opened. The trade path's callbacks (0x557e40): the destination test 0x271490, destination-valid 0x629460 (1), no heuristic (both slots null: the total is the known..."
+  review: imported
+- addr: 0x2715a0
+  final: 0x1a94b0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Planning.csv
+      turn: 69
+      value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  context:
+    - ...is of the land domain (finder +0x1f2 = 0x2669d0( formation, 2), set by the pool's init 0x2715a0 at +0x180 +0x72) and the plot is water, +1000 (0x3e800) where its player is not human (...
   review: imported
 - addr: 0x271b50
   final: 0x1a99b0
@@ -239,7 +256,9 @@
     - recording: h1_duelw1121
       turn: 11
       value: "runs/h1_duelw1121 t11: the   Horse Archer at 34:8 for 30:7 takes the path whose turn ends on the free   33:6, not the one through 33:7 / 32:7, both held by its own units."
-  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  readings:
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
   review: imported

@@ -3171,17 +3171,21 @@ class SimMasks:
         on_tunnel = tun.gather(1, tiles.clamp(min=0).unsqueeze(1)).squeeze(1)
         return torch.where(on_tunnel & (pick < BIG) & (tiles >= 0), pick, out)
 
-    def _minor_look_meets(self, rows: torch.Tensor, s: torch.Tensor, tiles: torch.Tensor, radius,
-                          see_through: torch.Tensor) -> None:
-        """`minorLookMeets`: minor `s` ([K] long)'s unit stands on `tiles`
-        ([K]) and looks, in the games `rows` ([K], unique); every major one of
-        whose plots or units the look takes in meets it (`_meet_citystates`),
-        and so does every major that sees the plot (`seatSeesPlot`), the
-        majors in seat order. No-op with fog off, as `revealAround` gates."""
+    def _minor_look(self, rows: torch.Tensor, s: torch.Tensor, tiles: torch.Tensor, radius,
+                    see_through: torch.Tensor) -> None:
+        """`minorLook`: minor `s` ([K] long)'s unit stands on `tiles`
+        ([K]) and looks, in the games `rows` ([K], unique); the plots the
+        look takes in join the minor's revealed plots (`mops_revealed`); every
+        major one of whose plots or units the look takes in meets it
+        (`_meet_citystates`), and so does every major that sees the plot
+        (`seatSeesPlot`), the majors in seat order. No-op with fog off, as
+        `revealAround` gates."""
         if not self.fog_of_war or rows.numel() == 0 or self.S == 0:
             return
         at = tiles.clamp(min=0)
         disk = self._los_disk(rows, at, radius, see_through)
+        sc = s.clamp(min=0, max=self.S - 1)
+        self.mops_revealed[rows, sc] = self.mops_revealed[rows, sc] | disk
         own = self.tile_seat[rows]
         # `disk`, `dist` and each `look` are already the games they are
         # gathered for, so every index below is narrowed to the same rows
@@ -3513,9 +3517,8 @@ class SimMasks:
         # the unit added answers a Train Unit quest (`questUnitAdded`)
         if not minor:
             self._quest_unit_added(row, can, type_idx)
-        # revealAround: a MAJOR's look lifts its fog ("nothing reads a
-        # city-state's fog"); a city-state's unit's look meets the majors it
-        # takes in (`minorLookMeets`)
+        # revealAround: a MAJOR's look lifts its fog; a city-state's unit's
+        # look reveals its plots and meets the majors it takes in (`minorLook`)
         if not minor:
             self._reveal_around(rows, row, spot.take(rows),
                                 self._unit_sight(type_idx.take(rows), torch.zeros_like(slot),
@@ -3524,7 +3527,7 @@ class SimMasks:
         elif 100 <= seat < 100 + self.S:
             _sight = self._unit_sight(type_idx.take(rows), torch.zeros_like(slot))
             _thr = self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)]
-            self._minor_look_meets(rows, torch.full_like(slot, seat - 100), spot.take(rows), _sight, _thr)
+            self._minor_look(rows, torch.full_like(slot, seat - 100), spot.take(rows), _sight, _thr)
             self._suzerain_look(rows, torch.full_like(slot, seat - 100), spot.take(rows), _sight, _thr)
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat["unitHp"]
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0

@@ -13515,14 +13515,14 @@ class SimSeats:
                     self.unit_promos.gather(1, _rc.unsqueeze(1)).squeeze(1)))
             self._reveal_around(rows[major], srow[major], dest.take(rows)[major], sight.take(rows)[major],
                                 see_through=see_thr.take(rows)[major])
-        # ...and a city-state's mover's look meets the majors it takes in
-        # (`revealAround`'s `minorLookMeets`)
+        # ...and a city-state's mover's look reveals and meets the majors it
+        # takes in (`revealAround`'s `minorLook`)
         mnr = (srow >= 100) & (srow < 100 + self.S)
         if bool(mnr.count_nonzero()):
             _ut = u_type.take(rows)[mnr]
             _up = u_promos.take(rows)[mnr]
-            self._minor_look_meets(rows[mnr], srow[mnr] - 100, dest.take(rows)[mnr],
-                                   self._unit_sight(_ut, _up), self._sees_through(_ut, _up))
+            self._minor_look(rows[mnr], srow[mnr] - 100, dest.take(rows)[mnr],
+                             self._unit_sight(_ut, _up), self._sees_through(_ut, _up))
             self._suzerain_look(rows[mnr], srow[mnr] - 100, dest.take(rows)[mnr],
                                 self._unit_sight(_ut, _up), self._sees_through(_ut, _up))
         # CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a
@@ -14213,7 +14213,8 @@ class SimSeats:
                    u_type: torch.Tensor, u_promos: torch.Tensor) -> None:
         """`revealAround` of a unit's look from `tile` ([K] each, `rows`
         unique): the barbarians' revealed plots, a major's fog (its meetings
-        with it), a city-state's meetings and its suzerain's look."""
+        with it), a city-state's revealed plots, meetings and its suzerain's
+        look."""
         sight = self._unit_sight(u_type, u_promos, seat, rows)
         thr = self._sees_through(u_type, u_promos)
         brb = seat == BARB_SEAT
@@ -14224,7 +14225,7 @@ class SimSeats:
             self._reveal_around(rows[major], seat[major], tile[major], sight[major], see_through=thr[major])
         mnr = (seat >= 100) & (seat < 100 + self.S)
         if bool(mnr.count_nonzero()):
-            self._minor_look_meets(rows[mnr], seat[mnr] - 100, tile[mnr], sight[mnr], thr[mnr])
+            self._minor_look(rows[mnr], seat[mnr] - 100, tile[mnr], sight[mnr], thr[mnr])
             self._suzerain_look(rows[mnr], seat[mnr] - 100, tile[mnr], sight[mnr], thr[mnr])
 
     def _pool_of(self, atk_kind: str):

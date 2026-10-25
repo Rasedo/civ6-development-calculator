@@ -363,6 +363,7 @@
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...st. The open list is a list sorted by total cost, equal totals by known cost (AddToOpen 0x775a0 scans from the head or the tail by a float midpoint, so a tie lands first or last by th...
@@ -836,7 +837,11 @@
       value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
     - recording: 1117
       value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
-  impl: [cpu/core/tactical.ts:reachPlots]
+  impl:
+    - cpu/core/tactical.ts:reachPlots
+    - cpu/core/tactical.ts:Ground
+    - cpu/core/tactical.ts:minor
+    - gpu/core/sim_tactics.py:_tac_search
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -1533,6 +1538,15 @@
   context:
     - ...0x4d bit 0), then the ring of radius 1 (0x6b1b0 -> 0x691f0, the centre not in it) through 0x513780, and last +1 when the plot's owner holds the civic its feature's row names (feature def +...
   review: imported
+- addr: 0x518f40
+  final: 0x3667f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  context:
+    - "...that keep it out (0x585d90: its own of its class, vtable +0xb8; another player's where 0x518f40 refuses the pair), none with MakeTradeRoute (+0x1b9 bit 64) or Spy (+0x1ba bit 2). Th..."
+  review: imported
 - addr: 0x519370
   final: 0x366ab0
   kind: function
@@ -1685,6 +1699,32 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - "...ormation's layer 0x2665b0 — 3 the religious one) is in a zone where, first, the functor 0x52f710 over its ring (0x6aef0, range 1) finds one, else per direction (0..5) a neighbour hol..."
+  review: imported
+- addr: 0x52fb90
+  final: 0x377790
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Planning.csv
+      turn: 69
+      value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  context:
+    - "...v — the row equal once priced so). The embark and disembark tests beside it (0x52fe90 / 0x52fb90, +1e6 where refused) and the mountain and canyon +1e6 the engines leave to the links..."
+  review: imported
+- addr: 0x52fe90
+  final: 0x377a90
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Planning.csv
+      turn: 69
+      value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  context:
+    - "...Planning.csv — the row equal once priced so). The embark and disembark tests beside it (0x52fe90 / 0x52fb90, +1e6 where refused) and the mountain and canyon +1e6 the engines leave to t..."
   review: imported
 - addr: 0x531660
   final: 0x3790d0

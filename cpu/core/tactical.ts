@@ -127,7 +127,9 @@ function dropHeldCosts(): void {
 
 /** `enterable` and `inEnemyZoc` for one search, each plot asked once: the
  *  ground holds still while the pathfinder runs; `stand`, may the unit end
- *  its move there — no other player's unit on it (the list's 0x586900) */
+ *  its move there — a path's: no other player's unit on it; the planning's
+ *  list's (0x26d890): none of another player not at war with it, a Trader
+ *  none, on a plot the player sees now */
 interface Ground {
   enter: (t: Tile) => boolean;
   zoc: (t: Tile) => boolean;
@@ -152,6 +154,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const foes = new Set<number>();
   const own = new Set<number>();
   const dom = unitDomain(unit.type);
+  let seenNow: Uint8Array | undefined;
   // the plots a unit at war with it that fights holds, whatever its domain
   // (the planning's attack test; a move order's path strikes its own domain)
   const fighters = new Set<number>();
@@ -167,12 +170,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const enters = new Map<number, boolean>();
   const zocs = new Map<number, boolean>();
   const seenZocs = new Map<number, boolean>();
-  let seenNow: Uint8Array | undefined;
   const ignoresZoc = !!UNITS[unit.type]?.ignoresZoc || (!!UNITS[unit.type]?.cavalry && !UNITS[unit.type]?.chariot);
-  const ex = seatOf(state, unit.seat)?.explored;
   // the plots the player revealed (node +0x51 bit 0, 0x154c0); a path
   // (`revealedOnly` false) reads every plot as revealed
-  const known = (i: number) => !revealedOnly || !ex || ex.length === 0 || ex[i] === 1;
+  const revealed = revealedOf(state, unit.seat);
+  const known = (i: number) => !revealedOnly || revealed(i);
   const def = UNITS[unit.type];
   const melee = !!def && def.combat > 0;
   const naval = !!def?.naval;
@@ -183,7 +185,23 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const minor = isCityStateSeat(unit.seat);
   return {
     known,
-    stand: (i) => !held.has(i),
+    stand: (i) => {
+      if (!held.has(i)) return true;
+      if (!planning) return false;
+      // the planning's list (0x26d890): on a plot the player sees now (node
+      // +0x50 & 2, the visibility count +0x290) a unit of another player
+      // not at war with it but a Trader (0x585d90 counts none with
+      // MakeTradeRoute or Spy: node +0x54) keeps the unit out; a plot it
+      // does not see now passes 0x586900 alone, whose flag 1 lets any unit
+      // there stand (runs/h1_duely1117 t2: Valletta's Warrior lists 13:12,
+      // the barbarian Scout's, out of its sight; h1_duely1127 t10: city-state
+      // 4's Warrior leaves 3:12 out, city-state 3's Builder on it in sight;
+      // t45: it lists 7:10, city-state 3's Trader on it, AI_Planning.csv)
+      seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+      if (seenNow[i] !== 1) return true;
+      return !state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat && onMap(x) && !UNITS[x.type]?.trader
+        && !unitsHostile(state, unit, x));
+    },
     full: (i) => own.has(i),
     foughtOn: (i) => {
       if (!fighters.has(i)) return false;
@@ -259,7 +277,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
  * a move order's path one on its own domain's); a strike's step is priced
  * so and then spends the Movement it leaves. Its cost (0x270dd0): 1000 x the step's
  * Movement +2, and where the step ends the turn's Movement +4, +3 more off
- * the unit's own territory. `onClose` sees each node as it closes; the
+ * the unit's own territory; a land unit's water +1000 more. `onClose` sees each node as it closes; the
  * search stops where it answers true. `onLink` sees each link the search
  * prices (the cost callback 0x26d6f0): the plot, the plot it is linked from,
  * the turn and Movement the step reaches it with, and whether it attacks —
@@ -411,10 +429,14 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     }
     // the cost (0x270dd0): +4 where the step leaves no Movement, +3 more
     // off the unit's territory on a revealed plot; +2 a revealed plot, +3
-    // an unrevealed one
+    // an unrevealed one; +1000 a land unit's revealed water, its player not
+    // human (0x2712be: the formation's land domain +0x1f2; runs/h1_duely1117
+    // t69: Valletta's Archer on 13:8 closes the Harbor's 14:7 (1/0) after
+    // 12:8 and 12:9 and its water to the north after the land, AI_Planning.csv)
     const seen = ground.known(to.index);
     const ends = moves <= 0 ? 4 + (seen && tileSeat(to) !== unit.seat ? 3 : 0) : 0;
-    return { g: p.g + cost * 1000 + (ends + (seen ? 2 : 3)) * FIX, moves, turns };
+    const wet = seen && !naval && isWater(to) ? 1000 : 0;
+    return { g: p.g + cost * 1000 + (ends + (seen ? 2 : 3) + wet) * FIX, moves, turns };
   }
 
   /** a node made cheaper from `p`: an open one re-keyed after its new
@@ -440,8 +462,8 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
 export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reach[] {
   const out: Reach[] = [];
   search(state, unit, maxTurns, false, (n, ground) => {
-    // a plot another player's unit holds the unit only passes (0x586900),
-    // its own plot listed whatever holds it
+    // a plot the unit may not stand on it only passes (`stand`), its own
+    // plot listed whatever holds it
     if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   });
@@ -969,8 +991,8 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     }
   };
   search(state, unit, PLAN_TURNS, false, (n, ground) => {
-    // a plot another player's unit holds the unit only passes (0x586900),
-    // its own plot listed whatever holds it (runs/h1_duelv1117 t115: city-state
+    // a plot the unit may not stand on it only passes (`stand`), its own
+    // plot listed whatever holds it (runs/h1_duelv1117 t115: city-state
     // 3's Crossbowman on 41:13 lists 41:13 first, China's Trader on it by the
     // turn's end)
     if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
@@ -2164,9 +2186,10 @@ function homelandSafety(state: GameState, pass: Pass): void {
 /** EXPLORE LAND's rounds over the homeland's units (0x70ce90: three at most) */
 const EXPLORE_ROUNDS = 3;
 
-/** the plots the player revealed (its `explored`; none tracked: every plot) */
+/** the plots the player revealed (a city-state's `revealed`, another
+ *  player's `explored`; none tracked: every plot) */
 function revealedOf(state: GameState, seat: number): (i: number) => boolean {
-  const ex = seatOf(state, seat)?.explored;
+  const ex = isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat)?.revealed : seatOf(state, seat)?.explored;
   return (i) => !ex || ex.length === 0 || ex[i] === 1;
 }
 

@@ -22,13 +22,17 @@
   final: 0x35a7f0
   kind: function
   status: PARTLY
-  impl: [cpu/core/barbarians.ts:othersSee, cpu/core/barbarians.ts:CAMP_SIGHT]
+  impl:
+    - cpu/core/barbarians.ts:othersSee
+    - cpu/core/barbarians.ts:CAMP_SIGHT
+    - cpu/core/fog.ts:minorLook
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2: the plot's visibility count fo..."
@@ -110,6 +114,7 @@
     - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   context:
     - "...Kandy's MINOR_CIV_KANDY_GRANT_RELIC_BONUS, Amount 1): the visibility manager's reveal 0x50d390 (Player_Visibility_Manager.cpp, the natural-wonder discovery notification), for i below..."
     - "- WORLD_CIRCUMNAVIGATED: on a plot revealed (0x50d390, the visibility manager), a player without the flag (+0x8a8) whose team has revealed a..."

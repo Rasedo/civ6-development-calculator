@@ -6,7 +6,9 @@
 - addr: 0x3e7d0
   kind: function
   status: PARTLY
-  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  readings:
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The cost (0x270dd0): 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no Movement +4, and on a revealed plot then the 1e6..."

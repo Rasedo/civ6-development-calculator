@@ -3403,7 +3403,7 @@ where it sees a plot or a unit of the major's, or where the major sees it
 (1124 t10: Granada's Warrior beside Xi'an's coast and China's Builder; the
 first meeting's envoy, `InfluenceGiven`, lands at the step, `DiplomacyMeet`
 later in the turn). The engines: `revealAround`'s meeting and
-`minorLookMeets` / `_reveal_around`, `_minor_look_meets`. Not separated by
+`minorLook` / `_reveal_around`, `_minor_look`. Not separated by
 these records (C-94 LAB): the line of a look across a ridge of two plots
 (1124 t28: Cardiff's Warrior at (7,11) and China's Scout at (6,12) met; the
 engines' line between them takes the Rainforest at (7,12) and blocks).
@@ -7388,6 +7388,69 @@ gpu/core/sim_tactics.py.
   (1/0), the embarking paid; ported: `stepCost`, `_embark_waived`). Mathematics' MODIFIER_PLAYER_UNITS_ADJUST_SEA_
   MOVEMENT reaches a hull alone (t78: 2's embarked Swordsman plans on 2
   Movement with Mathematics).
+- THE OPEN LIST AMONG EQUAL COSTS (READ): the planning's breadth-first
+  search 0x26dcd0 keeps the pool's heuristic (+0x30/+0x38, null in the pool
+  0x26f330 sets) and zeroes the destination test (+0x20/+0x28); the
+  destination is (-9999, -9999), so the search runs out. A node's key is
+  (+0x18 f, +0x1c g), f = g + heuristic << 8 = g. AddToOpen 0x775a0: below
+  the head goes first, above the tail last; else |f - tail| against
+  |f - head| (24.8 fixed to float, 0x774c0): nearer the tail (strictly) the
+  walk from the tail puts it after its equals, else the walk from the head
+  before them. UpdateOpenNode 0x79560 moves a node made cheaper toward the
+  head past those of higher f only (after its new equals). LinkChild
+  0x78750: the cost (+0x48, 0x270dd0) first, then a new node AddToOpen, an
+  open one re-keyed where strictly cheaper, a closed one UpdateParents. The
+  engines' `search` / `_tac_search` hold this. The order the game's rows
+  close in among equal costs comes from the cost: an unrevealed plot's step
+  is +3 with no +3 off the territory, a revealed one +2 and +3 more off it
+  where it ends the turn (0x270dd0), so a plot the player never revealed
+  closes before revealed equals two dearer (runs/h1_duely1117 t2: Valletta's
+  Warrior on 13:8 closes 11:10 (2/0) after 11:8 and before 15:11 — 11:10
+  unrevealed, 4018 against 15:11's 4019).
+- THE COST'S WATER TERM (0x270dd0 at 0x2712be, READ): on a revealed plot,
+  where the formation is of the land domain (finder +0x1f2 = 0x2669d0(
+  formation, 2), set by the pool's init 0x2715a0 at +0x180 +0x72) and the
+  plot is water, +1000 (0x3e800) where its player is not human (+0x1f6
+  IsHuman clear) or one of its units holds +0x590; the same cost serves the
+  path and the planning's lists. So an AI land unit's reach and path take
+  water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's
+  Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after
+  the land's 12:8 and 12:9, and each water plot of its second turn after
+  every land one, AI_Planning.csv — the row equal once priced so). The
+  embark and disembark tests beside it (0x52fe90 / 0x52fb90, +1e6 where
+  refused) and the mountain and canyon +1e6 the engines leave to the links
+  they never make. The init's other bytes: +0x1f1 a sea formation, +0x1f5
+  one embarked, +0x1f7 a unit's +0x590 set, +0x198 the owner, +0x1a4
+  0x2665b0. The engines: `search`'s price, `_tac_search`'s `wet`.
+- THE PLAYER'S REVEALED PLOTS, a city-state's (READ: the reveal 0x50d390 off
+  the visibility count change 0x508d50 for every player): its units' looks
+  write them as they step, as the majors' and the barbarians'; the planning
+  reads them as the unit's turn opens (0x792c90 runs once at the AI's turn
+  start), not the turn's later steps (runs/h1_duely1117 t2: 11:10, which the
+  other Warrior's step to 12:9 reveals later that turn, closes unrevealed).
+  The engines: `minorLook` / `_minor_look` (`CityState.revealed`,
+  `mops_revealed`), `revealedOf` / `_tac_known`; the replay hands the
+  minors' copy the revealed plots as the turn opened.
+- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the
+  node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now
+  (the player's visibility count +0x290 above 0), bit 2 a mountain (terrain
+  mask 0x4924), bit 3 (+0x3a bit 8 off a mountain), bit 4 water, bits 6 and
+  7 0x586900 under flags 1; +0x51 bit 0 revealed (0x154c0), bit 7 +0x54 at
+  the stacking limit (+0x1b0); +0x54 = 0x585eb0 less the mover: the plot's
+  units not at war with the mover that keep it out (0x585d90: its own of
+  its class, vtable +0xb8; another player's where 0x518f40 refuses the
+  pair), none with MakeTradeRoute (+0x1b9 bit 64) or Spy (+0x1ba bit 2).
+  The list: on a plot seen now, none with bits 2 or 3, none without bit 6,
+  none where +0x54 is above 0 and the plot's first unit is another
+  player's; then 0x586900 under flags 9 (the finder's 0x10 -> 1, 0x4 -> 8),
+  whose 0x586360 lets a unit 0x208b80 finds there (flags 0x109) stand under
+  flag 1 but where both are embarked — so a plot the player does not see now
+  is listed whatever stands on it (runs/h1_duely1117 t2: Valletta's Warrior
+  on 13:9 lists 13:12 (2/0), the barbarian Scout on it out of its sight;
+  h1_duely1127 t10: city-state 4's Warrior on 4:11 leaves 3:12 out, city-state
+  3's Builder on it in sight; t45: on 8:7 it lists 7:10, city-state 3's
+  Trader on it). The engines: `groundOf`'s stand under `planning`, the
+  GPU `_tac_search`'s `_tac_peaceful` & seen.
 - Measured (the action replay on 1117, 1121, 1124, 1127, 1128: each turn's
   pass on a copy, the units where the pair's first record holds them, the
   ground and research record t+1's, the "Random Direction" draws the log's):

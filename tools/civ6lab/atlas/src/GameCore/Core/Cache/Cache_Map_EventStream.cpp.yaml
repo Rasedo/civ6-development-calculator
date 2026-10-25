@@ -7,10 +7,11 @@
   final: 0xfce80
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:ex]
+  impl: [cpu/core/tactical.ts:ex, cpu/core/tactical.ts:ignoresZoc]
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...— save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0, 0x154c0) the step costs the parent's or 1 and no rule runs."

@@ -172,21 +172,26 @@ export function unitSeesThrough(u: { type: string; promos?: number }): boolean {
   return promoFlag(u, 'SEE_THROUGH') || !!UNITS[u.type]?.seesThrough;
 }
 
-/** A CITY-STATE'S UNIT STANDS on `tileIndex` and looks: every major one of
- *  whose plots, or of whose units, the look takes in meets the minor, and
- *  so does every major that sees the plot (`seatSeesPlot`; runs/h1_duelw1124
- *  t28: Cardiff's Warrior steps two plots from China's Scout, which sees it)
- *  — `meetCityState`, the majors in seat order. */
-function minorLookMeets(state: GameState, seat: number, tileIndex: number, radius: number, los: Look): void {
+/** A CITY-STATE'S UNIT STANDS on `tileIndex` and looks: the plots the look
+ *  takes in join the minor's revealed plots (`CityState.revealed`, the
+ *  player's +0x2f0 the visibility count change 0x508d50 writes), which its
+ *  units' planning reads; every major one of whose plots, or of whose units,
+ *  the look takes in meets the minor, and so does every major that sees the
+ *  plot (`seatSeesPlot`; runs/h1_duelw1124 t28: Cardiff's Warrior steps two
+ *  plots from China's Scout, which sees it) — `meetCityState`, the majors in
+ *  seat order. */
+function minorLook(state: GameState, seat: number, tileIndex: number, radius: number, los: Look): void {
   const cs = state.cityStates.find((c) => c.seat === seat);
   if (!cs) return;
   const t = state.map.tiles[tileIndex];
   const majorUnits = new Set<string>();
   for (const u of state.units) if (isCiv(u.seat)) majorUnits.add(`${u.tileIndex}:${u.seat}`);
   const seen = new Set<number>();
-  const sees = los ? losDisk(state.map, t, radius, los.seeThrough) : null;
+  const sees = losDisk(state.map, t, radius, los.seeThrough);
+  const revealed = (cs.revealed ??= new Array<number>(state.map.tiles.length).fill(0));
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
-    if (sees && !sees.has(n.index)) continue;
+    if (!sees.has(n.index)) continue;
+    revealed[n.index] = 1;
     const owner = tileSeat(n);
     if (isCiv(owner)) seen.add(owner);
     for (const s of state.seats) if (majorUnits.has(`${n.index}:${s.seat}`)) seen.add(s.seat);
@@ -342,7 +347,7 @@ export function revealAround(
   // China's first meeting's envoy lands before the minor's next move). Its
   // suzerain sees what it sees (`majorLook`).
   if (isCityStateSeat(seat)) {
-    if (los) minorLookMeets(state, seat, tileIndex, radius, los);
+    if (los) minorLook(state, seat, tileIndex, radius, los);
     const cs = state.cityStates.find((c) => c.seat === seat);
     const suz = cs ? suzerainOf(cs) : -1;
     if (isCiv(suz)) majorLook(state, suz, tileIndex, radius, los, false);

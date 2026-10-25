@@ -205,6 +205,17 @@ class SimTactics:
             out |= s != seat
         return out
 
+    def _tac_peaceful(self, seat: int) -> torch.Tensor:
+        """[B, T] bool — a unit of another player than `seat` not at war with
+        it, a Trader none, holds the plot (an aircraft or a spy holds none)."""
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+            pc = pl.clamp(min=0)
+            s = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, seat))
+            trader = self.unit_type.gather(1, pc) == self._trader_idx
+            out |= (s != seat) & ~self._seats_hostile(seat, s) & ~trader
+        return out
+
     def _tac_hostile(self, seat: int) -> torch.Tensor:
         """[B, T] bool — a unit of a player at war with `seat` holds the plot
         (an aircraft or a spy holds none)."""
@@ -230,11 +241,14 @@ class SimTactics:
         return maj & civic & ~war
 
     def _tac_known(self, seat: int) -> torch.Tensor | None:
-        """[B, T] bool — `groundOf`'s known: the plots `seat` revealed (a
-        major's explored plane; the barbarians' where they revealed any, else
-        every plot); None for a player that tracks none (every plot)."""
+        """[B, T] bool — `revealedOf`: the plots `seat` revealed (a major's
+        explored plane; a city-state's revealed plots; the barbarians' where
+        they revealed any, else every plot); None for a player that tracks
+        none (every plot)."""
         if 0 <= seat < self.n_majors:
             return self.seat_explored[:, seat]
+        if 100 <= seat < 100 + self.S:
+            return self.mops_revealed[:, seat - 100]
         if seat == BARB_SEAT:
             ex = self.barb_explored
             return ex | ~ex.any(dim=1, keepdim=True)
@@ -422,7 +436,8 @@ class SimTactics:
         embark it takes water too, a turn starting on the Movement of the
         domain its plot holds it in. Returns the closing rank and turns of each
         plot it may end on ([N, T], -1 never closed or only passed: another
-        player's unit holds it) and each node's parent; with `dest` [N] each
+        player's unit holds it — in the planning's, one not at war with it,
+        no Trader, on a plot it sees now) and each node's parent; with `dest` [N] each
         row stops once its plot closes. With `plan` (`_tac_plan`'s targets)
         each link the search prices — the start first, linked from itself —
         lays the targets' spots (`planUnit`'s `onLink`): "spot" [N, E, 6]
@@ -599,10 +614,11 @@ class SimTactics:
             moves = torch.where(a6, 0, moves)
             # +4 where the step leaves no Movement, +3 more off the unit's
             # territory on a revealed plot; +2 a revealed plot, +3 an
-            # unrevealed one
+            # unrevealed one; +1000 a land unit's revealed water (0x2712be)
             seen6 = kn_n.gather(1, nbc)
             ends = torch.where(moves <= 0, ((tseat[rows.unsqueeze(1), nbc] != seat) & seen6).long() * 3 + 4, 0)
-            gn = bg + cst * 1000 + (ends + 3 - seen6.long()) * _FIX
+            wet = (seen6 & water_n.gather(1, nbc) & ~naval.unsqueeze(1)).long() * 1000
+            gn = bg + cst * 1000 + (ends + 3 - seen6.long() + wet) * _FIX
             return nb, nbc, a6, turns, moves, gn, cliff6, bt
 
         def update_parents(rm: torch.Tensor, node: torch.Tensor, seq: torch.Tensor, lo: torch.Tensor) -> tuple:
@@ -806,11 +822,17 @@ class SimTactics:
             put(tie, tie6)
             put(st, torch.ones_like(s0), new6)
             put(key, nk6, ins6)
-        # the planning's list keeps the plots the unit may end on (0x586900):
-        # none another player's unit holds, but where it attacks, and its own
+        # the list keeps the plots the unit may end on, where it attacks, and
+        # its own: a path's none another player's unit holds; the planning's
+        # (0x26d890) none it sees now where a unit of another player not at
+        # war with it but a Trader stands (0x585d90, node +0x54)
         own = torch.zeros(N, T, dtype=torch.bool, device=dev)
         own[ar, start] = True
-        stand = ~self._tac_foreign(seat)[rows] | atk_n | own
+        if zoc:
+            kept_out = self._tac_foreign(seat)
+        else:
+            kept_out = self._tac_peaceful(seat) & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
+        stand = ~kept_out[rows] | atk_n | own
         closed = rturn
         rank = torch.where(stand, rank, torch.full_like(rank, -1))
         rturn = torch.where(stand, rturn, torch.full_like(rturn, -1))

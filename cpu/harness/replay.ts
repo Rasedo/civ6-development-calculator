@@ -998,9 +998,14 @@ const minorAiSeat = (seat: number) => isCityStateSeat(seat) || seat === FREE_SEA
  * set beside the game's tactical log and record t+1 (`tallyMinorTactics`):
  * the record's moves and battles stay the pair's.
  */
-function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>): void {
+function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
+  revealedWas: ReadonlyMap<number, number[] | undefined>): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
+  for (const cs of copy.cityStates) {
+    const r = revealedWas.get(cs.seat);
+    if (r) cs.revealed = [...r];
+  }
   const twin = new Map<Unit, Unit>();
   state.units.forEach((u, i) => twin.set(copy.units[i], u));
   const keyOf = new Map<Unit, string>();
@@ -1281,6 +1286,9 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
           }
         }
       }
+      // its revealed plots those the record's steps revealed, not the
+      // pass's own moves on the copy
+      c.revealed = cs.revealed ? [...cs.revealed] : undefined;
       const now = copy.turn;
       copy.turn = turn;
       // ...seeing no unit the next turn's start made
@@ -4238,6 +4246,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       break;
     }
     ctx.turn = a.turn;
+    // the city-states' revealed plots as the turn opens, which their units'
+    // planning reads (runs/h1_duely1117 t2: Valletta's Warrior on 13:8
+    // closes 11:10, which the other Warrior's step to 12:9 reveals later in
+    // the turn, as a plot never revealed, AI_Planning.csv)
+    const revealedWas = new Map(state.cityStates.map((cs) => [cs.seat, cs.revealed?.slice()] as const));
     const baseStep = transitionChecks(a, b, cat, history, prev);
     advanceHistory(history, b, cat);
     const recordA = ctx.next;
@@ -4717,7 +4730,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // the units the minors' cities trained in the engine's turn (a purchase
     // the record shows is not one)
     const bought = new Set(ds.flatMap((d) => (d.kind === 'buyUnit' ? [d.unit] : [])));
-    minorAi(ctx, b, a.turn, new Set([...ctx.units].filter(([k, u]) => minorAiSeat(u.seat) && !standing.has(u) && !bought.has(k)).map(([, u]) => u)));
+    minorAi(ctx, b, a.turn, new Set([...ctx.units].filter(([k, u]) => minorAiSeat(u.seat) && !standing.has(u) && !bought.has(k)).map(([, u]) => u)), revealedWas);
     // a later player's blow on a city-state's or the Free Cities' unit came
     // after the defender's end look: its record of the attacker is the blow's
     // (runs/h1_dueld1121 t22: Hunza's end look sees the barbarians'
