@@ -41,6 +41,7 @@ import { completeQueueItem } from '../core/production';
 import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
+import { CP_ACCEPTED, CP_IN_PROGRESS } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, FORTIFY_MAX_TURNS } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
@@ -3841,6 +3842,29 @@ function importedWorld(state: GameState, imp: Imported, rec: TurnRecord, history
   seedMoments(state, imp, history);
 }
 
+/** a contract the game's city queued in the turn `turn` the record's item
+ *  stands for (AI_CityBuild.csv's queue line: its item and tree): the
+ *  city-state's own contract of that item and tree, accepted and not
+ *  queued, is queued as the game's was — IN PROGRESS, bound to the city, in
+ *  hand at its value, its
+ *  completion connected (runs/h1_duelw1117 Antananarivo t15: contract 44's
+ *  Builder queued, COMPLETED at t19) */
+function bindQueuedContracts(ctx: Ctx, cs: CityState, imp: Imported, turn: number): void {
+  const ai = cs.cityAi;
+  const pid = imp.playerOfSeat.get(cs.seat);
+  if (!ai || pid === undefined) return;
+  for (const q of ctx.memoryLogs.queued.get(`${turn}:${pid}`) ?? []) {
+    const c = ai.contracts.find((x) => !x.queued && x.progress === CP_ACCEPTED
+      && `${x.unit ?? x.building ?? x.district ?? ''}|${x.treeName}` === q);
+    if (!c) continue;
+    c.progress = CP_IN_PROGRESS;
+    c.queued = true;
+    c.city = minorCity(cs).id;
+    ai.inHand[c.city] = c.id;
+    cs.prodSetValue = c.value;
+  }
+}
+
 /**
  * THE PAIR'S WORLD IS THE RECORD'S (`--aiscore`): record t as the importer
  * read it (`imp`, the import the pair before compared with) replaces the
@@ -3888,6 +3912,7 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   for (const cs of world.cityStates) {
     const o = state.cityStates.find((x) => x.id === cs.id);
     if (o) seatPair(o, cs, true);
+    bindQueuedContracts(ctx, cs, imp, a.turn - 1);
   }
   seatPair(state.barbSeat, world.barbSeat, true);
   if (world.freeSeat && state.freeSeat) {

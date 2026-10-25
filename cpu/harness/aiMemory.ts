@@ -6,7 +6,8 @@
  *   - knowledge.army: the knowledge base's army records, per player and unit
  *     type the count and the oldest's age (AI_Knowledge.csv's ARMY lines);
  *   - knowledge.camps: the camps the knowledge base holds (its CAMP lines);
- *   - cityAi.contracts: the city AI's open contracts (submitted, accepted, in
+ *   - cityAi.contracts: the city AI's contracts as AI_CityBuild.csv shows them (each
+ *     open where its last CONTRACT line printed it submitted, accepted or in
  *     progress), each its item and its tree, from AI_CityBuild.csv's
  *     CONTRACT lines folded to that turn;
  *   - ops: the operations alive at the turn's end, by name, from
@@ -16,7 +17,7 @@
  * the next turn's decisions read it (`replay.ts`).
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { CP_ACCEPTED, CP_IN_PROGRESS, CP_SUBMITTED } from '../core/aiContracts';
+import { CP_ACCEPTED, CP_IN_PROGRESS, CP_SUBMITTED, type AiContract } from '../core/aiContracts';
 import { opsOf } from '../core/operations/manager';
 import type { Seat } from '../core/types';
 
@@ -67,6 +68,14 @@ export class MemoryLogs {
   /** whether the recording kept each kind's log: a kind without one is not
    *  compared */
   readonly logged: Record<MemoryKind, boolean>;
+  /** per player, our contracts some CONTRACT line has named, by id, while
+   *  its last line printed it open — held after the contract leaves the book
+   *  (a tree's release, the weak handles' silent drop), as the log's fold
+   *  keeps it */
+  readonly shownOpen = new Map<number, Map<number, AiContract>>();
+  /** `${turn}:${player}` -> the contracts a city queued that turn
+   *  (`item|tree`, AI_CityBuild.csv's queue lines) */
+  readonly queued = new Map<string, string[]>();
 
   constructor(dumpPath: string) {
     const logs = dumpPath.replace(/\.jsonl$/, '.logs/');
@@ -82,6 +91,12 @@ export class MemoryLogs {
     const build = lines(`${logs}AI_CityBuild.csv`);
     for (const line of build) {
       const c = line.split(',').map((x) => x.trim());
+      // the queue line: "turn, player, city, , , item, tree, CONTRACT id"
+      if (c[4] === '' && c[7]?.startsWith('CONTRACT ')) {
+        const k = `${c[0]}:${c[1]}`;
+        (this.queued.get(k) ?? (this.queued.set(k, []), this.queued.get(k)!)).push(`${c[5]}|${c[6]}`);
+        continue;
+      }
       if (!c[4]?.startsWith('CONTRACT ') || c.length < 11) continue;
       const [turn, player] = [Number(c[0]), Number(c[1])];
       const book = open.get(player) ?? (open.set(player, new Map()), open.get(player)!);
@@ -159,9 +174,14 @@ export function readMemory(logs: MemoryLogs, seat: Seat, player: number, turn: n
     (logs.army.get(`${turn}:${player}`) ?? []).filter((x) => !x.includes('|SETTLER ')).sort());
   add('knowledge.camps', (seat.campsKnown ?? []).map((p) => `${p % W}:${Math.floor(p / W)}`), logs.camps.get(`${turn}:${player}`) ?? []);
   if (seat.cityAi) {
-    const open = seat.cityAi.contracts.filter((c) => c.progress === CP_SUBMITTED || c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS)
-      .map((c) => `${c.unit ?? c.building ?? c.district ?? ''}|${c.treeName}`).sort();
-    add('cityAi.contracts', open, logs.contractsAt(turn, player));
+    // as the log can show them: the progress its last CONTRACT line printed
+    const shown = logs.shownOpen.get(player) ?? (logs.shownOpen.set(player, new Map()), logs.shownOpen.get(player)!);
+    for (const c of seat.cityAi.contracts) if (c.shown !== undefined) shown.set(c.id, c);
+    for (const [id, c] of shown) {
+      if (c.shown !== CP_SUBMITTED && c.shown !== CP_ACCEPTED && c.shown !== CP_IN_PROGRESS) shown.delete(id);
+    }
+    add('cityAi.contracts', [...shown.values()].map((c) => `${c.unit ?? c.building ?? c.district ?? ''}|${c.treeName}`).sort(),
+      logs.contractsAt(turn, player));
   }
   add('ops', seat.ops ? opsOf(seat.ops).map((o) => o.def).sort() : [], logs.opsAt(turn, player));
   return out;

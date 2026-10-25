@@ -4503,6 +4503,22 @@ operations' contracts, the improvement values below, the purchases).
   three timeline entries set), so a city-state keeps the slot apart while
   any class stands. 1124 p3 t27 and t72 (Granada's Builder and Heavy
   Chariot) pass only folded.
+- BUILD UNIT's "already held" test (0x7f4e00 -> 0x18e9f0 City_Buildings ->
+  0x18fe60 HasBuilding) reads the city's buildings, not its queue:
+  runs/h1_duelw1121 Antioch t45, its Walls queued by that turn's Default
+  Specialization (135.1), the walls tree's BUILDING_WALLS contract
+  submitted the same turn.
+- AI_CityBuild.csv's CONTRACT lines come only from a city: the SUBMITTED
+  line of each city that lists a contract at its submission (0x5d6050) and
+  the line 0x5d4d70's head prints for a listed contract it drops (its
+  progress then: COMPLETED, FAILED, CANCELLED, IN PROGRESS, or ACCEPTED where
+  the city may no longer take it). A contract no city lists (a Purchase
+  Plot's, a goal tech's, an operation's Warrior Monk the religious AI
+  alone takes) prints none, and one a tree releases or a purchase completes
+  while the queue is busy prints none until (unless) the head runs — the
+  log's fold keeps it open (runs/h1_duelw1117 Valletta's Builder contract
+  47, PURCHASED t22, open in the fold after; 1117 Antananarivo's Slinger
+  contract 10 of t2, its tree gone by t9).
 - TryPurchaseUnits' threatened city (0x68c027): CityBuildAI +0x1b8's sign
   bit clear — a threat at or above 0.
 - 0x5d2810's walk starts its bests (+0x30, then +0x2c) at 0 (0x5d286c /

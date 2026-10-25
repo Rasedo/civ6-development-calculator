@@ -2034,7 +2034,8 @@ class _MinorWorld:
 
     def building_held(self, row):
         names = self._b_names
-        return self._rows_apply(row, lambda r: _t(self.f.building_held(names[r]), self.f.like()).bool())
+        # Build Unit's test reads the city's buildings, not its queue
+        return self._rows_apply(row, lambda r: _t(self.f.has_building(names[r]), self.f.like()).bool())
 
     def district_held(self, row):
         names = self._d_names

@@ -246,6 +246,8 @@ class CityAi:
         # the contract is in its tree's list; the seat's city lists it
         self.c_in_tree = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
         self.c_listed = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
+        # the progress its last CONTRACT line printed (`AiContract.shown`), -1 none
+        self.c_shown = torch.full((B, S, C), -1, dtype=L, device=dev)
         # the economic AI's purchase list holds it (`ContractBook.purchase`;
         # its order the contracts' ids)
         self.c_purchase = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
@@ -310,7 +312,8 @@ def new_contract(ai: CityAi, s: int, mask: torch.Tensor, **f) -> torch.Tensor:
     ai.c_serial[:, s] += mask.long()
     _cset(ai.c_id, s, j, cid, mask)
     defaults = {"tree": -1, "unit": -1, "building": -1, "district": -1, "goal_kind": GOAL_NONE, "goal": -1, "plot": -1,
-                "value": 0, "city": -1, "max_turns": 0, "turns": -1, "progress": CP_CLAIMED}
+                "value": 0, "city": -1, "max_turns": 0, "turns": -1, "progress": CP_CLAIMED,
+                "shown": -1}
     for k, d in defaults.items():
         v = f.get(k, d)
         _cset(getattr(ai, "c_" + k), s, j, _l(v, cid), mask)
@@ -402,6 +405,7 @@ def submit_contract(ai: CityAi, s: int, j: torch.Tensor, w, turn: int, mask: tor
     taken = gold | faith_purchasable(ai, unit, bld, dist)
     el = mask & contract_eligible(ai, s, j, w)
     _cset(ai.c_listed, s, j, True, el)
+    _cset(ai.c_shown, s, j, CP_SUBMITTED, el)
     clear = el & (_cget(ai.c_value, s, j) > _l(w.current_value(), j)) & (_l(w.founded_turn(), j) + 1 >= turn)
     if bool(clear.any()):
         w.clear_production(clear)
@@ -427,6 +431,7 @@ def city_contracts(ai: CityAi, s: int, w, mask: torch.Tensor) -> torch.Tensor:
         held = contract_at(ai, s, ai.in_hand[:, s])
         better = take & ((held < 0) | (_cget(ai.c_value, s, held) < _cget(ai.c_value, s, j)))
         ai.in_hand[:, s] = torch.where(better, _cget(ai.c_id, s, j), ai.in_hand[:, s])
+        _cset(ai.c_shown, s, j, _cget(ai.c_progress, s, j), on & ~take)
         _cset(ai.c_listed, s, j, False, on & ~take)
     return torch.where(mask, contract_at(ai, s, ai.in_hand[:, s]), torch.full_like(ai.in_hand[:, s], -1))
 

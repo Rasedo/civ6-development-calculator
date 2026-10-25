@@ -2939,9 +2939,10 @@
             "cai_c_queued",
             "cai_c_in_tree",
             "cai_c_listed",
-            "cai_c_city"
+            "cai_c_city",
+            "cai_c_shown"
           ],
-          "note": "the minor's contracts by id: [id, tree, unit, building, district rows, goal kind, goal, plot, value, city, most turns, turns, progress, assign, queued, held by its tree, listed by the city]"
+          "note": "the minor's contracts by id: [id, tree, unit, building, district rows, goal kind, goal, plot, value, city, most turns, turns, progress, assign, queued, held by its tree, listed by the city, the progress its last log line printed (-1 none)]"
         },
         {
           "name": "minorPurchaseList",

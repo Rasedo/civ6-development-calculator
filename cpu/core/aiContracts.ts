@@ -61,6 +61,10 @@ export interface AiContract extends ContractItem {
   assign: boolean;
   /** a city queued it: the item's completion signal is connected */
   queued?: boolean;
+  /** the progress its last AI_CityBuild.csv CONTRACT line printed (a city
+   *  lists it at its submission, the Default Specialization's head drops
+   *  it from the list); none while no line has named it */
+  shown?: number;
 }
 
 /** One city of the seat as the contracts read it */
@@ -223,6 +227,7 @@ export function submitContract(book: ContractBook, c: AiContract, cities: readon
   for (const city of cities) {
     if (!contractEligible(c, city)) continue;
     (book.city[city.id] ??= []).push(c.id);
+    c.shown = CP_SUBMITTED;
     line(city, c);
     if (c.value > city.currentValue && city.foundedTurn + 1 >= turn) clearProduction(city);
     taken = true;
@@ -252,6 +257,7 @@ export function cityContracts(book: ContractBook, city: ContractCity, line: (c: 
       kept.push(id);
       continue;
     }
+    c.shown = c.progress;
     line(c);
   }
   book.city[city.id] = kept;

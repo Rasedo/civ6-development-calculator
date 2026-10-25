@@ -1289,7 +1289,7 @@ _MUTABLE = [
     "cai_slots", "cai_tr_alive", "cai_tr_id", "cai_tr_status", "cai_tr_mem_a", "cai_tr_mem_b", "cai_tr_bb", "cai_tr_trigger",
     "cai_tr_units", "cai_c_id", "cai_c_tree", "cai_c_unit", "cai_c_building", "cai_c_district", "cai_c_goal_kind", "cai_c_goal",
     "cai_c_plot", "cai_c_value", "cai_c_city", "cai_c_max_turns", "cai_c_turns", "cai_c_progress", "cai_c_assign", "cai_c_queued",
-    "cai_c_in_tree", "cai_c_listed", "cai_c_purchase", "cai_in_hand", "cai_r_plot", "cai_r_tree", "cai_r_value", "cai_c_serial", "cai_t_serial",
+    "cai_c_in_tree", "cai_c_listed", "cai_c_purchase", "cai_c_shown", "cai_in_hand", "cai_r_plot", "cai_r_tree", "cai_r_value", "cai_c_serial", "cai_t_serial",
     "citystate_kb_slot", "citystate_kb_owner", "citystate_kb_type", "citystate_kb_seen", "citystate_kb_plot",  # its knowledge base's army records
     "citystate_kb_damage",  # the damage each record's unit had when last seen
     # its operations (`OpsAi`, sim_minorops.py): the pool, the trees, the teams, the stores, the pick, the camps known, the plots revealed

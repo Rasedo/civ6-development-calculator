@@ -430,7 +430,13 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
     districtDefensive: (d) => (AI_DISTRICTS.find((r) => r.type === d)?.hitPoints ?? 0) > 0,
     evals, bestImprovement: -1, buildings: tables.buildings, units: tables.units,
     eventBuilding: eventBuilding(tables, pf), eventUnit: eventUnit(tables),
-    buildingHeld: (b) => pf.buildingHeld(b),
+    // Build Unit's test reads the city's buildings (0x18e9f0 -> 0x18fe60), not
+    // its queue (runs/h1_duelw1121 Antioch t45: its Walls queued by the
+    // Default Specialization, the walls tree's contract submitted that turn)
+    buildingHeld: (b) => {
+      const id = engineId('building', b, 'BUILDING_', BUILDINGS);
+      return !!id && (cs.buildings ?? []).includes(id);
+    },
     districtHeld: (d) => facts.hasDistrict(d),
     threat,
     plot: cs.centerIndex,
