@@ -1749,16 +1749,32 @@ class SimMinors:
                            join=lambda tree, unit, m: self._mops_join(s, tree, unit - self.POOL_LO["major"], m))
         return fin
 
+    def _minor_upgrade_type(self, s: int) -> torch.Tensor:
+        """[B, P] long `minorUpgradeType` over the major pool (0x5909a0 ->
+        0x5374c0): the unit's UnitUpgrades rung where minor `s` holds its
+        PrereqTech and PrereqCivic (0x537fd0), and on up while the next
+        rung's are held — the furthest; -1 where the first rung's are not"""
+        def held(t: torch.Tensor) -> torch.Tensor:
+            tc = t.clamp(min=0)
+            rt, rc = self._type_tech[tc], self._type_civic[tc]
+            ok_t = (rt < 0) | self.citystate_techs[:, s].gather(1, rt.clamp(min=0))
+            ok_c = (rc < 0) | self.citystate_civics[:, s].gather(1, rc.clamp(min=0))
+            return (t >= 0) & ok_t & ok_c
+        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        cur = self._type_up_to[ut]
+        cur = torch.where(held(cur), cur, torch.full_like(cur, -1))
+        for _ in range(self.NU):
+            nxt = torch.where(cur >= 0, self._type_up_to[cur.clamp(min=0)], torch.full_like(cur, -1))
+            step = held(nxt)
+            if not bool(step.any()):
+                break
+            cur = torch.where(step, nxt, cur)
+        return cur
+
     def _minor_upgrade_visible(self, s: int) -> torch.Tensor:
         """[B, P] `minorUpgradeVisible` over the major pool: the unit has an
         upgrade minor `s`'s research unlocks (0x58fff0, the visible test)"""
-        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        nxt = self._type_up_to[ut]
-        nc = nxt.clamp(min=0)
-        rt, rc = self._type_tech[nc], self._type_civic[nc]
-        ok_t = (rt < 0) | self.citystate_techs[:, s].gather(1, rt.clamp(min=0))
-        ok_c = (rc < 0) | self.citystate_civics[:, s].gather(1, rc.clamp(min=0))
-        return (nxt >= 0) & ok_t & ok_c
+        return self._minor_upgrade_type(s) >= 0
 
     def _minor_can_upgrade(self, s: int) -> torch.Tensor:
         """[B, P] `minorCanUpgrade` (0x58fff0, the full test): the visible
@@ -1780,7 +1796,7 @@ class SimMinors:
         if not bool(go.count_nonzero()):
             return go
         ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        nxt = self._type_up_to[ut]
+        nxt = self._minor_upgrade_type(s)
         rr = go.nonzero(as_tuple=True)[0]
         u = first[rr]
         self.citystate_treasury[rr, s] -= self._mb_upgrade_gold

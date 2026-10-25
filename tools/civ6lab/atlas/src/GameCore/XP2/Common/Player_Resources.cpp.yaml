@@ -293,6 +293,8 @@
     - cpu/core/stockpile.ts:stockFree
     - gpu/core/sim_minorai.py:_cv_resource_value
     - gpu/core/sim_minorops.py:_mops_unit_rows
+    - cpu/core/operations/unitRows.ts:unitBuildable
+    - gpu/core/sim_minorops.py:_mops_stock_buildable
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the goody hut's other gates and the Relic — READ"
@@ -304,6 +306,7 @@
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...r TOURISM weight -1 => 0); tail: extra copies,   promotion class 0x723bb0, strategic resource gate (0x4aa790 / 0x5d45c0 => value 0), maintenance < handicap 3, PV...  NEXT: unit value / military table; DS pick..."
     - ".claude/scratchpad/st1/reading.md: ...r sees   (0x4ab4b0) counted by its plot's amount, and at distance 1 one the player   holds none of (0x4aa790, ownership 0) and not a bonus (0xadd080) is a new   resource. - The score (0x702380): per entry wit..."

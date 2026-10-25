@@ -371,6 +371,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
   context:
     - ...+0x2350 0 or +0x2340 null), the Default Specialization pick 0x5d4d70. A second hook (0x5ce5b0) runs the same pick on an empty queue (queue +0x1e0 / +0x1d0) and then walks 0x5d2810's...
     - "...ity was nuked?)\" for any other. The log line is the pick and its value; the second hook 0x5ce5b0 runs it again (two NO BUILDS lines a turn). MEASURED (`cityBuildLab.ts`, the five verbo..."
@@ -577,6 +578,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...bv>=pv; else unit if uv>=pv; else project. CanConstruct checks 0x5c9ea0/0x5ca5a0/0x5ca450;  fail -> 0x5d2810 fallback ('Generic Offense' / 'NO BUILDS AT ALL').  bestBuilding: value table plotEval(cityCenter)+..."
   context:

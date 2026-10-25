@@ -40,6 +40,17 @@ function majorVersion(traits: readonly string[]): (u: string) => string | null {
   };
 }
 
+/** the table's +0x0e (0x7989e0 at 0x798cc2): the install unit `u`'s
+ *  PrereqTech and PrereqCivic held (`holds`) and its StrategicResource's
+ *  stock less its reservations above 0 (0x4aa790, ownership 0) */
+export function unitBuildable(state: GameState, seat: number, holds: (x: string) => boolean, u: string): boolean {
+  const row = AI_UNITS[AI_UNIT_INDEX.get(u)!];
+  if ((row.tech && !holds(row.tech)) || (row.civic && !holds(row.civic))) return false;
+  if (!row.resource) return true;
+  const id = engineId('resource', row.resource, 'RESOURCE_', RESOURCES);
+  return !!id && stockFree(state, seat, id) > 0;
+}
+
 /** the entries of `seat` against its knowledge base's counts `knownBy` (per
  *  unit type and player), the game's players `players` and those it fights
  *  `atWar`. A unit is buildable where the seat holds its PrereqTech and
@@ -73,13 +84,7 @@ export function seatUnitRows(state: GameState, seat: number, knownBy: (unit: str
     knownBy,
     players,
     atWar,
-    buildable: (u) => {
-      const row = AI_UNITS[AI_UNIT_INDEX.get(u)!];
-      if ((row.tech && !holds(row.tech)) || (row.civic && !holds(row.civic))) return false;
-      if (!row.resource) return true;
-      const id = engineId('resource', row.resource, 'RESOURCE_', RESOURCES);
-      return !!id && stockFree(state, seat, id) > 0;
-    },
+    buildable: (u) => unitBuildable(state, seat, holds, u),
     maintained: (res) => {
       const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
       const k = id ? strategicSlot(id) : -1;

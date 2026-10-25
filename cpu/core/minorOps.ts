@@ -32,7 +32,7 @@ import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge
 import { NO_PLOT, opDef, opUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
-import { installType, minorCanUpgrade, minorSetItem, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
+import { installType, minorCanUpgrade, minorSetItem, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
 import { minorContractCity, minorSecondHook } from './minorCityAi';
 import { campTiles, tileSeat } from './seats';
 import { disbandUnit } from './units';
@@ -297,7 +297,7 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
         if (minorUpgradeUnit(state, cs, u)) held.delete(u.id);
         continue;
       }
-      if (upgradeUnasked(u) || (promotionCount(u) <= 1 && state.units.filter((x) => x.seat === cs.seat && x.type === u.type).length > 10)) drop(u);
+      if (upgradeUnasked(cs, u) || (promotionCount(u) <= 1 && state.units.filter((x) => x.seat === cs.seat && x.type === u.type).length > 10)) drop(u);
       continue;
     }
     if (unupgradedDeleted(state, cs, u)) drop(u);
@@ -316,15 +316,16 @@ export function upgradeMayGo(state: GameState, cs: CityState, u: Unit): boolean 
   return minorCanUpgrade(state, cs, u) && goldAffordable(cs.treasury, MINOR_UPGRADE_GOLD);
 }
 
-/** the unit's upgrade asks no strategic resource (0x591000 -1) */
-const upgradeUnasked = (u: Unit): boolean => !UNITS[UNITS[u.type]?.upgradesTo ?? '']?.requiresResource;
+/** the unit's upgrade asks no strategic resource (0x591000 -1, on the
+ *  chassis 0x5909a0 names: `minorUpgradeType`) */
+const upgradeUnasked = (cs: CityState, u: Unit): boolean => !UNITS[minorUpgradeType(cs, u.type) ?? '']?.requiresResource;
 
 /** Upgrade Units with Can Delete on a held unit whose full test fails: one
  *  no longer visible (0x58fff0 with r8 1) deleted, a visible one deleted on
  *  the minor's own ground where its upgrade asks no strategic resource */
 export function unupgradedDeleted(state: GameState, cs: CityState, u: Unit): boolean {
   if (!minorUpgradeVisible(cs, u)) return true;
-  return tileSeat(state.map.tiles[u.tileIndex]) === cs.seat && upgradeUnasked(u);
+  return tileSeat(state.map.tiles[u.tileIndex]) === cs.seat && upgradeUnasked(cs, u);
 }
 
 /** the promotions a unit holds (its `promos` bits) */

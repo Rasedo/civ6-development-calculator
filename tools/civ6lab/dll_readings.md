@@ -5351,6 +5351,48 @@ operations' contracts, the improvement values below, the purchases).
   civic, the buildings built, the units trained and bought); the districts
   placed as the record of T has them, refused for good only complete.
 
+## C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins
+
+- THE PURCHASE LIST'S ORDER (0x79d3a0 on the city's copy of the unit
+  production table, 0x79a320): its first key is the entry's +0x0e, the
+  table's buildable byte (0x7989e0 at 0x798cc2 / 0x798d11) — PrereqTech and
+  PrereqCivic held AND the StrategicResource stocked above 0 (0x4aa790,
+  ownership 0). A city-state trains and buys a Horseman without Horses
+  (CivilizationLevels.IgnoresUnitStrategicResourceRequirements), yet its
+  list puts the Horseman after every unit it holds the means of. 0x5ce5b0
+  asks 0x5d2810 for any domain (edx -1 at 0x5ce613 / 0x5ce651). CONFIRMED:
+  runs/h1_duely1127 Hattusa (player 3) t39, threatened at 5, its list by the
+  sums Horseman 21.2, Galley 15.6: the game bought the Galley (393216), the
+  engines the Horseman; runs/h1_duely1124 player 3 t72 the Quadrireme for
+  the Horseman alike. The operations' unit choice read the same byte
+  already (`seatUnitRows`); the purchase list now shares it
+  (`unitBuildable`, `_mops_stock_buildable`).
+- THE UPGRADE TYPE 0x5909a0 -> 0x5374c0 (unit def, player): the rung
+  0x5375f0 names; 0x537fd0 (the rung's PrereqTech +0x280 and PrereqCivic
+  +0x270 held, nothing else) refusing it, none; else 0x5374c0 again on the
+  rung, its result where not -1, else the rung — the furthest rung of the
+  line whose every step is held. Its readers: the visible / full test
+  0x58fff0, the upgrade's resource 0x591000, the discount analyzer 0x6bf850.
+  CONFIRMED: runs/h1_duely1127 city-state 2 t105, its Warrior 1441793
+  completed (CityProductionCompleted type 21) and upgraded at once
+  (UnitCommandStarted, UnitUpgraded 1507336 type 94 UNIT_MAN_AT_ARMS), past
+  the Swordsman. Ported for the city-states (`minorUpgradeType`,
+  `_minor_upgrade_type`); the majors' upgrade (`civUpgradeTarget`) still
+  one rung.
+- A FORMATION'S PROMOTIONS: the promotions the event log names on a unit
+  right after its UnitFormCorps / UnitFormArmy are the absorbed unit's
+  carried over, not a pick — three at once on runs/h1_duely1121 city-state
+  2's 2621442 at t214 (Battlecry, Commando, Zweihander), its Musketman
+  1966080 at t126 promoted at 3 experience; every unit.promote miss of the
+  five duely duels (1121 t126 / t154 / t214, 1124 t188) is one. The replay
+  lands them unscored (`formed`).
+- MEASURED (--aiscore, the five duely duels, full length, against
+  070feffa): carried unit.trained 231/258 -> 235/253, unit.bought 35/47 ->
+  36/47, unit.promote 31/40 -> 31/31; --memory aimem unit.trained 231/255
+  -> 235/250, unit.bought 41/47 -> 42/47, unit.promote 31/40 -> 31/31. The
+  two-step upgrades (1127 p2 t105, 1128 p2 t106 / p3 t108 / p3 t203, 1117
+  t168) pair.
+
 ## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)
 
 Ported in `cpu/core/aiTrade.ts` (`minorTradeList`, `minorTradeValue`; the

@@ -20,6 +20,7 @@
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...units of a desired type or, upgradeable, each whose upgrade passes the visible test (0x58fff0 with r8 1) are found; found none, or upgradeable, the evaluator (0x60a8c0, the tree's p...

@@ -529,7 +529,7 @@ export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit
   // the new chassis' strategic cost where its stock covers it, none where
   // both rungs ask the same resource (`upgradeResourceCost`'s rule; a
   // city-state upgrades without it)
-  const next = UNITS[u.type].upgradesTo!;
+  const next = minorUpgradeType(cityState, u.type)!;
   const res = unitResourceCost(next);
   if (res && res.id !== UNITS[u.type].requiresResource && canPayStockpile(state, cityState.seat, res.id, res.n)) {
     spendStockpile(state, cityState.seat, res.id, res.n, 'ug');
@@ -552,12 +552,24 @@ export function minorCanUpgrade(state: GameState, cityState: CityState, u: Unit)
 /** the unit has an upgrade the minor's research unlocks (0x58fff0, the
  *  visible test) */
 export function minorUpgradeVisible(cityState: CityState, u: Unit): boolean {
-  const next = UNITS[u.type]?.upgradesTo;
+  return minorUpgradeType(cityState, u.type) !== undefined;
+}
+
+/** the chassis a `type` upgrades into for the minor (0x5909a0 -> 0x5374c0):
+ *  its UnitUpgrades rung where the minor holds that rung's PrereqTech and
+ *  PrereqCivic (0x537fd0), and from there on up while the next rung's are
+ *  held — the furthest, so a Warrior trained with Apprenticeship held
+ *  becomes a Man-at-Arms in one upgrade (runs/h1_duely1127 t105: city-state
+ *  2's Warrior 1441793, completed and upgraded at once, UnitUpgraded to
+ *  UNIT_MAN_AT_ARMS 1507336). None where the first rung's are not held. */
+export function minorUpgradeType(cityState: CityState, type: string): string | undefined {
+  const next = UNITS[type]?.upgradesTo;
   const def = next ? UNITS[next] : undefined;
-  if (!def) return false;
+  if (!next || !def) return undefined;
   const r = cityState.research;
-  if (def.requiresTech && !r.techs.includes(def.requiresTech)) return false;
-  return !def.requiresCivic || r.civics.includes(def.requiresCivic);
+  if (def.requiresTech && !r.techs.includes(def.requiresTech)) return undefined;
+  if (def.requiresCivic && !r.civics.includes(def.requiresCivic)) return undefined;
+  return minorUpgradeType(cityState, next) ?? next;
 }
 
 /** A unit's purchase price for the minor: its Production cost (a Builder's

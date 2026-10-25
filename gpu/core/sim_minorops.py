@@ -432,6 +432,31 @@ class SimMinorOps:
 
     # -- the unit production entries ----------------------------------------
 
+    def _mops_stock_buildable(self, s: int) -> torch.Tensor:
+        """[B, NU] the table's +0x0e resource part (`unitBuildable`): a unit
+        row's StrategicResource the minor `s`'s stock less its reservations
+        holds (0x7989e0 at 0x798d11: 0x4aa790, ownership 0, the reservations
+        off); a row of none passes"""
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        E = T["engine"]
+        dev = self.device
+        res = getattr(self, "_mops_rows_res", None)
+        if res is None:
+            res = self._mops_rows_res = torch.tensor(
+                [E["resource"].get(r["resource"], -2) if r["resource"] else -1 for r in rows], dtype=torch.long, device=dev)
+        out = (res != -2).unsqueeze(0).expand(self.B, -1).clone()
+        srow = self._CITY_MINOR0 + s
+        if bool((res >= 0).any()):
+            free = self._stock_bank(srow) - self._stock_reserved(srow)
+            for k in (res >= 0).nonzero(as_tuple=True)[0].tolist():
+                slot = int(self._strat_slot_of[int(res[k])])
+                if slot >= 0:
+                    out[:, k] &= free[:, slot] > 0
+                else:
+                    out[:, k] = False
+        return out
+
     def _mops_unit_rows(self, s: int, u: dict) -> dict:
         """`seatUnitRows` for holder `s` (the military AI's unit production
         entries as the unit choice reads them, `unitProductionEntries`): per
@@ -450,10 +475,9 @@ class SimMinorOps:
                                                           "PSEUDOYIELD_UNIT_AIR_COMBAT")) for r in rows],
                                   dtype=torch.bool, device=dev)
             strength = torch.tensor([max(int(r["combat"]), int(r["rangedCombat"])) for r in rows], dtype=torch.long, device=dev)
-            res = torch.tensor([E["resource"].get(r["resource"], -2) if r["resource"] else -1 for r in rows], dtype=torch.long, device=dev)
             mres = torch.tensor([E["resource"].get(r["maintenanceResource"], -2) if r["maintenanceResource"] else -1
                                  for r in rows], dtype=torch.long, device=dev)
-            cache = self._mops_rows_static = {"version": version, "combat": combat, "strength": strength, "res": res,
+            cache = self._mops_rows_static = {"version": version, "combat": combat, "strength": strength,
                                               "mres": mres}
         techs, civics = self.citystate_techs[:, s], self.citystate_civics[:, s]
 
@@ -474,19 +498,8 @@ class SimMinorOps:
             for nm in (r["tech"], r["civic"]):
                 if nm:
                     buildable[:, k] &= holds(nm)
-        # a StrategicResource the minor's stock less its reservations holds
-        # (0x7989e0 at 0x798d11: 0x4aa790, ownership 0, the reservations off)
-        res = cache["res"]
+        buildable &= self._mops_stock_buildable(s)
         srow = self._CITY_MINOR0 + s
-        if bool((res >= 0).any()):
-            free = self._stock_bank(srow) - self._stock_reserved(srow)
-            for k in (res >= 0).nonzero(as_tuple=True)[0].tolist():
-                slot = int(self._strat_slot_of[int(res[k])])
-                if slot >= 0:
-                    buildable[:, k] &= free[:, slot] > 0
-                else:
-                    buildable[:, k] = False
-        buildable &= res != -2
         # the maintenance resource's turn income above its units' fuel bill
         # (0x79c277: Player_Resources +0x350 against 0x4ab270)
         mres = cache["mres"]
@@ -1326,7 +1339,7 @@ class SimMinorOps:
         # of its type; one whose full test failed — no longer visible, or on
         # the minor's own ground with its upgrade asking no resource
         ut = self.major_unit_type[:, :P].clamp(min=0, max=self.NU - 1)
-        nxt = self._type_up_to[ut]
+        nxt = self._minor_upgrade_type(s)[:, :P]
         unasked = self._type_resource.take(nxt.clamp(min=0)) < 0
         pr = self.major_unit_promos[:, :P].long()
         npro = torch.zeros_like(pr)

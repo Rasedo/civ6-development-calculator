@@ -115,8 +115,10 @@ export type Decision = Base & (
    *  type (-1 a city's shot or unknown), the victim's player and type */
   | { kind: 'kill'; player: number; killerType: number; victim: number; victimType: number; victimUnit: string }
   /** a promotion the player picked (`UnitPromoted`): the unit, the catalog's
-   *  `unitPromotions` index, the experience the unit held at record t */
-  | { kind: 'promote'; player: number; unit: string; promotion: number; xp: number }
+   *  `unitPromotions` index, the experience the unit held at record t;
+   *  `formed` one the unit carries over from a formation (logged right after
+   *  its `UnitFormCorps` / `UnitFormArmy`), no pick */
+  | { kind: 'promote'; player: number; unit: string; promotion: number; xp: number; formed?: true }
   /** a unit upgraded (`UnitUpgraded`): the game removes the unit and adds its
    *  upgrade under a new id */
   | { kind: 'upgrade'; player: number; unit: string; into: string }
@@ -537,7 +539,7 @@ const PURCHASE_PLOT = gameHash('PLOT');
 const PRODUCTION_KIND = ['unit', 'building', 'district', 'project'] as const;
 /** the events a reader takes */
 const READ_EVENTS = new Set(['CityAddedToMap', 'CityProductionCompleted', 'CityMadePurchase', 'ImprovementAddedToMap', 'PantheonFounded',
-  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitRemovedFromMap', 'UnitUpgraded', 'UnitChargesChanged', 'GoodyHutReward', 'UnitCaptured']);
+  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitFormCorps', 'UnitFormArmy', 'UnitRemovedFromMap', 'UnitUpgraded', 'UnitChargesChanged', 'GoodyHutReward', 'UnitCaptured']);
 
 /** the decisions of the kinds the log settles, keyed for the comparison */
 type Keyed = Map<string, Decision>;
@@ -615,8 +617,16 @@ export class RecordedActions implements ActionSource {
     const clearer = new Map<string, string>();
     // each unit's last operation the log started
     const lastOp = new Map<string, number>();
+    // the unit a formation just merged: the promotions the log names on it
+    // next are the absorbed unit's carried over, three at once on one unit
+    // (runs/h1_duely1121 t214: city-state 2's 2621442, UnitFormCorps then
+    // Battlecry, Commando and Zweihander; t126 its Musketman 1966080 at 3
+    // experience, Battlecry after UnitFormCorps)
+    let formed: string | null = null;
     for (const r of ev) {
       const name = r[2];
+      if (name === 'UnitFormCorps' || name === 'UnitFormArmy') formed = `${n(r, 0)}:${n(r, 1)}`;
+      else if (name !== 'UnitPromoted' || `${n(r, 0)}:${n(r, 1)}` !== formed) formed = null;
       if (name === 'UnitActivityChanged') acting.set(n(r, 0), `${n(r, 0)}:${n(r, 1)}`);
       if (name === 'UnitMoved' || name === 'UnitTeleported') stand.set(`${n(r, 0)}:${n(r, 1)}`, n(r, 3) * W + n(r, 2));
       if (name === 'UnitGreatPersonActivated') {
@@ -680,8 +690,9 @@ export class RecordedActions implements ActionSource {
         }
       } else if (name === 'UnitPromoted') {
         const u0 = a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
-        out0.push({ kind: 'promote', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: `${n(r, 0)}:${n(r, 1)}`, promotion: n(r, 2),
-          xp: u0 ? num(u0.xp) : 0 });
+        const key = `${n(r, 0)}:${n(r, 1)}`;
+        out0.push({ kind: 'promote', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: key, promotion: n(r, 2),
+          xp: u0 ? num(u0.xp) : 0, ...(formed === key ? { formed: true as const } : {}) });
       } else if (name === 'UnitChargesChanged' && n(r, 2) < n(r, 3)) {
         // a charge spent where the Builder stands on a wonder under
         // construction is a charge toward the wonder, one placed in the

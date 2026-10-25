@@ -1025,6 +1025,7 @@
       value: "Not ported: on runs/h1_duelw1121   every unit with an unlocked, reachable upgrade reads 23-59 for Hunza where   the game lists 1.0 (Professional Army t76-t93) — ASK: which units the list   +0xd8 holds"
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
   context:
     - "- EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT 0x6bf850 (@f04120; Amount stored fx(Amount x 0.01f) by its parser 0x6bf3a0): over the player's..."
   review: imported

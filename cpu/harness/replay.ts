@@ -86,9 +86,9 @@ import { missionOf, missionPayable } from '../core/deals';
 import { DEAL_MISSION } from '../data/seats';
 import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
-import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
+import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemInHand, minorItemKey, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemInHand, minorItemKey, minorUnitPrice, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -2926,8 +2926,12 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // 851968, trained and upgraded to the Swordsman 917509 in its turn)
         const into = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
         const mapped = new Set(ctx.units.values());
+        // a city-state's upgrade climbs its line as far as its research
+        // reaches (`minorUpgradeType`: a Warrior to a Man-at-Arms)
+        const minorOf = (x: Unit) => (isCityStateSeat(x.seat) ? state.cityStates.find((c) => c.seat === x.seat) : undefined);
+        const upTo = (x: Unit) => { const m = minorOf(x); return m ? minorUpgradeType(m, x.type) : UNITS[x.type]?.upgradesTo; };
         const made = unitOf(ctx, d.unit) ? undefined
-          : state.units.find((x) => x.seat === seatOfP(ctx, d.player) && !mapped.has(x) && !!into && UNITS[x.type]?.upgradesTo === into);
+          : state.units.find((x) => x.seat === seatOfP(ctx, d.player) && !mapped.has(x) && !!into && upTo(x) === into);
         if (made) {
           ctx.units.set(d.unit, made);
           // the unit trained the game's, upgraded in the same turn
@@ -2954,7 +2958,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const minor = isCityStateSeat(u.seat) ? state.cityStates.find((c) => c.seat === u.seat) : undefined;
         // bought through its economic AI (0x68c940), as its trees buy it
         if (minor?.economy) upgradePurchase(minor.economy, MINOR_UPGRADE_GOLD * FX);
-        const res = minor ? (minorUpgradeUnit(state, minor, u) ? { ok: true } : { ok: false, reason: `the minor may not upgrade ${u.type}->${UNITS[u.type]?.upgradesTo} (gold ${r3(minor.treasury)}, plot seat ${tileSeat(state.map.tiles[u.tileIndex])}, techs ${minor.research.techs.join('|')})` })
+        const res = minor ? (minorUpgradeUnit(state, minor, u) ? { ok: true } : { ok: false, reason: `the minor may not upgrade ${u.type}->${minorUpgradeType(minor, u.type)} (gold ${r3(minor.treasury)}, plot seat ${tileSeat(state.map.tiles[u.tileIndex])}, techs ${minor.research.techs.join('|')})` })
           : upgradeUnit(state, u, u.seat);
         ctx.units.delete(d.unit);
         ctx.units.set(d.into, u);
@@ -2980,6 +2984,14 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (!u || !name) { count(ctx, 'promote', 'refused', d.player); break; }
         const k = unitPromoRows(u).findIndex((p) => p.id === name);
         u.xp = Math.max(u.xp ?? 0, d.xp);
+        // a formation's carried promotion: the absorbed veteran's, held at
+        // its level, no pick and no heal
+        if (d.formed && k >= 0) {
+          u.promos = (u.promos ?? 0) | (1 << k);
+          u.level = Math.max(u.level ?? 1, promoCount(u) + 1);
+          count(ctx, 'promote', 'applied', d.player);
+          break;
+        }
         // a city-state's pick is its tactical AI's (`aiPromotionPick`, its
         // Promotion move run on the copy beside the record): scored here
         if (isCityStateSeat(u.seat)) {

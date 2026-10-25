@@ -65,6 +65,7 @@ import { minorJobUnits, minorOpContracts, minorOpLive, minorOpNear, minorOpsEval
 import { freeOpNear } from './freeOps';
 import { ARMY_READ_AGE } from './operations/knowledge';
 import { joinBuilt } from './operations/manager';
+import { unitBuildable } from './operations/unitRows';
 import { minorCity, minorFoodFocus } from './cityStates';
 import { FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor, isCiv, seatOf, tileSeat } from './seats';
 import { cityAppealResolver } from './governors';
@@ -587,7 +588,10 @@ export function minorContractCity(state: GameState, cs: CityState): CityTreeCity
 
 /** the minor's unit list for its purchases (CityBuildAI +0x650: the
  *  military AI's unit production table copied to the city, 0x79a320),
- *  sorted as 0x79d3a0 sorts it — the buildable first, then by the at-war
+ *  sorted as 0x79d3a0 sorts it — the buildable first (`unitBuildable`: its
+ *  prerequisites held, its StrategicResource stocked, so a city-state that
+ *  trains a Horseman without Horses still lists it after every unit it
+ *  holds the means of), then by the at-war
  *  players' sums, every player's sums and the strength, each the larger
  *  first (equal entries in database order) */
 function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
@@ -617,10 +621,7 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
     knownBy: (u, p) => by.get(`${u}:${p}`) ?? 0,
     players,
     atWar: (p) => wars.includes(p),
-    buildable: (u) => {
-      const row = AI_UNITS[AI_UNIT_INDEX.get(u)!];
-      return (!row.tech || holds(row.tech)) && (!row.civic || holds(row.civic));
-    },
+    buildable: (u) => unitBuildable(state, cs.seat, holds, u),
   });
   const order = rows.map((x, i) => [x, i] as const).sort(([a, i], [b, j]) =>
     (Number(b.buildable) - Number(a.buildable)) || (b.atWar - a.atWar) || (b.all - a.all) || (b.strength - a.strength) || (i - j));

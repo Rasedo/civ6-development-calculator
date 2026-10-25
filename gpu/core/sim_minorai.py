@@ -1174,7 +1174,8 @@ class SimMinorAi:
     def _minor_purchase_rows(self, s: int, f: _MinorFacts) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """the minor's unit list (CityBuildAI +0x650: the military AI's unit
         production table copied to the city, 0x79a320) in 0x79d3a0's order —
-        the buildable first, then by the at-war players' sums, every
+        the buildable first (`unitBuildable`: its prerequisites held, its
+        StrategicResource stocked), then by the at-war players' sums, every
         player's sums and the strength, each the larger first (equal entries
         in database order): [B, R] the AI unit rows, [B, R] the entries, [B, R]
         the entries ranked at or above 0"""
@@ -1222,6 +1223,7 @@ class SimMinorAi:
                 hold = (have_t[:, ti] if ti >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)) | \
                        (have_c[:, ci] if ci >= 0 else torch.zeros(B, dtype=torch.bool, device=dev))
                 buildable[:, k] &= hold
+        buildable &= self._mops_stock_buildable(s)
         strength = torch.tensor([max(int(r["combat"]), int(r["rangedCombat"])) for r in rows], dtype=torch.long,
                                 device=dev).unsqueeze(0).expand(B, -1)
         order = torch.arange(nu, device=dev).unsqueeze(0).expand(B, -1)

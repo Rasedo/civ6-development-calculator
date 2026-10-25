@@ -22,11 +22,14 @@
     - gpu/core/sim_cityvalue.py:_cv_unit_production
     - cpu/core/operations/unitRows.ts:seatUnitRows
     - gpu/core/sim_minorops.py:_mops_unit_rows
+    - cpu/core/operations/unitRows.ts:unitBuildable
+    - gpu/core/sim_minorops.py:_mops_stock_buildable
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 on PrereqTech/Civic turns), maintenance as plain Gold..."
   context:
@@ -45,6 +48,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
   context:
     - "...ityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0x5ce3f0: the job object at +0xcc0, vtable 0xd59af0 -> 0x5c..."
     - ...9d computes from the player's counts (+0x510, +0x4a0) feeds asserts only. The city hook 0x79a320 copies the table per city, the +0x2c / +0x30 times the extra copies.
