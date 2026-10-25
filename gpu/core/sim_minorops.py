@@ -2418,7 +2418,8 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     endangered — not bombard, with Movement, out of a city — to their safe
     plots (0x716b90); then the hurt (or fortified afloat in danger): a
     promotion due taken (`_promote_due`); not bombard: one not dug in off
-    friendly ground released from the team; one fortified afloat to its safe
+    friendly ground released, its orders ending there (0x73d1f0 removes it
+    from copies of the teams, so it stays the team's); one fortified afloat to its safe
     plot; one with Movement on a plot paying a plunder pillages it
     (`_plunder`); one with Movement on the ground of a player it is at war
     with or a plot of danger to its safe plot; each fortified (its turn ends
@@ -2476,7 +2477,6 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             ok &= off(us) & (sim._type_bombard.take(ut) <= 0) & (sim.major_unit_mp[b, uc] > 0) & ~sim._centre_plane()[b, sim.major_unit_tile[b, uc].clamp(min=0)]
             to_safe(us, ok, True)
         # the hurt
-        release = torch.zeros(B, n_m, dtype=torch.bool, device=dev)
         for jj in range(n_m):
             us = sim.mops_mem[:, s, k, ti, jj]
             ok = gt & live(us)
@@ -2497,9 +2497,7 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             ok &= sim._type_bombard.take(ut) <= 0
             if not bool(ok.any()):
                 continue
-            rel = ok & (fort == 0) & (sim.tile_seat[b, plot] != seat)
-            release[:, jj] = rel
-            ok &= ~rel
+            ok &= ~((fort == 0) & (sim.tile_seat[b, plot] != seat))
             sea = ok & (fort >= 2) & wat
             to_safe(us, sea, True)
             ok &= live(us)
@@ -2513,8 +2511,6 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             to_safe(us, ok & (sim.major_unit_mp[b, uc] > 0) & (war | dang), False)
             ok &= live(us)
             done[b, uc] = torch.where(ok, True, done[b, uc])
-        if bool(release.any()):
-            sim._mops_compact(s, k, ti, ~release, gt)
 
 
 def _u_naval_units(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:

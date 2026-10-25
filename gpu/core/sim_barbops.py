@@ -439,12 +439,8 @@ class SimBarbOps:
             self._tac_move_to(move, esc_, civ_plot.clamp(min=0), strike=False)
             meet = ex1 & (self.barb_unit_tile[bidx, esc_] == self.barb_unit_tile[bidx, csc])
             self.bcap_form[:, c] |= meet
-        # Defend Units 5: a member released leaves the capture's team
-        rel = self._bop_defend_exec(mv_on & mk5, cteam, goal, pct5, rng5, ctx)
-        for us, r, plane in zip(cteam, rel, (self.bcap_civ, self.bcap_esc)):
-            if bool(r.any()):
-                plane[:, c] = torch.where(r, torch.full_like(us, -1), plane[:, c])
-                mem[bidx[r], us[r].clamp(min=0)] = False
+        # Defend Units 5 (a member released stays in the capture's team)
+        self._bop_defend_exec(mv_on & mk5, cteam, goal, pct5, rng5, ctx)
         zero = torch.zeros_like(self.barb_unit_alive)
         formed = self.bcap_form[:, c]
         zero[bidx[formed & civ_ok], csc[formed & civ_ok]] = True
@@ -619,7 +615,7 @@ class SimBarbOps:
         self._bop_pillage(cont, k, ctx)
         if inside:
             self._bop_attack_city(cont, k, ctx)
-        self._bop_defend(cont, mk20, k, team, pct20, rng20, ctx)
+        self._bop_defend_exec(cont & mk20, team, self.tribe_op_plot[:, k], pct20, rng20, ctx)
         self._bop_move_exec(cont, k, target, tr.raid_moves[1][2], ar21, ready, ctx)
         self._bop_attack_units(home, k, ctx)
         self._bop_move_exec(home, k, rally, tr.raid_moves[2][2], ar24, ready, ctx)
@@ -687,7 +683,7 @@ class SimBarbOps:
         end |= ass & (c18 != _R)
         # the executions in node order
         ready = self.tribe_op_ready[:, k]
-        self._bop_defend(m, mk1, k, team, pct1, rng1, ctx)
+        self._bop_defend_exec(m & mk1, team, self.tribe_op_plot[:, k], pct1, rng1, ctx)
         self._bop_move_exec(gather & ~no0, k, goal0, tr.ass_moves[0][2], ar13, ready, ctx)
         self._bop_attack_units(march, k, ctx)
         self._bop_move_exec(march & ~no1, k, goal1, tr.ass_moves[1][2], ar17, ready, ctx)
@@ -804,26 +800,25 @@ class SimBarbOps:
         return marked
 
     def _bop_defend_exec(self, g: torch.Tensor, team: list, target: torch.Tensor, pct: int, rng: int,
-                         ctx: dict) -> list:
+                         ctx: dict) -> None:
         """OPERATION DEFEND UNITS' execution (`DefendOrders.execute`, 0x80d790)
         where `g` (marked) over the team's slots `team` in its order, the
         members outside `rng` of `target` (-1: all): the endangered — not
         bombard, with Movement, out of a city centre — to their safe plots
         (0x716b90); then the hurt (or fortified afloat in danger), not
-        bombard: one not dug in released from the team (no plot is the
-        barbarians' own ground); one fortified afloat to its safe plot; one
-        with Movement on a plot of danger to its safe plot (the barbarians
-        hold no war rows); each fortified, its turn ended. [B] per member,
-        released"""
+        bombard: one not dug in released (no plot is the barbarians' own
+        ground; 0x73d1f0 removes it from copies of the teams, so it stays
+        the operation's), its orders ending there; one fortified afloat to
+        its safe plot; one with Movement on a plot of danger to its safe plot
+        (the barbarians hold no war rows); each fortified, its turn ended"""
         B, dev = self.B, self.device
         b = self._bidx
         danger, done = ctx["danger"], ctx["done"]
         rowof, res = ctx["rowof"], ctx["res"]
         none_taken = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
         tc = target.clamp(min=0)
-        released = [torch.zeros_like(g) for _ in team]
         if not bool(g.any()):
-            return released
+            return
 
         def off(us: torch.Tensor) -> torch.Tensor:
             if rng < 0:
@@ -853,7 +848,7 @@ class SimBarbOps:
                    & ~self._centre_plane()[b, self.barb_unit_tile[b, uc].clamp(min=0)])
             to_safe(us, ok, True)
         # the hurt
-        for i, us in enumerate(team):
+        for us in team:
             ok = g & self._bop_live(us)
             if not bool(ok.any()):
                 continue
@@ -869,8 +864,7 @@ class SimBarbOps:
             if not bool(ok.any()):
                 continue
             rel = ok & (fort == 0)
-            released[i] = rel
-            # a member released still ends its turn in the walk that held it
+            # a member released ends its turn in the walk that holds it
             done[b, uc] = torch.where(rel, True, done[b, uc])
             ok &= ~rel
             to_safe(us, ok & (fort >= 2) & wat, True)
@@ -880,7 +874,6 @@ class SimBarbOps:
             to_safe(us, ok & (self.barb_unit_mp[b, uc] > 0) & dang, False)
             ok &= self._bop_live(us)
             done[b, uc] = torch.where(ok, True, done[b, uc])
-        return released
 
     def _bop_team(self, k: int) -> list:
         """tribe `k`'s operation's living members as a team in pool slot
@@ -888,16 +881,6 @@ class SimBarbOps:
         mem = self._bop_members(k)
         cols = mem.any(dim=0).nonzero(as_tuple=True)[0].tolist()
         return [torch.where(mem[:, j], j, -1) for j in cols]
-
-    def _bop_defend(self, upd: torch.Tensor, marked: torch.Tensor, k: int, team: list, pct: int, rng: int,
-                    ctx: dict) -> None:
-        """tribe `k`'s Defend Units executed where walked (`upd`) and marked,
-        a member released leaving the operation"""
-        rel = self._bop_defend_exec(upd & marked, team, self.tribe_op_plot[:, k], pct, rng, ctx)
-        b = self._bidx
-        for us, r in zip(team, rel):
-            if bool(r.any()):
-                self.barb_unit_op[b[r], us[r]] = False
 
     # -- the nodes -----------------------------------------------------------
 

@@ -2147,7 +2147,8 @@ function nearestUnrevealed(state: GameState, u: Unit, revealed: (i: number) => b
  * its player never revealed (0x70a6c0, the first of equals, above 0); else,
  * on the move's first round, the nearest unrevealed plot of its region
  * where the player has not revealed all of it ("cur region", a path to it
- * existing; a unit off any region the nearest of its area, "cur area");
+ * existing — 0x272a60, `turnsToPlot`; a unit off any region the nearest of
+ * its area, "cur area");
  * else the nearest unrevealed plot of the player's region lists (0x70b6f0,
  * a path to it existing) — the primary and the secondary its cities' (a
  * player with none holds none), the tertiary the regions of the plots it
@@ -2201,16 +2202,16 @@ function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number
   if (reg >= 0) {
     if (map.tiles.some((t) => t.region === reg && !revealed(t.index))) {
       const p = nearestUnrevealed(state, u, revealed, (t) => t.region === reg);
-      if (p >= 0 && !chosen.has(p) && pathTo(state, u, p).length) return { plot: p, move: 'HL: Explore cur region' };
+      if (p >= 0 && !chosen.has(p) && turnsToPlot(state, u, p) > 0) return { plot: p, move: 'HL: Explore cur region' };
     }
   } else {
     const area = here.area ?? -1;
     const p = nearestUnrevealed(state, u, revealed, (t) => (t.area ?? -1) === area);
-    if (p >= 0 && !chosen.has(p) && pathTo(state, u, p).length) return { plot: p, move: 'HL: Explore cur area' };
+    if (p >= 0 && !chosen.has(p) && turnsToPlot(state, u, p) > 0) return { plot: p, move: 'HL: Explore cur area' };
   }
   if (pass.regions.size) {
     const p = nearestUnrevealed(state, u, revealed, (t) => pass.regions.has(t.region ?? -1));
-    if (p >= 0 && !chosen.has(p) && pathTo(state, u, p).length) return { plot: p, move: 'HL: Explore tertiary regions' };
+    if (p >= 0 && !chosen.has(p) && turnsToPlot(state, u, p) > 0) return { plot: p, move: 'HL: Explore tertiary regions' };
   }
   return best2 >= 0 ? { plot: best2, move: 'HL: Explore fallback' } : null;
 }

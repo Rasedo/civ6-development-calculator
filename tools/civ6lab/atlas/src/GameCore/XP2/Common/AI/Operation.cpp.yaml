@@ -286,9 +286,15 @@
   final: 0x4e09f0
   kind: function
   status: PARTLY
+  impl:
+    - cpu/core/operations/nodes.ts:DefendOrders
+    - cpu/core/opsOrders.ts:us
+    - gpu/core/sim_barbops.py:_bop_defend_exec
+    - gpu/core/sim_minorops.py:_x_defend
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t is suzerain of, an ally's; 2 no one's; 3 another's) is released from the operation (0x73d1f0: its operation field +0x778 to -1, out of every team); one fortified afloat to its safe..."

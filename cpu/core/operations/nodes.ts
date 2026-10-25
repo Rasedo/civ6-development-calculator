@@ -44,13 +44,14 @@ export interface DiplomacyRequest {
  *  member endangered (the team update's list, 0x738f20), hurt to the
  *  percentage or fortified in danger; `execute` the execution's — the
  *  endangered to their safe plots; the hurt promoted where a promotion is
- *  due, released off friendly ground, pillaging where the plot pays a plunder,
- *  moved off a plot of danger (a barbarian not), fortified — its lines, the
- *  units released */
+ *  due, released off friendly ground (0x73d1f0: its assignment cleared, its
+ *  team untouched — the member's removal runs on a copy of each team, so it
+ *  stays the operation's), pillaging where the plot pays a plunder, moved
+ *  off a plot of danger (a barbarian not), fortified — its lines */
 export interface DefendOrders {
   flagged(members: readonly number[], pct: number): boolean;
   execute(members: readonly number[], target: number, pct: number, range: number):
-    { lines: readonly { type: string; what: string }[]; released: readonly number[] };
+    readonly { type: string; what: string }[];
 }
 
 export interface OpsContext {
@@ -770,7 +771,7 @@ const turnLimiter: BtHandler<OpsContext> = {
 // SUCCEEDS, marking the node where a team's member is endangered, hurt to
 // AutoProtect Percentage (33) of its hit points, or fortified in danger; the
 // marked node's execution protects the members outside Protect Outside
-// Range (-1: all) of the target, and a unit it releases leaves its team
+// Range (-1: all) of the target; a unit it releases stays in its team
 const operationDefendUnits: BtHandler<OpsContext> = {
   update(node, run, ctx) {
     const pct = dataInt(node, 'AutoProtect Percentage') ?? 33;
@@ -784,9 +785,7 @@ const operationDefendUnits: BtHandler<OpsContext> = {
     const pct = dataInt(node, 'AutoProtect Percentage') ?? 33;
     const range = dataInt(node, 'Protect Outside Range') ?? -1;
     for (const t of ctx.op.teams) {
-      const out = d.execute(t.members, ctx.op.target, pct, range);
-      if (out.released.length) t.members = t.members.filter((id) => !out.released.includes(id));
-      for (const x of out.lines) ctx.log(`${ctx.op.def}, Operation Protect Units, ${x.type}, ${x.what}`);
+      for (const x of d.execute(t.members, ctx.op.target, pct, range)) ctx.log(`${ctx.op.def}, Operation Protect Units, ${x.type}, ${x.what}`);
     }
   },
 };

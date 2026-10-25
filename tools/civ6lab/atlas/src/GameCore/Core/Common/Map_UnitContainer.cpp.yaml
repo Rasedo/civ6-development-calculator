@@ -11,7 +11,7 @@
     - recording: h1_duelw1117
       turn: 74
       value: "- The barbarians' look (Targets.cpp 0x7877e0) walks each seen plot's   units of the map's layer 0 (0x75800(map, 0) -> 0x75ce0): no Trader is   one of them — none of the barbarians' AI_Knowledge.csv AR"
-  impl: [cpu/core/tactical.ts:barb]
+  impl: [cpu/core/tactical.ts:barb, cpu/core/tactical.ts:knowledgeLook]
   readings:
     - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   context:

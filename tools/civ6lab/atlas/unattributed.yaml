@@ -674,6 +674,7 @@
       value: "UNIT_WARRIOR\" takes its   standing DEFENDER, the Combat Desire 0.0 at t10 (the city's update before   the recruit), 0.1 from t11 (AI_Military.csv), the shortfall 1."
   readings:
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...+0x7d0 the operation's id and +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0: the highest UnitAiInfos flag of the type up to COMBAT 3,..."
   review: imported
@@ -804,6 +805,8 @@
     - cpu/core/tactical.ts:turnsToPlot
     - gpu/core/sim_minorai.py:turns_to
     - gpu/core/sim_barbops.py:_bop_scout_tick
+    - cpu/core/tactical.ts:exploreTarget
+    - gpu/core/sim_tactics.py:nearest
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
@@ -3029,6 +3032,22 @@
   context:
     - ...ct Manager's check 0x7f2220 sets FAILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8...
   review: imported
+- addr: 0x735110
+  final: 0x4d9350
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1130
+      turn: 19
+      value: "So a released unit stays its operation's member, ordered by its tree   (runs/h1_duelw1130 log t19: tribe 0's Warrior 851979, damage 68, two   Movement, unfortified on 14:8, stays in the raid's team W/"
+    - recording: 1128
+      turn: 17
+      value: 1128 log t17 the same).
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  context:
+    - ...per team of the operation (stride 0x118) the team is copy-constructed onto the stack (0x735110), the unit's id (+0x100) erased from the COPY's member list (+0x18 / +0x28 of the copy)...
+  review: imported
 - addr: 0x7353d0
   final: 0x4d9610
   kind: function
@@ -3199,6 +3218,15 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...18bd) whose planning of two turns holds a plot at range 1 (0x791300) is queued with it (0x7803d0, \"Coastal Raid\"); the queue carried out (0x7735d0): each queued unit that can act moves..."
+  review: imported
+- addr: 0x787fb0
+  final: 0x516490
+  kind: function
+  status: UNREAD
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  context:
+    - ...s, not a unit; the lambda 0x783570 (one unit, through 0x5f0440) is referenced only from 0x787fb0, its caller unread.
   review: imported
 - addr: 0x78d630
   final: 0x518fa0

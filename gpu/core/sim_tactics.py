@@ -2930,9 +2930,10 @@ class SimTactics:
             on = p >= 0
             if bool(on.count_nonzero()):
                 r_i = bidx[on]
-                res = self._tac_search(r_i, u_b[on], seat, 1 << 30, True, dest=p[on], pre=pre)
+                # the path 0x272a60 (`turnsToPlot`: flag 0x1000)
+                res = self._tac_search(r_i, u_b[on], seat, 1 << 30, True, dest=p[on], pre=pre, later_turns=True)
                 ok = torch.zeros(B, dtype=torch.bool, device=dev)
-                ok[r_i] = res["found"]
+                ok[r_i] = res["turns"][torch.arange(r_i.shape[0], device=dev), p[on]] > 0
                 p = torch.where(ok, p, torch.full_like(p, -1))
             return p
 

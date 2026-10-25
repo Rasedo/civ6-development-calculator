@@ -153,7 +153,6 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
     },
     execute: (members, target, pct, range) => {
       const lines: { type: string; what: string }[] = [];
-      const released: number[] = [];
       const us = unitsOf(members);
       // the endangered to their safe plots (0x716b90)
       for (const u of endangered(state, pass, us)) {
@@ -179,10 +178,9 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
           changed();
         }
         if (aiStrengths(state, u).bombard > 0) continue;
-        if ((u.fortifyTurns ?? 0) === 0 && groundOf(state, seat, u.tileIndex) !== 1) {
-          released.push(u.id);
-          continue;
-        }
+        // one not dug in off friendly ground is released (0x73d1f0): its
+        // orders end there, its team keeps it
+        if ((u.fortifyTurns ?? 0) === 0 && groundOf(state, seat, u.tileIndex) !== 1) continue;
         if (fortified(u) && isWater(state.map.tiles[u.tileIndex])) {
           const to = passSafePlot(state, pass, u);
           passFinish(pass, u, 'Operation', u.tileIndex);
@@ -216,7 +214,7 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
         passFinish(pass, u, 'Operation', u.tileIndex);
         lines.push({ type: type(u), what: 'Fortify' });
       }
-      return { lines, released };
+      return lines;
     },
   };
 }

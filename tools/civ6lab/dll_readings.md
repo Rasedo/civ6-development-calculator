@@ -5949,9 +5949,19 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   +0x1bc0) takes the best (0x7b5d70, "Promote"); a bombard unit stops
   there; one not fortified (+0x650 == 0) whose plot is not friendly ground
   (Rules_Movement 0x530880: 1 the player's own, a city-state it is
-  suzerain of, an ally's; 2 no one's; 3 another's) is released from the
-  operation (0x73d1f0: its operation field +0x778 to -1, out of every
-  team); one fortified afloat to its safe plot ("Move"); with Movement a
+  suzerain of, an ally's; 2 no one's; 3 another's) is collected and, after
+  the walk, released (0x73d1f0) — its later orders skipped. THE RELEASE
+  0x73d1f0 (READ): its assignment +0x778 to -1 (0x1e60f0); then per team
+  of the operation (stride 0x118) the team is copy-constructed onto the
+  stack (0x735110), the unit's id (+0x100) erased from the COPY's member
+  list (+0x18 / +0x28 of the copy), and the copy destroyed — the team
+  itself keeps the unit, and its +0x7d0 (the recruit offer's test) holds.
+  So a released unit stays its operation's member, ordered by its tree
+  (runs/h1_duelw1130 log t19: tribe 0's Warrior 851979, damage 68, two
+  Movement, unfortified on 14:8, stays in the raid's team W/S/W through
+  t31; 1128 log t17 the same). The engines: no member leaves a team
+  (`passDefend` / `_bop_defend_exec` / `_x_defend`). One fortified afloat
+  to its safe plot ("Move"); with Movement a
   plunder where the plot's district or improvement pays a heal (0x51a080 /
   0x51a160, "Plunder"); with Movement, not a barbarian, on a plot of a
   player it fights (0x469cd0) or of danger, to its safe plot ("Move", then
@@ -6217,8 +6227,8 @@ the event in `seizeCivilian` (cpu/core/combat.ts, `GameState.barbCaptures`);
   city-states' reading ("Operation Defend Units, both twins") on the
   barbarians' pool: the raid's node 20, the assault's 1, the capture's 5;
   a hurt member not dug in is released (no plot is the barbarians' own
-  ground) and the barbarians hold no war rows (a hurt member flees danger
-  alone).
+  ground), staying in its team (THE RELEASE 0x73d1f0), and the barbarians
+  hold no war rows (a hurt member flees danger alone).
 - ASK (the operation manager's files): `targetValid` (nodes.ts) holds a
   camp target valid; the tree's INVALID swap needs the camp branch of
   0x73abf0 there ("no camp the seat knows on the target": `targetGone`),
