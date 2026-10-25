@@ -524,6 +524,8 @@
       turn: 2
       value: Hattusa's Farm at (4,12), the first 72.45 plot the district's tree does not reserve
   impl: [cpu/core/aiCityTrees.ts:bestPlotFor]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x5d1f10
@@ -750,10 +752,18 @@
 - addr: 0x5d4ae0
   final: 0x3e8000
   kind: function
-  status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:wholeValue]
-  notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  name: an improvement's value at a plot
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 72
+      value: Granada's Farm tree on 524 at 71.0 (its reservation), none t47-t71 while the Salween stood unnamed
+  impl: [cpu/core/aiCityTrees.ts:wholeValue, cpu/core/aiCityTrees.ts:improvementEvent]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  notes:
+    - the evaluation at the plot's coordinates (+0x28 / +0x2a), its +0x30[improvement]; with no plot the best over the owned evaluations no live tree reserves
+  review: reviewed
 - addr: 0x5d4c30
   kind: function
   status: PARTLY

@@ -448,6 +448,15 @@
   context:
     - "...s): its leader's InheritFrom chain's and its civilization's trait modifiers (the query @0xe261e0, ORDER BY ModifierId) whose requirements name a type tagged INFLUENCE_REQUIREMENT (Ty..."
   review: imported
+- addr: 0xe36190
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...1) and the city's event handle 3 (+0xb18 +0x18) live (its first byte not the none byte @0xe36190), the pick +0x648 (-1 none), its best plot 0x5d1cb0(city, pick, -1, 0) and the pick's v...
+  review: imported
 - addr: 0xefedf0
   kind: global
   status: PARTLY
@@ -1520,6 +1529,15 @@
   status: PARTLY
   impl: [cpu/core/behaviorTree.ts:priorityChild]
   notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0xf2ef18
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...t event builds. Its execution 0x7f6630 (the second handler table of 0x7cbca0, the slot @0xf2ef18 both tables share): for a player no human drives, the kept unit (+0x40) alive (+0x770 c..."
   review: imported
 - addr: 0xf2f978
   kind: global

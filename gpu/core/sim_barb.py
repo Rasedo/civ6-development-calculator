@@ -38,7 +38,7 @@ class SimBarb:
 
     # ------------------------------------------------------------- the sight
 
-    def _barb_seen(self, who: str | int) -> torch.Tensor:
+    def _barb_seen(self, who: str | int, shared: bool = True) -> torch.Tensor:
         """[B, T] bool — `plotsSeenNow`: what the majors (`who` "majors"), the
         majors and the Free Cities ("fullciv"),
         every living player, the barbarians included ("all", `allSeers`), the
@@ -47,7 +47,7 @@ class SimBarb:
         city centre two plots round, each owned plot with its ring, and the
         barbarians' camps with theirs (`CAMP_SIGHT`); a seat sees what each
         city-state it is suzerain of sees (the minor's outgoing visibility,
-        0x508330)."""
+        0x508330); with `shared` False the seats' own sight alone."""
         B, T = self.B, self.T
         seen = torch.zeros(B, T, dtype=torch.bool, device=self.device)
 
@@ -64,7 +64,7 @@ class SimBarb:
 
         # the city-states a seat of `who` is suzerain of, per game: [B, S]
         shared = (self.citystate_alive[:, :self.S] & (self.citystate_center[:, :self.S] >= 0)
-                  & given(self.citystate_suzerain[:, :self.S])) if self.S > 0 else None
+                  & given(self.citystate_suzerain[:, :self.S])) if shared and self.S > 0 else None
 
         def seer(seat: torch.Tensor) -> torch.Tensor:
             out = given(seat)

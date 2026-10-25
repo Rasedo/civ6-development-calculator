@@ -968,8 +968,11 @@ def _u_reserve_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 
 def _u_check_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
-    """CHECK PLOT (0x7f6ea0)"""
+    """CHECK PLOT (0x7f6ea0): on a plot holding no improvement and no
+    feature but a resource that cannot take the improvement, its Resource
+    Harvesting set (cleared first)"""
     w = c.w
+    c.set_tag(i, "Resource Harvesting", 0, at)
     plot = c.tag(i, "Plot To Check")
     none = (plot == NONE) | (plot < 0)
     p = torch.where(none, 0, plot)
@@ -985,6 +988,8 @@ def _u_check_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     c.set_tag(i, "Builder List", builder, go)
     c.set_tag(i, "Plot To Move", p, go)
     i_ok = _b(w.can_improve(p, imp_r), p)
+    imp_on, feat_on, res_on = w.plot_standing(p)
+    c.set_tag(i, "Resource Harvesting", 1, go & ~i_ok & ~imp_on & ~feat_on & res_on)
     st = torch.where(has_d, torch.where(d_ok, BT_SUCCESS, BT_FAILURE),
                      torch.where(ok_b & i_ok, BT_SUCCESS, BT_FAILURE))
     return torch.where(none, BT_FAILURE, st)
@@ -1136,14 +1141,26 @@ def _u_clear(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
 
 
 def _x_clear(c: _Ctx, i: int, at: torch.Tensor) -> None:
-    """the execution, after Move Unit's: the node's unit clears where it
-    then stands on the plot"""
-    plot = c.tag(i, "Plot To Clear")
+    """the execution (0x7f6630), after Move Unit's: the node's unit clears
+    the plot it then stands on — its improvement, else with Resource
+    Harvesting its resource, else its feature — and with Release on
+    Complete goes from the tree"""
+    ai, s = c.ai, c.s
     u = c.units()
-    stands = ((u["id"] == c.ma[:, i].unsqueeze(1)) & (u["plot"] == plot.unsqueeze(1))).any(dim=1)
-    go = at & (plot != NONE) & (c.ma[:, i] >= 0) & stands
-    if bool(go.any()):
-        c.w.order(c.ma[:, i], "clear", plot, torch.full_like(plot, -1), go)
+    mine = (u["id"] == c.ma[:, i].unsqueeze(1)) & u["valid"]
+    j = _first(mine)
+    go = at & (c.ma[:, i] >= 0) & (j >= 0)
+    if not bool(go.any()):
+        return
+    plot = _pick(u["plot"], j)
+    harvest = go & (c.tag(i, "Resource Harvesting") == 1)
+    if bool((go & ~harvest).any()):
+        c.w.order(c.ma[:, i], "clear", plot, torch.full_like(plot, -1), go & ~harvest)
+    if bool(harvest.any()):
+        c.w.order(c.ma[:, i], "harvest", plot, torch.full_like(plot, -1), harvest)
+    if c.tree.flag(i, "Release on Complete"):
+        rel = go.unsqueeze(1) & (ai.tr_units[:, s, c.k] == c.ma[:, i].unsqueeze(1))
+        ai.tr_units[:, s, c.k] = torch.where(rel, -1, ai.tr_units[:, s, c.k])
 
 
 def _u_build_improvement(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:

@@ -1366,14 +1366,16 @@ class SimMinorAi:
         fin = self._minor_finish(s, done, key)
         self.citystate_ovf[:, s] += torch.where(fin, (before + amt - cost).clamp(min=0), torch.zeros_like(amt))
 
-    def _minor_clear(self, s: int, mask: torch.Tensor, g: torch.Tensor, plot: torch.Tensor) -> None:
+    def _minor_clear(self, s: int, mask: torch.Tensor, g: torch.Tensor, plot: torch.Tensor,
+                     harvest: bool) -> torch.Tensor:
         """CLEAR PLOT's order carried out by the minor's Builder in global
         slot `g` on its plot where `mask`: a feature it may remove goes
         (`builderRemoveFeature`: its Feature_Removes rows as lumps where the
         minor owns the plot, the Lumber Mill on it with it, the Deforestation
-        Treaty's Gold), else a resource it may harvest (`builderHarvest`: the
-        harvest's lump where it owns the plot and its research unlocks the
-        resource's improvement); a charge and the turn spent"""
+        Treaty's Gold), or with `harvest` a resource it may harvest
+        (`builderHarvest`: the harvest's lump where it owns the plot and its
+        research unlocks the resource's improvement); a charge and the turn
+        spent. [B] bool: where it cleared"""
         row = self._CITY_MINOR0 + s
         seat = 100 + s
         bidx = self._bidx
@@ -1384,7 +1386,7 @@ class SimMinorAi:
         ftu = self.tile_ftu[bidx, pc]
         researched = (ftu >= 0) & self.citystate_techs[:, s].gather(1, ftu.clamp(min=0).unsqueeze(1)).squeeze(1)
         ban = self._congress_chop(fid)[0]
-        chop = mask & live_f & (ftr > 0) & researched & ~ban
+        chop = mask & live_f & (ftr > 0) & researched & ~ban & (not harvest)
         mine = self.tile_seat[bidx, pc] == seat
         if bool(chop.count_nonzero()):
             cr = chop.nonzero(as_tuple=True)[0]
@@ -1405,7 +1407,7 @@ class SimMinorAi:
             self._minor_lump(s, gold, 2, food + prod)
             self._spend_build_charge(cr, g, pc)
             self._eff_version += 1
-        rest = mask & ~chop
+        rest = mask & harvest
         rid = self.res_id[bidx, pc]
         live_r = self._res_live()[bidx, pc]
         nres = int(self._res_harvest_y.numel())
@@ -1429,6 +1431,7 @@ class SimMinorAi:
                 self._minor_lump(s, hv & (hy == k), int(k), amt)
             self._spend_build_charge(hr, g, pc)
             self._eff_version += 1
+        return chop | hv
 
     # -- the Free Cities -------------------------------------------------------
 
@@ -2247,6 +2250,15 @@ class _MinorWorld:
         seen = sim._res_live()[b, p] & ~sim._res_hidden(sim._CITY_MINOR0 + self.s)[b, p]
         return torch.where(live_f, fid, -1), torch.where(seen, sim.res_id[b, p], -1)
 
+    def plot_standing(self, plot):
+        """`plotStanding` at [B] plots: an improvement, a feature, a
+        resource (seen or not) stand there, [B] bool each"""
+        sim = self.sim
+        p = plot.clamp(min=0)
+        b = sim._bidx
+        return (sim.improvement[b, p] >= 0, (sim.feat_id[b, p] >= 0) & ~sim.feat_stripped[b, p],
+                sim._res_live()[b, p] & (sim.res_id[b, p] >= 0))
+
     def units(self):
         """the minor's units in the pool's order: id (its global slot), AI
         row, plot, charges, valid ([B, U] each)"""
@@ -2367,20 +2379,22 @@ class _MinorWorld:
                 # stands in (0xa4cee0 -> 0x196320)
                 sim._minor_replace_citizens(self.s, lay & (sim.tile_seat[sim._bidx, pc] == self.seat))
             return
-        # the plot's improvement goes first, at no charge; then its feature,
-        # else its resource
+        # the plot's improvement goes first, at no charge, on a plot of the
+        # minor's own; then the harvest of its resource ("harvest"), or the
+        # removal of its feature, each where the Builder may make it
         rem = here & (cur >= 0)
-        if bool(rem.count_nonzero()):
-            rr = rem.nonzero(as_tuple=True)[0]
+        own = rem & (sim.tile_seat[sim._bidx, pc] == self.seat)
+        if bool(own.count_nonzero()):
+            rr = own.nonzero(as_tuple=True)[0]
             sim.improvement[rr, pc[rr]] = -1
             sim.pillaged[rr, pc[rr]] = False
             sim.unit_mp[rr, uid[rr]] = 0
             sim._eff_version += 1
         rest = here & ~rem
-        spent = rest & (ch <= 1)
+        done = sim._minor_clear(self.s, rest, uid, plot, kind == "harvest")
+        spent = done & (ch <= 1)
         if bool(spent.count_nonzero()):
             self._spent.append(torch.where(spent, uid, -1))
-        sim._minor_clear(self.s, rest, uid, plot)
         sim._gen_ver += 1
 
     def unit_alive(self, ids):

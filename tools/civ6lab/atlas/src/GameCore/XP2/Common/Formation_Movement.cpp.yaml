@@ -28,6 +28,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/st1/reading.md: ...herwise the larger of combat and ranged) onto the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd also onto the l..."

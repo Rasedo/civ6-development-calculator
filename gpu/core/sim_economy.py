@@ -1652,8 +1652,9 @@ class SimEconomy:
 
     def _name_rivers(self) -> None:
         """`nameRivers`: a flood river takes its name the first time one of
-        its own plots (`_flood_own`) lies in a major's sight
-        (`_barb_seen("majors")`), read at the turn start. With no fog none is
+        its own plots (`_flood_own`) lies in a major's own sight
+        (`_barb_seen("majors", shared=False)`: not the sight of the city-states
+        it is suzerain of), read at the turn start. With no fog none is
         needed."""
         if not self.fog_of_war:
             return
@@ -1661,7 +1662,7 @@ class SimEconomy:
         live = (self._flood_sites[0] >= 0) & ~self.river_named
         if not bool(live.count_nonzero()):
             return
-        seen = self._barb_seen("majors")  # [B, T]
+        seen = self._barb_seen("majors", shared=False)  # [B, T]
         B, n, k = own.shape
         hit = seen.gather(1, own.clamp(min=0).reshape(B, n * k)).reshape(B, n, k) & (own >= 0)
         self.river_named |= live & hit.any(dim=2)

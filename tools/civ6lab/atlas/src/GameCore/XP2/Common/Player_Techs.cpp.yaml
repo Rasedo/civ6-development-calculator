@@ -218,6 +218,16 @@
     - ...PrereqTech (+0x60, the player's techs 0x39d1f0) and its second link (+0x68, the civics 0x4cb2f0) held; source 6 (Appeal) reads the plot's appeal (vcall +0x28); any other source the...
     - "...ivilizationLevel is FULL_CIV (0x469db0, hash 0x253718b0) and the receiver lacks the item (0x4cb2f0 / 0x39d1f0) and is neither FULL_CIV nor TRIBE (0x469ce0, 0xd959ec24) — a city-state or th..."
   review: imported
+- addr: 0x4cb4d0
+  final: 0x334ea0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...valuation's best improvement by value (0 or above, strictly higher), the tech (+0x1338, 0x4cb4d0) and civic (+0x1310, 0x39d3d0) tests and the Builder's (0x35ede0 with UNIT_BUILDER),...
+  review: imported
 - addr: 0x4cb590
   final: 0x334f60
   kind: function

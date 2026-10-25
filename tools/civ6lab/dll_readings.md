@@ -5072,7 +5072,32 @@ operations' contracts, the improvement values below, the purchases).
   improvement 0x5ccc10 (slot 3), 0x5cd4e0; then 0x5d4d70 where the queue
   is empty. A tree is made (0x7ff9a0) and seeded (0x7cb230) by its event,
   never ticked there: no city-tree contract of the five logs is SUBMITTED
-  and queued in one turn.
+  and queued in one turn. The update's third argument (the full update)
+  clear, only the threat is read; the in-hand check, the slots' freeing,
+  the analysis and the pick run on a full update alone, the events after
+  them for a player no human drives.
+- THE IMPROVEMENT EVENT 0x5ccc10, READ: with its slot free (+0xb88's
+  element 3 -1) and the city's event handle 3 (+0xb18 +0x18) live (its
+  first byte not the none byte @0xe36190), the pick +0x648 (-1 none), its
+  best plot 0x5d1cb0(city, pick, -1, 0) and the pick's value there
+  0x5d4ae0 above 0: the tree ("City %s" named), its trigger the pick and
+  the plot, its id in slot 3 (+0xb30). 0x5d1cb0, READ: over the analysis
+  (+0xcf8, 0x78 bytes each) the evaluations with both coordinates set, no
+  reservation (+0x48) by a tree the player's tree manager (+0x12d0,
+  0x609060) still holds, owned (+0x5a) and improvable (+0x54), the value
+  (+0x30[pick]) above FX(-9999) and strictly above the best so far; the
+  fourth argument 0 asks no plot test. 0x5d4ae0, READ: the evaluation at
+  the plot's coordinates, its +0x30[pick]. The pick 0x5c9a00, READ as
+  ported (`pickImprovement`): each owned evaluation's best improvement by
+  value (0 or above, strictly higher), the tech (+0x1338, 0x4cb4d0) and
+  civic (+0x1310, 0x39d3d0) tests and the Builder's (0x35ede0 with
+  UNIT_BUILDER), the plot it picks on also written (+0x530, the memory's
+  m_bestPlotToClear: its x 241 = FX(-9999)'s low byte with none). Recorded
+  (runs/h1_duely1124 Granada t47-t71): slot 3 -1 with the pick FARM on an
+  x-41 plot, the floodplain Farm on 524 (40:11) valued below 0 while the
+  Salween stands unnamed (its flood turns -1.0 end the yields' horizon at
+  once, the charge's cost alone) — the river logged floodable from t73,
+  the tree on 524 at t72, the Farm laid that turn.
 - The district choice 0x5d0c20 ("City Build District Choice"): over the
   evaluations with +0x55 and +0x5a or +0x57 (an adjacent plot of the
   player's, 0x5ceb67), the district valued above the plot's reservation;
@@ -5213,7 +5238,13 @@ operations' contracts, the improvement values below, the purchases).
   runs/h1_duelw1127 Mexico City: its Builder of contract 51, bought t22,
   stood on the centre to t39 beside its tree's Farm plot (the game's Farm
   there from t40), the barbarians about (City Defense t20-24, t32-33,
-  t36-37).
+  t36-37). LAB: runs/h1_duely1124 t30, Granada's Builder walks from its
+  centre to 525 and lays the Farm with the barbarian Slinger on 436 beside
+  Granada's Warrior on 481 (the engines' danger 15 on 525, the Slinger's
+  strike onto 481 putting 525 in its range); a ranged mover striking no plot
+  in the danger search lands it but costs the barbarians' Move To Safety
+  three moves on runs/h1_duely1121 (t28 Scout, t174 Settler, t198), so the
+  game's reading of that turn stays unread.
 - MOVE UNIT, READ. Update 0x7f0020: its
   kept unit (+0x50, kept across turns; an id of 0 or -1 none) alive with a
   planning: SUCCESS where the planning reaches the location within one turn
@@ -5226,15 +5257,28 @@ operations' contracts, the improvement values below, the purchases).
   Improvement" Move Unit (27) sits in a Concurrent with Protect Unit before
   Build Improvement (28) in their Sequence: its SUCCESS on the turn the
   Builder can arrive lets 28 update in the same walk.
-- CLEAR PLOT, READ (its execution unread: the clear by the kept unit
-  standing on the plot). Update 0x7f7960: over its Builder List (the
+- CLEAR PLOT, READ. Update 0x7f7960: over its Builder List (the
   tree's units where none), the first unit with charges on the Plot To
   Clear, or whose planning reaches it this turn with Movement left, is
   kept (+0x40): SUCCESS; else RUNNING where one reaches it this turn with
   none left, else FAILURE. It reads no improvement: in "Build City
   Improvement" its SUCCESS walks on into Build Improvement in the same
   tick, whose plot test still finds the feature, and the tree fails; the
-  next improvement event builds.
+  next improvement event builds. Its execution 0x7f6630 (the second
+  handler table of 0x7cbca0, the slot @0xf2ef18 both tables share): for a
+  player no human drives, the kept unit (+0x40) alive (+0x770 clear)
+  requests on the plot it stands on (0x90290, not the Plot To Clear) one
+  operation (WakeUnit 0x53e20, the request's vt +0x60): the plot's
+  improvement there (+0x44 set) its removal (0x967100); else, the node's
+  "Resource Harvesting" (tag Harvest) set, the harvest (0x95fb20); else
+  the feature's removal (0x965fd0). With "Release on Complete" (every
+  city tree's 1) the unit leaves the tree (+0x778 = -1, 0x1e60f0). Check
+  Plot (0x7f6ea0) sets Harvest only on a plot with no improvement and no
+  feature holding a resource (0x7f7844: the feature goes first, +0x74;
+  a plot holding another improvement FAILS with nothing set). Recorded
+  (runs/h1_duely1117 Caguana, its Builder 1114117): the remove operation
+  (-1314704092) on 41:14's Farm at t135 and t137, the build (492889976)
+  of the Farm there at t136 and t138.
 - A CAPTURED CIVILIAN is a new unit with a new ID (runs/h1_duelw1124 t112:
   player 4's Builder 1114113 becomes the barbarians' Builder 5111833), so a
   knowledge base's record of the old unit stays with its owner as a unit

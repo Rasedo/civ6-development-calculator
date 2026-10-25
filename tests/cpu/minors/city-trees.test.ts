@@ -139,7 +139,7 @@ function runScenario(sc: Scenario, variant: { ties: number[] }): unknown[] {
       turnsTo: () => 1,
       canPlaceDistrict: (plot) => sc.districtSites.includes(plot) && !placed.some((x) => x.plot === plot),
       plotOwner: (plot) => (sc.owned.includes(plot) ? sc.seat : sc.unowned.includes(plot) ? -1 : 5),
-      buildersMakeDistricts: false, buildersMakeWonders: false, plotGround: () => ({ feature: null, resource: null }),
+      buildersMakeDistricts: false, buildersMakeWonders: false, plotGround: () => ({ feature: null, resource: null }), plotStanding: () => ({ improvement: false, feature: false, resource: false }),
       districtTie: () => ties.shift() ?? 0,
       distance: (a, b) => Math.abs(a - b),
       newContractId: () => contractIds++, newTreeId: () => treeIds++,

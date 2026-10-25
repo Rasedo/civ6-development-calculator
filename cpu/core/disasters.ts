@@ -698,21 +698,25 @@ export function riverRevealed(state: GameState, river: FloodRiver): boolean {
 /**
  * THE RIVERS' NAMES (0x534950 -> 0xa29730 -> "Random River" 0xa292a0, from
  * the sight update 0x58aa90): a river takes its name the first time one of
- * its own plots lies in a major's sight (`plotsSeenNow` of the majors) —
- * read at each turn start, the look from the turn's positions. The name
- * itself (a draw over the namer's names left) is not drawn here (AUDIT C-74).
- * MEASURED: the five verbose duels' floodable rivers (Game_RandomEvents.csv)
- * turn by turn — runs/h1_duelv1127 t1, t1, t3, t29, t59, t106; 1128 t1, t15,
- * t38, t75; 1117 t1, t1, t10, t32 — all as logged, 1124 t1, t35 and t69 for
- * t73; the plots a major's record has revealed name 1127's at t16 and t48,
- * 1124's at t11 and t29.
+ * its own plots lies in a major's own sight (`plotsSeenNow` of the majors,
+ * without the sight of the city-states they are suzerain of: runs/h1_duely1124
+ * Granada's centre on the Salween in China's shared sight from t50, the
+ * river logged floodable from t73 and Granada's floodplain Farm on 524
+ * unvalued until t72) — read at each turn start, the look from the turn's
+ * positions. The name itself (a draw over the namer's names left) is not
+ * drawn here (AUDIT C-74); the action replay reads the majors' sight again
+ * after their actions, before the city-states' turns. MEASURED: the floodable
+ * rivers (Game_RandomEvents.csv, a river named in turn t counted from t+1)
+ * turn by turn — runs/h1_duely1127 t2, t28, t58, t105 as the game's,
+ * h1_duely1124 t34 as the game's and t68 for t72; the plots a major's record
+ * has revealed name runs/h1_duelv1127's at t16 and t48, 1124's at t11 and t29.
  */
 export function nameRivers(state: GameState): void {
   if (!fogActive(state)) return;
   const rivers = floodRivers(state.map);
   const named = (state.riverNamed ??= rivers.map(() => false));
   if (rivers.every((r) => named[r.id])) return;
-  const seen = plotsSeenNow(state, new Set(state.seats.filter((s) => isCiv(s.seat)).map((s) => s.seat)));
+  const seen = plotsSeenNow(state, new Set(state.seats.filter((s) => isCiv(s.seat)).map((s) => s.seat)), false);
   for (const r of rivers) if (!named[r.id] && r.own.some((t) => seen[t.index] === 1)) named[r.id] = true;
 }
 

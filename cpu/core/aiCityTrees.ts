@@ -188,6 +188,9 @@ export interface CityTreeWorld {
   /** the plot's feature and the resource the player sees on it (0x4ab4b0),
    *  install types, null none */
   plotGround(plot: number): { feature: string | null; resource: string | null };
+  /** what stands on the plot (Check Plot's +0x44 / +0x3c / +0x40): an
+   *  improvement, a feature, a resource, seen or not */
+  plotStanding(plot: number): { improvement: boolean; feature: boolean; resource: boolean };
   /** the player's builders make districts / wonders (player +0x308 /
    *  +0x3c8) */
   buildersMakeDistricts: boolean;
@@ -201,9 +204,11 @@ export interface CityTreeWorld {
   log(line: string): void;
   /** the city's production cleared (the contract listener 0x175d10) */
   clearProduction(city: ContractCity): void;
-  /** a unit order the tree gives (moved, improvement built); a move with
-   *  `safe` is not taken where its walk would end on a plot of danger */
-  order(unit: number, kind: 'move' | 'improve' | 'clear', plot: number, improvement?: string, safe?: boolean): void;
+  /** a unit order the tree gives (moved, improvement built, the plot it
+   *  stands on cleared: its improvement, else its feature — `harvest` its
+   *  resource); a move with `safe` is not taken where its walk would end on
+   *  a plot of danger */
+  order(unit: number, kind: 'move' | 'improve' | 'clear' | 'harvest', plot: number, improvement?: string, safe?: boolean): void;
   /** the player's danger map at the plot (0x716a60) */
   danger(plot: number): number;
   /** the unit still stands after the orders given (a Builder spending its
@@ -673,9 +678,11 @@ const reservePlot: BtHandler<Ctx> = {
 // CHECK PLOT (0x7f6ea0): the Builder type (the cheapest unit the city may
 // train that builds the improvement) into its tag, FAILURE with none; the
 // plot as it stands can take the improvement: SUCCESS, else FAILURE (the
-// tree clears it first)
+// tree clears it first) — on a plot holding no improvement and no feature
+// but a resource, its Resource Harvesting set (0x7f7844)
 const checkPlot: BtHandler<Ctx> = {
   update(node, run, ctx) {
+    setTag(run, node, 'Resource Harvesting', false);
     const plot = tagOf(run, node, 'Plot To Check');
     if (typeof plot !== 'number' || plot < 0) return BT_FAILURE;
     const districts = list(tagOf(run, node, 'Building Districts')).map(String);
@@ -687,7 +694,10 @@ const checkPlot: BtHandler<Ctx> = {
     if (!builder) return BT_FAILURE;
     setTag(run, node, 'Builder List', [builder]);
     setTag(run, node, 'Plot To Move', plot);
-    return ctx.w.canImprove(plot, imp) ? BT_SUCCESS : BT_FAILURE;
+    if (ctx.w.canImprove(plot, imp)) return BT_SUCCESS;
+    const g = ctx.w.plotStanding(plot);
+    if (!g.improvement && !g.feature && g.resource) setTag(run, node, 'Resource Harvesting', true);
+    return BT_FAILURE;
   },
 };
 
@@ -810,8 +820,10 @@ const moveUnit: BtHandler<Ctx> = {
 // CLEAR PLOT (0x7f7960): the first of its units with charges on the plot,
 // or whose planning reaches it this turn with Movement left, is the node's
 // (+0x40): SUCCESS; none so: RUNNING where one reaches it this turn, else
-// FAILURE. The execution, after Move Unit's, clears where that unit then
-// stands on the plot. Its SUCCESS walks on into the build in the same tick,
+// FAILURE. The execution (0x7f6630), after Move Unit's, clears the plot that
+// unit then stands on — its improvement, else with Resource Harvesting its
+// resource, else its feature — and with Release on Complete lets the unit
+// go from the tree. Its SUCCESS walks on into the build in the same tick,
 // whose plot test still finds the feature or resource: the tree fails and
 // the next improvement event builds (runs/h1_duelw1124 Granada: plot 570's
 // Marsh cleared at t21, the Alcazar laid two turns on)
@@ -834,9 +846,12 @@ const clearPlot: BtHandler<Ctx> = {
   },
   execute(node, run, ctx) {
     const m = run.mem[node.index];
-    const plot = tagOf(run, node, 'Plot To Clear');
-    if (typeof plot !== 'number' || typeof m.unit !== 'number' || m.unit < 0) return;
-    if (ctx.w.units.find((u) => u.id === m.unit)?.plot === plot) ctx.w.order(m.unit, 'clear', plot);
+    if (typeof m.unit !== 'number' || m.unit < 0) return;
+    const id = m.unit;
+    const at = ctx.w.units.find((u) => u.id === id)?.plot;
+    if (at === undefined) return;
+    ctx.w.order(id, tagOf(run, node, 'Resource Harvesting') === true ? 'harvest' : 'clear', at);
+    if (dataBool(node, 'Release on Complete') ?? false) ctx.tree.units = ctx.tree.units.filter((u) => u !== id);
   },
 };
 

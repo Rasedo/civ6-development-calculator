@@ -47,6 +47,7 @@
       value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...trol: +0 its id, +4 its kind, +0x10 its object; a free entry holds the next free index; 0x609060 (FinalRelease 0x4019f0) the lookup by id). A contract's watched fields (vtable, owner,..."
   review: imported

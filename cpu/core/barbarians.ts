@@ -72,12 +72,13 @@ export function barbarianTechs(state: GameState): void {
  * 88 below the engines' at Granada, t97; the five dueld duels' 1,245
  * turns: 1,065 equal with the share, 206 without it, the minor's plots alone
  * 454). A LAB reading: the camp step's exclusions fit it (runs/h1_duelw1120-1124
- * camp draws' ranges), the game's sight rule unread.
+ * camp draws' ranges), the game's sight rule unread. With `shared` false
+ * the seats' own sight alone.
  */
-export function plotsSeenNow(state: GameState, given: ReadonlySet<number>): Uint8Array {
+export function plotsSeenNow(state: GameState, given: ReadonlySet<number>, shared = true): Uint8Array {
   const { map } = state;
   const seats = new Set(given);
-  for (const cs of state.cityStates) if (cs.centerIndex >= 0 && given.has(suzerainOf(cs))) seats.add(cs.seat);
+  if (shared) for (const cs of state.cityStates) if (cs.centerIndex >= 0 && given.has(suzerainOf(cs))) seats.add(cs.seat);
   const seen = new Uint8Array(map.tiles.length);
   for (const u of state.units) {
     if (!seats.has(u.seat)) continue;

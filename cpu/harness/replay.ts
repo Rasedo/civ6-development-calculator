@@ -88,6 +88,7 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
+import { nameRivers } from '../core/disasters';
 import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemInHand, minorItemKey, minorUnitPrice, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
@@ -1013,7 +1014,8 @@ const minorAiSeat = (seat: number) => isCityStateSeat(seat) || seat === FREE_SEA
  * `freeCitiesMilitary`) on a copy of the state, in the game's player order,
  * after the majors' actions of the pair and before the barbarians' turn:
  * their units back where the pair's first record holds them, each in the
- * pool slot its ID names, with its Movement whole; the barbarians' units
+ * pool slot its ID names, with its Movement whole (one the turn bought, `bought`,
+ * at none); the barbarians' units
  * where the first record holds them, those it lacks not yet raised; the
  * ground (owners, features, improvements, districts, roads) and every
  * player's research as record t+1 holds them. A
@@ -1023,7 +1025,7 @@ const minorAiSeat = (seat: number) => isCityStateSeat(seat) || seat === FREE_SEA
  * set beside the game's tactical log and record t+1 (`tallyMinorTactics`):
  * the record's moves and battles stay the pair's.
  */
-function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
+function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>, bought: ReadonlySet<Unit>,
   revealedWas: ReadonlyMap<number, number[] | undefined>): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
@@ -1106,8 +1108,13 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // trained where it was made, a Builder's charges before the turn's orders
   // (record t+1's spent them); a Builder record t+1 lost (its last charge
   // spent in the turn, runs/h1_dueldA1117 Valletta's at 365, t9's Farm)
-  // stands where the turn found it for its city trees' order
+  // stands where the turn found it for its city trees' order; one its
+  // Economic AI's contract purchase made in the turn at Movement 0, as a
+  // unit bought stands its turn out (runs/h1_duely1124 t27: Granada's Builder
+  // bought for its Farm tree's contract, the tree gone that turn, the Farm on
+  // 525 laid at t30)
   const spentBuilders = new Set<Unit>();
+  const boughtNow = new Set([...bought].map((u) => `${u.seat}:${u.id}`));
   for (const s of ctx.minorUnits) {
     const there = copy.units.find((x) => x.seat === s.seat && x.id === s.id);
     if (there) {
@@ -1122,7 +1129,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     const before = mineAt.filter((i) => copy.units[i].id < c.id);
     copy.units.splice(before.length ? before[before.length - 1] + 1 : mineAt.length ? mineAt[0] : copy.units.length, 0, c);
     c.movesFull = unitFullMoves(copy, c);
-    c.movesLeft = c.movesFull;
+    c.movesLeft = boughtNow.has(`${c.seat}:${c.id}`) ? 0 : c.movesFull;
   }
   // a city-state's research in its actions is its start's, which record
   // t+1 holds (its embarking), and the majors' as their actions left it
@@ -1382,10 +1389,11 @@ function minorBuysAfter(ctx: Ctx, copy: GameState, buys: readonly CopyBuy[], twi
 interface CopyBuy { cs: CityState; u: Unit; price: number; savings?: number[]; threatened: boolean }
 
 /** a plot's ground as the copy of the units' turn sets it from record t+1 */
-type GroundOf = Pick<Tile, 'ownerSeat' | 'ownerCity' | 'feature' | 'improvement' | 'pillaged' | 'district' | 'districtComplete'
+type GroundOf = Pick<Tile, 'ownerSeat' | 'ownerCity' | 'feature' | 'resource' | 'improvement' | 'pillaged' | 'district' | 'districtComplete'
   | 'districtPillaged' | 'road'>;
-const groundOf = (t: Tile): GroundOf => ({ ownerSeat: t.ownerSeat, ownerCity: t.ownerCity, feature: t.feature, improvement: t.improvement,
-  pillaged: t.pillaged, district: t.district, districtComplete: t.districtComplete, districtPillaged: t.districtPillaged, road: t.road });
+const groundOf = (t: Tile): GroundOf => ({ ownerSeat: t.ownerSeat, ownerCity: t.ownerCity, feature: t.feature, resource: t.resource,
+  improvement: t.improvement, pillaged: t.pillaged, district: t.district, districtComplete: t.districtComplete,
+  districtPillaged: t.districtPillaged, road: t.road });
 
 /** THE CITY-STATES' LAYINGS after their units' turn on the copy, each
  *  against the record's improvements of the pair (`ctx.minorImproves`) by
@@ -4701,6 +4709,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // DiplomacySummary.csv, the record of t62 the first to show it; 1117
       // t20: China's Scout gone from 41:12 by city-state 3's look)
       for (const p of otherMajors) syncUnits(ctx, b, p);
+      // ...and the rivers their sight names there, which the city-states'
+      // turns after read (runs/h1_duely1127 t28: the fourth river logged from
+      // t29, Muscat's floodplain Farm on 747 laid in its turn of t28)
+      nameRivers(state);
       // ...taking into the turn's heal the moves their actions spent
       for (const [u, kept] of movesKept) if (others.includes(u.seat)) u.movesLeft = kept ? grantedMoves(state, u) : 0;
       for (const seat of others) detectBoosts(state, seat);
@@ -4994,7 +5006,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // engine's turn did not make is the units' turn's
     const bought = new Set(ds.flatMap((d) => (d.kind === 'buyUnit' ? [d.unit] : [])));
     minorAi(ctx, b, a.turn, new Set([...ctx.units].filter(([k, u]) => minorAiSeat(u.seat) && !standing.has(u)
-      && (!bought.has(k) || minorBought.has(u))).map(([, u]) => u)), revealedWas);
+      && (!bought.has(k) || minorBought.has(u))).map(([, u]) => u)), new Set(minorBought.keys()), revealedWas);
     // the items the city-states' second hooks set, against record t+1's
     minorBuilds(ctx, b, report.minorBuilds);
     // a later player's blow on a city-state's or the Free Cities' unit came

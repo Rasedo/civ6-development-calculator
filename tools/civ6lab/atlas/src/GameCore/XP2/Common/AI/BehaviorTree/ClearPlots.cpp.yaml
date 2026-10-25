@@ -3,10 +3,29 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x7f6630
+  kind: function
+  name: Clear Plot (execution)
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 135
+      value: Caguana's Builder 1114117 removes 41:14's Farm (operation -1314704092), t136 lays the Farm again
+  impl: [cpu/core/aiCityTrees.ts:clearPlot, gpu/core/sim_citytrees.py:_x_clear]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  notes:
+    - "the kept unit (+0x40) on the plot it stands on: the improvement's removal (0x967100), else with Harvest the harvest (0x95fb20), else the feature's removal (0x965fd0); Release on Complete clears the unit's +0x778"
+  review: reviewed
 - addr: 0x7f6ea0
   final: 0x55e160
   kind: function
-  status: PARTLY
+  name: Check Plot
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 49
+      value: Mexico City's Builder harvests 360's Stone (no feature, the Harvest flag), its Farm laid t50
   impl:
     - cpu/core/aiCityTrees.ts:checkPlot
     - gpu/core/sim_citytrees.py:_u_check_plot

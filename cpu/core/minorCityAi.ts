@@ -162,6 +162,13 @@ export function plotGroundOf(state: GameState, seat: number, plot: number): { fe
   };
 }
 
+/** what stands on a plot: an improvement, a feature, a resource seen or not
+ *  (the trees' `plotStanding`) */
+export function plotStandingOf(state: GameState, plot: number): { improvement: boolean; feature: boolean; resource: boolean } {
+  const t = state.map.tiles[plot];
+  return { improvement: !!t.improvement, feature: !!t.feature, resource: !!t.resource };
+}
+
 /** the improvements the ground of a plot takes for the minor, the
  *  improvements' own research waived (CanHaveImprovement, 0x35fd60) — a
  *  ground row's civic (the Farm on Hills, a feature row) held: those of the
@@ -510,6 +517,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     },
     plotOwner: (plot) => tileSeat(state.map.tiles[plot]),
     plotGround: (plot) => plotGroundOf(state, cs.seat, plot),
+    plotStanding: (plot) => plotStandingOf(state, plot),
     // its danger map as the trees first read it in the turn (`dangerPlane`)
     danger: (plot) => (danger ??= dangerPlane(state, cs.seat))[plot],
     buildersMakeDistricts: false,
@@ -548,30 +556,37 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
       }
       // the plot's improvement goes first, at no charge (runs/h1_duelv1124
       // Cardiff's Lumber Mill on plot 626 gone at t116 with the Builder's
-      // charge kept, the Forest at t117, the Farm at t122); then its
-      // feature, else its resource
+      // charge kept, the Forest at t117, the Farm at t122); then the
+      // harvest of its resource, or the removal of its feature, each where
+      // the Builder may make it
       if (tile.improvement) {
+        if (tileSeat(tile) !== cs.seat) return;
         tile.improvement = null;
         tile.pillaged = false;
         unit.movesLeft = 0;
         return;
       }
-      if ((unit.charges ?? 0) <= 1) spent.add(u);
-      const clears = tile.feature && canRemoveFeature(state, tile, cs.seat).ok ? 'feature' : tile.resource ? 'resource' : null;
+      const clears = kind === 'harvest' ? (tile.resource ? 'resource' : null)
+        : tile.feature && canRemoveFeature(state, tile, cs.seat).ok ? 'feature' : null;
+      if (!clears) return;
       // a clearing kept stands, the Builder's turn spent and its charge
       // kept; an unpaid one lands no lump
-      const held = clears ? clearHeld?.(plot, clears) ?? null : null;
+      const held = clearHeld?.(plot, clears) ?? null;
       if (held === 'kept') {
         unit.movesLeft = 0;
         return;
       }
-      if (clears === 'feature') builderRemoveFeature(state, unit.id, cs.seat, held !== 'unpaid');
-      else if (clears === 'resource') builderHarvest(state, unit.id, held !== 'unpaid');
+      const last = (unit.charges ?? 0) <= 1;
+      const res = clears === 'feature' ? builderRemoveFeature(state, unit.id, cs.seat, held !== 'unpaid') : builderHarvest(state, unit.id, held !== 'unpaid');
+      if (res.ok && last) spent.add(u);
     },
     unitAlive: (u) => !!unitOf(u) && !spent.has(u),
     startOperation: (name, plot) => minorOpsStart(state, cs, name, plot),
     operationLive: (id) => minorOpLive(cs, id),
     heldContracts: () => minorOpContracts(cs),
+    trace: tracer ? (t, root, ups) => tracer?.(`t${state.turn} ${cs.name} tick ${t.id}:${t.name} root ${root} builders [${state.units
+      .filter((u) => u.seat === cs.seat && (u.charges ?? 0) > 0).map((u) => `${u.id}@${u.tileIndex}/${u.movesLeft}/${u.charges ?? 0}`)
+      .join(' ')}] ${ups.join(' ')}`) : undefined,
   };
 }
 
