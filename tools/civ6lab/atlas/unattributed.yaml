@@ -982,6 +982,19 @@
   context:
     - "...table), keeps each row whose byte +0x48 is set and +0x50 non- null and whose live record (0x27a680 -> 0x25bef0 on the row's +0x20) reads -1 at +0x0 and +0xc — not in play —, weighs each 1..."
   review: imported
+- addr: 0x282ac0
+  final: 0x1b6150
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_probez1117_20261025T104915Z
+      turn: 1
+      value: "MEASURED (runs/h1_probez1117_20261025T104915Z,   t1-t15, the reader that dumps members over 0x28 bytes whole): +0x80 the   record's food x 256 on 69 of 69 city-records;"
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "...nts it): +0x80 m_xFood (24.8), +0x84 m_iOtherGrowthModifier — the percent the Release's 0x1b6180 adds its game-config growth term to (CityGrowth +0x84 there too), where the residues `C..."
+  review: imported
 - addr: 0x292e10
   final: 0x1c3d80
   kind: function
@@ -1971,14 +1984,16 @@
     - recording: h1_duelu1128
       turn: 240
       value: "the upgrade's StrategicResource (+0x2c8) index, -1 none: Bologna's Scouts (Skirmisher, none) deleted, Hong Kong's Warriors (Swordsman, Iron) held"
-  impl: [cpu/core/minorOps.ts:upgradeTreesTick, gpu/core/sim_minorops.py:_mops_upgrade_trees]
+  impl:
+    - cpu/core/minorOps.ts:upgradeTreesTick
+    - gpu/core/sim_minorops.py:_mops_upgrade_trees
+    - cpu/core/minorOps.ts:upgradeUnasked
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  notes: [returns the upgrade's StrategicResource, not a district]
   context:
     - "...MMAND_DELETE, 0x73cd1698) of an excess obsolete unit: no district asked by its upgrade (0x591000 -1), or at most one promotion and more than 10 of its type (0x4f2c90); the full test fa..."
-  notes: ["returns the upgrade's StrategicResource, not a district"]
   review: reviewed
 - addr: 0x5bbf80
   final: 0x3d4270

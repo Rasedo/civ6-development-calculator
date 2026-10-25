@@ -397,11 +397,33 @@ class Reader:
                 "citiesEc": self.pm.i32(self.pm.u64(pl + 0x6D0) + 0xEC)}
 
     # -- the players' and cities' named fields (aimem_fields.json)
+    def vector(self, q0: int, q1: int, q2: int) -> bytes | None:
+        """a vector header's items: an EASTL {begin, end, capacity end}, or
+        a {begin, capacity, count} (the contracts' container, the build
+        queue's per-type arrays); None where the words are neither"""
+        if not ptr(q0):
+            return None
+        if ptr(q1) and q0 <= q1 <= q2 and q1 - q0 <= 0x4000:
+            return self.pm.read(q0, q1 - q0) if q1 > q0 else b""
+        n = min(q1, q2)
+        if max(q1, q2) <= 0x1000:
+            return self.pm.read(q0, 4 * n) if n else b""
+        return None
+
     def fields(self, obj: int, table: list) -> dict:
         """an object's named fields (`aimem_fields`): a scalar member (0x18)
-        its int at +0x10; a vector ({begin, capacity, count} at +0x10) its
-        items as int32s; any other member's value bytes as int32s
-        — the int lists sparse {index: value} where mostly zero"""
+        its int at +0x10; a vector member (0x28: its header at +0x10, either
+        layout of `vector`) its items as int32s; any other member (a
+        component, City's m_kGrowth, m_kCulture, m_kBuildQueue ...) its value
+        bytes as int32s, and under `<name>.v` the items of every {begin,
+        capacity, count} vector its words hold (by the word its header
+        starts at: the build queue's per-type progress) — the int lists
+        sparse {index: value} where mostly zero"""
+        def ints_of(raw: bytes):
+            ints = struct.unpack(f"<{len(raw) // 4}i", raw[:len(raw) // 4 * 4])
+            nz = sum(1 for v in ints if v)
+            return list(ints) if nz * 2 > len(ints) else {k: v for k, v in enumerate(ints) if v} | {"n": len(ints)}
+
         out = {}
         size = max(o + s for _, o, s in table)
         b = self.pm.read(obj, size)
@@ -410,14 +432,27 @@ class Reader:
                 v = struct.unpack_from("<i", b, off + 0x10)[0]
                 out[name] = v & 0xFF if name.startswith("m_b") else v
                 continue
-            beg, cap, n = struct.unpack_from("<QQQ", b, off + 0x10) if sz >= 0x28 else (0, 0, 0)
-            if ptr(beg) and n <= cap <= 0x1000:
-                raw = self.pm.read(beg, 4 * n) if n else b""
-            else:
-                raw = b[off + 0x10:off + sz]
-            ints = struct.unpack(f"<{len(raw) // 4}i", raw[:len(raw) // 4 * 4])
-            nz = sum(1 for v in ints if v)
-            out[name] = list(ints) if nz * 2 > len(ints) else {k: v for k, v in enumerate(ints) if v} | {"n": len(ints)}
+            if sz == 0x28:
+                # a header whose words only look like a vector's: its own
+                # bytes (one member's failed read never loses the object's)
+                try:
+                    raw = self.vector(*struct.unpack_from("<QQQ", b, off + 0x10))
+                except MemError:
+                    raw = None
+                out[name] = ints_of(raw if raw is not None else b[off + 0x10:off + sz])
+                continue
+            region = b[off + 0x10:off + sz]
+            out[name] = ints_of(region)
+            inner = {}
+            for k in range(0, len(region) - 0x17, 8):
+                p, cap, n = struct.unpack_from("<QQQ", region, k)
+                if ptr(p) and 0 < n <= cap <= 0x400:
+                    try:
+                        inner[k // 4] = ints_of(self.pm.read(p, 4 * n))
+                    except MemError:
+                        continue
+            if inner:
+                out[name + ".v"] = inner
         return out
 
     def world(self, players: list[int]) -> dict:

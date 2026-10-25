@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x1a8580
+  final: 0x11aba0
+  kind: function
+  status: PARTLY
+  impl: [cpu/harness/import.ts:cultureExpansions]
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "- CITY m_kCulture (City +0xb80, its value at +0xb90; FinalRelease 0x11aba0 prints it): +8 m_xCulture (24.8), +0xc m_iPlotsAcquired, +0x10 m_iPlotsAcquiredFromCu..."
+  review: imported
 - addr: 0x1a8a30
   final: 0x11b000
   kind: function

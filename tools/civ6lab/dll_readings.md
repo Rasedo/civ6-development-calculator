@@ -3845,9 +3845,51 @@ this file do not carry over; the knowledge base's inner layout does.
   +0x84 the units before and after its recruit.
 - THE NAMED FIELDS (`aimem_fields.py`): each player component's and city's
   watched members, named by the constructor (`m_` string, then the member's
-  `lea`): a scalar's value at member +0x10; a vector's {items, capacity,
-  count} at +0x10 (PlayerCities m_aeSettledContinents: [19]). Read at each
-  record's hold into the record's `mem` (12 ms, 190 KB a record).
+  `lea`): a scalar's value at member +0x10. A vector member (0x28 bytes)
+  holds its header at +0x10 in one of two layouts: EASTL {begin, end,
+  capacity end} (PlayerInfluence m_aiTokensReceived, PlayerStats
+  m_aiNumUnitsConstructed) or {begin, capacity, count} (PlayerCities
+  m_aeSettledContinents: [19]). Read at each record's hold into the
+  record's `mem` (12 ms, 190 KB a record). The duely recordings read only
+  the second layout: their EASTL vectors and every member over 0x28 bytes
+  (City's m_kGrowth among them) hold their header words, not their items.
+- CITY m_kCulture (City +0xb80, its value at +0xb90; FinalRelease 0x11aba0
+  prints it): +8 m_xCulture (24.8), +0xc m_iPlotsAcquired, +0x10
+  m_iPlotsAcquiredFromCulture, +0x14 m_iBorderExpansionModifier, +0x1c
+  m_iNextPlot. MEASURED on the five duely recordings, 10,500 city-records:
+  +8 the record's culture x 256 on 10,498, +0x1c its next plot on all, and
+  the engine's borderGrowthCost of +0x10 its next plot's cost on all
+  (+0xc on none) — the plots taken with culture (`City.tilesAcquired`).
+- CITY m_kGrowth (City +0x960, its value at +0x970; FinalRelease 0x122d20
+  prints it): +0x80 m_xFood (24.8), +0x84 m_iOtherGrowthModifier — the
+  percent the Release's 0x1b6180 adds its game-config growth term to
+  (CityGrowth +0x84 there too), where the residues `City.growthDrift`
+  reconstructs are kept. MEASURED (runs/h1_probez1117_20261025T104915Z,
+  t1-t15, the reader that dumps members over 0x28 bytes whole): +0x80 the
+  record's food x 256 on 69 of 69 city-records; +0x84 0 on all (no
+  detached percent yet).
+- CITY m_kBuildQueue (City +0x10c0, its value at +0x10d0, 0x3d8 bytes): its
+  first words the queue's entries, then per-type arrays as {begin,
+  capacity, count} (50, 138, 144, 36, 37 items), twice, their items in the
+  heap. MEASURED (the same probe): the array whose header is at value
+  +0x218 (138 items, a building row each) and the one at +0x230 (144, a
+  unit row each) hold each row's progress (24.8): the queue head's
+  progress (the record's queueProgress, floored) at its row on 51 of 51
+  city-records; +0x248 (36) and +0x260 (37) the district and project rows
+  by their counts, not yet seen holding the head's. (The Lua cache
+  0x68b390 copies the queue: GetBuildingProgress reads its copy's +0x68.)
+- PlayerResources m_aiReservedResources (inline, a word per resource) is
+  not the reservation the importer replays: runs/h1_duely1117 China t105 10
+  of the resource and t106 none while its front unit holds 20 from t105 to t113
+  in `importPower`'s replay; 20 of 764 major-records agree.
+- PlayerDiplomacy m_iWarWeariness (inline, a word per player) is the hold's
+  total, not the ledger at the seat's last processing the amenities read:
+  runs/h1_duely1128 t206 Rome against China 262 at the hold, 158 in the
+  ledger after Rome's t205 decay; 130 of 310 seat-records agree.
+- PlayerInfluence m_iLevyTurnCounter: the turns since the city-state's
+  levy, 1 the record after it, -1 none (1,950 of 1,982 levied
+  unit-records against the levy the units' changing hands dated; the 32
+  others a new levy of the same minor the unit diff missed).
 
 ## H-1: a pillaged building's specialist, the centre's defence, three moments — READ
 

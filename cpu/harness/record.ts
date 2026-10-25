@@ -274,6 +274,51 @@ export interface TurnRecord {
   /** the game's combat log rows of the turns the record's event log covers,
    *  where the recording kept the log (`loadCombatLog`, set by the replay) */
   combatLog?: CombatRow[];
+  /** the game's own named fields at the dump's hold (`h1/dump.py`,
+   *  tools/civ6lab/aimem_fields.py), by player id; absent from records the
+   *  dumper wrote before it read them */
+  mem?: Record<string, PlayerMem>;
+}
+
+/**
+ * One player's named fields (`TurnRecord.mem`): per player component
+ * (PlayerStats, PlayerInfluence, PlayerResources, PlayerDiplomacy, ...) its
+ * fields by their `m_` names, and per city of the player (in the record's
+ * city order) the City's. A scalar is its int; a member the reader took as
+ * a vector or a raw region is int32 words, sparse `{index: word, n: count}`
+ * where mostly zero.
+ */
+export interface PlayerMem {
+  cities?: Record<string, MemValue>[];
+  [component: string]: Record<string, MemValue> | Record<string, MemValue>[] | undefined;
+}
+
+export type MemValue = number | number[] | { n: number; [k: string]: number };
+
+/** a named member's int32 words, dense; undefined where absent */
+export function memWords(v: MemValue | undefined): number[] | undefined {
+  if (v === undefined) return undefined;
+  if (typeof v === 'number') return [v];
+  if (Array.isArray(v)) return v;
+  return Array.from({ length: v.n }, (_, k) => v[String(k)] ?? 0);
+}
+
+/** a player component's named field at the record's hold */
+export function memField(rec: TurnRecord, player: number, component: string, field: string): MemValue | undefined {
+  const c = rec.mem?.[String(player)]?.[component];
+  return c && !Array.isArray(c) ? c[field] : undefined;
+}
+
+/** a record city's own named fields: the player's mem city of its place
+ *  among the player's record cities, undefined where the two lists differ
+ *  in length */
+export function memCity(rec: TurnRecord, owner: number, id: number): Record<string, MemValue> | undefined {
+  const list = rec.mem?.[String(owner)]?.cities;
+  if (!list) return undefined;
+  const mine = rec.cities.filter((c) => c.owner === owner);
+  if (mine.length !== list.length) return undefined;
+  const k = mine.findIndex((c) => c.id === id);
+  return k < 0 ? undefined : list[k];
 }
 
 /** One player's state at a point of its start of turn (`TurnRecord.witness`). */

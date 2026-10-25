@@ -68,6 +68,19 @@
   context:
     - "...take the first. 0x68be60 (Economic, city or all, unit, flag): per city, the Gold price 0x1b22d0 (below 0 skipped); the UNITS and SLUSH slots together above it with UNITS above half..."
   review: imported
+- addr: 0x1b6d80
+  final: 0x122d20
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_probez1117_20261025T104915Z
+      turn: 1
+      value: "MEASURED (runs/h1_probez1117_20261025T104915Z,   t1-t15, the reader that dumps members over 0x28 bytes whole): +0x80 the   record's food x 256 on 69 of 69 city-records;"
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  context:
+    - "- CITY m_kGrowth (City +0x960, its value at +0x970; FinalRelease 0x122d20 prints it): +0x80 m_xFood (24.8), +0x84 m_iOtherGrowthModifier — the percent the Rele..."
+  review: imported
 - addr: 0x1f43c0
   final: 0x14a6f0
   kind: function

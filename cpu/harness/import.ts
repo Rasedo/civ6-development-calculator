@@ -54,8 +54,8 @@ import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
-import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP, FORMATION_CS } from '../data/units';
-import { MP_SCALE, WONDER_FREE_TILES, borderGrowthCost, emptyStockpile, scaleByGameSpeed } from '../data/constants';
+import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP } from '../data/units';
+import { MP_SCALE, emptyStockpile, scaleByGameSpeed } from '../data/constants';
 import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, resolveSeatPower, stockpileCap, strategicSlot, unitResourceCost } from '../core/stockpile';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -84,12 +84,12 @@ import { LUXURY_IDS } from '../../world/resources';
 import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import type { QueueItem } from '../core/types';
 import { projectCost, settlerCost, unitStepCost } from '../core/game';
-import { builderCost, rangedCombatOf, traderCost, unitDomain } from '../core/units';
+import { builderCost, traderCost } from '../core/units';
 import { carryLayout, computeUnlocks, governmentSlots } from '../core/effects';
 import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
 import { standingRemovable } from '../core/climate';
 import { districtSiteCost } from '../core/phase';
-import { P, bool, num, plotAt, revealedPlots, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
+import { P, bool, memCity, memField, memWords, num, plotAt, revealedPlots, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
 import { aliases, engineId, gameHash } from '../data/aliases';
 import type { RandLog } from './randLog';
 
@@ -130,7 +130,8 @@ export interface Imported {
   gaps: Map<string, number>;
   /** engine religion id (its founder's seat) by the game's religion type */
   religionSeat: Map<number, number>;
-  /** cities whose culture-expansion count the history cannot know */
+  /** cities whose culture-expansion count neither the record's mem nor the
+   *  history holds (a city standing before the first record) */
   tilesUnknown: Set<number>;
   /** cities the game holds no next plot for (`History.nextPlotUnheld`) */
   nextPlotUnheld: Set<number>;
@@ -193,6 +194,16 @@ export interface Imported {
 }
 
 const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(prefix.length) : s);
+
+/** the plots a record city has taken with culture (`City.tilesAcquired`):
+ *  its City's m_kCulture value (City +0xb90, FinalRelease 0x11aba0's
+ *  fields: +8 m_xCulture, +0xc m_iPlotsAcquired, +0x10
+ *  m_iPlotsAcquiredFromCulture, +0x14 m_iBorderExpansionModifier, +0x1c
+ *  m_iNextPlot), its word 4 at the record's hold; undefined where the
+ *  record holds no `mem` for it */
+function cultureExpansions(rec: TurnRecord, c: DumpCity): number | undefined {
+  return memWords(memCity(rec, c.owner, c.id)?.m_kCulture)?.[4];
+}
 
 /** the game's six river / cliff direction bits per plot: 1 = the plot lies NE
  *  of the edge (the edge is its SW side), 2 = NW of it (SE side), 4 = W of it
@@ -446,15 +457,14 @@ function leaderRow(leader: string): number {
 
 /**
  * WHAT ONE TURN'S STATE DOES NOT SAY, read off the records before it: the
- * strongest melee unit each player has trained or bought (a city centre's
- * base, `Seat.bestMeleeCS`), how many plots each city has taken with culture
- * (`City.tilesAcquired`, what a border expansion costs), the Builders
- * each player has gained, and the age every closed era gave each player with
- * the era score it began the current one on. All are reconstructed from
- * diffs — a unit id new at t+1, a culture box that fell, age thresholds that
- * moved — so a game recorded from its first turn carries them; a city first
- * seen after its founding turn is `unknownSince`, and a check reading its
- * count is skipped.
+ * Builders each player has gained, the units levied from a city-state, and
+ * the age every closed era gave each player with the era score it began the
+ * current one on. All are reconstructed from diffs — a unit id new at t+1,
+ * age thresholds that moved — so a game recorded from its first turn carries
+ * them; a city first seen after its founding turn is `unknownSince`, and a
+ * check reading its count is skipped. What the game's own fields hold at the
+ * record's hold (`TurnRecord.mem`: the best strengths trained, the plots
+ * taken with culture, a levy's clock) is read there.
  */
 export interface History {
   firstTurn: number;
@@ -467,24 +477,20 @@ export interface History {
   beforeThat: TurnRecord | null;
   /** the World Congress table the record before the current one showed */
   congressBefore?: unknown;
-  bestMelee: Map<number, number>;
-  /** each player's strongest Ranged Strength made (`Seat.bestRangedCS`) */
-  bestRanged: Map<number, number>;
   /** units a major holds levied from a city-state, by `owner:id`, with the
    *  city-state's player id: a city-state's unit gone at t+1 beside a new
    *  one of its type under the major */
   levied: Map<string, number>;
-  /** the turn of each city-state's last levy, by its player id: the term's
-   *  clock (`CityState.levyEnds`) */
-  levyTurn: Map<number, number>;
   /** the turn each player last seated each governor (`GovernorAssigned` in
    *  the records' action log), by `player:governor` catalog index */
   govSeated: Map<string, number>;
-  /** culture expansions by the city's centre plot (a capture keeps them) */
-  cultureTaken: Map<number, number>;
   /** the residue each city's growth accumulator keeps, in 256ths, by the
    *  city's `owner:id` (`City.growthDrift`, `foldGrowthDrift`) */
   growthDrift: Map<string, number>;
+  /** each player's best strengths trained as the last record whose mem read
+   *  its PlayerStats held them, [melee, ranged] (`TurnRecord.mem`): a record
+   *  whose read of them failed carries the last */
+  trained: Map<number, [number, number]>;
   /** Builders each player has gained: a Builder id new at t+1 */
   builders: Map<number, number>;
   /** Great People each player has spent, by class: a Great Person unit of
@@ -825,7 +831,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), bestRanged: new Map(), levied: new Map(), levyTurn: new Map(), govSeated: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), govSeated: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
@@ -1310,26 +1316,17 @@ function copiesQuoted(rec: TurnRecord, cat: Catalog, pid: number, unitName: stri
 /** Fold one record into the history, in turn order. */
 export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void {
   const W = rec.head.W;
-  const uReplace = new Map(cat.unitReplaces);
+  for (const p of rec.players) {
+    const melee = memField(rec, p.id, 'PlayerStats', 'm_iMaxMeleeStrengthTrained');
+    const ranged = memField(rec, p.id, 'PlayerStats', 'm_iMaxRangedStrengthTrained');
+    if (typeof melee === 'number' && typeof ranged === 'number') h.trained.set(p.id, [melee, ranged]);
+  }
   // a governor seated in a city: [.., turn, kind, city owner, city id,
   // player, governor]
   const logged = (rec as TurnRecord & { actions?: unknown }).actions;
   for (const r of Array.isArray(logged) ? logged : []) {
     if (Array.isArray(r) && r[2] === 'GovernorAssigned') h.govSeated.set(`${r[5]}:${r[6]}`, r[1] as number);
   }
-  // what a unit new at this record raises its owner's base to
-  // (`raiseBestTrained`): a land or naval fighting unit's Combat with its
-  // formation's strength
-  const made = (idx: number, formation: number) => {
-    const id = unitId({ cat, uReplace, gaps: new Map() }, idx);
-    const def = id ? UNITS[id] : undefined;
-    return def && def.combat > 0 && unitDomain(id!) === 'military' ? def.combat + (FORMATION_CS[formation] ?? 0) : 0;
-  };
-  const madeRanged = (idx: number, formation: number) => {
-    const id = unitId({ cat, uReplace, gaps: new Map() }, idx);
-    const r = id && made(idx, formation) > 0 ? rangedCombatOf(id) : 0;
-    return r > 0 ? r + (FORMATION_CS[formation] ?? 0) : 0;
-  };
   // a resource a player reads paying its yield without the revealing
   // technology: the grant (`GP_RESOURCE_REVEAL`) where the records name no
   // great person, and a reading no random event made either way. An unowned
@@ -1386,15 +1383,6 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   if (h.last === null) {
     h.firstTurn = rec.turn;
     if (rec.turn > 1) for (const c of rec.cities) h.unknownSince.add(c.y * W + c.x);
-    // the era's starting units raise the best melee and ranged strengths
-    // as they are placed (0x4580b0 -> 0x4c1c10)
-    for (const u of rec.units) {
-      if (bool(u.embarked)) continue;
-      const cs = made(u.type, Math.max(0, num(u.formation)));
-      if (cs > (h.bestMelee.get(u.owner) ?? 0)) h.bestMelee.set(u.owner, cs);
-      const rs = madeRanged(u.type, Math.max(0, num(u.formation)));
-      if (rs > (h.bestRanged.get(u.owner) ?? 0)) h.bestRanged.set(u.owner, rs);
-    }
   } else {
     const seen = new Set(h.last.units.map((u) => `${u.owner}:${u.id}`));
     const builder = cat.units.indexOf('UNIT_BUILDER');
@@ -1403,16 +1391,11 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     const live = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
     const handed = h.last.units.filter((u) => !live.has(`${u.owner}:${u.id}`));
     const shape = { width: W, height: rec.head.H, wrapX: bool(rec.head.wrapX) };
-    const minors = new Set(rec.players.filter((p) => bool(p.minor)).map((p) => p.id));
     const levies = leviesAcross(h.last, rec);
     for (const u of rec.units) {
       if (seen.has(`${u.owner}:${u.id}`)) continue;
-      const from = handed.find((g) => g.owner !== u.owner && g.type === u.type && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
       const levy = levies.get(`${u.owner}:${u.id}`);
-      if (levy !== undefined) {
-        h.levied.set(`${u.owner}:${u.id}`, levy);
-        h.levyTurn.set(levy, h.last.turn);
-      }
+      if (levy !== undefined) h.levied.set(`${u.owner}:${u.id}`, levy);
       // a levied unit upgraded is a new unit of the type it upgrades into,
       // beside where it stood and as wounded: it stays levied (1118 China's
       // levied Catapult, a Trebuchet from t87, still costs no upkeep)
@@ -1420,34 +1403,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         && UNITS[engineRowOf(cat, 'unit', g.type) ?? '']?.upgradesTo === engineRowOf(cat, 'unit', u.type)
         && num(g.damage) === num(u.damage) && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
       if (was) h.levied.set(`${u.owner}:${u.id}`, h.levied.get(`${was.owner}:${was.id}`)!);
-      const cs = from || bool(u.embarked) ? 0 : made(u.type, Math.max(0, num(u.formation)));
-      if (cs > (h.bestMelee.get(u.owner) ?? 0)) h.bestMelee.set(u.owner, cs);
-      const rs = from || bool(u.embarked) ? 0 : madeRanged(u.type, Math.max(0, num(u.formation)));
-      if (rs > (h.bestRanged.get(u.owner) ?? 0)) h.bestRanged.set(u.owner, rs);
       if (u.type === builder) h.builders.set(u.owner, (h.builders.get(u.owner) ?? 0) + 1);
-    }
-    // a unit the log shows trained, bought or upgraded raises it too, gone
-    // by the record or not (1121 t43: Xi'an's Heavy Chariot, made and
-    // removed in China's processing, holds every centre at 28 - 10 until
-    // t77; 1118 t207: a Cuirassier made a Tank, merged into a Corps before
-    // the record, 85 - 10)
-    // An upgrade made at sea stands embarked and raises nothing (1122 t131:
-    // a Line Infantry made embarked).
-    const logged = (rec as TurnRecord & { actions?: unknown }).actions;
-    const afloat = new Set<unknown>();
-    for (const r of Array.isArray(logged) ? logged as unknown[][] : []) {
-      if (r[2] === 'UnitEmbarkedStateChanged') {
-        if (r[5] === true) afloat.add(r[4]);
-        else afloat.delete(r[4]);
-      }
-      const idx = r[2] === 'CityProductionCompleted' && r[5] === 0 ? r[6]
-        : r[2] === 'CityMadePurchase' && r[7] === PURCHASE_UNIT_HASH ? r[8]
-          : r[2] === 'UnitUpgraded' && !afloat.has(r[4]) ? r[5] : undefined;
-      if (typeof idx !== 'number' || minors.has(r[3] as number)) continue;
-      const cs = made(idx, 0);
-      if (cs > (h.bestMelee.get(r[3] as number) ?? 0)) h.bestMelee.set(r[3] as number, cs);
-      const rs = madeRanged(idx, 0);
-      if (rs > (h.bestRanged.get(r[3] as number) ?? 0)) h.bestRanged.set(r[3] as number, rs);
     }
     const now = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
     for (const u of h.last.units) {
@@ -1458,27 +1414,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       h.gpSpent.set(u.owner, spent);
     }
     const before = new Map(h.last.cities.map((c) => [c.y * W + c.x, c]));
-    // the plots the record's event log says were bought this turn; null
-    // where the record carries no log
     const rows = (rec as TurnRecord & { actions?: unknown }).actions;
-    const boughtPlots = Array.isArray(rows) ? new Set<number>() : null;
-    for (const r of Array.isArray(rows) ? rows : []) {
-      if (!Array.isArray(r) || r[2] !== 'CityMadePurchase' || r[7] !== PURCHASE_PLOT_HASH) continue;
-      boughtPlots!.add((r[6] as number) * W + (r[5] as number));
-    }
-    // the plots a city gained in its owner's actions, after its start (a
-    // culture claim lands in the start, before the player's
-    // PlayerTurnActivated: runs/h1_duelw1120 t161, Xi'an's stored 275 taken
-    // by a unit's move in the actions, its next plot -1)
-    const gainedInActions = new Set<string>();
-    const active = new Set<string>();
-    for (const r of Array.isArray(rows) ? rows : []) {
-      if (!Array.isArray(r)) continue;
-      if (r[2] === 'PlayerTurnActivated') active.add(`${r[1]}:${r[3]}`);
-      else if (r[2] === 'CityTileOwnershipChanged' && active.has(`${r[1]}:${r[3]}`)) {
-        gainedInActions.add(`${r[3]}:${r[4]}:${(r[6] as number) * W + (r[5] as number)}`);
-      }
-    }
     // A city's culture step draws its next plot when it holds none; a plot
     // gained after that step — bought (an AI buys in its start, after the
     // step: runs/h1_duelw1128 Shanghai t91, -1 at t92, 540 drawn at t93), or
@@ -1522,58 +1458,12 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       if (cleared) h.nextPlotUnheld.add(k);
       if (!b || b.owner !== c.owner) {
         if (cleared === null) h.nextPlotUnheld.add(k);
-        // a city changing hands starts its border count again, a plot it
-        // gained in the same turn counted (runs/h1_duelw1110, Rome taken at
-        // t142 with no plot gained: 107 Culture the turn before, 5 on
-        // capture, then 10 and 17; runs/h1_duelw1114, the Free City of Rome
-        // taken at t197 with one plot gained: 10, then 17 and 26)
-        if (b) h.cultureTaken.set(k, Math.max(0, c.plots.length - b.plots.length));
-        // a city new since a record before the turn's last took its founding
-        // ring there; a plot beyond it was taken since, in the turns no record
-        // read (runs/h1_duelw1119 Rome, founded t3: the t4 record read
-        // mid-turn and dropped, t5 holds 8 plots with the box fallen to 1.6
-        // and the price 10)
-        else if (h.last.turn < rec.turn - 1) {
-          const shape = { width: W, height: rec.head.H, wrapX: bool(rec.head.wrapX) };
-          h.cultureTaken.set(k, c.plots.filter((q) => hexDistance(shape, c.x, c.y, q % W, Math.floor(q / W)) > 1).length);
-        }
         continue;
       }
-      // the box fell on a plot gained or a next plot held: culture paid for
-      // it (a box that falls with no plot gained and none to claim moves no
-      // price: runs/h1_duelw1108, Xi'an's 307 from t207 while its box
-      // emptied every nine turns)
-      // A turn whose culture outran the price claims the next plot with the
-      // box standing higher than before (runs/h1_duelw1117 Handan t103: box
-      // 4.8 -> 6.4, plot 391 taken, the price 5 -> 10): the plot the record
-      // named next joined the city alone and the event log bought none of it.
-      // Several plots at once came another way (a culture bomb, a wonder's
-      // free tiles: Handan t145 took 434 and 438 with its price standing).
-      // a wonder the log completes in the city takes its free tiles
-      // (WONDER_FREE_TILES_UPON_COMPLETION) before the box can: a box that
-      // fell with no more than those gained bought nothing (1118 Beijing t224:
-      // two plots with its wonder, the price standing at 193; 1127 Jiaodong
-      // t208: its next plot taken with the Oracle, the box rising, the price
-      // standing at 149)
-      const free = wonderFreeTiles(rec, c.owner, c.id);
-      const gainedNow = c.plots.filter((q) => !b.plots.includes(q));
-      const claimedNext = boughtPlots !== null && free === 0 && num(b.nextPlot) >= 0
-        && gainedNow.length === 1 && gainedNow[0] === num(b.nextPlot)
-        && !boughtPlots.has(num(b.nextPlot)) && !gainedInActions.has(`${c.owner}:${c.id}:${num(b.nextPlot)}`);
-      // a plot taken alone while the box rose, but by less than the turn's
-      // culture at the largest border percent (+25%) less the city's price:
-      // the culture claimed it with no plot stored (runs/h1_duelw1105 Ostia,
-      // founded t81: 0 -> 0.30 on 5.30 a turn, its first plot gained and the
-      // price 5 -> 10; a box held still is no claim: 1109 Guangzhou t150)
-      const rise = num(c.culture) - num(b.culture);
-      const roseShort = gainedNow.length === 1 && free === 0 && !(boughtPlots?.has(gainedNow[0]) ?? false)
-        && !gainedInActions.has(`${c.owner}:${c.id}:${gainedNow[0]}`)
-        && rise > 0 && rise < num(b.cultureYield) * 1.25 - borderGrowthCost(h.cultureTaken.get(k) ?? 0) + 0.01;
-      const paid = claimedNext || roseShort || (num(c.culture) < num(b.culture) - 0.01
-        && (free > 0 ? gainedNow.length > free : c.plots.length > b.plots.length || num(b.nextPlot) >= 0));
-      if (paid) h.cultureTaken.set(k, (h.cultureTaken.get(k) ?? 0) + 1);
-      // with no log: a box pays for one plot; any more came another way
-      if (cleared === null && !Array.isArray(rows) && c.plots.length - b.plots.length > (paid ? 1 : 0)) h.nextPlotUnheld.add(k);
+      // with no log: the culture paid for the plots its count of plots taken
+      // with culture rose by (`cultureExpansions`); any more came another way
+      const paid = Math.max(0, (cultureExpansions(rec, c) ?? 0) - (cultureExpansions(h.last, b) ?? 0));
+      if (cleared === null && !Array.isArray(rows) && c.plots.length - b.plots.length > paid) h.nextPlotUnheld.add(k);
     }
     const fname = (i: number) => cat.features[plotAt(rec, i)[P.feature] as number] ?? '';
     const fwas = (i: number) => cat.features[plotAt(h.last!, i)[P.feature] as number] ?? '';
@@ -2247,11 +2137,24 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     importPlayer(ctx, p, s);
     if (bool(p.major)) importAges(ctx, s, p, history);
     ctx.scopeSeat = undefined;
-    // the barbarians train nothing: their best strengths stay none (the AI
-    // memory reader's PlayerStats +0xf0, runs/h1_duelt1121 player 63 t1-t60)
+    // the best strengths trained are the game's (PlayerStats
+    // m_iMaxMeleeStrengthTrained / m_iMaxRangedStrengthTrained at the
+    // record's hold; a record whose read of them failed, the last read's:
+    // runs/h1_duely1127 player 3 from t135, a `mem-unread` gap); the
+    // barbarians train nothing: theirs stay none (runs/h1_duelt1121 player
+    // 63 t1-t60)
     const barb = isBarbSeat(seat);
-    s.bestMeleeCS = barb ? 0 : Math.max(startMeleeCS(seat), history?.bestMelee.get(p.id) ?? 0);
-    s.bestRangedCS = barb ? 0 : history?.bestRanged.get(p.id) ?? 0;
+    const melee = memField(rec, p.id, 'PlayerStats', 'm_iMaxMeleeStrengthTrained');
+    const ranged = memField(rec, p.id, 'PlayerStats', 'm_iMaxRangedStrengthTrained');
+    const read = typeof melee === 'number' && typeof ranged === 'number';
+    const held = read ? [melee, ranged] : history?.trained.get(p.id);
+    if (!barb && rec.mem && !read) {
+      ctx.scopeSeat = seat;
+      gap(ctx, 'mem-unread', 'PlayerStats');
+      ctx.scopeSeat = undefined;
+    }
+    s.bestMeleeCS = barb ? 0 : Math.max(startMeleeCS(seat), held?.[0] ?? 0);
+    s.bestRangedCS = barb ? 0 : held?.[1] ?? 0;
     // the copies a price progression counts are the game's own, read off its
     // quote where one stands: a Builder taken back in the field moves no
     // price (runs/h1_duelw1105, China's t46 and t52 three-charge Builders
@@ -2468,7 +2371,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       population: c.pop,
       foodBox: num(c.food),
       cultureBox: num(c.culture),
-      tilesAcquired: history?.cultureTaken.get(center) ?? 0,
+      tilesAcquired: cultureExpansions(rec, c) ?? 0,
       ...(history?.growthDrift.get(`${c.owner}:${c.id}`) ? { growthDrift: history.growthDrift.get(`${c.owner}:${c.id}`) } : {}),
       nextPlot: num(c.nextPlot),
       focus: 'balanced',
@@ -2649,12 +2552,14 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
     state.units.push(unit);
     // the levy in force: the major holding the minor's army, and its term
-    // from the levy's turn (`levyUnits`)
+    // from the levy's turn (`levyUnits`): the minor's PlayerInfluence
+    // m_iLevyTurnCounter, the turns since the levy (1 the record after it;
+    // -1 none)
     const levied = levy === undefined ? undefined : state.cityStates.find((c) => c.seat === seatOfGame(levy));
-    const levyTurn = levy === undefined ? undefined : history?.levyTurn.get(levy);
-    if (levied && levyTurn !== undefined) {
+    const since = levy === undefined ? undefined : memField(rec, levy, 'PlayerInfluence', 'm_iLevyTurnCounter');
+    if (levied && typeof since === 'number' && since > 0) {
       levied.levySeat = seat;
-      levied.levyEnds = levyTurn + LEVY_TURNS - 1;
+      levied.levyEnds = rec.turn - since + LEVY_TURNS - 1;
     }
   }
   state.nextUnitId = nextId;
@@ -2773,7 +2678,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
     congressGaps, congressOf, luxCardsOf: (seat: number) => luxCards.get(seat), queueProgressRead, readBack, lowlandsRead, projectYieldUnread, routes,
     districtLocked: history?.districtLocked ?? new Map(), stockOverCap,
-    tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
+    tilesUnknown: new Set(rec.cities.filter((c) => cultureExpansions(rec, c) === undefined).map((c) => c.y * W + c.x)
+      .filter((k) => !history || history.unknownSince.has(k))),
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
     cityBefore: prevCities,
     recordBefore: b1,
@@ -2876,16 +2782,6 @@ function importPower(ctx: Ctx, rec: TurnRecord, state: GameState, seatOfGame: (p
     banks.set(rec.turn, [...s.stockpile]);
   }
   return overCap;
-}
-
-/** the plots the wonders a record's log completes in a city grant it
- *  (WONDER_FREE_TILES_UPON_COMPLETION each); 0 where the record carries no log */
-function wonderFreeTiles(rec: TurnRecord, pid: number, cityId: number): number {
-  const rows = (rec as TurnRecord & { actions?: unknown }).actions;
-  if (!Array.isArray(rows)) return 0;
-  let n = 0;
-  for (const r of rows as unknown[][]) if (r[2] === 'WonderCompleted' && r[6] === pid && r[7] === cityId) n += WONDER_FREE_TILES;
-  return n;
 }
 
 /** whether the record's action log names player `pid`'s placement of the

@@ -214,25 +214,16 @@ describe('importTurn', () => {
 });
 
 describe('the history', () => {
-  it('carries the best melee trained and the culture expansions', () => {
+  it('reads the best strengths trained and the plots taken with culture off the record\'s mem', () => {
     const h = newHistory();
-    // the box falls on the next plot the city held: the culture paid for it
-    const a = record(1, { cities: [city({ nextPlot: 9 }), record(1).cities[1]] });
     const b = record(2, {
-      units: [...record(1).units, unit(0, 9, 1, 2, 2)],
-      cities: [city({ culture: 1 }), record(1).cities[1]],
+      mem: { 0: { PlayerStats: { m_iMaxMeleeStrengthTrained: 35, m_iMaxRangedStrengthTrained: 25 }, cities: [{ m_kCulture: { n: 34, 4: 1 } }] } },
     });
-    advanceHistory(h, a, CAT);
+    advanceHistory(h, record(1), CAT);
     advanceHistory(h, b, CAT);
-    expect(h.bestMelee.get(0)).toBe(35);
-    expect(h.cultureTaken.get(8)).toBe(1);
-    // a box that falls with no next plot held pays for none
-    const h2 = newHistory();
-    advanceHistory(h2, record(1), CAT);
-    advanceHistory(h2, b, CAT);
-    expect(h2.cultureTaken.get(8)).toBeUndefined();
     const imp = importTurn(b, CAT, h);
     expect(imp.state.seats[0].bestMeleeCS).toBe(35);
+    expect(imp.state.seats[0].bestRangedCS).toBe(25);
     expect(imp.state.seats[0].cities[0].tilesAcquired).toBe(1);
     expect(imp.tilesUnknown.size).toBe(0);
   });
@@ -241,13 +232,6 @@ describe('the history', () => {
     const h = newHistory();
     advanceHistory(h, record(40), CAT);
     expect(importTurn(record(40), CAT, h).tilesUnknown.has(8)).toBe(true);
-  });
-
-  it('raises the best melee on no unit first seen embarked', () => {
-    const h = newHistory();
-    advanceHistory(h, record(1, { units: [] }), CAT);
-    advanceHistory(h, record(2,{ units: [{ ...unit(0, 9, 1, 2, 2), embarked: true }] }), CAT);
-    expect(h.bestMelee.get(0) ?? 0).toBe(0);
   });
 });
 

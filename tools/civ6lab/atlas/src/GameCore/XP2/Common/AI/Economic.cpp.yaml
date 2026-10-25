@@ -185,6 +185,7 @@
   impl: [cpu/core/aiEconomic.ts:purchaseContracts]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...e holder +0xa8 and \"%d, %d, PURCHASE, , , %s, %s, CONTRACT %d\"; a building's (+0x468) 0x68afe0 (MustPurchase +0x159 & 0x10 refused, CanConstruct 0x1714d0, a value test against the ci..."
   review: imported

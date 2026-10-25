@@ -70,7 +70,11 @@
     - recording: h1_duelu1128
       turn: 240
       value: "Bologna at 0 Gold: its eight Scouts (Skirmisher, no resource) deleted as Steel lands; its Infantry (Mechanized Infantry, Oil) kept"
-  impl: [cpu/core/minorOps.ts:upgradeTreesTick, cpu/core/minorOps.ts:upgradeMayGo, cpu/core/minorOps.ts:unupgradedDeleted, gpu/core/sim_minorops.py:_mops_upgrade_trees]
+  impl:
+    - cpu/core/minorOps.ts:upgradeTreesTick
+    - cpu/core/minorOps.ts:upgradeMayGo
+    - cpu/core/minorOps.ts:unupgradedDeleted
+    - gpu/core/sim_minorops.py:_mops_upgrade_trees
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
