@@ -58,9 +58,13 @@ export function newScores(): DecisionScores {
 
 /** a decision scored; `clean` whether its player's memory was clean as the
  *  turn opened (undefined for a player whose memory is not compared) */
+const ROWS = new Set((process.env.AISCORE_ROWS ?? '').split(',').filter(Boolean));
+
 export function scoreDecision(s: DecisionScores, kind: string, turn: number, subject: string, equal: boolean,
   ours: unknown, game: unknown, clean?: boolean): void {
   const k = (s[kind] ??= { compared: 0, equal: 0 });
+  // AISCORE_ROWS=<kind>,<kind>: every row of those kinds, one line each
+  if (ROWS.has(kind)) console.error(`SCORE ${kind} t${turn} ${subject} ${equal ? '=' : 'X'} ${cut(ours)} / ${cut(game)}`);
   const take = (x: { compared: number; equal: number; first?: KindScore['first'] }) => {
     x.compared += 1;
     if (equal) x.equal += 1;

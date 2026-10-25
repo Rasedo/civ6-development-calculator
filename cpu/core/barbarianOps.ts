@@ -74,16 +74,21 @@ const campsKnown = (state: GameState): number[] => state.barbSeat.campsKnown ?? 
 
 const unitOf = (state: GameState, id: number): Unit | undefined => state.units.find((u) => u.id === id && isBarbSeat(u.seat));
 
+/** BARBARIAN SPAWN CHANGE's execution (0x7c6e50) on tribe `k`: its spawn
+ *  interval the force's SpawnRate (`rate`, the force of a raiding party or
+ *  not, by the target owner's handicap), else back to its own */
+export function barbSpawnChange(state: GameState, k: number, rate: boolean, raiding: boolean): void {
+  const tr = tribeAt(state, k);
+  if (!tr) return;
+  const force = rate && tr.op ? barbForce(tr.kind, raiding, handicapOf(state, tr.op.target.seat)) : undefined;
+  if (force) tr.every = force.rate;
+  else if (!rate) delete tr.every;
+}
+
 /** what the barbarians' nodes ask of a tribe */
 function hooksOf(state: GameState): BarbarianHooks {
   return {
-    spawnChange(k, rate, raiding) {
-      const tr = tribeAt(state, k);
-      if (!tr) return;
-      const force = rate && tr.op ? barbForce(tr.kind, raiding, handicapOf(state, tr.op.target.seat)) : undefined;
-      if (force) tr.every = force.rate;
-      else if (!rate) delete tr.every;
-    },
+    spawnChange: (k, rate, raiding) => barbSpawnChange(state, k, rate, raiding),
     // the force (0x7c7580: the BarbarianAttackForces row by the target
     // owner's handicap, each class the barbarians cannot raise dropped,
     // 0x144610) from the tribe's units of each class, those raised this turn

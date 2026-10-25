@@ -309,6 +309,30 @@ export function importOps(ai: OpsAi, read: GameMemoryRead, w: ImportWorld, turn:
   return { ids, ops: taken.length };
 }
 
+/** a Barbarian Spawn Change a game operation's tree executed in the turn
+ *  `read` ends (its node SUCCESS on the end look): our operation's id, the
+ *  force's rate named or not, a raiding party's or not */
+export interface GameSpawnChange { op: number; rate: boolean; raiding: boolean }
+
+/** the spawn changes the barbarians' operations `ids` holds (`importOps`)
+ *  executed in the game's turn: the tribe's interval is the tribe's, which
+ *  no memory read holds, and the imported tree resumes past the node
+ *  (runs/h1_duely1128 t78: the raid on 15:10 started, its node 3 SUCCESS at
+ *  Spawn Rate 2, the tribe on 762 raising at t80, t81, t82) */
+export function gameSpawnChanges(read: GameMemoryRead, ids: ReadonlyMap<number, number>): GameSpawnChange[] {
+  const out: GameSpawnChange[] = [];
+  for (const g of read.ops ?? []) {
+    const tree = read.trees?.[String(g.treeControlId)];
+    const rows = AI_TREES[AI_OP_DEFS[g.name ?? '']?.tree ?? ''];
+    if (!ids.has(g.treeControlId) || !tree?.nodes || !rows || tree.nodes.length !== rows.length) continue;
+    rows.forEach((row, k) => {
+      if (row.type !== 'Barbarian Spawn Change' || tree.nodes![k][0] !== BT_SUCCESS) return;
+      out.push({ op: ids.get(g.treeControlId)!, rate: row.data['Spawn Rate']?.value !== undefined, raiding: /^(1|true)$/i.test(String(row.data['Raiding Party']?.value ?? '')) });
+    });
+  }
+  return out;
+}
+
 function contractOf(w: ImportWorld, c: GameContract, trees: Record<string, GameTree>): AiContract {
   const n = w.names;
   const item = (i: number | undefined, list: readonly string[]) => ((i ?? -1) >= 0 ? list[i!] ?? null : null);

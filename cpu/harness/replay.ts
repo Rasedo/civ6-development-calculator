@@ -94,7 +94,7 @@ import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './rec
 import { num, bool } from './record';
 import { holdMinorClears, minorAiTurn, minorGreatPersonClass, minorMilitaryTurn, minorSecondHook, traceMinorAi } from '../core/minorCityAi';
 import { UPGRADE_MOVE, cityStateMilitary, holdSecondHook, traceMinorOps, unupgradedDeleted, upgradeMayGo } from '../core/minorOps';
-import { traceBarbOps } from '../core/barbarianOps';
+import { barbSpawnChange, traceBarbOps } from '../core/barbarianOps';
 import { opsOf } from '../core/operations/manager';
 import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
@@ -115,7 +115,7 @@ import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
 import { GameMemory, MemoryLogs, readGameMemory, readMemory, syncContracts, type ArmyLogged } from './aiMemory';
-import { importCityAi, importOps } from './gameAiImport';
+import { gameSpawnChanges, importCityAi, importOps, type GameSpawnChange } from './gameAiImport';
 import { NO_SCORE } from '../core/aiPolicyValue';
 
 /** what became of one decision */
@@ -4208,11 +4208,13 @@ function bindQueuedContracts(ctx: Ctx, cs: CityState, imp: Imported, turn: numbe
  * the pair's world: per minor, Free Cities and barbarian seat its army
  * records — each the unit the record holds under that game id (its engine
  * id), else a fresh id; its owner's seat, its engine type, its plot, seen
- * at `turn` less its age (the records aged at `turn`), no damage (the game's
- * record holds none the reader names) —, its camps in the game's order and
+ * at `turn` less its age (the records aged at `turn`), its damage the
+ * record's second int (+0x4: runs/h1_duely1127 t2, the barbarian Scout 46 and
+ * city-state 4's Warrior 26 as record t3 holds them) —, its camps in the game's order and
  * its contracts' progress, value and times (`syncContracts`).
  */
-function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: number): void {
+function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: number): GameSpawnChange[] {
+  const spawns: GameSpawnChange[] = [];
   let fresh = -1;
   for (const s of [...world.cityStates, ...(world.freeSeat ? [world.freeSeat] : []), world.barbSeat]) {
     const pid = imp.playerOfSeat.get(s.seat);
@@ -4227,7 +4229,7 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
         if (!type) continue;
         for (const r of rows) {
           const u = ctx.units.get(`${owner}:${r[0]}`);
-          recs.push({ id: u ? u.id : fresh--, owner: seat, type, seen: turn - r[3], plot: r[5] * ctx.W + r[4], damage: 0 });
+          recs.push({ id: u ? u.id : fresh--, owner: seat, type, seen: turn - r[3], plot: r[5] * ctx.W + r[4], damage: r[1] });
         }
       }
     }
@@ -4248,7 +4250,9 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
     const ops = nodes && s.ops ? importOps(s.ops, read, w, turn, cityState).ids : new Map<number, number>();
     if (cityState && nodes) importCityAi(s as CityState, read, w, ops);
     else syncContracts(ctx.gameMemory!, ctx.cat, s, pid!, turn, ctx.W);
+    if (s === world.barbSeat) spawns.push(...gameSpawnChanges(read, ops));
   }
+  return spawns;
 }
 
 function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, fromLog: boolean, fromAimem: boolean): void {
@@ -4319,8 +4323,14 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   // the game's own memory instead (`--memory aimem`): each minor's and the
   // barbarians' knowledge base — the army records and the camps — as its
   // end look of the turn before left them (`<stem>.aimem.jsonl`)
-  if (fromAimem && ctx.gameMemory) importGameKnowledge(ctx, world, imp, a.turn - 1);
+  const spawns = fromAimem && ctx.gameMemory ? importGameKnowledge(ctx, world, imp, a.turn - 1) : [];
   carryFields(state, world, [...GAME_MEMORY, ...GAME_STORES]);
+  // ...and the spawn changes its raids' trees executed, on the tribe each
+  // raid runs for (`gameSpawnChanges`)
+  for (const sp of spawns) {
+    const k = (world.barbTribes ?? []).findIndex((tr) => tr.op?.id === sp.op);
+    if (k >= 0) barbSpawnChange(world, k, sp.rate, sp.raiding);
+  }
   for (const key of Object.keys(state)) if (!(key in world)) delete (state as unknown as Record<string, unknown>)[key];
   Object.assign(state, world);
   importedWorld(state, imp, a, history);
