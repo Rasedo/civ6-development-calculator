@@ -294,6 +294,32 @@ class SimMinors:
         self.citystate_kb_seq[rows, r, k] = nxt.to(self.citystate_kb_seq.dtype)
         self.citystate_kb_next[rows, r] = nxt + 1
 
+    def _kb_own_loss(self, s: int, rows: torch.Tensor, g: torch.Tensor) -> None:
+        """`recordOwnLoss` — minor `s`'s units `g` [N] (global slots) lost at
+        its turn's start in the games `rows` [N] stand in its knowledge base
+        as seen this turn, on their plots: the record of each refreshed, else
+        one added"""
+        if not rows.numel():
+            return
+        slot = self.citystate_kb_slot[:, s]
+        own = self.citystate_kb_owner[:, s]
+        typ = self.citystate_kb_type[:, s]
+        turn = int(self.turn)
+        hp_max = int(self.rules.combat["unitHp"])
+        for bi, gi in zip(rows.tolist(), g.tolist()):
+            hit = ((slot[bi] == gi) & (own[bi] == 100 + s) & (typ[bi] == int(self.unit_type[bi, gi]))).nonzero(as_tuple=True)[0]
+            if hit.numel():
+                k = int(hit[0])
+                self.citystate_kb_seen[bi, s, k] = turn
+                self.citystate_kb_plot[bi, s, k] = int(self.unit_tile[bi, gi])
+                self.citystate_kb_damage[bi, s, k] = hp_max - int(self.unit_hp[bi, gi])
+                continue
+            b1 = torch.tensor([bi], device=self.device)
+            self._kb_birth(s, 100 + s, b1, torch.tensor([gi], device=self.device))
+            k = int(((slot[bi] == gi) & (own[bi] == 100 + s)).nonzero(as_tuple=True)[0][-1])
+            self.citystate_kb_seen[bi, s, k] = turn
+            self.citystate_kb_damage[bi, s, k] = hp_max - int(self.unit_hp[bi, gi])
+
     def _kb_unit_anew(self, rows: torch.Tensor, g: torch.Tensor) -> None:
         """`unitMadeAnew` — global units `g` [N] of the games `rows` [N]
         made anew under another owner (a levy, its return home): every

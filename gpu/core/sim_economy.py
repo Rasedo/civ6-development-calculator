@@ -5473,19 +5473,25 @@ class SimEconomy:
             out = torch.where((cls == ar_c).unsqueeze(-1), aw, out)
         return out
 
-    def _gw_activation_room_at(self, row: int, cls: torch.Tensor, at: torch.Tensor, tc: torch.Tensor) -> torch.Tensor:
+    def _gw_next_obj(self, cls: torch.Tensor, at: torch.Tensor, left: torch.Tensor) -> torch.Tensor:
+        """[...] long — `gpNextWork`: the object of the work a person's next
+        charge makes, its works in creation order one a charge (`left` the
+        charges it holds), -1 none."""
+        objs = self._gw_person_objs(cls, at)                                 # [..., 3]
+        n = (objs >= 0).long().sum(dim=-1)
+        k = (n - left.long()).clamp(min=0, max=2)
+        return torch.where(n > 0, objs.gather(-1, k.unsqueeze(-1)).squeeze(-1), torch.full_like(n, -1))
+
+    def _gw_activation_room_at(self, row: int, cls: torch.Tensor, at: torch.Tensor, tc: torch.Tensor,
+                               left: torch.Tensor) -> torch.Tensor:
         """[B, N] bool — `gwOpen`: the city on each rank's tile has an open
-        slot taking at least one of the person's works."""
+        slot taking the person's next work (`left` its charges)."""
         B = self.B
         col = self.city_slot_at(row).gather(1, tc)                           # [B, N]
         rb = self._gw_room_by_obj(row).reshape(B, self.RC * 8)               # [B, RC*8]
-        objs = self._gw_person_objs(cls, at)                                 # [B, N, 3]
-        out = torch.zeros_like(col, dtype=torch.bool)
-        for k in range(3):
-            o = objs[:, :, k]
-            idx = col.clamp(min=0) * 8 + o.clamp(min=0)
-            out = out | (rb.gather(1, idx) & (col >= 0) & (o >= 0))
-        return out
+        o = self._gw_next_obj(cls, at, left)                                 # [B, N]
+        idx = col.clamp(min=0) * 8 + o.clamp(min=0)
+        return rb.gather(1, idx) & (col >= 0) & (o >= 0)
 
     def _gw_room_kind(self, row: int, kind: int) -> torch.Tensor:
         """[B, RC] bool — an open slot taking ANY object of the kind: what a
@@ -5497,21 +5503,18 @@ class SimEconomy:
         return out
 
     def _gw_place_person(self, row: int, m: torch.Tensor, col: torch.Tensor, cls: torch.Tensor,
-                         at: torch.Tensor, culture_val: torch.Tensor) -> None:
-        """`activateGreatPerson`'s works: each of the person's works seeks its
-        own slot in the city at `col`; every work with none is one instant
-        culture lump."""
+                         at: torch.Tensor, culture_val: torch.Tensor, left: torch.Tensor) -> None:
+        """`activateGreatPerson`'s work: the charge's work (`_gw_next_obj`,
+        `left` the charges held) seeks its slot in the city at `col`; with
+        none it is one instant culture lump."""
         if not bool(m.count_nonzero()):
             return
-        objs = self._gw_person_objs(cls, at)                                 # [B, 3]
+        o = self._gw_next_obj(cls, at, left)                                 # [B]
         seat = torch.full((self.B,), int(self._ROW_SEAT[row]), dtype=torch.long, device=self.device)
         era = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
-        overflow = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        for k in range(3):
-            o = objs[:, k]
-            go = m & (o >= 0) & (col >= 0)
-            placed = self._gw_place(row, go, col, o, at.clamp(min=0), era, seat)
-            overflow = overflow + (go & ~placed).long()
+        go = m & (o >= 0) & (col >= 0)
+        placed = self._gw_place(row, go, col, o, at.clamp(min=0), era, seat)
+        overflow = (go & ~placed).long()
         # a person with no city at all pays the ONE lump `activateGreatPerson`'s
         # else-arm pays
         overflow = overflow + (m & (col < 0)).long()

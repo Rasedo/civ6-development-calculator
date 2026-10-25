@@ -253,7 +253,7 @@ class SimGp:
         # 2 a city of this seat with an open slot taking one of the person's
         # works — a class's own, or the one work another person carries (Sun
         # Tzu's Work of Writing)
-        a_gw = own & self._gw_activation_room_at(row, cls, at, tc)
+        a_gw = own & self._gw_activation_room_at(row, cls, at, tc, self.unit_charges.gather(1, sc))
         _gwk = self._gp_fx(cls, at, "greatWorkKind").long()
         if bool(((_gwk >= 0) & ok & (site == 2)).count_nonzero()):
             _col = self.city_slot_at(row).gather(1, tc)
@@ -388,7 +388,8 @@ class SimGp:
         for k_cls in self._gw_cls:
             if k_cls >= 0:
                 wrote = wrote | (m & (cls == k_cls))
-        self._gw_place_person(row, wrote, ccol, cls, at, self._gp_fx(cls, at, "culture").double())
+        self._gw_place_person(row, wrote, ccol, cls, at, self._gp_fx(cls, at, "culture").double(),
+                              self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1))
         self.civ_civic_prog[:, row] = self.civ_civic_prog[:, row] + col("culture") * (~wrote).to(dt)
         self.civ_faith[:, row] = self.civ_faith[:, row] + col("faith")
         self.civ_treasury[:, row] = self.civ_treasury[:, row] + col("gold")

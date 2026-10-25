@@ -4574,6 +4574,43 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   4,391 of 6,173 (57.8% -> 71.1%), the decisions within a few rows. Left
   (rows of a single class): another player's unit only the engines hold
   (252), on another plot (238), at another age (145).
+- A UNIT A CITY-STATE LOSES AT ITS TURN'S START (the records, no DLL
+  reading): of the units the five duely duels' city-states lose before their
+  turn opens with no unit added after, the 53 the log removes after the
+  turn's civic change all stand on that turn's ARMY line at age 0 on their
+  plot (runs/h1_duely1117 t179: city-state 4's Bombard 1638405 on 31:6; 1117
+  t104, t240, 1124 t118, t130, 1127 t51, t122, 1128 t98, t117), the 19 it
+  removes right after the research change, before the civic one, at age 1
+  (the levies, 1121 t42; 1117 t184 city-state 4's Bombard 1835012; 1121 t165
+  city-state 4's Skirmisher 2293760, beside the Skirmisher 1638401 the same
+  turn removes after the civic change at age 0). The bankruptcy's victims are
+  the first kind: the engines record each in its own knowledge base as seen
+  that turn (`recordOwnLoss` / `_kb_own_loss`). What removes the second kind
+  is unread.
+- THE ROSTER ORDER (the records): the game walks a player's units in the
+  order they were made, the serial in an id's high half; the record lists
+  them by pool slot (runs/h1_duely1117 t179: city-state 4's bankruptcy takes
+  the Bombard 1638405, serial 25 on slot 5, before 1835012, serial 28 on slot
+  4). The replay's per-turn world takes the record's units in that order.
+- ONE GREAT WORK A CHARGE (the install, the records): a Writer, Artist or
+  Musician carries ActionCharges 0 (GreatPersonIndividuals) and spends one
+  activation on each of its works, in creation order, standing until the
+  last (runs/h1_duely1117: China's Donatello 5636117 activated at t179, t180
+  and t181, a GreatWorkCreated each time, removed at the third). The
+  engines: `gpChargesOf` (its row's, else one a work), `gpNextWork` (the
+  charge's work, `gwOpen` its slot); the GPU's `_gw_next_obj` in
+  `_gw_activation_room_at` and `_gw_place_person`. The replay names a record
+  person's charges less the works of its standing in the world.
+- THE CITY-STATES' TACTICAL LOOK'S SIGHT (a lab, .claude/scratchpad of kb1:
+  `cityStateSight` on record t's world, the earlier players' units where
+  record t+1 holds them, against each ARMY line's age-0 records): 1117 2,264
+  agree, 47 seen by the game alone, 55 by ours alone; 1128 1,319 / 25 / 33.
+  Of the game's alone 61 lie within two of a unit of the minor's (a unit on
+  another plot in the lab's world, not the rule); 1128 t47 Hong Kong's
+  record of city-state 3's Warrior 327683 on 7:5, three plots from its every
+  unit and its centre, no plot of its beside it, its moves all tactical
+  (AI_Tactical.csv), is unexplained. A radius of three about the centre
+  takes 1 more and adds 66 (1128) and 582 (1117) the game holds unseen.
 - A UNIT MADE ANEW (the replay's records, no DLL reading): a levy and its
   return remove each unit and add one of a new id under the other owner, so
   every knowledge base keeps its records of the old unit as a gone unit's,
@@ -4593,7 +4630,7 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   t8) and every other player's unit, and each of theirs their camps raised,
   where the log's last step before their turn opens put it (h1_duely1121
   t85: China's Great Scientist on 6:17, teleported to 6:12 after their
-  turn; h1_duely1124 t17: their Scout added on 42:7); a unit the game holds
+  turn; h1_duely1124 t17: their Scout added on 42:7), one with no step before it where the first record holds it (h1_duely1121 t102: China's Great Scientist on 5:12, teleported to 6:12 in their turn); a unit the game holds
   as their turn opens that the replay's battles killed or its record took
   off stands for it with the log's damage (h1_duely1128 t33: their Warrior
   on 32:8 struck to 98 by city-state 4's Horseman, falling in their turn;

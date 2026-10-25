@@ -1296,8 +1296,18 @@ export function gpNoMilitaryOf(person: GreatPersonDef): boolean {
   return !!a && !a.unmodelled && (a.unit !== undefined || a.unitBestClass !== undefined);
 }
 
+/** A person's charges: its row's, else one for each work a Writer, Artist
+ *  or Musician makes — the game spends one activation on each work
+ *  (GreatPersonIndividuals.ActionCharges 0 for the art classes;
+ *  runs/h1_duely1117 China's Donatello 5636117 activated at t179, t180 and
+ *  t181, a Great Work created each time, removed at the third) — else one */
 export function gpChargesOf(person: GreatPersonDef): number {
-  return GP_ABILITY[person.id]?.charges ?? 1;
+  const a = GP_ABILITY[person.id];
+  if (a?.charges !== undefined) return a.charges;
+  if (GW_WORK_CLASSES.has(person.class) && gpEffectOf(person).greatWorkKind === undefined) {
+    return personWorkObjects(person.class, GREAT_PEOPLE[person.class].indexOf(person)).length;
+  }
+  return 1;
 }
 
 /** What ONE charge pays out. A person with no sourced row — the four classes

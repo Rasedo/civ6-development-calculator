@@ -1929,6 +1929,9 @@ class SimOrders:
             rows = do_kill.nonzero(as_tuple=True)[0]
             vslot = victim[rows]
             vtile = self.unit_tile[rows, vslot]
+            # a city-state's own knowledge base records its loss (`recordOwnLoss`)
+            if self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S:
+                self._kb_own_loss(row - self._CITY_MINOR0, rows, vslot)
             self._occ_clear(rows, vtile, vslot)
             self.unit_alive[rows, vslot] = False
             left = left - do_kill.long()

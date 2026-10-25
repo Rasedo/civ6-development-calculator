@@ -112,7 +112,7 @@ import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId, gameHash, gameTypeOf } from '../data/aliases';
 import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsScore';
-import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
+import { GREAT_PEOPLE, gpChargesOf, personWorkObjects } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
 import { GameMemory, MemoryLogs, readGameMemory, readMemory, syncContracts, type ArmyLogged } from './aiMemory';
@@ -864,9 +864,14 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     if (x[2] === 'UnitRemovedFromMap') lived.delete(key);
   }
   const keyOf = new Map([...ctx.units].map(([k, u]) => [u, k] as const));
+  // (a unit with no step before it where the first record holds it:
+  // runs/h1_duely1121 t102, China's Great Scientist on 5:12, teleported to
+  // 6:12 in their turn)
+  const start = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
   for (const c of copy.units) {
     const u = twin.get(c);
-    const at = u && (!isBarbSeat(u.seat) || !before.has(u)) ? last.get(keyOf.get(u) ?? '') : undefined;
+    const key = u ? keyOf.get(u) ?? '' : '';
+    const at = u && (!isBarbSeat(u.seat) || !before.has(u)) && open !== undefined ? last.get(key) ?? start.get(key) : undefined;
     if (at !== undefined) c.tileIndex = at;
   }
   // the plots stand as the barbarians' turn opens: their pillages of the
@@ -2747,7 +2752,13 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           const at = id && cls !== undefined ? GREAT_PEOPLE[cls].findIndex((p) => p.id === id) : -1;
           if (at >= 0 && cls !== undefined) {
             u.gpAt = at;
-            u.charges = gpChargesOf(GREAT_PEOPLE[cls][at]);
+            // ...its charges less the works the person already made, the
+            // world's (runs/h1_duely1117: Donatello 5636117's second
+            // activation at t180, one Sculpture standing)
+            const objs = personWorkObjects(cls, at);
+            const made = [...state.seats.flatMap((s) => s.cities), ...state.cityStates.map(minorCity)]
+              .flatMap((c) => c.greatWorks ?? []).filter((w) => w.maker === at && objs.includes(w.obj)).length;
+            u.charges = Math.max(1, gpChargesOf(GREAT_PEOPLE[cls][at]) - made);
           }
         }
         if (!activateGreatPerson(state, u)) {
@@ -4489,10 +4500,17 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   const was = new Map(ctx.units);
   ctx.units = new Map();
   const kept = new Set<Unit>();
+  // the game's roster runs in the order its units were made, the serial in
+  // an id's high half, where the record lists them by pool slot: every walk
+  // of a player's units reads it (runs/h1_duely1117 t179: city-state 4's
+  // bankruptcy disbands its older Bombard 1638405, serial 25, before
+  // 1835012, serial 28 on the lower slot)
+  const serial = new Map<Unit, number>();
   let k = 0;
   for (const r of a.units) {
     if (!imp.seatOfPlayer.has(r.owner) || !engineRowOf(ctx.cat, 'unit', r.type)) continue;
     const u = world.units[k++];
+    serial.set(u, Math.floor(r.id / 65536));
     const key = `${r.owner}:${r.id}`;
     const old = was.get(key);
     // the record's unit keeps its id where the engine's battle killed it and
@@ -4506,6 +4524,7 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
     }
     ctx.units.set(key, u);
   }
+  world.units.sort((x, y) => (serial.get(x) ?? 0) - (serial.get(y) ?? 0));
   let nextId = state.nextUnitId;
   for (const u of world.units) if (!kept.has(u)) u.id = nextId++;
   world.nextUnitId = nextId;

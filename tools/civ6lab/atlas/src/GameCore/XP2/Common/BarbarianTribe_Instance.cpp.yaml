@@ -248,6 +248,7 @@
     - cpu/core/barbarians.ts:barbBattleBoldness
     - cpu/data/barbarians.ts:BARB_BOLD_TURN
     - gpu/core/sim_barb.py:_barb_battle_boldness
+    - cpu/core/barbarians.ts:barbUnitLost
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"

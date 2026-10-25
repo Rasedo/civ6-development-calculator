@@ -59,16 +59,20 @@ function gpCityAt(state: GameState, seat: number, tile: Tile): City | undefined 
   return citiesOf(state, seat).find((c) => c.isCapital);
 }
 
-/** the object types of the works one person makes: the class's own, or the
- *  single work a person of another class carries (Sun Tzu's). */
-function gpWorkObjects(person: GreatPersonDef, at: number): number[] {
+/** the object type of the work a person's next charge makes: the single
+ *  work a person of another class carries (Sun Tzu's), else the class's
+ *  works in creation order, one a charge (`gpChargesOf`) */
+function gpNextWork(person: GreatPersonDef, unit: Unit): number | undefined {
   const kind = gpEffectOf(person).greatWorkKind;
-  return kind !== undefined ? [gwKindObjects(kind)[0]!] : personWorkObjects(person.class, at);
+  if (kind !== undefined) return gwKindObjects(kind)[0]!;
+  const works = personWorkObjects(person.class, unit.gpAt ?? 0);
+  return works[Math.max(0, works.length - (unit.charges ?? 1))];
 }
 
-/** an open slot in this city that takes at least one of the person's works */
-function gwOpen(state: GameState, city: City, person: GreatPersonDef, at: number): boolean {
-  return gpWorkObjects(person, at).some((obj) => gwHasRoom(state, city, obj));
+/** an open slot in this city that takes the person's next work */
+function gwOpen(state: GameState, city: City, person: GreatPersonDef, unit: Unit): boolean {
+  const obj = gpNextWork(person, unit);
+  return obj !== undefined && gwHasRoom(state, city, obj);
 }
 
 /** MAY this person's charge be spent on the tile the unit is standing on? */
@@ -87,7 +91,7 @@ export function gpActivateOk(state: GameState, unit: Unit): boolean {
   if (person.class === 'PROPHET' && tileOwnedByCiv(tile, unit.seat) && tile.builtWonder && tile.builtWonderComplete
     && BUILT_WONDERS[tile.builtWonder]?.effects?.religionSite) return true;
   return gpSiteHolds(state, unit.seat, site, district, tile,
-    (city) => gwOpen(state, city, person, unit.gpAt ?? 0), building);
+    (city) => gwOpen(state, city, person, unit), building);
 }
 
 /** the wonder a city of `seat` is raising on `tile`, and that city — the
@@ -280,12 +284,10 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   // CIV6 (Marina Raskova): "District in this tile gains +1 air unit slots."
   if (fx.airSlotBonus) tile.airSlotBonus = (tile.airSlotBonus ?? 0) + fx.airSlotBonus;
   if (GW_WORK_CLASSES.has(person.class) && city) {
-    // each work seeks its own slot in THIS city; one with none is the lump
-    let overflow = 0;
-    for (const obj of personWorkObjects(person.class, unit.gpAt ?? 0)) {
-      if (placeGreatWork(state, city, { obj, maker: unit.gpAt ?? 0, era: -1, seat: unit.seat }) < 0) overflow += 1;
-    }
-    if (fx.culture) owner.research.civicProgress += fx.culture * overflow;
+    // the charge's work seeks its slot in THIS city; none is the lump
+    const obj = gpNextWork(person, unit);
+    const placed = obj !== undefined && placeGreatWork(state, city, { obj, maker: unit.gpAt ?? 0, era: -1, seat: unit.seat }) >= 0;
+    if (fx.culture && !placed) owner.research.civicProgress += fx.culture;
   } else if (fx.culture) {
     owner.research.civicProgress += fx.culture;
   }

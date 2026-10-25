@@ -65,7 +65,7 @@ import { logDistrictCost } from './difflog';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, adjacentPlotRowOk, adjacentPlotTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons } from './units';
+import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, recordOwnLoss, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons } from './units';
 import { killUnit } from './combat';
 import { adoptBeliefs, itemCost, unitProdCost, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -948,6 +948,7 @@ export function bankruptcy(state: GameState, s: Seat, upkeepOf: (unit: Unit) => 
   for (let k = 0; k < n; k++) {
     const victim = state.units.find((u) => u.seat === s.seat && upkeepOf(u) > 0);
     if (!victim) return;
+    recordOwnLoss(state, victim);
     disbandUnit(state, victim.id);
   }
 }

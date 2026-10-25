@@ -1732,6 +1732,26 @@ export function recordAttacker(state: GameState, attacker: Unit, seat: number): 
   } else recs.push({ id: attacker.id, owner: attacker.seat, type: attacker.type, seen, plot: attacker.tileIndex, damage });
 }
 
+/** A UNIT A CITY-STATE LOSES AT ITS TURN'S START (a bankruptcy's
+ *  disband) stands in its own knowledge base as seen that
+ *  turn, on its plot: the turn's ARMY line holds it at age 0, aging from
+ *  there (runs/h1_duely1117 t179: city-state 4's Bombard 1638405 on 31:6;
+ *  every unit the five duely duels' city-states lose before their turn
+ *  opens, 1117 t104 and t240, 1124 t118 and t130, 1127 t51 and t122, 1128
+ *  t98 and t117, at age 0 on the line) */
+export function recordOwnLoss(state: GameState, u: Unit): void {
+  if (!isCityStateSeat(u.seat)) return;
+  const holder = seatOf(state, u.seat);
+  if (!holder) return;
+  const recs = (holder.armyKnown ??= []);
+  const r = recs.find((x) => x.id === u.id && x.type === u.type && x.owner === u.seat);
+  if (r) {
+    r.seen = state.turn;
+    r.plot = u.tileIndex;
+    r.damage = UNIT_HP - u.hp;
+  } else recs.push({ id: u.id, owner: u.seat, type: u.type, seen: state.turn, plot: u.tileIndex, damage: UNIT_HP - u.hp });
+}
+
 /** A UNIT MADE ANEW under another owner (a levy, its return home: the game
  *  removes each unit and adds one of a new id): every knowledge base's
  *  record of it is a gone unit's, aging on (runs/h1_duely1117: city-state
