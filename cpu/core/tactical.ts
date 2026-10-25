@@ -2824,37 +2824,6 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
 }
 
-/** THE ACTION REPLAY'S HOLD on the barbarians' turn: the replay lands the
- *  other players' actions of the turn after the engine's turn, and the
- *  barbarians close the turn after those actions, so the replay runs their
- *  turn there (`barbarianTurn` in cpu/harness/replay.ts); the hold takes the
- *  engine's barbarian turn. Null outside a replay. */
-let barbHold: ((state: GameState) => void) | null = null;
-let barbRelease: ((state: GameState) => void) | null = null;
-let barbMinors: ((state: GameState, on: boolean) => void) | null = null;
-export function holdBarbarians(fn: ((state: GameState) => void) | null, release: ((state: GameState) => void) | null = null,
-  minors: ((state: GameState, on: boolean) => void) | null = null): void {
-  barbHold = fn;
-  barbRelease = release;
-  barbMinors = minors;
-}
-
-/** the hold's units beside the city-states' turn: the units the hold keeps
- *  stand where the city-states' look and AI see them while their turn runs
- *  (`on`), and leave the engine's turn again after it. Nothing outside a
- *  replay. */
-export function barbariansBesideMinors(state: GameState, on: boolean): void {
-  barbMinors?.(state, on);
-}
-
-/** the hold's second half, once the turn's end (its random events, its
- *  climate) has struck the map the barbarians' turn left: what the hold
- *  keeps of their units leaves the engine's turn there. Nothing outside a
- *  replay. */
-export function releaseBarbarians(state: GameState): void {
-  barbRelease?.(state);
-}
-
 /** each barbarian's Movement and attacks at the start of its turn */
 export function refreshBarbarians(state: GameState): void {
   for (const u of state.units) {
@@ -2872,10 +2841,6 @@ export function refreshBarbarians(state: GameState): void {
  * tactical pass), then their scouts (`barbarianScouts`).
  */
 export function barbarianPhase(state: GameState): void {
-  if (barbHold) {
-    barbHold(state);
-    return;
-  }
   barbSlots(state);
   const acting = new Set(state.units.filter((u) => isBarbSeat(u.seat)).map((u) => u.id));
   barbarianRules(state, state.turn);

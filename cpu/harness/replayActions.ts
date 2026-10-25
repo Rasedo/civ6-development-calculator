@@ -15,9 +15,11 @@
  * record's active player). Its actions of turn t come after record t and
  * before its own start of turn t+1, so its orders land BEFORE the engine's
  * turn (`phase: 'before'`). Every other player starts turn t after record t
- * and then acts, so its orders land AFTER the engine's turn (`'after'`), and
- * record t+1 shows them already taken. A government or card set lands inside
- * the engine's turn whichever player's it is (`replay.ts`, `stagePolicies`).
+ * and then acts, so its orders land after its start (`'after'`: another
+ * major's inside the engine's turn, before the city-states'; the minors' and
+ * the barbarians' after the engine's turn), and record t+1 shows them
+ * already taken. A government or card set lands inside the engine's turn
+ * whichever player's it is (`replay.ts`, `stagePolicies`).
  */
 import { hexDistance } from '../../world/hex';
 import { UNITS } from '../data/units';

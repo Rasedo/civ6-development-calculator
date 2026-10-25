@@ -171,15 +171,9 @@ function losePopulation(state: GameState, tile: Tile): void {
 
 /** One citizen an event takes from `seat`'s city `cityId` (a city-state's
  *  one city: -1), a full point of the event's damage to the owner
- *  (`aidDamage`); held for `landHeldLosses` where the caller holds the
- *  owner's losses (`holdEventLosses`). */
+ *  (`aidDamage`) */
 function loseCitizen(state: GameState, seat: number, cityId: number): void {
   aidDamage(seat, 2);
-  if (lossHeld?.(seat)) heldLosses.push({ seat, cityId });
-  else takeCitizen(state, seat, cityId);
-}
-
-function takeCitizen(state: GameState, seat: number, cityId: number): void {
   if (isCityStateSeat(seat)) {
     const cs = state.cityStates.find((c) => c.seat === seat);
     if (cs && cs.population > 1) cs.population -= 1;
@@ -190,25 +184,6 @@ function takeCitizen(state: GameState, seat: number, cityId: number): void {
     home.population -= 1;
     logPopWrite(state, home, 'ds');
   }
-}
-
-/** the seats whose event citizen losses wait for `landHeldLosses`, null for none */
-let lossHeld: ((seat: number) => boolean) | null = null;
-const heldLosses: { seat: number; cityId: number }[] = [];
-
-/** hold the event citizen losses of the seats `held` names out of the turn's
- *  event step: the action replay, whose engine turn stands for the other
- *  players' starts of the turn before the event (in the game they start,
- *  then the turn changes and the event strikes), lands them after those
- *  starts (`landHeldLosses`) */
-export function holdEventLosses(held: ((seat: number) => boolean) | null): void {
-  lossHeld = held;
-  heldLosses.length = 0;
-}
-
-/** the held event citizen losses, each never a city's last */
-export function landHeldLosses(state: GameState): void {
-  for (const h of heldLosses.splice(0)) takeCitizen(state, h.seat, h.cityId);
 }
 
 /** THE EVENT'S DAMAGE TALLY (0x33b350 over the event's per-player record,

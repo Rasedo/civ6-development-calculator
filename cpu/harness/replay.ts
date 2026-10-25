@@ -4,10 +4,13 @@
  *
  * The first record is imported (`importTurn`) and from then on the state is
  * the engine's own. For each record pair t -> t+1 the replay takes the
- * decisions an `ActionSource` reads off the records (`replayActions.ts`),
- * lands the active player's before the engine's turn and every other
- * player's after it (when each was taken), runs `endTurn`, and compares the
- * engine's state with record t+1:
+ * decisions an `ActionSource` reads off the records (`replayActions.ts`) and
+ * runs the turn in the game's player order: the active player's actions,
+ * then each other major's start and actions, the city-states' and Free
+ * Cities' turns, the barbarians', the turn's close and change, the active
+ * player's next start (the engine's pieces of `endTurn`, the city-states',
+ * Free Cities' and barbarians' recorded decisions after them); then it
+ * compares the engine's state with record t+1:
  *
  *   - STATE: every city's size, boxes, plots, loyalty, buildings, districts,
  *     production and religious pressure; every seat's purse, research,
@@ -33,13 +36,14 @@ import type { BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat
 import { hexDistance, neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { NO_SEAT, type Governor } from '../core/types';
-import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
+import { advanceTurn, minorTurns, turnChange, turnClose, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
-  serialize, deserialize, itemCost, holdEraOpening, eraOpeningDue, openHeldEra } from '../core/game';
+  serialize, deserialize, itemCost } from '../core/game';
 import { completeQueueItem } from '../core/production';
 import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
-  placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys } from '../core/phase';
+  placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
+  seatPhase, worldCongress } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { CP_ACCEPTED, CP_IN_PROGRESS } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
@@ -59,7 +63,7 @@ import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
-import { barbarianTactics, dangerPlane, holdBarbarians, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
+import { barbarianTactics, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
 import { barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
@@ -68,7 +72,6 @@ import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/que
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
-import { holdEventLosses, landHeldLosses } from '../core/disasters';
 import { displaceAirFrom } from '../core/air';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setDelegationWith, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
 import { activateGreatPerson, gpActivateOk, gpClassOfUnit } from '../core/gpAbility';
@@ -165,6 +168,11 @@ interface Ctx {
   /** the units that moved in the pair dug in: unit -> its first step's place
    *  in the log and the fortification it held before it (`dugIn`) */
   undug: Map<string, { ord: number; turns: number }>;
+  /** each player's generator where its actions of the pair left it
+   *  (`applyPhase`) */
+  streams: Map<number, number>;
+  /** the pair's decisions an `applyPhase` call has taken */
+  applied: Set<Decision>;
   cat: Catalog;
   W: number;
   seatOfPlayer: Map<number, number>;
@@ -2016,7 +2024,8 @@ const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
 const ORDER: Decision['kind'][] = ['found', 'capture', 'policies', 'pantheon', 'religion', 'governors', 'war',
   'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'unitNew', 'pillage', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
 
-function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord): void {
+function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord,
+  players?: ReadonlySet<number>): void {
   const { state, next } = ctx;
   // a unit lost in the pair was lost to a blow of whoever struck it, which
   // may be a later player's: its loss lands with the other players' actions,
@@ -2040,14 +2049,18 @@ function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnR
     : 'player' in d ? d.player : -1);
   // a charge on a wonder the pair placed lands once the queue holds it
   const order = (d: Decision) => (d.kind === 'wonderCharge' && d.placed ? ORDER.indexOf('queue') + 0.5 : ORDER.indexOf(d.kind));
-  const mine = ds.filter((d) => phaseOf(d) === phase)
+  // `players`: the actions of those players' turns alone (their rank); else
+  // every decision of the phase no earlier call took
+  const taken = (d: Decision) => ctx.applied.has(d);
+  const mine = ds.filter((d) => phaseOf(d) === phase && !taken(d) && (!players || players.has(rank(d))))
     .sort((x, y) => (rank(x) - rank(y)) || (order(x) - order(y)));
+  for (const d of mine) ctx.applied.add(d);
   // EACH PLAYER'S ACTIONS draw on the stream its start completed with (its
   // `PlayerTurnStartComplete` witness in `wit`: record t for the active
   // player's, record t + 1 for the others'), each player's draws its own
   // run of it (runs/h1_duelw1117 t24: China's envoy annexes Caguana's 702 on
   // the first draw past its start; t26: Stonehenge's two free plots)
-  const streams = new Map<number, number>();
+  const streams = ctx.streams;
   let drawing: number | undefined;
   for (const d of mine) {
     const p = 'player' in d ? d.player : undefined;
@@ -2854,6 +2867,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       }
     }
   }
+  if (drawing !== undefined) streams.set(drawing, state.rngState);
 }
 
 /** THE ACTIVE PLAYER'S BOOSTS land in its actions, before its next start
@@ -4003,10 +4017,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdMinorOrders(true);
   holdCityStrikes(true);
   holdLevies(true);
-  // the era a pair's engine turn opens opens after the other players'
-  // actions of the pair (`openHeldEra`), as their research prices read the
-  // era before (`holdResearchEra`)
-  holdEraOpening(true);
   // the city-states' own purchases of the pair, each with its price
   const minorBought = new Map<Unit, { cityState: CityState; price: number }>();
   traceMinorPurchases((cityState, u, price) => minorBought.set(u, { cityState, price }));
@@ -4063,7 +4073,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), minorBlows: new Map(), upgradeInto: new Set(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies, majorCivicEntries: new Map(),
@@ -4163,6 +4173,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.minorBlows = new Map();
     ctx.barbNew = [];
     ctx.lateEnvoys = [];
+    ctx.undug = new Map();
+    ctx.streams = new Map();
+    ctx.applied = new Set();
     minorBought.clear();
     traceTurn = b.turn;
     const holders = [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])];
@@ -4177,7 +4190,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     stream.actions(a.turn);
     applyPhase(ctx, ds, 'before', b, a);
     // the active player's units stand where its actions left them before its
-    // next start (`endTurn`'s seat phase): its moves reveal, and meet, there
+    // next start (the engine's turn below): its moves reveal, and meet, there
     syncUnits(ctx, b, activePlayer(a));
     activeBoosts(ctx, b, activePlayer(a));
     stageEnvoys(ctx, ds, a, b, history.randLog);
@@ -4210,7 +4223,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // that stood its turn, then took a barbarian Spearman's attack, held the
     // turn's fortification against it)
     const struckOnly = new Set(ds.flatMap((d) => (d.kind === 'battle' ? [d.defender] : [])));
-    const fought = new Set(ds.flatMap((d) => (d.kind === 'combat' && !struckOnly.has(d.unit) ? [d.unit] : d.kind === 'battle' ? [d.attacker] : [])));
+    // the majors that start and act after the active player within the
+    // pair, before the city-states (their actions land inside the engine's
+    // turn, `otherMajorsTurn`), and the blows struck outside their turns
+    const activeP = activePlayer(a);
+    const otherMajors = new Set([...majorSeats.keys()].filter((p) => p !== activeP));
+    const struckLate = new Set(ds.flatMap((d) => (d.kind === 'battle' && !otherMajors.has(d.player) ? [d.defender] : [])));
+    const fought =new Set(ds.flatMap((d) => (d.kind === 'combat' && !struckOnly.has(d.unit) ? [d.unit] : d.kind === 'battle' ? [d.attacker] : [])));
     const was = new Map(a.units.map((u) => [`${u.owner}:${u.id}`, u.y * ctx.W + u.x]));
     // where the record carries its log, a unit walked when the log names its
     // steps — a unit pushed off its plot (`UnitTeleported`) spent nothing
@@ -4223,6 +4242,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const upgraded = new Set(ds.flatMap((d) => (d.kind === 'upgrade' ? [d.unit, d.into] : [])));
     const spent = new Map<Unit, { hp: number; fortify: number }>();
     const struckHp = new Map<Unit, number>();
+    // whether each unit takes its moves into the turn's heal (`rested`, or a
+    // minor's own)
+    const movesKept = new Map<Unit, boolean>();
     // a barbarian unit's rest: whether it stood the turn through and struck
     // no blow
     const barbRest = new Map<Unit, boolean>();
@@ -4243,79 +4265,49 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // rest heal still the record's actions' (runs/h1_duelw1124 t10: city-
       // state 2's Warrior attacked the Spearman at 8:14 and fought it again
       // at t11 on 62 HP, unhealed)
-      u.movesLeft = rested || minorAiSeat(u.seat) ? grantedMoves(state, u) : 0;
+      movesKept.set(u, rested || minorAiSeat(u.seat));
+      u.movesLeft = movesKept.get(u) ? grantedMoves(state, u) : 0;
       if (!rested) spent.set(u, { hp: u.hp, fortify: u.fortifyTurns ?? 0 });
-      else if (struckOnly.has(key)) struckHp.set(u, u.hp);
+      else if (struckLate.has(key)) struckHp.set(u, u.hp);
       if (isBarbSeat(u.seat)) barbRest.set(u, stood && !struck.has(key) && num(r.fortify) > 0);
     }
     // THE BARBARIANS' TURN closes the pair (`barbarianTurn`), after the
     // other players' actions; their units' moves and battles are the
-    // record's (`syncUnits`, `battle`), so they sit the engine's turn out
-    // (`holdBarbarians`): the engine's AI would fight battles the record
-    // never fought (runs/h1_duelw1117 t11: a Warrior China's engine killed that
-    // the game's lived to t12). The city-states' units stay: their script's
-    // draws are on the turn's stream before the random events
-    // (runs/h1_duelw1118 t7: without them a flood's draw took a citizen of
-    // Rome the game's spared)
-    // The turn's end strikes the map their turn left: a unit record t+1
-    // holds stands its random events and climate where it holds it, and
-    // leaves the engine's turn after them (runs/h1_duelw1121 t19: an
-    // eruption's damage on a barbarian Spearman and Horse Archer).
+    // record's (`syncUnits`, `battle`), so they sit the engine's turn out:
+    // the engine's AI would fight battles the record never fought
+    // (runs/h1_duelw1117 t11: a Warrior China's engine killed that the
+    // game's lived to t12). Through the other majors' and the city-states'
+    // turns they stand where the pair's first record holds them (the minors'
+    // look, threat and operations), out of the turn's close and heal. The
+    // turn's change strikes the map their turn left: a unit record t+1 holds
+    // stands its random events and climate where it holds it, and leaves the
+    // engine's turn after them (runs/h1_duelw1121 t19: an eruption's damage
+    // on a barbarian Spearman and Horse Archer).
     const barbs: Unit[] = [];
     const barbAt = new Map<Unit, number>();
     for (const r of b.units) {
       const u = unitOf(ctx, `${r.owner}:${r.id}`);
       if (u && isBarbSeat(u.seat)) barbAt.set(u, r.y * ctx.W + r.x);
     }
-    const takeBarbs = (st: GameState, keep: boolean) => {
-      barbs.push(...st.units.filter((u) => isBarbSeat(u.seat) && !(keep && barbAt.has(u))));
-      st.units = st.units.filter((u) => !isBarbSeat(u.seat) || (keep && barbAt.has(u)));
+    const takeBarbs = () => {
+      barbs.push(...state.units.filter((u) => isBarbSeat(u.seat)));
+      state.units = state.units.filter((u) => !isBarbSeat(u.seat));
     };
-    const barbFrom = new Map<Unit, number>();
-    holdBarbarians((st) => {
-      takeBarbs(st, true);
-      for (const [u, at] of barbAt) {
-        barbFrom.set(u, u.tileIndex);
-        u.tileIndex = at;
-      }
-    }, (st) => {
-      // back where the replay's own steps take them from (`syncUnits`)
-      for (const [u, at] of barbFrom) u.tileIndex = at;
-      takeBarbs(st, false);
-    }, (st, on) => {
-      // the city-states' turn sees them where the pair's first record holds
-      // them, before their own moves (the minors' look, threat and
-      // operations): back in the state while that turn runs, out after it
-      if (on) {
-        st.units.push(...barbs);
-        barbs.length = 0;
-        // ...and every other major's units where their own start of the
-        // turn moved them, which the game takes before the city-states'
-        // (record t+1 holds them so): the active player's alone act after
-        // them (runs/h1_duelw1117 t20: China's Scout gone from 41:12 by
-        // city-state 3's look, its record the log's age 1)
-        for (const r of b.units) {
-          if (r.owner === activePlayer(a) || !isCiv(seatOfP(ctx, r.owner))) continue;
-          const u = unitOf(ctx, `${r.owner}:${r.id}`);
-          if (u && st.units.includes(u)) u.tileIndex = r.y * ctx.W + r.x;
-        }
-      } else takeBarbs(st, false);
-    });
     const tribesBefore = state.barbTribes?.length ?? 0;
     // THE CATCH-UP'S COUNT: the majors' research as the record holds it at
     // the city-states' starts — the majors' research is their decisions and
     // their economy, not the city-states', so the count reads the game's.
-    // THE ACTIVE PLAYER'S START runs first in the engine's turn, and in the
-    // game after the city-states' starts the record's pair holds (record
-    // t+1 is read in its turn): theirs counts its research as record t
-    // holds it (runs/h1_duelw1121: Rome's Code of Laws at its start of t4,
-    // every minor's done at its own start of t4); every other major's start
-    // came before theirs, its research as record t+1 holds it. What the
-    // active player's actions of the turn completed (a boost) it holds at
-    // their starts too: the engine's completions record t+1 confirms
+    // THE ACTIVE PLAYER'S START closes the engine's turn, after the
+    // city-states' starts the record's pair holds (record t+1 is read in its
+    // turn): theirs counts its research as record t holds it
+    // (runs/h1_duelw1121: Rome's Code of Laws at its start of t4, every
+    // minor's done at its own start of t4); every other major's start came
+    // before theirs, its research as record t+1 holds it. What the active
+    // player's actions of the turn completed (a boost) it holds at their
+    // starts too: the engine's completions record t+1 confirms
     // (runs/h1_duelv1128 t20: Rome's Bronze Working boosted complete in its
     // turn, Bologna's done at its own start of t20)
-    const active = state.seats[seatOfP(ctx, activePlayer(a))];
+    const active = state.seats[seatOfP(ctx, activeP)];
     holdMinorCatchUp(new Map(state.seats.map((s) => {
       const r = seatOf(s === active ? recordA.state : read.state, s.seat)?.research ?? s.research;
       if (s !== active) return [s.seat, { techs: [...r.techs], civics: [...r.civics] }] as const;
@@ -4332,28 +4324,87 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     holdResearchEra(new Map([...state.seats.filter((s) => s !== active).map((s) => s.seat), ...state.cityStates.map((c) => c.seat), FREE_SEAT]
       .map((seat) => [seat, eraWas] as const)));
     stream.actions(null);
-    // the other majors' Favor is banked after their actions of the turn
-    // (`seatFavor`, below), not at the start the engine's turn stands for
-    const favorAfter = state.seats.filter((s) => s !== active && isCiv(s.seat)).map((s) => s.seat);
-    holdFavor((seat) => favorAfter.includes(seat));
-    // the turn's random events strike the other players' cities after the
-    // starts the engine's turn stands for (in the game their starts of turn
-    // t come before the turn changes and the events strike: runs/
-    // h1_duelw1128 t46, a fire on plot 542 takes Xi'an's citizen after
-    // China's start banked its Food, the city growing at its next start)
-    holdEventLosses((seat) => seat !== active.seat);
+    // the other majors' Favor is banked at the turn's change (`seatFavor`,
+    // below), not at their start
+    const others = state.seats.filter((s) => s !== active && isCiv(s.seat)).map((s) => s.seat);
+    holdFavor((seat) => others.includes(seat));
+    // THE OTHER MAJORS' ACTIONS, in their own turn after their start and
+    // before the city-states' (record t+1 holds them taken)
+    const otherMajorsTurn = () => {
+      // the units their starts made, under the record's ids, and the units
+      // the turn has lost so far
+      matchNewUnits(ctx, b);
+      const live = new Set(state.units);
+      ctx.engineKilled = new Set([...ctx.units].filter(([, u]) => !live.has(u)).map(([k]) => k));
+      {
+        // their governor turns: their starts' civics stand before their AI turns
+        const starts = turnStartCompletions(ctx, b, a.turn);
+        ctx.governorAi.aiTurn(state, a.turn, (p) => p !== activeP, (s, id) => recordCityName(ctx, s, id),
+          (seat) => new Set([...(seatOf(state, seat)?.research.civics ?? []), ...(starts.get(seat)?.civics ?? [])]
+            .filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))));
+      }
+      {
+        // THE MAJORS' DIPLOMATIC SENDING: the record's human majors' missions
+        // fed, the AI majors' their port's own
+        const recMissions = missions.get(a.turn) ?? [];
+        const strat = aiInputs(a.turn);
+        applyMissions(ctx, recMissions, diplomacy, strat, (seat) => !sender.isSender(seat));
+        applyTransitions(ctx, diplomacy, sender, strat);
+        const picks = sender.turn(state, a.turn, strat, (o, x) => diplomacy.stateOf(o, x), (x) => diplomacy.agendasOf(x),
+          (x) => strategies.knownCities(x), (o, x) => diplomacy.opinionOf(o, x));
+        sender.compare(a.turn, picks, recMissions);
+        applySenderPicks(ctx, picks, recMissions, sender, diplomacy, strat);
+        sender.close(state, (o, x) => diplomacy.opinionOf(o, x));
+        greatPeopleAi.turn(state, a, b, strat, sender.memory);
+        ctx.religionPort.inputs = strat;
+        portPantheons(ctx, b);
+      }
+      applyPhase(ctx, ds, 'after', b, b, otherMajors);
+      // their units stand where their actions left them: their looks reveal
+      // and meet in their turn (runs/h1_duelv1127: China meets Rome at t61,
+      // DiplomacySummary.csv, the record of t62 the first to show it; 1117
+      // t20: China's Scout gone from 41:12 by city-state 3's look)
+      for (const p of otherMajors) syncUnits(ctx, b, p);
+      // ...taking into the turn's heal the moves their actions spent
+      for (const [u, kept] of movesKept) if (others.includes(u.seat)) u.movesLeft = kept ? grantedMoves(state, u) : 0;
+      for (const seat of others) detectBoosts(state, seat);
+    };
     // each unit's health before the engine's turn heals it, beside the plot
     // the heal reads (`healedOn`)
     const hpPre = new Map(state.units.map((u) => [u, u.hp]));
+    // THE ENGINE'S TURN in the order the pair holds it: the other majors'
+    // starts and actions of turn t, the city-states' and Free Cities' turns,
+    // the barbarians' (sat out), the World Congress, the turn's close and
+    // heal; the counter's change (the random events, the climate, the era);
+    // the active player's start of t+1
     try {
-      endTurn(state);
-      landHeldLosses(state);
+      ctx.streams = new Map();
+      seatPhase(state, { seats: new Set(others), deals: true });
+      stream.actions(a.turn);
+      otherMajorsTurn();
+      minorTurns(state);
+      takeBarbs();
+      worldCongress(state);
+      turnClose(state);
+      const changing = barbs.filter((u) => barbAt.has(u));
+      barbs.splice(0, barbs.length, ...barbs.filter((u) => !barbAt.has(u)));
+      const barbFrom = new Map(changing.map((u) => [u, u.tileIndex] as const));
+      for (const u of changing) u.tileIndex = barbAt.get(u)!;
+      state.units.push(...changing);
+      turnChange(state);
+      // back where the replay's own steps take them from (`syncUnits`)
+      for (const [u, at] of barbFrom) u.tileIndex = at;
+      takeBarbs();
+      // the other majors' per-turn Favor, at the turn's change after the
+      // Congress (runs/h1_duelw1128 t101: China votes on 56, then banks +3)
+      for (const seat of others) seatFavor(state, seat);
+      seatPhase(state, { seats: new Set([active.seat]), deals: false });
+      advanceTurn(state);
     } catch (e) {
-      report.stopped = `endTurn threw at turn ${a.turn}: ${(e as Error).message}`;
+      report.stopped = `the engine's turn threw at turn ${a.turn}: ${(e as Error).message}`;
       break;
     } finally {
       holdFavor(null);
-      holdEventLosses(null);
     }
     holdMinorCatchUp(null);
     stream.actions(a.turn);
@@ -4376,22 +4427,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     state.units.push(...barbs);
     verifyPolicies(ctx, staged);
     settleAi.postTurn(b);
-    {
-      // THE MAJORS' DIPLOMATIC SENDING: the record's human majors' missions
-      // fed, the AI majors' their port's own
-      const recMissions = missions.get(a.turn) ?? [];
-      const strat = aiInputs(a.turn);
-      applyMissions(ctx, recMissions, diplomacy, strat, (seat) => !sender.isSender(seat));
-      applyTransitions(ctx, diplomacy, sender, strat);
-      const picks = sender.turn(state, a.turn, strat, (o, x) => diplomacy.stateOf(o, x), (x) => diplomacy.agendasOf(x),
-        (x) => strategies.knownCities(x), (o, x) => diplomacy.opinionOf(o, x));
-      sender.compare(a.turn, picks, recMissions);
-      applySenderPicks(ctx, picks, recMissions, sender, diplomacy, strat);
-      sender.close(state, (o, x) => diplomacy.opinionOf(o, x));
-      greatPeopleAi.turn(state, a, b, strat, sender.memory);
-      ctx.religionPort.inputs = strat;
-      portPantheons(ctx, b);
-    }
     operationsAi.postTurn(b);
     majorAi.postTurn(state, (seat) => {
       const d = staged.find((x) => seatOfP(ctx, x.player) === seat);
@@ -4438,27 +4473,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const live = new Set(state.units);
     ctx.engineKilled = new Set([...ctx.units].filter(([, u]) => !live.has(u)).map(([k]) => k));
     fortifyOrders(ctx, a, b);
-    // ...the others' after their turn start, the engine's turn
-    {
-      // their turn starts' civics stand before their AI turns
-      const starts = turnStartCompletions(ctx, b, a.turn);
-      ctx.governorAi.aiTurn(state, a.turn, (p) => p !== activePlayer(a), (s, id) => recordCityName(ctx, s, id),
-        (seat) => new Set([...(seatOf(state, seat)?.research.civics ?? []), ...(starts.get(seat)?.civics ?? [])]
-          .filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))));
-    }
+    // the city-states', Free Cities' and barbarians' decisions, and what
+    // record t+1 shows of every unit (its loss, its health)
     applyPhase(ctx, ds, 'after', b, b);
-    for (const seat of favorAfter) seatFavor(state, seat);
-    // the era's opening, its quests drawn on what those actions earned
-    // (runs/h1_duelw1117 t30: China's kill boosts Bronze Working before the
-    // Classical era's quest for Caguana, which draws over Sailing and
-    // Writing); its draws are the new turn's, before the looks of the other
-    // players' moves, which meet (t31: China meets Antananarivo after it,
-    // the log's second quest)
-    if (eraOpeningDue()) {
-      stream.actions(a.turn + 1);
-      openHeldEra(state);
-      stream.actions(a.turn);
-    }
     // an AI major's governor turn where record t+1 holds its roster as it
     // was: the record's
     for (const p of ctx.governorAi.actedAlone(new Set(ds.filter((d) => d.kind === 'governors').map((d) => d.player)))) {
@@ -4475,10 +4492,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       u.hp = rest.hp;
     }
     // the game heals every unit at the turn's end, after every player's
-    // actions: a rested unit of another major whose plot those actions
-    // changed (a city founded on it, a plot bought under it) heals on the
-    // plot as they left it (runs/h1_duelw1121 t36: China's Warrior escorting
-    // the Settler that founds Taiyuan under it heals 20 in the new city)
+    // actions: a rested unit of another major whose plot the decisions
+    // landed after the engine's turn changed (a plot bought under it) heals
+    // on the plot as they left it
     for (const [u, was] of healedOn) {
       const hp = hpPre.get(u);
       if (hp === undefined || spent.has(u) || struckHp.has(u) || ctx.battled.has(unitKeyOf(ctx, u)) || !isCiv(u.seat)
@@ -4487,9 +4503,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       restUnit(state, rest, true);
       u.hp = rest.hp;
     }
-    // the other players' units stand where their turn t's moves left them:
-    // their looks reveal and meet in turn t (runs/h1_duelv1127: China meets
-    // Rome at t61, DiplomacySummary.csv, the record of t62 the first to show it)
+    // the city-states', Free Cities' and barbarians' units stand where their
+    // turn t's moves left them: their looks reveal and meet in turn t
     inTurn(state, a.turn, () => syncUnits(ctx, b));
     campsTaken(ctx, b, a.turn);
     // the units the minors' cities trained in the engine's turn (a purchase
@@ -4688,10 +4703,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdMinorOrders(false);
   holdCityStrikes(false);
   holdLevies(false);
-  holdEraOpening(false);
   traceMinorPurchases(null);
   traceMinorPolicyScores(null);
-  holdBarbarians(null);
   holdCongressBallots(null);
   if (strategies.active) {
     report.strategies = strategies.tally;

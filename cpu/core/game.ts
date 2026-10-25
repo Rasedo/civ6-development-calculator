@@ -14,7 +14,7 @@ import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileF
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
-import { barbarianPhase, barbariansBesideMinors, releaseBarbarians } from './tactical';
+import { barbarianPhase } from './tactical';
 import { cityLook } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
@@ -1560,32 +1560,6 @@ function eraOpening(state: GameState): void {
   eraInspirations(state);
 }
 
-let eraOpeningHeld = false;
-let eraOpeningOwed = false;
-
-/** A replay applying the other players' actions of a turn after `endTurn`
- *  holds the opening of the era that turn opens until they have landed
- *  (`openHeldEra`): in the game it comes after every player's actions of the
- *  turn before (runs/h1_duelw1117 t30-31: China's kill of t30 boosts Bronze
- *  Working, then the era's quest for Caguana draws over Sailing and Writing
- *  alone, its "Choosing random tech type" range 2) */
-export function holdEraOpening(on: boolean): void {
-  eraOpeningHeld = on;
-  eraOpeningOwed = false;
-}
-
-/** whether a held `endTurn` owes its era's opening */
-export function eraOpeningDue(): boolean {
-  return eraOpeningOwed;
-}
-
-/** the era opening a held `endTurn` owes, where it owes one */
-export function openHeldEra(state: GameState): void {
-  if (!eraOpeningOwed) return;
-  eraOpeningOwed = false;
-  eraOpening(state);
-}
-
 /**
  * ONE GAME TURN, as Civ 6 runs it (tools/civ6lab/turn_order_civ6.md,
  * runs/turnorder/): the barbarians' turn, which closes the turn every
@@ -1607,28 +1581,46 @@ export function openHeldEra(state: GameState): void {
  * Cities (16 of 16 turns); then the Special Sessions and the emergencies
  * and the heal of every unit and every city, before the counter moves; then,
  * on the new turn, the victory checks. The majors'
- * actions follow, between two turns.
+ * actions follow, between two turns. The action replay runs the same pieces
+ * in the order a record's pair holds them (cpu/harness/replay.ts).
  */
 export function endTurn(state: GameState): void {
   if (state.unitsMode) barbarianPhase(state);
   worldCongress(state);
+  turnChange(state);
+  seatPhase(state);
+  minorTurns(state);
+  turnClose(state);
+  advanceTurn(state);
+}
+
+/** THE TURN'S CHANGE: the random-event step (`disasterPhase`), the climate
+ *  step, then the game era and Ages of the turn the starts open and its
+ *  opening (`gameEraTurn`, `eraOpening`) */
+export function turnChange(state: GameState): void {
   if (state.disasters) disasterPhase(state);
   climateTurn(state);
-  if (state.unitsMode) releaseBarbarians(state);
-  if (gameEraTurn(state, state.turn + 1)) {
-    if (eraOpeningHeld) eraOpeningOwed = true;
-    else eraOpening(state);
-  }
-  seatPhase(state);
-  if (state.unitsMode) barbariansBesideMinors(state, true);
+  if (gameEraTurn(state, state.turn + 1)) eraOpening(state);
+}
+
+/** THE CITY-STATES' TURNS, then the Free Cities' */
+export function minorTurns(state: GameState): void {
   minorPhase(state);
-  if (state.unitsMode) barbariansBesideMinors(state, false);
   freeCitiesPhase(state);
+}
+
+/** THE TURN'S CLOSE after every player: theological combat, the Special
+ *  Sessions and the emergencies, then the heal of every unit and every city */
+export function turnClose(state: GameState): void {
   theologicalCombatPhase(state);
   emergencySessions(state);
   if (state.unitsMode) refreshUnits(state);
   healCities(state);
+}
 
+/** THE COUNTER MOVES, the turn's moments are recorded, the exoplanet flight
+ *  advances and the victory checks run on the new turn */
+export function advanceTurn(state: GameState): void {
   state.turn += 1;
   recordMoments(state);
   // THE EXOPLANET FLIGHT — CIV6: the craft covers 1 light-year/turn plus one

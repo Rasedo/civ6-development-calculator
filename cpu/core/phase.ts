@@ -2771,7 +2771,13 @@ export function completeResearchNow(state: GameState, seat: number, id: string):
   refreshDistrictDiscount(state, seat);
 }
 
-export function seatPhase(state: GameState): void {
+/**
+ * THE MAJORS' STARTS AND ACTIONS, each seat in ascending order. `only` runs
+ * the seats it names alone (the action replay runs each player's start in
+ * the place its record's pair holds it), the standing deals' turn with them
+ * where `deals` says so; every seat, the deals first, without it.
+ */
+export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>; deals: boolean }): void {
 
   // Seat units get their movement in this phase (like barbarians).
   // An EMBARKED land unit moves on the flat EMBARK_MOVES pool (not its
@@ -2789,7 +2795,7 @@ export function seatPhase(state: GameState): void {
   // Seat generals war-walk LATER in this phase, so freezing the bonus here
   // (before any of them moves) is also what keeps the GPU snapshot turn-exact.
   for (const u of state.units) {
-    if (!isCiv(u.seat)) continue;
+    if (!isCiv(u.seat) || (only && !only.seats.has(u.seat))) continue;
     const fullR = unitFullMoves(state, u);
     u.movesLeft = fullR + generalAuraMP(state, u);
     u.movesFull = u.movesLeft;
@@ -2797,9 +2803,10 @@ export function seatPhase(state: GameState): void {
 
   // What the standing deals owe each other, before any new one is struck: the
   // per-turn payments, the 30-turn clock, and the offer nobody answered.
-  dealPhase(state);
+  if (!only || only.deals) dealPhase(state);
 
   for (const actor of state.seats) {
+    if (only && !only.seats.has(actor.seat)) continue;
     atRngPoint(state, { kind: 'seat', seat: actor.seat, turn: state.turn });
     storeUnitStrength(state, actor.seat);
     const recU = state.seatActions?.[state.turn - 1]?.[actor.seat];
