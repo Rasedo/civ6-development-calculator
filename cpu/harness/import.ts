@@ -30,7 +30,7 @@ import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, Ga
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, type MinorItem } from '../core/minorBuild';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, majorsAlive, setMetTurnWith } from '../core/seats';
+import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, majorsAlive, setMetTurnWith } from '../core/seats';
 import { routeOriginCenter, stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
@@ -2247,8 +2247,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     importPlayer(ctx, p, s);
     if (bool(p.major)) importAges(ctx, s, p, history);
     ctx.scopeSeat = undefined;
-    s.bestMeleeCS = Math.max(startMeleeCS(seat), history?.bestMelee.get(p.id) ?? 0);
-    s.bestRangedCS = history?.bestRanged.get(p.id) ?? 0;
+    // the barbarians train nothing: their best strengths stay none (the AI
+    // memory reader's PlayerStats +0xf0, runs/h1_duelt1121 player 63 t1-t60)
+    const barb = isBarbSeat(seat);
+    s.bestMeleeCS = barb ? 0 : Math.max(startMeleeCS(seat), history?.bestMelee.get(p.id) ?? 0);
+    s.bestRangedCS = barb ? 0 : history?.bestRanged.get(p.id) ?? 0;
     // the copies a price progression counts are the game's own, read off its
     // quote where one stands: a Builder taken back in the field moves no
     // price (runs/h1_duelw1105, China's t46 and t52 three-charge Builders

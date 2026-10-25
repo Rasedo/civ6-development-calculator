@@ -400,6 +400,7 @@
     - recording: h1_duelv1124
       turn: 17
       value: minor 3's dead Warrior 131073 stays on its ARMY line from t17 to t38, gone at t39
+  impl: [cpu/core/units.ts:recordAttacker]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"

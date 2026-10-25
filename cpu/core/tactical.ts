@@ -19,7 +19,7 @@ import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   canEmbark, cityAtIndex, crossesRiver, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious,
-  unitsHostile, unitVisibleTo,
+  setBarbStepLook, unitsHostile, unitVisibleTo,
   waterEnterable,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
@@ -31,8 +31,8 @@ import { encampOuterPool, outerPool } from './rules';
 import { cityStateAt, minorCity } from './cityStates';
 import { irradiated } from './nuclear';
 import { canSee, losDisk, unitSight } from './fog';
-import { barbarianScouts, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, ringPlots, tribeOf } from './barbarians';
-import { barbarianCaptures, barbarianTrees } from './barbarianOps';
+import { barbScoutLook, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, ringPlots, tribeOf } from './barbarians';
+import { barbarianCaptures, barbarianOpsTurn, barbarianTrees } from './barbarianOps';
 import { opsOf } from './operations/manager';
 import { lookCamps } from './operations/knowledge';
 import { opUnits } from './operations/operation';
@@ -2851,6 +2851,14 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   // the knowledge base ages and looks, then the target list (0x785f30)
   knowledgeLook(state, state.barbSeat, BARB_SEAT, seen, true);
   barbCampsLook(state, seen);
+  // the military AI's part of the turn after the look: their operations
+  // logged and refreshed on the knowledge base it left (the AI memory
+  // reader: runs/h1_duelt1121 t16 the raid's 46 against 54 at the end look,
+  // 49 against 47 at the log moment, "Not Ready"; t61 65 against 81, t63
+  // 65 against 61), one a tribe started this turn among them (AI_Operation.csv:
+  // runs/h1_duelw1110 t42 "Barbarian City Assault, Started" before the
+  // running raid's line)
+  barbarianOpsTurn(state);
   const targets = tacticalTargets(state, BARB_SEAT, seen, ex.length ? ex : null, state.barbSeat.armyKnown ?? []);
   const reach = new Map<number, Reach[]>();
   const plan = new Map<number, Planner>();
@@ -2907,7 +2915,7 @@ export function refreshBarbarians(state: GameState): void {
  * THE BARBARIANS' TURN: their unit pool (`barbSlots`), the game's rules for
  * them (`barbarianRules`: their techs, the camp step, each tribe's turn), their
  * units' AI (`barbarianTactics`: their operations' trees, then their
- * tactical pass), then their scouts (`barbarianScouts`).
+ * tactical pass), their scouts looking at each step (`barbScoutLook`).
  */
 export function barbarianPhase(state: GameState): void {
   barbSlots(state);
@@ -2915,7 +2923,14 @@ export function barbarianPhase(state: GameState): void {
   barbarianRules(state, state.turn);
   barbSlots(state);
   refreshBarbarians(state);
-  barbarianTactics(state, acting);
-  barbarianScouts(state);
+  // a scout looks at each step it takes, in move order: the sight update of
+  // the step (0x58aa90) raises the report (0x153ef0) as its plots come into
+  // the barbarian player's view
+  setBarbStepLook(barbScoutLook);
+  try {
+    barbarianTactics(state, acting);
+  } finally {
+    setBarbStepLook(null);
+  }
   barbSlotsDying(state);
 }

@@ -6556,14 +6556,30 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   Archer from 7:14 to 6:13 at t73 and stays at t74. runs/h1_duelv1124 t35
   (a Warrior's goal one plot short of its target) agrees. The ring test
   0x815d50 takes a plot holding a unit of the mover's player only where
-  0x265ac0 -> 0x265af0 passes it on the mover's path finder (+0x738 0: any;
-  else formation classes, damage, the group's leader's plot — PARTLY READ);
-  the engines take none.
+  0x265ac0 -> 0x265af0 passes it on the mover's path finder (READ): with
+  no member (+0x738 0) any unit; else the unit must be alive (+0x770
+  clear, +0xcf0 below its hit points), not of the air domain (+0x650 1),
+  on the group's leader's plot (the first member +0x728, +0x220 / +0x224),
+  no Spy (unit info +0x1ba bit 2) nor +0x1b9 bit 0x40; with one member a
+  civilian (formation class 2) beside a support leader (1) or a support
+  unit beside a civilian leader refused; and none of its formation's units
+  of a member's formation class or of the air class (4). A unit on another
+  ring plot never stands on the leader's plot, so a mover with a member
+  takes no plot of its own player's units: the engines take none.
 - THE DESIRED STRENGTH (0x723ab0, READ): the advantage (fixed x256) at -5
   or less asks minus the enemy strength; else the advantage times the
   smaller of the seat's and the enemy's PlayerStats +0xf0 (the best melee
   strength trained; the seat's own where the enemy is none). Raid City's
-  team asks -1. runs/h1_duelw1121 t57-t68: the game's raid team (Archer,
+  team asks -1. The barbarians' PlayerStats +0xf0 stays 0 (the AI memory
+  reader, runs/h1_duelt1121 player 63 t1-t60, its units raised and
+  upgraded), so a barbarian team asks nothing past the enemy's strength:
+  the engines raise no barbarian best strength (`raiseBestTrained`, the
+  importer) and the GPU asks none. The refresh (0x73eb60 / 0x73f7d0) runs
+  in the barbarians' tactical turn after the knowledge base aged and
+  looked (the reader: t16 the raid's stored 49 against 47 at the log
+  moment, 46 against 54 at the end look, the log "Not Ready"; t61 65
+  against 81 Not Ready, t63 65 against 61 Ready): `barbarianOpsTurn` /
+  `_barb_ops_refresh` after `knowledgeLook` in the pass. runs/h1_duelw1121 t57-t68: the game's raid team (Archer,
   two Warriors, 65) Ready t59-60 and t63-66, Not Ready t57-58, t61-62,
   t67-68 — an enemy strength about 6:12 near 65; the engines' 115-167 (the
   city 28, its owner's best 28, the knowledge base's 86-111 of seat 1's
@@ -6977,9 +6993,13 @@ gpu/core/sim_tactics.py.
   t32 and the raid starts at t33. The engines take the plots of a city's
   wonders, built or queued (`barbScoutLook`; `_barb_scout_look` on the
   `city_wonder` registry); the action replay starts the tree there.
-- LAB: the engines look where the scout stands after its moves (the replay
-  along the record's steps), a plot new against its last look and seen by
-  no other barbarian unit there; the game's event fires within a move.
+- THE LOOK'S MOMENT: the sight update of each step (0x58aa90) raises it,
+  so a scout looks at each step it takes, in the order the moves are made,
+  the other units where they stand then: the engines' step (`stepUnit`
+  through `setBarbStepLook` in the barbarians' tactical pass; `_step_verb`
+  for the barbarians' pool), a plot new against the scout's last look and
+  seen by no other barbarian unit; the action replay along the record's
+  steps.
 
 ## C-96 / C-97: the AI's weights and the modifier evaluator — READ (the parts below), the agendas' path and most analyzers unread
 

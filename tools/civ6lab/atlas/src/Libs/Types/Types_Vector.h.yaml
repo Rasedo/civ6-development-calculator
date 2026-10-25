@@ -150,12 +150,16 @@
     - cpu/harness/drawSites.ts:DRAW_SITES
     - cpu/core/barbarians.ts:othersSee
     - cpu/core/disasters.ts:nameRivers
+    - cpu/core/tactical.ts:barbarianPhase
+    - cpu/core/units.ts:barbStepLook
+    - gpu/core/sim_seats.py:_step_verb
   readings:
     - "H-1: the raids — READ"
     - "H-1: draws the AI takes, draws the engines lack"
     - "H-1: the raids — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2:...

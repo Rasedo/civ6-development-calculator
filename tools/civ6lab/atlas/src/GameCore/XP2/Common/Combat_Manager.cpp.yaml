@@ -136,6 +136,7 @@
     - cpu/harness/replayActions.ts:melee
     - gpu/core/sim_seats.py:_melee_exchange
     - cpu/core/combat.ts:defDef
+    - cpu/core/combat.ts:struck
   readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the at..."
@@ -268,7 +269,10 @@
 - addr: 0x20d280
   kind: function
   status: PARTLY
-  readings: ["C-34: the interception's damage, XP, weariness and the answers"]
+  impl: [cpu/core/units.ts:recordAttacker]
+  readings:
+    - "C-34: the interception's damage, XP, weariness and the answers"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "- War weariness (0x1fb680, from the combat log 0x20d280): it reads only the struct's [+0] and [+8] and the combat's location — the interceptor..."
   review: imported

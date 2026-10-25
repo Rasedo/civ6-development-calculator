@@ -9,8 +9,9 @@
  * assault against the target's owner; a scout that saw a city walks home
  * under the tree "Barbarian Found City" (`homing`). The player's turn: the
  * military AI's part logs and refreshes the operations
- * (`barbarianOpsTurn`, before the tribes' turn); in the tactical pass, once
- * each unit's planning is taken, every tree ticks in the order it was made
+ * (`barbarianOpsTurn`, in the tactical pass once the knowledge base aged and
+ * looked); then, once each unit's planning is taken, every tree ticks in the
+ * order it was made
  * (`barbarianTrees`), and the trees' units are theirs. The barbarians weigh
  * no candidate, and a member killed stays in its team.
  */

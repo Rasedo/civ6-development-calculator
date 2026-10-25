@@ -8,6 +8,7 @@
   kind: function
   semantics: one unit into the records (0x5f0440) from a game signal
   status: PARTLY
+  impl: [cpu/core/units.ts:recordAttacker, gpu/core/sim_minors.py:_kb_attacked]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"

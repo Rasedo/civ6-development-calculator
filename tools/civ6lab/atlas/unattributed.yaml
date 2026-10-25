@@ -3358,6 +3358,7 @@
   final: 0x516490
   kind: function
   status: UNREAD
+  impl: [cpu/core/units.ts:recordAttacker]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:

@@ -256,6 +256,9 @@
     - gpu/core/sim_barb.py:_barb_scout_look
     - gpu/core/sim_barb.py:_barb_others_see
     - cpu/core/types.ts:GameState
+    - cpu/core/tactical.ts:barbarianPhase
+    - cpu/core/units.ts:barbStepLook
+    - gpu/core/sim_seats.py:_step_verb
   readings: ["H-1: the raids — READ", "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
   context:
     - "- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout (unit +0x1c0 == 2) seeing an owne..."

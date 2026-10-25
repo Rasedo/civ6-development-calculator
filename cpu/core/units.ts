@@ -67,7 +67,7 @@ import { promiseIncursion } from './grievance';
 import { PROMISE_DIG } from '../data/promises';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { BARB_SEAT, NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, drawCitizenName, civsAtWar, isCiv, isCityStateSeat, leaderOf, seatOf, seatsAllied, tileSeat } from './seats';
+import { BARB_SEAT, NO_SEAT, isBarbSeat, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, drawCitizenName, civsAtWar, isCiv, isCityStateSeat, leaderOf, seatOf, seatsAllied, tileSeat } from './seats';
 import { suzerainOf } from './cityStates';
 import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost } from './stockpile';
 import { canTrainAir, carryAirWith, isAirUnit } from './air';
@@ -967,6 +967,12 @@ export function stepCost(state: GameState, unit: { type: string; seat: number; p
 /** CITY_MOVEMENT_COST (GlobalParameters), in MP_SCALE units */
 const CITY_MOVEMENT_MP = MP_SCALE;
 
+/** the barbarian player's sight event on a step (0x58aa90 -> 0x153ef0):
+ *  `barbScoutLook`, set by cpu/core/barbarians.ts; null, no look */
+let barbStepLook: ((state: GameState, unit: Unit) => void) | null = null;
+export function setBarbStepLook(fn: ((state: GameState, unit: Unit) => void) | null): void {
+  barbStepLook = fn;
+}
 
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const seat = unit.seat;
@@ -1053,6 +1059,9 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
     claimMeteorSite(state, unit);
   }
   clearCampFor(state, unit, to.index);
+  // a barbarian's step updates its player's sight: a scout looks at the plots
+  // it newly sees, in the order the moves are made
+  if (isBarbSeat(unit.seat)) barbStepLook?.(state, unit);
   // the walk ends on a plot of an enemy's zone, the unit's Movement kept for
   // a blow from there (runs/h1_duelw1117 log t8: city-state 2's Warrior
   // steps 13:10 -> 12:11 beside the camp's Spearman and melee-attacks it;
@@ -1666,7 +1675,9 @@ export function formationTierFor(state: GameState, seat: number, unitType: strin
  *  Bomber; h1_duelw1107 t247: a Fighter). */
 export function raiseBestTrained(state: GameState, seat: number, unitType: string, formation = 0): void {
   const def = UNITS[unitType];
-  if (!def || !(def.combat > 0) || unitDomain(unitType) !== 'military') return;
+  // the barbarians' stay none (PlayerStats +0xf0 0 through runs/h1_duelt1121
+  // player 63's t1-t60, its units upgraded and raised)
+  if (!def || !(def.combat > 0) || unitDomain(unitType) !== 'military' || isBarbSeat(seat)) return;
   const owner = seatOf(state, seat);
   if (!owner) return;
   owner.bestMeleeCS = Math.max(owner.bestMeleeCS ?? 0, def.combat + (FORMATION_CS[formation] ?? 0));

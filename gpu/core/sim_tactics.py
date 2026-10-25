@@ -2651,6 +2651,9 @@ class SimTactics:
         seen0 = self._barb_seen("barbarians")
         self._knowledge_look(self.BK, BARB_SEAT, seen0, torch.ones(B, dtype=torch.bool, device=dev), True)
         self._barb_kb_camps(seen0)
+        # the military AI's part of the turn after the look: the operations
+        # refreshed on the knowledge base it left (`barbarianOpsTurn`)
+        self._barb_ops_refresh()
         tg = self._tac_targets(BARB_SEAT, self.BK)
         treg = self._tac_seen_regions(BARB_SEAT)
         # the planning: the reach of two turns, no zones of control, and the

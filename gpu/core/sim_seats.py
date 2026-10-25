@@ -13562,6 +13562,17 @@ class SimSeats:
                 hit = (moved & enc_t & melee & (_own >= 0) & (_own < BARB_SEAT)
                        & self._seats_hostile(_ms.unsqueeze(1), _own.unsqueeze(1)).squeeze(1))
                 self._conquer_encampment(hit, d0, _ms)
+        # a barbarian's step updates its player's sight: a scout looks at the
+        # plots it newly sees, in the order the moves are made (0x58aa90 ->
+        # 0x153ef0; `barbScoutLook`)
+        _blo = self.POOL_LO["barb"]
+        _bm = moved & (gslot >= _blo) & (gslot < self.POOL_HI["barb"])
+        if bool(_bm.count_nonzero()):
+            _bs = torch.where(_bm, gslot - _blo, torch.full_like(gslot, -1))
+            _tr = self.barb_unit_tribe.gather(1, _bs.clamp(min=0).unsqueeze(1)).squeeze(1)
+            for _k in torch.unique(_tr[_bm]).tolist():
+                if _k >= 0:
+                    self._barb_scout_look(_bm & (_tr == _k), int(_k), _bs)
         return moved
 
     def _encamp_terms(self, tc: torch.Tensor):

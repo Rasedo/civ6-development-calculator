@@ -1985,14 +1985,14 @@ class SimOrders:
         game's rules for them (`_barbarian_rules`: their techs, the camp step,
         each tribe's turn), their units' AI (`_barbarian_tactics`) for the
         units that stood before their camps raised this turn's (their operations'
-        trees first), then their scouts (`_barbarian_scouts`)."""
+        trees first), their scouts looking at each step (`_step_verb`'s
+        `_barb_scout_look`)."""
         self._barb_slots()
         acting = self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT)
         self._barbarian_rules()
         self._barb_slots()
         self._barb_reset_mp()  # barbarianPhase's own movesLeft reset
         self._barbarian_tactics(acting)
-        self._barbarian_scouts()
         self._barb_slots_dying()
 
     def _barb_melee_at(self, attack: torch.Tensor, u: int, ttc: torch.Tensor) -> None:

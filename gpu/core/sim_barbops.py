@@ -16,8 +16,8 @@ its recruit's and its raid's Turn Limiters' first turns `tribe_op_rstart`,
 the military AI's turn `tribe_op_ready`) and at most one scout's tree
 (`tribe_home_*`: its scout, the city it saw, its id, its Sequence's resume,
 Move Unit's held scout). The player's turn: the military AI's part
-refreshes the operations' teams (`_barb_ops_refresh`, before the tribes'
-turn); in the tactical pass every tree ticks in id order
+refreshes the operations' teams (`_barb_ops_refresh`, in the tactical pass
+once the knowledge base aged and looked); then every tree ticks in id order
 (`_barb_trees`), a tree a scout's report starts ticking in the same walk.
 """
 

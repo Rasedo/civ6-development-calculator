@@ -6,8 +6,8 @@
  * (0x1488a0) — its spawn clock, its ranged roll, its scout. What the
  * barbarians' units then do is their AI's: the tactical pass
  * (cpu/core/tactical.ts) and their operations' and scouts' trees in it
- * (cpu/core/barbarianOps.ts). After their moves their scouts look
- * (`barbarianScouts`): a scout that sees a major's city starts its tree,
+ * (cpu/core/barbarianOps.ts). At each step their scouts look
+ * (`barbScoutLook`): a scout that sees a major's city starts its tree,
  * which walks it home; its tribe raids the city once its Boldness allows
  * (or waits for it), and the raid recruits its force from the tribe's
  * units, asking the spawn clock for the rest.
@@ -19,7 +19,7 @@
  * name is the last to be taken again.
  */
 import type { GameState, Tile, BarbTribe, Unit, UnitPool } from './types';
-import { barbOpLive, barbOpStart, barbScoutTreeStart, barbarianOpsTurn } from './barbarianOps';
+import { barbOpLive, barbOpStart, barbScoutTreeStart } from './barbarianOps';
 import { neighbors, hexDistance, tilesWithin, tileAt, offsetToAxial, axialToOffset } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
@@ -510,20 +510,6 @@ export function barbScoutLook(state: GameState, unit: Unit): void {
   }
 }
 
-/**
- * THE BARBARIANS' SCOUTS in their player's turn, after their units
- * moved: each living tribe's scouts look where they stand (the sight
- * event of their moves).
- */
-export function barbarianScouts(state: GameState): void {
-  for (const tr of tribesOf(state)) {
-    if (!tr.alive) continue;
-    for (const id of tr.scouts) {
-      const u = state.units.find((x) => x.id === id);
-      if (u && isBarbSeat(u.seat)) barbScoutLook(state, u);
-    }
-  }
-}
 
 /**
  * A BATTLE'S DEAD MOVE A TRIBE'S BOLDNESS (0x1540b0 / 0x148e90): the
@@ -613,10 +599,4 @@ export function barbarianRules(state: GameState, closing: number): void {
   barbarianTechs(state);
   campStep(state);
   for (const tr of [...tribesOf(state)]) if (tr.alive) tribeTurn(state, tr);
-  // the military AI's part of their turn after the tribes': their operations
-  // logged and refreshed, one a tribe started this turn among them
-  // (AI_Operation.csv: runs/h1_duelw1110 t42 "Barbarian City Assault,
-  // Started" before the running raid's line, the assault's "running" line
-  // the same turn)
-  barbarianOpsTurn(state);
 }

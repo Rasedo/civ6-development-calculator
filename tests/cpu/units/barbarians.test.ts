@@ -3,7 +3,7 @@ import { BARB_SEAT, isBarbSeat, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { deriveAreas } from '../../../world/query';
 import { spawnUnit } from '../../../cpu/core/units';
-import { barbarianScouts, barbarianRules, barbarianTechs, barbSlots, barbUnitFor, raiseCamp, ringPlots, tribeKindAt } from '../../../cpu/core/barbarians';
+import { barbScoutLook, barbarianRules, barbarianTechs, barbSlots, barbUnitFor, raiseCamp, ringPlots, tribeKindAt } from '../../../cpu/core/barbarians';
 import { barbOp, barbOpStart } from '../../../cpu/core/barbarianOps';
 import { addMember } from '../../../cpu/core/operations/operation';
 import { barbarianTactics, plotDistance, refreshBarbarians } from '../../../cpu/core/tactical';
@@ -133,7 +133,7 @@ describe('a barbarian raid', () => {
     // the scout's look starts its tree; the tree's tick in the tactical pass
     // finds it home: the raid starts, its own tree ticking in the same walk
     // (its spawn change and the recruit's ask)
-    barbarianScouts(state);
+    barbScoutLook(state, state.units.find((u) => u.id === tribe.scouts[0])!);
     expect(tribe.homing).toBeDefined();
     const pass = (acting: (u: Unit) => boolean) => {
       barbSlots(state);
@@ -176,7 +176,7 @@ describe('a barbarian raid', () => {
     // a Warrior two plots from the scout: its turn's reach takes the scout in
     const at = state.map.tiles[scout.tileIndex];
     const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, at.col, at.row + 2).index, 0)!;
-    barbarianScouts(state);
+    barbScoutLook(state, scout);
     const pass = () => {
       barbSlots(state);
       refreshBarbarians(state);

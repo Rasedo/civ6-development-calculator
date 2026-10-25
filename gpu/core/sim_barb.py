@@ -468,19 +468,22 @@ class SimBarb:
 
     # ------------------------------------------------------- the operations
 
-    def _barb_scout_look(self, on: torch.Tensor, k: int) -> None:
-        """`barbScoutLook` for tribe `k`'s living scout: the owned plots newly
-        visible to the barbarian player by its sight (in it now, not at its
-        last look, seen by no other unit of theirs) holding an improvement or
-        a district (a wonder among them), in plot order — per major the first, once its throttle
-        allows, sends the scout home when none walks yet and spares the major
-        further reports."""
-        sc = self.barb_unit_alive & (self.barb_unit_tribe == k) & self.barb_unit_scout
-        has = on & sc.any(dim=1)
+    def _barb_scout_look(self, on: torch.Tensor, k: int, at: torch.Tensor) -> None:
+        """`barbScoutLook` for tribe `k`'s living scout at local slot `at` [B]
+        in the games `on`, as it steps: the owned plots newly visible to the
+        barbarian player by its sight (in it now, not at its last look, seen
+        by no other unit of theirs) holding an improvement or a district (a
+        wonder among them), in plot order — per major the first, once its
+        throttle allows, sends the scout home when none walks yet and spares
+        the major further reports."""
+        ac = at.clamp(min=0).unsqueeze(1)
+        sc = (self.barb_unit_alive.gather(1, ac) & (self.barb_unit_tribe.gather(1, ac) == k)
+              & self.barb_unit_scout.gather(1, ac)).squeeze(1)
+        has = on & (at >= 0) & sc & self.tribe_alive[:, k]
         rows = has.nonzero(as_tuple=True)[0]
         if not rows.numel():
             return
-        slot = sc[rows].long().argmax(dim=1)
+        slot = at[rows]
         ut = self.barb_unit_type[rows, slot]
         pr = self.barb_unit_promos[rows, slot]
         st = torch.full_like(ut, BARB_SEAT)
@@ -546,14 +549,6 @@ class SimBarb:
             out[ri] |= self._los_disk(r, self.barb_unit_tile[r, u], rad, self._sees_through(ut, pr)) & plots[ri]
         return out
 
-    def _barbarian_scouts(self) -> None:
-        """`barbarianScouts`: each living tribe's scout looks where it stands."""
-        for k in range(int(self.n_tribes.max())):
-            on = self.tribe_alive[:, k] & (k < self.n_tribes)
-            if not bool(on.count_nonzero()):
-                continue
-            self._barb_scout_look(on, k)
-
     def _barb_battle_boldness(self, live: torch.Tensor, a_kind: str, u: int, a_seat: torch.Tensor,
                               d_slot: torch.Tensor, d_is_barb: torch.Tensor,
                               a_died: torch.Tensor, d_died: torch.Tensor) -> None:
@@ -591,11 +586,8 @@ class SimBarb:
 
     def _barbarian_rules(self) -> None:
         """`barbarianRules`: the techs, the camp step, each living tribe's turn
-        in the tribes' order, then the military AI's part of the turn (its
-        operations refreshed, one a tribe started this turn among them,
-        `_barb_ops_refresh`)."""
+        in the tribes' order."""
         self._barb_tech_step()
         self._barb_camp_step()
         for k in range(int(self.n_tribes.max())):
             self._barb_tribe_turn(k)
-        self._barb_ops_refresh()
