@@ -2461,9 +2461,10 @@ def _u_defend(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
                 continue
             uc = us.clamp(min=0)
             plot = sim.major_unit_tile[b, uc].clamp(min=0)
-            fort = sim.major_unit_fortify[b, uc] >= 2
-            marked |= ok & (sim._mops_endangered(s, us, ok, view) | sim._mops_hurt(s, us, pct)
-                            | (fort & (danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0)))
+            # a land unit (+0x650 == 2) afloat in danger
+            land = ~sim.unit_naval.take(sim.major_unit_type[b, uc].clamp(min=0, max=sim.NU - 1))
+            afloat = land & sim.water[b, plot] & (danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0)
+            marked |= ok & (sim._mops_endangered(s, us, ok, view) | sim._mops_hurt(s, us, pct) | afloat)
     c.ma[:, i] = torch.where(at, marked.long(), c.ma[:, i])
     return _status(c, BT_SUCCESS)
 
@@ -2531,10 +2532,10 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """OPERATION DEFEND UNITS' execution (0x80d790) where marked, per team
     over its members outside Protect Outside Range of the target: the
     endangered — not bombard, with Movement, out of a city — to their safe
-    plots (0x716b90); then the hurt (or fortified afloat in danger): a
-    promotion due taken (`_promote_due`); not bombard: one not dug in off
-    friendly ground released, its orders ending there (0x73d1f0 removes it
-    from copies of the teams, so it stays the team's); one fortified afloat to its safe
+    plots (0x716b90); then the hurt (or a land unit afloat in danger): a
+    promotion due taken (`_promote_due`); not bombard: a ship (+0x650 == 0)
+    off friendly ground released, its orders ending there (0x73d1f0 removes it
+    from copies of the teams, so it stays the team's); a land unit afloat to its safe
     plot; one with Movement on a plot paying a plunder pillages it
     (`_plunder`); one with Movement on the ground of a player it is at war
     with or a plot of danger to its safe plot; each fortified (its turn ends
@@ -2600,20 +2601,21 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             uc = us.clamp(min=0)
             ok &= (sim.major_unit_mp[b, uc] > 0) & off(us)
             plot = sim.major_unit_tile[b, uc].clamp(min=0)
-            fort = sim.major_unit_fortify[b, uc]
+            ut = sim.major_unit_type[b, uc].clamp(min=0, max=sim.NU - 1)
+            ship = sim.unit_naval.take(ut)
             wat = sim.water[b, plot]
             dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
-            afloat = (fort >= 2) & wat & dang
-            ok &= sim._mops_hurt(s, us, pct) | afloat
-            ut = sim.major_unit_type[b, uc].clamp(min=0, max=sim.NU - 1)
+            ok &= sim._mops_hurt(s, us, pct) | (~ship & wat & dang)
             # a promotion due: the AI's pick, its turn done
             _promote_due(sim, ok, uc)
             done[b, uc] = torch.where(ok & (sim.major_unit_mp[b, uc] <= 0), True, done[b, uc])
             ok &= sim._type_bombard.take(ut) <= 0
             if not bool(ok.any()):
                 continue
-            ok &= ~((fort == 0) & (sim.tile_seat[b, plot] != seat))
-            sea = ok & (fort >= 2) & wat
+            # a ship (+0x650 == 0) off friendly ground released, its orders
+            # ending there; a land unit afloat to its safe plot
+            ok &= ~(ship & (sim.tile_seat[b, plot] != seat))
+            sea = ok & ~ship & wat
             to_safe(us, sea, True)
             ok &= live(us)
             plot = sim.major_unit_tile[b, uc].clamp(min=0)

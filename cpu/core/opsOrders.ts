@@ -87,8 +87,12 @@ const damageOf = (u: Unit): number => COMBAT_MAX_HIT_POINTS - u.hp;
 const hurt = (u: Unit, pct: number): boolean =>
   damageOf(u) >= Math.fround(COMBAT_MAX_HIT_POINTS * Math.fround(pct * Math.fround(0.01)));
 
-/** the unit fortified (+0x650 == 2, two turns dug in) */
-const fortified = (u: Unit): boolean => (u.fortifyTurns ?? 0) >= 2;
+/** the unit's domain (+0x650: 0 sea, 1 air, 2 land) is the land's */
+const landUnit = (u: Unit): boolean => !UNITS[u.type]?.naval && UNITS[u.type]?.air === undefined;
+
+/** a land unit afloat on a plot of danger (+0x650 == 2, 0x834d0) */
+const afloatInDanger = (state: GameState, pass: Pass, u: Unit): boolean =>
+  landUnit(u) && isWater(state.map.tiles[u.tileIndex]) && pass.danger[u.tileIndex] > 0;
 
 /**
  * THE TEAM UPDATE'S ENDANGERED (0x738f20 over the members): per member, the
@@ -149,7 +153,7 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
     flagged: (members, pct) => {
       const us = unitsOf(members);
       if (endangered(state, pass, us).length) return true;
-      return us.some((u) => hurt(u, pct) || (fortified(u) && pass.danger[u.tileIndex] > 0));
+      return us.some((u) => hurt(u, pct) || afloatInDanger(state, pass, u));
     },
     execute: (members, target, pct, range) => {
       const lines: { type: string; what: string }[] = [];
@@ -165,11 +169,10 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
           changed();
         }
       }
-      // the hurt, or fortified afloat in danger
+      // the hurt, or a land unit afloat in danger
       for (const u of us) {
         if (!state.units.includes(u) || u.movesLeft <= 0 || !off(u, target, range)) continue;
-        const afloat = fortified(u) && isWater(state.map.tiles[u.tileIndex]) && pass.danger[u.tileIndex] > 0;
-        if (!hurt(u, pct) && !afloat) continue;
+        if (!hurt(u, pct) && !afloatInDanger(state, pass, u)) continue;
         // a promotion due: the AI's pick, its turn done
         const k = aiPromotionPick(u);
         if (k >= 0 && takePromotion(u, k)) {
@@ -178,10 +181,11 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
           changed();
         }
         if (aiStrengths(state, u).bombard > 0) continue;
-        // one not dug in off friendly ground is released (0x73d1f0): its
-        // orders end there, its team keeps it
-        if ((u.fortifyTurns ?? 0) === 0 && groundOf(state, seat, u.tileIndex) !== 1) continue;
-        if (fortified(u) && isWater(state.map.tiles[u.tileIndex])) {
+        // a ship (+0x650 == 0) off friendly ground is released (0x73d1f0):
+        // its orders end there, its team keeps it
+        if (UNITS[u.type]?.naval && groundOf(state, seat, u.tileIndex) !== 1) continue;
+        // a land unit afloat to its safe plot
+        if (landUnit(u) && isWater(state.map.tiles[u.tileIndex])) {
           const to = passSafePlot(state, pass, u);
           passFinish(pass, u, 'Operation', u.tileIndex);
           if (to >= 0) {

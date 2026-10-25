@@ -94,7 +94,7 @@ export function scoreTable(s: DecisionScores): string[] {
 /** the memory agreement table: per memory kind the player-turns compared,
  *  those whose memory equals the logs', the first that did not */
 export function memoryTable(s: DecisionScores): string[] {
-  const out = ['| memory | player-turns | equal to the logs | % | first differing (turn, player: ours / logs) |', '|---|---:|---:|---:|---|'];
+  const out = ['| memory | player-turns | equal to the game\'s | % | first differing (turn, player: ours / game) |', '|---|---:|---:|---:|---|'];
   for (const [k, x] of Object.entries(s)) out.push(`| ${k} | ${x.compared} | ${x.equal} | ${pct(x)} | ${firstOf(x.first)} |`);
   return out;
 }
@@ -108,7 +108,7 @@ export function aiScoreMarkdown(r: { dump: string; turns: number[]; stopped?: st
     'turn t, the majors\' actions the record\'s; each decision against the game\'s logs of turn t and record t+1. "Memory clean":',
     'the decisions of a minor or barbarian player whose carried memory, at the end of its turn before, equalled every kind',
     'the game\'s logs show of it (the memory table below).', '',
-    ...scoreTable(r.scores), '', '## The AI\'s memory against the game\'s logs', '', ...memoryTable(r.memory),
+    ...scoreTable(r.scores), '', '## The AI\'s memory against the game\'s (its own memory beside the recording, else its logs)', '', ...memoryTable(r.memory),
     '', '## What each kind compares', '',
     ...Object.entries(KIND_NOTES).map(([k, v]) => `- ${k}: ${v}`)];
   const none = unscored(r.scores);

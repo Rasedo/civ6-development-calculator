@@ -834,9 +834,10 @@ class SimBarbOps:
                 continue
             uc = us.clamp(min=0)
             plot = self.barb_unit_tile[b, uc].clamp(min=0)
-            fort = self.barb_unit_fortify[b, uc] >= 2
-            marked |= ok & (self._bop_endangered(us, ok, ctx) | self._bop_hurt(us, pct)
-                            | (fort & (danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0)))
+            # a land unit (+0x650 == 2) afloat in danger
+            land = ~self.unit_naval.take(self.barb_unit_type[b, uc].clamp(min=0, max=self.NU - 1))
+            afloat = land & self.water[b, plot] & (danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0)
+            marked |= ok & (self._bop_endangered(us, ok, ctx) | self._bop_hurt(us, pct) | afloat)
         return marked
 
     def _bop_defend_exec(self, g: torch.Tensor, team: list, target: torch.Tensor, pct: int, rng: int,
@@ -845,10 +846,10 @@ class SimBarbOps:
         where `g` (marked) over the team's slots `team` in its order, the
         members outside `rng` of `target` (-1: all): the endangered — not
         bombard, with Movement, out of a city centre — to their safe plots
-        (0x716b90); then the hurt (or fortified afloat in danger), not
-        bombard: one not dug in released (no plot is the barbarians' own
+        (0x716b90); then the hurt (or a land unit afloat in danger), not
+        bombard: a ship released (+0x650 == 0; no plot is the barbarians' own
         ground; 0x73d1f0 removes it from copies of the teams, so it stays
-        the operation's), its orders ending there; one fortified afloat to
+        the operation's), its orders ending there; a land unit afloat to
         its safe plot; one with Movement on a plot of danger to its safe plot
         (the barbarians hold no war rows); each fortified, its turn ended"""
         B, dev = self.B, self.device
@@ -895,19 +896,19 @@ class SimBarbOps:
             uc = us.clamp(min=0)
             ok &= (self.barb_unit_mp[b, uc] > 0) & off(us)
             plot = self.barb_unit_tile[b, uc].clamp(min=0)
-            fort = self.barb_unit_fortify[b, uc]
+            ut = self.barb_unit_type[b, uc].clamp(min=0, max=self.NU - 1)
+            ship = self.unit_naval.take(ut)
             wat = self.water[b, plot]
             dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
-            ok &= self._bop_hurt(us, pct) | ((fort >= 2) & wat & dang)
-            ut = self.barb_unit_type[b, uc].clamp(min=0, max=self.NU - 1)
+            ok &= self._bop_hurt(us, pct) | (~ship & wat & dang)
             ok &= self._type_bombard.take(ut) <= 0
             if not bool(ok.any()):
                 continue
-            rel = ok & (fort == 0)
+            rel = ok & ship
             # a member released ends its turn in the walk that holds it
             done[b, uc] = torch.where(rel, True, done[b, uc])
             ok &= ~rel
-            to_safe(us, ok & (fort >= 2) & wat, True)
+            to_safe(us, ok & ~ship & wat, True)
             ok &= self._bop_live(us)
             plot = self.barb_unit_tile[b, uc].clamp(min=0)
             dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0

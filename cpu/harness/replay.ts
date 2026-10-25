@@ -32,7 +32,7 @@
  * from the game's draw log where the recording kept it.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import type { BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Tile, Unit } from '../core/types';
+import type { ArmyRecord, BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Tile, Unit } from '../core/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { NO_SEAT, type Governor } from '../core/types';
@@ -130,7 +130,7 @@ import { OperationsProbe, operationsMarkdown, type OperationsTally } from './ope
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 import { newScores, scoreDecision, scoreTable, memoryTable, type DecisionScores } from './aiScore';
-import { MemoryLogs, readMemory, type ArmyLogged } from './aiMemory';
+import { GameMemory, MemoryLogs, readGameMemory, readMemory, type ArmyLogged } from './aiMemory';
 import { NO_SCORE } from '../core/aiPolicyValue';
 
 /** what became of one decision */
@@ -278,6 +278,9 @@ interface Ctx {
    *  barbarian player whether its memory at the end of its turn before
    *  equalled them, which this pair's decisions read */
   memoryLogs: MemoryLogs;
+  /** the game's own AI memory beside the recording, where it holds one
+   *  (`<stem>.aimem.jsonl`): the memory compared against it instead */
+  gameMemory?: GameMemory;
   /** per seat its knowledge base as its last tactical turn logged it */
   armyLogged: Map<number, ArmyLogged>;
   memoryClean: Map<number, boolean>;
@@ -3930,7 +3933,43 @@ function bindQueuedContracts(ctx: Ctx, cs: CityState, imp: Imported, turn: numbe
  * its plots and its grants with it. The replay's own carry-overs of the
  * world (the production banked on items switched away from) start empty.
  */
-function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, fromLog: boolean): void {
+/**
+ * The game's knowledge bases at the end look of `turn` (`GameMemory`) onto
+ * the pair's world: per minor, Free Cities and barbarian seat its army
+ * records — each the unit the record holds under that game id (its engine
+ * id), else a fresh id; its owner's seat, its engine type, its plot, seen
+ * at `turn` less its age (the records aged at `turn`), no damage (the game's
+ * record holds none the reader names) — and its camps in the game's order.
+ */
+function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: number): void {
+  let fresh = -1;
+  for (const s of [...world.cityStates, ...(world.freeSeat ? [world.freeSeat] : []), world.barbSeat]) {
+    const pid = imp.playerOfSeat.get(s.seat);
+    const read = pid === undefined ? undefined : ctx.gameMemory!.at('endlook', turn, pid);
+    if (!read) continue;
+    const recs: ArmyRecord[] = [];
+    for (const [owner, per] of Object.entries(read.army ?? {})) {
+      const seat = imp.seatOfPlayer.get(Number(owner));
+      if (seat === undefined) continue;
+      for (const [t, rows] of Object.entries(per)) {
+        const type = engineRowOf(ctx.cat, 'unit', Number(t));
+        if (!type) continue;
+        for (const r of rows) {
+          const u = ctx.units.get(`${owner}:${r[0]}`);
+          recs.push({ id: u ? u.id : fresh--, owner: seat, type, seen: turn - r[3], plot: r[5] * ctx.W + r[4], damage: 0 });
+        }
+      }
+    }
+    if (recs.length) s.armyKnown = recs;
+    else delete s.armyKnown;
+    s.armyAged = turn;
+    const camps = (read.camps ?? []).map((c) => c[1] * ctx.W + c[0]);
+    if (camps.length) s.campsKnown = camps;
+    else delete s.campsKnown;
+  }
+}
+
+function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, fromLog: boolean, fromAimem: boolean): void {
   const { state } = ctx;
   const world = deserialize(serialize(imp.state));
   const live = new Set(state.units);
@@ -3991,6 +4030,10 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
       else delete s.campsKnown;
     }
   }
+  // the game's own memory instead (`--memory aimem`): each minor's and the
+  // barbarians' knowledge base — the army records and the camps — as its
+  // end look of the turn before left them (`<stem>.aimem.jsonl`)
+  if (fromAimem && ctx.gameMemory) importGameKnowledge(ctx, world, imp, a.turn - 1);
   carryFields(state, world, [...GAME_MEMORY, ...GAME_STORES]);
   for (const key of Object.keys(state)) if (!(key in world)) delete (state as unknown as Record<string, unknown>)[key];
   Object.assign(state, world);
@@ -4005,6 +4048,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   /** with `aiScore`, the memory the game's logs hold whole (the knowledge
    *  bases' camps) taken from them each pair instead of carried */
   memoryFromLog?: boolean;
+  /** with `aiScore`, the game's own knowledge bases (army records, camps)
+   *  taken each pair from `<stem>.aimem.jsonl` instead of carried */
+  memoryFromAimem?: boolean;
   /** called after each pair is compared, with the engine state and record t+1 */
   onPair?: (state: GameState, b: TurnRecord, decisions: Decision[]) => void } = {}): ReplayReport {
   const { cat, recs } = loadRecords(dumpPath, opts.from ?? -Infinity, opts.to ?? Infinity);
@@ -4103,7 +4149,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies, majorCivicEntries: new Map(),
-    scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), armyLogged: new Map(),
+    scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(),
     // a game from its first turn opens on no memory, the game's as well
     memoryClean: new Map([...first.playerOfSeat].filter(([seat]) => minorAiSeat(seat) || isBarbSeat(seat)).map(([, p]) => [p, recs[0].turn <= 1] as const)),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
@@ -4176,7 +4222,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       report.stopped = `no record of turn ${a.turn + 1}`;
       break;
     }
-    if (opts.aiScore && i > 0) perTurnWorld(ctx, a, ctx.next, history, opts.memoryFromLog ?? false);
+    if (opts.aiScore && i > 0) perTurnWorld(ctx, a, ctx.next, history, opts.memoryFromLog ?? false, opts.memoryFromAimem ?? false);
     if (state.turn !== a.turn) {
       report.stopped = `engine at turn ${state.turn}, record at ${a.turn}`;
       break;
@@ -4611,7 +4657,14 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         const pid = ctx.playerOfSeat.get(s.seat);
         if (pid === undefined) continue;
         const logged = ctx.armyLogged.get(s.seat);
-        const reads = readMemory(ctx.memoryLogs, s, pid, a.turn, ctx.W, (seat) => ctx.playerOfSeat.get(seat) ?? seat, logged);
+        const playerOf = (seat: number) => ctx.playerOfSeat.get(seat) ?? seat;
+        const unitType = (id: number) => {
+          const u = state.units.find((x) => x.id === id);
+          return u ? gameTypeOf('unit', u.type, 'UNIT_') : undefined;
+        };
+        const reads = ctx.gameMemory
+          ? readGameMemory(ctx.gameMemory, cat, s, pid, a.turn, ctx.W, playerOf, logged, unitType)
+          : readMemory(ctx.memoryLogs, s, pid, a.turn, ctx.W, playerOf, logged);
         for (const m of reads) {
           scoreDecision(report.memory, m.kind, a.turn, `p${pid}`, m.equal, m.ours, m.game);
           // REPLAY_TRACE=memory: each kind that differs

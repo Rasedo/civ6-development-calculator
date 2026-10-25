@@ -42,9 +42,9 @@ export interface DiplomacyRequest {
 /** OPERATION DEFEND UNITS' orders (0x80ee70 / 0x80d790) for a team's
  *  members in the seat's units' turn: `flagged` the update's test — a
  *  member endangered (the team update's list, 0x738f20), hurt to the
- *  percentage or fortified in danger; `execute` the execution's — the
- *  endangered to their safe plots; the hurt promoted where a promotion is
- *  due, released off friendly ground (0x73d1f0: its assignment cleared, its
+ *  percentage or a land unit afloat in danger; `execute` the execution's —
+ *  the endangered to their safe plots; the hurt promoted where a promotion
+ *  is due, a ship released off friendly ground (0x73d1f0: its assignment cleared, its
  *  team untouched — the member's removal runs on a copy of each team, so it
  *  stays the operation's), pillaging where the plot pays a plunder, moved
  *  off a plot of danger (a barbarian not), fortified — its lines */
@@ -769,7 +769,8 @@ const turnLimiter: BtHandler<OpsContext> = {
 
 // OPERATION DEFEND UNITS (0x80ee70 update, 0x80d790 execution): the update
 // SUCCEEDS, marking the node where a team's member is endangered, hurt to
-// AutoProtect Percentage (33) of its hit points, or fortified in danger; the
+// AutoProtect Percentage (33) of its hit points, or a land unit afloat in
+// danger; the
 // marked node's execution protects the members outside Protect Outside
 // Range (-1: all) of the target; a unit it releases stays in its team
 const operationDefendUnits: BtHandler<OpsContext> = {

@@ -5,7 +5,7 @@
  *
  *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> [--out <report.json>] [--from T] [--to T]
  *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --replay <replay.json> [--from T] [--to T]
- *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --aiscore <out> [--memory log] [--from T] [--to T]
+ *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --aiscore <out> [--memory log|aimem] [--from T] [--to T]
  *
  * Writes `<dump>.report.json` (or `--out`) and its Markdown digest
  * (`.report.md`): per check the counts (pass, fail, skip by reason, and how
@@ -20,7 +20,9 @@
  * (`perTurnWorld`): the city-states', Free Cities' and barbarians' AI scored
  * turn by turn, decision by decision (`aiScore.ts`), into `<out>.json` and
  * `<out>.md`; `--memory log` takes the memory the game's logs hold whole
- * from them each pair instead.
+ * from them each pair instead, `--memory aimem` the game's own knowledge bases
+ * (`<stem>.aimem.jsonl`). A recording with the game's AI memory beside it is
+ * compared against that (`readGameMemory`), else against its logs.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
@@ -208,7 +210,7 @@ function main() {
   if (!dump) throw new Error('usage: run.ts <dump.jsonl> [--out file | --replay file] [--from T] [--to T]');
   if (opt.aiscore) {
     const r = runReplay(dump, { from: opt.from ? Number(opt.from) : undefined, to: opt.to ? Number(opt.to) : undefined, aiScore: true,
-      memoryFromLog: opt.memory === 'log' });
+      memoryFromLog: opt.memory === 'log', memoryFromAimem: opt.memory === 'aimem' });
     const stem = opt.aiscore.replace(/\.(json|md)$/, '');
     const { perTurn, ...rest } = r;
     writeFileSync(`${stem}.json`, JSON.stringify({ ...rest, pairs: perTurn.length }, null, 1) + '\n');
