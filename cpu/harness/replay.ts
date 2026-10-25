@@ -64,7 +64,7 @@ import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
 import { barbarianTactics, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
-import { barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
+import { barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, holdBarbBattles, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
@@ -225,6 +225,9 @@ interface Ctx {
   /** the record's new units of those city-states the engine has not made,
    *  matched once the clearings' lumps have landed (`minorClearsAfter`) */
   minorClearUnits: { d: Extract<Decision, { kind: 'unitNew' }>; ds: readonly Decision[] }[];
+  /** this pair's barbarian attacks' boldness and counts, landed after their
+   *  rules (`holdBarbBattles`) */
+  barbBattles: (() => void)[];
   /** the city-states' units as each one's own engine turn left them, before
    *  the record's sync (`minorTurns`): their copy's turn opens so (a unit its
    *  city trained where it was made), a Builder record t+1 lost to its own
@@ -764,6 +767,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   const opLines: string[] = [];
   traceBarbOps((l) => opLines.push(l));
   barbarianRules(state, closing);
+  for (const land of ctx.barbBattles.splice(0)) land();
   // where the pair's first record holds each unit its moves took off
   const from = new Map([...moved.keys()].map((u) => [u, u.tileIndex] as const));
   for (const [u, at] of moved) u.tileIndex = at;
@@ -4649,7 +4653,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorClearUnits: [], minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorClearUnits: [], barbBattles: [], minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -5256,7 +5260,16 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     fortifyOrders(ctx, a, b);
     // the city-states', Free Cities' and barbarians' decisions, and what
     // record t+1 shows of every unit (its loss, its health)
-    applyPhase(ctx, ds, 'after', b, b);
+    // (a barbarian's own attack moves its tribe's boldness and counts after
+    // their rules, `barbarianTurn`)
+    const barbBattles: (() => void)[] = [];
+    holdBarbBattles((land) => { barbBattles.push(land); return true; });
+    try {
+      applyPhase(ctx, ds, 'after', b, b);
+    } finally {
+      holdBarbBattles(null);
+    }
+    ctx.barbBattles = barbBattles;
     for (const u of struckHp.keys()) {
       if (!state.units.includes(u) || u.hp >= UNIT_HP) continue;
       const rest = { ...u };

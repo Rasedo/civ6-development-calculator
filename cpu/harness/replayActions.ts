@@ -925,12 +925,15 @@ export class RecordedActions implements ActionSource {
         if (!hit(r)) return;
         const pv = ev.slice(Math.max(0, i - 3), i).reverse().find((x) => x[2] === 'UnitDamageChanged');
         const counter = n(r, 0) === actor && !!pv && hit(pv) && n(pv, 0) !== actor;
+        // the battle's row of the combat log, where it holds one
+        let logged: CombatRow | undefined;
         if (!counter) {
           // the shots at cities before this battle drew first
           const j = n(r, 0) === actor
             ? rowOf((x) => x.atkObj === 1 && x.defObj === 3 && x.atkId === n(r, 1) && !cityShot(x))
             : rowOf((x) => x.defObj === 1 && x.defCiv === n(r, 0) && x.defId === n(r, 1));
           if (j !== undefined) shoot(r[0] as number, j);
+          if (j !== undefined) logged = combat[j];
         }
         const k = hits;
         hits += 1;
@@ -961,7 +964,13 @@ export class RecordedActions implements ActionSource {
         let attacker = countered ? `${n(nx, 0)}:${n(nx, 1)}` : acting;
         let from = attacker === undefined ? undefined : pos.get(attacker);
         const at = pos.get(defender);
-        if (!countered && at !== undefined && (attacker === undefined || from === undefined || !reaches(attacker, from, at))) {
+        // a blow the combat log names a district's is its city's shot, though
+        // a unit of the actor's that reaches set acting last (runs/h1_duely1128
+        // t97: China's Crossbowman shoots barbarian Swordsman 3997709 for 30
+        // and its city's centre, "3:1" 65536, kills it for the 22 left,
+        // the Crossbowman's activity around both)
+        const districtShot = !countered && logged?.atkObj === 3;
+        if (!countered && at !== undefined && (districtShot || attacker === undefined || from === undefined || !reaches(attacker, from, at))) {
           // a blow the last acting unit could not have dealt is its city's
           // shot (cities log no activity), else the last acting unit's of
           // the actor that reaches (runs/h1_duelw1124 t23: a barbarian

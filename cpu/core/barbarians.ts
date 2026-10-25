@@ -390,11 +390,6 @@ function raise(state: GameState, tribe: BarbTribe, tag: BarbTag, radius: number,
   return out;
 }
 
-/** the tribe that raised a unit */
-function tribeOfUnit(state: GameState, id: number): BarbTribe | undefined {
-  return tribesOf(state).find((tr) => tr.units.includes(id) || tr.scouts.includes(id));
-}
-
 /** a player's handicap (a Difficulties index): a seat's own, else the AI's */
 export function handicapOf(state: GameState, seat: number): number {
   return state.seats[seat]?.handicap ?? DEFAULT_HANDICAP;
@@ -531,31 +526,53 @@ export function barbScoutLook(state: GameState, unit: Unit): void {
 }
 
 
+/** THE BARBARIANS' OWN BATTLES HELD: the action replay lands the record's
+ *  battles before the barbarians' turn, where the game fights a barbarian's
+ *  attack after their rules (each tribe's turn); it takes such a battle's
+ *  boldness and counts (true) to land after `barbarianRules`
+ *  (runs/h1_duely1128 t141: tribe 1's Warrior and Man-at-Arms die on
+ *  China's Courser after its strike found five, so it raises none). Null
+ *  outside a replay. */
+let battlesHeld: ((land: () => void) => boolean) | null = null;
+export function holdBarbBattles(held: typeof battlesHeld): void {
+  battlesHeld = held;
+}
+
 /**
  * A BATTLE'S DEAD MOVE A TRIBE'S BOLDNESS (0x1540b0 / 0x148e90): the
  * defender dead, else the attacker — an enemy a tribe's unit killed
  * BARBARIAN_BOLDNESS_PER_KILL, a tribe's unit lost
  * BARBARIAN_BOLDNESS_PER_UNIT_LOST, its scout BARBARIAN_BOLDNESS_PER_SCOUT_LOST.
+ * A tribe's units its camp's defender among them, which no raise counts but
+ * whose death lowers the count (runs/h1_duely1128 t121: tribe 3's Spearman
+ * on 4:1 dies attacking a Man-at-Arms, its five Quadriremes standing, and
+ * the tribe raises a sixth at its t123 strike).
  */
 export function barbBattleBoldness(state: GameState, attacker: Unit, defender: Unit, aDied: boolean, dDied: boolean): void {
   if (!dDied && !aDied) return;
+  if (isBarbSeat(attacker.seat) && battlesHeld?.(() => barbBattleBoldness(state, attacker, defender, aDied, dDied))) return;
   const [killer, victim] = dDied ? [attacker, defender] : [defender, attacker];
   if (isBarbSeat(killer.seat) && !isBarbSeat(victim.seat)) {
-    const tr = tribeOfUnit(state, killer.id);
+    const tr = tribeOf(state, killer.id);
     if (tr) tr.boldness = (tr.boldness ?? 0) + BARB_BOLD_KILL;
-  } else if (isBarbSeat(victim.seat) && !isBarbSeat(killer.seat)) {
-    const tr = tribeOfUnit(state, victim.id);
-    if (!tr) return;
-    // the counts its turn reads fall (0x148e90): a scout's, its wait begun
-    // again; any other's but a support unit's
-    if (tr.scouts.includes(victim.id)) {
-      tr.boldness = (tr.boldness ?? 0) + BARB_BOLD_SCOUT_LOST;
-      tr.scoutCount -= 1;
-      tr.scoutTurns = 0;
-    } else {
-      tr.boldness = (tr.boldness ?? 0) + BARB_BOLD_UNIT_LOST;
-      if (unitDomain(victim.type) !== 'support') tr.unitCount -= 1;
-    }
+  } else if (isBarbSeat(victim.seat) && !isBarbSeat(killer.seat)) barbUnitLost(state, victim);
+}
+
+/** A TRIBE'S UNIT LOST in a unit battle (0x148e90; a city's shot lowers
+ *  nothing: runs/h1_duely1128 t97, tribe 1's Swordsman to China's centre,
+ *  no raise in its place at t106): its boldness falls and the counts its
+ *  turn reads — a scout's, its wait begun again; any other's but a support
+ *  unit's */
+function barbUnitLost(state: GameState, victim: Unit): void {
+  const tr = tribeOf(state, victim.id);
+  if (!tr) return;
+  if (tr.scouts.includes(victim.id)) {
+    tr.boldness = (tr.boldness ?? 0) + BARB_BOLD_SCOUT_LOST;
+    tr.scoutCount -= 1;
+    tr.scoutTurns = 0;
+  } else {
+    tr.boldness = (tr.boldness ?? 0) + BARB_BOLD_UNIT_LOST;
+    if (unitDomain(victim.type) !== 'support') tr.unitCount -= 1;
   }
 }
 
@@ -563,7 +580,7 @@ export function barbBattleBoldness(state: GameState, attacker: Unit, defender: U
  *  pillage, a coastal raid): the tribe's raid score grows */
 export function barbPillageScore(state: GameState, unit: Unit): void {
   if (!isBarbSeat(unit.seat)) return;
-  const tr = tribeOfUnit(state, unit.id);
+  const tr = tribeOf(state, unit.id);
   if (tr) tr.score = (tr.score ?? 0) + BARB_PILLAGE_SCORE;
 }
 

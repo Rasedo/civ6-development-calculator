@@ -589,15 +589,25 @@ class SimBarb:
         lo, hi = self.POOL_LO["barb"], self.POOL_HI["barb"]
         neg = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
         a_barb = a_seat == BARB_SEAT
+        K = max(int(self.n_tribes.max()), 1)
+
+        def tribe_of(slot: torch.Tensor) -> torch.Tensor:
+            # the tribe a unit was raised by, its camp's defender among them
+            # (`tribeOf`)
+            own = self.barb_unit_tribe[bidx, slot]
+            hit = self.tribe_defender[:, :K] == slot.unsqueeze(1)
+            dk = torch.where(hit.any(dim=1), hit.long().argmax(dim=1), neg)
+            return torch.where(own >= 0, own, dk)
+
         if a_kind == "barb":
-            a_tr, a_sc = self.barb_unit_tribe[:, u], self.barb_unit_scout[:, u]
+            a_tr, a_sc = tribe_of(torch.full_like(neg, u)), self.barb_unit_scout[:, u]
             a_ty = self.barb_unit_type[:, u]
         else:
             a_tr, a_sc = neg, torch.zeros_like(kd)
             a_ty = neg
         d_in = (d_slot >= lo) & (d_slot < hi)
         dl = (d_slot - lo).clamp(min=0, max=hi - lo - 1)
-        d_tr = torch.where(d_in, self.barb_unit_tribe[bidx, dl], neg)
+        d_tr = torch.where(d_in, tribe_of(dl), neg)
         d_sc = d_in & self.barb_unit_scout[bidx, dl]
         d_ty = torch.where(d_in, self.barb_unit_type[bidx, dl], neg)
         bb = self._bb
