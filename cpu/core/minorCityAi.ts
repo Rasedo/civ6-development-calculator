@@ -76,7 +76,6 @@ import { tileAppeal } from './appeal';
 import { builderHarvest, builderRemoveFeature, tileFreeForUnit } from './units';
 import { aiStrengths, dangerPlane, moveTo, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
-import { minorTradeList } from './aiTrade';
 import {
   installType, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
   minorProjectFacts, minorResourceCounts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
@@ -815,8 +814,6 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean): vo
   const ai = (cs.cityAi ??= newCityAi());
   const eco = (cs.economy ??= newEconomicMemory());
   // A: the city's update
-  // its trade list, kept at the city's analysis (none the turn it is founded)
-  if (!fresh) minorTradeList(state, cs);
   // a founding turn's first look reads the military AI's unit production
   // table as it stood before the city: no known unit, every entry 1.0
   // (runs/h1_duelv1117 t1: every city-state's Warrior, Slinger and Builder

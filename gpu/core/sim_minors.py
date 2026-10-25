@@ -48,12 +48,18 @@ class SimMinors:
             self._minor_military_turn(s)
             self._minor_knowledge(s, True)
             self._minor_upgrades(s, gained)
+            # its city AI ran before this turn (the City Analysis job's list
+            # takes none the turn the city is founded)
+            ran = self.citystate_ai_on[:, s].clone()
             self._minor_ai_turn(s)
             self._minor_trade(s)
             self._city_strikes(self._CITY_MINOR0 + s, col0, alive)
             self._minor_tactics(s)
-            # its knowledge base's trade record at its tactical turn
+            # its knowledge base's route value K at its tactical turn, on the
+            # trade list of the turn before; then the City Analysis job's
+            # list of the turn (`minorPhase`)
             self._minor_trade_value(s, alive)
+            self._minor_trade_list(s, alive & ran & (self.citystate_center[:, s] >= 0))
             self._minor_knowledge(s, False)
             # the boosts its turn earned
             self._detect_minor_boosts(s, alive)
@@ -302,6 +308,17 @@ class SimMinors:
             self.major_unit_levied[m] = False
             self.major_unit_levy_src[m] = -1
             self._gen_ver += 1
+            # each unit made anew under the minor (`sendLevyHome`): the
+            # record it held of the unit before the levy a gone unit's, and
+            # a record of the unit it made
+            b, u = m.nonzero(as_tuple=True)
+            g = u + self.POOL_LO["major"]
+            slot = self.citystate_kb_slot[:, s]
+            own = self.citystate_kb_owner[:, s]
+            for j, (bi, gi) in enumerate(zip(b.tolist(), g.tolist())):
+                gone = (slot[bi] == gi) & (own[bi] == 100 + s)
+                slot[bi][gone] = -1
+                self._kb_birth(s, 100 + s, b[j:j + 1], g[j:j + 1])
         self.citystate_levy_seat[:, s] = torch.where(back, torch.full_like(ls, -1), ls)
         self.citystate_levy_ends[:, s] = torch.where(back, torch.full_like(ls, -1), self.citystate_levy_ends[:, s])
 

@@ -88,7 +88,7 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, levyUnitHome, releaseLevies, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -2228,8 +2228,12 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           ctx.units.set(to, u);
           if (u.seat === seat) { count(ctx, 'levyEnd', 'applied'); continue; }
           if (TRACE.has('levyEnd')) { const cs = state.cityStates.find((c) => c.seat === seat); console.error(`   levyEnd ${from} seat${u.seat} levied${u.leviedFrom} cs${seat} levySeat${cs?.levySeat} ends${cs?.levyEnds} turn${state.turn}`); }
-          u.seat = seat;
-          delete u.leviedFrom;
+          const cs = state.cityStates.find((c) => c.seat === seat);
+          if (cs) levyUnitHome(state, cs, u);
+          else {
+            u.seat = seat;
+            delete u.leviedFrom;
+          }
           count(ctx, 'levyEnd', 'fallback', d.player);
         }
         break;

@@ -3,8 +3,9 @@
  * the knowledge base's trade record; `tools/civ6lab/dll_readings.md` "C-96:
  * the trade AI's route value").
  *
- * THE CITY'S TRADE LIST (CityBuildAI +0x870, kept by 0x78f210 at the city's
- * analysis): per known city in the knowledge base's order not yet sorted
+ * THE CITY'S TRADE LIST (CityBuildAI +0x870, kept by 0x78f210 in the city's
+ * City Analysis job 0x5ce3f0, which runs after the knowledge base's tactical
+ * turn): per known city in the knowledge base's order not yet sorted
  * whose centre the minor has revealed (0x2d2220, `CityState.revealed`; an
  * unrevealed one is not tried), a trade path from the city (the
  * Trade_Movement pathfinder 0x559140, `routeInRange`) lists it, else it goes
@@ -19,7 +20,8 @@
  * (0x526330 with its last argument 1: `minorRouteOriginYields` on a route
  * with no course) valued (`yieldValue`, 0x7a6690) and summed — never below
  * 0. The knowledge base updates it at its tactical turn, after the city's
- * update: the city build AI's Trader value reads the one of the turn before
+ * update and before its City Analysis job, so on the list of the turn
+ * before: the city build AI's Trader value reads the K of the turn before
  * (`traderValue`).
  *
  * The known cities are the route scorer's (`minorRouteCandidate`): the other

@@ -170,8 +170,7 @@ class SimMinorAi:
         ai = self.cityai
         fresh = alive & ~self.citystate_ai_on[:, s]
         self.citystate_ai_on[:, s] |= alive
-        # A: the city's update; its trade list, kept at the city's analysis
-        self._minor_trade_list(s, alive & ~fresh)
+        # A: the city's update
         f = self._cv_minor_facts(s)
         # a founding turn's first look: the unit production table with no
         # known unit (`minorAiTurn`)

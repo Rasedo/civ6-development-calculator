@@ -75,7 +75,7 @@ import { cityGrowth, majorView, storeUnitStrength } from './majorView';
 import { civicPolicyBest, governmentValues, policyScores } from './aiPolicyValue';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
-import { minorTradeValue } from './aiTrade';
+import { minorTradeList, minorTradeValue } from './aiTrade';
 
 /** One minor at a time — a district one minor lands may lend a neighbour's
  *  district adjacency across the border, so the next minor's yields read it.
@@ -129,8 +129,14 @@ export function minorPhase(state: GameState): void {
     const city = minorCity(cityState);
     cityStrikes(state, city, cityStrikeStrength(state, city));
     if (!ordersHeld) cityStateMilitary(state, cityState);
-    // its knowledge base's trade record at its tactical turn, after its city's update
+    // its knowledge base's route value K at its tactical turn, after its
+    // city's update (whose builds read the K of the turn before), on the
+    // trade list its City Analysis job kept the turn before; then that job's
+    // list of the turn (none the turn the city is founded): runs/h1_duelw1121
+    // Antioch meets Rome at t6, its K 1.80 from t7; Hunza meets China at t28,
+    // its K 2.10 from t29, its t29 build a Warrior
     minorTradeValue(state, cityState);
+    if (!fresh) minorTradeList(state, cityState);
     minorKnowledge(state, cityState, false);
     // the boosts its turn earned (runs/h1_duelw1117 t1: every city-state
     // takes Pottery before its coastal city's Sailing eureka lands)
@@ -186,15 +192,26 @@ export function releaseLevies(state: GameState, cityStateId?: number): void {
   }
 }
 
-/** the levied army is the minor's again where it stands */
+/** the levied army is the minor's again where it stands. The game removes
+ *  each unit and makes it anew under the minor (runs/h1_duelw1117 t42:
+ *  China's three levied Warriors removed, three Warriors of city-state 3
+ *  added on their plots), so the minor's knowledge base records each as a
+ *  unit it made (0x7874a0), the record it held of the unit before the levy
+ *  that of a unit gone, aging on: its own Warrior records 5 -> 8 on the
+ *  turn's line */
 function sendLevyHome(state: GameState, cityState: CityState): void {
-  for (const u of state.units) {
-    if (u.leviedFrom !== cityState.seat) continue;
-    u.seat = cityState.seat;
-    delete u.leviedFrom;
-  }
+  for (const u of state.units) if (u.leviedFrom === cityState.seat) levyUnitHome(state, cityState, u);
   delete cityState.levySeat;
   delete cityState.levyEnds;
+}
+
+/** one levied unit home to its minor, made anew there (`sendLevyHome`) */
+export function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
+  u.seat = cityState.seat;
+  delete u.leviedFrom;
+  for (const r of cityState.armyKnown ?? []) if (r.id === u.id && r.owner === cityState.seat) r.id = -1;
+  (cityState.armyKnown ??= []).push({ id: u.id, owner: cityState.seat, type: u.type, seen: cityState.armyAged ?? state.turn,
+    plot: u.tileIndex, damage: 0 });
 }
 
 /**

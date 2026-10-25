@@ -4950,12 +4950,36 @@ EFFECT_ADJUST_TRADE_ROUTE_CAPACITY term read the K it keeps.
   route scorer's: the other city-states by id, then the majors' cities);
   0x54c630's term; what reveals a major's city to a minor beyond its looks:
   the engines reveal the major's first city at the meeting (`meetCityState`)
-  — the records: a minor's K turns above 0 the turn it meets its first major
-  (runs/h1_duelw1121 Antioch t7, Hunza t29, Ayutthaya t33; 1117, 1124 each
-  minor the same), and a major meeting a city-state has its centre revealed
+  — the records: a minor's K turns above 0 the turn after it meets its
+  first major (runs/h1_duelw1121 DiplomacySummary: Antioch meets Rome at t6,
+  K 1.80 from t7; Hunza meets China at t28, 2.10 from t29; both majors act
+  before the minor in the turn), and a major meeting a city-state has its centre revealed
   that turn (21 of 21 meetings, 1117 / 1121 / 1128). Measured K: the
   engines' 1.50 against the log's 1.80 (1121 Antioch t7) and 2.10 (Hunza),
   the route's origin yields short.
+- THE TURN'S ORDER OF THE LIST, K AND THE BUILDS: the city update (A,
+  0x5c2650 -> 0x5ce680, its events the builds) runs before the tactical
+  turn (0x785f30, its ageing's tail 0x5e9b20 setting K); the trade list is
+  0x78f210's in the City Analysis job (0x5ce3f0), which the K of the same
+  turn has not read. So a turn's builds read the K of the turn before, and
+  its K the list of the turn before: Hunza's list takes China's capital at
+  t28, its K reads it at t29, its t29 build a Warrior on the t28 K of 0.
+  The engines: `minorTradeValue` / `_minor_trade_value` at the tactical
+  turn after the city AI, then `minorTradeList` / `_minor_trade_list`.
+  MEASURED (--aiscore --to 60): 1121 cityState.build 170 -> 171 of 174 (the
+  t29 Warrior); 1117 unchanged.
+- THE LEVIED ARMY'S RETURN (runs/h1_duelw1117 t42, the action log): each of
+  China's three levied Warriors removed (UnitRemovedFromMap 1:655365,
+  1:720902, 1:786439) and a Warrior of city-state 3 added on its plot
+  (UnitAddedToMap 3:589824 ...), in city-state 3's turn; its ARMY line of
+  t42 holds 8 own Warrior records against 5 the turn before, the old
+  records aging on (age 16). The engines' return (`levyUnitHome`, GPU
+  `_minor_levy_return`) records each unit as one the minor made (the birth
+  record), the record of the unit from before the levy one of a gone
+  unit's (TS id -1, GPU slot -1). MEASURED (--aiscore --to 60):
+  knowledge.army 1117 69.8% -> 71.5%, 1121 70.2% -> 70.8%; 1117 t42 ours
+  still 5 (the replay applies the return with the record's levyEnd
+  decision a pair after the minor's turn), 8 from t43.
 
 ## C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)
 
