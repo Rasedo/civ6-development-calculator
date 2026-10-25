@@ -24,6 +24,7 @@
       value: the plotValueLab's Pastures 451 -> 453 exact on 1121 (the lab imports the   record, which holds no minor's stockpile, so its t20+ rows read 0 held).
   readings:
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...(1 + 0.01 x the city's +0x1e00 at the plot's terrain +0x2c, 0x4a9ff0; @0xd136f0 0.01, @0xcfc9f8 1.0) from T to H; the count passed is its whole part (`sar 8`). The plot's own improv..."
   review: imported
@@ -75,6 +76,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...the knowledge base's update 0x783980 from a per-plot visibility word > 0) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, els..."
   review: imported
@@ -95,6 +97,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...1358 +0xf8). The value 0x7a60d0: f = 1 + w, q = 0x655840; f q >= 0 -> f + q, else +-0.1 (@0xd2f320, f's sign) where |q| > |f|, else f + q; the amount x (f x DefaultValue). A followed strat..."
@@ -232,6 +235,23 @@
   context:
     - "...0x198310) adds Amount raw. EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 (@f03d20, vtable 0xd62ad0): the centre's strike 0x249ee0, its whole part above 0, x Amount / 100 truncated (0x51e..."
   review: imported
+- addr: 0xd630b8
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1117
+      value: "runs/h1_duelv1117 Solar Farm rows exact 120 -> 389 of   485, Wind Farm 28 -> 57 of 108: each 2 Power's 40.00."
+    - recording: h1_duelv1124
+      turn: 209
+      value: "LAB: a city-state's   city never short — runs/h1_duelv1124 Cardiff t209-t220 (a Factory) and   Bologna t207-t220 (a Research Lab), no renewable, their Solar Farm rows   the 40.00 alone, no Production "
+    - recording: 1124
+      turn: 232
+      value: "The term is gone once no Great Scientist stands on the present timeline   (Game_GreatPeople.csv: 1124 after Carl Sagan's grant at t232, 1117 after   Stephanie Kwolek's at t246, no scientist added;"
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+  context:
+    - "- EFFECT_ADJUST_CITY_FREE_POWER (registry 0x6c9640: object @0xf03c90, vtable 0xd630b8, slot 1 0x6b1af0), READ: with the context's player and city, 0x7a67f0(player, city, Amo..."
+  review: imported
 - addr: 0xd63100
   kind: global
   status: READ
@@ -351,6 +371,7 @@
       value: A   port of the improvement half (each neighbour's yields value with the   improvement on the plot less as the map stands) lowered the plot values   lab's Farms on runs/h1_duelv1127 10,904 -> 9,376 ex
   readings:
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...ontext's plot list +0x10 empty): a walk of radius 1 (0x6b1b0) with a functor (vtable @0xd71be8, invoke 0x7b8a20 -> 0x79ed40): a neighbour holding a district (+0x1e) adds valueConstru..."
   review: imported
@@ -370,6 +391,18 @@
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "- The evaluation (0x7bc580, vtable 0xd71c30 slot 1, at the player's activation): a strategy disqualified for good is skipped; a vic..."
+  review: imported
+- addr: 0xd74c88
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 233
+      value: "Not   ported (the minors' Ski Resort rows: runs/h1_duely1117 t233, 1124 t200 and   t202, 1127 t233)."
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+  context:
+    - "...t whose +0x3a has bit 3 (impassable), the node walks the plot's ring (0x6b1b0, functor @0xd74c88, invoke 0x7f81c0) while nothing is found: a neighbour neither impassable nor holding un..."
   review: imported
 - addr: 0xd760f8
   kind: global
@@ -563,6 +596,23 @@
   kind: global
   status: PARTLY
   notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0xf03c90
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1117
+      value: "runs/h1_duelv1117 Solar Farm rows exact 120 -> 389 of   485, Wind Farm 28 -> 57 of 108: each 2 Power's 40.00."
+    - recording: h1_duelv1124
+      turn: 209
+      value: "LAB: a city-state's   city never short — runs/h1_duelv1124 Cardiff t209-t220 (a Factory) and   Bologna t207-t220 (a Research Lab), no renewable, their Solar Farm rows   the 40.00 alone, no Production "
+    - recording: 1124
+      turn: 232
+      value: "The term is gone once no Great Scientist stands on the present timeline   (Game_GreatPeople.csv: 1124 after Carl Sagan's grant at t232, 1117 after   Stephanie Kwolek's at t246, no scientist added;"
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+  context:
+    - "- EFFECT_ADJUST_CITY_FREE_POWER (registry 0x6c9640: object @0xf03c90, vtable 0xd630b8, slot 1 0x6b1af0), READ: with the context's player and city, 0x7a67f..."
   review: imported
 - addr: 0xf03d80
   kind: global
@@ -1250,6 +1300,9 @@
   kind: global
   name: PSEUDOYIELD_GPP_SCIENTIST
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
   review: imported
 - addr: 0xf2e230

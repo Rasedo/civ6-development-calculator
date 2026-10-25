@@ -127,8 +127,9 @@ class SimCityValue:
         }
         self._cv_cache = cached
         # the rows the tables value (a civilization's own building and a wonder
-        # value FX(-9999) before their modifiers)
-        rows = [b for b in cb["buildings"] if not b["trait"] and not b["wonder"]] + list(cb["projects"])
+        # value FX(-9999) before their modifiers), and the improvements
+        rows = ([b for b in cb["buildings"] if not b["trait"] and not b["wonder"]] + list(cb["projects"])
+                + list(cb["improvements"]))
         for row in rows:
             for m in row["modifiers"]:
                 self._cv_check_read(m, cached["reads"])
@@ -362,6 +363,18 @@ class SimCityValue:
         if row["appealYield"]:
             amt = _fmul(_t(f.appeal(), like) * _FX, torch.full_like(like, _fx_const(row["appealPct"] * 0.01)))
             v = v + self._cv_yield(amt, row["appealYield"], f.yield_w(row["appealYield"]))
+        # its tourism: a TOURISMSOURCE_APPEAL row's Appeal x ScalingFactor /
+        # 100 at PSEUDOYIELD_TOURISM x the era weight (`improvementYieldsValue`)
+        for source, scale in row["tourism"]:
+            if source != "TOURISMSOURCE_APPEAL":
+                continue
+            ap = _t(f.appeal(), like)
+            amt = ap if scale == 100 else torch.div(ap * scale, 100, rounding_mode="trunc")
+            weights = torch.tensor([_fx_float(_f32(1 - _f32(max(5 - e, 0) * _f32(0.1)))) for e in range(16)],
+                                   dtype=torch.long, device=like.device)
+            w = weights[_t(f.era(), like).clamp(0, 15)]
+            pv = self._cv_pseudo(amt * _FX, "PSEUDOYIELD_TOURISM", f.pseudo_w("PSEUDOYIELD_TOURISM"))
+            v = v + torch.div(pv * w, _FX, rounding_mode="floor")
         # the defence: min(max(n, 1), DefenseModifier) + min(n,
         # GrantFortification), n 0 (LAB, `improvementYieldsValue`)
         n = 0
@@ -374,6 +387,9 @@ class SimCityValue:
             value = value + torch.div(hv * _FX, max(row["tilesRequired"], 1) * _FX, rounding_mode="trunc")
             # the Housing again, its whole value (LAB, `improvementYieldsValue`)
             value = value + torch.div(hv, _FX, rounding_mode="trunc") * _FX
+        # its modifiers in the plot's city's analysis (0x7a4b20)
+        if row.get("modifiers"):
+            value = value + self._cv_modifiers(f, row["modifiers"], t, h)
         value = torch.where(dead, torch.zeros_like(value), value)
         return torch.where(past, torch.full_like(value, _FX_MIN), value)
 
@@ -1200,7 +1216,7 @@ class SimCityValue:
                      "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN",
                      "EFFECT_GRANT_UNIT_IN_CITY", "EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER",
                      "EFFECT_GRANT_INFLUENCE_TOKEN", "EFFECT_GRANT_SPY", "EFFECT_GRANT_COMBAT_ADJACENCY",
-                     "EFFECT_ADJUST_UNIT_PRODUCTION")
+                     "EFFECT_ADJUST_UNIT_PRODUCTION", "EFFECT_ADJUST_CITY_FREE_POWER")
 
     def _cv_check_read(self, m: dict, reads: dict, depth: int = 1) -> None:
         """refuse a modifier whose analysis the TS evaluator reads through an
@@ -1409,6 +1425,19 @@ class SimCityValue:
             if not city:
                 return zero
             return _t(f.unit_cost(a.get("UnitType", "")), like) * amount
+        if eff == "EFFECT_ADJUST_CITY_FREE_POWER":
+            # `EFFECT_ADJUST_CITY_FREE_POWER`: the more of half the city's
+            # Production where its power is short and the Amount at
+            # PSEUDOYIELD_GPP_SCIENTIST, from the start to the horizon
+            if not city or amount <= 0:
+                return zero
+            prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64) * _FX + 0.5).long()
+            half = _fmul(prod.expand_as(like), torch.full_like(like, _fx_const(0.5)))
+            pt = between(self._cv_yield(half, "YIELD_PRODUCTION", f.yield_w("YIELD_PRODUCTION")))
+            pt = torch.where(_t(f.power_short(), like).bool(), pt, torch.zeros_like(pt))
+            ps = between(self._cv_pseudo(torch.full_like(like, amount * _FX), "PSEUDOYIELD_GPP_SCIENTIST",
+                                         f.pseudo_w("PSEUDOYIELD_GPP_SCIENTIST")))
+            return torch.maximum(pt, ps) >> 8
         # the civics value's grants (`sim_civics.py`'s terms): the envoys'
         # points as PSEUDOYIELD_INFLUENCE discounted from the start, a spy's
         # PSEUDOYIELD_UNIT_SPY and the minor's strength from the start to the
@@ -2140,6 +2169,10 @@ class _MinorFacts:
     def city_yield(self, y):
         return self._total(_YIELDS.index(y))
 
+    def power_short(self):
+        """a city-state's city never short (`cityPowerShort`)"""
+        return self._bools(False)
+
     def city_strikes(self):
         """the outer defences' pool above 0"""
         sim = self.sim
@@ -2248,6 +2281,10 @@ class _FreeFacts(_MinorFacts):
     def forecast_growth(self):
         # a Free City's update reads its growth as it stands
         return self.growth()
+
+    def power_short(self):
+        demand, supply, _near, _ppr = self.sim._city_power_need(self.row)
+        return supply[:, self.j] < demand[:, self.j]
 
     # the defensive pick where the city is under threat (0x5cdc50): its
     # threat above -1 with its centre's hit points damaged or the enemy at

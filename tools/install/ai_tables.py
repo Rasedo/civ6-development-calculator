@@ -552,6 +552,8 @@ def build_city(rows, modifier) -> str:
     imp_features = multi("Improvement_ValidFeatures", "ImprovementType")
     imp_units = multi("Improvement_ValidBuildUnits", "ImprovementType")
     imp_adj = multi("Improvement_Adjacencies", "ImprovementType")
+    imp_tourism = multi("Improvement_Tourism", "ImprovementType")
+    imp_mods = multi("ImprovementModifiers", "ImprovementType")
     adj_yield = {k: c.get("YieldType") for k, c in keyed(rows("Adjacency_YieldChanges"), "ID").items()}
     improvements = [{"type": i, "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "trait": c.get("TraitType"),
                      "buildable": c.get("Buildable", "").lower() == "true",
@@ -563,7 +565,9 @@ def build_city(rows, modifier) -> str:
                      "defenseModifier": num(c, "DefenseModifier"), "grantFortification": num(c, "GrantFortification"),
                      "features": [f["FeatureType"] for f in imp_features[i]],
                      "buildUnits": [[u["UnitType"], u.get("ConsumesCharge") != "false"] for u in imp_units[i]],
-                     "adjacency": [adj_yield[a["YieldChangeId"]] for a in imp_adj[i] if adj_yield.get(a["YieldChangeId"])]}
+                     "adjacency": [adj_yield[a["YieldChangeId"]] for a in imp_adj[i] if adj_yield.get(a["YieldChangeId"])],
+                     "tourism": [[r["TourismSource"], num(r, "ScalingFactor", 100)] for r in imp_tourism[i]],
+                     "modifiers": [modifier(r["ModifierId"]) for r in imp_mods[i]]}
                     for i, c in in_game_order("Improvements", "ImprovementType", keyed(rows("Improvements"), "ImprovementType"))]
     # the districts (the district choice's and the trees' rows: PrereqTech /
     # PrereqCivic, the civilization trait), in DATABASE ORDER

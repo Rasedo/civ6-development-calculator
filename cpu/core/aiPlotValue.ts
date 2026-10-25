@@ -10,6 +10,7 @@
  */
 import { AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
 import type { AiImprovementRow } from './aiResource';
+import type { AiModifier } from './aiModifiers';
 import { AI_YIELD_DEFAULT } from '../data/aiTables';
 import { AI_RATE, FX, FX_MIN, discounted, fmul, fxConst, presentValue, pseudoYieldValue, valueBetween, whole, yieldValue, type AiValueView } from './aiValue';
 import { STRATEGIC_PER_TURN } from '../data/constants';
@@ -68,6 +69,11 @@ export interface PlotValueFacts {
   /** the city's percent more accumulation on the plot's terrain (city
    *  +0x1e00 at the plot's terrain: EFFECT_ADJUST_EXTRA_ACCUMALATION_TERRAIN) */
   accumulationPct: number;
+  /** the player's era index (0x467eb0, Eras' order from 0) */
+  era: number;
+  /** the modifiers' sum (0x7a4b20) in the analysis of the plot's city from
+   *  `t` to `h`, raw */
+  modifiers(mods: readonly AiModifier[], t: number, h: number): number;
 }
 
 const IMPROVEMENT = new Map(AI_IMPROVEMENTS.map((r) => [r.type, r] as const));
@@ -157,6 +163,16 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
   for (const [y, a] of imp.yields) v += yieldValue(f.view, f.seat, a * FX, y);
   for (const y of new Set(imp.adjacency)) v += yieldValue(f.view, f.seat, f.adjacency(imp.type, y) * FX, y);
   if (imp.appealYield) v += yieldValue(f.view, f.seat, fmul(f.appeal * FX, fxConst(imp.appealPct * 0.01)), imp.appealYield);
+  // its tourism (Improvement_Tourism, 0x7b19a0): a TOURISMSOURCE_APPEAL row's
+  // the plot's Appeal x ScalingFactor / 100 (0x1aba40) at PSEUDOYIELD_TOURISM,
+  // x (1 - 0.1 for each era the player stands before the sixth) a turn; the
+  // yield sources' rows are not valued
+  for (const [source, scale] of imp.tourism) {
+    if (source !== 'TOURISMSOURCE_APPEAL') continue;
+    const amount = scale === 100 ? f.appeal : Math.trunc((f.appeal * scale) / 100);
+    const eraWeight = fxOfFloat(Math.fround(1 - Math.fround(Math.max(5 - f.era, 0) * Math.fround(0.1))));
+    v += Math.floor((pseudoYieldValue(f.view, f.seat, amount * FX, 'PSEUDOYIELD_TOURISM') * eraWeight) / FX);
+  }
   // the defence: min(max(n, 1), DefenseModifier) + min(n, GrantFortification),
   // n a count over the game's players (0x3dfae0, partly read) — LAB: n 0
   // (runs/h1_duelv1124 Granada's Alcazar, DefenseModifier 4: every row one
@@ -174,6 +190,10 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
     // 88.00 at t45)
     value += Math.trunc(hv / FX) * FX;
   }
+  // its modifiers (ImprovementModifiers) in the plot's city's analysis
+  // (0x7a4b20 at 0x7b23d8): a Solar Farm's 2 Power 40.00 over a city-state's
+  // horizon (runs/h1_duelv1117)
+  if (imp.modifiers.length) value += f.modifiers(imp.modifiers, t, h);
   return value;
 }
 

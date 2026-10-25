@@ -1258,10 +1258,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // on that research where the
   // first record stands it, not the engine's turn-start pool (runs/h1_duelw1121
   // t113: city-state 2's embarked Musketmen plan on 3 Movement with the
-  // Square Rigging record t+1 holds, record t+1's maxMoves 3)
+  // Square Rigging record t+1 holds, record t+1's maxMoves 3) — none for one
+  // the turn's contract purchase made (`boughtNow`)
   for (const c of mine) {
     c.movesFull = unitFullMoves(copy, c);
-    c.movesLeft = upgraded.has(c) ? 0 : c.movesFull;
+    c.movesLeft = upgraded.has(c) || boughtNow.has(`${c.seat}:${c.id}`) ? 0 : c.movesFull;
   }
   // ...and the ground as record t+1 holds it: its owners, features,
   // improvements, districts and roads, which the planning's steps read

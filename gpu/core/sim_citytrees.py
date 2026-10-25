@@ -970,7 +970,8 @@ def _u_reserve_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
 def _u_check_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     """CHECK PLOT (0x7f6ea0): on a plot holding no improvement and no
     feature but a resource that cannot take the improvement, its Resource
-    Harvesting set (cleared first)"""
+    Harvesting set (cleared first); a plot taking it, Plot To Move the
+    world's builder plot (`builderPlot`)"""
     w = c.w
     c.set_tag(i, "Resource Harvesting", 0, at)
     plot = c.tag(i, "Plot To Check")
@@ -988,6 +989,8 @@ def _u_check_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     c.set_tag(i, "Builder List", builder, go)
     c.set_tag(i, "Plot To Move", p, go)
     i_ok = _b(w.can_improve(p, imp_r), p)
+    # an impassable plot taking it: the Builder's plot beside it
+    c.set_tag(i, "Plot To Move", _l(w.builder_plot(p), p), go & i_ok)
     imp_on, feat_on, res_on = w.plot_standing(p)
     c.set_tag(i, "Resource Harvesting", 1, go & ~i_ok & ~imp_on & ~feat_on & res_on)
     st = torch.where(has_d, torch.where(d_ok, BT_SUCCESS, BT_FAILURE),

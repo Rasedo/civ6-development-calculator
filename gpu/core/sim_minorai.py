@@ -597,8 +597,9 @@ class SimMinorAi:
         passable; a resource's plot its own improvement alone; a water plot
         the water rows; land the minor's own trait improvement, the Farm, the
         Mine, the Lumber Mill, the Seaside Resort and the ground-only rows,
-        each on its own ground; no row a governor gates; with `drought` none a
-        drought bars"""
+        each on its own ground; a bare mountain of its own the Builder's
+        adjacent-plot rows (the Ski Resort); no row a governor gates; with
+        `drought` none a drought bars"""
         B, T, dev = self.B, self.T, self.device
         K = int(self._imp_unlock.numel())
         PN = self._cv_tables()["plot_names"]
@@ -666,6 +667,12 @@ class SimMinorAi:
             elif self.SEASIDE >= 0 and k == self.SEASIDE:
                 ok = ok | (((land & self._sr_c & bare) | (land_h & nr["_sr_c"] & bare) | (land_c & nr["_sr_c"]))
                            & appeal_ok)
+            elif self._imp_adj_plot[k]:
+                # a Builder's adjacent-plot row (the Ski Resort): a bare
+                # mountain of its own, laid from a neighbour
+                # (`adjacentPlotTargetOk`)
+                if not self._imp_eng[k] and self._imp_uniq_leader[k] < 0 and gov:
+                    ok = ok | self._adj_plot_target_ok(k, self.tile_seat == 100 + s)
             elif self._imp_suz[k] and self._imp_built_by[k] < 0:
                 if gov:
                     mine_k = (self.citystate_suz_imp[:, s] == k).unsqueeze(1)
@@ -1763,6 +1770,17 @@ class _PlotFacts:
     def pseudo_w(self, p):
         return self._at(self.mf.pseudo_w(p))
 
+    # the plots' city, as the analysis of an improvement's modifiers and its
+    # tourism read it
+    def era(self):
+        return self._at(self.mf.era())
+
+    def city_yield(self, y):
+        return self._at(self.mf.city_yield(y))
+
+    def power_short(self):
+        return self._at(self.mf.power_short())
+
     def plot_improvement(self):
         return self._imp
 
@@ -2255,6 +2273,25 @@ class _MinorWorld:
         free = (cur < 0) | ((cur == k) & pil)
         return v & free & (imp >= 0) & (k >= 0) & (plot >= 0)
 
+    def builder_plot(self, plot):
+        """`builderPlot` at [B] plots: an impassable plot's ring walked in
+        the ring walk's order (`_RING_DIRS`) until a neighbour of the minor's
+        own: each passable neighbour holding no unit taken; else the plot"""
+        sim = self.sim
+        b = sim._bidx
+        p = plot.clamp(min=0)
+        blocked = ~(sim.passable | sim.wpass)
+        held = (sim.military_at >= 0) | (sim.civilian_at >= 0) | (sim.support_at >= 0) | (sim.embarked_at >= 0)
+        out = p.clone()
+        found = ~blocked[b, p]
+        for d in sim._RING_DIRS:
+            n = sim.neigh[p, d]
+            nn = n.clamp(min=0)
+            ok = (n >= 0) & ~found & ~blocked[b, nn] & ~held[b, nn]
+            out = torch.where(ok, nn, out)
+            found = found | (ok & (sim.tile_seat[b, nn] == self.seat))
+        return torch.where(plot >= 0, out, plot)
+
     def plot_owner(self, plot):
         sim = self.sim
         flat = plot.reshape(sim.B, -1)
@@ -2368,7 +2405,14 @@ class _MinorWorld:
                              avoid=(self._danger_map() > 0) if safe else None)
             sim._gen_ver += 1
             return
-        here = alive & (sim.major_unit_tile.gather(1, g.unsqueeze(1)).squeeze(1) == plot)
+        ut = sim.major_unit_tile.gather(1, g.unsqueeze(1)).squeeze(1)
+        here = alive & (ut == plot)
+        if kind == "improve":
+            # an adjacent-plot row (the Ski Resort) laid from beside its plot
+            k = self._ei.take(imp.clamp(min=0))
+            adj = torch.tensor(sim._imp_adj_plot + [False], dtype=torch.bool, device=sim.device)
+            beside = (sim.neigh[ut.clamp(min=0)] == plot.unsqueeze(1)).any(dim=1) & (ut >= 0)
+            here = here | (alive & (imp >= 0) & (k >= 0) & adj[k.clamp(min=0)] & beside)
         if not bool(here.count_nonzero()):
             return
         ch = sim.major_unit_charges.gather(1, g.unsqueeze(1)).squeeze(1)
@@ -2394,7 +2438,7 @@ class _MinorWorld:
                 sim.improvement[rr, tt] = k[rr]
                 sim.pillaged[rr, tt] = False
                 sim._eff_version += 1
-                sim._spend_build_charge(rr, uid, plot)
+                sim._spend_build_charge(rr, uid, ut)
                 sim._gen_ver += 1
                 # an improvement laid re-places the citizens of the city it
                 # stands in (0xa4cee0 -> 0x196320)

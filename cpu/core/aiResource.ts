@@ -32,6 +32,7 @@ import { UNITS } from '../data/units';
 import { RESOURCES } from '../../world/resources';
 import { TECHS } from '../data/techs';
 import { engineId, gameTypeOf } from '../data/aliases';
+import type { AiModifier } from './aiModifiers';
 
 export interface AiResourceRow {
   type: string;
@@ -72,6 +73,10 @@ export interface AiImprovementRow {
   buildUnits: readonly (readonly [string, boolean])[];
   /** each Improvement_Adjacencies row's YieldType */
   adjacency: readonly string[];
+  /** Improvement_Tourism: [TourismSource, ScalingFactor] */
+  tourism: readonly (readonly [string, number])[];
+  /** ImprovementModifiers' modifiers */
+  modifiers: readonly AiModifier[];
 }
 
 /** what the value reads of its player */

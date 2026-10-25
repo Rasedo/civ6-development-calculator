@@ -191,6 +191,10 @@ export interface CityTreeWorld {
   /** what stands on the plot (Check Plot's +0x44 / +0x3c / +0x40): an
    *  improvement, a feature, a resource, seen or not */
   plotStanding(plot: number): { improvement: boolean; feature: boolean; resource: boolean };
+  /** the plot a Builder lays the plot's improvement from: an impassable
+   *  plot's neighbour (Check Plot's ring walk, `builderPlotOf`), else the
+   *  plot */
+  builderPlot(plot: number): number;
   /** the player's builders make districts / wonders (player +0x308 /
    *  +0x3c8) */
   buildersMakeDistricts: boolean;
@@ -677,8 +681,9 @@ const reservePlot: BtHandler<Ctx> = {
 
 // CHECK PLOT (0x7f6ea0): the Builder type (the cheapest unit the city may
 // train that builds the improvement) into its tag, FAILURE with none; the
-// plot as it stands can take the improvement: SUCCESS, else FAILURE (the
-// tree clears it first) — on a plot holding no improvement and no feature
+// plot as it stands can take the improvement: SUCCESS, its Plot To Move the
+// plot the Builder lays from (`builderPlot`), else FAILURE (the tree clears
+// it first) — on a plot holding no improvement and no feature
 // but a resource, its Resource Harvesting set (0x7f7844)
 const checkPlot: BtHandler<Ctx> = {
   update(node, run, ctx) {
@@ -694,7 +699,12 @@ const checkPlot: BtHandler<Ctx> = {
     if (!builder) return BT_FAILURE;
     setTag(run, node, 'Builder List', [builder]);
     setTag(run, node, 'Plot To Move', plot);
-    if (ctx.w.canImprove(plot, imp)) return BT_SUCCESS;
+    if (ctx.w.canImprove(plot, imp)) {
+      // an impassable plot (a Ski Resort's mountain): the Builder's plot
+      // beside it (0x7f77a4..0x7f7821)
+      setTag(run, node, 'Plot To Move', ctx.w.builderPlot(plot));
+      return BT_SUCCESS;
+    }
     const g = ctx.w.plotStanding(plot);
     if (!g.improvement && !g.feature && g.resource) setTag(run, node, 'Resource Harvesting', true);
     return BT_FAILURE;

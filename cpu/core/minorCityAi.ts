@@ -41,8 +41,8 @@ import { AI_BUILDINGS, AI_DISTRICT_LISTS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEM
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS } from '../data/aiCityTrees';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
-import { axialToOffset, hexDistance, inBounds, neighbors, offsetToAxial, wrapCol } from '../../world/hex';
-import { isCoastalLand } from '../../world/query';
+import { RING_DIRS, axialToOffset, hexDistance, inBounds, neighborTile, neighbors, offsetToAxial, wrapCol } from '../../world/hex';
+import { isCoastalLand, isImpassable } from '../../world/query';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingTable, defaultSpecialization, housingValue, specializationBests, unitTable,
   type CityBuildFacts, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable } from './aiProjectValue';
@@ -50,7 +50,8 @@ import { improvementValue, type PlotValueFacts } from './aiPlotValue';
 import { districtValue, type DistrictValueFacts } from './aiDistrictValue';
 import { resourceValue } from './aiResource';
 import { accumulationPct } from './stockpile';
-import { FX, FX_MIN, fmul, pseudoYieldValue } from './aiValue';
+import { AI_RATE, FX, FX_MIN, fmul, pseudoYieldValue } from './aiValue';
+import { modifiersValue } from './aiModifiers';
 import {
   buildingEvent, defenseEvent, defensiveCancel, districtEvent, freeSlots, goalsReached, improvementEvent, newCityAi, pickImprovement, tickCityTrees,
   type CityAi, type CityTreeCity, type CityTreeWorld, type PlotEval, type TreeUnit,
@@ -69,7 +70,7 @@ import { unitBuildable } from './operations/unitRows';
 import { minorCity, minorFoodFocus } from './cityStates';
 import { FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor, isCiv, seatOf, tileSeat } from './seats';
 import { cityAppealResolver } from './governors';
-import { canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
+import { adjacentPlotTargetOk, canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
 import { borderCandidates, computeCityStats } from './city';
 import { goldAffordable, tilePurchaseCost } from './game';
 import { computeUnlocksIn, makeYieldCtx } from './effects';
@@ -141,7 +142,33 @@ function groundOpts(state: GameState, cs: CityState) {
  *  Builder on plot 570's Marsh t7-t21, the Marsh gone t22, the Alcazar
  *  t24) */
 function standingImprovements(state: GameState, cs: CityState, tile: Tile): readonly string[] {
-  return validImprovementsIn(seenGround(state, cs, tile), groundOpts(state, cs));
+  return [...validImprovementsIn(seenGround(state, cs, tile), groundOpts(state, cs)), ...adjacentRowsOn(state, cs, tile)];
+}
+
+/** the Builder's adjacent-plot rows (the Ski Resort) a bare mountain of the
+ *  minor's own takes, laid from a neighbour (`adjacentPlotTargetOk`) */
+function adjacentRowsOn(state: GameState, cs: CityState, tile: Tile): string[] {
+  const own = (t: Tile) => tileSeat(t) === cs.seat;
+  return Object.values(IMPROVEMENTS)
+    .filter((d) => d.adjacentPlot && !d.engineer && !d.uniqueLeader && adjacentPlotTargetOk(state.map, tile, d, own))
+    .map((d) => d.id);
+}
+
+/** the plot a Builder lays a plot's improvement from (Check Plot, 0x7f6ea0):
+ *  an impassable plot's ring walked in the ring walk's order (`RING_DIRS`,
+ *  0x6b1b0) until a neighbour of the seat's own, each neighbour neither
+ *  impassable nor holding a unit taken; else the plot */
+export function builderPlotOf(state: GameState, seat: number, plot: number): number {
+  const tile = state.map.tiles[plot];
+  if (!isImpassable(tile)) return plot;
+  let at = plot;
+  for (const d of RING_DIRS) {
+    const n = neighborTile(state.map, tile, d);
+    if (!n || isImpassable(n) || state.units.some((u) => u.tileIndex === n.index)) continue;
+    at = n.index;
+    if (tileSeat(n) === seat) break;
+  }
+  return at;
 }
 
 /** the plot as the minor sees it: a resource whose revealing technology it
@@ -180,7 +207,7 @@ function groundImprovements(state: GameState, cs: CityState, actual: Tile): Set<
   const tile = seenGround(state, cs, actual);
   const clearable = !!tile.feature && !!FEATURE_ROW.get(installFeature(tile.feature))?.removable;
   const harvestable = !!tile.resource && (RES.get(gameTypeOf('resource', tile.resource, 'RESOURCE_'))?.harvests.length ?? 0) > 0;
-  const out = new Set<string>(validImprovementsIn(tile, opts));
+  const out = new Set<string>([...validImprovementsIn(tile, opts), ...adjacentRowsOn(state, cs, tile)]);
   for (const [harvest, clear] of [[true, false], [false, true], [true, true]]) {
     if ((harvest && !harvestable) || (clear && !clearable)) continue;
     const ground = { ...tile, resource: harvest ? null : tile.resource, feature: clear ? null : tile.feature };
@@ -277,6 +304,9 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
         return row ? resourceValue(resFacts, row, count, t, h) : 0;
       },
       accumulationPct: accumulationPct(state, cs.seat, tile.terrain),
+      era: facts.era,
+      modifiers: (mods, t, h) => modifiersValue({ view: facts.view, seat: cs.seat, start: t, horizon: h, rate: AI_RATE,
+        owner: { cityId: facts.cityId, capital: facts.capital } }, mods),
     };
     const ground = owned && !repair ? groundImprovements(state, cs, tile) : new Set<string>();
     // an improvement a drought on the plot bars, which its ground takes
@@ -518,6 +548,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     plotOwner: (plot) => tileSeat(state.map.tiles[plot]),
     plotGround: (plot) => plotGroundOf(state, cs.seat, plot),
     plotStanding: (plot) => plotStandingOf(state, plot),
+    builderPlot: (plot) => builderPlotOf(state, cs.seat, plot),
     // its danger map as the trees first read it in the turn (`dangerPlane`)
     danger: (plot) => (danger ??= dangerPlane(state, cs.seat))[plot],
     buildersMakeDistricts: false,
@@ -539,11 +570,14 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
         moveTo(state, unit, plot, false, safe ? (p) => (danger ??= dangerPlane(state, cs.seat))[p] > 0 : undefined);
         return;
       }
-      if (unit.tileIndex !== plot) return;
       const tile = state.map.tiles[plot];
       if (kind === 'improve') {
         const id = imp ? engineId('improvement', imp, 'IMPROVEMENT_', IMPROVEMENTS) : null;
         if (!id) return;
+        // an adjacent-plot row (the Ski Resort) laid from beside its plot
+        const beside = !!IMPROVEMENTS[id as keyof typeof IMPROVEMENTS]?.adjacentPlot
+          && neighbors(state.map, tile).some((n) => n.index === unit.tileIndex);
+        if (unit.tileIndex !== plot && !beside) return;
         // the repair of the plot's own pillaged improvement: no charge
         if (tile.improvement === id && tile.pillaged) {
           tile.pillaged = false;
@@ -554,6 +588,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
         minorBuilderLays(state, unit, plot, id);
         return;
       }
+      if (unit.tileIndex !== plot) return;
       // the plot's improvement goes first, at no charge (runs/h1_duelv1124
       // Cardiff's Lumber Mill on plot 626 gone at t116 with the Builder's
       // charge kept, the Forest at t117, the Farm at t122); then the

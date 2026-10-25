@@ -913,6 +913,24 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const production = fxOf(t.view.cityYield(s.seat, s.id, 'YIELD_PRODUCTION'));
     return whole(valueBetween(fmul(per, production), t.start, t.horizon, t.rate));
   },
+  // 0x6b1af0 -> 0x7a67f0, on a city subject (context +0x70) with an Amount
+  // above 0: the more of half the city's Production (City::GetYield x 0.5f)
+  // at its value where the city's power is short (City_Power +0x08 x (100 +
+  // +0xa8)% below +0x58) and the Amount at PSEUDOYIELD_GPP_SCIENTIST
+  // (@0xf2e22c), each from the start to the horizon (0x7a2140 / 0x7a1240 at
+  // start = horizon); an Amount below 0 (its walk over the player's +0x1320)
+  // not read, 0
+  EFFECT_ADJUST_CITY_FREE_POWER: (t, args, s) => {
+    const amount = Number(args.Amount ?? 0) | 0;
+    if (s.kind !== 'city' || amount <= 0) return 0;
+    let short = 0;
+    if (t.view.cityPowerShort(s.seat, s.id)) {
+      const half = fmul(fxOf(t.view.cityYield(s.seat, s.id, 'YIELD_PRODUCTION')), fxConst(0.5));
+      short = valueBetween(yieldValue(t.view, t.seat, half, 'YIELD_PRODUCTION'), t.start, t.horizon, t.rate);
+    }
+    const gpp = valueBetween(pseudoYieldValue(t.view, t.seat, amount * FX, 'PSEUDOYIELD_GPP_SCIENTIST'), t.start, t.horizon, t.rate);
+    return whole(Math.max(short, gpp));
+  },
   // 0x6b76f0 (Amount, YieldType, TerrainType, DistrictType): the plots of
   // the terrain (plot +0x2c, hills their own type)
   EFFECT_TERRAIN_ADJACENCY: (t, args, s) => adjacencyValue(t, args, s, (p) => t.view.plotTerrain(p) === args.TerrainType),

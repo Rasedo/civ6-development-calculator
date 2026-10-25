@@ -200,6 +200,10 @@ export interface AiValueView {
   /** a city's Food surplus less its citizens' (its growth object's
    *  0x1b5620), raw */
   cityFoodSurplus(seat: number, cityId: number): number;
+  /** a city's power short of its load (City_Power +0x08 x (100 + +0xa8)%
+   *  below +0x58): its renewables' supply below its buildings' demand
+   *  (`cityPower`) */
+  cityPowerShort(seat: number, cityId: number): boolean;
   /** the seat's era (player +0x1358): the latest era of a technology or a
    *  civic it holds, an index into AI_ERAS */
   playerEra(seat: number): number;

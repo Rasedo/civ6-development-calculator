@@ -24,7 +24,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory } from './import';
 import { AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
-import { FX } from '../core/aiValue';
+import { AI_RATE, FX } from '../core/aiValue';
+import { modifiersValue } from '../core/aiModifiers';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { improvementValue, type PlotValueFacts } from '../core/aiPlotValue';
 import { districtValue, type DistrictValueFacts } from '../core/aiDistrictValue';
@@ -60,6 +61,7 @@ const districtsMode = args.includes('--districts');
 // every DISTRICTS row with its values two turns either side (--rows)
 const rowsOut = args.includes('--rows');
 const show = args.includes('--show') ? Number(args[args.indexOf('--show') + 1]) : 20;
+const allRows = args.includes('--all');
 
 const cat = loadCatalog(dump);
 const recs: TurnRecord[] = readFileSync(dump, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l) as TurnRecord)
@@ -198,6 +200,9 @@ for (const rec of recs) {
           return row ? resourceValue(resFacts, row, count, t, h) : 0;
         },
         accumulationPct: accumulationPct(state, cs.seat, tile.terrain),
+        era: facts.era,
+        modifiers: (mods, t, h) => modifiersValue({ view: facts.view, seat: cs.seat, start: t, horizon: h, rate: AI_RATE,
+          owner: { cityId: facts.cityId, capital: facts.capital } }, mods),
       };
       if (districtsMode) {
         const city = minorCity(cs);
@@ -287,6 +292,8 @@ for (const rec of recs) {
         const ours = improvementValue(f, row.type, t, AI_VALUE_HORIZON) / FX;
         const d = Math.abs(ours - lv);
         const k = tallyOf(row.type);
+        // --all: every row, with its modifiers' part
+        if (allRows) console.log(`ALL t${turn} p${player} (${lp.x},${lp.y}) log ${lv.toFixed(2)} ours ${ours.toFixed(2)} t=${t} mods ${(f.modifiers(row.modifiers, t, AI_VALUE_HORIZON) / FX).toFixed(2)}`);
         if (d <= 0.01) k.exact++;
         else if (d <= 1) k.close++;
         else {

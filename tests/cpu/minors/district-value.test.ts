@@ -26,7 +26,7 @@ const at = (v: number): number => Math.round((v / FX) * 100) / 100;
 /** a plot of runs/h1_duelv1127 t2 player 3 (Hattusa's neighbour), the Campus
  *  landing in 15 turns (2 to build, 13 to Writing) */
 const plot = (over: Partial<DistrictValueFacts> = {}): DistrictValueFacts => ({
-  view, seat: 0, improvement: null, pillaged: false, resource: null, feature: null,
+  view, seat: 0, era: 0, modifiers: () => 0, improvement: null, pillaged: false, resource: null, feature: null,
   floodTurns: null, eruptionTurns: null, appeal: 0, besideHousingDistrict: false,
   unitCost: () => 25, buildsUnit: () => true, extraCharges: () => 0, progressPct: 0, escalation: 1000,
   speedScaled: (n) => Math.floor(n / 2), adjacency: () => 0, housingValue: () => 0, resourceValue: () => 0,

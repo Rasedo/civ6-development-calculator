@@ -17777,7 +17777,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "FEATURE_FLOODPLAINS_PLAINS"
   ],
   "buildUnits": [],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_FARM",
@@ -17826,6 +17828,29 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_FOOD",
    "YIELD_FOOD",
    "YIELD_PRODUCTION"
+  ],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "FARM_HOUSING_WITH_MAYAB_TRAIT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_HOUSING",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "CivilizationType": "CIVILIZATION_MAYA"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -17883,7 +17908,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   ],
   "adjacency": [
    "YIELD_SCIENCE"
-  ]
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    0
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_QUARRY",
@@ -17924,7 +17956,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_FISHING_BOATS",
@@ -17973,7 +18007,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   ],
   "adjacency": [
    "YIELD_PRODUCTION"
-  ]
+  ],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_PASTURE",
@@ -18016,6 +18052,36 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   ],
   "adjacency": [
    "YIELD_PRODUCTION"
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "TEMPLE_ARTEMIS_PASTURE_AMENITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_AMENITY",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_BUILDING_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "BuildingType": "BUILDING_TEMPLE_ARTEMIS",
+        "MinRange": "0",
+        "MaxRange": "4"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -18086,6 +18152,76 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "adjacency": [
    "YIELD_PRODUCTION",
    "YIELD_PRODUCTION"
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "TEMPLE_ARTEMIS_PLANTATION_AMENITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_AMENITY",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_BUILDING_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "BuildingType": "BUILDING_TEMPLE_ARTEMIS",
+        "MinRange": "0",
+        "MaxRange": "4"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "PLANTATION_NEGATIVE_LOYALTY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_IDENTITY_PER_TURN",
+    "args": {
+     "Amount": "-2"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_LEADER_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "LeaderType": "LEADER_ABRAHAM_LINCOLN"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "PLANTATION_NEGATIVE_LOYALTY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_IDENTITY_PER_TURN",
+    "args": {
+     "Amount": "-2"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_LEADER_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "LeaderType": "LEADER_ABRAHAM_LINCOLN"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -18135,7 +18271,32 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "TEMPLE_ARTEMIS_CAMP_AMENITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_AMENITY",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_BUILDING_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "BuildingType": "BUILDING_TEMPLE_ARTEMIS",
+        "MinRange": "0",
+        "MaxRange": "4"
+       }
+      }
+     ]
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_LUMBER_MILL",
@@ -18167,7 +18328,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_GOODY_HUT",
@@ -18193,7 +18356,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "FEATURE_FLOODPLAINS_PLAINS"
   ],
   "buildUnits": [],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_OIL_WELL",
@@ -18226,7 +18391,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_OFFSHORE_OIL_RIG",
@@ -18259,7 +18426,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_FORT",
@@ -18285,7 +18454,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_AIRSTRIP",
@@ -18311,7 +18482,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_BEACH_RESORT",
@@ -18337,7 +18510,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [
+   [
+    "TOURISMSOURCE_APPEAL",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_MISSILE_SILO",
@@ -18363,7 +18543,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_CHATEAU",
@@ -18404,7 +18586,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_CULTURE",
    "YIELD_CULTURE",
    "YIELD_GOLD"
-  ]
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_COLOSSAL_HEAD",
@@ -18444,7 +18633,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_FAITH",
    "YIELD_FAITH",
    "YIELD_FAITH"
-  ]
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_FAITH",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_GREAT_WALL",
@@ -18482,7 +18678,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "adjacency": [
    "YIELD_GOLD",
    "YIELD_CULTURE"
-  ]
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_KURGAN",
@@ -18518,7 +18721,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "adjacency": [
    "YIELD_FAITH",
    "YIELD_FAITH"
-  ]
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_FAITH",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_MISSION",
@@ -18562,6 +18772,66 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "adjacency": [
    "YIELD_SCIENCE",
    "YIELD_SCIENCE"
+  ],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "MISSION_NEWCONTINENT_FAITH",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_FAITH",
+     "Amount": "2"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_IS_OWNER_CAPITAL_CONTINENT",
+       "inverse": true,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "MISSION_NEWCONTINENT_PRODUCTION",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_PRODUCTION",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_IS_OWNER_CAPITAL_CONTINENT",
+       "inverse": true,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "MISSION_NEWCONTINENT_FOOD",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_FOOD",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_IS_OWNER_CAPITAL_CONTINENT",
+       "inverse": true,
+       "args": {}
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -18588,7 +18858,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_SPHINX",
@@ -18625,7 +18897,55 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "SPHINX_WONDERADJACENCY_FAITH",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_FAITH",
+     "Amount": "2"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_WONDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "SPHINX_FLOODPLAINS_CULTURE",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_CULTURE",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_FEATURE_TAG_MATCHES",
+       "inverse": false,
+       "args": {
+        "Tag": "CLASS_FLOODPLAINS"
+       }
+      }
+     ]
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_STEPWELL",
@@ -18658,7 +18978,72 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "STEPWELL_FARMADJACENCY_FOOD",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_FOOD",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_IMPROVEMENT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "ImprovementType": "IMPROVEMENT_FARM"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "STEPWELL_HOLYSITEADJACENCY_FAITH",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_FAITH",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_DISTRICT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "DistrictType": "DISTRICT_HOLY_SITE"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "STEPWELL_HOUSING_WITHTECH",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_HOUSING",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_TECHNOLOGY",
+       "inverse": false,
+       "args": {
+        "TechnologyType": "TECH_SANITATION"
+       }
+      }
+     ]
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_ZIGGURAT",
@@ -18695,7 +19080,34 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "ZIGGURAT_RIVERADJACENCY_CULTURE",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_CULTURE",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_RIVER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_KAMPUNG",
@@ -18730,6 +19142,34 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   ],
   "adjacency": [
    "YIELD_FOOD"
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_FOOD",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "KAMPUNG_HOUSING_WITHTECH",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_HOUSING",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_TECHNOLOGY",
+       "inverse": false,
+       "args": {
+        "TechnologyType": "TECH_MASS_PRODUCTION"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -18759,7 +19199,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_MONASTERY",
@@ -18790,6 +19237,29 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   ],
   "adjacency": [
    "YIELD_FAITH"
+  ],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "MONASTERY_HOUSING",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_HOUSING",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_CIVIC",
+       "inverse": false,
+       "args": {
+        "CivicType": "CIVIC_COLONIALISM"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -18849,7 +19319,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_FAITH",
    "YIELD_PRODUCTION",
    "YIELD_CULTURE"
-  ]
+  ],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_PAIRIDAEZA",
@@ -18887,7 +19359,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_GOLD",
    "YIELD_CULTURE",
    "YIELD_CULTURE"
-  ]
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_OUTBACK_STATION",
@@ -18924,7 +19403,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_FOOD",
    "YIELD_PRODUCTION",
    "YIELD_FOOD"
-  ]
+  ],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_CHEMAMULL",
@@ -18953,7 +19434,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_GOLF_COURSE",
@@ -18989,6 +19477,50 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "adjacency": [
    "YIELD_CULTURE",
    "YIELD_CULTURE"
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "GOLFCOURSE_AMENITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_AMENITY",
+    "args": {
+     "Amount": "1"
+    }
+   },
+   {
+    "id": "GOLFCOURSE_HOUSING_WITHGLOBLIZATION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_HOUSING",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_CIVIC",
+       "inverse": false,
+       "args": {
+        "CivicType": "CIVIC_GLOBALIZATION"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "GOLFCOURSE_AMENITIES",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_AMENITY",
+    "args": {
+     "Amount": "1"
+    }
+   }
   ]
  },
  {
@@ -19030,6 +19562,50 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_FOOD",
    "YIELD_FOOD",
    "YIELD_GOLD"
+  ],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "MEKEWAP_HOUSING_WITHCIVILSERVICE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_HOUSING",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_CIVIC",
+       "inverse": false,
+       "args": {
+        "CivicType": "CIVIC_CIVIL_SERVICE"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "MEKEWAP_LUXURY_GOLD",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_GOLD",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_RESOURCE_CLASS_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "ResourceClassType": "RESOURCECLASS_LUXURY"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -19071,7 +19647,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_FOOD",
    "YIELD_FOOD",
    "YIELD_PRODUCTION"
-  ]
+  ],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_FISHERY",
@@ -19106,6 +19684,30 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   ],
   "adjacency": [
    "YIELD_FOOD"
+  ],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "FISHERY_GOVERNOR_PRODUCTION",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_PRODUCTION",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_HAS_SPECIFIC_GOVERNOR_PROMOTION_TYPE",
+       "inverse": false,
+       "args": {
+        "GovernorPromotionType": "GOVERNOR_PROMOTION_AQUACULTURE"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -19135,7 +19737,64 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "CITY_PARK_GOVERNOR_CULTURE",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_CULTURE",
+     "Amount": "3"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_HAS_SPECIFIC_GOVERNOR_PROMOTION_TYPE",
+       "inverse": false,
+       "args": {
+        "GovernorPromotionType": "GOVERNOR_PROMOTION_PARKS_RECREATION"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "CITY_PARK_WATER_AMENITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_AMENITY",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_COAST",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_LAKE",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_RIVER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_GEOTHERMAL_PLANT",
@@ -19170,7 +19829,41 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "GEOTHERMAL_GENERATE_POWER",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_FREE_POWER",
+    "args": {
+     "Amount": "4",
+     "SourceType": "FREE_POWER_SOURCE_GEOTHERMAL"
+    }
+   },
+   {
+    "id": "MERCHANT_RENEWABLE_ENERGY_GEOTHERMAL_GENERATE_POWER",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_FREE_POWER",
+    "args": {
+     "Amount": "2",
+     "SourceType": "FREE_POWER_SOURCE_GEOTHERMAL"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_HAS_SPECIFIC_GOVERNOR_PROMOTION_TYPE",
+       "inverse": false,
+       "args": {
+        "Established": "true",
+        "GovernorPromotionType": "GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY"
+       }
+      }
+     ]
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_SOLAR_FARM",
@@ -19203,7 +19896,41 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "SOLAR_FARM_GENERATE_POWER",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_FREE_POWER",
+    "args": {
+     "Amount": "2",
+     "SourceType": "FREE_POWER_SOURCE_SOLAR"
+    }
+   },
+   {
+    "id": "MERCHANT_RENEWABLE_ENERGY_SOLAR_FARM_GENERATE_POWER",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_FREE_POWER",
+    "args": {
+     "Amount": "2",
+     "SourceType": "FREE_POWER_SOURCE_SOLAR"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_HAS_SPECIFIC_GOVERNOR_PROMOTION_TYPE",
+       "inverse": false,
+       "args": {
+        "Established": "true",
+        "GovernorPromotionType": "GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY"
+       }
+      }
+     ]
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_WIND_FARM",
@@ -19236,7 +19963,41 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "WIND_FARM_GENERATE_POWER",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_FREE_POWER",
+    "args": {
+     "Amount": "2",
+     "SourceType": "FREE_POWER_SOURCE_WIND"
+    }
+   },
+   {
+    "id": "MERCHANT_RENEWABLE_ENERGY_WIND_FARM_GENERATE_POWER",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_FREE_POWER",
+    "args": {
+     "Amount": "2",
+     "SourceType": "FREE_POWER_SOURCE_WIND"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_HAS_SPECIFIC_GOVERNOR_PROMOTION_TYPE",
+       "inverse": false,
+       "args": {
+        "Established": "true",
+        "GovernorPromotionType": "GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY"
+       }
+      }
+     ]
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_OFFSHORE_WIND_FARM",
@@ -19265,7 +20026,41 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "OFFSHORE_WIND_FARM_GENERATE_POWER",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_FREE_POWER",
+    "args": {
+     "Amount": "2",
+     "SourceType": "FREE_POWER_SOURCE_WIND"
+    }
+   },
+   {
+    "id": "MERCHANT_RENEWABLE_ENERGY_OFFSHORE_WIND_FARM_GENERATE_POWER",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_FREE_POWER",
+    "args": {
+     "Amount": "2",
+     "SourceType": "FREE_POWER_SOURCE_WIND"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_HAS_SPECIFIC_GOVERNOR_PROMOTION_TYPE",
+       "inverse": false,
+       "args": {
+        "Established": "true",
+        "GovernorPromotionType": "GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY"
+       }
+      }
+     ]
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_SEASTEAD",
@@ -19305,7 +20100,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "adjacency": [
    "YIELD_PRODUCTION",
    "YIELD_CULTURE"
-  ]
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_MOAI",
@@ -19339,6 +20141,66 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "adjacency": [
    "YIELD_CULTURE",
    "YIELD_CULTURE"
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "MOAI_COASTADJACENCY_CULTURE",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_CULTURE",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_IS_COAST",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_COAST",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "MOAI_VOLCANICADJACENCY_CULTURE",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_CULTURE",
+     "Amount": "2"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_FEATURE_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "FeatureType": "FEATURE_VOLCANIC_SOIL"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "FeatureType": "FEATURE_VOLCANIC_SOIL"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -19379,6 +20241,69 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "adjacency": [
    "YIELD_FOOD",
    "YIELD_FOOD"
+  ],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "MOUND_AMENITY_MAX_ONE",
+    "collection": "COLLECTION_OWNER_CITY",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_AMENITY",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_CIVIC",
+       "inverse": true,
+       "args": {
+        "CivicType": "CIVIC_NATURAL_HISTORY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "MOUND_AMENITY_MAX_TWO",
+    "collection": "COLLECTION_OWNER_CITY",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_AMENITY",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_CIVIC",
+       "inverse": false,
+       "args": {
+        "CivicType": "CIVIC_NATURAL_HISTORY"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "MOUND_HOUSING",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_HOUSING",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_CIVIC",
+       "inverse": false,
+       "args": {
+        "CivicType": "CIVIC_CULTURAL_HERITAGE"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -19403,7 +20328,150 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "NAZCA_LINE_ADJACENCY_FAITH",
+    "collection": "COLLECTION_PLAYER_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_FAITH",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "NAZCA_LINE_ADJACENCY_FAITH_RESOURCE",
+    "collection": "COLLECTION_PLAYER_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_FAITH",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLOT_HAS_ANY_RESOURCE",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "NAZCA_LINE_ADJACENCY_FOOD_DESERT_CIVIL_SERVICE",
+    "collection": "COLLECTION_PLAYER_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_FOOD",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_CIVIC",
+       "inverse": false,
+       "args": {
+        "CivicType": "CIVIC_CIVIL_SERVICE"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "TerrainType": "TERRAIN_DESERT_HILLS"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "NAZCA_LINE_ADJACENCY_FOOD_DESERT_HILLS_CIVIL_SERVICE",
+    "collection": "COLLECTION_PLAYER_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_FOOD",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_CIVIC",
+       "inverse": false,
+       "args": {
+        "CivicType": "CIVIC_CIVIL_SERVICE"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "TerrainType": "TERRAIN_DESERT"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "NAZCA_LINE_ADJACENCY_PRODUCTION_FLAT_MASS_PRODUCTION",
+    "collection": "COLLECTION_PLAYER_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_PRODUCTION",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_TECHNOLOGY",
+       "inverse": false,
+       "args": {
+        "TechnologyType": "TECH_MASS_PRODUCTION"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_IS_HILLS",
+       "inverse": true,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_SKI_RESORT",
@@ -19427,7 +20495,23 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [
+   [
+    "TOURISMSOURCE_APPEAL",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "SKI_RESORT_AMENITY",
+    "collection": "COLLECTION_OWNER_CITY",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_AMENITY",
+    "args": {
+     "Amount": "1"
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_MOUNTAIN_TUNNEL",
@@ -19451,7 +20535,16 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "MOUNTAIN_PORTAL",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_MOUNTAIN_PORTAL",
+    "args": {}
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_OPEN_AIR_MUSEUM",
@@ -19475,7 +20568,33 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "OPEN_AIR_MUSEUM_LOYALTY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_IDENTITY_PER_TURN",
+    "args": {
+     "Amount": "2"
+    }
+   },
+   {
+    "id": "OPEN_AIR_MUSEUM_CULTURE_FOR_TERRAIN_CLASS_CITIES",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_PER_TERRAIN_CLASS_CITIES_IMPROVEMENT",
+    "args": {
+     "Amount": "2",
+     "YieldType": "YIELD_CULTURE",
+     "ImprovementType": "IMPROVEMENT_OPEN_AIR_MUSEUM"
+    }
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_ICE_HOCKEY_RINK",
@@ -19517,6 +20636,43 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_CULTURE",
    "YIELD_CULTURE",
    "YIELD_CULTURE"
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": [
+   {
+    "id": "ICEHOCKEYRINK_CULTURE_STADIUM",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_CULTURE",
+     "Amount": "4"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_BUILDING_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "BuildingType": "BUILDING_STADIUM"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "ICEHOCKEYRINK_AMENITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IMPROVEMENT_AMENITY",
+    "args": {
+     "Amount": "1"
+    }
+   }
   ]
  },
  {
@@ -19561,6 +20717,36 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_FOOD",
    "YIELD_FOOD",
    "YIELD_PRODUCTION"
+  ],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "TERRACE_FARM_PRODUCTION_FRESH_WATER_NO_AQUEDUCT",
+    "collection": "COLLECTION_SINGLE_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_PRODUCTION",
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_IS_FRESH_WATER",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_DISTRICT_TYPE_MATCHES",
+       "inverse": true,
+       "args": {
+        "DistrictType": "DISTRICT_AQUEDUCT",
+        "MustBeFunctioning": "false"
+       }
+      }
+     ]
+    }
+   }
   ]
  },
  {
@@ -19585,7 +20771,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_MOUNTAIN_ROAD",
@@ -19609,7 +20797,16 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": [
+   {
+    "id": "MOUNTAIN_PORTAL",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_MOUNTAIN_PORTAL",
+    "args": {}
+   }
+  ]
  },
  {
   "type": "IMPROVEMENT_BATEY",
@@ -19643,7 +20840,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_CULTURE",
    "YIELD_CULTURE",
    "YIELD_CULTURE"
-  ]
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_CULTURE",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_HACIENDA",
@@ -19685,7 +20889,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_FOOD",
    "YIELD_PRODUCTION",
    "YIELD_PRODUCTION"
-  ]
+  ],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_METEOR_GOODY",
@@ -19708,7 +20914,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "FEATURE_MARSH"
   ],
   "buildUnits": [],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_ROCK_HEWN_CHURCH",
@@ -19750,7 +20958,14 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_FAITH",
    "YIELD_FAITH",
    "YIELD_FAITH"
-  ]
+  ],
+  "tourism": [
+   [
+    "TOURISMSOURCE_FAITH",
+    100
+   ]
+  ],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_MAHAVIHARA",
@@ -19788,7 +21003,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "YIELD_SCIENCE",
    "YIELD_FAITH",
    "YIELD_FAITH"
-  ]
+  ],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_TRADING_DOME",
@@ -19819,7 +21036,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   ],
   "adjacency": [
    "YIELD_GOLD"
-  ]
+  ],
+  "tourism": [],
+  "modifiers": []
  },
  {
   "type": "IMPROVEMENT_FEITORIA",
@@ -19852,7 +21071,9 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
     true
    ]
   ],
-  "adjacency": []
+  "adjacency": [],
+  "tourism": [],
+  "modifiers": []
  }
 ];
 

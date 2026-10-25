@@ -639,12 +639,12 @@ export function holdMinorOrders(on: boolean): void {
 /** the replay holds the minors' and the Free Cities' unit orders */
 export const minorOrdersHeld = (): boolean => ordersHeld;
 
-/** A MINOR'S BUILDER LAYS AN IMPROVEMENT: it stands on the plot, spends a
- *  charge and its turn, and is gone with its last charge. */
+/** A MINOR'S BUILDER LAYS AN IMPROVEMENT: from the plot (an adjacent-plot
+ *  row from beside it) it spends a charge and its turn, and is gone with its
+ *  last charge. */
 export function minorBuilderLays(state: GameState, u: Unit, plot: number, imp: string): void {
   layTracer?.(u, plot, imp);
   const tile = state.map.tiles[plot];
-  u.tileIndex = plot;
   tile.improvement = imp;
   tile.pillaged = false;
   u.charges = (u.charges ?? 0) - 1;

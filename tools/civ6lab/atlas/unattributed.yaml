@@ -343,7 +343,10 @@
     - recording: 1109
       turn: 225
       value: "and a National Park's Tourism (1109 Handan t225-241) read the park's appeal before the Conservation term until t242 — the same cache."
-  impl: [gpu/core/sim_economy.py:SimEconomy, cpu/core/opsOrders.ts:endangered]
+  impl:
+    - gpu/core/sim_economy.py:SimEconomy
+    - cpu/core/opsOrders.ts:endangered
+    - cpu/core/minorCityAi.ts:builderPlotOf
   readings:
     - "C-74: the fire — READ"
     - "H-1: the plot's Appeal — READ"
@@ -352,6 +355,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "SPREAD (0x336a50's last arm → 0x33b580): the plot's neighbours within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, the event's own start test 0x28ec10 (its Ran..."
     - ...e pillaged, -1 for its own pillaged improvement (+0x4d bit 0), then the ring of radius 1 (0x6b1b0 -> 0x691f0, the centre not in it) through 0x513780, and last +1 when the plot's owner hol...
@@ -702,6 +706,7 @@
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...bour within 3 of the city another owns, without a wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T, 0x79f0c0); its modifiers 0x7a4b20; at the top level its neighb..."
   review: reviewed
@@ -733,6 +738,24 @@
     - ".claude/scratchpad/st1/reading.md: ...within 5, 0x6b000): invalid where the player has not revealed the plot or   may not found there (0x1eaa30: not impassable (+0x3a bit 3), a feature   with Settlement (Features +0xc2 bit 2), no district, uno..."
   context:
     - "...5, 0x6b000): invalid where the player has not revealed the plot or may not found there (0x1eaa30: not impassable (+0x3a bit 3), a feature with Settlement (Features +0xc2 bit 2), no dis..."
+  review: imported
+- addr: 0x1f02f0
+  final: 0x147d40
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1117
+      value: "runs/h1_duelv1117 Solar Farm rows exact 120 -> 389 of   485, Wind Farm 28 -> 57 of 108: each 2 Power's 40.00."
+    - recording: h1_duelv1124
+      turn: 209
+      value: "LAB: a city-state's   city never short — runs/h1_duelv1124 Cardiff t209-t220 (a Factory) and   Bologna t207-t220 (a Research Lab), no renewable, their Solar Farm rows   the 40.00 alone, no Production "
+    - recording: 1124
+      turn: 232
+      value: "The term is gone once no Great Scientist stands on the present timeline   (Game_GreatPeople.csv: 1124 after Carl Sagan's grant at t232, 1117 after   Stephanie Kwolek's at t246, no scientist added;"
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+  context:
+    - "...0x1f0020, +0x08 x (100 + +0xa8)% where +0xa8 > 0) is below its required power (+0x58, 0x1f02f0; the unpowered notification 0x1ee5c0 prints +0x58 against +0x30 plus the free power), h..."
   review: imported
 - addr: 0x1f6480
   final: 0x14b7f0
@@ -2916,6 +2939,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66 requirements; the effects the policies and gover..."
@@ -2936,6 +2960,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...c0) goes to the analyzer's slot 1, none to slot 2; nesting stops at depth 4. The context (0x6ccd50, filled in 0x7a7590) carries T (+0xb4), H (+0xb8), the rate as a float (+0xbc), the city...
@@ -3751,6 +3776,7 @@
   impl: [cpu/core/aiPlotValue.ts:PlotValueFacts, cpu/core/aiPlotValue.ts:featureRemovalValue]
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...t DefaultValue (Appeal x 0.5 Food more where a neighbour holds a district with Housing, 0x79e140; Districts +0x40 Housing) from T to H. 0x7a37d0: Resource_Harvests at DefaultValue disc..."
   review: reviewed
@@ -3775,6 +3801,7 @@
       value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...ns, without a wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T, 0x79f0c0); its modifiers 0x7a4b20; at the top level its neighbours' improvements and districts r..."
   review: reviewed
@@ -4346,6 +4373,19 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...nit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670; Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
+  review: imported
+- addr: 0x7f81c0
+  final: 0x55f2e0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 233
+      value: "Not   ported (the minors' Ski Resort rows: runs/h1_duely1117 t233, 1124 t200 and   t202, 1127 t233)."
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+  context:
+    - "...bit 3 (impassable), the node walks the plot's ring (0x6b1b0, functor @0xd74c88, invoke 0x7f81c0) while nothing is found: a neighbour neither impassable nor holding units (+0x4c) is..."
   review: imported
 - addr: 0x7fef20
   final: 0x563070
@@ -5401,6 +5441,7 @@
   impl: [cpu/core/disasters.ts:floodHazardTurns]
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...ist holds the plot, each severity from MAJOR up adds 100 / its river entry +0x98[sev] — 0xa2efb0's N / OccurrencesPerGame at the game's realism (0x339140), N the event draw's 0x339020..."
   review: imported
@@ -5558,6 +5599,7 @@
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...), the value 0x7a58f0(impr, rate, T, horizon, plot, city). The Improvements row (loader 0xac6bb0, its SELECT alphabetical): AirSlots +0x2c, Appeal +0x30, DefenseModifier +0x34, Dispe..."
   review: reviewed

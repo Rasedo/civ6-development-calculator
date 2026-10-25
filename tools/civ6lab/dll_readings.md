@@ -5731,7 +5731,7 @@ gpu/core/sim_cityvalue.py); its unit-value call `unitValue`
   t21's at T 6; 1124 p3 t33 likewise) or K (1121 p2 t129 424.02 against
   353.63).
 
-## C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired
+## C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)
 
 Ported in `cpu/core/aiPlotValue.ts`; measured by
 `cpu/harness/plotValueLab.ts` on every IMPROVEMENTS row the five verbose
@@ -5806,9 +5806,9 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   civics' list +0x1380 holds the improvement (0x39de20) the claimed plots
   0x7a10c0 (each neighbour within 3 of the city another owns, without a
   wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T,
-  0x79f0c0); its modifiers 0x7a4b20. No neighbour is revalued for an
-  improvement (0x79f280's one caller is the district value body). Unported:
-  the tourism, claims and modifiers terms. LAB: the
+  0x79f0c0); its modifiers 0x7a4b20; at the top level its ring's
+  neighbours revalued (below). Unported: the claims and the neighbours
+  terms. LAB: the
   Housing counted a second time at its whole value (the housing value's
   whole part, as an analyzer's): runs/h1_duelv1117 Caguana's Farm rows
   each the value without it plus exactly that whole part (18.00 at t6, 30.00
@@ -5817,6 +5817,65 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   0x7a58f0 / 0x7b1320 / the modifiers 0x7a4b20 unread (0x7b1320 calls the
   housing value once, over TilesRequired; 0x6ad2b0, an analyzer beside
   EFFECT_ADJUST_DISTRICT_AMENITY, calls it too).
+- 0x7A58F0'S OLD IMPROVEMENT, READ: an unpillaged improvement on the plot
+  other than the candidate takes off 0x7b1320 of it (T, H) and the resource
+  value 0x7a21e0 of -1 copy of the plot's resource, as ported. The loop
+  rows (runs/h1_duelv1117 Caguana's Batey over a Farm, -101.53 logged, ours
+  -55.20) are the Farm's own value off: Caguana's bare Farm rows of a turn
+  stand off the log by the same amount the Batey-over-Farm rows stand off
+  it the other way (t41 +46.32 / -46.32, t52 +60.11 / -60.11, t58 +135.25 /
+  -135.25, t59 +147.12 / -147.12), one amount per turn over every plot of
+  the city — the housing term's (the housing value 0x7a3d70 of the city's
+  growth facts), whose LAB second whole part fits the early turns only.
+- 0x7b1320's TOURISM (0x7b19a0), READ: per Improvement_Tourism row (+0x168)
+  of source 6 (TOURISMSOURCE_APPEAL) the plot's Appeal x ScalingFactor /
+  100 (0x1aba40), x (1 + the city's +0x1b20 percent, 0 for a city-state);
+  a turn's PSEUDOYIELD_TOURISM of it (0x7a60d0) x fx(1 - max(5 - era, 0) x
+  0.1f) (@0xd2f320 0.1, @0xcfc9f8 1.0; the era 0x467eb0), added before the
+  defence term. The other sources' rows not valued. runs/h1_duelv1124 Ski
+  Resort rows exact 0 -> 153 of 315, 1117 0 -> 98 of 153.
+- 0x7b1320's MODIFIERS (0x7a4b20 at 0x7b23d8), READ: the improvement's
+  ImprovementModifiers in an analysis context (0x6ccd50) of the player
+  (+0x80), the plot's city (+0x70), T (+0x64), H (+0x68) and the rate
+  (+0x6c), added after the housing and the claims. Then, at the top level
+  only (the context's plot list +0x10 empty), the plot is pushed and its
+  ring walked (0x6b1b0, functor @0xd71be8 -> 0x79ed40, the district value's
+  neighbour walk) — unported, as for the district value.
+- EFFECT_ADJUST_CITY_FREE_POWER (registry 0x6c9640: object @0xf03c90,
+  vtable 0xd630b8, slot 1 0x6b1af0), READ: with the context's player and
+  city, 0x7a67f0(player, city, Amount, rate, T, H)'s whole part. 0x7a67f0
+  for an Amount above 0: where the city's free power (City_Power +0x30d0:
+  0x1f0020, +0x08 x (100 + +0xa8)% where +0xa8 > 0) is below its required
+  power (+0x58, 0x1f02f0; the unpowered notification 0x1ee5c0 prints +0x58
+  against +0x30 plus the free power), half its Production (City::GetYield
+  x @0xd20458 0.5) at its value (0x7a6690) from T to H (0x7a2140); the
+  Amount at PSEUDOYIELD_GPP_SCIENTIST (@0xf2e22c, 0x7a60d0) from T to H
+  (0x7a1240 at T = H); the larger. An Amount below 0 walks the player's
+  +0x1320 (unread). runs/h1_duelv1117 Solar Farm rows exact 120 -> 389 of
+  485, Wind Farm 28 -> 57 of 108: each 2 Power's 40.00. LAB: a city-state's
+  city never short — runs/h1_duelv1124 Cardiff t209-t220 (a Factory) and
+  Bologna t207-t220 (a Research Lab), no renewable, their Solar Farm rows
+  the 40.00 alone, no Production term (1124 Solar Farm 116 -> 348 of 622).
+  The term is gone once no Great Scientist stands on the present timeline
+  (Game_GreatPeople.csv: 1124 after Carl Sagan's grant at t232, 1117 after
+  Stephanie Kwolek's at t246, no scientist added; every Solar Farm row of
+  both 40.00 below ours from the next turn) — the weight's writer unread,
+  not ported.
+- CHECK PLOT's MOUNTAIN, READ (0x7f77a4..0x7f7821): the plot test passed (or
+  the repair) on a plot whose +0x3a has bit 3 (impassable), the node walks
+  the plot's ring (0x6b1b0, functor @0xd74c88, invoke 0x7f81c0) while
+  nothing is found: a neighbour neither impassable nor holding units (+0x4c)
+  is written into Plot To Move (the tree's Builder Location), and found
+  where its owner (+0x30 -> +0x1c) is the player; SUCCESS either way
+  (`builderPlotOf` / `builder_plot`). Build Improvement's worker on that
+  plot lays the mountain's row from beside it, the minors' plot analysis
+  taking the Builder's adjacent-plot rows on a bare mountain of their own
+  (the city-states' Ski Resorts: runs/h1_duely1117 t233, 1124 t200 and
+  t202, 1127 t233).
+- THE ROAD TIER the replay imports: the game era's (ROAD_TIER_ERA's), from
+  the record's era (runs/h1_duely1121 t222 Antioch's Builder trained and
+  laying plot 869 the same turn, 1128 t156 Hong Kong's on 405: two road
+  steps with Movement left).
 - The research AI's turns (0x7610e0): the entry's turns plus its +0x528,
   the turns left on the research as its last turn wrote them; a city
   founded the turn before reads -1 (1127 t2: the minors' Mines at T 4 of

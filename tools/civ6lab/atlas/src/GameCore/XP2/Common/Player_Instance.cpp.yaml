@@ -31,7 +31,7 @@
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
-  impl: [cpu/core/quests.ts:playerEra]
+  impl: [cpu/core/quests.ts:playerEra, cpu/core/aiPlotValue.ts:PlotValueFacts]
   readings:
     - "C-94: the game era, the ages and the founding moments — READ"
     - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
@@ -39,6 +39,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "- A player's era (0x467eb0, the techs object +0xf8) is the highest era of its techs and civics as of its turn's en..."
     - "...x6c4); when TOURISM_ADVANCED_ERA_WONDER (GP +0x6c0) is set, plus the owner's era index (0x467eb0) less the wonder's — its PrereqTech's era (+0x210 → +0xc0), else its PrereqCivic's (+..."

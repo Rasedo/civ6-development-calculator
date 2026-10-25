@@ -48,7 +48,7 @@ import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatR
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
-import { buildingVariantAdjacency, effectiveAdjacency } from './yields';
+import { buildingVariantAdjacency, cityPower, effectiveAdjacency } from './yields';
 import { civEraIndex, computeCityStats } from './city';
 import { PROJECTS } from '../data/projects';
 import { RESOURCES } from '../../world/resources';
@@ -300,6 +300,17 @@ export function aiView(state: GameState): AiView {
     cityFoodSurplus: (i, id) => {
       const c = cityOf(i, id);
       return c ? fxOf(computeCityStats(state, c).foodSurplus) : 0;
+    },
+    cityPowerShort: (i, id) => {
+      // a city-state's city never short (LAB: City_Power +0x58 / +0x08 unread
+      // for a minor; runs/h1_duelv1124 Cardiff t209-t220 with a Factory and
+      // Bologna t207-t220 with a Research Lab, no renewable, each Solar Farm
+      // row its 2 Power's 40.00 alone, no Production term)
+      if (isCityStateSeat(i)) return false;
+      const c = cityOf(i, id);
+      if (!c) return false;
+      const p = cityPower(state, c);
+      return p.supply < p.demand;
     },
     districtCost: (i, type) => {
       const id = engineId('district', type, 'DISTRICT_', DISTRICTS) as DistrictId | null;

@@ -31,8 +31,11 @@
     - gpu/core/sim_citytrees.py:_u_check_plot
     - cpu/core/minorCityAi.ts:owned
     - cpu/core/minorCityAi.ts:danger
+    - cpu/core/aiCityTrees.ts:builder
+    - cpu/core/minorCityAi.ts:builderPlotOf
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...7da0 (0x5d74c0: another tree's reservation yields to a value 20.0 above it); Check Plot 0x7f6ea0; Find Available Unit 0x7ec7b0; Cancel Contract 0x7f5200 / 0x7f4980; Protect Unit 0x7f07..."

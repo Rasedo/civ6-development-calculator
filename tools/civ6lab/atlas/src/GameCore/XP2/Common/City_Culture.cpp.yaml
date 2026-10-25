@@ -204,9 +204,11 @@
     - recording: 1117
       turn: 222
       value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
+  impl: [cpu/core/aiPlotValue.ts:improvementYieldsValue]
   readings:
     - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "- An improvement (the lens 0x399e10 at 0x39a73c, the city 0x1aba40): its Improvement_Tourism row pays only with its PrereqTech (+0x60, the player's tech..."
   review: imported

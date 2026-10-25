@@ -176,20 +176,23 @@ export function adjacentPlotTarget(
 ): number {
   let best = -1;
   for (const n of neighbors(map, tile)) {
-    if (!isMountain(n) || n.improvement) continue;
-    // no such row lists a feature, so a natural wonder's mountain and a
-    // volcano refuse it
-    if (!featureOk(def, n, null)) continue;
-    // the TARGET answers the territory column, not the tile the builder
-    // stands on — `CanBuildOutsideTerritory` reaches unowned mountains and
-    // stops at another seat's border like every other row.
-    if (!territoryOk(def, n, ownsTile)) continue;
-    // CIV6 (`SameAdjacentValid` false, the Ski Resort): the TARGET stands
-    // beside none of its own kind
-    if (def.noAdjacentSame && neighbors(map, n).some((m) => m.improvement === def.id)) continue;
-    if (best < 0 || n.index < best) best = n.index;
+    if (adjacentPlotTargetOk(map, n, def, ownsTile) && (best < 0 || n.index < best)) best = n.index;
   }
   return best;
+}
+
+/** may the adjacent-plot row `def` be laid ON `n` from a neighbour: a bare
+ *  mountain; no such row lists a feature, so a natural wonder's mountain and
+ *  a volcano refuse it; the TARGET answers the territory column, not the
+ *  tile the builder stands on — `CanBuildOutsideTerritory` reaches unowned
+ *  mountains and stops at another seat's border like every other row; and
+ *  (CIV6 `SameAdjacentValid` false, the Ski Resort) it stands beside none of
+ *  its own kind */
+export function adjacentPlotTargetOk(map: GameMap, n: Tile, def: ImprovementDef, ownsTile: (t: Tile) => boolean): boolean {
+  if (!isMountain(n) || n.improvement) return false;
+  if (!featureOk(def, n, null)) return false;
+  if (!territoryOk(def, n, ownsTile)) return false;
+  return !(def.noAdjacentSame && neighbors(map, n).some((m) => m.improvement === def.id));
 }
 
 /**
