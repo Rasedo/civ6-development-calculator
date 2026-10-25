@@ -4265,6 +4265,18 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   end look (player signal +0x228). A record's age is the count of ageings
   since it was last seen (+0xc reset to 0 by a sight or a birth): a unit
   made before the turn's ageing reads age 1 on that turn's line.
+- THE CITY-STATES ONE AT A TIME (the replay): each city-state's turn opens
+  with the city-states before it standing where their turn left them (the
+  record t+1's plots: `holdMinorStart`), and a city-state's own unit the
+  next record lost stands, for its end look, on the last plot the log's
+  steps of the turn took it to. The cases: runs/h1_dueld1121 t40 Ayutthaya's
+  Galley out of Antioch's sight before Antioch's look (its record the
+  game's age 1, ours 0 before); h1_dueldA1117 t8 Valletta's Warrior walking
+  to 13:12 and falling after the look (its record the game's 13:12). --aiscore
+  --to 60, the five dueld duels: knowledge.army 59.5% -> 61.7% (ages one
+  turn younger 208 -> 73 rows). Left: 1117 t42 city-state 3's sight of
+  China's units is the levied Warriors' return a pair late (the replay's
+  levy clock).
 - THE FOUNDING SETTLER'S RECORD: a city-state's knowledge base holds the
   Settler that founded its city, a unit gone, aging as any record to 21
   (runs/h1_dueld1121 aimem: each city-state's SETTLER on its centre at age

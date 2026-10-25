@@ -98,6 +98,7 @@ import { minorTradeList, minorTradeValue } from './aiTrade';
 export function minorPhase(state: GameState): void {
   for (const cityState of state.cityStates) {
     atRngPoint(state, { kind: 'seat', seat: cityState.seat, turn: state.turn });
+    minorStart?.(state, cityState);
     minorLevyReturn(state, cityState);
     // its strategic resources, before anything reads them: every improved
     // source of its own pays into its stockpile, as a major's does
@@ -165,6 +166,15 @@ export function minorLevyReturn(state: GameState, cityState: CityState): void {
     return;
   }
   sendLevyHome(state, cityState);
+}
+
+/** the replay's look at each minor's turn as it opens (`holdMinorStart`):
+ *  the players before it in the turn stand where their turn left them */
+let minorStart: ((state: GameState, cityState: CityState) => void) | null = null;
+/** set (or clear) the replay's hook at each minor's turn's opening. Nothing
+ *  outside a replay. */
+export function holdMinorStart(fn: ((state: GameState, cityState: CityState) => void) | null): void {
+  minorStart = fn;
 }
 
 /** the replay's hold on the levied armies' return (`holdLevies`): the

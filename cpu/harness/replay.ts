@@ -88,7 +88,7 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorOrders, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, levyUnitHome, releaseLevies, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, levyUnitHome, releaseLevies, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -1176,7 +1176,19 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
     if (c.centerIndex >= 0) {
       const held: [Unit, number, number][] = [];
       for (const [x, u] of twin) {
-        if (!copy.units.includes(x) || !state.units.includes(u)) continue;
+        if (!copy.units.includes(x)) continue;
+        if (!state.units.includes(u)) {
+          // its unit record t+1 lost stands where the log's steps of the
+          // turn left it, its last plot the look sees it on (runs/h1_dueld1117
+          // t8: Valletta's Warrior walks to 13:12 and falls after the look,
+          // its record the game's 13:12 at age 1)
+          const steps = x.seat === c.seat ? ctx.paths.get(keyOf.get(u) ?? '') : undefined;
+          if (steps?.length) {
+            held.push([x, x.tileIndex, x.hp]);
+            x.tileIndex = steps[steps.length - 1];
+          }
+          continue;
+        }
         held.push([x, x.tileIndex, x.hp]);
         if (x.seat === c.seat) x.tileIndex = u.tileIndex;
         else x.hp = u.hp;
@@ -4459,7 +4471,20 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       seatPhase(state, { seats: new Set(others), deals: true });
       stream.actions(a.turn);
       otherMajorsTurn();
-      minorTurns(state);
+      // each city-state's turn opens with the city-states before it standing
+      // where their turn left them, as the record holds them: the game runs
+      // them one at a time (runs/h1_dueld1121 t40: Ayutthaya's Galley out of
+      // Antioch's sight before Antioch's look, its record the game's age 1)
+      let before: number | undefined;
+      holdMinorStart((_st, cs) => {
+        if (before !== undefined) syncUnits(ctx, b, before);
+        before = ctx.playerOfSeat.get(cs.seat);
+      });
+      try {
+        minorTurns(state);
+      } finally {
+        holdMinorStart(null);
+      }
       takeBarbs();
       worldCongress(state);
       turnClose(state);
