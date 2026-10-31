@@ -341,7 +341,9 @@ const OP_DEFS = [...MINOR_OP_DEFS, FREE_RAID_DEF];
 import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { unitEfficiency } from '../core/aiUnitEfficiency';
 import { minorDistrictVerdict } from '../core/minorCityAi';
-import { AI_YIELDS, majorYieldBias } from '../core/aiWeights';
+import { AI_YIELDS, agendaYieldBias, eraYieldBias, majorYieldBias } from '../core/aiWeights';
+import { AI_AGENDAS } from '../data/aiTables';
+import { ERAS as ERA_NAMES } from '../data/techs';
 import type { Era } from '../data/techs';
 import { BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CAMP_DIST_CITY, BARB_TECH_PCT, BARB_REGION_MIN,
   BARB_SCOUT_WAIT, BARB_ISLAND_PLOTS, BARB_COAST_WATER, BARB_MAX_UNITS, BARB_MAX_SCOUTS, BARB_NAMES_PER_KIND, BARB_CAMP_TERRAINS,
@@ -1048,9 +1050,15 @@ export function buildRules() {
       pyUnitCombat: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_UNIT_COMBAT,
       pyLuxury: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_RESOURCE_LUXURY,
       yieldDefault: AI_YIELDS.map((y) => AI_YIELD_DEFAULT[y]),
-      // each civilization-leader pair's Yields lists' weights at the Prince
-      // handicap, raw (AI_YIELDS order): a major's weights the trade AI's walk reads
+      // the majors' weight lists at the Prince handicap, raw, the Yields
+      // system's six then the YieldSensitivities system's (AI_YIELDS order) —
+      // the major's weights the trade AI's walk reads: each
+      // civilization-leader pair's traits', each agenda's (AI_AGENDAS order),
+      // every era strategy's up to each era (ERAS order)
       majorYieldBias: CIV_LEADERS.map((_, i) => majorYieldBias(i)),
+      agendas: AI_AGENDAS,
+      agendaYieldBias: AI_AGENDAS.map((a) => agendaYieldBias(a)),
+      eraYieldBias: ERA_NAMES.map((_, e) => eraYieldBias(e)),
     },
     // the city build AI's value tables (`aiCityBuild.ts`, `aiPlotValue.ts`,
     // `aiDistrictValue.ts`, `aiProjectValue.ts`, `aiEconomic.ts`): the yields'

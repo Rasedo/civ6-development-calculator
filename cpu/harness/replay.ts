@@ -89,6 +89,7 @@ import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constan
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import { nameRivers } from '../core/disasters';
+import { civicAgendas, setupAgendas } from '../core/agendas';
 import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorUnitPrice, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
@@ -291,6 +292,9 @@ interface Ctx {
    *  `${turn}:${player}` the row researched and the goal */
   aiResearchLog: Map<string, AiResearchRows>;
   researchScores: Record<ResearchParty, ResearchScoreTally>;
+  /** each major's civics at the agendas' last staging (`stageAgendas`); null
+   *  before the set-up's */
+  agendaCivics: Map<number, readonly string[]> | null;
   /** the civics AI's choices against the record's (`ResearchAiTally`, no
    *  log names the civic chosen), each seat's civic as the pair opened, the
    *  game's AI log of civics (`<dump>.logs/AI_GovtPolicies.csv`, per
@@ -2332,6 +2336,25 @@ function envoysInStart(log: RandLog | undefined, a: TurnRecord, b: TurnRecord, p
   if (!draws) return true;
   const picks = draws.filter((x) => x.label === 'GetNextBuyablePlot picker').length;
   return picks > a.cities.filter((c) => c.owner === player).length;
+}
+
+/** THE MAJORS' AGENDAS on the game's own draws ("Choose random agenda", its
+ *  draw log): the set-up's at the first turn (`setupAgendas`), then, for each
+ *  major that has come to hold a civic of RandomAgendasForCivic since the
+ *  last staging, that civic's draws of the turn before (`civicAgendas`) */
+function stageAgendas(ctx: Ctx, turn: number, log: RandLog | undefined): void {
+  const draws = (t: number) => {
+    const vs = (log?.draws ?? []).filter((d) => d.label === 'Choose random agenda' && d.turn === t).map((d) => d.value);
+    let k = 0;
+    return (n: number) => (k < vs.length ? vs[k++] : n);
+  };
+  const majors = ctx.state.seats.filter((s) => isCiv(s.seat));
+  if (!ctx.agendaCivics) setupAgendas(ctx.state, draws(turn));
+  else {
+    const draw = draws(turn - 1);
+    for (const s of majors) civicAgendas(ctx.state, s, ctx.agendaCivics.get(s.seat) ?? [], draw);
+  }
+  ctx.agendaCivics = new Map(majors.map((s) => [s.seat, [...s.research.civics]] as const));
 }
 
 /**
@@ -4381,7 +4404,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * THE AI'S MEMORY: what the AI keeps across turns that no record holds,
  * carried from our own turn into the next pair's world (`perTurnWorld`).
  * Per seat (the majors', the city-states', the Free Cities', the
- * barbarians'): the unit pool, the knowledge base (army records and their
+ * barbarians'): the unit pool, a major's agendas, the knowledge base (army records and their
  * ageing, the camps, the player its trade record walks), the Combat Desire,
  * the city AI (events' slots, trees,
  * contracts, reservations), the operation manager and its next id, the
@@ -4396,7 +4419,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
  */
-const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'tradeSeat', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
+const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'tradeSeat', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'aiLeft', 'aiLeftSeen',
   'techCatchUp', 'civicCatchUp', 'favTech'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
@@ -4718,7 +4741,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
     engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorClearUnits: [], barbBattles: [], minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
-    researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
+    researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
     scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), minorLookTypes: new Map(),
@@ -4843,6 +4866,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     syncUnits(ctx, b, activePlayer(a));
     activeBoosts(ctx, b, activePlayer(a));
     stageEnvoys(ctx, ds, a, b, history.randLog);
+    stageAgendas(ctx, a.turn, history.randLog);
     const staged = stagePolicies(ctx, ds);
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);

@@ -16,6 +16,7 @@ import { isImpassable, isWater, isMountain, multiDomainPlot } from '../../world/
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, spawnUnit } from './units';
+import { revealAround, unitSeesThrough, unitSight } from './fog';
 import { routeInRange, tradeCourse, tradeReach } from './tradePath';
 import { TRADE_COURSE_MAX, scaleByGameSpeed } from '../data/constants';
 import { civEraIndex } from './city';
@@ -1245,6 +1246,12 @@ export function tradeRouteWalk(state: GameState, actor: Seat): void {
     // neither does a portal's mountain
     if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) layRoad(state, actor.seat, state.map.tiles[next]);
     claimTileEnRoute(state, actor.seat, next);
+    // the Trader is a unit on the map and looks from the plot it reaches, as
+    // a unit's step does (a major's fog and meetings, a city-state's revealed
+    // plots and meetings: runs/h1_duely1127 t41-t50 Hattusa's Trader on its
+    // route, one plot a turn)
+    const trader = { type: 'TRADER', seat: actor.seat };
+    revealAround(state, actor.seat, next, unitSight(trader, state), { seeThrough: unitSeesThrough(trader) });
     if (r.walkLeg === 0 && i === course.length - 1) r.walkLeg = 1;
     else if (r.walkLeg === 1 && i === 0) r.walkLeg = 0;
   }

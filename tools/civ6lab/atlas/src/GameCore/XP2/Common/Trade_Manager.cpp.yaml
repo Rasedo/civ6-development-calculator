@@ -101,6 +101,7 @@
       value: "runs/h1_duelv1117: Valletta's K   2.10 from t14 (0.00 before), the record training its Trader at t33."
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+    - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
   context:
     - ...ieldsFromPotentialRoute 0x54eb90, 0x54c630, the path term CalculateOriginYieldsFromPath 0x54e160 skipped on the last argument 1, Trade_Manager 0x54c6c0); a domestic one adds the dest...
   review: imported
@@ -165,6 +166,7 @@
     - "C-94: trade posts and cultural dominance — READ"
     - "H-1: a route's yield per path plot (Hunza) — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
+    - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
   context:
     - "- Trade_Manager 0x5500b0 counts the Trading Posts on a route's path from index 1 through the destination, own an..."
     - ...th, 0x5526a0), n its plots (4-byte entries, both ends included); the posts counted on it (0x5500b0) times the player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-ti...

@@ -4572,10 +4572,17 @@ class SimInit:
         self.row_civ = torch.where(self.row_leader >= 0,
                                    torch.tensor(self._pair_civ + [-1], dtype=torch.long, device=device)[self.row_leader.clamp(min=0)],
                                    torch.full_like(self.row_leader, -1))
-        # per civilization-leader pair its Yields lists' weights, raw, in the
-        # yields' order (`majorYieldBias`), flattened pair-major
-        self._major_yield_bias = torch.tensor([int(v) for row in rules.ai_value["majorYieldBias"] for v in row] or [0],
+        # the majors' weight lists, raw, the Yields system's six then the
+        # YieldSensitivities system's (`majorYieldBias`): per
+        # civilization-leader pair its traits' (flattened pair-major), per
+        # agenda its traits' [NA, 12], per era every era strategy's up to it
+        # [n_eras, 12]; and each major's agendas (`Seat.agendas`)
+        _av = rules.ai_value
+        self._major_yield_bias = torch.tensor([int(v) for row in _av["majorYieldBias"] for v in row] or [0],
                                               dtype=torch.long, device=device)
+        self._agenda_yield_bias = torch.tensor(_av["agendaYieldBias"] or [[0] * 12], dtype=torch.long, device=device)
+        self._era_yield_bias = torch.tensor(_av["eraYieldBias"], dtype=torch.long, device=device)
+        self.civ_agendas = torch.zeros(B, self.n_majors, self._agenda_yield_bias.shape[0], dtype=torch.bool, device=device)
         _ab = _uq["abilities"]
         self._iteru_mult = float(_ab["iteruProdMult"])
         self._knarr_heal = int(_ab["knarrNeutralHeal"])

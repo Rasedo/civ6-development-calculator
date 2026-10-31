@@ -10,11 +10,18 @@
   cases:
     - recording: h1_duelw1112
       value: "The civic pool leaves out an agenda every major holds   (28: runs/h1_duelw1112 and 1121, both majors on one agenda);"
+    - recording: h1_duely1127
+      turn: 1
+      value: "Choose random agenda 20 / 9: China's Money Grubber (set-up pool EARLY then ANY, Agendas order); its Gold weight +0.2, China's K 2.10 for three Gold from t3"
+  impl:
+    - cpu/core/agendas.ts:setupAgendas
+    - cpu/core/agendas.ts:civicAgendas
+    - cpu/harness/replay.ts:stageAgendas
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
     - "- The agendas (Game_Initializer 0x31d3c0; the civic's 0x31f7f0 / 0x427bf0): each major's HistoricalAgendas, then RandomAgendasIn..."
-  review: imported
+  review: reviewed
 - addr: 0x31f7f0
   final: 0x2298e0
   kind: function

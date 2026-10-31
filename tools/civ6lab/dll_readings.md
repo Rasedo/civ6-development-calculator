@@ -6202,14 +6202,37 @@ routes (`hypo`) and the civics value's trade-capacity term
   China's capital only from t10, city-state 3 printing its 1.50 from t11).
 - THE MAJORS' LISTS: each major's city keeps its trade list at its turn's
   start (0x78f210 over the major's explored plots).
-- THE MAJORS' WEIGHTS: the walk values a major's routes at the engine's
-  yield weights of that major (its leader's and civilization's Yields
-  lists, the Economic Gold boost). Unread for the majors: the hidden
-  agenda's Yields list and the era strategies' (China's Gold +0.2 above
-  Rome's on 1121 / 1124 / 1127 from the first K, 2.10 for three Gold where
-  ours is 1.80; 1117's China 1.80 at t18, 4.20 at t36 where ours is 3.60;
-  "C-96 / C-97: the AI's yield weights" above, MoneyGrubber; the agenda
-  draws "Choose random agenda" at t1 in RandCalls).
+- THE DESTINATION'S TRADING POST is the path term's (0x54e160, its posts
+  through 0x5500b0 from the plot past the origin through the destination;
+  the walk's 0x526330 skips it on its last argument 1): runs/h1_duely1117 t59
+  China's post at the city-state on plot 614 leaves its route there at six
+  Gold (K 5.29) where counting it gives 5.99; a city-state's walk alike
+  (1121 city-state 3's K 79 -> 97 of 118 turns as
+  logged).
+- THE TRADER'S LOOK: a route's Trader steps one plot a turn along its course
+  and looks from it as a unit's step does (`tradeRouteWalk`, its
+  `revealAround`). Unmatched still: runs/h1_duely1127 t47 China meets
+  Hattusa through Hattusa's Trader on its route to Mexico City (record
+  t41-t50), a route the engine's Hattusa does not run (its Mexico City
+  routes to Xi'an instead: the city-states' route choice); t61 China meets
+  Rome and Muscat the same turn, no unit of either within sight in the
+  record — unread.
+- THE MAJORS' WEIGHTS: the walk values a major's routes at that major's
+  yield weights (`yieldWeights`): its leader's and civilization's lists, its
+  agendas' (AgendaTraits -> AiLists), its era strategies' (every
+  STRATEGY_<ERA>_CHANGES up to its era: StrategyConditions "Is <Era>", the
+  strategy started the AI turn the major first holds a technology or civic
+  of the era and never stopped; the Yields and YieldSensitivities lists of
+  Strategy_Priorities), the Economic Gold boost, and the sensitivity over
+  the majors it has met. The agendas are the replay's import
+  (`stageAgendas`: the set-up's and the civic's draws "Choose random
+  agenda" from the game's draw log over the pool `agendas.ts` walks, "C-97:
+  the majors' opinion — the agendas" below): every duel's China at
+  set-up — 1117 Great Person Advocate (7), 1121 Gossip (15), 1124 and 1127
+  Money Grubber (9), 1128 Populous (11) — with Rome's Optimus Princeps and
+  Civilized / Gossip / Wonder Advocate. China's Gold +0.2 at its first K
+  in 1124 / 1127 is Money Grubber's list; in 1121 (t29) and 1117 (t36) the
+  Classical era strategy's ClassicalYields (Gold +20).
 
 ## H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)
 

@@ -22,7 +22,9 @@
  * player, per known city in the city's trade list, the most a route there
  * pays — an international one, its holder not at war with that player, the
  * route's origin yields with no path term (0x526330 with its last argument
- * 1: a route with no course); a domestic one those and its destination's
+ * 1: a route with no course, the destination's Trading Post Gold the path's:
+ * runs/h1_duely1117 t59 China's post at the city-state on plot 614 leaves its K
+ * 5.29, six Gold); a domestic one those and its destination's
  * (0x525b90) — each yield valued (`yieldValue`, 0x7a6690) and summed; never
  * below 0. A city-state's knowledge base updates it at its tactical turn,
  * after its city's update and before its City Analysis job: the city build
@@ -35,7 +37,7 @@
 import { fxOf, yieldValue, type AiValueView } from './aiValue';
 import { aiView } from './aiView';
 import { civsAtWar, freeSeatOf, isCiv, isCityStateSeat, seatOf } from './seats';
-import { minorRouteOriginYields, routeDestYields, routeOriginYields } from './trade';
+import { minorRouteOriginYields, routeDestYields, routeOriginYields, routePostGold } from './trade';
 import { routeInRange } from './tradePath';
 import type { CityState, GameState, Seat, TradeRoute, Yields } from './types';
 
@@ -127,6 +129,7 @@ export function routeValueOver(state: GameState, seat: number): number {
       if (!listed.has(k.centre) || civsAtWar(state, seat, k.holder)) continue;
       const y = minorRouteOriginYields(state, cs, k.route);
       if (!y) continue;
+      y.gold -= routePostGold(state, seat, k.centre);
       const v = yieldsValue(view, seat, y);
       if (v > best) best = v;
     }
@@ -139,7 +142,9 @@ export function routeValueOver(state: GameState, seat: number): number {
       if (!listed.has(k.centre)) continue;
       const domestic = k.holder === seat;
       if (!domestic && civsAtWar(state, seat, k.holder)) continue;
-      let v = yieldsValue(view, seat, routeOriginYields(state, c, k.route));
+      const y = routeOriginYields(state, c, k.route);
+      if (!domestic) y.gold -= routePostGold(state, seat, k.centre);
+      let v = yieldsValue(view, seat, y);
       if (domestic) v += yieldsValue(view, seat, routeDestYields(state, seat, k.route));
       if (v > best) best = v;
     }

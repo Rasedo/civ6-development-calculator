@@ -37,7 +37,7 @@
  * the browser build
 imports this.
  */
-import { AI_GOVERNMENTS } from '../data/aiTables';
+import { AI_AGENDAS, AI_GOVERNMENTS } from '../data/aiTables';
 import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { installType } from './minorBuild';
@@ -719,6 +719,8 @@ const SEAT: Record<string, Extractor> = {
   tourismReligious: overSeats((s) => s.tourismReligious ?? 0),
   sciRate: overSeats((s) => s.sciRate ?? 0),
   culRate: overSeats((s) => s.culRate ?? 0),
+  // a major's agendas, as AI_AGENDAS indices ascending
+  agendas: overSeats((s) => (s.agendas ?? []).map((a) => AI_AGENDAS.indexOf(a)).sort((x, y) => x - y)),
   tourRate: overSeats((s) => s.tourRate ?? 0),
   tourismTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismTo?.[seat] ?? 0))),
   tourismReligiousTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismReligiousTo?.[seat] ?? 0))),

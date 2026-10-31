@@ -28,8 +28,9 @@
  * PSEUDOYIELD_DISTRICT adds 0.5 x the ChronologyIndex of the player's era
  * (player +0x1358 +0xf8, Eras +0x1c).
  */
-import { AI_CIVILIZATION_TRAITS, AI_DIFFICULTIES, AI_LEADER_TRAITS, AI_LIST_ITEMS,
+import { AI_AGENDA_TRAITS, AI_CIVILIZATION_TRAITS, AI_DIFFICULTIES, AI_ERA_STRATEGY_LISTS, AI_LEADER_TRAITS, AI_LIST_ITEMS,
   AI_TRAIT_LISTS } from '../data/aiTables';
+import { ERAS } from '../data/techs';
 import { CIV_LEADERS } from '../data/seats';
 import { FX, fmul, fxConst, type AiListItem, type AiListRef } from './aiValue';
 import { civEraIndex, computeCityStats, luxuryAmenities } from './city';
@@ -58,12 +59,32 @@ function within(r: AiListRef | AiListItem, h: number): boolean {
   return (!r.minDifficulty || AI_DIFFICULTIES.indexOf(r.minDifficulty) <= h) && (!r.maxDifficulty || AI_DIFFICULTIES.indexOf(r.maxDifficulty) >= h);
 }
 
-/** one system's sum per item over the lists the player's traits carry:
- *  each row fx(Value x 0.01), Favored false subtracted (0x6dd1b0) */
+/** the weight lists a major carries beyond its traits': its agendas'
+ *  (AgendaTraits, `Seat.agendas`) and its era strategies' — every era's up to
+ *  its own (StrategyConditions "Is <Era>", started the AI turn the major
+ *  first holds a technology or civic of the era, never stopped) */
+function strategyRefs(seat: number, s: Seat): AiListRef[] {
+  if (!isCiv(seat)) return [];
+  const out: AiListRef[] = [];
+  for (const a of s.agendas ?? []) for (const t of AI_AGENDA_TRAITS[a] ?? []) out.push(...(AI_TRAIT_LISTS[t] ?? []));
+  const era = civEraIndex(s.research.techs, s.research.civics);
+  for (let e = 0; e <= era; e++) out.push(...(AI_ERA_STRATEGY_LISTS[`ERA_${ERAS[e].toUpperCase()}`] ?? []));
+  return out;
+}
+
+/** one system's sum per item over the lists the player carries — its
+ *  traits', its agendas' and its era strategies' (`strategyRefs`): each row
+ *  fx(Value x 0.01), Favored false subtracted (0x6dd1b0) */
 function listSum(seat: number, s: Seat, system: string): Map<string, number> {
   const h = s.handicap ?? PRINCE;
   const lists: string[] = [];
   for (const t of traitsOf(seat, s)) for (const r of AI_TRAIT_LISTS[t] ?? []) if (r.system === system && within(r, h)) lists.push(r.list);
+  for (const r of strategyRefs(seat, s)) if (r.system === system && within(r, h)) lists.push(r.list);
+  return refSum(lists, h);
+}
+
+/** the lists' sum per item at handicap `h` */
+function refSum(lists: readonly string[], h: number): Map<string, number> {
   const out = new Map<string, number>();
   for (const l of lists) {
     for (const it of AI_LIST_ITEMS[l] ?? []) {
@@ -75,12 +96,35 @@ function listSum(seat: number, s: Seat, system: string): Map<string, number> {
   return out;
 }
 
-/** a major playing the CIV_LEADERS pair `civ` at the Prince handicap: its
- *  Yields lists' weight per YieldType (raw, `AI_YIELDS`' order) — what the
- *  GPU twin's major weights read (`_major_yield_w`) */
+/** the Yields and YieldSensitivities systems' sums of `refs` at the Prince
+ *  handicap, raw, in `AI_YIELDS`' order (the six Yields, then the six
+ *  sensitivities) — the tables the GPU twin's major weights read
+ *  (`_major_yield_w`) */
+function weightRow(refs: readonly AiListRef[]): number[] {
+  const row = (system: string): number[] => {
+    const sums = refSum(refs.filter((r) => r.system === system && within(r, PRINCE)).map((r) => r.list), PRINCE);
+    return AI_YIELDS.map((y) => sums.get(y) ?? 0);
+  };
+  return [...row('Yields'), ...row('YieldSensitivities')];
+}
+
+/** a major playing the CIV_LEADERS pair `civ`: its traits' lists */
 export function majorYieldBias(civ: number): number[] {
-  const sums = listSum(0, { civ } as Seat, 'Yields');
-  return AI_YIELDS.map((y) => sums.get(y) ?? 0);
+  const entry = CIV_LEADERS[civ];
+  const traits = entry ? [...(AI_LEADER_TRAITS[`LEADER_${entry.leader}`] ?? []), ...(AI_CIVILIZATION_TRAITS[`CIVILIZATION_${entry.civ}`] ?? [])] : [];
+  return weightRow(traits.flatMap((t) => AI_TRAIT_LISTS[t] ?? []));
+}
+
+/** an agenda's lists (AgendaTraits) */
+export function agendaYieldBias(agenda: string): number[] {
+  return weightRow((AI_AGENDA_TRAITS[agenda] ?? []).flatMap((t) => AI_TRAIT_LISTS[t] ?? []));
+}
+
+/** the era strategies' lists of every era up to `era` (an Eras index) */
+export function eraYieldBias(era: number): number[] {
+  const refs: AiListRef[] = [];
+  for (let e = 0; e <= era; e++) refs.push(...(AI_ERA_STRATEGY_LISTS[`ERA_${ERAS[e].toUpperCase()}`] ?? []));
+  return weightRow(refs);
 }
 
 /** the seat's gold per turn: its cities' net Gold (a city-state's one city's) less its units' and its

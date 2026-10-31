@@ -586,36 +586,87 @@ class SimMinors:
             self.city_trade_ok[:, r, j] = ok
             self.city_trade_no[:, r, j] = no
 
-    def _major_yield_w(self, r: int) -> dict:
-        """`yieldWeights` of major row `r`, per YieldType [B] raw: its
-        leader's and civilization's Yields lists (`majorYieldBias`, at the
-        Prince handicap) and the Economic AI's Gold boost, -0.2 x its gold a
-        turn while that is below 0 (its cities' Gold less its units' upkeep
-        and its devices')"""
-        from .sim_cityvalue import _YIELDS
-        bias = self._major_yield_bias.take(self.row_leader[:, r].clamp(min=0).unsqueeze(1) * 6
-                                           + torch.arange(6, device=self.device).unsqueeze(0))
-        bias = torch.where((self.row_leader[:, r] >= 0).unsqueeze(1), bias, torch.zeros_like(bias))
+    def _major_gpt(self, r: int) -> torch.Tensor:
+        """[B] f64 `goldPerTurn` of major row `r`: its cities' Gold less its
+        units' upkeep and its devices'"""
         tot = self._seat_city_stats(r, record=False)[0]
         alive = self.city_alive[:, r, : tot.shape[1]]
         gold = (tot[:, :, 2] * alive.double()).sum(dim=1)
         mine = self.major_unit_alive & (self.major_unit_seat == r)
         up = (self._unit_upkeep(r, self.major_unit_type, self.major_unit_formation, self.major_unit_levied).double()
               * mine.double()).sum(dim=1)
-        gpt = gold - up - self._wmd_upkeep(r).double()
+        return gold - up - self._wmd_upkeep(r).double()
+
+    def _major_lists(self, r: int) -> torch.Tensor:
+        """[B, 12] raw — the weight lists major row `r` carries, summed per
+        item: its leader's and civilization's (`majorYieldBias`), its
+        agendas' (`civ_agendas`, `agendaYieldBias`) and its era
+        strategies' — every era's up to its own (`eraYieldBias`, cumulative);
+        the Yields system's six, then the YieldSensitivities system's"""
+        lead = self.row_leader[:, r]
+        idx = lead.clamp(min=0).unsqueeze(1) * 12 + torch.arange(12, device=self.device).unsqueeze(0)
+        out = torch.where((lead >= 0).unsqueeze(1), self._major_yield_bias.take(idx), torch.zeros_like(idx))
+        if self._agenda_yield_bias.shape[0] > 0:
+            out = out + (self.civ_agendas[:, r].long() @ self._agenda_yield_bias)
+        era = self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]).long()
+        out = out + self._era_yield_bias[era.clamp(min=0, max=self._era_yield_bias.shape[0] - 1)]
+        return out
+
+    def _major_yield_w(self, r: int) -> dict:
+        """`yieldWeights` of major row `r`, per YieldType [B] raw: the
+        Economic AI's Gold boost, -0.2 x its gold a turn while that is below
+        0 (`_major_gpt`); its weight lists' Yields (`_major_lists`); and per
+        yield of sensitivity s above 0, over it and every major it has met,
+        their yields a turn (its Science and Culture rates, its gold a turn):
+        s x (max - its own) / sd where sd > 0 and its own is below the max"""
+        from .sim_cityvalue import _YIELDS
+        lists = self._major_lists(r)
+        gpt = self._major_gpt(r)
         boost = torch.where(gpt < 0, _fmul(torch.full_like(gpt, _fx_const(-0.2), dtype=torch.long), _fx_const_t(gpt)),
                             torch.zeros_like(gpt, dtype=torch.long))
-        out = {y: bias[:, k] for k, y in enumerate(_YIELDS)}
+        out = {y: lists[:, k].clone() for k, y in enumerate(_YIELDS)}
         out["YIELD_GOLD"] = out["YIELD_GOLD"] + boost
+        sens = lists[:, 6:]
+        n = self.n_majors
+        met = [(self.seat_met_turn[:, r, o] >= 0) if o != r else None for o in range(n)]
+        for k, y in enumerate(_YIELDS):
+            sv = sens[:, k]
+            if y not in ("YIELD_SCIENCE", "YIELD_CULTURE", "YIELD_GOLD") or not bool((sv > 0).count_nonzero()):
+                continue
+
+            def per_turn(o: int) -> torch.Tensor:
+                if y == "YIELD_SCIENCE":
+                    return self.civ_sci_rate[:, o].double()
+                if y == "YIELD_CULTURE":
+                    return self.civ_cul_rate[:, o].double()
+                return self._major_gpt(o)
+            own = per_turn(r)
+            xs = [own]
+            ms = [torch.ones_like(own, dtype=torch.bool)]
+            for o in range(n):
+                if o == r:
+                    continue
+                xs.append(per_turn(o))
+                ms.append(met[o])
+            X = torch.stack(xs, dim=1)
+            M = torch.stack(ms, dim=1)
+            cnt = M.sum(dim=1).double()
+            mx = torch.where(M, X, torch.full_like(X, -1e300)).max(dim=1).values
+            mean = torch.where(M, X, torch.zeros_like(X)).sum(dim=1) / cnt
+            var = torch.where(M, (X - mean.unsqueeze(1)) ** 2, torch.zeros_like(X)).sum(dim=1) / (cnt - 1).clamp(min=1)
+            sd = var.sqrt()
+            ok = (sv > 0) & (cnt > 1) & (sd > 0) & (own < mx)
+            add = _fmul(sv, _fx_const_t(torch.where(ok, (mx - own) / torch.where(ok, sd, torch.ones_like(sd)), torch.zeros_like(sd))))
+            out[y] = out[y] + torch.where(ok, add, torch.zeros_like(add))
         return out
 
     def _cs_route_value(self, s: int) -> torch.Tensor:
         """0x5e9b20's walk over minor `s`'s one city ([B] raw): over its listed
         cities whose holder it is not at war with, the most a route there
         pays it, its origin yields with no path term (`minorRouteOriginYields`
-        on a route with no course: the destination's rows, the Trading Post
-        there, a major city's foreign-route Gold and its wonders' sender
-        yields) each valued at its weights (`yieldValue`) and summed; never
+        on a route with no course, less the Trading Post there, the path's:
+        the destination's rows, a major city's foreign-route Gold and its
+        wonders' sender yields) each valued at its weights (`yieldValue`) and summed; never
         below 0"""
         from .sim_cityvalue import _YIELDS
         B, S, dev = self.B, self.S, self.device
@@ -648,13 +699,11 @@ class SimMinors:
                     y[:, 3] += wc.double() @ self._wond_sender_sci
                 y6.append(y)
                 free.append(~self.war[:, row, r2])
-        post = self._route_post_gold(row, ctr).double()                     # [B, ND]
         for d in range(len(y6)):
             on = ok_l[:, d] & free[d]
             if not bool(on.count_nonzero()):
                 continue
             y = y6[d].clone()
-            y[:, 2] += post[:, d]
             v = torch.zeros(B, dtype=torch.long, device=dev)
             for k, name in enumerate(_YIELDS):
                 amt = torch.floor(y[:, k] * 256 + 0.5).long()

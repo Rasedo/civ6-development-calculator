@@ -878,6 +878,9 @@ export interface Seat {
    *  or the Free Cities (`freeCombatDesire`), raw 24.8: its
    *  PSEUDOYIELD_UNIT_COMBAT weight */
   combatDesire?: number;
+  /** a major's agendas (`agendas.ts`): its historical ones, then the random
+   *  ones as drawn; absent, none */
+  agendas?: string[];
   /** the player its knowledge base last met (the trade record's +0x6e0,
    *  0x5ecb50), whose cities its route value walks; absent, itself */
   tradeSeat?: number;

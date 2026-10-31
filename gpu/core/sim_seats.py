@@ -9201,7 +9201,7 @@ class SimSeats:
         `hypo` (a major row, with `per_route`): the origin terms of the
         routes `(from city id, dest code, dest seat, dest city id)` ([B, K]
         each, the stored routes' encoding) instead of the row's own, each
-        with no course — no path term, no length, no posts passed — the
+        with no course — no path term, no length, no posts passed or at the destination — the
         trade AI's potential routes (`routeOriginYields` on a route with no
         course)."""
         if row >= self.n_majors:
@@ -9421,7 +9421,7 @@ class SimSeats:
                 for _kc in range(6):
                     _rk_add(_kc, _csr[:, _kc].unsqueeze(1) * pays_c.double())
             pg_c = self._route_post_gold(row, self.citystate_center[:, :S].gather(1, css))
-            if bool((pg_c > 0).count_nonzero()):
+            if hypo is None and bool((pg_c > 0).count_nonzero()):
                 _rk_add(2, pg_c.double() * pays_c.double())
             # CIV6 (Amsterdam, Antioch): a city-state's city is a foreign city
             # too — its own tiles' distinct luxuries, per suzerainty
@@ -9503,7 +9503,8 @@ class SimSeats:
                 gold_i = gold_i + self._coinage_spec_gold * spec_dest.double() * gdc.double().unsqueeze(1)
             # the destination's Trading Post gold (`_route_post_gold`)
             _dctr = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
-            gold_i = gold_i + self._route_post_gold(row, _dctr).double()
+            if hypo is None:
+                gold_i = gold_i + self._route_post_gold(row, _dctr).double()
             # a route from a row culturally dominant over the destination's
             # (Trade_Manager 0x54c6c0)
             if row < self.n_majors:
@@ -16346,6 +16347,17 @@ class SimSeats:
                 new_leg = torch.where(on & (lg == 0) & (i == n_len - 1), torch.ones_like(lg),
                                       torch.where(on & (lg == 1) & (i == 0), torch.zeros_like(lg), lg))
                 self.seat_route_leg[bb, row, kk] = new_leg
+                # the Trader looks from the plot it reaches, as a unit's step
+                # does (`_unit_look`: a major's fog and meetings, a
+                # city-state's revealed plots, meetings and its suzerain's
+                # look), one route column at a time (the games unique)
+                seat_v = int(self._ROW_SEAT[row])
+                if self._trader_idx >= 0 and (seat_v < self.n_majors or 100 <= seat_v < 100 + self.S):
+                    for k in sorted(set(kk[on].tolist())):
+                        m = on & (kk == k)
+                        rb = bb[m]
+                        self._unit_look(rb, torch.full_like(rb, seat_v), nxt[m],
+                                        torch.full_like(rb, self._trader_idx), torch.zeros_like(rb))
         wt = self.seat_route_walk[:, row]
         chk = act & (wt >= 0) & active.unsqueeze(1)
         if row < self.n_majors:

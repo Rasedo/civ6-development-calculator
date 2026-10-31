@@ -210,7 +210,51 @@ def build() -> str:
 
     leader_w = {lt: [t for t in leader_traits(lt) if t in trait_lists] for lt in sorted(inherit)}
     civ_w = {ct: [t for t in ts if t in trait_lists] for ct, ts in sorted(ctraits.items())}
-    wanted = {x["list"] for v in trait_lists.values() for x in v}
+    # THE AGENDAS (Game_Initializer 0x31d3c0): in DATABASE ORDER (the order the
+    # random agenda pool walks within a tag), the random ones' tags and game
+    # limits, the set-up and civic draws' tags, the historical agendas, the
+    # exclusive pairs, each agenda's traits (AgendaTraits)
+    agenda_traits: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("AgendaTraits"):
+        if c.get("AgendaType") and c.get("TraitType"):
+            agenda_traits[c["AgendaType"]].append(c["TraitType"])
+    agendas = list(keyed(rows("Agendas"), "AgendaType"))
+    random_tag = {a: {"tag": c.get("AgendaTag"), "religion": (c.get("RequiresReligion") or "").lower() == "true"}
+                  for a, c in keyed(rows("RandomAgendas_XP2"), "AgendaType").items()}
+    random_agendas = [{"agenda": a, "gameLimit": int(c.get("GameLimit") or -1), "tag": random_tag.get(a, {}).get("tag"),
+                       "requiresReligion": random_tag.get(a, {}).get("religion", False)}
+                      for a, c in keyed(rows("RandomAgendas"), "AgendaType").items()]
+    era_tags: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("RandomAgendaEraTags"):
+        era_tags[c["EraType"]].append(c["AgendaTag"])
+    civic_tags: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("RandomAgendaCivicTags"):
+        civic_tags[c["CivicType"]].append(c["AgendaTag"])
+    in_era = [{"era": c["EraType"], "n": int(c.get("NumAgendas") or 1), "tags": era_tags[c["EraType"]]}
+              for c in rows("RandomAgendasInEra")]
+    for_civic = [{"civic": c["CivicType"], "n": int(c.get("NumAgendas") or 1), "tags": civic_tags[c["CivicType"]]}
+                 for c in rows("RandomAgendasForCivic")]
+    historical: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("HistoricalAgendas"):
+        historical[c["LeaderType"]].append(c["AgendaType"])
+    exclusive = [[c["AgendaOne"], c["AgendaTwo"]] for c in rows("ExclusiveAgendas")]
+    # THE ERA STRATEGIES (StrategyConditions "Is <Era>", a major's): each era's
+    # strategy's Strategy_Priorities lists of a weight system
+    era_by_word = {k.replace("ERA_", "").title(): k for k in keyed(rows("Eras"), "EraType")}
+    # a strategy whose one condition (its disqualifiers aside) is the era's
+    conds: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("StrategyConditions"):
+        if c.get("StrategyType") and (c.get("Disqualifier") or "").lower() != "true":
+            conds[c["StrategyType"]].append(c.get("ConditionFunction") or "")
+    era_strategy = {st: era_by_word[fs[0][3:]] for st, fs in conds.items()
+                    if len(fs) == 1 and fs[0].startswith("Is ") and fs[0][3:] in era_by_word}
+    weight_lists = {c["ListType"]: c["System"] for c in rows("AiLists") if c.get("ListType") and c.get("System") in WEIGHT_SYSTEMS}
+    era_lists: dict[str, list] = collections.defaultdict(list)
+    for c in rows("Strategy_Priorities"):
+        st, lt = c.get("StrategyType"), c.get("ListType")
+        if st in era_strategy and lt in weight_lists:
+            era_lists[era_strategy[st]].append({"list": lt, "system": weight_lists[lt], "minDifficulty": None, "maxDifficulty": None})
+    wanted = {x["list"] for v in trait_lists.values() for x in v} | {x["list"] for v in era_lists.values() for x in v}
     difficulties = [c["DifficultyType"] for c in keyed(rows("Difficulties"), "DifficultyType").values()]
 
     def lit(name, value, typ):
@@ -286,6 +330,15 @@ def build() -> str:
         + lit("AI_LEADER_TRAITS", {k: v for k, v in leader_w.items() if v}, "Readonly<Record<string, readonly string[]>>")
         + lit("AI_CIVILIZATION_TRAITS", {k: v for k, v in civ_w.items() if v}, "Readonly<Record<string, readonly string[]>>")
         + lit("AI_DIFFICULTIES", difficulties, "readonly string[]")
+        + lit("AI_AGENDAS", agendas, "readonly string[]")
+        + lit("AI_RANDOM_AGENDAS", random_agendas,
+              "readonly { agenda: string; gameLimit: number; tag: string | null; requiresReligion: boolean }[]")
+        + lit("AI_RANDOM_AGENDAS_IN_ERA", in_era, "readonly { era: string; n: number; tags: readonly string[] }[]")
+        + lit("AI_RANDOM_AGENDAS_FOR_CIVIC", for_civic, "readonly { civic: string; n: number; tags: readonly string[] }[]")
+        + lit("AI_HISTORICAL_AGENDAS", dict(sorted(historical.items())), "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_EXCLUSIVE_AGENDAS", exclusive, "readonly (readonly [string, string])[]")
+        + lit("AI_AGENDA_TRAITS", {a: agenda_traits[a] for a in agendas if agenda_traits[a]}, "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_ERA_STRATEGY_LISTS", dict(era_lists), "Readonly<Record<string, readonly AiListRef[]>>")
         + lit("AI_MINOR_INFLUENCE_MODIFIERS", dict(sorted(minor_influence.items())), "Readonly<Record<string, readonly AiModifier[]>>")
         + lit("AI_CIVIC_MODIFIERS", {k: [modifier(m) for m in v] for k, v in sorted(civic_mods.items())},
               "Readonly<Record<string, readonly AiModifier[]>>")

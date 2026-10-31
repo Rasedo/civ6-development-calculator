@@ -115,6 +115,45 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "ClassicalSensitivity": [
+  {
+   "item": "YIELD_SCIENCE",
+   "value": 10,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "ClassicalYields": [
+  {
+   "item": "YIELD_FAITH",
+   "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_FOOD",
+   "value": 15,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_GOLD",
+   "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_SCIENCE",
+   "value": 30,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "CultureLoverCulturePreference": [
   {
    "item": "YIELD_CULTURE",
@@ -224,6 +263,22 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "IndustrialYields": [
+  {
+   "item": "YIELD_FAITH",
+   "value": -40,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_GOLD",
+   "value": 15,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "IndustryLoverIndustryPreference": [
   {
    "item": "YIELD_PRODUCTION",
@@ -287,6 +342,84 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "MedievalSensitivity": [
+  {
+   "item": "YIELD_CULTURE",
+   "value": 10,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "MedievalYields": [
+  {
+   "item": "YIELD_FAITH",
+   "value": -25,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_FOOD",
+   "value": 25,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_GOLD",
+   "value": 15,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_PRODUCTION",
+   "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_SCIENCE",
+   "value": 15,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "ModernSensitivity": [
+  {
+   "item": "YIELD_SCIENCE",
+   "value": 10,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_CULTURE",
+   "value": 10,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "ModernYields": [
+  {
+   "item": "YIELD_FOOD",
+   "value": 5,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_GOLD",
+   "value": 10,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "MoneyGrubberGoldPreference": [
   {
    "item": "YIELD_GOLD",
@@ -300,6 +433,22 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
   {
    "item": "YIELD_CULTURE",
    "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "RenaissanceYields": [
+  {
+   "item": "YIELD_FOOD",
+   "value": 10,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "item": "YIELD_GOLD",
+   "value": 15,
    "favored": true,
    "minDifficulty": null,
    "maxDifficulty": null
@@ -807,6 +956,1281 @@ export const AI_DIFFICULTIES: readonly string[] = [
  "DIFFICULTY_IMMORTAL",
  "DIFFICULTY_DEITY"
 ];
+export const AI_AGENDAS: readonly string[] = [
+ "AGENDA_AIRPOWER",
+ "AGENDA_BARBARIAN_LOVER",
+ "AGENDA_CITY_STATE_PROTECTOR",
+ "AGENDA_CIVILIZED",
+ "AGENDA_CULTURED",
+ "AGENDA_DARWINIST",
+ "AGENDA_DEVOUT",
+ "AGENDA_ENVIRONMENTALIST",
+ "AGENDA_EXPLOITATIVE",
+ "AGENDA_EXPLORER",
+ "AGENDA_FUN_LOVING",
+ "AGENDA_GREAT_PERSON_ADVOCATE",
+ "AGENDA_IDEOLOGUE",
+ "AGENDA_INDUSTRIALIST",
+ "AGENDA_MONEY_GRUBBER",
+ "AGENDA_NATURALIST",
+ "AGENDA_NUKE_LOVER",
+ "AGENDA_PARANOID",
+ "AGENDA_POPULOUS",
+ "AGENDA_STANDING_ARMY",
+ "AGENDA_TECHNOPHILE",
+ "AGENDA_WONDER_ADVOCATE",
+ "AGENDA_ALLY_OF_ENKIDU",
+ "AGENDA_AYYUBID_DYNASTY",
+ "AGENDA_BACKSTAB_AVERSE",
+ "AGENDA_BIG_STICK_POLICY",
+ "AGENDA_BLACK_QUEEN",
+ "AGENDA_BUSHIDO",
+ "AGENDA_CITY_STATE_ALLY",
+ "AGENDA_COUNTER_REFORMER",
+ "AGENDA_DELIAN_LEAGUE",
+ "AGENDA_ENTHUSIASTIC_DISCIPLE",
+ "AGENDA_GREAT_PERSON_OBSESSED",
+ "AGENDA_IRON_CROWN",
+ "AGENDA_LAST_VIKING_KING",
+ "AGENDA_OPTIMUS_PRINCEPS",
+ "AGENDA_PEACEKEEPER",
+ "AGENDA_QUEEN_OF_NILE",
+ "AGENDA_SUN_NEVER_SETS",
+ "AGENDA_TLATOANI",
+ "AGENDA_WESTERNIZER",
+ "AGENDA_WITH_YOUR_SHIELD_OR_ON_IT",
+ "AGENDA_WONDER_OBSESSED",
+ "AGENDA_BILLIONAIRE",
+ "AGENDA_CHEOMSEONGDAE",
+ "AGENDA_FLOWER_OF_SCOTLAND",
+ "AGENDA_HORSE_LORD",
+ "AGENDA_HORN_CHEST_LOINS",
+ "AGENDA_IRON_CONFEDERACY",
+ "AGENDA_MAURYA_EMPIRE",
+ "AGENDA_NARIKALA_FORTRESS",
+ "AGENDA_SPIRIT_OF_TUCAPEL",
+ "AGENDA_CURMUDGEON",
+ "AGENDA_FLIRTATIOUS",
+ "AGENDA_GOSSIP",
+ "AGENDA_SYCOPHANT",
+ "AGENDA_SYMPATHIZER",
+ "AGENDA_DEMAGOGUE",
+ "AGENDA_DESTINATION_CIV",
+ "AGENDA_EXPANSIONIST",
+ "AGENDA_FLAT_EARTHER",
+ "AGENDA_GREAT_WHITE_FLEET",
+ "AGENDA_INTOLERANT",
+ "AGENDA_LIBERTARIAN",
+ "AGENDA_PILLAGER",
+ "AGENDA_TURTLER",
+ "AGENDA_ZEALOT",
+ "AGENDA_ANGEVIN_EMPIRE",
+ "AGENDA_CANADIAN_EXPEDITIONARY",
+ "AGENDA_KAITIAKITANGA",
+ "AGENDA_LAWGIVER",
+ "AGENDA_LORD_OF_MINES",
+ "AGENDA_RAVEN_BANNER",
+ "AGENDA_PATRON_OF_ARTS",
+ "AGENDA_SAPA_INCA",
+ "AGENDA_SICILIAN_WARS",
+ "AGENDA_PERPETUALLY_ON_GUARD",
+ "AGENDA_HAMMURABI_DISTRICTS",
+ "AGENDA_BASIL_ZEALOT",
+ "AGENDA_AMBIORIX_ARMY",
+ "AGENDA_MAGNIFICENCES",
+ "AGENDA_ETHIOPIAN_HIGHLANDS",
+ "AGENDA_LADY_SIX_SKY",
+ "AGENDA_SIMON_BOLIVAR",
+ "AGENDA_ETERNAL",
+ "AGENDA_NEW_ROME",
+ "AGENDA_SEJONG",
+ "AGENDA_PRESERVER_OF_THE_UNION",
+ "AGENDA_SULTAN",
+ "AGENDA_DECOLONIZATION",
+ "AGENDA_SAKOKU",
+ "AGENDA_PREFER_LANDPOWER",
+ "AGENDA_GOLDEN_AGE",
+ "AGENDA_ARCHIPELAGIC_STATE",
+ "AGENDA_END_TO_SUFFERING",
+ "AGENDA_GALLIC_WARS",
+ "AGENDA_TRIEU_DEFENDER",
+ "AGENDA_KUBLAI_PAX",
+ "AGENDA_SHORT_LIFE_GLORY",
+ "AGENDA_BACKSTABBER",
+ "AGENDA_CITY_PLANNER",
+ "AGENDA_SAINT",
+ "AGENDA_JOAO_EXPLORER",
+ "AGENDA_SIHAI",
+ "AGENDA_YINDING",
+ "AGENDA_COURT_INTRIGUE",
+ "AGENDA_TRADE_AGREEMENT",
+ "AGENDA_SAGA",
+ "AGENDA_INDUSTRIAL_REVOLUTION",
+ "AGENDA_MAAT",
+ "AGENDA_PREFER_FOOD",
+ "AGENDA_LION_OF_MALI",
+ "AGENDA_BULL_MOOSE"
+];
+export const AI_RANDOM_AGENDAS: readonly { agenda: string; gameLimit: number; tag: string | null; requiresReligion: boolean }[] = [
+ {
+  "agenda": "AGENDA_AIRPOWER",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_CITY_STATE_ALLY",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_CITY_STATE_PROTECTOR",
+  "gameLimit": -1,
+  "tag": "AGENDA_EARLY_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_CIVILIZED",
+  "gameLimit": -1,
+  "tag": "AGENDA_EARLY_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_CULTURED",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_DARWINIST",
+  "gameLimit": 3,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_DEVOUT",
+  "gameLimit": -1,
+  "tag": "AGENDA_EARLY_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_ENVIRONMENTALIST",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_EXPLOITATIVE",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_EXPLORER",
+  "gameLimit": -1,
+  "tag": "AGENDA_EARLY_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_FUN_LOVING",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_GREAT_PERSON_ADVOCATE",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_IDEOLOGUE",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_INDUSTRIALIST",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_MONEY_GRUBBER",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_NUKE_LOVER",
+  "gameLimit": 2,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_PARANOID",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_POPULOUS",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_STANDING_ARMY",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_TECHNOPHILE",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_WONDER_ADVOCATE",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_GOSSIP",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_SYCOPHANT",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_SYMPATHIZER",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_DEMAGOGUE",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_DESTINATION_CIV",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_EXPANSIONIST",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_FLAT_EARTHER",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_GREAT_WHITE_FLEET",
+  "gameLimit": -1,
+  "tag": "AGENDA_ANY_ERA",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_INTOLERANT",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": true
+ },
+ {
+  "agenda": "AGENDA_LIBERTARIAN",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_PILLAGER",
+  "gameLimit": -1,
+  "tag": "AGENDA_EARLY_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_TURTLER",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": false
+ },
+ {
+  "agenda": "AGENDA_ZEALOT",
+  "gameLimit": -1,
+  "tag": "AGENDA_LATE_ERA_ONLY",
+  "requiresReligion": true
+ }
+];
+export const AI_RANDOM_AGENDAS_IN_ERA: readonly { era: string; n: number; tags: readonly string[] }[] = [
+ {
+  "era": "ERA_ANCIENT",
+  "n": 1,
+  "tags": [
+   "AGENDA_EARLY_ERA_ONLY",
+   "AGENDA_ANY_ERA"
+  ]
+ }
+];
+export const AI_RANDOM_AGENDAS_FOR_CIVIC: readonly { civic: string; n: number; tags: readonly string[] }[] = [
+ {
+  "civic": "CIVIC_NATIONALISM",
+  "n": 1,
+  "tags": [
+   "AGENDA_LATE_ERA_ONLY",
+   "AGENDA_ANY_ERA"
+  ]
+ }
+];
+export const AI_HISTORICAL_AGENDAS: Readonly<Record<string, readonly string[]>> = {
+ "LEADER_ABRAHAM_LINCOLN": [
+  "AGENDA_PRESERVER_OF_THE_UNION"
+ ],
+ "LEADER_ALEXANDER": [
+  "AGENDA_SHORT_LIFE_GLORY"
+ ],
+ "LEADER_AMANITORE": [
+  "AGENDA_CITY_PLANNER"
+ ],
+ "LEADER_AMBIORIX": [
+  "AGENDA_AMBIORIX_ARMY"
+ ],
+ "LEADER_BARBAROSSA": [
+  "AGENDA_IRON_CROWN"
+ ],
+ "LEADER_BASIL": [
+  "AGENDA_BASIL_ZEALOT"
+ ],
+ "LEADER_CATHERINE_DE_MEDICI": [
+  "AGENDA_BLACK_QUEEN"
+ ],
+ "LEADER_CATHERINE_DE_MEDICI_ALT": [
+  "AGENDA_MAGNIFICENCES"
+ ],
+ "LEADER_CHANDRAGUPTA": [
+  "AGENDA_MAURYA_EMPIRE"
+ ],
+ "LEADER_CLEOPATRA": [
+  "AGENDA_QUEEN_OF_NILE"
+ ],
+ "LEADER_CLEOPATRA_ALT": [
+  "AGENDA_PREFER_FOOD"
+ ],
+ "LEADER_CYRUS": [
+  "AGENDA_BACKSTABBER"
+ ],
+ "LEADER_DIDO": [
+  "AGENDA_SICILIAN_WARS"
+ ],
+ "LEADER_ELEANOR_ENGLAND": [
+  "AGENDA_ANGEVIN_EMPIRE"
+ ],
+ "LEADER_ELEANOR_FRANCE": [
+  "AGENDA_ANGEVIN_EMPIRE"
+ ],
+ "LEADER_ELIZABETH": [
+  "AGENDA_TRADE_AGREEMENT"
+ ],
+ "LEADER_GANDHI": [
+  "AGENDA_PEACEKEEPER"
+ ],
+ "LEADER_GENGHIS_KHAN": [
+  "AGENDA_HORSE_LORD"
+ ],
+ "LEADER_GILGAMESH": [
+  "AGENDA_ALLY_OF_ENKIDU"
+ ],
+ "LEADER_GITARJA": [
+  "AGENDA_ARCHIPELAGIC_STATE"
+ ],
+ "LEADER_GORGO": [
+  "AGENDA_WITH_YOUR_SHIELD_OR_ON_IT"
+ ],
+ "LEADER_HAMMURABI": [
+  "AGENDA_HAMMURABI_DISTRICTS"
+ ],
+ "LEADER_HARALD_ALT": [
+  "AGENDA_SAGA"
+ ],
+ "LEADER_HARDRADA": [
+  "AGENDA_LAST_VIKING_KING"
+ ],
+ "LEADER_HOJO": [
+  "AGENDA_BUSHIDO"
+ ],
+ "LEADER_JADWIGA": [
+  "AGENDA_SAINT"
+ ],
+ "LEADER_JAYAVARMAN": [
+  "AGENDA_END_TO_SUFFERING"
+ ],
+ "LEADER_JOAO_III": [
+  "AGENDA_JOAO_EXPLORER"
+ ],
+ "LEADER_JOHN_CURTIN": [
+  "AGENDA_PERPETUALLY_ON_GUARD"
+ ],
+ "LEADER_JULIUS_CAESAR": [
+  "AGENDA_GALLIC_WARS"
+ ],
+ "LEADER_KRISTINA": [
+  "AGENDA_PATRON_OF_ARTS"
+ ],
+ "LEADER_KUBLAI_KHAN_CHINA": [
+  "AGENDA_KUBLAI_PAX"
+ ],
+ "LEADER_KUBLAI_KHAN_MONGOLIA": [
+  "AGENDA_KUBLAI_PAX"
+ ],
+ "LEADER_KUPE": [
+  "AGENDA_KAITIAKITANGA"
+ ],
+ "LEADER_LADY_SIX_SKY": [
+  "AGENDA_LADY_SIX_SKY"
+ ],
+ "LEADER_LADY_TRIEU": [
+  "AGENDA_TRIEU_DEFENDER"
+ ],
+ "LEADER_LAURIER": [
+  "AGENDA_CANADIAN_EXPEDITIONARY"
+ ],
+ "LEADER_LAUTARO": [
+  "AGENDA_SPIRIT_OF_TUCAPEL"
+ ],
+ "LEADER_LUDWIG": [
+  "AGENDA_ETERNAL"
+ ],
+ "LEADER_MANSA_MUSA": [
+  "AGENDA_LORD_OF_MINES"
+ ],
+ "LEADER_MATTHIAS_CORVINUS": [
+  "AGENDA_RAVEN_BANNER"
+ ],
+ "LEADER_MENELIK": [
+  "AGENDA_ETHIOPIAN_HIGHLANDS"
+ ],
+ "LEADER_MONTEZUMA": [
+  "AGENDA_TLATOANI"
+ ],
+ "LEADER_MVEMBA": [
+  "AGENDA_ENTHUSIASTIC_DISCIPLE"
+ ],
+ "LEADER_NADER_SHAH": [
+  "AGENDA_PREFER_LANDPOWER"
+ ],
+ "LEADER_NZINGA_MBANDE": [
+  "AGENDA_DECOLONIZATION"
+ ],
+ "LEADER_PACHACUTI": [
+  "AGENDA_SAPA_INCA"
+ ],
+ "LEADER_PEDRO": [
+  "AGENDA_GREAT_PERSON_OBSESSED"
+ ],
+ "LEADER_PERICLES": [
+  "AGENDA_DELIAN_LEAGUE"
+ ],
+ "LEADER_PETER_GREAT": [
+  "AGENDA_WESTERNIZER"
+ ],
+ "LEADER_PHILIP_II": [
+  "AGENDA_COUNTER_REFORMER"
+ ],
+ "LEADER_POUNDMAKER": [
+  "AGENDA_IRON_CONFEDERACY"
+ ],
+ "LEADER_QIN": [
+  "AGENDA_WONDER_OBSESSED"
+ ],
+ "LEADER_QIN_ALT": [
+  "AGENDA_SIHAI"
+ ],
+ "LEADER_RAMSES": [
+  "AGENDA_MAAT"
+ ],
+ "LEADER_ROBERT_THE_BRUCE": [
+  "AGENDA_FLOWER_OF_SCOTLAND"
+ ],
+ "LEADER_SALADIN": [
+  "AGENDA_AYYUBID_DYNASTY"
+ ],
+ "LEADER_SALADIN_ALT": [
+  "AGENDA_SULTAN"
+ ],
+ "LEADER_SEJONG": [
+  "AGENDA_SEJONG"
+ ],
+ "LEADER_SEONDEOK": [
+  "AGENDA_CHEOMSEONGDAE"
+ ],
+ "LEADER_SHAKA": [
+  "AGENDA_HORN_CHEST_LOINS"
+ ],
+ "LEADER_SIMON_BOLIVAR": [
+  "AGENDA_SIMON_BOLIVAR"
+ ],
+ "LEADER_SULEIMAN": [
+  "AGENDA_LAWGIVER"
+ ],
+ "LEADER_SULEIMAN_ALT": [
+  "AGENDA_GOLDEN_AGE"
+ ],
+ "LEADER_SUNDIATA_KEITA": [
+  "AGENDA_LION_OF_MALI"
+ ],
+ "LEADER_TAMAR": [
+  "AGENDA_NARIKALA_FORTRESS"
+ ],
+ "LEADER_THEODORA": [
+  "AGENDA_NEW_ROME"
+ ],
+ "LEADER_TOKUGAWA": [
+  "AGENDA_SAKOKU"
+ ],
+ "LEADER_TOMYRIS": [
+  "AGENDA_BACKSTAB_AVERSE"
+ ],
+ "LEADER_TRAJAN": [
+  "AGENDA_OPTIMUS_PRINCEPS"
+ ],
+ "LEADER_T_ROOSEVELT": [
+  "AGENDA_BULL_MOOSE"
+ ],
+ "LEADER_T_ROOSEVELT_ROUGHRIDER": [
+  "AGENDA_BIG_STICK_POLICY"
+ ],
+ "LEADER_VICTORIA": [
+  "AGENDA_SUN_NEVER_SETS"
+ ],
+ "LEADER_VICTORIA_ALT": [
+  "AGENDA_INDUSTRIAL_REVOLUTION"
+ ],
+ "LEADER_WILHELMINA": [
+  "AGENDA_BILLIONAIRE"
+ ],
+ "LEADER_WU_ZETIAN": [
+  "AGENDA_COURT_INTRIGUE"
+ ],
+ "LEADER_YONGLE": [
+  "AGENDA_YINDING"
+ ]
+};
+export const AI_EXCLUSIVE_AGENDAS: readonly (readonly [string, string])[] = [
+ [
+  "AGENDA_DELIAN_LEAGUE",
+  "AGENDA_CITY_STATE_ALLY"
+ ],
+ [
+  "AGENDA_QUEEN_OF_NILE",
+  "AGENDA_STANDING_ARMY"
+ ],
+ [
+  "AGENDA_QUEEN_OF_NILE",
+  "AGENDA_PARANOID"
+ ],
+ [
+  "AGENDA_ALLY_OF_ENKIDU",
+  "AGENDA_DARWINIST"
+ ],
+ [
+  "AGENDA_PEACEKEEPER",
+  "AGENDA_DARWINIST"
+ ],
+ [
+  "AGENDA_IRON_CROWN",
+  "AGENDA_CITY_STATE_ALLY"
+ ],
+ [
+  "AGENDA_IRON_CROWN",
+  "AGENDA_CITY_STATE_PROTECTOR"
+ ],
+ [
+  "AGENDA_LAST_VIKING_KING",
+  "AGENDA_PARANOID"
+ ],
+ [
+  "AGENDA_GREAT_PERSON_OBSESSED",
+  "AGENDA_GREAT_PERSON_ADVOCATE"
+ ],
+ [
+  "AGENDA_WONDER_OBSESSED",
+  "AGENDA_WONDER_ADVOCATE"
+ ],
+ [
+  "AGENDA_BIG_STICK_POLICY",
+  "AGENDA_DARWINIST"
+ ],
+ [
+  "AGENDA_BIG_STICK_POLICY",
+  "AGENDA_EXPLOITATIVE"
+ ],
+ [
+  "AGENDA_BUSHIDO",
+  "AGENDA_CULTURED"
+ ],
+ [
+  "AGENDA_BUSHIDO",
+  "AGENDA_STANDING_ARMY"
+ ],
+ [
+  "AGENDA_BUSHIDO",
+  "AGENDA_DEVOUT"
+ ],
+ [
+  "AGENDA_BUSHIDO",
+  "AGENDA_PARANOID"
+ ],
+ [
+  "AGENDA_WESTERNIZER",
+  "AGENDA_CULTURED"
+ ],
+ [
+  "AGENDA_WESTERNIZER",
+  "AGENDA_TECHNOPHILE"
+ ],
+ [
+  "AGENDA_ENTHUSIASTIC_DISCIPLE",
+  "AGENDA_DEVOUT"
+ ],
+ [
+  "AGENDA_CHEOMSEONGDAE",
+  "AGENDA_TECHNOPHILE"
+ ],
+ [
+  "AGENDA_HORN_CHEST_LOINS",
+  "AGENDA_PARANOID"
+ ],
+ [
+  "AGENDA_HORSE_LORD",
+  "AGENDA_PARANOID"
+ ],
+ [
+  "AGENDA_BLACK_QUEEN",
+  "AGENDA_GOSSIP"
+ ],
+ [
+  "AGENDA_CHEOMSEONGDAE",
+  "AGENDA_FLAT_EARTHER"
+ ],
+ [
+  "AGENDA_OPTIMUS_PRINCEPS",
+  "AGENDA_EXPANSIONIST"
+ ],
+ [
+  "AGENDA_LAST_VIKING_KING",
+  "AGENDA_GREAT_WHITE_FLEET"
+ ],
+ [
+  "AGENDA_PARANOID",
+  "AGENDA_GREAT_WHITE_FLEET"
+ ],
+ [
+  "AGENDA_COUNTER_REFORMER",
+  "AGENDA_INTOLERANT"
+ ],
+ [
+  "AGENDA_SYCOPHANT",
+  "AGENDA_SYMPATHIZER"
+ ],
+ [
+  "AGENDA_ENVIRONMENTALIST",
+  "AGENDA_EXPLOITATIVE"
+ ],
+ [
+  "AGENDA_ENTHUSIASTIC_DISCIPLE",
+  "AGENDA_INTOLERANT"
+ ],
+ [
+  "AGENDA_ANGEVIN_EMPIRE",
+  "AGENDA_POPULOUS"
+ ],
+ [
+  "AGENDA_CANADIAN_EXPEDITIONARY",
+  "AGENDA_EXPLOITATIVE"
+ ],
+ [
+  "AGENDA_KAITIAKITANGA",
+  "AGENDA_ENVIRONMENTALIST"
+ ],
+ [
+  "AGENDA_KAITIAKITANGA",
+  "AGENDA_EXPLOITATIVE"
+ ],
+ [
+  "AGENDA_KAITIAKITANGA",
+  "AGENDA_INDUSTRIALIST"
+ ],
+ [
+  "AGENDA_LAWGIVER",
+  "AGENDA_FUN_LOVING"
+ ],
+ [
+  "AGENDA_LORD_OF_MINES",
+  "AGENDA_MONEY_GRUBBER"
+ ],
+ [
+  "AGENDA_PERPETUALLY_ON_GUARD",
+  "AGENDA_DARWINIST"
+ ],
+ [
+  "AGENDA_AMBIORIX_ARMY",
+  "AGENDA_STANDING_ARMY"
+ ],
+ [
+  "AGENDA_BASIL_ZEALOT",
+  "AGENDA_ZEALOT"
+ ],
+ [
+  "AGENDA_LADY_SIX_SKY",
+  "AGENDA_PARANOID"
+ ],
+ [
+  "AGENDA_LADY_SIX_SKY",
+  "AGENDA_EXPANSIONIST"
+ ],
+ [
+  "AGENDA_NEW_ROME",
+  "AGENDA_CULTURED"
+ ],
+ [
+  "AGENDA_SEJONG",
+  "AGENDA_CULTURED"
+ ],
+ [
+  "AGENDA_SEJONG",
+  "AGENDA_TECHNOPHILE"
+ ],
+ [
+  "AGENDA_PRESERVER_OF_THE_UNION",
+  "AGENDA_IDEOLOGUE"
+ ],
+ [
+  "AGENDA_PREFER_LANDPOWER",
+  "AGENDA_AIRPOWER"
+ ],
+ [
+  "AGENDA_PREFER_LANDPOWER",
+  "AGENDA_STANDING_ARMY"
+ ],
+ [
+  "AGENDA_SAKOKU",
+  "AGENDA_TURTLER"
+ ],
+ [
+  "AGENDA_GOLDEN_AGE",
+  "AGENDA_SYCOPHANT"
+ ],
+ [
+  "AGENDA_GOLDEN_AGE",
+  "AGENDA_SYMPATHIZER"
+ ],
+ [
+  "AGENDA_PREFER_LANDPOWER",
+  "AGENDA_GREAT_WHITE_FLEET"
+ ],
+ [
+  "AGENDA_GALLIC_WARS",
+  "AGENDA_BARBARIAN_LOVER"
+ ],
+ [
+  "AGENDA_GALLIC_WARS",
+  "AGENDA_CIVILIZED"
+ ],
+ [
+  "AGENDA_SHORT_LIFE_GLORY",
+  "AGENDA_PARANOID"
+ ],
+ [
+  "AGENDA_SHORT_LIFE_GLORY",
+  "AGENDA_CITY_STATE_PROTECTOR"
+ ],
+ [
+  "AGENDA_SHORT_LIFE_GLORY",
+  "AGENDA_DARWINIST"
+ ],
+ [
+  "AGENDA_BACKSTABBER",
+  "AGENDA_CITY_STATE_PROTECTOR"
+ ],
+ [
+  "AGENDA_SHORT_LIFE_GLORY",
+  "AGENDA_TURTLER"
+ ],
+ [
+  "AGENDA_SAINT",
+  "AGENDA_DEVOUT"
+ ],
+ [
+  "AGENDA_JOAO_EXPLORER",
+  "AGENDA_EXPLORER"
+ ],
+ [
+  "AGENDA_SIHAI",
+  "AGENDA_CIVILIZED"
+ ],
+ [
+  "AGENDA_SIHAI",
+  "AGENDA_BARBARIAN_LOVER"
+ ],
+ [
+  "AGENDA_YINDING",
+  "AGENDA_MONEY_GRUBBER"
+ ],
+ [
+  "AGENDA_COURT_INTRIGUE",
+  "AGENDA_PARANOID"
+ ],
+ [
+  "AGENDA_SAGA",
+  "AGENDA_CITY_STATE_PROTECTOR"
+ ],
+ [
+  "AGENDA_INDUSTRIAL_REVOLUTION",
+  "AGENDA_ENVIRONMENTALIST"
+ ],
+ [
+  "AGENDA_INDUSTRIAL_REVOLUTION",
+  "AGENDA_INDUSTRIALIST"
+ ],
+ [
+  "AGENDA_MAAT",
+  "AGENDA_EXPLOITATIVE"
+ ],
+ [
+  "AGENDA_ENVIRONMENTALIST",
+  "AGENDA_MAAT"
+ ],
+ [
+  "AGENDA_DESTINATION_CIV",
+  "AGENDA_LION_OF_MALI"
+ ],
+ [
+  "AGENDA_BULL_MOOSE",
+  "AGENDA_NATURALIST"
+ ],
+ [
+  "AGENDA_BULL_MOOSE",
+  "AGENDA_DARWINIST"
+ ],
+ [
+  "AGENDA_BULL_MOOSE",
+  "AGENDA_EXPLOITATIVE"
+ ]
+];
+export const AI_AGENDA_TRAITS: Readonly<Record<string, readonly string[]>> = {
+ "AGENDA_AIRPOWER": [
+  "TRAIT_AGENDA_PREFER_AIRPOWER"
+ ],
+ "AGENDA_BARBARIAN_LOVER": [
+  "TRAIT_AGENDA_BARBARIAN_LOVER"
+ ],
+ "AGENDA_CITY_STATE_PROTECTOR": [
+  "TRAIT_AGENDA_PREFER_CITY_STATE_PROTECTOR"
+ ],
+ "AGENDA_CIVILIZED": [
+  "TRAIT_AGENDA_PREFER_CLEAR_BANDIT_CAMPS"
+ ],
+ "AGENDA_CULTURED": [
+  "TRAIT_AGENDA_PREFER_CULTURE"
+ ],
+ "AGENDA_DARWINIST": [
+  "TRAIT_AGENDA_ENJOYS_WAR",
+  "TRAIT_AGENDA_IGNORE_WARMONGERING"
+ ],
+ "AGENDA_DEVOUT": [
+  "TRAIT_AGENDA_PREFER_FAITH"
+ ],
+ "AGENDA_ENVIRONMENTALIST": [
+  "TRAIT_AGENDA_PREFER_ENVIRONMENT"
+ ],
+ "AGENDA_EXPLOITATIVE": [
+  "TRAIT_AGENDA_PREFER_EXPLOITATION"
+ ],
+ "AGENDA_EXPLORER": [
+  "TRAIT_AGENDA_EXPLORATION_OBSESSED"
+ ],
+ "AGENDA_FUN_LOVING": [
+  "TRAIT_AGENDA_PREFER_HAPPINESS"
+ ],
+ "AGENDA_GREAT_PERSON_ADVOCATE": [
+  "TRAIT_AGENDA_GREAT_PERSON_ADVOCATE"
+ ],
+ "AGENDA_IDEOLOGUE": [
+  "TRAIT_AGENDA_PREFER_SAME_GOVERNMENT"
+ ],
+ "AGENDA_INDUSTRIALIST": [
+  "TRAIT_AGENDA_PREFER_INDUSTRY"
+ ],
+ "AGENDA_MONEY_GRUBBER": [
+  "TRAIT_AGENDA_PREFER_INCOME"
+ ],
+ "AGENDA_NATURALIST": [
+  "TRAIT_AGENDA_NATURALIST"
+ ],
+ "AGENDA_NUKE_LOVER": [
+  "TRAIT_AGENDA_PREFER_NUKES"
+ ],
+ "AGENDA_PARANOID": [
+  "TRAIT_AGENDA_PARANOID"
+ ],
+ "AGENDA_POPULOUS": [
+  "TRAIT_AGENDA_PREFER_POPULATION"
+ ],
+ "AGENDA_STANDING_ARMY": [
+  "TRAIT_AGENDA_PREFER_STANDING_ARMY"
+ ],
+ "AGENDA_TECHNOPHILE": [
+  "TRAIT_AGENDA_PREFER_SCIENCE"
+ ],
+ "AGENDA_WONDER_ADVOCATE": [
+  "TRAIT_AGENDA_WONDER_ADVOCATE"
+ ],
+ "AGENDA_ALLY_OF_ENKIDU": [
+  "TRAIT_AGENDA_ALLY_OF_ENKIDU"
+ ],
+ "AGENDA_AYYUBID_DYNASTY": [
+  "TRAIT_AGENDA_AYYUBID_DYNASTY"
+ ],
+ "AGENDA_BACKSTAB_AVERSE": [
+  "TRAIT_AGENDA_BACKSTAB_AVERSE"
+ ],
+ "AGENDA_BIG_STICK_POLICY": [
+  "TRAIT_AGENDA_BIG_STICK_POLICY"
+ ],
+ "AGENDA_BLACK_QUEEN": [
+  "TRAIT_AGENDA_BLACK_QUEEN"
+ ],
+ "AGENDA_BUSHIDO": [
+  "TRAIT_AGENDA_BUSHIDO"
+ ],
+ "AGENDA_CITY_STATE_ALLY": [
+  "TRAIT_AGENDA_CITY_STATE_ALLY"
+ ],
+ "AGENDA_COUNTER_REFORMER": [
+  "TRAIT_AGENDA_COUNTER_REFORMER"
+ ],
+ "AGENDA_DELIAN_LEAGUE": [
+  "TRAIT_AGENDA_DELIAN_LEAGUE"
+ ],
+ "AGENDA_ENTHUSIASTIC_DISCIPLE": [
+  "TRAIT_AGENDA_ENTHUSIASTIC_DISCIPLE"
+ ],
+ "AGENDA_GREAT_PERSON_OBSESSED": [
+  "TRAIT_AGENDA_GREAT_PERSON_OBSESSED"
+ ],
+ "AGENDA_IRON_CROWN": [
+  "TRAIT_AGENDA_IRON_CROWN"
+ ],
+ "AGENDA_LAST_VIKING_KING": [
+  "TRAIT_AGENDA_LAST_VIKING_KING"
+ ],
+ "AGENDA_OPTIMUS_PRINCEPS": [
+  "TRAIT_AGENDA_OPTIMUS_PRINCEPS"
+ ],
+ "AGENDA_PEACEKEEPER": [
+  "TRAIT_AGENDA_PEACEKEEPER"
+ ],
+ "AGENDA_QUEEN_OF_NILE": [
+  "TRAIT_AGENDA_QUEEN_OF_NILE"
+ ],
+ "AGENDA_SUN_NEVER_SETS": [
+  "TRAIT_AGENDA_SUN_NEVER_SETS"
+ ],
+ "AGENDA_TLATOANI": [
+  "TRAIT_AGENDA_TLATOANI"
+ ],
+ "AGENDA_WESTERNIZER": [
+  "TRAIT_AGENDA_WESTERNIZER"
+ ],
+ "AGENDA_WITH_YOUR_SHIELD_OR_ON_IT": [
+  "TRAIT_AGENDA_WITH_SHIELD",
+  "TRAIT_AGENDA_IGNORE_WARMONGERING"
+ ],
+ "AGENDA_WONDER_OBSESSED": [
+  "TRAIT_AGENDA_WONDER_OBSESSED"
+ ],
+ "AGENDA_BILLIONAIRE": [
+  "TRAIT_AGENDA_BILLIONAIRE"
+ ],
+ "AGENDA_CHEOMSEONGDAE": [
+  "TRAIT_AGENDA_CHEOMSEONGDAE"
+ ],
+ "AGENDA_FLOWER_OF_SCOTLAND": [
+  "TRAIT_AGENDA_FLOWER_OF_SCOTLAND"
+ ],
+ "AGENDA_HORSE_LORD": [
+  "TRAIT_AGENDA_HORSE_LORD"
+ ],
+ "AGENDA_HORN_CHEST_LOINS": [
+  "TRAIT_AGENDA_HORN_CHEST_LOINS"
+ ],
+ "AGENDA_IRON_CONFEDERACY": [
+  "TRAIT_AGENDA_IRON_CONFEDERACY"
+ ],
+ "AGENDA_MAURYA_EMPIRE": [
+  "TRAIT_AGENDA_MAURYA_EMPIRE"
+ ],
+ "AGENDA_NARIKALA_FORTRESS": [
+  "TRAIT_AGENDA_NARIKALA_FORTRESS"
+ ],
+ "AGENDA_SPIRIT_OF_TUCAPEL": [
+  "TRAIT_AGENDA_SPIRIT_OF_TUCAPEL"
+ ],
+ "AGENDA_GOSSIP": [
+  "TRAIT_AGENDA_GOSSIP"
+ ],
+ "AGENDA_SYCOPHANT": [
+  "TRAIT_AGENDA_SYCOPHANT"
+ ],
+ "AGENDA_SYMPATHIZER": [
+  "TRAIT_AGENDA_SYMPATHIZER"
+ ],
+ "AGENDA_DEMAGOGUE": [
+  "TRAIT_AGENDA_PREFER_NOFAVOR"
+ ],
+ "AGENDA_DESTINATION_CIV": [
+  "TRAIT_AGENDA_PREFER_NOTOURISM"
+ ],
+ "AGENDA_EXPANSIONIST": [
+  "TRAIT_AGENDA_EXPANSIONIST"
+ ],
+ "AGENDA_FLAT_EARTHER": [
+  "TRAIT_AGENDA_FLAT_EARTHER"
+ ],
+ "AGENDA_GREAT_WHITE_FLEET": [
+  "TRAIT_AGENDA_GREAT_WHITE_FLEET"
+ ],
+ "AGENDA_INTOLERANT": [
+  "TRAIT_AGENDA_INTOLERANT"
+ ],
+ "AGENDA_LIBERTARIAN": [
+  "TRAIT_AGENDA_PREFER_NODIPLOVP"
+ ],
+ "AGENDA_PILLAGER": [
+  "TRAIT_AGENDA_PREFER_PILLAGE"
+ ],
+ "AGENDA_TURTLER": [
+  "TRAIT_AGENDA_TURTLER"
+ ],
+ "AGENDA_ZEALOT": [
+  "TRAIT_AGENDA_ZEALOT"
+ ],
+ "AGENDA_ANGEVIN_EMPIRE": [
+  "TRAIT_AGENDA_ANGEVIN_EMPIRE"
+ ],
+ "AGENDA_CANADIAN_EXPEDITIONARY": [
+  "TRAIT_AGENDA_CANADIAN_EXPEDITIONARY"
+ ],
+ "AGENDA_KAITIAKITANGA": [
+  "TRAIT_AGENDA_KAITIAKITANGA"
+ ],
+ "AGENDA_LAWGIVER": [
+  "TRAIT_AGENDA_LAWGIVER"
+ ],
+ "AGENDA_LORD_OF_MINES": [
+  "TRAIT_AGENDA_LORD_OF_MINES"
+ ],
+ "AGENDA_RAVEN_BANNER": [
+  "TRAIT_AGENDA_RAVEN_BANNER"
+ ],
+ "AGENDA_PATRON_OF_ARTS": [
+  "TRAIT_AGENDA_PATRON_OF_ARTS"
+ ],
+ "AGENDA_SAPA_INCA": [
+  "TRAIT_AGENDA_SAPA_INCA"
+ ],
+ "AGENDA_SICILIAN_WARS": [
+  "TRAIT_AGENDA_SICILIAN_WARS"
+ ],
+ "AGENDA_PERPETUALLY_ON_GUARD": [
+  "TRAIT_AGENDA_PERPETUALLY_ON_GUARD"
+ ],
+ "AGENDA_HAMMURABI_DISTRICTS": [
+  "TRAIT_AGENDA_HAMMURABI_DISTRICTS"
+ ],
+ "AGENDA_BASIL_ZEALOT": [
+  "TRAIT_AGENDA_BASIL_ZEALOT"
+ ],
+ "AGENDA_AMBIORIX_ARMY": [
+  "TRAIT_AGENDA_AMBIORIX_ARMY",
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "AGENDA_MAGNIFICENCES": [
+  "TRAIT_AGENDA_MAGNIFICENCES"
+ ],
+ "AGENDA_ETHIOPIAN_HIGHLANDS": [
+  "TRAIT_AGENDA_ETHIOPIAN_HIGHLANDS"
+ ],
+ "AGENDA_LADY_SIX_SKY": [
+  "TRAIT_AGENDA_LADY_SIX_SKY"
+ ],
+ "AGENDA_SIMON_BOLIVAR": [
+  "TRAIT_AGENDA_SIMON_BOLIVAR"
+ ],
+ "AGENDA_ETERNAL": [
+  "TRAIT_AGENDA_ETERNAL"
+ ],
+ "AGENDA_NEW_ROME": [
+  "TRAIT_AGENDA_NEW_ROME"
+ ],
+ "AGENDA_SEJONG": [
+  "TRAIT_AGENDA_SEJONG"
+ ],
+ "AGENDA_PRESERVER_OF_THE_UNION": [
+  "TRAIT_AGENDA_LINCOLN"
+ ],
+ "AGENDA_SULTAN": [
+  "TRAIT_AGENDA_SULTAN"
+ ],
+ "AGENDA_DECOLONIZATION": [
+  "TRAIT_AGENDA_DECOLONIZATION"
+ ],
+ "AGENDA_SAKOKU": [
+  "TRAIT_AGENDA_SAKOKU"
+ ],
+ "AGENDA_PREFER_LANDPOWER": [
+  "TRAIT_AGENDA_PREFER_LANDPOWER"
+ ],
+ "AGENDA_GOLDEN_AGE": [
+  "TRAIT_AGENDA_SYCOPHANT"
+ ],
+ "AGENDA_ARCHIPELAGIC_STATE": [
+  "TRAIT_AGENDA_ARCHIPELAGIC_STATE"
+ ],
+ "AGENDA_END_TO_SUFFERING": [
+  "TRAIT_AGENDA_END_TO_SUFFERING"
+ ],
+ "AGENDA_GALLIC_WARS": [
+  "TRAIT_AGENDA_GALLIC_WARS"
+ ],
+ "AGENDA_TRIEU_DEFENDER": [
+  "TRAIT_AGENDA_TRIEU_DEFENDER"
+ ],
+ "AGENDA_KUBLAI_PAX": [
+  "TRAIT_AGENDA_KUBLAI_PAX"
+ ],
+ "AGENDA_SHORT_LIFE_GLORY": [
+  "TRAIT_AGENDA_SHORT_LIFE_GLORY",
+  "TRAIT_AGENDA_IGNORE_WARMONGERING"
+ ],
+ "AGENDA_BACKSTABBER": [
+  "TRAIT_AGENDA_BACKSTABBER"
+ ],
+ "AGENDA_CITY_PLANNER": [
+  "TRAIT_AGENDA_CITY_PLANNER"
+ ],
+ "AGENDA_SAINT": [
+  "TRAIT_AGENDA_SAINT"
+ ],
+ "AGENDA_JOAO_EXPLORER": [
+  "TRAIT_JOAO_EXPLORATION_AGENDA"
+ ],
+ "AGENDA_SIHAI": [
+  "TRAIT_AGENDA_SIHAI"
+ ],
+ "AGENDA_YINDING": [
+  "TRAIT_AGENDA_YINDING"
+ ],
+ "AGENDA_COURT_INTRIGUE": [
+  "TRAIT_AGENDA_COURT_INTRIGUE"
+ ],
+ "AGENDA_TRADE_AGREEMENT": [
+  "TRAIT_AGENDA_TRADE_AGREEMENT"
+ ],
+ "AGENDA_SAGA": [
+  "TRAIT_AGENDA_SAGA"
+ ],
+ "AGENDA_INDUSTRIAL_REVOLUTION": [
+  "TRAIT_AGENDA_INDUSTRIAL_REVOLUTION"
+ ],
+ "AGENDA_MAAT": [
+  "TRAIT_AGENDA_MAAT"
+ ],
+ "AGENDA_PREFER_FOOD": [
+  "TRAIT_AGENDA_PREFER_FOOD"
+ ],
+ "AGENDA_LION_OF_MALI": [
+  "TRAIT_AGENDA_LION_OF_MALI"
+ ],
+ "AGENDA_BULL_MOOSE": [
+  "TRAIT_AGENDA_BULL_MOOSE"
+ ]
+};
+export const AI_ERA_STRATEGY_LISTS: Readonly<Record<string, readonly AiListRef[]>> = {
+ "ERA_CLASSICAL": [
+  {
+   "list": "ClassicalYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "list": "ClassicalSensitivity",
+   "system": "YieldSensitivities",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "ERA_MEDIEVAL": [
+  {
+   "list": "MedievalYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "list": "MedievalSensitivity",
+   "system": "YieldSensitivities",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "ERA_RENAISSANCE": [
+  {
+   "list": "RenaissanceYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "ERA_INDUSTRIAL": [
+  {
+   "list": "IndustrialYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "ERA_MODERN": [
+  {
+   "list": "ModernYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "list": "ModernSensitivity",
+   "system": "YieldSensitivities",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ]
+};
 export const AI_MINOR_INFLUENCE_MODIFIERS: Readonly<Record<string, readonly AiModifier[]>> = {
  "CIVILIZATION_AKKAD": [
   {
