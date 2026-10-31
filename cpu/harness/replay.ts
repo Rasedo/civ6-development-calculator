@@ -1412,12 +1412,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       }
     }
   }
-  // a unit the copy upgraded ahead of the pass has no move to compare: the
-  // game's upgrade is a new unit its pass never holds, no tactical row that
-  // turn (runs/h1_duely1121 t61: city-state 2's Swordsman 1310720,
-  // UnitAddedToMap); its end plot is compared
-  const outOfPass = new Set([...upgraded].map((c) => twin.get(c)).filter((u): u is Unit => !!u));
-  tallyMinorTactics(ctx, b, turn, moves, ended, opOf, outOfPass);
+  // the units the copy holds at Movement 0 as its pass opens (upgraded,
+  // bought): none of the pass's, their end plots compared
+  const idle = new Set([...twin].filter(([c]) => upgraded.has(c) || boughtNow.has(`${c.seat}:${c.id}`))
+    .map(([, u]) => u).filter((u) => !moves.has(u)));
+  tallyMinorTactics(ctx, b, turn, moves, ended, opOf, idle);
 }
 
 /**
@@ -1447,12 +1446,13 @@ function gameJob(ctx: Ctx, turn: number, player: number, id: number): string {
 }
 
 function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<Unit, { move: string; plot: number }>,
-  ended: ReadonlyMap<Unit, number>, opOf: ReadonlyMap<Unit, string>, outOfPass: ReadonlySet<Unit>): void {
+  ended: ReadonlyMap<Unit, number>, opOf: ReadonlyMap<Unit, string>, idle: ReadonlySet<Unit>): void {
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
   const rows = ctx.tactical?.others.get(turn);
   const at = new Map(b.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
-  for (const [u, m] of moves) {
+  const all: [Unit, { move: string; plot: number }][] = [...moves, ...[...idle].map((u) => [u, { move: '(no row)', plot: -1 }] as [Unit, { move: string; plot: number }])];
+  for (const [u, m] of all) {
     const key = keyOf.get(u);
     if (!key) continue;
     // a unit with no tactical row: its job in the game's AI memory
@@ -1465,7 +1465,7 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: Readonl
     if (same) t.move += 1;
     if (!same && t.firstMove === undefined) t.firstMove = turn;
     const party = u.seat === FREE_SEAT ? 'freeCities' : 'cityState';
-    if (game !== undefined && !outOfPass.has(u)) score(ctx, `${party}.move.family`, turn, ownerOf(key), `${key} ${u.type}`, same, tacticalCategory(m.move), game);
+    if (game !== undefined && !idle.has(u)) score(ctx, `${party}.move.family`, turn, ownerOf(key), `${key} ${u.type}`, same, tacticalCategory(m.move), game);
     const want = at.get(key);
     const end = ended.get(u);
     if (want === undefined || end === undefined) continue;

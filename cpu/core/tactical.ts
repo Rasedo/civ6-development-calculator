@@ -455,8 +455,16 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       cost += moves;
       moves = 0;
     } else if (zoc && moves > 0 && ground.zoc(to)) {
+      // a zone of control's step costs at least the Movement it starts with
+      // (0x26f980's minimum), the parent's carry on top: with one, the step
+      // is left short (0x26ed00)
       cost = pm;
       moves = 0;
+      carry = 0;
+      if ((p.carry ?? 0) > 0 && !(p === start && unmoved) && p.turns === turns) {
+        turns += 1;
+        cost = pm + (p.carry ?? 0);
+      }
     }
     // the cost (0x270dd0): +4 where the step leaves no Movement, +3 more
     // off the unit's territory on a revealed plot; +2 a revealed plot, +3
@@ -2599,6 +2607,12 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
   costsHeld = new Map();
   try {
     const pass = openPass(state, cityState.seat, militaryAiTypeOf);
+    // a unit with no Movement left as the pass opens is none of its (the
+    // game logs no tactical row: runs/h1_duely1117 t19 city-state 3's
+    // Warrior 393220 bought at its start, 1121 t61 city-state 2's Swordsman
+    // 1310720 upgraded; 199 such unit-turns over the five duely duels, none
+    // logged)
+    for (const u of pass.units) if (u.movesLeft <= 0) pass.done.add(u.id);
     operations(pass);
     supportFormation(state, pass);
     attackUnits(state, pass, 'HIGH');

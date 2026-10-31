@@ -9,6 +9,7 @@
   status: PARTLY
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+    - "C-95: the best route's owner term — READ, nothing to port"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...OnlyWithUnit ones (the Railroad) only with a unit; then the plot owner's +0x12e0 count (0x6fe50) raises the value by that many rungs — UNREAD which effect sets it (0 in every recorded..."

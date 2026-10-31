@@ -79,7 +79,11 @@
       value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
     - recording: 1117
       value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
-  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:price, gpu/core/sim_tactics.py:price6]
+  impl:
+    - cpu/core/tactical.ts:search
+    - cpu/core/tactical.ts:price
+    - gpu/core/sim_tactics.py:price6
+    - cpu/core/tactical.ts:moves
   readings:
     - "C-95: a river crossing's Movement — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -89,14 +93,7 @@
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
-  notes:
-    - ".claude/scratchpad/mu1/readings_c96.md: ...out); a land unit whose   player may embark it takes water (a turn starting on the domain's pool:   0x26e920's [r9 + 0x180 + domain*4]); the barbarians' land units take none   (0 of 6,269 of their AI_Planning..."
-    - ".claude/scratchpad/mu1/readings_c96.md: ...1121 and 1124 hold a   water plot; the majors' and the minors' do from t62-69). The step's cost   (0x26e920's rules 0x531660..0x530240): into a city at most   CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x..."
-  context:
-    - "...the movement cost's river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) a..."
-    - "- A step's turns and Movement (0x26e920, in 24.8 fixed point): a parent with no Movement starts the next turn at the domain's f..."
-    - "...nd unit whose player may embark it takes water (a turn starting on the domain's pool: 0x26e920's [r9 + 0x180 + domain*4]); the barbarians' land units take none (0 of 6,269 of their A..."
-  review: imported
+    - "C-99: the carry under a zone of control — READ (0x26e920), both twins"
 - addr: 0x26ee80
   final: 0x1a74c0
   kind: function
@@ -107,6 +104,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...empt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x34 += x through 0xac650). A crossing is the terrain's cost plus 2 (`RIVER_CROSS_MP`..."
+    - "...step starts with (the parent's, or the new turn's full), +0x34 the cost the rules add (0x26ee80), +0x38 a carry the rules add (0x26ee90), stored as the node's +0x20 (0x26d7f0: +0x28 M..."
   review: imported
 - addr: 0x26ee90
   final: 0x1a74d0
@@ -121,19 +119,14 @@
 - addr: 0x26eea0
   final: 0x1a74e0
   kind: function
-  status: READ
-  cases:
-    - recording: h1_duely1121
-      value: "t61: Quadriremes 1900549 / 2228245 and Galley 2293780 (Movement 3, maxMoves 4 from that turn's tech) wander to a plot 4 away (the planning's) and walk 3"
-  impl:
-    - cpu/core/tactical.ts:search
-    - gpu/core/sim_tactics.py:_tac_search
-    - cpu/core/tactical.ts:startMoves
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:startMoves, gpu/core/sim_tactics.py:_tac_search]
   readings:
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
-  notes:
-    - "the breadth-first search's start callback (+0xa8, installed where 0x26dcd0's third argument is set: UnitPlanning 0x791e00 passes 1): +0x1bc = GetMaxMoves (0x56e130 via 0x266660, the formation's) << 8"
-  review: reviewed
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...rch 0x26dcd0 with its third argument 1 (flags 0x115), which installs the start callback 0x26eea0 at +0xa8; GeneratePath calls it first, and it sets the start node's Movement (+0x1bc, r...
+  review: imported
 - addr: 0x26f1d0
   final: 0x1a76a0
   kind: function
@@ -150,15 +143,20 @@
 - addr: 0x26f330
   final: 0x1a7840
   kind: function
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 7
+      value: "runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from   39:20 beside China's Warrior and Scout, the planning's refusal shuts it   in (875 / 963 in the Warrior's zone), the path takes it ho"
   impl: [cpu/core/tactical.ts:search]
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...er_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair is null), so a node's key is its cost. The op..."
+    - "...r a unit +0x738 above 1 holding 0x2669d0 2 or 4; then the A* 0x7a630 over the callbacks 0x26f330 sets: the validity 0x2720a0, the cost 0x26e920), its turns the answer. The planning's..."
+    - ...eadth-first search 0x26dcd0 keeps the pool's heuristic (+0x30/+0x38, null in the pool 0x26f330 sets) and zeroes the destination test (+0x20/+0x28); the destination is (-9999, -9999),...
   review: imported
 - addr: 0x26f7d0
   final: 0x1a7ce0
@@ -183,15 +181,29 @@
 - addr: 0x26f980
   final: 0x1a7e90
   kind: function
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:Ground]
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 8
+      value: "THE LOG   AGAINST IT: the moves keep their Movement on entering a zone —   runs/h1_duelw1117 log t8, city-state 2's Warrior 196610 steps 13:10 ->   12:11 beside the camp's Spearman (\"Attack Target Mov"
+    - recording: AI_Planning.csv
+      turn: 10
+      value: AI_Planning.csv t10   lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one   Movement left;
+    - recording: h1_duelw1124
+      turn: 1
+      value: "runs/h1_duelw1124 t1-60 planning rows (the replay's classifier):   855 -> 1,061 of 1,276 equal, the extra plots 609 -> 98, no new miss (65   revealed, 30 unrevealed as before);"
+    - recording: 1128
+      value: "- LAB: 1128 the Cavalry from 35:7 lists 37:6 and 36:5 (1/1) beside 35:6's   (2/0) (12 rows);"
+  impl: [cpu/core/tactical.ts:Ground, cpu/core/tactical.ts:moves]
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-99: the carry under a zone of control — READ (0x26e920), both twins"
   context:
     - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."
+    - "- THE ZONE OF CONTROL'S TEST (Rules_Movement 0x530f50, READ; through 0x26f980(finder, from, to, the path's destination) from the path cost 0x26e920, the move's step..."
+    - ...whose parent is not the unit's own plot and lies in the unit's enemy zone of control (0x26f980 -> Rules_Movement 0x530f50, the mover's owner, its stacking count 0x585eb0) is refused...
   review: imported
 - addr: 0x26fe20
   kind: function
@@ -200,6 +212,12 @@
     - recording: 1121
       turn: 110
       value: "Recorded: 1121 t110, a barbarian   on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan   (`religiousUnitLost`, the harness replaying the log's kill)."
+    - recording: h1_duelw1117
+      turn: 8
+      value: "THE LOG   AGAINST IT: the moves keep their Movement on entering a zone —   runs/h1_duelw1117 log t8, city-state 2's Warrior 196610 steps 13:10 ->   12:11 beside the camp's Spearman (\"Attack Target Mov"
+    - recording: AI_Planning.csv
+      turn: 10
+      value: AI_Planning.csv t10   lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one   Movement left;
   impl:
     - cpu/core/combat.ts:seizeCivilian
     - cpu/core/combat.ts:seizable
@@ -207,23 +225,30 @@
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: a civilian stepped on — READ"
-    - DLL rules the engines contradict
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - DLL rules the engines contradict
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."
-    - "- A move onto a religious unit (0x26fe20): the engines' melee order onto one only shares its plot (AUDIT C-94 BUILD)."
+    - "...'s destination) from the path cost 0x26e920, the move's step cost 0x270980 and the walk 0x26fe20 at 0x270800, which stores the answer on the formation +0x518): the plot entered (the..."
   review: imported
 - addr: 0x270980
   final: 0x1a8da0
   kind: function
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 8
+      value: "THE LOG   AGAINST IT: the moves keep their Movement on entering a zone —   runs/h1_duelw1117 log t8, city-state 2's Warrior 196610 steps 13:10 ->   12:11 beside the camp's Spearman (\"Attack Target Mov"
+    - recording: AI_Planning.csv
+      turn: 10
+      value: AI_Planning.csv t10   lists the Warrior on 13:11, beside the camp, reaching 12:11 (1/1), one   Movement left;
   readings:
     - "C-95: a river crossing's Movement — READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...nt cost's river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the uni..."
+    - "...er, from, to, the path's destination) from the path cost 0x26e920, the move's step cost 0x270980 and the walk 0x26fe20 at 0x270800, which stores the answer on the formation +0x518): th..."
   review: imported
 - addr: 0x270be0
   final: 0x1a8f00
@@ -237,20 +262,24 @@
 - addr: 0x270dd0
   final: 0x1a9060
   kind: function
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: AI_Planning.csv
+      turn: 69
+      value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
   impl:
     - cpu/core/tactical.ts:search
-    - cpu/core/tactical.ts:from
     - cpu/core/tactical.ts:price
-    - gpu/core/sim_tactics.py:price6
     - cpu/core/tactical.ts:seen
+    - gpu/core/sim_tactics.py:price6
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The cost (0x270dd0): 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no..."
+    - ...tep), its step costing +3 where a revealed plot's costs +2 and no +3 off the territory (0x270dd0); a path (the move order's pathfinder) reads every plot as revealed. A plot only reve...
+    - "...past those of higher f only (after its new equals). LinkChild 0x78750: the cost (+0x48, 0x270dd0) first, then a new node AddToOpen, an open one re-keyed where strictly cheaper, a close..."
   review: imported
 - addr: 0x271490
   final: 0x30c70
@@ -294,30 +323,49 @@
     - recording: h1_duelw1121
       turn: 11
       value: "runs/h1_duelw1121 t11: the   Horse Archer at 34:8 for 30:7 takes the path whose turn ends on the free   33:6, not the one through 33:7 / 32:7, both held by its own units."
+    - recording: 1124
+      turn: 1
+      value: "The   planning's search (0x115 | 0x800 | 0x100) carries +4: none of them runs   there (the planning classifier, 1124 t1-60: applying the stacking test   takes 822 equal rows to 472)."
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
+    - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."
   review: imported
 - addr: 0x2720a0
   final: 0x1a9f00
   kind: function
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 11
+      value: "runs/h1_duelw1121 t11: the   Horse Archer at 34:8 for 30:7 takes the path whose turn ends on the free   33:6, not the one through 33:7 / 32:7, both held by its own units."
+    - recording: 1124
+      turn: 1
+      value: "The   planning's search (0x115 | 0x800 | 0x100) carries +4: none of them runs   there (the planning classifier, 1124 t1-60: applying the stacking test   takes 822 equal rows to 472)."
+    - recording: 1124
+      turn: 13
+      value: "Rampage rows on a COMBAT_DISTRICT,   runs/h1_duely1117 and 1124 (the engine's sight at the strike beside the   record's end plot): the melee movers whose target the barbarians do not   see stay 167 of"
+    - recording: 1124
+      turn: 115
+      value: those that see   it go (1124 t115-t117, 1117 t13).
   impl:
     - cpu/core/tactical.ts:enterable
+    - cpu/core/tactical.ts:planningSearch
     - cpu/core/tactical.ts:from
     - gpu/core/sim_tactics.py:_tac_search
-    - cpu/core/tactical.ts:before
-    - cpu/core/tactical.ts:planningSearch
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
-    - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
-  notes: ["imported: cited by the code, in no dll_readings section"]
+  context:
+    - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
+    - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."
+    - ...rrior for Valletta's garrison) the same. The pathfinder's own test (the move's validity 0x2720a0 / the attack test of 0x26e570's twin) is unread; ported as the move order's attack pl...
   review: imported
 - addr: 0x2726b0
   final: 0x1aa510

@@ -11889,3 +11889,54 @@ the replay leaves such a unit its city made out of unit.trained.
   t221-t250 m_bestImprovementToMake 46, no tree, no Builder contract: a
   tree that ran on would buy Muscat a Builder at t222). LAB: where in
   0x5ccc10 / the tree's seed the Tunnel stops is unread.
+
+## C-95: the pathfinder's Woods waivers — ported (GPU twin)
+
+`_tac_waived` / `_tac_waive_code` / `_tac_cost(waive)` / `_tac_cost_rows`
+(gpu/core/sim_tactics.py), the twin of `search`'s `stepCostHeld` through
+`terrainMp` (cpu/core/units.ts): a mover's terrain waivers (bit 1 hills: the
+Alpine promotion, the chassis, Alpine Training; bit 2 live Woods and
+Rainforest: the Ranger promotion, the chassis) lifted off the plot's cost in
+the planning's search, the path's walk and the shore step's entry. The CPU
+pathfinder already priced them; the GPU's ignored the Woods ones.
+
+## C-99: the planning's carry and the embarked pool — explained
+
+The rows the carry seemed not to fit are the embarked pool rising with its
+techs (EMBARK_MOVE_TECHS: Square Rigging +1, Steam Power +2): runs/
+h1_duely1128 city-state 4's Cavalry (5) carries 2 over a pool of 3 at
+t171-182 (37:6 (2/0)), none over 5 from Steam Power at t186 (t229 / t237 /
+t238 37:6 and 36:5 (1/1)); 1124 Granada's Cuirassiers (4) carry none over 5
+from t148 (t171-188: (4,1) -> (1,0)).
+
+## C-99: the carry under a zone of control — READ (0x26e920), both twins
+
+0x26f980 (under no flag 0x800, on a step that starts no turn) sets the
+step's minimum cost to the Movement it starts with; the parent's carry is
+added on top (0x26ed00), so a step into a zone of control from a node
+carrying Movement is left short: a wait a turn on (the turn's Movement
+and the carry its cost), the unit's own unmoved plot or a turn's first step
+spending everything (`price`'s zone branch, `price6`'s `waits`).
+
+## C-99: a unit with no Movement as the city-state's pass opens — none of its
+
+`cityStateTactics` (cpu/core/tactical.ts), the city-state pass's `done`
+(gpu/core/sim_tactics.py). The game logs no tactical row for a city-state's
+unit standing at Movement 0 as its pass opens: a unit bought at its start
+(runs/h1_duely1117 t19 city-state 3's Warrior 393220, CityMadePurchase
+before PlayerTurnActivated; t59 2's Archer 655365; 1124 t18 4's Warrior
+458757; t72 3's Heavy Chariot 983044) and one upgraded (UnitUpgraded:
+1121 t61 2's Swordsman 1310720) — 199 such unit-turns over the five duely
+duels, none logged. A unit trained before the pass, at full Movement, is
+logged (runs/h1_duelw1121 t16 Ayutthaya's Warrior wanders). The pass's
+unit gather in the DLL is UNREAD.
+
+## C-95: the best route's owner term — READ, nothing to port
+
+0x512120's owner term (the plot owner's +0x12e0 count, 0x6fe50) is
+Player_Trade's m_iImprovedRouteLevel, which
+EFFECT_ADJUST_PLAYER_IMPROVED_ROUTE_LEVEL (MODIFIER_PLAYER_ADJUST_IMPROVED_
+ROUTE_LEVEL, Modifiers.xml) raises; its one modifier is Persia's
+TRAIT_SATRAPIES_IMPROVED_ROUTE_LEVEL (Macedonia_Persia_GameplayData.xml,
+ImprovedRouteLevel 1: its plots' roads a rung above its era's). The
+engines' roster carries no Persia, so the term is 0 for every player.

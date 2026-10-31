@@ -170,19 +170,38 @@ class SimTactics:
             tm = torch.where(mc > 0, (mc - 1) * self._mp_scale, tm)
         return self._mp_scale + tm
 
-    def _tac_step_cost(self, hill_free: bool = False) -> torch.Tensor:
+    def _tac_waived(self, waive: int) -> torch.Tensor:
+        """[B, T] long — the terrain Movement waiver code `waive` lifts off
+        each plot (`terrainMp`): bit 1 its hills (the Alpine promotion, the
+        chassis, Alpine Training), bit 2 its live Woods or Rainforest (the
+        Ranger promotion, the chassis)"""
+        out = torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
+        if waive & 1:
+            out = out + self.hills.long() * self._mp_scale
+        if waive & 2 and self._woods_feats.numel():
+            tc = torch.arange(self.T, device=self.device).unsqueeze(0).expand(self.B, -1)
+            out = out + self._feature_live(tc, self._woods_feats).long() * self._mp_scale
+        return out
+
+    def _tac_waive_code(self, utype: torch.Tensor, promos: torch.Tensor, alpine: torch.Tensor) -> torch.Tensor:
+        """[N] long — each mover's waiver code (`_tac_waived`): 1 hills a plain
+        move, 2 Woods and Rainforest, 3 both"""
+        hills = (self._promo_flag(utype, promos, "TERRAIN_MOVE_HILLS") | self._type_no_hill_cost.take(utype) | alpine)
+        woods = self._promo_flag(utype, promos, "TERRAIN_MOVE_WOODS") | self._type_no_woods_cost.take(utype)
+        return hills.long() + 2 * woods.long()
+
+    def _tac_step_cost(self, waive: int = 0) -> torch.Tensor:
         """[B, T, 6] long — `stepCost` for a step off each plot along each
         neighbour column onto LAND, in `mp_scale` units: the plot's own cost
-        (an improvement's Movement in its place), a route at both ends its
-        tier's instead, the river crossing a bridging tier drops and none
-        where either plot is a city's (0x531510); a step into a city costs
-        one Movement at most (CITY_MOVEMENT_COST, 0x531660). `hill_free`: a
-        mover whose hills cost a plain move (`terrainMp`'s Alpine waiver: the
-        promotion, the chassis, Alpine Training); no other waiver here."""
+        (an improvement's Movement in its place) less the mover's terrain
+        waivers (`_tac_waived`), a route at both ends its tier's instead, the
+        river crossing a bridging tier drops and none where either plot is a
+        city's (0x531510); a step into a city costs one Movement at most
+        (CITY_MOVEMENT_COST, 0x531660)."""
         nb = self.neigh.clamp(min=0)  # [T, 6]
         tm = self._tac_entry()[:, nb] - self._mp_scale
-        if hill_free:
-            tm = (tm - self.hills[:, nb].long() * self._mp_scale).clamp(min=0)
+        if waive:
+            tm = (tm - self._tac_waived(waive)[:, nb]).clamp(min=0)
         rr_f = self.railroad.unsqueeze(2)
         rr_t = self.railroad[:, nb]
         rd = (self.road.unsqueeze(2) | rr_f) & (self.road[:, nb] | rr_t)
@@ -369,14 +388,24 @@ class SimTactics:
         ign = self._type_zoc_ignore | (self._type_cavalry & ~self._type_chariot)
         return ign.take(utype.clamp(min=0, max=self.NU - 1))
 
-    def _tac_cost(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """`_tac_step_cost`, plain and hill-free, held through a tactical pass
-        until a pillage changes the ground"""
+    def _tac_cost(self, waive: int = 0) -> torch.Tensor:
+        """`_tac_step_cost` under waiver code `waive`, held through a tactical
+        pass until a pillage changes the ground"""
         if not self._tac_in_pass:
-            return self._tac_step_cost(), self._tac_step_cost(True)
+            return self._tac_step_cost(waive)
         if self._tac_cost_held is None:
-            self._tac_cost_held = (self._tac_step_cost(), self._tac_step_cost(True))
-        return self._tac_cost_held
+            self._tac_cost_held = {}
+        if waive not in self._tac_cost_held:
+            self._tac_cost_held[waive] = self._tac_step_cost(waive)
+        return self._tac_cost_held[waive]
+
+    def _tac_cost_rows(self, rows: torch.Tensor, frm: torch.Tensor, waive: torch.Tensor) -> torch.Tensor:
+        """[N, 6] long — each row's `_tac_cost` off plot `frm` under its own
+        waiver code"""
+        out = self._tac_cost()[rows, frm]
+        for c in sorted(set(waive.tolist()) - {0}):
+            out = torch.where((waive == c).unsqueeze(1), self._tac_cost(c)[rows, frm], out)
+        return out
 
     def _tac_full(self, pre: str = "barb") -> tuple[torch.Tensor, torch.Tensor]:
         """[B, P] twice — each unit of pool `pre`'s full Movement
@@ -512,19 +541,19 @@ class SimTactics:
         fights = self._type_combat.take(utype) > 0
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows] | (a_fw[rows] & embarks.unsqueeze(1))) \
             & fights.unsqueeze(1) & ~ent_n
-        cost_b, cost_hf = self._tac_cost()  # [B, T, 6] each
-        # the units whose hills cost a plain move (`terrainMp`): the Alpine
-        # promotion, the chassis, Alpine Training
-        hill_free = (self._promo_flag(utype, getattr(self, f"{pre}_unit_promos")[rows, slots], "TERRAIN_MOVE_HILLS")
-                     | self._type_no_hill_cost.take(utype) | getattr(self, f"{pre}_unit_alpine")[rows, slots])
-        any_hf = bool(hill_free.count_nonzero())
+        cost_b = self._tac_cost()  # [B, T, 6]
+        # each unit's terrain waivers (`terrainMp`: hills, Woods)
+        waive = self._tac_waive_code(utype, getattr(self, f"{pre}_unit_promos")[rows, slots],
+                                     getattr(self, f"{pre}_unit_alpine")[rows, slots])
+        any_hf = bool(waive.count_nonzero())
         # the land/water steps priced (`stepCost`'s transition) where a unit
         # embarks or strikes a plot across the shore
         any_embark = bool(embarks.count_nonzero()) or bool((atk_n & water_n & ~naval.unsqueeze(1)).count_nonzero())
         if any_embark:
             entry_n = self._tac_entry()[rows]
             if any_hf:
-                entry_n = entry_n - (hill_free.unsqueeze(1) & self.hills[rows]).long() * self._mp_scale
+                for c in sorted(set(waive.tolist()) - {0}):
+                    entry_n = entry_n - (waive == c).long().unsqueeze(1) * self._tac_waived(c)[rows]
             ctr_n = self._centre_plane()[rows]
             ut_pool = getattr(self, f"{pre}_unit_type")
             ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, slots]
@@ -616,9 +645,7 @@ class SimTactics:
             bg, bm, bt = g.gather(1, b1), mv.gather(1, b1), tn.gather(1, b1)  # [N, 1]
             nb = neigh[best]  # [N, 6]
             nbc = nb.clamp(min=0)
-            cst = cost_b[rows, best][:, cols]
-            if any_hf:
-                cst = torch.where(hill_free.unsqueeze(1), cost_hf[rows, best][:, cols], cst)
+            cst = (self._tac_cost_rows(rows, best, waive) if any_hf else cost_b[rows, best])[:, cols]
             fw = water_n.gather(1, b1)  # [N, 1]
             cliff6 = None
             if any_embark:
@@ -665,6 +692,12 @@ class SimTactics:
                 inz = zp.gather(1, nbc) & (moves > 0) & ~a6
                 cst = torch.where(inz, pm, cst)
                 moves = torch.where(inz, 0, moves)
+                # the parent's carry on top of the zone's minimum leaves the
+                # step short (0x26ed00): a wait where the turn goes on
+                carry6 = torch.where(inz, torch.zeros_like(carry6), carry6)
+                waits = inz & (cr.gather(1, b1) > 0) & ~at_start & same_turn
+                turns = torch.where(waits, turns + 1, turns)
+                cst = torch.where(waits, pm + cr.gather(1, b1), cst)
             # the attack's step priced as any step, then spending the
             # Movement it leaves (`search`)
             cst = torch.where(a6, cst + moves, cst)
@@ -983,23 +1016,24 @@ class SimTactics:
         return disk.gather(1, to.unsqueeze(1)).squeeze(1) | (frm == to)
 
     def _tac_step(self, rows: torch.Tensor, frm: torch.Tensor, to: torch.Tensor, dcol: torch.Tensor,
-                  utype: torch.Tensor, ign_shore: torch.Tensor, hill_free: torch.Tensor) -> torch.Tensor:
+                  utype: torch.Tensor, ign_shore: torch.Tensor, waive: torch.Tensor) -> torch.Tensor:
         """[R] long — `stepCost` of one step `frm` -> `to` (neighbour column
         `dcol`) for units of `utype` in the games `rows`, in `mp_scale`
         units: a hull's and an embarked unit's one Movement, a land/water
         step its plot's own cost and the embarking's (waived at a Harbor, a
         coastal city centre or by `ign_shore`), a land step the held plane's
-        (the hill-free one where `hill_free`); one Movement at most into a
+        (under each row's waiver code `waive`); one Movement at most into a
         city."""
         naval = self.unit_naval.take(utype)
         fw = self.water[rows, frm]
         tw = self.water[rows, to]
         mp1 = torch.full_like(frm, self._mp_scale)
-        plain, hf = self._tac_cost()
-        land = torch.where(hill_free, hf[rows, frm, dcol], plain[rows, frm, dcol])
+        land = self._tac_cost_rows(rows, frm, waive).gather(1, dcol.unsqueeze(1)).squeeze(1)
         ctr = self._centre_plane()
         dock = self._embark_waived(frm.unsqueeze(1), to.unsqueeze(1), rows).squeeze(1)
-        entry = self._tac_entry()[rows, to] - (hill_free & self.hills[rows, to]).long() * self._mp_scale
+        entry = self._tac_entry()[rows, to]
+        for c in sorted(set(waive.tolist()) - {0}):
+            entry = entry - (waive == c).long() * self._tac_waived(c)[rows, to]
         trans = torch.where(tw, mp1, entry)
         trans = trans + torch.where(dock | ign_shore, torch.zeros_like(trans),
                                     torch.full_like(trans, self._embark_transition_mp))
@@ -1061,9 +1095,9 @@ class SimTactics:
         naval = self.unit_naval.take(ut)
         ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, sr]
         halts = self._tac_zoc(seat)[rows] & ~self._tac_zoc_ignored(ut).unsqueeze(1)
-        # hills a plain move (`terrainMp`): the Alpine promotion, the chassis, Alpine Training
-        hill_free = (self._promo_flag(ut, getattr(self, f"{pre}_unit_promos")[rows, sr], "TERRAIN_MOVE_HILLS")
-                     | self._type_no_hill_cost.take(ut) | getattr(self, f"{pre}_unit_alpine")[rows, sr])
+        # its terrain waivers (`terrainMp`: hills, Woods)
+        waive = self._tac_waive_code(ut, getattr(self, f"{pre}_unit_promos")[rows, sr],
+                                     getattr(self, f"{pre}_unit_alpine")[rows, sr])
 
         def own_at(pl: torch.Tensor) -> torch.Tensor:
             return (pl >= 0) & (self.unit_seat[rows].gather(1, pl.clamp(min=0)) == seat)
@@ -1096,7 +1130,7 @@ class SimTactics:
                 break
             pc = p.clamp(min=0)
             dcol = (self.neigh[frm] == pc.unsqueeze(1)).long().argmax(dim=1)
-            c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, hill_free) + carry
+            c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, waive) + carry
             on = on & ~((mp < c) & (mp < full))
             tw = self.water[rows, pc]
             cross = (self.water[rows, frm] != tw) & ~naval & ~ww
@@ -3850,7 +3884,9 @@ class SimTactics:
         op = self._seat_pass_open(pre, seat, act, full=ops_on)
         units, order, npass = op["units"], op["order"], op["npass"]
         tg = op["tg"]
-        done = torch.zeros_like(units)
+        # a unit with no Movement left as the pass opens is none of its
+        # (`cityStateTactics`)
+        done = units & (self.major_unit_mp <= 0)
         alive = self.major_unit_alive
         # its operations' run once the pass has its units' planning: their
         # units' turns are the operations'

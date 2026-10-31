@@ -20,6 +20,7 @@
   impl: [cpu/core/eras.ts:bestRoadTier]
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+    - "C-95: the best route's owner term — READ, nothing to port"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The best route for a player on a plot (0x512120): the route of the highest PlacementValue valid on the plot (0x511700) whose Placemen..."
