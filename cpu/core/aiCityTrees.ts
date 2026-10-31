@@ -414,11 +414,16 @@ export function bestPlotFor(ai: CityAi, city: CityTreeCity, improvement: number)
 
 /** 0x5ccc10, THE IMPROVEMENT EVENT: with its slot free, the improvement the
  *  city's turn picked, at its best plot, valued above 0 there, starts
- *  "Build City Improvement" */
+ *  "Build City Improvement" — one no Builder lays (the Military Engineer's
+ *  Mountain Tunnel the pick takes) starts none (runs/h1_duely1124 Cardiff
+ *  t214-t250, runs/h1_duely1127 Hattusa t220-t250 and Muscat t221-t250:
+ *  m_bestImprovementToMake the Tunnel, no "Build City Improvement" tree
+ *  held, no Builder bought for it) */
 export function improvementEvent(ai: CityAi, w: CityTreeWorld, city: CityTreeCity, tree: string): void {
   if (!slotFree(ai, city.id, SLOT_IMPROVEMENT)) return;
   const imp = city.bestImprovement;
   if (imp === -1) return;
+  if (!AI_IMPROVEMENTS[imp].buildUnits.some(([u]) => u === 'UNIT_BUILDER')) return;
   const e = bestPlotFor(ai, city, imp);
   if (!e || e.improvements[imp] <= 0) return;
   startTree(ai, w, city, SLOT_IMPROVEMENT, tree, {

@@ -212,6 +212,23 @@
   context:
     - "...dd70: the count 0x5cbc0(2) + 18 = 37, f(0) = 1, f(n) = f(n-1) + 6n; each plot through 0x5d1e0 -> 0x5d000, off the map or off any region skipped, one equal to the centre's skipped; e..."
   review: imported
+- addr: 0x5d3c0
+  final: 0x44d40
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 0
+      value: runs/h1_duelv1124 logs those rows (Cardiff 12:13 239.34 at T 0, 12:12   170.34;
+    - recording: AI_Knowledge.csv
+      value: "Cardiff's K 6.87 (AI_Knowledge.csv TRADE VAL): three roads beside 12:13   +207, two beside 12:12 +138;"
+    - recording: h1_duelv1124
+      value: "The K the   analysis reads is the turn before's (the knowledge base's TRADE line of   t-1): the plotValueLab's Tunnel rows 163 -> 402 of 414 exact in   runs/h1_duelv1124, 0 -> 102 of 106 in runs/h1_du"
+  readings:
+    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
+  context:
+    - "...hbour whose +0x47 (its route) is not -1 counts; one with none that the route manager (0x5d3c0 -> 0x88490, 0x88680: Route_Instance's plot lookup) holds an instance on refuses the who..."
+  review: imported
 - addr: 0x5d3e0
   final: 0x44f00
   kind: function

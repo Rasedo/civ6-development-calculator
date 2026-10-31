@@ -71,6 +71,9 @@ export interface ValueTerms {
    *  subject its attaching modifier stood on): COLLECTION_OWNER is that city,
    *  of `seat` (the evaluating seat where absent); absent, the player */
   owner?: { cityId: number; capital: boolean; seat?: number };
+  /** the plot the evaluation is of (context +0x88): an improvement's in the
+   *  plot analysis; absent, none */
+  plot?: number;
   /** the religion the evaluation is of (context +0x48), -1 for none: a
    *  belief's (0x7a7400) is the player's own religion, else its majority
    *  religion */
@@ -90,9 +93,6 @@ export interface ValueTerms {
    *  COLLECTION_PLAYER_UNITS walk, kept through a granted ability's own
    *  modifiers; absent, none */
   unit?: { plot: number; type: string; moves: number; level: number };
-  /** the plot the evaluation is of (context +0x88): an improvement's plot
-   *  in its ImprovementModifiers' analysis; absent, none */
-  plot?: number;
   /** a resolution's target hint (0x67dd40's handlers), in the install's
    *  types: the luxury (+0x4c), the yield (+0x64), the government (+0x28),
    *  the great person class (+0x6c), the project (+0x68) */

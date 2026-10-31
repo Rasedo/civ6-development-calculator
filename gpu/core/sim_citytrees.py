@@ -675,7 +675,8 @@ def improvement_event(ai: CityAi, s: int, w, best_improvement: torch.Tensor, mas
     slot's tree"""
     if SLOT_IMPROVEMENT not in ai.slot_trees:
         return
-    go = mask & slot_free(ai, s, SLOT_IMPROVEMENT) & (best_improvement != -1)
+    # one no Builder lays (the Mountain Tunnel) starts none
+    go = mask & slot_free(ai, s, SLOT_IMPROVEMENT) & (best_improvement != -1) & w.builder_lays(best_improvement)
     if not bool(go.any()):
         return
     ev = w.evals()

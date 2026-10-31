@@ -715,10 +715,10 @@ class SimMinorAi:
                 ok = ok | (((land & self._sr_c & bare) | (land_h & nr["_sr_c"] & bare) | (land_c & nr["_sr_c"]))
                            & appeal_ok)
             elif self._imp_adj_plot[k]:
-                # a Builder's adjacent-plot row (the Ski Resort): a bare
-                # mountain of its own, laid from a neighbour
-                # (`adjacentPlotTargetOk`)
-                if not self._imp_eng[k] and self._imp_uniq_leader[k] < 0 and gov:
+                # an adjacent-plot row (the Ski Resort, the Military
+                # Engineer's Mountain Tunnel): a bare mountain of its own,
+                # laid from a neighbour (`adjacentPlotTargetOk`)
+                if self._imp_uniq_leader[k] < 0 and gov:
                     ok = ok | self._adj_plot_target_ok(k, self.tile_seat == 100 + s)
             elif self._imp_suz[k] and self._imp_built_by[k] < 0:
                 if gov:
@@ -2281,6 +2281,14 @@ class _MinorWorld:
     def start_operation(self, name, plot, mask):
         T = self.sim._mops_tables()
         return self.sim._mops_start(self.s, T.names.index(name), plot, plot, mask)
+
+    def builder_lays(self, imp):
+        """[B] the improvement row (AI_IMPROVEMENTS' order, -1 none) is one
+        a Builder lays (its buildUnits name UNIT_BUILDER)"""
+        rows = self.sim.rules.ai_city_build["improvements"]
+        lays = torch.tensor([any(u == "UNIT_BUILDER" for u, _c in r["buildUnits"]) for r in rows] + [False],
+                            dtype=torch.bool, device=self.sim.device)
+        return lays[torch.where(imp >= 0, imp, torch.full_like(imp, len(rows)))]
 
     def builder_type(self, imp):
         T = self.T

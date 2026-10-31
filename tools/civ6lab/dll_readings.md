@@ -11881,3 +11881,11 @@ the replay leaves such a unit its city made out of unit.trained.
   taken before it, and the game logs no tactical row for it that turn —
   193 of the five duely duels' 217 "(no row)" unit-turns where ours moved
   (160 HL: End Turn, 19 Operation, 17 Heal ...) are such upgrades.
+
+  The analysis takes the Military Engineer's adjacent-plot row on a bare
+  mountain of the minor's own (`adjacentRowsOn`), the pick takes it, and
+  the improvement event starts no tree for a row no Builder lays
+  (`improvementEvent`; runs/h1_duely1127 Hattusa t220-t250 and Muscat
+  t221-t250 m_bestImprovementToMake 46, no tree, no Builder contract: a
+  tree that ran on would buy Muscat a Builder at t222). LAB: where in
+  0x5ccc10 / the tree's seed the Tunnel stops is unread.

@@ -145,12 +145,16 @@ function standingImprovements(state: GameState, cs: CityState, tile: Tile): read
   return [...validImprovementsIn(seenGround(state, cs, tile), groundOpts(state, cs)), ...adjacentRowsOn(state, cs, tile)];
 }
 
-/** the Builder's adjacent-plot rows (the Ski Resort) a bare mountain of the
- *  minor's own takes, laid from a neighbour (`adjacentPlotTargetOk`) */
+/** the adjacent-plot rows a bare mountain of the minor's own takes, laid
+ *  from a neighbour (`adjacentPlotTargetOk`): the analysis values the
+ *  Military Engineer's Mountain Tunnel beside the Builder's Ski Resort
+ *  (runs/h1_duely1124 Cardiff t214-t250: its pick m_bestImprovementToMake
+ *  the Tunnel on 584, its MOUNTAIN_PORTAL term above the Ski Resort, no
+ *  tree holding it, its Builder on 628 never laying: `improvementEvent`) */
 function adjacentRowsOn(state: GameState, cs: CityState, tile: Tile): string[] {
   const own = (t: Tile) => tileSeat(t) === cs.seat;
   return Object.values(IMPROVEMENTS)
-    .filter((d) => d.adjacentPlot && !d.engineer && !d.uniqueLeader && adjacentPlotTargetOk(state.map, tile, d, own))
+    .filter((d) => d.adjacentPlot && !d.uniqueLeader && adjacentPlotTargetOk(state.map, tile, d, own))
     .map((d) => d.id);
 }
 
