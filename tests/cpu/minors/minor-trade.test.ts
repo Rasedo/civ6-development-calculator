@@ -9,9 +9,10 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { declareWarOnCityState, minorCity } from '../../../cpu/core/cityStates';
 import {
-  cityStateRouteYields, cityTradeYields, minorRouteCandidate, minorRouteYields, minorTrade, routeDestCenter, routeOriginCenter,
+  cityStateRouteYields, cityTradeYields, minorTrade, routeDestCenter, routeOriginCenter,
   tradeCapacity, tradeRouteMinDuration,
 } from '../../../cpu/core/trade';
+import { minorRouteCandidate } from '../../../cpu/core/aiTrade';
 import { spawnUnit } from '../../../cpu/core/units';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, CityStateType, GameState, Yields } from '../../../cpu/core/types';
@@ -44,6 +45,8 @@ function scene() {
   const near = addCs(state, 15, 5, 'trade');
   const far = addCs(state, 34, 34, 'cultural');
   cs.research.civics = ['FOREIGN_TRADE'];
+  // its city's trade list (`minorTradeList`) holds both minors
+  cs.tradeCities = [near.centerIndex, far.centerIndex];
   return { state, cs, near, far };
 }
 
@@ -59,17 +62,11 @@ describe("a city-state's trade capacity", () => {
 });
 
 describe("a city-state's route", () => {
-  it('its free Trader takes the best-paying destination in range and is spent on it', () => {
+  it('its free Trader takes a listed destination in range and is spent on it', () => {
     const { state, cs, near, far } = scene();
-    const cap = settleAt(state, tileAtCoords(state.map, 5, 14).index, 0);
-    // the scorer: every new in-range destination, the highest yield sum, the
-    // first on a tie — the minor out of range never competes
+    // the minor out of range never competes
     const pick = minorRouteCandidate(state, cs)!;
-    const toNear = sum(minorRouteYields(state, { from: -1, to: -1, toCs: near.id })!);
-    const toCap = sum(minorRouteYields(state, { from: -1, to: -1, toSeat: 0, toSeatCity: cap.id })!);
-    expect(toNear).toBe(sum(cityStateRouteYields(state, near)));
-    if (toNear >= toCap) expect(pick.toCs).toBe(near.id);
-    else expect(pick.toSeatCity).toBe(cap.id);
+    expect(pick.toCs).toBe(near.id);
     expect(pick.toCs).not.toBe(far.id);
 
     const trader = spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat)!;
@@ -130,6 +127,7 @@ describe("a city-state's route", () => {
     near.centerIndex = tileAtCoords(state.map, 30, 30).index; // out of range: the major's city is the only one
     const cap = settleAt(state, tileAtCoords(state.map, 5, 14).index, 0);
     cs.met = [0];
+    cs.tradeCities = [cap.centerIndex];
     spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat);
     minorTrade(state, cs, true);
     expect(cs.tradeRoutes![0].toSeatCity).toBe(cap.id);

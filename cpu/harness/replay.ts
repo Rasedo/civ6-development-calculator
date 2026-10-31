@@ -68,6 +68,7 @@ import { barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLoo
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
+import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
@@ -3024,6 +3025,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
             // a city-state's Trader goes where its AI sent it; a major's city
             // it names is the engine's at that centre
             const to = r.toSeatCity !== undefined ? cityAt(state, dst) : undefined;
+            const pick = minorRouteCandidate(state, minor);
+            const ours = pick ? routeDestCenter(state, minor, pick) : -1;
+            const named = (c: number) => (c < 0 ? 'none' : cityAt(state, c)?.name ?? state.cityStates.find((x) => x.centerIndex === c)?.name ?? `plot ${c}`);
+            score(ctx, 'trade.route.minor', state.turn, d.player, `p${d.player} ${minor.name}`, ours === dst, named(ours), named(dst));
             const traders = state.units.filter((u) => u.seat === seat && u.type === 'TRADER');
             res = r.toCs !== undefined ? minorRouteTo(state, minor, { from: -1, to: -1, toCs: r.toCs })
               : to ? minorRouteTo(state, minor, { from: -1, to: -1, toSeat: to.seat, toSeatCity: to.id })

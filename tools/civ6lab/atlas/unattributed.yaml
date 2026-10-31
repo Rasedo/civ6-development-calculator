@@ -3690,6 +3690,31 @@
   context:
     - ...s, not a unit; the lambda 0x783570 (one unit, through 0x5f0440) is referenced only from 0x787fb0, its caller unread.
   review: imported
+- addr: 0x78cc40
+  final: 0x5185b0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: Game_TradeManager.csv
+      turn: 53
+      value: "Game_TradeManager.csv's Route Started   rows (origin yields per route) confirm the values: runs/h1_duely1127   Mexico City t53 takes Hattusa (3 Gold 1 Science, x2) over Xi'an (its   post there;"
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...0 is 0. The list sorted by value, highest first (0x78d510, std::sort: an insertion sort 0x78cc40 at 32 entries or fewer, ties keeping the list's order); the first CanStartRoute (0x54..."
+  review: imported
+- addr: 0x78d510
+  final: 0x518e80
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: Game_TradeManager.csv
+      turn: 53
+      value: "Game_TradeManager.csv's Route Started   rows (origin yields per route) confirm the values: runs/h1_duely1127   Mexico City t53 takes Hattusa (3 Gold 1 Science, x2) over Xi'an (its   post there;"
+  impl: [cpu/core/aiTrade.ts:minorRouteCandidate]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...+ destination) yields, x3 where 0x54ad70 is 0. The list sorted by value, highest first (0x78d510, std::sort: an insertion sort 0x78cc40 at 32 entries or fewer, ties keeping the list'..."
+  review: imported
 - addr: 0x78d630
   final: 0x518fa0
   kind: function
@@ -3718,9 +3743,11 @@
     - recording: h1_duelv1117
       turn: 14
       value: Valletta's TRADE, TO -1, VAL 2.10 (0.00 before t14)
+  impl: [cpu/core/aiTrade.ts:minorRouteCandidate]
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
   context:
     - ...er's cities must list it in its trade AI's city list (CityBuildAI +0x870 m_cityTrade, 0x78e010); MustHaveNukes (definition +0x7a) asks the nuke check 0x2d1f20 / 0x2d2090; the value t...
   review: reviewed
@@ -3743,6 +3770,7 @@
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
   context:
     - "## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city orde..."
     - "...at +0x10 / count +0x20, a rejected list of 8-byte entries at +0x28 / +0x38), kept by 0x78f210 from the city's analysis (0x5ce3f0 \"City Analysis\"): per city entry of the owner's know..."

@@ -9,6 +9,7 @@
   status: PARTLY
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
   context:
     - "...jected list. A listed city of the owner's own (a domestic route) rates its destination (0x54ad70 >= 5: +8 set) — a city-state holds one city. 0x78e010 is the list's lookup."
   review: imported
@@ -131,6 +132,20 @@
   readings: ["H-1: the trade path's search, its score and the Canal — READ"]
   context:
     - "...120, the district row's hash). The route's path score (Trade_Manager 0x5500b0 counting, 0x54eeb0 weighing): past the origin, a centre counts its Trading Post (foreign, own); any other..."
+  review: imported
+- addr: 0x54efc0
+  final: 0x38cf50
+  kind: function
+  name: CanStartRoute
+  status: PARTLY
+  cases:
+    - recording: Game_TradeManager.csv
+      turn: 53
+      value: "Game_TradeManager.csv's Route Started   rows (origin yields per route) confirm the values: runs/h1_duely1127   Mexico City t53 takes Hattusa (3 Gold 1 Science, x2) over Xi'an (its   post there;"
+  impl: [cpu/core/aiTrade.ts:minorRouteCandidate]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - ...cc40 at 32 entries or fewer, ties keeping the list's order); the first CanStartRoute (0x54efc0) admits is the order (WakeUnit, MAKE_TRADE_ROUTE). A city-state has no diplomatic focus...
   review: imported
 - addr: 0x54fe20
   final: 0x38dab0

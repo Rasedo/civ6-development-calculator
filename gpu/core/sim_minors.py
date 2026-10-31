@@ -441,65 +441,122 @@ class SimMinors:
                          & (self.major_unit_type == self._trader_idx)).sum(dim=1)
         return out
 
+    def _minor_dest_y6(self, s: int) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+        """Per known city of minor `s`'s trade AI, in `_known_trade_cands`'
+        order: ([B, 6] f64 what a route there pays its city before the path
+        term and the Trading Post — the destination's rows, a major city's
+        foreign-route Gold and its wonders' sender yields — and [B] bool its
+        holder not at war with the minor)"""
+        B, S = self.B, self.S
+        row = self._CITY_MINOR0 + s
+        y6, free = [], []
+        cs6 = self._cs_route_y6() if S > 0 else None
+        for s2 in range(S):
+            y6.append(cs6[:, s2])
+            free.append(~self.war[:, row, self._CITY_MINOR0 + s2])
+        reg = self.city_dist_tile
+        comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
+        fgk = self._gp_city_perm_names.index("foreignRouteGold")
+        wond = getattr(self, "_wond_sender_gold", None) is not None
+        for r2 in range(self.n_majors):
+            for j in range(self.RC):
+                y = self._route_centre_intl.reshape(1, 6).double() + comp[:, r2, j].double() @ self._route_intl_y
+                y = y.clone()
+                y[:, 2] += self.city_gp_perm[:, r2, j, fgk].double()
+                if wond:
+                    wr = self.city_wonder[:, r2, j]
+                    wc = (wr >= 0) & self.built_wonder_complete.gather(1, wr.clamp(min=0))
+                    y[:, 2] += wc.double() @ self._wond_sender_gold
+                    y[:, 3] += wc.double() @ self._wond_sender_sci
+                y6.append(y)
+                free.append(~self.war[:, row, r2])
+        return y6, free
+
     def _minor_route_candidate(self, s: int, want: torch.Tensor):
-        """`minorRouteCandidate` — where minor `s`'s free Trader goes: the new
-        in-range destination whose route pays the most, its six yields summed
-        (`_minor_route_yield6`), strictly-greater beats in the scan order —
-        the other city-states by index, then every major's cities in row and
-        slot order — so ties keep the first. The gates: the range (the walk
-        from its city, in the games `want`), the route not already running, no
-        war with the destination's holder, Trade Policy's ban. Returns ([B] found, [B] dest code (-(2+cs) or -1),
+        """`minorRouteCandidate` — where minor `s`'s free Trader goes, in the
+        games `want` (the economic AI's turn 0x687bf0 -> 0x78e0a0). Over the
+        known cities in `_known_trade_cands`' order that its city's trade list
+        holds (`citystate_trade_ok`), each whose holder it is not at war with:
+        not one its routes already run to, not under Trade Policy's ban, one
+        the potential course (`_trade_course`) reaches — the route's value,
+        its origin yields on that course (`_minor_dest_y6`, the path term
+        `_route_path_gold` over the course, the Trading Post at the
+        destination `_route_post_gold`) valued at the minor's weights and
+        summed, times 2 where the minor holds no Trading Post in any city of
+        the destination's holder (0x4d9830). The greatest wins, the first in
+        the order on a tie. Returns ([B] found, [B] dest code (-(2+cs) or -1),
         [B] dest seat row, [B] dest city id, [B] dest centre)."""
-        B, S, dev = self.B, self.S, self.device
+        from .sim_cityvalue import _YIELDS
+        B, S, RC, dev = self.B, self.S, self.RC, self.device
         row = self._CITY_MINOR0 + s
         rr = self.seat_routes[:, row]
         act = rr[:, :, 0] >= 0
-        reach = self._trade_reach_rows(row, want.nonzero(as_tuple=True)[0].tolist(),
-                                       self.citystate_center[:, s:s + 1])[:, 0]  # [B, T]
-        best = torch.full((B,), -1.0, dtype=torch.float64, device=dev)
+        live, ctr = self._minor_trade_cands(s)
+        ND = live.shape[1]
+        on = self.citystate_trade_ok[:, s] & live & (want & self.citystate_alive[:, s]).unsqueeze(1)
+        y6, free = self._minor_dest_y6(s)
+        codes, seats, cids, posts = [], [], [], []
+        tp = self.trading_post[:, row]
+        for d in range(ND):
+            if d < S:
+                has = (act & (rr[:, :, 1] == -(2 + d))).any(dim=1)
+                gate = free[d] & ~has
+                codes.append(torch.full((B,), -(2 + d), dtype=torch.long, device=dev))
+                seats.append(torch.full((B,), -1, dtype=torch.long, device=dev))
+                cids.append(torch.full((B,), -1, dtype=torch.long, device=dev))
+                posts.append(tp.gather(1, ctr[:, d].clamp(min=0).unsqueeze(1)).squeeze(1))
+            else:
+                r2, j = divmod(d - S, RC)
+                cid = self.city_id[:, r2, j]
+                has = (act & (self.seat_route_dseat[:, row] == r2)
+                       & (self.seat_route_dcity[:, row] == cid.unsqueeze(1))).any(dim=1)
+                gate = free[d] & ~has & ~self._congress_intl_banned(r2)
+                codes.append(torch.full((B,), -1, dtype=torch.long, device=dev))
+                seats.append(torch.full((B,), r2, dtype=torch.long, device=dev))
+                cids.append(cid)
+                held = tp.gather(1, self.city_center[:, r2].clamp(min=0)) & self.city_alive[:, r2]
+                posts.append(held.any(dim=1))
+            on[:, d] = on[:, d] & gate
+        L = self.seat_route_course.shape[-1]
+        crs = torch.full((B, ND, L), -1, dtype=torch.long, device=dev)
+        games = on.any(dim=1).nonzero(as_tuple=True)[0].tolist()
+        if games:
+            graphs = self._trade_graphs(row, games)
+            o_ct = self.citystate_center[:, s].tolist()
+            for b in games:
+                for d in on[b].nonzero(as_tuple=True)[0].tolist():
+                    course = self._trade_course(b, row, int(o_ct[b]), int(ctr[b, d]), graphs[b])
+                    if course:
+                        crs[b, d, :len(course)] = torch.tensor(course, dtype=torch.long, device=dev)
+        on = on & (crs[:, :, 0] >= 0)
         found = torch.zeros(B, dtype=torch.bool, device=dev)
         code = torch.full((B,), -1, dtype=torch.long, device=dev)
         dseat = torch.full((B,), -1, dtype=torch.long, device=dev)
         dcity = torch.full((B,), -1, dtype=torch.long, device=dev)
         dct = torch.full((B,), -1, dtype=torch.long, device=dev)
-        per_cs = self._cs_route_y6().sum(dim=2) if S > 0 else None  # [B, S]
-        for s2 in range(S):
-            if s2 == s:
+        if not bool(on.count_nonzero()):
+            return found, code, dseat, dcity, dct
+        y = torch.stack(y6, dim=1).clone()  # [B, ND, 6]
+        y[:, :, 2] += self._route_path_gold(row, y[:, :, 2], on, crs) \
+            + (self._route_post_gold(row, ctr) * on.long()).double()
+        f = self._cv_minor_facts(s)
+        best = torch.zeros(B, dtype=torch.long, device=dev)
+        for d in range(ND):
+            o_d = on[:, d]
+            if not bool(o_d.count_nonzero()):
                 continue
-            ctr = self.citystate_center[:, s2].clamp(min=0)
-            has = (act & (rr[:, :, 1] == -(2 + s2))).any(dim=1)
-            ok = (self.citystate_alive[:, s2] & ~has & reach.gather(1, ctr.unsqueeze(1)).squeeze(1))
-            key = per_cs[:, s2]
-            take = ok & (~found | (key > best))
-            best = torch.where(take, key, best)
+            v = torch.zeros(B, dtype=torch.long, device=dev)
+            for k, name in enumerate(_YIELDS):
+                amt = torch.floor(y[:, d, k] * 256 + 0.5).long()
+                v = v + self._cv_yield(amt, name, f.yield_w(name))
+            v = v * torch.where(posts[d], 1, 2)
+            take = o_d & (~found | (v > best))
+            best = torch.where(take, v, best)
             found = found | take
-            code = torch.where(take, torch.full_like(code, -(2 + s2)), code)
-            dseat = torch.where(take, torch.full_like(dseat, -1), dseat)
-            dcity = torch.where(take, torch.full_like(dcity, -1), dcity)
-            dct = torch.where(take, ctr, dct)
-        y6 = self._route_centre_intl.sum()
-        for r2 in range(self.n_majors):
-            free = ~self.war[:, row, r2] & ~self._congress_intl_banned(r2)
-            dreg = self.city_dist_tile[:, r2]
-            comp = (dreg >= 0) & self.district_complete.gather(1, dreg.clamp(min=0).reshape(B, -1)).reshape_as(dreg)
-            ysum = comp.double() @ self._route_intl_y.sum(dim=1) + float(y6)  # [B, RC]
-            for j in range(self.RC):
-                live = self.city_alive[:, r2, j] & free
-                if not bool(live.count_nonzero()):
-                    continue
-                ctr = self.city_center[:, r2, j].clamp(min=0)
-                cid = self.city_id[:, r2, j]
-                has = (act & (self.seat_route_dseat[:, row] == r2)
-                       & (self.seat_route_dcity[:, row] == cid.unsqueeze(1))).any(dim=1)
-                ok = live & ~has & reach.gather(1, ctr.unsqueeze(1)).squeeze(1)
-                key = ysum[:, j]
-                take = ok & (~found | (key > best))
-                best = torch.where(take, key, best)
-                found = found | take
-                code = torch.where(take, torch.full_like(code, -1), code)
-                dseat = torch.where(take, torch.full_like(dseat, r2), dseat)
-                dcity = torch.where(take, cid, dcity)
-                dct = torch.where(take, ctr, dct)
+            code = torch.where(take, codes[d], code)
+            dseat = torch.where(take, seats[d], dseat)
+            dcity = torch.where(take, cids[d], dcity)
+            dct = torch.where(take, ctr[:, d], dct)
         return found, code, dseat, dcity, dct
 
     def _known_trade_cands(self, centre: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -677,28 +734,7 @@ class SimMinors:
         if not bool(ok_l.count_nonzero()):
             return best
         f = self._cv_minor_facts(s)
-        y6 = []
-        free = []
-        cs6 = self._cs_route_y6() if S > 0 else None
-        for s2 in range(S):
-            y6.append(cs6[:, s2])
-            free.append(~self.war[:, row, self._CITY_MINOR0 + s2])
-        reg = self.city_dist_tile
-        comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
-        fgk = self._gp_city_perm_names.index("foreignRouteGold")
-        wond = getattr(self, "_wond_sender_gold", None) is not None
-        for r2 in range(self.n_majors):
-            for j in range(self.RC):
-                y = self._route_centre_intl.reshape(1, 6).double() + comp[:, r2, j].double() @ self._route_intl_y
-                y = y.clone()
-                y[:, 2] += self.city_gp_perm[:, r2, j, fgk].double()
-                if wond:
-                    wr = self.city_wonder[:, r2, j]
-                    wc = (wr >= 0) & self.built_wonder_complete.gather(1, wr.clamp(min=0))
-                    y[:, 2] += wc.double() @ self._wond_sender_gold
-                    y[:, 3] += wc.double() @ self._wond_sender_sci
-                y6.append(y)
-                free.append(~self.war[:, row, r2])
+        y6, free = self._minor_dest_y6(s)
         for d in range(len(y6)):
             on = ok_l[:, d] & free[d]
             if not bool(on.count_nonzero()):

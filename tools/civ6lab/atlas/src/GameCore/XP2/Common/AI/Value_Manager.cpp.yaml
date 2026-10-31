@@ -450,6 +450,7 @@
     - gpu/core/sim_cityvalue.py:_cv_yield
     - cpu/core/minorBuild.ts:minorUnitTerm
     - cpu/core/aiEconomic.ts:BuildingPurchaseCity
+    - cpu/core/aiTrade.ts:minorRouteCandidate
   readings:
     - "H-1: the district adjacency — READ"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"

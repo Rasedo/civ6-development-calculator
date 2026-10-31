@@ -4197,6 +4197,26 @@ building tables).
   0x78e0a0 (per known city of the knowledge base +0xe0 entries, the routes'
   yields 0x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the
   unit table: that is 0x7989e0 (the section "C-96 / C-97: the unit value").
+- THE TRADER'S DESTINATION (0x687bf0 -> 0x78e0a0, the economic AI's turn,
+  per idle Trader standing in a city): over the city's trade list
+  (CityBuildAI +0x870, kept by 0x78f210) and the knowledge base's +0xe0 city
+  entries in their order, each listed city 0x78e010 admits: an
+  international one whose owner the player is not at war with (0x469cd0)
+  is valued Σ yieldValue(0x7a6690) over the route's origin yields 0x526330
+  with its last argument 0 (the path term on the potential course with
+  them), times a multiplier: 1, x3 where the diplomatic AI's vt+0x30 (the
+  focus player +0x6780) names the owner, + (1 + the Player_Diplomacy +0x480
+  sum) where 0x4d9830 finds no Trading Post of the player in any city of
+  the owner. A domestic one: (origin + destination) yields, x3 where
+  0x54ad70 is 0. The list sorted by value, highest first (0x78d510,
+  std::sort: an insertion sort 0x78cc40 at 32 entries or fewer, ties
+  keeping the list's order); the first CanStartRoute
+  (0x54efc0) admits is the order (WakeUnit, MAKE_TRADE_ROUTE). A city-state
+  has no diplomatic focus and no +0x480 entries: its multiplier is 2 to an
+  owner without its post, 1 with. Game_TradeManager.csv's Route Started
+  rows (origin yields per route) confirm the values: runs/h1_duely1127
+  Mexico City t53 takes Hattusa (3 Gold 1 Science, x2) over Xi'an (its
+  post there; 4 Gold 1 Science 1 Faith, x1).
 - HOUSING 0x7a3d70 (`housingValue`, args: CityBuildAI, the city's growth
   +0x1788, the rate, population, Housing, T, H): S = the Food surplus less
   the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing

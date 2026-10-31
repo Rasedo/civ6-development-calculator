@@ -144,6 +144,7 @@
     - cpu/core/aiUnitProduction.ts:UnitProductionFacts
     - cpu/core/minorCityAi.ts:freeCityThreat
     - cpu/core/freeOps.ts:freeFights
+    - cpu/core/aiTrade.ts:minorRouteCandidate
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -165,6 +166,7 @@
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...d). - The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0,..."
   context:

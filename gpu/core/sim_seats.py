@@ -15934,19 +15934,23 @@ class SimSeats:
                    else torch.zeros(self.B, dtype=torch.long, device=self.device))
         return post.long() * amt.reshape((self.B,) + (1,) * (dest_ct.dim() - 1))
 
-    def _route_path_gold(self, row: int, d: torch.Tensor, want: torch.Tensor) -> torch.Tensor:
+    def _route_path_gold(self, row: int, d: torch.Tensor, want: torch.Tensor,
+                         crs: torch.Tensor | None = None) -> torch.Tensor:
         """[B, K] f64 — `routePathGold` for row `row`'s route slots where
         `want`, D `d` [B, K]: D x min(cap, floor(denom x S / n)) / denom + T
-        over the stored course — S the water, railroad and Canal plots past
-        the origin and the portals taken, n every plot, T the foreign cities
-        passed through that hold this row's Trading Post
-        (`_route_course_posts`). 0 where the course is shorter than a step."""
+        over the course — the stored one, or `crs` [B, K, L] (-1-padded) —
+        S the water, railroad and Canal plots past the origin and the portals
+        taken, n every plot, T the foreign cities passed through that hold
+        this row's Trading Post (`_route_course_posts`). 0 where the course is
+        shorter than a step."""
         B, K = want.shape
         out = torch.zeros(B, K, dtype=torch.float64, device=self.device)
         if not bool(want.count_nonzero()):
             return out
+        if crs is None:
+            crs = self.seat_route_course[:, row]
         bb, kk = want.nonzero(as_tuple=True)
-        c = self.seat_route_course[bb, row, kk]  # [n, L]
+        c = crs[bb, kk]  # [n, L]
         valid = c >= 0
         n = valid.sum(dim=1)
         c0 = c.clamp(min=0)
@@ -15957,7 +15961,7 @@ class SimSeats:
               + (self.pair_dist[prev, cur].long() > 1).long() * self._path_portal)
         score = (sc * valid[:, 1:].long()).sum(dim=1)
         eff = torch.clamp(torch.div(self._path_denom * score, n.clamp(min=1), rounding_mode="floor"), max=self._path_cap)
-        held = self._route_course_posts(row, self.seat_route_course[:, row])[bb, kk]  # [n, L]
+        held = self._route_course_posts(row, crs)[bb, kk]  # [n, L]
         posts = (held & (self.tile_seat[b1, c0] != int(self._ROW_SEAT[row]))).sum(dim=1)
         gold = d[bb, kk] * eff.double() / float(self._path_denom) + posts.double()
         out[bb, kk] = torch.where(n >= 2, gold, torch.zeros_like(gold))

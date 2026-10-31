@@ -37,8 +37,9 @@
 import { fxOf, yieldValue, type AiValueView } from './aiValue';
 import { aiView } from './aiView';
 import { civsAtWar, freeSeatOf, isCiv, isCityStateSeat, seatOf } from './seats';
+import { congressIntlBanned } from './congress';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routePostGold } from './trade';
-import { routeInRange } from './tradePath';
+import { routeInRange, tradeCourse, tradeReach } from './tradePath';
 import type { CityState, GameState, Seat, TradeRoute, Yields } from './types';
 
 /** a known city a trade AI reads: its centre, its holder and the route
@@ -150,6 +151,53 @@ export function routeValueOver(state: GameState, seat: number): number {
     }
   }
   return best;
+}
+
+/**
+ * THE CITY-STATE'S ROUTE: where its free Trader goes (the economic AI's turn
+ * 0x687bf0 -> 0x78e0a0, per idle Trader in its city). Over the known cities
+ * in the knowledge base's order that its city's trade list holds
+ * (`CityState.tradeCities`, 0x78e010), each whose holder it is not at war
+ * with (0x469cd0): the route's value — its origin yields on its potential
+ * course, the path term with it (0x526330 with its last argument 0:
+ * `minorRouteOriginYields` on the course `tradeCourse` lays, the Trading
+ * Post there and on the way), each valued at the minor's weights
+ * (`yieldValue`, 0x7a6690) and summed — times 2 where the minor holds no
+ * Trading Post in any city of the destination's holder (0x4d9830: 1, plus 1
+ * and the diplomatic +0x480 term a city-state carries none of), else once.
+ * The list sorted the highest first (0x78d510), the first in the list's
+ * order on a tie; the first a route may start to (CanStartRoute 0x54efc0:
+ * none running there, in range, Trade Policy's ban) is taken
+ * (runs/h1_duely1127 Mexico City t53: Hattusa at 3 Gold and 1 Science,
+ * twice, over Xi'an, where its post stands, at 4 Gold, 1 Science and 1
+ * Faith, as Game_TradeManager logs). Null = none.
+ */
+export function minorRouteCandidate(state: GameState, cs: CityState): TradeRoute | null {
+  if (cs.centerIndex < 0) return null;
+  const routes = cs.tradeRoutes ?? [];
+  const listed = new Set(cs.tradeCities ?? []);
+  const posts = new Set(cs.tradingPosts ?? []);
+  const reach = tradeReach(state, cs.seat, cs.centerIndex);
+  const view = aiView(state);
+  const cands: { route: TradeRoute; value: number }[] = [];
+  for (const k of knownTradeCities(state, cs.centerIndex, -1, cs.seat)) {
+    if (!listed.has(k.centre) || civsAtWar(state, cs.seat, k.holder)) continue;
+    const r = k.route;
+    if (r.toCs !== undefined ? routes.some((x) => x.toCs === r.toCs)
+      : routes.some((x) => x.toSeat === r.toSeat && x.toSeatCity === r.toSeatCity)) continue;
+    if (r.toSeat !== undefined && congressIntlBanned(state, r.toSeat)) continue;
+    const course = tradeCourse(reach, k.centre);
+    if (!course) continue;
+    const y = minorRouteOriginYields(state, cs, { ...r, course });
+    if (!y) continue;
+    const holderCentres = isCityStateSeat(k.holder)
+      ? [k.centre] : (seatOf(state, k.holder)?.cities ?? []).map((c) => c.centerIndex);
+    const mult = holderCentres.some((c) => posts.has(c)) ? 1 : 2;
+    cands.push({ route: r, value: yieldsValue(view, cs.seat, y) * mult });
+  }
+  let best: { route: TradeRoute; value: number } | null = null;
+  for (const c of cands) if (!best || c.value > best.value) best = c;
+  return best?.route ?? null;
 }
 
 /** 0x5e9b20: a city-state's route value K (raw, `Seat.tradeValue`) over the

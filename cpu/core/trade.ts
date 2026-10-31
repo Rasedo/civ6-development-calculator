@@ -17,6 +17,7 @@ import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, spawnUnit } from './units';
 import { revealAround, unitSeesThrough, unitSight } from './fog';
+import { minorRouteCandidate } from './aiTrade';
 import { routeInRange, tradeCourse, tradeReach } from './tradePath';
 import { TRADE_COURSE_MAX, scaleByGameSpeed } from '../data/constants';
 import { civEraIndex } from './city';
@@ -1309,54 +1310,6 @@ export function tradeRouteExpiry(state: GameState, actor: Seat): void {
   }
 }
 
-/**
- * THE CITY-STATE'S ROUTE: where its free Trader goes. The census records
- * no destination, so the engine's own route scorer picks (`routeCandidateRow`'s
- * key): the new in-range destination whose route pays the most, its yields
- * summed (`minorRouteYields`) — the other city-states in id order, then every
- * major's cities in seat and array order, strictly-greater beats, so ties
- * keep the first. A minor has no fog and meets no one, so the gates are the
- * range (`tradeReach` from its city, its Trading Posts refuelling), a route
- * not already running, no war with the destination's holder, and Trade
- * Policy's ban on a banned major. Null = none.
- */
-export function minorRouteCandidate(state: GameState, cityState: CityState): TradeRoute | null {
-  const routes = cityState.tradeRoutes ?? [];
-  const reach = tradeReach(state, cityState.seat, cityState.centerIndex);
-  const cands: TradeRoute[] = [];
-  for (const dest of [...state.cityStates].sort((a, b) => a.id - b.id)) {
-    if (dest.id === cityState.id || routes.some((x) => x.toCs === dest.id)) continue;
-    if (!tradeCourse(reach, dest.centerIndex)) continue;
-    cands.push({ from: -1, to: -1, toCs: dest.id });
-  }
-  for (const other of state.seats) {
-    if (civsAtWar(state, cityState.seat, other.seat) || congressIntlBanned(state, other.seat)) continue;
-    for (const pc of other.cities) {
-      if (routes.some((x) => x.toSeat === other.seat && x.toSeatCity === pc.id)) continue;
-      if (!tradeCourse(reach, pc.centerIndex)) continue;
-      cands.push({ from: -1, to: -1, toSeat: other.seat, toSeatCity: pc.id });
-    }
-  }
-  let best: TradeRoute | null = null;
-  let bestSum = -1;
-  for (const r of cands) {
-    const y = minorRouteYields(state, r)!;
-    const ySum = y.food + y.production + y.gold + y.science + y.culture + y.faith;
-    if (best === null || ySum > bestSum) {
-      best = r;
-      bestSum = ySum;
-    }
-  }
-  return best;
-}
-
-/**
- * THE CITY-STATE'S TRADE TURN (`minorPhase`): its routes walk and meet their
- * raiders; a free Trader under its trade capacity takes the scorer's
- * destination (`minorRouteCandidate`) and is spent on it — where `pick`, the
- * engine standing in for the minor's AI; then the round trips that are done
- * end.
- */
 export function minorTrade(state: GameState, cityState: CityState, pick: boolean): void {
   tradeRouteWalk(state, cityState);
   const routes = cityState.tradeRoutes ?? [];

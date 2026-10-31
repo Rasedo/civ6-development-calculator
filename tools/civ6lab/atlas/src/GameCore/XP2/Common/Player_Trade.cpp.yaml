@@ -77,6 +77,19 @@
   context:
     - ...luded); the posts counted on it (0x5500b0) times the player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-tile bonus (0x4d9620, the player trade vector +0xeb8 that E...
   review: imported
+- addr: 0x4d9830
+  final: 0x33e0f0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: Game_TradeManager.csv
+      turn: 53
+      value: "Game_TradeManager.csv's Route Started   rows (origin yields per route) confirm the values: runs/h1_duely1127   Mexico City t53 takes Hattusa (3 Gold 1 Science, x2) over Xi'an (its   post there;"
+  impl: [cpu/core/aiTrade.ts:minorRouteCandidate, gpu/core/sim_minors.py:_minor_route_candidate]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...focus player +0x6780) names the owner, + (1 + the Player_Diplomacy +0x480 sum) where 0x4d9830 finds no Trading Post of the player in any city of the owner. A domestic one: (origin +..."
+  review: imported
 - addr: 0x4d9a70
   final: 0x33e250
   kind: function

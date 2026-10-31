@@ -50,6 +50,7 @@ export const KIND_NOTES: Record<string, string> = {
   'barb.move.family': 'a barbarian unit\'s move vs AI_Tactical.csv',
   'barb.move.plot': 'its end plot vs record t+1\'s',
   'barb.unit': 'a unit a camp raised vs record t+1\'s new barbarian units (barb:unitNew, barb:unit)',
+  'trade.route.minor': 'the destination a city-state\'s Trader takes (minorRouteCandidate) vs record t+1\'s new route',
 };
 
 export function newScores(): DecisionScores {
