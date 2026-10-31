@@ -1678,6 +1678,42 @@ class SimMinors:
         self.citystate_ovf[:, s] = torch.where(fin, (made - (cost - before).clamp(min=0)).clamp(min=0),
                                                self.citystate_ovf[:, s])
 
+    def _minor_raise_building(self, s: int, m: torch.Tensor, bi: torch.Tensor) -> None:
+        """`minorRaiseBuilding` where `m`: engine building `bi` [B] rises in
+        the minor's city (its production's completion or its purchase): the
+        Flood Barrier repairs behind it, the walls refit the centre's and the
+        Encampment's outer pools"""
+        B, dev = self.B, self.device
+        row = self._CITY_MINOR0 + s
+        rd = self.rules_dev
+        rr = m.nonzero(as_tuple=True)[0]
+        self.city_bldg[rr, row, 0, bi[rr]] = True
+        if self._barrier_bidx >= 0 and bool((m & (bi == self._barrier_bidx)).any()):
+            self._repair_behind_barrier(row, torch.zeros(B, dtype=torch.long, device=dev), m & (bi == self._barrier_bidx))
+        wl = m & (rd.b_walls.to(dev).take(bi) > 0)
+        if bool(wl.any()):
+            ww = wl.nonzero(as_tuple=True)[0]
+            full = self._walls_tier_hp[self._minor_walls_tier(s)]
+            self.city_outer_hp[ww, row, 0] = full[ww]
+            self._fit_encamp_outer(ww, row, torch.zeros_like(ww), full[ww])
+        self._bldg_version += 1
+        self._eff_version += 1
+
+    def _minor_buy_building(self, s: int, mask: torch.Tensor, bi: torch.Tensor, price: torch.Tensor) -> torch.Tensor:
+        """`minorBuyBuilding` where `mask` (the purchase request 0x977490):
+        the treasury covers the price; engine building `bi` [B] rises, and
+        leaves the queue where the city produced it; [B] the games where it
+        bought"""
+        go = mask & self._afford(self.citystate_treasury[:, s], price)
+        if not bool(go.count_nonzero()):
+            return go
+        self.citystate_treasury[:, s] -= torch.where(go, price, torch.zeros_like(price))
+        held = go & (self.citystate_item[:, s] == self._mk_b0 + bi)
+        if bool(held.any()):
+            self._minor_set_item(s, held, -1)
+        self._minor_raise_building(s, go, bi)
+        return go
+
     def _minor_finish(self, s: int, done: torch.Tensor, item: torch.Tensor) -> torch.Tensor:
         """`minorFinish` where `done`: the unit stands on the centre, beside
         the minor's own units there (`stack`), with the city's training grants
@@ -1721,18 +1757,7 @@ class SimMinors:
         m = done & is_b
         if bool(m.any()):
             bi = (item - self._mk_b0).clamp(min=0, max=int(rd.b_cost.shape[0]) - 1)
-            rr = m.nonzero(as_tuple=True)[0]
-            self.city_bldg[rr, row, 0, bi[rr]] = True
-            if self._barrier_bidx >= 0 and bool((m & (bi == self._barrier_bidx)).any()):
-                self._repair_behind_barrier(row, torch.zeros(B, dtype=torch.long, device=dev), m & (bi == self._barrier_bidx))
-            wl = m & (rd.b_walls.to(dev).take(bi) > 0)
-            if bool(wl.any()):
-                ww = wl.nonzero(as_tuple=True)[0]
-                full = self._walls_tier_hp[self._minor_walls_tier(s)]
-                self.city_outer_hp[ww, row, 0] = full[ww]
-                self._fit_encamp_outer(ww, row, torch.zeros_like(ww), full[ww])
-            self._bldg_version += 1
-            self._eff_version += 1
+            self._minor_raise_building(s, m, bi)
             b_row = torch.where(m, T["building_row"].to(dev).take(bi), b_row)
             fin = fin | m
         m = done & is_d

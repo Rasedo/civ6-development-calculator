@@ -89,7 +89,7 @@ import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constan
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import { nameRivers } from '../core/disasters';
-import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemInHand, minorItemKey, minorUnitPrice, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorUnitPrice, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -4379,7 +4379,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * analyses, its turns left, the civics AI's government values and best cards,
  * the minors' catch-up counts, the military AI's favoured technology. Per
  * city-state: its city AI's item value, its
- * Food focus, trade list and value, UNITS table, resource counts, economic
+ * Food focus, trade list and value, UNITS and BUILDINGS tables, resource counts, economic
  * memory (savings), threat, enemy at the gates, growth forecast, revealed
  * plots, standing army's lack, "Upgrade Units" trees. Per Free City: its threat, enemy at the gates
  * and raid. Per unit: its id, its pool slot, its DEFENDER type. The
@@ -4389,7 +4389,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
 const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'aiLeft', 'aiLeftSeen',
   'techCatchUp', 'civicCatchUp', 'favTech'] as const;
-const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'unitValues', 'resourceCounts',
+const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'unitValues', 'buildingValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiYieldsSeen', 'revealed', 'standingArmyShort', 'explored', 'upgrading', 'upgradeTrigger'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid'] as const;
 const UNIT_MEMORY = ['slot', 'aiDefender'] as const;
@@ -5298,7 +5298,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (TRACE.has('minorProd')) {
       for (const cs of state.cityStates) {
         const us = state.units.filter((u) => u.seat === cs.seat).map((u) => `${u.type}@${u.tileIndex}`);
-        console.error(`t${traceTurn} minor ${cs.id} ${cs.name} item ${cs.prodItem ?? '-'} ${r3(cs.prodProgress ?? 0)} over ${r3(cs.prodOverflow ?? 0)} gold ${r3(cs.treasury)} routes ${(cs.tradeRoutes ?? []).length} [${us.join(' ')}] tech ${cs.research.techs.join(',')} cur ${cs.research.tech} ${r3(cs.research.techProgress)} ovf ${r3(cs.research.techOverflow ?? 0)} civic ${cs.research.civics.join(',')} ${r3(cs.research.civicProgress)} met [${cs.met}] envoys ${JSON.stringify(cs.envoys)}`);
+        const held = minorItemInHand(cs);
+        console.error(`t${traceTurn} minor ${cs.id} ${cs.name} item ${cs.prodItem ?? '-'} ${r3(cs.prodProgress ?? 0)}/${held ? minorItemCost(state, cs, held) : '-'} over ${r3(cs.prodOverflow ?? 0)} gold ${r3(cs.treasury)} sav ${(cs.economy?.savings ?? []).map((x) => r3(x / 256)).join(":")} bal ${r3((cs.economy?.balance ?? 0) / 256)} routes ${(cs.tradeRoutes ?? []).length} [${us.join(' ')}] tech ${cs.research.techs.join(',')} cur ${cs.research.tech} ${r3(cs.research.techProgress)} ovf ${r3(cs.research.techOverflow ?? 0)} civic ${cs.research.civics.join(',')} ${r3(cs.research.civicProgress)} met [${cs.met}] envoys ${JSON.stringify(cs.envoys)}`);
       }
     }
     // the record's units the engine's own turn destroyed: a kill the log

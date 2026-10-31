@@ -5252,9 +5252,26 @@ operations' contracts, the improvement values below, the purchases).
   (+0x408) TryPurchaseUnits(economic, the city +0x588 binds or null — every
   city —, unit, 0), on success progress 7 COMPLETED through the holder
   +0xa8 and "%d, %d, PURCHASE, , , %s, %s, CONTRACT %d"; a building's
-  (+0x468) 0x68afe0 (MustPurchase +0x159 & 0x10 refused, CanConstruct
-  0x1714d0, a value test against the city's analysis 0x5d4920; not
-  ported). Then goldPatronage 0x6898b0, 0x68a100, 0x689610. The purchased
+  (+0x468) 0x68afe0, READ: +0x159 & 0x10 refused (the list holds no
+  wonder); the queue's CanConstruct 0x1714d0 (city +0x2170); the price
+  0x1b18c0 (city +0x1688, YIELD_GOLD @0xf2f97c) << 8; the city's analysis
+  value 0x5d4920 (flags 0) below 0x16e7d0(yieldValue 0x7a6690 of the price
+  for the player +0xa0, 0.25 @0xd2f324) refuses; a price below 0
+  refuses; UNITS (slot 1) + SLUSH (slot 0) at or below the price refuses;
+  UNITS above (price x 0.5 @0xd20458) >> 8 or SLUSH above price x 2, else
+  refused — TryPurchaseUnits' savings test without its threatened-city
+  balance; the purchase request 0x977490 (city +0x158, YIELD_GOLD) and the
+  command vt +0x48 / +0x50; the spend SLUSH -= max(0, price - UNITS),
+  UNITS = max(0, UNITS - price) ("slushFund >= cost - savedForUnits"),
+  the balance +0x1b8 lowered by the price (0x731d10); 0x5d4920 with flags
+  0 is the city centre evaluation's building table (+0xcf8 entry +0x28),
+  the update's own. The one case: runs/h1_duely1121 t178 Hunza's Stock
+  Exchange of contract 533 (the only building PURCHASE line of the five
+  duely duels' city-states), 660 Gold (165 x 4, the record's buy row), the
+  treasury 955.9 -> 307.2; our t177 update values it 31.8 against the
+  82.5 floor (Economics a turn late in our research, its turns still in
+  the value), so the value test stands unconfirmed on a recorded purchase
+  (`tryPurchaseBuilding` / `_minor_contract_building`). Then goldPatronage 0x6898b0, 0x68a100, 0x689610. The purchased
   unit binds to no tree (the completion signals are a queued contract's);
   the tree's Find Available Unit takes it. Measured (city-states, the
   PURCHASE lines of runs/h1_duelw1117-1128, 38, the savings on the record's Gold):

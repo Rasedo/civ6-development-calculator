@@ -77,6 +77,7 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...the knowledge base's update 0x783980 from a per-plot visibility word > 0) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, els..."
   review: imported
@@ -110,6 +111,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - ...h twice the cost in hand; then the heroes) gets a contract, and the boost takes -0.25 (@0xd2f324) once the balance passes its cost, -0.25 more once the Faith per turn (0x496fd0) passes...
   review: imported
@@ -1644,7 +1646,9 @@
   kind: global
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
-  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  readings:
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...food (+0x08) the plot's Food; each yield not disfavored (+0x50) counted twice, Gold once (0xf2f97c = YIELD_GOLD), into favored (+0x0c, the yields m_favoredYields +0x38 holds) or other (+0x...

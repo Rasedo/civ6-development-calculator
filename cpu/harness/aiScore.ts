@@ -64,7 +64,7 @@ export function scoreDecision(s: DecisionScores, kind: string, turn: number, sub
   ours: unknown, game: unknown, clean?: boolean): void {
   const k = (s[kind] ??= { compared: 0, equal: 0 });
   // AISCORE_ROWS=<kind>,<kind>: every row of those kinds, one line each
-  if (ROWS.has(kind)) console.error(`SCORE ${kind} t${turn} ${subject} ${equal ? '=' : 'X'} ${cut(ours)} / ${cut(game)}`);
+  if (ROWS.has(kind)) console.error(`SCORE ${kind} t${turn} ${subject} ${equal ? '=' : 'X'} ${whole(ours)} // ${whole(game)}`);
   const take = (x: { compared: number; equal: number; first?: KindScore['first'] }) => {
     x.compared += 1;
     if (equal) x.equal += 1;
@@ -74,6 +74,7 @@ export function scoreDecision(s: DecisionScores, kind: string, turn: number, sub
   if (clean) take((k.clean ??= { compared: 0, equal: 0 }));
 }
 
+const whole = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v) ?? '');
 const cut = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v) ?? '').slice(0, 90).replace(/\|/g, '/');
 const pct = (k?: { compared: number; equal: number }) => (k?.compared ? `${((100 * k.equal) / k.compared).toFixed(1)}%` : '-');
 const firstOf = (f?: KindScore['first']) => {

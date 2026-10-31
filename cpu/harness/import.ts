@@ -2291,6 +2291,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       if (pil) pillaged.push(id);
     }
     const districts: City['districts'] = [];
+    const lockedDistrictCost = new Map<number, number>();
     let hp = CITY_MAX_HP;
     let outerHp: number | undefined;
     for (const d of c.districts) {
@@ -2312,6 +2313,14 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         t.districtPillaged = dpil === true;
       }
       districts.push({ type: id, tileIndex: at });
+      // a district under construction keeps the price locked at its
+      // placement, which the city's cost reader quotes (its buy row): the
+      // minor's item cost (`minorDistrictCost`; runs/h1_duely1124 Granada's
+      // Harbor at 53 through t44's civic, which took the fresh price to 58)
+      if (id !== 'CITY_CENTER' && complete !== true) {
+        const locked = num(c.buy.find((b) => b[0] === 'D' && b[1] === ti)?.[2]);
+        if (locked > 0) lockedDistrictCost.set(at, locked);
+      }
     }
     const pins = specialistPins(rec, cat, c);
     if (!districts.some((d) => d.type === 'CITY_CENTER')) {
@@ -2346,7 +2355,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       minor.outerHp = outerHp;
       minor.buildings = buildings.filter((b) => b !== 'PALACE');
       minor.pillagedBuildings = pillaged.length ? pillaged : undefined;
-      minor.districts = districts.filter((d) => d.type !== 'CITY_CENTER');
+      minor.districts = districts.filter((d) => d.type !== 'CITY_CENTER')
+        .map((d) => (lockedDistrictCost.has(d.tileIndex) ? { ...d, cost: lockedDistrictCost.get(d.tileIndex) } : d));
       minor.religionPressure = religionPressure;
       minor.unconvertedPressure = unconvertedPressure;
       minor.specialistPref = pins;

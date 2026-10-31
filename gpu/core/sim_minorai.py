@@ -39,7 +39,7 @@ from .sim_citytrees import (
     improvement_event, in_hand_check, pick_improvement, queue_contract, takes_turn, tick_city_trees, _cget, _cset,
     gold_purchasable, CP_ACCEPTED, CP_COMPLETED,
 )
-from .sim_cityvalue import _FX_MIN, _MinorFacts, _t
+from .sim_cityvalue import _FX_MIN, _SLOT_SLUSH, _SLOT_UNITS, _MinorFacts, _t
 from .sim_research import _FX, _discounted, _fmul, _fx_const, _present_value
 from .sim_minorops import _ARMY_READ_AGE
 
@@ -136,18 +136,26 @@ class SimMinorAi:
         keep = ai.c_purchase[cs] & live & (ai.c_progress[cs] == CP_ACCEPTED) & gold
         ai.c_purchase[cs] = torch.where(act.unsqueeze(1), keep, ai.c_purchase[cs])
         units = act.unsqueeze(1) & ai.c_purchase[cs] & (ai.c_unit[cs] >= 0)
-        if not bool(units.any()):
+        blds = act.unsqueeze(1) & ai.c_purchase[cs] & (ai.c_unit[cs] < 0) & (ai.c_building[cs] >= 0)
+        if not bool((units | blds).any()):
             return
         E = self._cv_tables()["engine"]
         eu = torch.tensor(E["unit"] or [-1], dtype=torch.long, device=self.device)
-        order = torch.where(units, ai.c_id[cs], torch.full_like(ai.c_id[cs], 1 << 40)).argsort(dim=1)
+        eb = torch.tensor(E["building"] or [-1], dtype=torch.long, device=self.device)
+        order = torch.where(units | blds, ai.c_id[cs], torch.full_like(ai.c_id[cs], 1 << 40)).argsort(dim=1)
         seat = 100 + s
         ctr = self.citystate_center[:, s].clamp(min=0)
+        gold_w = self._cv_minor_facts(s).yield_w("YIELD_GOLD") if bool(blds.any()) else 0
         for r in range(order.shape[1]):
             j = order[:, r]
+            on_b = blds.gather(1, j.unsqueeze(1)).squeeze(1)
+            if bool(on_b.any()):
+                self._minor_contract_building(s, j, on_b, eb, gold_w)
             on = units.gather(1, j.unsqueeze(1)).squeeze(1)
-            if not bool(on.any()):
+            if not bool((on | on_b).any()):
                 break
+            if not bool(on.any()):
+                continue
             ui = torch.where(on, eu.take(_cget(ai.c_unit, s, j).clamp(min=0)), torch.full_like(j, -1))
             on = on & (ui >= 0)
             price = self._minor_gold_price(s, ui.clamp(min=0))
@@ -165,6 +173,39 @@ class SimMinorAi:
             self.citystate_balance[:, s] = torch.where(bought, bal, self.citystate_balance[:, s])
             self._minor_buy_unit(s, bought, ui, price)
             _cset(ai.c_progress, s, j, CP_COMPLETED, bought)
+
+    def _minor_contract_building(self, s: int, j: torch.Tensor, on: torch.Tensor, eb: torch.Tensor, gold_w) -> None:
+        """`tryPurchaseBuilding` (0x68afe0) of contract slot `j` [B] where
+        `on`: the queue's CanConstruct; the city's analysis value of the
+        building (its last update's) at least 0.25 x the player's value of
+        its Gold price; the price 0 or more, the UNITS and SLUSH slots
+        together above it, UNITS above half or SLUSH above twice it; the
+        purchase request (`minorBuyBuilding`); the spend; COMPLETED where it
+        buys"""
+        ai = self.cityai
+        row_ai = _cget(ai.c_building, s, j).clamp(min=0)
+        bi = torch.where(on, eb.take(row_ai), torch.full_like(j, -1))
+        on = on & (bi >= 0)
+        if not bool(on.any()):
+            return
+        key = torch.where(on, self._mk_b0 + bi.clamp(min=0), torch.full_like(bi, -1))
+        ok = on & self._minor_queue_ok(s, key, torch.full_like(bi, -1))
+        price = self._purchase_step(self._minor_item_cost(s, key) * float(self.rules.gold_purchase_mult))
+        cost = price.long() * _FX
+        value = self.citystate_building_values[:, s].gather(1, row_ai.unsqueeze(1)).squeeze(1)
+        worth = _fmul(self._cv_yield(cost, "YIELD_GOLD", gold_w), torch.full_like(cost, _FX >> 2))
+        ok = ok & (value >= worth) & (cost >= 0)
+        sv = self.citystate_savings[:, s]
+        s0, s1 = sv[:, _SLOT_SLUSH], sv[:, _SLOT_UNITS]
+        ok = ok & (s0 + s1 > cost) & ((s1 > (cost >> 1)) | (s0 > 2 * cost))
+        bought = self._minor_buy_building(s, ok, bi.clamp(min=0), price)
+        if not bool(bought.any()):
+            return
+        sav, bal, _ = self._cv_try_purchase(sv, self.citystate_balance[:, s], price.long(),
+                                            torch.full_like(self.citystate_threat[:, s], -1), bought)
+        self.citystate_savings[:, s] = torch.where(bought.unsqueeze(1), sav, sv)
+        self.citystate_balance[:, s] = torch.where(bought, bal, self.citystate_balance[:, s])
+        _cset(ai.c_progress, s, j, CP_COMPLETED, bought)
 
     def _minor_ai_turn(self, s: int, units: torch.Tensor | None = None) -> None:
         """`minorAiTurn` — THE MINOR'S CITY AI TURN (the order above, after

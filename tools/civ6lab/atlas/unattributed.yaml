@@ -691,6 +691,26 @@
   context:
     - "...a8a30 — a wonder's free tiles, a founding, a city-state's envoy annex —, the purchase 0x1a7710, a culture bomb 0x524e30) raises the annexed count (+0xc), clears the stored next plot..."
   review: imported
+- addr: 0x1b18c0
+  final: 0x120ed0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 15
+      value: "Measured (city-states, the   PURCHASE lines of runs/h1_duelw1117-1128, 38, the savings on the record's Gold):   27 bought the turn the test first passes with the GREAT_PEOPLE slot   apart, 26 with it "
+    - recording: 1127
+      turn: 46
+      value: 1127 p4 t46, p2 t210);
+    - recording: 1124
+      turn: 27
+      value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
+  impl: [cpu/core/aiEconomic.ts:BuildingPurchaseCity]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  context:
+    - ...he list holds no wonder); the queue's CanConstruct 0x1714d0 (city +0x2170); the price 0x1b18c0 (city +0x1688, YIELD_GOLD @0xf2f97c) << 8; the city's analysis value 0x5d4920 (flags 0)...
+  review: imported
 - addr: 0x1b1cb0
   final: 0x121170
   kind: function

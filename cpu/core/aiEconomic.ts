@@ -19,8 +19,8 @@
  * price.
  *
  * THE CONTRACT PURCHASES (0x687bf0, after the savings): the gold-bought
- * contracts its listener listed, each tried through TryPurchaseUnits
- * (`purchaseContracts`).
+ * contracts its listener listed, a unit's tried through TryPurchaseUnits, a
+ * building's through the building purchase 0x68afe0 (`purchaseContracts`).
  *
  * THE PURCHASES (the city's second hook 0x5ce5b0, after the Default
  * Specialization): a threatened city (CityBuildAI +0x1b8 above -1) of a
@@ -28,7 +28,7 @@
  * the unit its list puts first (0x5d2810).
  */
 import { AI_DEFAULT_SAVINGS } from '../data/aiTables';
-import { FX } from './aiValue';
+import { FX, fmul } from './aiValue';
 import { CP_ACCEPTED, CP_COMPLETED, contractById, goldPurchasable, type AiContract, type ContractBook } from './aiContracts';
 
 /** the savings slots by SavingTypes order */
@@ -187,13 +187,18 @@ export function purchaseSpend(e: EconomicMemory, cost: number, threatened: boole
  *  contract +0x160, which no read writer sets); then, for a player no human
  *  drives, each tries its purchase (vt +0x50 true, vt +0x20 0x5f3c40): a
  *  unit's through TryPurchaseUnits in the city the contract binds (every
- *  city of the player where it binds none), COMPLETED where it buys — its
- *  "PURCHASE" line; a building's (0x68afe0's value test) buys none here (runs/h1_duelw1124 t27 Granada: the Builder of contract
- *  58, submitted at t26, bought at the start of its turn). `cities` the
- *  cities a contract may buy in. The contracts bought. */
+ *  city of the player where it binds none), a building's through 0x68afe0
+ *  in the city it binds (`tryPurchaseBuilding`), COMPLETED where it buys —
+ *  its "PURCHASE" line (runs/h1_duelw1124 t27 Granada: the Builder of
+ *  contract 58, submitted at t26, bought at the start of its turn;
+ *  runs/h1_duely1121 t178 Hunza: the Stock Exchange of contract 533,
+ *  submitted at t177, bought for 660 Gold). `cities` the cities a unit's
+ *  contract may buy in, `buildingCity` the city a building's binds (null
+ *  none). The contracts bought. */
 export function purchaseContracts(e: EconomicMemory, book: ContractBook, human: boolean,
                                   cities: (c: AiContract) => readonly PurchaseCity[],
-                                  buy: (city: PurchaseCity, unit: string) => void): AiContract[] {
+                                  buy: (city: PurchaseCity, unit: string) => void,
+                                  buildingCity: (c: AiContract) => BuildingPurchaseCity | null): AiContract[] {
   book.purchase = book.purchase.filter((id) => {
     const c = contractById(book, id);
     return !!c && c.progress === CP_ACCEPTED && goldPurchasable(c);
@@ -202,13 +207,57 @@ export function purchaseContracts(e: EconomicMemory, book: ContractBook, human: 
   if (human) return bought;
   for (const id of book.purchase) {
     const c = contractById(book, id)!;
-    if (c.unit === null) continue;
-    const unit = c.unit;
-    if (!tryPurchaseUnits(e, cities(c), unit, (city) => buy(city, unit))) continue;
+    if (c.unit !== null) {
+      const unit = c.unit;
+      if (!tryPurchaseUnits(e, cities(c), unit, (city) => buy(city, unit))) continue;
+    } else {
+      const city = buildingCity(c);
+      if (!city || c.building === null || !tryPurchaseBuilding(e, city, c.building)) continue;
+    }
     c.progress = CP_COMPLETED;
     bought.push(c);
   }
   return bought;
+}
+
+/** What the building purchase (0x68afe0) reads of the city a contract binds */
+export interface BuildingPurchaseCity {
+  /** the queue's CanConstruct (0x1714d0) */
+  canConstruct(building: string): boolean;
+  /** the city's Gold price of the building (city +0x1688, 0x1b18c0),
+   *  whole Gold */
+  goldCost(building: string): number;
+  /** the city's analysis value of the building (0x5d4920), raw */
+  value(building: string): number;
+  /** the player's value of `amount` raw Gold (0x7a6690), raw */
+  goldValue(amount: number): number;
+  /** the purchase request lets it through (0x977490) and buys it */
+  purchase(building: string): boolean;
+}
+
+/** the building purchase's floor: the city's value of the building at
+ *  least a quarter of its price's worth to the player (0x68b13c, 0.25) */
+const BUILDING_PURCHASE_VALUE = FX >> 2;
+
+/** 0x68AFE0, THE BUILDING PURCHASE (a wonder, +0x159 & 0x10, never on the list): the
+ *  queue's CanConstruct; the city's analysis value of the building at least
+ *  0.25 x the player's value of its Gold price; the price whole and 0 or
+ *  more, the UNITS and SLUSH slots together above it, with the UNITS slot
+ *  above half of it or the SLUSH slot above twice it (no threatened city's
+ *  balance here); the purchase request; the spend the UNITS slot then the
+ *  SLUSH slot, the balance lowered by the price. Whether it bought. */
+export function tryPurchaseBuilding(e: EconomicMemory, city: BuildingPurchaseCity, building: string): boolean {
+  if (!city.canConstruct(building)) return false;
+  const cost = city.goldCost(building) * FX;
+  if (city.value(building) < fmul(city.goldValue(cost), BUILDING_PURCHASE_VALUE)) return false;
+  if (cost < 0) return false;
+  const s0 = e.savings[SLOT_SLUSH];
+  const s1 = e.savings[SLOT_UNITS];
+  if (s0 + s1 <= cost) return false;
+  if (!(s1 > (cost >> 1) || s0 > 2 * cost)) return false;
+  if (!city.purchase(building)) return false;
+  purchaseSpend(e, cost, false);
+  return true;
 }
 
 /** One entry of the city's unit list (CityBuildAI +0x650, 0x168 bytes each,

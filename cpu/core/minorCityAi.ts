@@ -50,14 +50,14 @@ import { improvementValue, type PlotValueFacts } from './aiPlotValue';
 import { districtValue, type DistrictValueFacts } from './aiDistrictValue';
 import { resourceValue } from './aiResource';
 import { accumulationPct } from './stockpile';
-import { AI_RATE, FX, FX_MIN, fmul, pseudoYieldValue } from './aiValue';
+import { AI_RATE, FX, FX_MIN, fmul, pseudoYieldValue, yieldValue } from './aiValue';
 import { modifiersValue } from './aiModifiers';
 import {
   buildingEvent, defenseEvent, defensiveCancel, districtEvent, freeSlots, goalsReached, improvementEvent, newCityAi, pickImprovement, tickCityTrees,
   type CityAi, type CityTreeCity, type CityTreeWorld, type PlotEval, type TreeUnit,
 } from './aiCityTrees';
 import { cityContracts, contractBuilt, inHandCheck, queueContract, takesTurn, type AiContract, type ContractItem } from './aiContracts';
-import { newEconomicMemory, purchaseContracts, purchaseTurn, purchasePick, savingsTurn, type PurchaseCity, type PurchaseEntry } from './aiEconomic';
+import { newEconomicMemory, purchaseContracts, purchaseTurn, purchasePick, savingsTurn, type BuildingPurchaseCity, type PurchaseCity, type PurchaseEntry } from './aiEconomic';
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat, type CityThreat } from './operations/cityThreat';
 import { aiView } from './aiView';
@@ -81,7 +81,7 @@ import { builderHarvest, builderRemoveFeature, purchaseSpotBlocked } from './uni
 import { aiStrengths, dangerPlane, moveTo, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import {
-  installType, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
+  installType, minorBuildFacts, minorBuilderLays, minorBuildingPrice, minorBuyBuilding, minorBuyUnit, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
   minorProjectFacts, minorResourceCounts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
   minorCanTrain, researchHolds, unitObsoleteIn,
 } from './minorBuild';
@@ -822,8 +822,9 @@ export function minorMilitaryTurn(state: GameState, cs: CityState): void {
   // its contract purchases, in its city on the threat its last update stored
   if (cs.cityAi) {
     const pcity = minorPurchaseCity(state, cs, cs.threat ?? -1);
+    const bcity = minorBuildingPurchaseCity(state, cs);
     purchaseContracts(eco, cs.cityAi, false, (c) => (c.city === -1 || c.city === pcity.id ? [pcity] : []),
-      (_c, u) => minorBuyInstall(state, cs, u));
+      (_c, u) => minorBuyInstall(state, cs, u), (c) => (c.city === -1 || c.city === pcity.id ? bcity : null));
   }
   minorOpsEvaluate(state, cs);
 }
@@ -861,6 +862,32 @@ function minorPurchaseCity(state: GameState, cs: CityState, threat: number): Pur
       if (!goldAffordable(cs.treasury, price(u))) return false;
       const id = engineId('unit', u, 'UNIT_', UNITS);
       return !!id && minorCanTrain(state, cs, id) && !purchaseSpotBlocked(state, cs, cs.seat, id);
+    },
+  };
+}
+
+/** the minor's city as the building purchase (0x68afe0) reads it: the
+ *  queue's CanConstruct (`minorQueueOk`), its Gold price, the city's
+ *  analysis of its last update (`CityState.buildingValues`), the player's
+ *  value of Gold; the purchase request the purse covering the price
+ *  (`minorBuyBuilding`) */
+function minorBuildingPurchaseCity(state: GameState, cs: CityState): BuildingPurchaseCity {
+  const id = (b: string) => engineId('building', b, 'BUILDING_', BUILDINGS);
+  const view = aiView(state);
+  return {
+    canConstruct: (b) => {
+      const x = id(b);
+      return !!x && minorQueueOk(state, cs, { building: x });
+    },
+    goldCost: (b) => {
+      const x = id(b);
+      return x ? minorBuildingPrice(state, cs, x) : -1;
+    },
+    value: (b) => cs.buildingValues?.[AI_BUILDING_INDEX.get(b) ?? -1] ?? FX_MIN,
+    goldValue: (amount) => yieldValue(view, cs.seat, amount, 'YIELD_GOLD'),
+    purchase: (b) => {
+      const x = id(b);
+      return !!x && minorBuyBuilding(state, cs, x);
     },
   };
 }

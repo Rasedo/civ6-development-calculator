@@ -1717,6 +1717,42 @@ export function minorItemCost(state: GameState, cityState: CityState, item: Excl
             - Math.floor((minorBuildingCost(state, cityState, item.repair) * MINOR_REPAIR_RESUME_PCT) / 100);
 }
 
+/** THE MINOR'S BUILDING RISES (its production's completion or its purchase):
+ *  the Flood Barrier repairs behind it, the walls refit the centre's and the
+ *  Encampment's outer pools */
+function minorRaiseBuilding(state: GameState, cityState: CityState, id: string): void {
+  const b = BUILDINGS[id];
+  cityState.buildings = [...(cityState.buildings ?? []), id];
+  if (b.floodBarrier) repairBehindBarrier(state, minorCity(cityState));
+  if (b.walls) {
+    cityState.outerHp = wallsMax(state, { buildings: cityState.buildings, seat: cityState.seat });
+    // the Encampment's own pool refits at the walls tier (`fitEncampOuter`)
+    for (const d of cityState.districts ?? []) {
+      const t = state.map.tiles[d.tileIndex];
+      if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = cityState.outerHp;
+    }
+  }
+}
+
+/** A building's Gold purchase price for the minor: its Production price
+ *  times the purchase multiplier (runs/h1_duely1121 t178 Hunza: the Stock
+ *  Exchange's 165 at 660, the record's buy row) */
+export function minorBuildingPrice(state: GameState, cityState: CityState, id: string): number {
+  return purchaseStep(minorBuildingCost(state, cityState, id) * GOLD_PURCHASE_MULT);
+}
+
+/** THE MINOR BUYS A BUILDING in its city (the purchase request 0x977490):
+ *  the purse covers the price; the building rises, and leaves the queue
+ *  where the city produced it. Whether it bought. */
+export function minorBuyBuilding(state: GameState, cityState: CityState, id: string): boolean {
+  const price = minorBuildingPrice(state, cityState, id);
+  if (!goldAffordable(cityState.treasury, price)) return false;
+  cityState.treasury -= price;
+  if (cityState.prodItem === minorItemKey({ building: id })) minorSetItem(state, cityState, null);
+  minorRaiseBuilding(state, cityState, id);
+  return true;
+}
+
 /** THE MINOR'S ITEM COMPLETES: the unit stands on the centre, beside the
  *  minor's own units there (`spawnUnit`'s 'stack'), with the city's training
  *  grants (none where no plot takes it: the item waits), the
@@ -1737,17 +1773,7 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
     if (cost && cityState.prodReserved !== undefined) spendStockpile(state, cityState.seat, cost.id, cityState.prodReserved, 'mu');
     delete cityState.prodReserved;
   } else if ('building' in item) {
-    const b = BUILDINGS[item.building];
-    cityState.buildings = [...(cityState.buildings ?? []), item.building];
-    if (b.floodBarrier) repairBehindBarrier(state, minorCity(cityState));
-    if (b.walls) {
-      cityState.outerHp = wallsMax(state, { buildings: cityState.buildings, seat: cityState.seat });
-      // the Encampment's own pool refits at the walls tier (`fitEncampOuter`)
-      for (const d of cityState.districts ?? []) {
-        const t = state.map.tiles[d.tileIndex];
-        if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = cityState.outerHp;
-      }
-    }
+    minorRaiseBuilding(state, cityState, item.building);
   } else if ('district' in item) {
     // the plot no longer takes it: the item leaves the queue (a resource
     // seen since it was placed does not refuse it)

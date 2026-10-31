@@ -173,24 +173,25 @@
 - addr: 0x68afe0
   final: 0x458d00
   kind: function
+  name: the building contract's purchase
   status: READ
   cases:
-    - recording: h1_duelw1117
-      turn: 15
-      value: "Measured (city-states, the   PURCHASE lines of runs/h1_duelw1117-1128, 38, the savings on the record's Gold):   27 bought the turn the test first passes with the GREAT_PEOPLE slot   apart, 26 with it "
-    - recording: 1127
-      turn: 46
-      value: 1127 p4 t46, p2 t210);
-    - recording: 1124
-      turn: 27
-      value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
-  impl: [cpu/core/aiEconomic.ts:purchaseContracts]
+    - recording: h1_duely1121
+      turn: 178
+      value: "Hunza's Stock Exchange of contract 533 (submitted t177), 660 Gold, treasury 955.9 -> 307.2; our t177 table 31.8 under the 82.5 floor (our research a turn late): the value test unconfirmed"
+  impl:
+    - cpu/core/aiEconomic.ts:tryPurchaseBuilding
+    - cpu/core/aiEconomic.ts:BuildingPurchaseCity
+    - cpu/core/minorCityAi.ts:minorBuildingPurchaseCity
+    - gpu/core/sim_minorai.py:_minor_contract_building
+    - cpu/core/aiEconomic.ts:purchaseContracts
+    - cpu/core/aiEconomic.ts:BUILDING_PURCHASE_VALUE
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
-    - "...e holder +0xa8 and \"%d, %d, PURCHASE, , , %s, %s, CONTRACT %d\"; a building's (+0x468) 0x68afe0 (MustPurchase +0x159 & 0x10 refused, CanConstruct 0x1714d0, a value test against the ci..."
-  review: imported
+    - "...e holder +0xa8 and \"%d, %d, PURCHASE, , , %s, %s, CONTRACT %d\"; a building's (+0x468) 0x68afe0, READ: +0x159 & 0x10 refused (the list holds no wonder); the queue's CanConstruct..."
+  review: reviewed
 - addr: 0x68be60
   final: 0x459320
   kind: function

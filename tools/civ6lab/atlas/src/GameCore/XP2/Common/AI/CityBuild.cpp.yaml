@@ -741,7 +741,7 @@
   final: 0x3e7e50
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiContracts.ts:ContractCity]
+  impl: [cpu/core/aiContracts.ts:ContractCity, cpu/core/aiEconomic.ts:BuildingPurchaseCity]
   readings:
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
