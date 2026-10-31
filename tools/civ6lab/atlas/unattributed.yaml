@@ -3399,6 +3399,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ct Manager's check 0x7f2220 sets FAILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8...
@@ -3584,6 +3585,21 @@
   context:
     - "...18bd) whose planning of two turns holds a plot at range 1 (0x791300) is queued with it (0x7803d0, \"Coastal Raid\"); the queue carried out (0x7735d0): each queued unit that can act moves..."
   review: imported
+- addr: 0x787f50
+  final: 0x516430
+  kind: function
+  name: knowledgeMeetingDelegate
+  semantics: "game signal +0xc78's delegate (bound by 0x7864c0, vtable @0xd70418): of a meeting's two players the one not the knowledge base's owner to 0x5ecb50"
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 2
+      value: China meets city-state 4 at t2 (DiplomacySummary); city-state 4's K prints China's route value 2.10 at t3-t4, 0.00 after meeting city-state 3 at t4
+  readings: ["H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"]
+  context:
+    - "## H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"
+    - "- 0x787f50 (the delegate the Targets constructor 0x7864c0 binds on game signal +0xc78, every AI pl..."
+  review: reviewed
 - addr: 0x787fb0
   final: 0x516490
   kind: function

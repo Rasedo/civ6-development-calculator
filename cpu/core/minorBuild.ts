@@ -76,6 +76,7 @@ import { civicPolicyBest, governmentValues, policyScores } from './aiPolicyValue
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
 import { minorTradeList, minorTradeValue } from './aiTrade';
+import { militaryFavTech } from './operations/unitRows';
 
 /** One minor at a time — a district one minor lands may lend a neighbour's
  *  district adjacency across the border, so the next minor's yields read it.
@@ -118,10 +119,12 @@ export function minorPhase(state: GameState): void {
     cityState.aiGrowth = minorCityGrowth(state, cityState);
     minorGrowth(state, cityState);
     minorResearchAi(state, cityState);
-    // its military AI's turn: the Combat Desire on the records as its last
-    // update aged them
+    // its military AI's turn: the Combat Desire and the favoured technology
+    // on the records as its last update aged them
     cityState.combatDesire = minorCombatDesire(state, cityState, state.turn - 1).desire;
-    const fresh = !cityState.cityAi;
+    const wars = seatOf(state, cityState.seat)?.wars ?? [];
+    cityState.research.favTech = militaryFavTech(state, cityState.seat, cityState.armyKnown ?? [],
+      (p) => p === BARB_SEAT || wars.includes(p));    const fresh = !cityState.cityAi;
     // the units its City Analysis counts: those standing before its savings
     // turn's purchases
     const units = state.units.filter((u) => u.seat === cityState.seat).length;

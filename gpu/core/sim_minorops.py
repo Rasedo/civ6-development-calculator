@@ -533,6 +533,50 @@ class SimMinorOps:
                 "all": n_all @ eff_t, "war": n_war @ eff_t,
                 "strength": cache["strength"].unsqueeze(0).expand(B, -1)}
 
+    def _military_fav_tech(self, s: int, mask: torch.Tensor) -> None:
+        """`militaryFavTech` for holder `s` (a city-state, or the Free Cities'
+        `FR`) where `mask` [B]: THE MILITARY AI'S FAVOURED TECHNOLOGY
+        (`citystate_fav_tech`, -1 none) over the unit production entries in
+        the Units' database order (`_mops_unit_rows`) — an entry not of the
+        sea, not buildable, whose at-war players' sum is above the best so far
+        (from 0) and whose PrereqTech the holder may research now sets it.
+        A city-state's counts are its knowledge base's records, the
+        barbarians at war with it; the Free Cities' every unit of each major,
+        the majors and the barbarians the players they fight"""
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        E = T["engine"]
+        B, dev = self.B, self.device
+        nu = len(rows)
+        u = self._mops_units(s)
+        ur = self._mops_unit_rows(s, u)
+        er = T["engine_row"].to(dev)
+        n_war = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
+        if s == self.FR:
+            al = self.major_unit_alive & (self.major_unit_seat >= 0) & (self.major_unit_seat < self.n_majors)
+            rw = er.take(self.major_unit_type.clamp(min=0, max=self.NU - 1))
+            on = al & (rw >= 0)
+            n_war.scatter_add_(1, torch.where(on, rw, torch.full_like(rw, nu)), on.long())
+        else:
+            rec = self._mops_records(self._mops_kb(s))
+            war = rec["live"] & (rec["row"] >= 0) & (self._mops_fights(s, rec["owner"]) | (rec["owner"] == BARB_SEAT))
+            n_war.scatter_add_(1, torch.where(war, rec["row"], torch.full_like(rec["row"], nu)), war.long())
+        n_war = n_war[:, :nu]
+        opp = self._mops_rows_static["combat"].unsqueeze(0) & ~ur["obsolete"]
+        wsum = torch.where(opp, n_war, torch.zeros_like(n_war)) @ T["eff"].to(dev).t()
+        rt = self._rai_tables()
+        res = self._available_mask(self.citystate_techs[:, s], self._prereq_t, rt["repeat"])
+        fav = torch.full((B,), -1, dtype=torch.long, device=dev)
+        best = torch.zeros(B, dtype=torch.long, device=dev)
+        for k, r in enumerate(rows):
+            ti = E["tech"].get(r["tech"], -1) if r["tech"] else -1
+            if ti < 0 or r["domain"] == "DOMAIN_SEA":
+                continue
+            take = ur["entry"][:, k] & ~ur["buildable"][:, k] & (wsum[:, k] > best) & res[:, ti]
+            fav = torch.where(take, torch.full_like(fav, ti), fav)
+            best = torch.where(take, wsum[:, k], best)
+        self.citystate_fav_tech[:, s] = torch.where(mask, fav, self.citystate_fav_tech[:, s])
+
     def _mops_fits(self, rows: dict, need: torch.Tensor, full: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """per entry [B, NU]: it may be chosen for the team's needed types
         `need` and full ones `full` ([B, NAT]) — standing, of a needed type, of

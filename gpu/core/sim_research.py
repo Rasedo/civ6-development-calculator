@@ -244,8 +244,22 @@ class SimResearch:
         far = lv[2][1].any(dim=2)
         turns = torch.where(far | spent, torch.full_like(turns, -1), turns)
         nxt = torch.where(spent, col.expand(B, -1), nxt)
-        # the value (`techValue`) and the resources term `researchAnalysis` adds
-        val = self._rai_value(s, turns) + self._rai_resources(s, turns) + self._rai_unit_term(s, turns, False, False)
+        # the value (`techValue`) before its modifiers and the city terms
+        # `researchAnalysis` adds; the military AI's favoured technology 1.5
+        # times where the minor is at war with a player but the barbarians
+        # (the Free Cities always); then the modifiers
+        own = self._rai_value(s, turns, mods=False) + self._rai_resources(s, turns) + self._rai_unit_term(s, turns, False, False)
+        h = int(T["horizon"])
+        if s == self.FR:
+            fight = torch.ones(B, dtype=torch.bool, device=self.device)
+        else:
+            w = self.war[:, self._CITY_MINOR0 + s].clone()
+            w[:, self.BARB_ROW] = False
+            fight = w.any(dim=1)
+        fav = self.citystate_fav_tech[:, s]
+        hit = (col == fav.unsqueeze(1)) & (fav >= 0).unsqueeze(1) & fight.unsqueeze(1) & (turns >= 0) & (turns <= h)
+        own = torch.where(hit, _fmul(own, _fx_const(1.5)), own)
+        val = torch.where(turns > h, own, own + self._rai_mods(s, turns.clamp(min=0)))
         base = torch.where(turns < 0, torch.zeros_like(val), val)
         score = base + self._rai_contracts(s, base, spent) + self._rai_upstream(have, base, turns)
         return turns, nxt, base, score, spent
@@ -521,14 +535,15 @@ class SimResearch:
             out = out + torch.where(has, v, torch.zeros_like(v))
         return torch.where(turns > h, torch.zeros_like(out), out)
 
-    def _rai_value(self, s: int, turns: torch.Tensor) -> torch.Tensor:
+    def _rai_value(self, s: int, turns: torch.Tensor, mods: bool = True) -> torch.Tensor:
         """`techValue` [B, NT] for minor `s`: landing each row in `turns`
         turns — its own pseudo-yield (an EmbarkUnitType and EmbarkAll add; a
         row of an era before the game's counts once per era between, plus
         one), a share per building, a district's and a wonder's at their
         pseudo-yields (the district's at the minor's weight), a project's
         share and a weapon project's PSEUDOYIELD_NUCLEAR_WEAPON of 1.0, each
-        from landing to the horizon; past the horizon -9999"""
+        from landing to the horizon; past the horizon -9999. `mods` adds the
+        rows' TechnologyModifiers (`_rai_mods`)"""
         T = self._rai_tables()
         B, NT = turns.shape
         era = T["era"].unsqueeze(0)
@@ -543,7 +558,8 @@ class SimResearch:
                + u[:, :, 2] * self._rai_from_landing(torch.full_like(own, _imul(T["share"], T["py_wonder"])), nn)
                + u[:, :, 3] * self._rai_from_landing(torch.full_like(own, T["project"]), nn)
                + u[:, :, 4] * self._rai_from_landing(torch.full_like(own, _imul(_FX, T["py_nuclear"])), nn))
-        val = val + self._rai_mods(s, nn)
+        if mods:
+            val = val + self._rai_mods(s, nn)
         return torch.where(turns > T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
 
     def _rai_mods(self, s: int, nn: torch.Tensor) -> torch.Tensor:

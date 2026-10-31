@@ -680,6 +680,7 @@ function researchRecord(r: ResearchState | undefined): number[] {
       const e = cents.get(id)!;
       return [e.turns, idx(CIVIC_IDX, e.next), e.base, e.score, e.owned ? 1 : 0];
     }) : []),
+    idx(TECH_IDX, r?.favTech ?? null),
     r?.civicGovValues ? 1 : 0,
     ...govValuesRow(r),
   ];
@@ -956,6 +957,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorCurrentTech: overCityStates((cityState) => idx(TECH_IDX, cityState.research.tech)),
   minorCurrentCivic: overCityStates((cityState) => idx(CIVIC_IDX, cityState.research.civic)),
   minorTechGoal: overCityStates((cityState) => idx(TECH_IDX, cityState.research.goal ?? null)),
+  minorFavTech: overCityStates((cityState) => idx(TECH_IDX, cityState.research.favTech ?? null)),
   minorResearchAi: overCityStates((cityState) => {
     const ents = new Map((cityState.research.aiEntries ?? []).map((e) => [e.tech, e]));
     if (!ents.size) return [];

@@ -33,6 +33,7 @@ import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, 
 import { LEVY_TURNS, govInfluence, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { storeUnitStrength } from './aiView';
+import { militaryFavTech } from './operations/unitRows';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { plotDistance, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
@@ -119,7 +120,7 @@ import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarD
 import { levyMoment, pantheonMoment, transferMoments, agePressure, worldEraIndex } from './eras';
 import { improvementMoment } from './moments';
 import { cityAppealResolver, cityGovernorEstablished, establishedGovernorCityIds, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
-import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat, leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed, majorsMet, setPeaceTurnWith } from './seats';
+import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat, leaderOf, warBanned, cityAtTile, onHomeContinent, BARB_SEAT, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed, majorsMet, setPeaceTurnWith } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, goldenDedication } from './eras';
@@ -1064,10 +1065,18 @@ export function freeCitiesPhase(state: GameState): void {
 }
 
 /** THE FREE CITIES' MILITARY AI'S TURN, with or without a city: the Combat
- *  Desire on the records as their last update aged them (`freeCombatDesire`),
- *  then their knowledge base ages and looks (`freeKnowledge`) */
+ *  Desire on the records as their last update aged them (`freeCombatDesire`)
+ *  and the favoured technology on the same records (`militaryFavTech`), then
+ *  their knowledge base ages and looks (`freeKnowledge`) */
 function freeMilitaryTurn(state: GameState): void {
-  freeSeatOf(state).combatDesire = freeCombatDesire(state, state.turn - 1).desire;
+  const free = freeSeatOf(state);
+  free.combatDesire = freeCombatDesire(state, state.turn - 1).desire;
+  // the counts its unit production table reads are every unit of each
+  // major — the players it met at the start — whatever its records hold
+  // (runs/h1_duely1127: no ARMY record, its Fav Tech as logged on 58 of the
+  // turns t1-t59); the majors and the barbarians are the players it fights
+  const majors = state.units.filter((u) => isCiv(u.seat)).map((u) => ({ type: u.type, owner: u.seat }));
+  free.research.favTech = militaryFavTech(state, FREE_SEAT, majors, (p) => isCiv(p) || p === BARB_SEAT);
   freeKnowledge(state, true);
 }
 

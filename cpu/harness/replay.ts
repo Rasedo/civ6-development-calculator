@@ -4377,7 +4377,8 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * contracts, reservations), the operation manager and its next id, the
  * strength its turn start stored. Per research: the research AI's goal, its
  * analyses, its turns left, the civics AI's government values and best cards,
- * the minors' catch-up counts. Per city-state: its city AI's item value, its
+ * the minors' catch-up counts, the military AI's favoured technology. Per
+ * city-state: its city AI's item value, its
  * Food focus, trade list and value, UNITS table, resource counts, economic
  * memory (savings), threat, enemy at the gates, growth forecast, revealed
  * plots, standing army's lack, "Upgrade Units" trees. Per Free City: its threat, enemy at the gates
@@ -4387,7 +4388,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  */
 const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'aiLeft', 'aiLeftSeen',
-  'techCatchUp', 'civicCatchUp'] as const;
+  'techCatchUp', 'civicCatchUp', 'favTech'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'unitValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'revealed', 'standingArmyShort', 'explored', 'upgrading', 'upgradeTrigger'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid'] as const;

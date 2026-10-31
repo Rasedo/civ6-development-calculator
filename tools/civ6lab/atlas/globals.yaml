@@ -352,6 +352,14 @@
   context:
     - "...ic unheld, 0x4cb590 / 0x39d490; the one listener the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: its m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0..."
   review: imported
+- addr: 0xd70418
+  kind: global
+  status: PARTLY
+  readings: ["H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...onstructor 0x7864c0 binds on game signal +0xc78, every AI player's, at 0x7869f0 vtable @0xd70418): a meeting's two players; where one is the knowledge base's owner, 0x5ecb50 (the kno..."
+  review: imported
 - addr: 0xd70c98
   kind: global
   status: PARTLY

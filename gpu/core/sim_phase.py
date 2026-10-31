@@ -791,9 +791,11 @@ class SimPhase:
     def _free_military_turn(self, act: torch.Tensor) -> None:
         """`freeMilitaryTurn` — THE FREE CITIES' MILITARY AI'S TURN in the
         games of `act`, with or without a city: the Combat Desire on the
-        records as their last update aged them (`_free_combat_desire`), then
-        their knowledge base ages and looks (`_free_knowledge`)"""
+        records as their last update aged them (`_free_combat_desire`) and
+        the favoured technology (`_military_fav_tech`), then their knowledge
+        base ages and looks (`_free_knowledge`)"""
         self._free_combat_desire(act)
+        self._military_fav_tech(self.FR, act)
         self._free_knowledge(act, True)
 
     def _free_cities_phase(self) -> None:

@@ -5995,8 +5995,13 @@ Contract %d").
   PSEUDOYIELD_SPACE_RACE of 0x7b8a30² (a std::function walk, unread) for a
   space race one, + NUCLEAR_WEAPON of 1.0 for a weapon (+0x148), each paid
   from landing; per improvement the resources near the cities (0x5d45c0 -> 0x7a21e0);
-  the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88
-  and 0x3dcf50 holds; + the row's modifiers analysed (0x7a4b20). The
+  the governments' (+0x130, 0x7b26b0); x1.5 (0x7b5b22..0x7b5b7f: fx(1.5)
+  times the value so far, >> 8) where the row is the military AI's
+  favoured technology ([player+0x12a0] is AI::Military, +0xd88 its "Fav
+  Tech", "H-1: the military AI's favoured technology" below) and 0x3dcf50
+  holds (the player at war with a living player of the players manager's
+  +0xb50 list — the barbarians not: 1 of 4,624 city-state rows of
+  runs/h1_duely1127 at 1.5 times); + the row's modifiers analysed (0x7a4b20). The
   discount is the GlobalAI's +0x290 (a variable at +0x238): its initializer
   (0x6ddb40..0x6ddba3) writes AI_DISCOUNT_RATE (GlobalParameters +0x10, 2.0)
   through 0x525590 — x 100 / the speed's CostMultiplier ([speed+0x28]) — over
@@ -6087,6 +6092,76 @@ Contract %d").
   3,875 (Sailing 120.7 at 1 turn with its EmbarkUnitType; Iron Working +20 a
   Warrior; Industrialization's project +20.1); the space race (Rocketry)
   the rest. On the engine's own unit tables 3,488.
+
+## H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)
+
+Ported in `cpu/core/operations/unitRows.ts` (`militaryFavTech`, on
+`ResearchState.favTech`) and `aiResearch.ts` (`researchAnalysis`); the GPU
+twin `_military_fav_tech` (sim_minorops.py, `citystate_fav_tech`) and
+`_rai_analysis`.
+
+- THE PICK, the military AI's turn 0x71fb80 (the regional strengths'
+  function) at 0x720676 / 0x721ad4: the tracked "Fav Tech" (+0xd30, its
+  value +0xd88; AI_Military.csv's column) set to -1, then over the unit
+  production table ([player+0x1290]+0x268, 0x168-byte entries in the Units'
+  database order, 0x7989e0) — an entry with +0x0e clear (not buildable:
+  0x798cc2 its PrereqTech and PrereqCivic held, its StrategicResource
+  stocked), +0x0a clear (its domain DOMAIN_SEA, 0x798c83), +0x2c (the sum
+  over the players at war with it, 0x469cd0, of the knowledge base's count
+  of each opposing type, 0x5eb650, times the efficiency M[opposing][entry],
+  0x7992b0..0x7994af) above the best so far (r13d, 0 from 0x7204b1), and
+  the unit's PrereqTech (+0x280) researchable now (0x4c8c40) — the tech is
+  set (0x731d10) and its sum the best. NO_TECH where none.
+- ITS USE, the research value 0x7b3e50 at 0x7b5b22 (above): the value so
+  far x1.5 where the row is +0xd88 and 0x3dcf50 holds; the military turn
+  runs after the research AI's, so the analysis reads the Fav Tech of the
+  turn before (runs/h1_duely1127 the Free Cities: Fav Tech Archery at t33,
+  Archery 83.7 -> 125.6 at t34; The Wheel at t34, 34.5 -> 51.8 at t35;
+  Horseback Riding from t36, 4.3 -> 6.4 from t61, as logged).
+- MEASURED (runs/h1_duely1127 t1-t130, the barbarians at war with every
+  city-state): 466 of 513 city-state and Free Cities turns' Fav Tech as
+  logged. The misses: city-state 2's Masonry (the Battering Ram) where the
+  game names The Wheel (t21-t26, t41: the strengthless units' efficiency
+  rows, AI_UnitEfficiency.csv's Battering Ram 1.00 / 0.01 by column, C-98),
+  the Free Cities' t34 Archery for The Wheel.
+- THE FREE CITIES' COUNTS: their knowledge base holds no ARMY record (the
+  log's seven empty ARMY lines and the AI memory's `army: {}` on every
+  turn), yet a Fav Tech is logged from t33; every unit of each major (the
+  players they met at the start) as the count gives 58 of t1-t59 as
+  logged (every major's unit and the barbarians' the same 58). What fills
+  0x5eb650's per-player vectors for a player with no sight is unread.
+
+## H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported
+
+- 0x787f50 (the delegate the Targets constructor 0x7864c0 binds on game
+  signal +0xc78, every AI player's, at 0x7869f0 vtable @0xd70418): a
+  meeting's two players; where one is the knowledge base's owner, 0x5ecb50
+  (the knowledge base, the other): "Invalid player initialized" guard,
+  m_playerKnowledge[+0x2b48 index] := the other, and +0x6e0 := the other —
+  the trade record's (+0x680) +0x60, which 0x5e9b20 reads as THE player
+  whose cities it walks (init 0x5ec951: +0x6e0 := the owner +0x6e8).
+- 0x5e9b20 so walks the LAST MET player's cities (its +0x12f0 +0xd8 list),
+  each city's trade list (its CityBuildAI +0x870, kept by that player's
+  City Analysis job), that player's knowledge base's city entries
+  ([player+0x12b8]), its wars (0x469cd0 on it) and its weights (0x7a6690
+  with r9 that player): K is the last-met player's own route value. A
+  domestic destination (owner the player, 0x5e9f9c) values the origin
+  yields (0x526330 into +0x108) and the destination's (0x525b90 into
+  +0x140), both summed.
+- The records: the Free Cities meet each major on turn 1 in seat order
+  (DiplomacySummary, every duel: 62 meets 0, then 1) and nobody after;
+  their K is major 1's route value — runs/h1_duely1127 2.10 from t3 (China
+  meets city-state 4 at t2), while city-state 4 (last met China at t2) also
+  prints 2.10 at t3-t4 and 0.00 from t5, having met city-state 3 at t4;
+  the Free Cities' K at t46 3.99 the turn before city-state 3's (it met
+  China at t47). The first K above 0 lands on the record's turn in every
+  duel on major 1's trade lists kept at its turn start (1117 t18, 1121 t29,
+  1127 t3).
+- Not ported: the values need the majors' city trade lists, their routes'
+  origin yields with no course and the majors' yield weights — China's Gold
+  +0.2 above Rome's on 1121 / 1127 (2.10 for three Gold, Rome's 1.80;
+  1117's China 1.80 at t18): the hidden agenda's Yields list
+  ("C-96 / C-97: the AI's yield weights" above, MoneyGrubber), majors' AI.
 
 ## H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)
 

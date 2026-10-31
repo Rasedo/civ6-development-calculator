@@ -44,7 +44,7 @@ import {
 import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_FAVORED, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
 import { researchCost } from './economy';
 import { randRange } from './rand';
-import { leaderOf, seatOf } from './seats';
+import { isBarbSeat, isFreeSeat, leaderOf, seatOf } from './seats';
 import { AI_RATE, FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
 import { AI_TECH_MODIFIERS } from '../data/aiTables';
 import { modifiersValue } from './aiModifiers';
@@ -63,7 +63,7 @@ function owned(r: ResearchState, id: string): boolean {
 }
 
 /** 0x4c8c40: researchable now — unowned (or repeatable), every prerequisite owned */
-function researchable(r: ResearchState, id: string): boolean {
+export function researchable(r: ResearchState, id: string): boolean {
   return !owned(r, id) && prereqs(id).every((p) => r.techs.includes(p));
 }
 
@@ -158,7 +158,15 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
  */
 export function techValue(state: GameState, seat: number, id: string, turns: number, pw: ReadonlyMap<string, number>,
   view?: AiValueView): number {
-  if (turns > AI_VALUE_HORIZON) return fxConst(-9999);
+  const v = techValueParts(state, seat, id, turns, pw, view);
+  return v.own + v.mods;
+}
+
+/** `techValue` in its two parts: the terms before the modifiers (`own`) and
+ *  the modifiers' (`mods`); past the horizon -9999 and none */
+function techValueParts(state: GameState, seat: number, id: string, turns: number, pw: ReadonlyMap<string, number>,
+  view?: AiValueView): { own: number; mods: number } {
+  if (turns > AI_VALUE_HORIZON) return { own: fxConst(-9999), mods: 0 };
   const def = TECHS[id];
   const w = (p: string): number => pw.get(p) ?? 0;
   let own = pseudoYield(PSEUDOYIELD_TECHNOLOGY, FX, w('PSEUDOYIELD_TECHNOLOGY'));
@@ -170,12 +178,21 @@ export function techValue(state: GameState, seat: number, id: string, turns: num
   const share = fxConst(AI_UNLOCK_SHARE);
   const n = techUnlocks(id);
   const mods = AI_TECH_MODIFIERS[gameTypeOf('tech', id, 'TECH_')] ?? [];
-  return fromLanding(own, turns) + n.buildings * fromLanding(share, turns)
-    + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns)
-    + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
-    + n.projects * fromLanding(fxConst(AI_PROJECT_SHARE), turns)
-    + n.weapons * fromLanding(pseudoYield(PSEUDOYIELD_NUCLEAR_WEAPON, FX, w('PSEUDOYIELD_NUCLEAR_WEAPON')), turns)
-    + (mods.length ? modifiersValue({ view: view ?? aiView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0);
+  return {
+    own: fromLanding(own, turns) + n.buildings * fromLanding(share, turns)
+      + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns)
+      + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
+      + n.projects * fromLanding(fxConst(AI_PROJECT_SHARE), turns)
+      + n.weapons * fromLanding(pseudoYield(PSEUDOYIELD_NUCLEAR_WEAPON, FX, w('PSEUDOYIELD_NUCLEAR_WEAPON')), turns),
+    mods: mods.length ? modifiersValue({ view: view ?? aiView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0,
+  };
+}
+
+/** 0x3dcf50: the seat at war with a player of the game but the barbarians —
+ *  the Free Cities with every major */
+function atWarForValue(state: GameState, seat: number): boolean {
+  if (isFreeSeat(seat)) return true;
+  return (seatOf(state, seat)?.wars ?? []).some((p) => !isBarbSeat(p));
 }
 
 /** what a technology unlocks that its value counts: the buildings and
@@ -239,7 +256,12 @@ function researchOf(state: GameState, seat: number): ResearchState {
  *  value's terms its cities give where the seat's facts give them — the
  *  unlocked units' (their City Analysis values and their upgrade sources) and
  *  the resources' (per improvement the row unlocks, the resources its cities
- *  hold unimproved, 0x5d45c0 -> 0x7a21e0); `contracts` the seat's Tech
+ *  hold unimproved, 0x5d45c0 -> 0x7a21e0); the military AI's favoured
+ *  technology (`ResearchState.favTech`, written at its last turn) takes its
+ *  value before the modifiers 1.5 times where the seat is at war
+ *  (0x7b5b22: the row [player +0x12a0] +0xd88 and 0x3dcf50; runs/h1_duely1127
+ *  the Free Cities' Archery 83.7 -> 125.6 at t34, Horseback Riding 4.3 ->
+ *  6.4 from t61, as logged); `contracts` the seat's Tech
  *  Contracts, each adding its value (raw) to its row's score before the
  *  propagation where the row is unowned and its score not negative
  *  (0x760980's contract walk, 0x5f36e0 -> 0x761980) */
@@ -249,11 +271,18 @@ export function researchAnalysis(state: GameState, seat: number, science: number
   const rate = fxOf(science);
   const pw = pseudoYieldWeights(state, seat);
   let view: AiValueView | undefined;
-  const entries: ResearchEntry[] = TECH_TABLE_ORDER.filter((id) => TECHS[id]).map((id) => {
+  const fav = r.favTech && atWarForValue(state, seat) ? r.favTech : null;  const entries: ResearchEntry[] = TECH_TABLE_ORDER.filter((id) => TECHS[id]).map((id) => {
     const leaf = !REQUIRED.has(id);
     if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
-    const base = turns < 0 ? 0 : techValue(state, seat, id, turns, pw, view ??= aiView(state)) + (cityTerm && turns <= AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
+      if (turns < 0) return { tech: id, next, turns, owned: false, leaf, base: 0, score: 0 };
+    const v = techValueParts(state, seat, id, turns, pw, view ??= aiView(state));
+    let own = v.own;
+    if (turns <= AI_VALUE_HORIZON) {
+      if (cityTerm) own += cityTerm(id, turns);
+      if (id === fav) own = fmul(own, fxConst(1.5));
+    }
+    const base = own + v.mods;
     return { tech: id, next, turns, owned: false, leaf, base, score: base };
   });
   addContracts(entries, contracts);

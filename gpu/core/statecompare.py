@@ -322,6 +322,7 @@ def _research_record(sim, b: int, s: int) -> list:
         out += [v for c in range(sim.citystate_cai_turns.shape[2]) for v in (
             int(sim.citystate_cai_turns[b, s, c]), int(sim.citystate_cai_next[b, s, c]), int(sim.citystate_cai_base[b, s, c]),
             int(sim.citystate_cai_score[b, s, c]), int(sim.citystate_cai_owned[b, s, c]))]
+    out.append(int(sim.citystate_fav_tech[b, s]))
     gv = bool(sim.citystate_gov_valid[b, s])
     out.append(1 if gv else 0)
     return out + _gov_values_row(sim, b, s)
@@ -949,6 +950,7 @@ CITY_STATE = {
     "minorCurrentTech": lambda sim, b, rows: [int(sim.citystate_cur_tech[b, s]) for s in rows],
     "minorCurrentCivic": lambda sim, b, rows: [int(sim.citystate_cur_civic[b, s]) for s in rows],
     "minorTechGoal": lambda sim, b, rows: [int(sim.citystate_tech_goal[b, s]) for s in rows],
+    "minorFavTech": lambda sim, b, rows: [int(sim.citystate_fav_tech[b, s]) for s in rows],
     "minorResearchAi": lambda sim, b, rows: [
         [v for t in range(sim.citystate_ai_turns.shape[2]) for v in (
             int(sim.citystate_ai_turns[b, s, t]), int(sim.citystate_ai_next[b, s, t]), int(sim.citystate_ai_base[b, s, t]),

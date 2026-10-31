@@ -448,6 +448,7 @@
             "citystate_cur_tech",
             "citystate_cur_civic",
             "citystate_tech_goal",
+            "citystate_fav_tech",
             "citystate_tech_ovf",
             "citystate_civic_ovf",
             "citystate_ai_left",
@@ -472,7 +473,7 @@
             "citystate_gov_valid",
             "citystate_civic_pol_best"
           ],
-          "note": "the Free Cities' research (`minorResearch` on `freeSeat.research`; the research row `FR`): its techs and civics, progress, items in hand, goal, overflows, turns left, kept progress, the catch-up's counts and the two AIs' last analyses; empty until its first turn makes the seat."
+          "note": "the Free Cities' research (`minorResearch` on `freeSeat.research`; the research row `FR`): its techs and civics, progress, items in hand, goal, overflows, turns left, kept progress, the catch-up's counts, the two AIs' last analyses and the military AI's favoured technology; empty until its first turn makes the seat."
         },
         {
           "name": "barbArmyKnown",
@@ -2149,6 +2150,17 @@
             "citystate_tech_goal"
           ],
           "note": "the research AI's goal, -1 none"
+        },
+        {
+          "name": "minorFavTech",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.favTech"
+          ],
+          "planes": [
+            "citystate_fav_tech"
+          ],
+          "note": "the military AI's favoured technology (+0xd88) its last turn wrote, -1 none"
         },
         {
           "name": "minorResearchAi",

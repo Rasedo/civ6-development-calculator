@@ -15,6 +15,7 @@ import { RESOURCES } from '../../../world/resources';
 import { TECHS } from '../../data/techs';
 import { UNITS } from '../../data/units';
 import { engineId } from '../../data/aliases';
+import { researchable } from '../aiResearch';
 import type { GameState } from '../types';
 import { stockFree, stockpileIncome, strategicSlot, unitUpkeepBill } from '../stockpile';
 
@@ -38,6 +39,43 @@ function majorVersion(traits: readonly string[]): (u: string) => string | null {
       && engineId('unit', x.type, 'UNIT_', UNITS) !== null && UNITS[engineId('unit', x.type, 'UNIT_', UNITS)!]?.replaces === base);
     return unique ? unique.type : u;
   };
+}
+
+/**
+ * THE MILITARY AI'S FAVOURED TECHNOLOGY (AI::Military +0xd88, AI_Military.csv's
+ * "Fav Tech"; 0x71fb80 at 0x721b12): over the seat's unit production entries
+ * in the Units' database order (`seatUnitRows` on its knowledge base's
+ * records `records`, the players it fights `atWar`) — an entry not of the
+ * sea (+0x0a), not buildable (+0x0e), whose at-war players' sum (+0x2c) is
+ * above the best so far (from 0) and whose PrereqTech the seat may research
+ * now (0x4c8c40) sets it, its sum the best; null (NO_TECH) for none.
+ * runs/h1_duely1127 t1-t130: 466 of 513 city-state and Free Cities turns as
+ * logged (the Free Cities' Archery at t33, Iron Working t35, Horseback
+ * Riding from t36).
+ */
+export function militaryFavTech(state: GameState, seat: number, records: readonly { type: string; owner: number }[],
+                                atWar: (player: number) => boolean): string | null {
+  const s = seatOf(state, seat);
+  if (!s) return null;
+  const by = new Map<string, number>();
+  const players = new Set<number>();
+  for (const r of records) {
+    const k = `${installType('unit', r.type, 'UNIT_')}|${r.owner}`;
+    by.set(k, (by.get(k) ?? 0) + 1);
+    players.add(r.owner);
+  }
+  const rows = seatUnitRows(state, seat, (u, p) => by.get(`${u}|${p}`) ?? 0, [...players].sort((a, b) => a - b), atWar);
+  let fav: string | null = null;
+  let best = 0;
+  for (const row of rows) {
+    const u = AI_UNITS[AI_UNIT_INDEX.get(row.unit)!];
+    if (u.domain === 'DOMAIN_SEA' || row.buildable || row.atWar <= best || !u.tech) continue;
+    const tech = engineId('tech', u.tech, 'TECH_', TECHS);
+    if (!tech || !researchable(s.research, tech)) continue;
+    fav = tech;
+    best = row.atWar;
+  }
+  return fav;
 }
 
 /** the table's +0x0e (0x7989e0 at 0x798cc2): the install unit `u`'s

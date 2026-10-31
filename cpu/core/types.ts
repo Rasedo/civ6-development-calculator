@@ -250,6 +250,10 @@ export interface ResearchState {
    *  reads — the one before this turn's choice (`aiCityBuild.ts`) */
   aiLeft?: number;
   aiLeftSeen?: number;
+  /** the military AI's favoured technology (AI::Military +0xd88,
+   *  AI_Military.csv's "Fav Tech"; `militaryFavTech`), written at its turn
+   *  and read by the next research analysis; absent or null, none */
+  favTech?: string | null;
 }
 
 export interface GovernmentState {

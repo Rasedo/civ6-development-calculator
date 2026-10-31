@@ -283,6 +283,9 @@ class SimInit:
         # and score (raw 24.8) and owned flag
         nt_ai = len(rules.t_cost)
         self.citystate_tech_goal = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        # the military AI's favoured technology its last turn wrote (-1 none;
+        # `ResearchState.favTech`, `_military_fav_tech`)
+        self.citystate_fav_tech = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         self.citystate_ai_turns = torch.full((B, r_pad, nt_ai), -1, dtype=torch.long, device=device)
         self.citystate_ai_next = torch.zeros(B, r_pad, nt_ai, dtype=torch.long, device=device)
         self.citystate_ai_base = torch.zeros(B, r_pad, nt_ai, dtype=torch.long, device=device)

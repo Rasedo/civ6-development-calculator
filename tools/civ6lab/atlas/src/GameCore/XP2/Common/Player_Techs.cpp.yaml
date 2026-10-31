@@ -20,10 +20,11 @@
     - recording: 1117
       turn: 226
       value: "0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bolshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each"
-  impl: [cpu/core/aiResearch.ts:researchable]
+  impl: [cpu/core/aiResearch.ts:researchable, cpu/core/operations/unitRows.ts:militaryFavTech]
   readings:
     - "H-1: the random boost and free research pickers — READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
   context:
     - "...olshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each draw erasing its pick — a row the first grant opens is not offered (1117 t226: two..."
     - ...er to rate x the truncated quotient; with no Science the cost); a row not researchable (0x4c8c40) adds its unowned prerequisites, each level's rows once, the next step the last one add...

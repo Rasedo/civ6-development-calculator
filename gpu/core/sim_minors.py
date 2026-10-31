@@ -45,6 +45,7 @@ class SimMinors:
             self._minor_growth(s)
             self._minor_research_ai(s)
             self._minor_combat_desire(s)
+            self._military_fav_tech(s, alive)
             # the units its City Analysis counts: those standing before its
             # savings turn's purchases
             units = (self.major_unit_alive & (self.major_unit_seat == 100 + s)).sum(dim=1)

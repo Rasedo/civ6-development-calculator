@@ -38,6 +38,7 @@
   impl: [cpu/core/aiTrade.ts:minorTradeValue, gpu/core/sim_minors.py:_minor_trade_value]
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+    - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"
   context:
     - "## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's..."
     - "- THE ROUTE VALUE K (0x5e9b20, this = the knowledge base +0x680; called at the tail of the knowledge base's ageing 0x..."
@@ -169,6 +170,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
   context:
     - "..., over the player list (0x483b50 +0x4a0) the knowledge base's count of it (CivKnowledge 0x5eb650: the player's army records, AI_Knowledge.csv's ARMY lines \"UNIT_X count age\"), N thei..."
   review: imported
@@ -235,6 +237,30 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   context:
     - "- The update (0x5ebb30): every entry ages; one whose plot the player sees with no city of its owner there is d..."
+  review: imported
+- addr: 0x5ec7b0
+  final: 0x3f3680
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...record's (+0x680) +0x60, which 0x5e9b20 reads as THE player whose cities it walks (init 0x5ec951: +0x6e0 := the owner +0x6e8)."
+  review: imported
+- addr: 0x5ecb50
+  final: 0x3f3990
+  kind: function
+  name: knowledgeMetPlayer
+  semantics: "a met player's knowledge initialized: m_playerKnowledge[+0x2b48 index] := the player, and the trade record's player (+0x6e0) := the player, the player 0x5e9b20 walks"
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 3
+      value: the Free Cities (last met China, t1) print K 2.10 from t3, China's route to city-state 4; city-state 4 (met China t2, city-state 3 t4) 2.10 at t3-t4, 0.00 from t5
+  readings: ["H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"]
+  context:
+    - "## H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"
+    - "...f0 vtable @0xd70418): a meeting's two players; where one is the knowledge base's owner, 0x5ecb50 (the knowledge base, the other): \"Invalid player initialized\" guard, m_playerKnowledg..."
   review: imported
 - addr: 0x5eceb0
   final: 0x3f3b00
