@@ -350,9 +350,10 @@ export function aiView(state: GameState): AiView {
     },
     tradeRouteCapacity: (i) => tradeCapacity(state, i),
     traders: (i) => unitsOf(state, i).filter((u) => UNITS[u.type]?.trader).length,
-    // a city-state's trade AI's route value (`minorTradeValue`); a major's
+    // a city-state's or the Free Cities' trade AI's route value
+    // (`minorTradeValue`, `freeTradeValue`); a major's
     // is not read
-    tradeKnowledge: (i) => (isCityStateSeat(i) ? state.cityStates.find((c) => c.seat === i)?.tradeValue ?? 0 : null),
+    tradeKnowledge: (i) => (isCityStateSeat(i) || i === FREE_SEAT ? seatOf(state, i)?.tradeValue ?? 0 : null),
     influenceTokensUsed: (i) => state.cityStates.reduce((n, cs) => n + envoysOf(cs, i), 0),
     tributaries: (i) => state.cityStates.filter((cs) => suzerainOf(cs) === i).length,
     cityStateCount: () => state.cityStates.filter((cs) => cs.centerIndex >= 0).length,

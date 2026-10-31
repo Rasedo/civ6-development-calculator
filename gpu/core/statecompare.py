@@ -458,6 +458,7 @@ GAME = {
             sim.citystate_kb_plot[b, sim.FK].tolist(), sim.citystate_kb_damage[b, sim.FK].tolist()) if k != -2) for x in r]],
     "freeArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.FK])],
     "freeCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, sim.FR])],
+    "freeTradeValue": lambda sim, b, rows: [int(sim.free_trade_value[b])],
     "freeOps": lambda sim, b, rows: [_minor_ops(sim, b, sim.FR)],
     "freeAiSerials": lambda sim, b, rows: [[int(sim.cai_c_serial[b, sim.FR]), int(sim.cai_t_serial[b, sim.FR])]],
     "storms": lambda sim, b, rows: [_storm_table(sim, b)],
@@ -1048,6 +1049,9 @@ CITY_STATE = {
     "minorResourceCounts": lambda sim, b, rows: [[int(x) for x in sim.citystate_res_counts[b, s].tolist()] for s in rows],
     "minorTradeList": lambda sim, b, rows: [_trade_list(sim, b, s) for s in rows],
     "minorTradeValue": lambda sim, b, rows: [int(sim.citystate_trade_value[b, s]) for s in rows],
+    "minorTradeSeat": lambda sim, b, rows: [int(sim.citystate_trade_seat[b, s]) for s in rows],
+    "minorMetMinors": lambda sim, b, rows: [[100 + o for o, on in enumerate(sim.citystate_met_minor[b, s, : sim.S].tolist()) if on]
+                                            for s in rows],
     "minorUnitStrength": lambda sim, b, rows: [int(sim.citystate_unit_strength[b, s]) for s in rows],
     "minorArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, s]) for s in rows],
     "minorRevealed": lambda sim, b, rows: [[int(p) for p in sim.mops_revealed[b, s].nonzero(as_tuple=True)[0].tolist()]
@@ -1072,6 +1076,19 @@ CITY_STATE = {
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],
     "treatyTurns": lambda sim, b, rows: [_treaty_clock_line(sim, b, 100 + s) for s in rows],
 }
+
+
+def _city_trade_list(sim, b: int, c: int, s: int) -> list[int]:
+    """a major's city's trade list (`cityTradeList`), its known-city slots
+    read through their centres: the listed centres ascending, -1, the
+    rejected ones ascending; -1 alone for any other city"""
+    if c >= sim.n_majors:
+        return [-1]
+    ctr = sim._known_trade_cands(sim.city_center[:, c, s])[1][b].tolist()
+    ok = sim.city_trade_ok[b, c, s].tolist()
+    no = sim.city_trade_no[b, c, s].tolist()
+    return (sorted(int(x) for x, on in zip(ctr, ok) if on) + [-1]
+            + sorted(int(x) for x, on in zip(ctr, no) if on))
 
 
 def _trade_list(sim, b: int, s: int) -> list[int]:
@@ -1326,6 +1343,7 @@ CITY = {
     ],
     "foundedTurn": _cty("city_founded_turn"),
     "freeGrantTurns": _cty("city_free_grant"),
+    "cityTradeList": lambda sim, b, rows: [_city_trade_list(sim, b, c, s) for c, s in rows],
     "freeCityThreat": _cty("city_ai_threat"),
     "freeCityThreatNear": lambda sim, b, rows: [int(bool(sim.city_ai_near[b, c, s])) for c, s in rows],
     "freeCityRaid": _cty("city_free_raid"),

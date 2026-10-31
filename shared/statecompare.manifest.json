@@ -563,6 +563,17 @@
           ]
         },
         {
+          "name": "freeTradeValue",
+          "compare": "exact",
+          "note": "the Free Cities' trade AI's route value K (`freeTradeValue` on `freeSeat.tradeValue`), raw 24.8, over the last major's cities; 0 until the seat is made.",
+          "covers": [
+            "Seat.tradeValue"
+          ],
+          "planes": [
+            "free_trade_value"
+          ]
+        },
+        {
           "name": "freeOps",
           "compare": "exact",
           "covers": [],
@@ -2906,12 +2917,34 @@
           "name": "minorTradeValue",
           "compare": "exact",
           "covers": [
-            "CityState.tradeValue"
+            "Seat.tradeValue"
           ],
           "planes": [
             "citystate_trade_value"
           ],
-          "note": "the minor's trade AI's route value K, raw 24.8 (knowledge base +0x680); 0 before its first"
+          "note": "the minor's trade AI's route value K, raw 24.8 (knowledge base +0x680), over the cities of the player it last met; 0 before its first"
+        },
+        {
+          "name": "minorTradeSeat",
+          "compare": "exact",
+          "covers": [
+            "Seat.tradeSeat"
+          ],
+          "planes": [
+            "citystate_trade_seat"
+          ],
+          "note": "the player the minor's knowledge base last met (the trade record's +0x6e0), its own seat before any"
+        },
+        {
+          "name": "minorMetMinors",
+          "compare": "exact",
+          "covers": [
+            "CityState.metMinors"
+          ],
+          "planes": [
+            "citystate_met_minor"
+          ],
+          "note": "the other city-states the minor has met, their seats ascending"
         },
         {
           "name": "minorUnitStrength",
@@ -3478,6 +3511,19 @@
             "city_free_grant"
           ],
           "note": "a FREE CITY's count of turns toward its next grant (`freeCityGrant`, 0x274010's +0x18): back to 0 at a grant, held while its own grants stand at the cap; 0 for any other city."
+        },
+        {
+          "name": "cityTradeList",
+          "compare": "exact",
+          "covers": [
+            "City.tradeCities",
+            "City.tradeRejected"
+          ],
+          "planes": [
+            "city_trade_ok",
+            "city_trade_no"
+          ],
+          "note": "a major's city's trade list (CityBuildAI +0x870, `majorTradeLists`): the listed centres ascending, -1, the rejected ones ascending (the GPU's known-city slots read through their centres); -1 alone for any other city"
         },
         {
           "name": "freeCityThreat",

@@ -34,6 +34,7 @@ import { LEVY_TURNS, govInfluence, CITY_STATE_MAX_HP } from '../data/cityStates'
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { storeUnitStrength } from './aiView';
 import { militaryFavTech } from './operations/unitRows';
+import { freeTradeValue, majorTradeLists } from './aiTrade';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { plotDistance, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
@@ -1067,7 +1068,8 @@ export function freeCitiesPhase(state: GameState): void {
 /** THE FREE CITIES' MILITARY AI'S TURN, with or without a city: the Combat
  *  Desire on the records as their last update aged them (`freeCombatDesire`)
  *  and the favoured technology on the same records (`militaryFavTech`), then
- *  their knowledge base ages and looks (`freeKnowledge`) */
+ *  their knowledge base ages and looks (`freeKnowledge`) and keeps its route
+ *  value (`freeTradeValue`) */
 function freeMilitaryTurn(state: GameState): void {
   const free = freeSeatOf(state);
   free.combatDesire = freeCombatDesire(state, state.turn - 1).desire;
@@ -1078,6 +1080,8 @@ function freeMilitaryTurn(state: GameState): void {
   const majors = state.units.filter((u) => isCiv(u.seat)).map((u) => ({ type: u.type, owner: u.seat }));
   free.research.favTech = militaryFavTech(state, FREE_SEAT, majors, (p) => isCiv(p) || p === BARB_SEAT);
   freeKnowledge(state, true);
+  // the route value K at the ageing's tail (`freeTradeValue`)
+  freeTradeValue(state);
 }
 
 /**
@@ -1522,6 +1526,9 @@ export function transferCity(
     if (isCiv(fromSeat)) relocatePalace(loser.cities);
     if (loser.tradeRoutes) loser.tradeRoutes = loser.tradeRoutes.filter((x) => x.from !== civCity.id && x.to !== civCity.id);
   }
+  // its City Analysis job starts its trade list anew under the new owner
+  delete civCity.tradeCities;
+  delete civCity.tradeRejected;
   if (why === 'conquered' && to.cities.length >= MAX_CITIES_PER_SEAT) {
     // CIV6 (LOC_RAZE_CITY_DISTRICTS): "Raze city clearing it and all its
     // districts and buildings from the map" — every district and wonder on
@@ -2843,6 +2850,8 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
     }
 
     placeIdleCitizens(actor.cities);
+    // its cities' City Analysis jobs keep their trade lists (`majorTradeLists`)
+    majorTradeLists(state, actor);
     // THE TURN'S RESOURCES, before anything reads them: every improved source
     // pays into the stockpile, then the plants burn what they need and the
     // POWERED flag every yield reader takes is set for the turn.

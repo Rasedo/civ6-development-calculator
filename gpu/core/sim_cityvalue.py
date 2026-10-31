@@ -2274,8 +2274,8 @@ class _FreeFacts(_MinorFacts):
     hostile pool; no knowledge base's units known; its queue the city's"""
 
     def trade_knowledge(self):
-        # the Free Cities' trade AI is not read
-        return None
+        # the Free Cities' trade AI's route value K (`_free_trade_value`)
+        return self.sim.free_trade_value
 
     def __init__(self, sim, j: int):
         super().__init__(sim, sim.FR)

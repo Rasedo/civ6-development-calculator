@@ -193,6 +193,8 @@ class SimPhase:
         # the turn's processing places every citizen the player left idle
         # (`placeIdleCitizens`)
         self.city_idle[:, row] = 0
+        # its cities' City Analysis jobs keep their trade lists (`majorTradeLists`)
+        self._major_trade_lists(row, active)
         # THE TURN'S RESOURCES, before anything reads them: every improved
         # source pays into the bank, then the plants burn what they need and
         # the POWERED flag every yield reader takes is set for the turn.
@@ -793,10 +795,12 @@ class SimPhase:
         games of `act`, with or without a city: the Combat Desire on the
         records as their last update aged them (`_free_combat_desire`) and
         the favoured technology (`_military_fav_tech`), then their knowledge
-        base ages and looks (`_free_knowledge`)"""
+        base ages and looks (`_free_knowledge`) and keeps its route value
+        (`_free_trade_value`)"""
         self._free_combat_desire(act)
         self._military_fav_tech(self.FR, act)
         self._free_knowledge(act, True)
+        self._free_trade_value(act)
 
     def _free_cities_phase(self) -> None:
         """The FREE CITIES player's turn, after every major's — the

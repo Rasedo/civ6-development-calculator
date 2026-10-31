@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .sim_research import _FX, _discounted, _fmul, _fx_const, _imul, _turns_at, _walk_slots
+from .sim_research import _FX, _discounted, _fmul, _fx_const, _imul, _present_value, _turns_at, _walk_slots
 
 # THE CIVICS AI (`cpu/core/aiCivics.ts`, GameCore_XP2 AI/CultureAi.cpp;
 # tools/civ6lab/dll_readings.md "H-1: the civics AI") — the city-states'
@@ -122,7 +122,8 @@ class SimCivics:
         cards' best score its last turn wrote, at least the policy floor; its modifiers, each its whole part: the envoys granted
         (their points as PSEUDOYIELD_INFLUENCE discounted from landing), the
         spies (PSEUDOYIELD_UNIT_SPY) and the combat adjacency (the minor's
-        strength, `_cai_strength`) from landing to the horizon. At the
+        strength, `_cai_strength`) from landing to the horizon, and the trade
+        capacity's Trader worth on its route value K (`traderValue`). At the
         horizon or past it -9999"""
         T = self._cai_tables()
         B, NC = turns.shape
@@ -157,8 +158,31 @@ class SimCivics:
         # slots none), at least the floor; the floor before its first turn
         valid = self.citystate_gov_valid[:, s].unsqueeze(1)
         cards = torch.where(valid, self.citystate_civic_pol_best[:, s].clamp(min=T["floor"]), torch.full_like(turns, T["floor"]))
+        # the trade capacity (EFFECT_ADJUST_TRADE_ROUTE_CAPACITY, `traderValue`):
+        # none where its Traders fill the capacity plus the Amount, else its
+        # trade AI's route value K from landing to 30 turns on (or the
+        # horizon), one discounted turn where the two meet, x4, whole
+        trade = torch.zeros_like(own)
+        cap_n = m[:, :, 4].expand(B, NC)
+        if bool((cap_n != 0).any()):
+            if s == self.FR:
+                k = self.free_trade_value
+                mine = self.barb_unit_alive & (self.barb_unit_seat == FREE_SEAT)
+                traders = (mine & (self.barb_unit_type == self._trader_idx)).sum(dim=1)
+                capacity = self._trade_capacity(self.FREE_ROW)
+            else:
+                f = self._cv_minor_facts(s)
+                k = self.citystate_trade_value[:, s]
+                traders, capacity = f.traders(), f.trade_capacity()
+            h = torch.full_like(nn, T["horizon"])
+            end = torch.minimum(nn + 30, h)
+            kk = k.unsqueeze(1).expand(B, NC)
+            v = torch.where(nn == end, _discounted(kk, T["rate"], nn),
+                            _present_value(kk, T["rate"], end) - _present_value(kk, T["rate"], nn))
+            full = traders.unsqueeze(1) >= capacity.unsqueeze(1) + cap_n
+            trade = torch.where(full | (cap_n == 0), torch.zeros_like(v), ((v * 4) >> 8) * _FX)
         val = (own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * district
-               + m[:, :, 3] * formation.unsqueeze(1) + cards + tokens + spies + adjacency)
+               + m[:, :, 3] * formation.unsqueeze(1) + cards + tokens + spies + adjacency + trade)
         return torch.where(turns >= T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
 
     def _cai_gov_term(self, s: int, B: int, NC: int) -> torch.Tensor:

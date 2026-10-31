@@ -370,6 +370,14 @@ class SimInit:
         self.citystate_trade_ok = torch.zeros(B, s_pad, _nd, dtype=torch.bool, device=device)
         self.citystate_trade_no = torch.zeros(B, s_pad, _nd, dtype=torch.bool, device=device)
         self.citystate_trade_value = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # the player its knowledge base last met, whose cities the route
+        # value walks (the trade record's +0x6e0; its own seat before any),
+        # and the other city-states it has met (`CityState.tradeSeat`,
+        # `.metMinors`)
+        self.citystate_trade_seat = (100 + torch.arange(s_pad, device=device)).unsqueeze(0).repeat(B, 1)
+        self.citystate_met_minor = torch.zeros(B, s_pad, s_pad, dtype=torch.bool, device=device)
+        # the Free Cities' route value K (raw, `freeTradeValue`)
+        self.free_trade_value = torch.zeros(B, dtype=torch.long, device=device)
         self.citystate_unit_values = torch.full((B, s_pad, len(rules.ai_city_build["units"])), -9999 * 256,
                                                 dtype=torch.long, device=device)
         self.citystate_unit_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
@@ -4030,6 +4038,12 @@ class SimInit:
         self.city_prod_bank = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=dtype, device=device)
         # a FREE CITY's count of turns toward its next grant (`City.freeGrantTurns`)
         self.city_free_grant = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
+        # a MAJOR's city's trade list (CityBuildAI +0x870, `majorTradeLists`)
+        # over its known cities (the city-states, then the majors' slots):
+        # listed, rejected
+        _nd = max(self.S + self.n_majors * self.RC, 1)
+        self.city_trade_ok = torch.zeros(B, self.n_majors, self.RC, _nd, dtype=torch.bool, device=device)
+        self.city_trade_no = torch.zeros(B, self.n_majors, self.RC, _nd, dtype=torch.bool, device=device)
         # a FREE CITY's threat as its city AI's last update left it (`City.aiThreat`), -1 none
         self.city_ai_threat = torch.full((B, self.CITY_ROWS, self.RC), -1, dtype=torch.long, device=device)
         # a FREE CITY's enemy at the gates (`City.aiThreatNear`, CityBuildAI +0x218)
@@ -4549,6 +4563,10 @@ class SimInit:
         self.row_civ = torch.where(self.row_leader >= 0,
                                    torch.tensor(self._pair_civ + [-1], dtype=torch.long, device=device)[self.row_leader.clamp(min=0)],
                                    torch.full_like(self.row_leader, -1))
+        # per civilization-leader pair its Yields lists' weights, raw, in the
+        # yields' order (`majorYieldBias`), flattened pair-major
+        self._major_yield_bias = torch.tensor([int(v) for row in rules.ai_value["majorYieldBias"] for v in row] or [0],
+                                              dtype=torch.long, device=device)
         _ab = _uq["abilities"]
         self._iteru_mult = float(_ab["iteruProdMult"])
         self._knarr_heal = int(_ab["knarrNeutralHeal"])

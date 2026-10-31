@@ -5733,15 +5733,12 @@ EFFECT_ADJUST_TRADE_ROUTE_CAPACITY term read the K it keeps.
   2.10 from t14 (0.00 before), the record training its Trader at t33.
 - Unread: the knowledge base's city entries' order (the engines take the
   route scorer's: the other city-states by id, then the majors' cities);
-  0x54c630's term; what reveals a major's city to a minor beyond its looks:
-  the engines reveal the major's first city at the meeting (`meetCityState`)
-  — the records: a minor's K turns above 0 the turn after it meets its
-  first major (runs/h1_duelw1121 DiplomacySummary: Antioch meets Rome at t6,
-  K 1.80 from t7; Hunza meets China at t28, 2.10 from t29; both majors act
-  before the minor in the turn), and a major meeting a city-state has its centre revealed
-  that turn (21 of 21 meetings, 1117 / 1121 / 1128). Measured K: the
-  engines' 1.50 against the log's 1.80 (1121 Antioch t7) and 2.10 (Hunza),
-  the route's origin yields short.
+  0x54c630's term. A minor's K above 0 the turn after it meets its first
+  major (runs/h1_duelw1121 Antioch meets Rome at t6, K 1.80 from t7; Hunza
+  meets China at t28, 2.10 from t29) is the MAJOR's route value, the walk
+  being over the last-met player's cities ("H-1: the trade record's
+  player"); a major meeting a city-state has its centre revealed that turn
+  (21 of 21 meetings, 1117 / 1121 / 1128).
 - THE TURN'S ORDER OF THE LIST, K AND THE BUILDS: the city update (A,
   0x5c2650 -> 0x5ce680, its events the builds) runs before the tactical
   turn (0x785f30, its ageing's tail 0x5e9b20 setting K); the trade list is
@@ -6142,7 +6139,17 @@ twin `_military_fav_tech` (sim_minorops.py, `citystate_fav_tech`) and
   logged (every major's unit and the barbarians' the same 58). What fills
   0x5eb650's per-player vectors for a player with no sight is unread.
 
-## H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported
+## H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)
+
+Ported in `cpu/core/aiTrade.ts` (`routeValueOver`, `majorTradeLists`,
+`minorTradeValue`, `freeTradeValue`; `Seat.tradeSeat`), `cityStates.ts`
+(`meetCityState`, `meetCityStates`) and `fog.ts` (`minorLook`); the GPU
+twin `_route_value_over` / `_major_trade_lists` / `_free_trade_value`
+(sim_minors.py, `citystate_trade_seat`, `citystate_met_minor`,
+`city_trade_ok` / `_no`, `free_trade_value`), `_minor_look` /
+`_meet_citystates` (sim_masks.py), `_seat_route_income`'s potential
+routes (`hypo`) and the civics value's trade-capacity term
+(`_cai_value`).
 
 - 0x787f50 (the delegate the Targets constructor 0x7864c0 binds on game
   signal +0xc78, every AI player's, at 0x7869f0 vtable @0xd70418): a
@@ -6168,11 +6175,25 @@ twin `_military_fav_tech` (sim_minorops.py, `citystate_fav_tech`) and
   China at t47). The first K above 0 lands on the record's turn in every
   duel on major 1's trade lists kept at its turn start (1117 t18, 1121 t29,
   1127 t3).
-- Not ported: the values need the majors' city trade lists, their routes'
-  origin yields with no course and the majors' yield weights — China's Gold
-  +0.2 above Rome's on 1121 / 1127 (2.10 for three Gold, Rome's 1.80;
-  1117's China 1.80 at t18): the hidden agenda's Yields list
-  ("C-96 / C-97: the AI's yield weights" above, MoneyGrubber), majors' AI.
+- THE MEETINGS the engines keep: a major and a city-state as before
+  (`meetCityState`); two city-states where one's unit's look takes in a
+  plot or a unit of the other (`minorLook`, after its majors): the first
+  meetings of every duel's city-state pairs on the turn DiplomacySummary
+  logs them (1127 t4 3-4, t42 2-3; 1121 t37 3-4). The meeting no longer
+  reveals the major's capital to the minor: a city-state's K at its first
+  meeting is the major's route to it (1121 Antioch 1.80 from t7 is Rome's
+  route, Antioch's own to Rome 1.50; 1127 city-state 4's own list holds
+  China's capital only from t10, city-state 3 printing its 1.50 from t11).
+- THE MAJORS' LISTS: each major's city keeps its trade list at its turn's
+  start (0x78f210 over the major's explored plots).
+- THE MAJORS' WEIGHTS: the walk values a major's routes at the engine's
+  yield weights of that major (its leader's and civilization's Yields
+  lists, the Economic Gold boost). Unread for the majors: the hidden
+  agenda's Yields list and the era strategies' (China's Gold +0.2 above
+  Rome's on 1121 / 1124 / 1127 from the first K, 2.10 for three Gold where
+  ours is 1.80; 1117's China 1.80 at t18, 4.20 at t36 where ours is 3.60;
+  "C-96 / C-97: the AI's yield weights" above, MoneyGrubber; the agenda
+  draws "Choose random agenda" at t1 in RandCalls).
 
 ## H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)
 

@@ -341,7 +341,7 @@ const OP_DEFS = [...MINOR_OP_DEFS, FREE_RAID_DEF];
 import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS } from '../data/aiBuildTables';
 import { unitEfficiency } from '../core/aiUnitEfficiency';
 import { minorDistrictVerdict } from '../core/minorCityAi';
-import { AI_YIELDS } from '../core/aiWeights';
+import { AI_YIELDS, majorYieldBias } from '../core/aiWeights';
 import type { Era } from '../data/techs';
 import { BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CAMP_DIST_CITY, BARB_TECH_PCT, BARB_REGION_MIN,
   BARB_SCOUT_WAIT, BARB_ISLAND_PLOTS, BARB_COAST_WATER, BARB_MAX_UNITS, BARB_MAX_SCOUTS, BARB_NAMES_PER_KIND, BARB_CAMP_TERRAINS,
@@ -1048,6 +1048,9 @@ export function buildRules() {
       pyUnitCombat: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_UNIT_COMBAT,
       pyLuxury: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_RESOURCE_LUXURY,
       yieldDefault: AI_YIELDS.map((y) => AI_YIELD_DEFAULT[y]),
+      // each civilization-leader pair's Yields lists' weights at the Prince
+      // handicap, raw (AI_YIELDS order): a major's weights the trade AI's walk reads
+      majorYieldBias: CIV_LEADERS.map((_, i) => majorYieldBias(i)),
     },
     // the city build AI's value tables (`aiCityBuild.ts`, `aiPlotValue.ts`,
     // `aiDistrictValue.ts`, `aiProjectValue.ts`, `aiEconomic.ts`): the yields'
@@ -3184,7 +3187,7 @@ function techAiModifiers(id: string): { aiSpies: number; aiSeaMoves: number } {
 
 /** the CivicModifiers the civics AI's value reads of a civic, as the GPU twin
  *  takes them: each effect's Amount (Enable as 1) */
-function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAdjacency: number } {
+function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAdjacency: number; aiTradeCapacity: number } {
   const mods = AI_CIVIC_MODIFIERS[gameTypeOf('civic', id, 'CIVIC_')] ?? [];
   const sum = (effect: string, arg: string): number => mods.filter((m) => m.effect === effect)
     .reduce((n, m) => n + (arg === 'Enable' ? (m.args.Enable === 'true' ? 1 : 0) : Number(m.args[arg] ?? 0) | 0), 0);
@@ -3192,5 +3195,6 @@ function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAd
     aiTokens: sum('EFFECT_GRANT_INFLUENCE_TOKEN', 'Amount'),
     aiSpies: sum('EFFECT_GRANT_SPY', 'Amount'),
     aiAdjacency: sum('EFFECT_GRANT_COMBAT_ADJACENCY', 'Enable'),
+    aiTradeCapacity: sum('EFFECT_ADJUST_TRADE_ROUTE_CAPACITY', 'Amount'),
   };
 }

@@ -153,6 +153,11 @@ export interface City {
   /** A FREE CITY's enemy at the gates (CityBuildAI +0x218) as its city AI's
    *  last update left it (`cityThreat`); absent, none */
   aiThreatNear?: boolean;
+  /** A MAJOR's city's trade list (CityBuildAI +0x870, `majorTradeLists`):
+   *  the destination centres a trade path reaches, and the ones it did not;
+   *  absent, none */
+  tradeCities?: number[];
+  tradeRejected?: number[];
   /** A FREE CITY's raid (its manager record +0x20 / +0x24, `freeRaidSignal`):
    *  the player it raids once in its life, and the id of the Free Cities
    *  Raid running for it, -1 once that operation is gone; absent, none */
@@ -867,6 +872,12 @@ export interface Seat {
    *  or the Free Cities (`freeCombatDesire`), raw 24.8: its
    *  PSEUDOYIELD_UNIT_COMBAT weight */
   combatDesire?: number;
+  /** the player its knowledge base last met (the trade record's +0x6e0,
+   *  0x5ecb50), whose cities its route value walks; absent, itself */
+  tradeSeat?: number;
+  /** the trade AI's route value K of a city-state or the Free Cities (raw,
+   *  knowledge base +0x6d8; `minorTradeValue`, `freeTradeValue`) */
+  tradeValue?: number;
   /** the barbarians' knowledge base's camps (`barbCampsLook`), in its
    *  order. Absent = none. */
   campsKnown?: number[];
@@ -1194,6 +1205,9 @@ export interface CityState extends Seat {
   population: number;
   envoys: Record<number, number>;
   met: number[];
+  /** the other city-states it has met (`meetCityStates`), in meeting order;
+   *  absent, none */
+  metMinors?: number[];
   hp?: number;
   /** THE LEVY (`levyUnits`): the seat holding this minor's army, and the turn
    *  at whose start it comes home (`LEVY_TURNS` - 1 after the levy). Absent
@@ -1262,9 +1276,6 @@ export interface CityState extends Seat {
    *  destination centres a trade path reaches, and the ones it did not */
   tradeCities?: number[];
   tradeRejected?: number[];
-  /** its trade AI's route value K (raw, knowledge base +0x6d8,
-   *  `minorTradeValue`) */
-  tradeValue?: number;
   /** its city's UNITS table (raw, `AI_UNITS`' order) as its city AI's last
    *  turn left it, and its unimproved resources' counts (CityBuildAI +0x978)
    *  as its last update counted them — the research and civics values'

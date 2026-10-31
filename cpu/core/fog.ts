@@ -2,7 +2,7 @@
 import type { GameState, Tile } from './types';
 import type { GameMap } from '../../world/types';
 import { citiesOf, civOf, isBarbSeat, isCityStateSeat, isCiv, leaderOf, majorsAlive, majorsMet, seatOf, seatsAllied, setMetTurnWith, tileSeat, unitsOf } from './seats';
-import { hasMet, meetCityState, suzerainOf } from './cityStates';
+import { hasMet, meetCityState, meetCityStates, suzerainOf } from './cityStates';
 import { boostOnEvent } from './boosts';
 import { metAllMajorsMoment } from './eras';
 import { ALLIANCE_SHARED_VIS_ROWS, rowIsFor } from '../data/civilizations';
@@ -179,13 +179,22 @@ export function unitSeesThrough(u: { type: string; promos?: number }): boolean {
  *  the look takes in meets the minor, and so does every major that sees the
  *  plot (`seatSeesPlot`; runs/h1_duelw1124 t28: Cardiff's Warrior steps two
  *  plots from China's Scout, which sees it) — `meetCityState`, the majors in
- *  seat order. */
+ *  seat order; then every other city-state one of whose plots or units the
+ *  look takes in (`meetCityStates`), in the city-states' order. */
 function minorLook(state: GameState, seat: number, tileIndex: number, radius: number, los: Look): void {
   const cs = state.cityStates.find((c) => c.seat === seat);
   if (!cs) return;
   const t = state.map.tiles[tileIndex];
   const majorUnits = new Set<string>();
-  for (const u of state.units) if (isCiv(u.seat)) majorUnits.add(`${u.tileIndex}:${u.seat}`);
+  const minorUnits = new Map<number, Set<number>>();
+  for (const u of state.units) {
+    if (isCiv(u.seat)) majorUnits.add(`${u.tileIndex}:${u.seat}`);
+    else if (isCityStateSeat(u.seat) && u.seat !== seat) {
+      let at = minorUnits.get(u.tileIndex);
+      if (!at) minorUnits.set(u.tileIndex, (at = new Set()));
+      at.add(u.seat);
+    }
+  }
   const seen = new Set<number>();
   const sees = losDisk(state.map, t, radius, los.seeThrough);
   const revealed = (cs.revealed ??= new Array<number>(state.map.tiles.length).fill(0));
@@ -193,13 +202,17 @@ function minorLook(state: GameState, seat: number, tileIndex: number, radius: nu
     if (!sees.has(n.index)) continue;
     revealed[n.index] = 1;
     const owner = tileSeat(n);
-    if (isCiv(owner)) seen.add(owner);
+    if (isCiv(owner) || (isCityStateSeat(owner) && owner !== seat)) seen.add(owner);
     for (const s of state.seats) if (majorUnits.has(`${n.index}:${s.seat}`)) seen.add(s.seat);
+    for (const o of minorUnits.get(n.index) ?? []) seen.add(o);
   }
   for (const s of state.seats) {
     if (hasMet(cs, s.seat)) continue;
     if (seen.has(s.seat) || seatSeesPlot(state, s.seat, t)) meetCityState(state, cs, s.seat);
   }
+  // and every other city-state one of whose plots or units the look takes
+  // in, in the city-states' order
+  for (const o of state.cityStates) if (seen.has(o.seat)) meetCityStates(cs, o);
 }
 
 /** a major that has met every other living major (`majorsAlive`) */

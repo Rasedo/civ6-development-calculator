@@ -75,6 +75,14 @@ function listSum(seat: number, s: Seat, system: string): Map<string, number> {
   return out;
 }
 
+/** a major playing the CIV_LEADERS pair `civ` at the Prince handicap: its
+ *  Yields lists' weight per YieldType (raw, `AI_YIELDS`' order) — what the
+ *  GPU twin's major weights read (`_major_yield_w`) */
+export function majorYieldBias(civ: number): number[] {
+  const sums = listSum(0, { civ } as Seat, 'Yields');
+  return AI_YIELDS.map((y) => sums.get(y) ?? 0);
+}
+
 /** the seat's gold per turn: its cities' net Gold (a city-state's one city's) less its units' and its
  *  devices' upkeep */
 export function goldPerTurn(state: GameState, seat: number): number {

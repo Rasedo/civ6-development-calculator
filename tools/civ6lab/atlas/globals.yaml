@@ -370,7 +370,9 @@
 - addr: 0xd70418
   kind: global
   status: PARTLY
-  readings: ["H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"]
+  readings:
+    - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"
+    - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...onstructor 0x7864c0 binds on game signal +0xc78, every AI player's, at 0x7869f0 vtable @0xd70418): a meeting's two players; where one is the knowledge base's owner, 0x5ecb50 (the kno..."

@@ -4373,25 +4373,26 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * carried from our own turn into the next pair's world (`perTurnWorld`).
  * Per seat (the majors', the city-states', the Free Cities', the
  * barbarians'): the unit pool, the knowledge base (army records and their
- * ageing, the camps), the Combat Desire, the city AI (events' slots, trees,
+ * ageing, the camps, the player its trade record walks), the Combat Desire,
+ * the city AI (events' slots, trees,
  * contracts, reservations), the operation manager and its next id, the
  * strength its turn start stored. Per research: the research AI's goal, its
  * analyses, its turns left, the civics AI's government values and best cards,
  * the minors' catch-up counts, the military AI's favoured technology. Per
  * city-state: its city AI's item value, its
- * Food focus, trade list and value, UNITS and BUILDINGS tables, resource counts, economic
+ * Food focus, trade list and value, the city-states it met, UNITS and BUILDINGS tables, resource counts, economic
  * memory (savings), threat, enemy at the gates, growth forecast, revealed
  * plots, standing army's lack, "Upgrade Units" trees. Per Free City: its threat, enemy at the gates
- * and raid. Per unit: its id, its pool slot, its DEFENDER type. The
+ * and raid; per major's city its trade list. Per unit: its id, its pool slot, its DEFENDER type. The
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
  */
-const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
+const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'tradeSeat', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
 const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'aiLeft', 'aiLeftSeen',
   'techCatchUp', 'civicCatchUp', 'favTech'] as const;
-const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'unitValues', 'buildingValues', 'resourceCounts',
+const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiYieldsSeen', 'revealed', 'standingArmyShort', 'explored', 'upgrading', 'upgradeTrigger'] as const;
-const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid'] as const;
+const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
 const UNIT_MEMORY = ['slot', 'aiDefender'] as const;
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;
 /** THE RULES' STORES NO RECORD SHOWS, carried the same way: the research

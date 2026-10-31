@@ -215,20 +215,29 @@ export function setMet(cityState: CityState, seat: number): void {
   if (!cityState.met.includes(seat)) cityState.met.push(seat);
 }
 
+/** TWO CITY-STATES MEET: each knowledge base takes the other as the player
+ *  its route value walks (the meeting signal's 0x787f50 -> 0x5ecb50:
+ *  runs/h1_duely1127 city-state 4, met China at t2, prints China's route
+ *  value 2.10 at t3-t4 and city-state 3's 0.00 from t5, having met it at t4) */
+export function meetCityStates(a: CityState, b: CityState): void {
+  if (a.seat === b.seat || a.metMinors?.includes(b.seat)) return;
+  (a.metMinors ??= []).push(b.seat);
+  (b.metMinors ??= []).push(a.seat);
+  a.tradeSeat = b.seat;
+  b.tradeSeat = a.seat;
+}
+
 /** A MAJOR MEETS A CITY-STATE: the major's first city revealed to the
  *  minor; the first major to meet it sends it its
- *  INFLUENCE_TOKENS_FREE_FOR_FIRST_PLAYER_MEET envoys, free. */
+ *  INFLUENCE_TOKENS_FREE_FOR_FIRST_PLAYER_MEET envoys, free. The minor's
+ *  knowledge base takes the major as the player its route value walks
+ *  (`CityState.tradeSeat`; 0x787f50 -> 0x5ecb50). */
 export function meetCityState(state: GameState, cityState: CityState, seat: number): void {
   if (hasMet(cityState, seat)) return;
   const first = !cityState.met.some((s) => isCiv(s));
   setMet(cityState, seat);
-  // the major's first city (its capital) is revealed to the minor, whose
-  // trade list tries only revealed cities (runs/h1_duelw1121: Antioch's
-  // route value K from t7, Hunza's from t29, each the turn it meets its
-  // first major)
-  const capital = state.seats.find((s) => s.seat === seat)?.cities[0];
-  if (capital) (cityState.revealed ??= new Array<number>(state.map.tiles.length).fill(0))[capital.centerIndex] = 1;
-  // and the minor's centre and the six beside it are revealed to the major,
+  cityState.tradeSeat = seat;
+  // the minor's centre and the six beside it are revealed to the major,
   // seen or not — a write of the revealed plots alone, no look (runs/
   // h1_duelw1127 t3: China meets Mexico City and its seven plots show, its
   // Warrior three plots off; 1121 t7, Rome and Antananarivo)

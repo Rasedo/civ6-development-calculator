@@ -502,42 +502,48 @@ class SimMinors:
                 dct = torch.where(take, ctr, dct)
         return found, code, dseat, dcity, dct
 
-    def _minor_trade_cands(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
-        """the known cities of minor `s`'s trade AI (`knownTradeCities`):
-        ([B, ND] standing, [B, ND] centre) over the other city-states by
-        index, then every major's cities in row and slot order"""
+    def _known_trade_cands(self, centre: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """the known cities a trade AI reads from the city at `centre` [B]
+        (`knownTradeCities`): ([B, ND] standing, [B, ND] centre) over the
+        city-states by index, then every major's cities in row and slot
+        order, the city itself passed"""
         S = self.S
         live, ctr = [], []
         for s2 in range(S):
             c = self.citystate_center[:, s2]
-            live.append(self.citystate_alive[:, s2] & (c >= 0) & (s2 != s))
+            live.append(self.citystate_alive[:, s2] & (c >= 0))
             ctr.append(c)
         for r2 in range(self.n_majors):
             for j in range(self.RC):
                 live.append(self.city_alive[:, r2, j])
                 ctr.append(self.city_center[:, r2, j])
-        return torch.stack(live, dim=1), torch.stack(ctr, dim=1)
+        lv, ct = torch.stack(live, dim=1), torch.stack(ctr, dim=1)
+        return lv & (ct != centre.unsqueeze(1)), ct
 
-    def _minor_trade_list(self, s: int, mask: torch.Tensor) -> None:
-        """`minorTradeList` where `mask` [B]: minor `s`'s city's trade list
-        (CityBuildAI +0x870, 0x78f210) kept a turn on — each known city not
-        yet sorted whose centre the minor has revealed (`mops_revealed`,
-        0x2d2220; an unrevealed one is not tried) that a trade path from the
-        city reaches is listed (`citystate_trade_ok`), any other tried
-        rejected (`citystate_trade_no`); once the list holds a city at most
-        two are tried a turn; a turn that
-        tries none clears the rejected; a city gone leaves the list"""
-        row = self._CITY_MINOR0 + s
-        live, ctr = self._minor_trade_cands(s)
-        ok_l = self.citystate_trade_ok[:, s] & live
-        no_l = self.citystate_trade_no[:, s].clone()
+    def _minor_trade_cands(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """the known cities of minor `s`'s trade AI (`_known_trade_cands` from
+        its centre)"""
+        return self._known_trade_cands(self.citystate_center[:, s])
+
+    def _keep_trade_list(self, row: int, origin: torch.Tensor, live: torch.Tensor, ctr: torch.Tensor,
+                         ok: torch.Tensor, no: torch.Tensor, seen: torch.Tensor,
+                         mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """0x78f210 (`keepTradeList`) where `mask` [B]: the trade list ([B, ND]
+        listed `ok`, rejected `no`) of the city at `origin` [B] of seat row
+        `row` kept a turn on — each known city not yet sorted whose centre
+        `seen` [B, T] reveals that a trade path from the city reaches is
+        listed, any other tried rejected; once the list holds a city at most
+        two are tried a turn; a turn that tries none clears the rejected; a
+        city gone leaves the list. Returns the new (ok, no)."""
+        ok_l = ok & live
+        no_l = no.clone()
         limited = ok_l.any(dim=1)
-        seen = self.mops_revealed[:, s].gather(1, ctr.clamp(min=0))
-        todo = mask.unsqueeze(1) & live & ~ok_l & ~no_l & seen
+        rev = seen.gather(1, ctr.clamp(min=0))
+        todo = mask.unsqueeze(1) & live & ~ok_l & ~no_l & rev
         tried = torch.zeros(self.B, dtype=torch.long, device=self.device)
         games = todo.any(dim=1).nonzero(as_tuple=True)[0].tolist()
         if games:
-            reach = self._trade_reach_rows(row, games, self.citystate_center[:, s:s + 1])[:, 0]   # [B, T]
+            reach = self._trade_reach_rows(row, games, origin.unsqueeze(1))[:, 0]   # [B, T]
             for d in range(todo.shape[1]):
                 t = todo[:, d]
                 if not bool(t.count_nonzero()):
@@ -549,26 +555,76 @@ class SimMinors:
                 no_l[:, d] = no_l[:, d] | (go & ~inr)
         no_l = no_l & ~(tried == 0).unsqueeze(1)
         m = mask.unsqueeze(1)
-        self.citystate_trade_ok[:, s] = torch.where(m, ok_l, self.citystate_trade_ok[:, s])
-        self.citystate_trade_no[:, s] = torch.where(m, no_l, self.citystate_trade_no[:, s])
+        return torch.where(m, ok_l, ok), torch.where(m, no_l, no)
 
-    def _minor_trade_value(self, s: int, mask: torch.Tensor) -> None:
-        """`minorTradeValue` where `mask` [B]: minor `s`'s route value K
-        (0x5e9b20, `citystate_trade_value` raw) — over its listed cities whose
-        holder it is not at war with, the most a route there pays it, its
-        origin yields with no path term (`minorRouteOriginYields` on a route
-        with no course: the destination's rows, the Trading Post there, a
-        major city's foreign-route Gold and its wonders' sender yields) each
-        valued (`yieldValue`) and summed; never below 0"""
+    def _minor_trade_list(self, s: int, mask: torch.Tensor) -> None:
+        """`minorTradeList` where `mask` [B]: minor `s`'s city's trade list
+        (CityBuildAI +0x870, `citystate_trade_ok` / `citystate_trade_no`) kept
+        a turn on over the plots it has revealed (`mops_revealed`)"""
+        live, ctr = self._minor_trade_cands(s)
+        ok, no = self._keep_trade_list(self._CITY_MINOR0 + s, self.citystate_center[:, s], live, ctr,
+                                       self.citystate_trade_ok[:, s], self.citystate_trade_no[:, s],
+                                       self.mops_revealed[:, s], mask)
+        self.citystate_trade_ok[:, s] = ok
+        self.citystate_trade_no[:, s] = no
+
+    def _major_trade_lists(self, r: int, mask: torch.Tensor) -> None:
+        """`majorTradeLists` where `mask` [B]: each city of major row `r` its
+        trade list (`city_trade_ok` / `city_trade_no`) kept a turn on, at its
+        turn's start — the plots it has explored revealed, every plot with
+        the fog off"""
+        seen = (self.seat_explored[:, r] if self.fog_of_war
+                else torch.ones(self.B, self.T, dtype=torch.bool, device=self.device))
+        for j in range(self.RC):
+            act = mask & self.city_alive[:, r, j]
+            if not bool(act.count_nonzero()):
+                continue
+            centre = self.city_center[:, r, j]
+            live, ctr = self._known_trade_cands(centre)
+            ok, no = self._keep_trade_list(r, centre, live, ctr, self.city_trade_ok[:, r, j],
+                                           self.city_trade_no[:, r, j], seen, act)
+            self.city_trade_ok[:, r, j] = ok
+            self.city_trade_no[:, r, j] = no
+
+    def _major_yield_w(self, r: int) -> dict:
+        """`yieldWeights` of major row `r`, per YieldType [B] raw: its
+        leader's and civilization's Yields lists (`majorYieldBias`, at the
+        Prince handicap) and the Economic AI's Gold boost, -0.2 x its gold a
+        turn while that is below 0 (its cities' Gold less its units' upkeep
+        and its devices')"""
+        from .sim_cityvalue import _YIELDS
+        bias = self._major_yield_bias.take(self.row_leader[:, r].clamp(min=0).unsqueeze(1) * 6
+                                           + torch.arange(6, device=self.device).unsqueeze(0))
+        bias = torch.where((self.row_leader[:, r] >= 0).unsqueeze(1), bias, torch.zeros_like(bias))
+        tot = self._seat_city_stats(r, record=False)[0]
+        alive = self.city_alive[:, r, : tot.shape[1]]
+        gold = (tot[:, :, 2] * alive.double()).sum(dim=1)
+        mine = self.major_unit_alive & (self.major_unit_seat == r)
+        up = (self._unit_upkeep(r, self.major_unit_type, self.major_unit_formation, self.major_unit_levied).double()
+              * mine.double()).sum(dim=1)
+        gpt = gold - up - self._wmd_upkeep(r).double()
+        boost = torch.where(gpt < 0, _fmul(torch.full_like(gpt, _fx_const(-0.2), dtype=torch.long), _fx_const_t(gpt)),
+                            torch.zeros_like(gpt, dtype=torch.long))
+        out = {y: bias[:, k] for k, y in enumerate(_YIELDS)}
+        out["YIELD_GOLD"] = out["YIELD_GOLD"] + boost
+        return out
+
+    def _cs_route_value(self, s: int) -> torch.Tensor:
+        """0x5e9b20's walk over minor `s`'s one city ([B] raw): over its listed
+        cities whose holder it is not at war with, the most a route there
+        pays it, its origin yields with no path term (`minorRouteOriginYields`
+        on a route with no course: the destination's rows, the Trading Post
+        there, a major city's foreign-route Gold and its wonders' sender
+        yields) each valued at its weights (`yieldValue`) and summed; never
+        below 0"""
         from .sim_cityvalue import _YIELDS
         B, S, dev = self.B, self.S, self.device
         row = self._CITY_MINOR0 + s
         live, ctr = self._minor_trade_cands(s)
-        ok_l = self.citystate_trade_ok[:, s] & live
+        ok_l = self.citystate_trade_ok[:, s] & live & self.citystate_alive[:, s].unsqueeze(1)
         best = torch.zeros(B, dtype=torch.long, device=dev)
-        if not bool((ok_l & mask.unsqueeze(1)).count_nonzero()):
-            self.citystate_trade_value[:, s] = torch.where(mask, best, self.citystate_trade_value[:, s])
-            return
+        if not bool(ok_l.count_nonzero()):
+            return best
         f = self._cv_minor_facts(s)
         y6 = []
         free = []
@@ -594,7 +650,7 @@ class SimMinors:
                 free.append(~self.war[:, row, r2])
         post = self._route_post_gold(row, ctr).double()                     # [B, ND]
         for d in range(len(y6)):
-            on = ok_l[:, d] & free[d] & mask
+            on = ok_l[:, d] & free[d]
             if not bool(on.count_nonzero()):
                 continue
             y = y6[d].clone()
@@ -604,7 +660,110 @@ class SimMinors:
                 amt = torch.floor(y[:, k] * 256 + 0.5).long()
                 v = v + self._cv_yield(amt, name, f.yield_w(name))
             best = torch.where(on & (v > best), v, best)
-        self.citystate_trade_value[:, s] = torch.where(mask, best, self.citystate_trade_value[:, s])
+        return best
+
+    def _major_route_value(self, r: int) -> torch.Tensor:
+        """0x5e9b20's walk over major row `r`'s cities ([B] raw): per city, per
+        known city in its trade list, the most a route there pays — an
+        international one, its holder not at war with the major, the route's
+        origin yields with no course (`_seat_route_income`'s potential
+        routes); a domestic one those and its destination's (the destination
+        improvement rows) — each valued at the major's weights
+        (`_major_yield_w`) and summed; never below 0"""
+        from .sim_cityvalue import _YIELDS
+        B, S, RC, dev = self.B, self.S, self.RC, self.device
+        frm, code, dseat, dcity, dest_j, dom = [], [], [], [], [], []
+        for j in range(RC):
+            live, _ctr = self._known_trade_cands(self.city_center[:, r, j])
+            on = self.city_trade_ok[:, r, j] & live & self.city_alive[:, r, j].unsqueeze(1)
+            fid = torch.where(on, self.city_id[:, r, j].unsqueeze(1), torch.full_like(on, -1, dtype=torch.long))
+            nd = on.shape[1]
+            for d in range(nd):
+                f_d = fid[:, d]
+                if d < S:
+                    hold = self._CITY_MINOR0 + d
+                    c_d = torch.full_like(f_d, -(2 + d))
+                    ds = torch.full_like(f_d, -1)
+                    dc = torch.full_like(f_d, -1)
+                    is_dom = False
+                    jj = 0
+                else:
+                    r2, jj = divmod(d - S, RC)
+                    hold = r2
+                    is_dom = r2 == r
+                    cid = self.city_id[:, r2, jj]
+                    c_d = cid if is_dom else torch.full_like(f_d, -1)
+                    ds = torch.full_like(f_d, -1) if is_dom else torch.full_like(f_d, r2)
+                    dc = torch.full_like(f_d, -1) if is_dom else cid
+                if not is_dom:
+                    f_d = torch.where(self.war[:, r, hold], torch.full_like(f_d, -1), f_d)
+                frm.append(f_d)
+                code.append(c_d)
+                dseat.append(ds)
+                dcity.append(dc)
+                dest_j.append(jj)
+                dom.append(is_dom)
+        best = torch.zeros(B, dtype=torch.long, device=dev)
+        if not frm:
+            return best
+        frm_t = torch.stack(frm, dim=1)
+        if not bool((frm_t >= 0).count_nonzero()):
+            return best
+        rk = self._seat_route_income(r, per_route=True,
+                                     hypo=(frm_t, torch.stack(code, dim=1), torch.stack(dseat, dim=1), torch.stack(dcity, dim=1)))
+        if rk is None:
+            return best
+        w = self._major_yield_w(r)
+        imp_rows = [x for x in self._live_rows(r, self._route_improvement_rows) if x[5] == 1]
+        for k in range(frm_t.shape[1]):
+            on = frm_t[:, k] >= 0
+            if not bool(on.count_nonzero()):
+                continue
+            y = rk[:, k].clone()
+            if dom[k]:
+                for _ic, _il, _ii, _iy, _ia, _is in imp_rows:
+                    iw = self._row_is(r, _ic, _il)
+                    if bool(iw.count_nonzero()):
+                        y[:, _iy] += _ia * self._city_improvement_count(_ii)[:, r, dest_j[k]].double() * iw.double()
+            v = torch.zeros(B, dtype=torch.long, device=dev)
+            for kk, name in enumerate(_YIELDS):
+                amt = torch.floor(y[:, kk] * 256 + 0.5).long()
+                v = v + self._cv_yield(amt, name, w[name])
+            best = torch.where(on & (v > best), v, best)
+        return best
+
+    def _route_value_over(self, seat: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        """`routeValueOver` ([B] raw): 0x5e9b20's walk over the cities of the
+        player `seat` [B] names, in the games of `mask` — a city-state's
+        (`_cs_route_value`), a major's (`_major_route_value`); 0 for any
+        other"""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for s2 in range(self.S):
+            m = mask & (seat == 100 + s2)
+            if bool(m.count_nonzero()):
+                out = torch.where(m, self._cs_route_value(s2), out)
+        for r in range(self.n_majors):
+            m = mask & (seat == r)
+            if bool(m.count_nonzero()):
+                out = torch.where(m, self._major_route_value(r), out)
+        return out
+
+    def _minor_trade_value(self, s: int, mask: torch.Tensor) -> None:
+        """`minorTradeValue` where `mask` [B]: minor `s`'s route value K
+        (0x5e9b20, `citystate_trade_value` raw) over the cities of the player
+        its knowledge base last met (`citystate_trade_seat`)"""
+        v = self._route_value_over(self.citystate_trade_seat[:, s], mask)
+        self.citystate_trade_value[:, s] = torch.where(mask, v, self.citystate_trade_value[:, s])
+
+    def _free_trade_value(self, mask: torch.Tensor) -> None:
+        """`freeTradeValue` where `mask` [B]: the Free Cities' route value K
+        (`free_trade_value` raw) over the last major's cities — they meet
+        every major on the first turn in seat order and nobody after"""
+        if self.n_majors == 0:
+            return
+        seat = torch.full((self.B,), self.n_majors - 1, dtype=torch.long, device=self.device)
+        v = self._route_value_over(seat, mask)
+        self.free_trade_value.copy_(torch.where(mask, v, self.free_trade_value))
 
     def _minor_trade(self, s: int) -> None:
         """`minorTrade` — minor `s`'s routes walk and meet their raiders

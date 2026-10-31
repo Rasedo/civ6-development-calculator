@@ -637,6 +637,7 @@ const GAME: Record<string, Extractor> = {
     .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()],
   freeArmyAged: (s) => [s.freeSeat?.armyAged ?? -1],
   freeCombatDesire: (s) => [s.freeSeat?.combatDesire ?? 0],
+  freeTradeValue: (s) => [s.freeSeat?.tradeValue ?? 0],
   // the Free Cities' operations (the Free Cities Raid) and the ids their
   // next contract and tree take
   freeOps: (s) => [opsRecord(s.freeSeat?.ops, FREE_SEAT, [...MINOR_OP_DEFS, FREE_RAID_DEF], s)],
@@ -1056,6 +1057,8 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorTradeList: overCityStates((cityState) => [...(cityState.tradeCities ?? [])].sort((a, b) => a - b)
     .concat(-1, [...(cityState.tradeRejected ?? [])].sort((a, b) => a - b))),
   minorTradeValue: overCityStates((cityState) => cityState.tradeValue ?? 0),
+  minorTradeSeat: overCityStates((cityState) => cityState.tradeSeat ?? cityState.seat),
+  minorMetMinors: overCityStates((cityState) => [...(cityState.metMinors ?? [])].sort((a, b) => a - b)),
   minorUnitStrength: overCityStates((cityState) => cityState.unitStrength ?? 0),
   minorArmyAged: overCityStates((cityState) => cityState.armyAged ?? -1),
   minorRevealed: overCityStates((cityState) => (cityState.revealed ?? []).flatMap((v, p) => (v === 1 ? [p] : []))),
@@ -1160,6 +1163,10 @@ const CITY: Record<string, Extractor> = {
   // the turn its owner founded or took the city (a FREE CITY's revolt)
   foundedTurn: overCities((r) => r.city.foundedTurn),
   freeGrantTurns: overCities((r) => r.city.freeGrantTurns ?? 0),
+  // a major's city's trade list (`majorTradeLists`): the listed centres
+  // ascending, -1, the rejected ones ascending
+  cityTradeList: overCities((r) => [...(r.city.tradeCities ?? [])].sort((a, b) => a - b)
+    .concat(-1, [...(r.city.tradeRejected ?? [])].sort((a, b) => a - b))),
   freeCityThreat: overCities((r) => r.city.aiThreat ?? -1),
   freeCityThreatNear: overCities((r) => (r.city.aiThreatNear ? 1 : 0)),
   freeCityRaid: overCities((r) => [r.city.freeRaid?.player ?? -1, r.city.freeRaid?.op ?? -1]),

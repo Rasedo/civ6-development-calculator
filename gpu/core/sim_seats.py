@@ -9132,7 +9132,7 @@ class SimSeats:
         comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
         return (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)
 
-    def _seat_route_income(self, row: int, per_route: bool = False) -> torch.Tensor | None:
+    def _seat_route_income(self, row: int, per_route: bool = False, hypo: tuple | None = None) -> torch.Tensor | None:
         """cityTradeYields for ANY seat row — per-COLUMN ORIGIN income from this
         row's outgoing routes, [B, cols, 6] double in engine yield
         order (food, prod, gold, sci, cul, faith), or None when the row holds
@@ -9170,7 +9170,14 @@ class SimSeats:
 
         `per_route` (a major row): the ORIGIN terms per route instead, [B, K,
         6], uncached and before the Letters of Marque cut — `routeOriginYields`'
-        twin, which the plunder payout reads (`_route_yield_value`)."""
+        twin, which the plunder payout reads (`_route_yield_value`).
+
+        `hypo` (a major row, with `per_route`): the origin terms of the
+        routes `(from city id, dest code, dest seat, dest city id)` ([B, K]
+        each, the stored routes' encoding) instead of the row's own, each
+        with no course — no path term, no length, no posts passed — the
+        trade AI's potential routes (`routeOriginYields` on a route with no
+        course)."""
         if row >= self.n_majors:
             # a MINOR's one city: Democracy's "+4 Food and +4 Production for
             # BOTH CITIES" on its suzerain's route in, then its own routes out
@@ -9185,7 +9192,12 @@ class SimSeats:
         key = (self.turn, row, self._eff_version, self._rp_kill_version, self._bel_stamp())
         if not per_route and self._seat_route_cache is not None and self._seat_route_cache[0] == key:
             return self._seat_route_cache[1]
-        rr = self.seat_routes[:, row]
+        if hypo is not None:
+            rr = torch.stack((hypo[0], hypo[1]), dim=2)
+            rd_seat, rd_city = hypo[2], hypo[3]
+        else:
+            rr = self.seat_routes[:, row]
+            rd_seat, rd_city = self.seat_route_dseat[:, row], self.seat_route_dcity[:, row]
         act = rr[:, :, 0] >= 0
         # A seat with no route of its own can still be PAID here — by routes
         # OTHER seats send INTO its cities. Every destination-side row has to
@@ -9396,7 +9408,7 @@ class SimSeats:
         # INTERNATIONAL legs: a route to ANY OTHER MAJOR's city
         # (seat_route_dcity >= 0) pays District_TradeRouteYields' INTERNATIONAL
         # column over the dest's completed districts plus the centre row.
-        rd_c = self.seat_route_dcity[:, row]  # [B, K] dest city id (>=0 = intl)
+        rd_c = rd_city  # [B, K] dest city id (>=0 = intl)
         intl = act & (rd_c >= 0)
         if bool(intl.count_nonzero()):
             K_i = rd_c.shape[1]
@@ -9405,7 +9417,7 @@ class SimSeats:
             # seat's LIVING cities — `seatOf(toSeat).cities.find(c => c.id ===
             # toSeatCity)`. A capture re-mints the flipped city's id under the
             # captor, so the pair stops resolving and the leg pays nothing.
-            dr = self.seat_route_dseat[:, row].clamp(min=0)  # [B, K]
+            dr = rd_seat.clamp(min=0)  # [B, K]
             _rx = dr.unsqueeze(2).expand(B, K_i, RCw)
             hit = (self.city_id.gather(1, _rx) == rd_c.unsqueeze(2)) & self.city_alive.gather(1, _rx)
             valid_dest = intl & hit.any(dim=2)
@@ -9594,7 +9606,7 @@ class SimSeats:
                                          _ar[:, _kc].unsqueeze(1) * _ally_d.double())
         # THE PATH TERM (`routePathGold`) of every paying leg, to the ORIGIN
         # column's Gold
-        if bool(_p_want.count_nonzero()):
+        if hypo is None and bool(_p_want.count_nonzero()):
             _rk_add(2, self._route_path_gold(row, _p_d, _p_want))
         # CIV6 (Great Zimbabwe): "Your Trade Routes from this city get +2
         # Gold for every Bonus resource within 3 tiles of the city and in
@@ -9609,6 +9621,8 @@ class SimSeats:
                 _cntw = (_d3 & _ownc & (self.res_cat == 1).unsqueeze(1)).sum(dim=2).double()
                 _rk_add(2,
                                  (_pw * _cntw).gather(1, from_j) * (act & has_from).double())
+        if hypo is not None:
+            return rk
         crs = self.seat_route_course[:, row]  # [B, K, L] the stored course
         # CIV6 (Hunza): "+1 Gold for every 5 tiles a Trade Route travels"
         # (`..._PER_PATH_TILE`, Amount 0.2) — every leg, whichever kind, once
@@ -11198,6 +11212,9 @@ class SimSeats:
         self.city_proj_yield[b, row, col] = -1
         self.city_free_grant[b, row, col] = 0
         self.city_ai_threat[b, row, col] = -1
+        if row < self.n_majors:
+            self.city_trade_ok[b, row, col] = False
+            self.city_trade_no[b, row, col] = False
         self.city_ai_near[b, row, col] = False
         self.city_free_raid[b, row, col] = -1
         self.city_free_allowed[b, row, col] = False
@@ -11673,6 +11690,9 @@ class SimSeats:
         self.city_free_press[b, dst_row, col, :] = 0
         self.city_free_grant[b, dst_row, col] = 0
         self.city_ai_threat[b, dst_row, col] = -1
+        if dst_row < self.n_majors:
+            self.city_trade_ok[b, dst_row, col] = False
+            self.city_trade_no[b, dst_row, col] = False
         self.city_ai_near[b, dst_row, col] = False
         self.city_free_raid[b, dst_row, col] = -1
         self.city_free_allowed[b, dst_row, col] = False

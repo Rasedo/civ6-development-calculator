@@ -35,10 +35,17 @@
     - recording: h1_duelv1117
       turn: 14
       value: Valletta's TRADE, TO -1, VAL 2.10 (0.00 before t14)
-  impl: [cpu/core/aiTrade.ts:minorTradeValue, gpu/core/sim_minors.py:_minor_trade_value]
+  impl:
+    - cpu/core/aiTrade.ts:routeValueOver
+    - cpu/core/aiTrade.ts:minorTradeValue
+    - cpu/core/aiTrade.ts:freeTradeValue
+    - gpu/core/sim_minors.py:_route_value_over
+    - gpu/core/sim_minors.py:_major_route_value
+    - gpu/core/sim_minors.py:_cs_route_value
+    - gpu/core/sim_minors.py:_minor_trade_value
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
-    - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"
+    - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
   context:
     - "## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's..."
     - "- THE ROUTE VALUE K (0x5e9b20, this = the knowledge base +0x680; called at the tail of the knowledge base's ageing 0x..."
@@ -242,7 +249,8 @@
   final: 0x3f3680
   kind: function
   status: PARTLY
-  readings: ["H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"]
+  readings:
+    - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...record's (+0x680) +0x60, which 0x5e9b20 reads as THE player whose cities it walks (init 0x5ec951: +0x6e0 := the owner +0x6e8)."
@@ -257,11 +265,18 @@
     - recording: h1_duely1127
       turn: 3
       value: the Free Cities (last met China, t1) print K 2.10 from t3, China's route to city-state 4; city-state 4 (met China t2, city-state 3 t4) 2.10 at t3-t4, 0.00 from t5
-  readings: ["H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"]
+  impl:
+    - cpu/core/cityStates.ts:meetCityState
+    - cpu/core/cityStates.ts:meetCityStates
+    - gpu/core/sim_masks.py:_meet_citystates
+    - gpu/core/sim_masks.py:_minor_look
+    - cpu/core/types.ts:Seat
+  readings:
+    - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
   context:
-    - "## H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"
+    - "## H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
     - "...f0 vtable @0xd70418): a meeting's two players; where one is the knowledge base's owner, 0x5ecb50 (the knowledge base, the other): \"Invalid player initialized\" guard, m_playerKnowledg..."
-  review: imported
+  review: reviewed
 - addr: 0x5eceb0
   final: 0x3f3b00
   kind: function

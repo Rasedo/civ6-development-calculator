@@ -3180,7 +3180,9 @@ class SimMasks:
         look takes in join the minor's revealed plots (`mops_revealed`); every
         major one of whose plots or units the look takes in meets it
         (`_meet_citystates`), and so does every major that sees the plot
-        (`seatSeesPlot`), the majors in seat order. No-op with fog off, as
+        (`seatSeesPlot`), the majors in seat order; then every other
+        city-state one of whose plots or units it takes in (`meetCityStates`,
+        `citystate_met_minor`, `citystate_trade_seat`). No-op with fog off, as
         `revealAround` gates."""
         if not self.fog_of_war or rows.numel() == 0 or self.S == 0:
             return
@@ -3220,6 +3222,20 @@ class SimMasks:
             if bool(seen.count_nonzero()):
                 k = seen.nonzero(as_tuple=True)[0]
                 self._meet_citystates(rows[k], g, col[k])
+        # and every other city-state one of whose plots or units the look
+        # takes in (`meetCityStates`), in the city-states' order: each
+        # knowledge base takes the other as the player its route value walks
+        for o in range(self.S):
+            seat_o = 100 + o
+            seen = (disk & (own == seat_o)).any(dim=1) | (uin & (us == seat_o)).any(dim=1)
+            new = seen & (sc != o) & (s >= 0) & ~self.citystate_met_minor[rows, sc, o]
+            if not bool(new.count_nonzero()):
+                continue
+            nr, ns = rows[new], sc[new]
+            self.citystate_met_minor[nr, ns, o] = True
+            self.citystate_met_minor[nr, o, ns] = True
+            self.citystate_trade_seat[nr, ns] = seat_o
+            self.citystate_trade_seat[nr, o] = 100 + ns
 
     def _eyes_of(self, rows: torch.Tensor, seats: torch.Tensor, g: int) -> torch.Tensor:
         """`seatSeesPlot`'s eyes: where `seats` ([K, X] absolute seats, the
@@ -3340,7 +3356,8 @@ class SimMasks:
         `rows` ([K] batch indices, unique): each newly met; a minor no major
         had met takes the meeter's INFLUENCE_TOKENS_FREE_FOR_FIRST_PLAYER_MEET
         envoys, the influence landing as `addEnvoys` lands it (the suzerains,
-        then the ground)."""
+        then the ground); the minor's knowledge base takes the meeter as the
+        player its route value walks (`citystate_trade_seat`)."""
         S = self.S
         if S == 0 or rows.numel() == 0:
             return
@@ -3365,13 +3382,10 @@ class SimMasks:
                 continue
             nr, nsr = rows[ns], sr[ns]
             self.seat_citystate_met[nr, nsr, s] = True
-            # the major's first city (its capital) is revealed to the minor
-            alive = self.city_alive[nr, nsr]
-            j = alive.long().argmax(dim=1)
-            cap = self.city_center[nr, nsr, j]
-            ok = alive.any(dim=1) & (cap >= 0)
-            self.mops_revealed[nr[ok], s, cap[ok]] = True
-            # and the minor's centre and the six beside it are revealed to
+            # the minor's knowledge base takes the major as the player its
+            # route value walks
+            self.citystate_trade_seat[nr, s] = nsr
+            # the minor's centre and the six beside it are revealed to
             # the major, seen or not — the revealed plots alone, no look
             if self.fog_of_war:
                 ring = self.pair_dist[self.citystate_center[nr, s].clamp(min=0)].long() <= 1
