@@ -23,7 +23,7 @@
  */
 import { hexDistance } from '../../world/hex';
 import { UNITS } from '../data/units';
-import { gameHash } from '../data/aliases';
+import { engineId, gameHash } from '../data/aliases';
 import { bool, num, plotAt, P, type Catalog, type DumpCity, type DumpPlayer, type DumpQueueEntry, type TurnRecord } from './record';
 import type { CombatRow } from './randLog';
 
@@ -795,7 +795,7 @@ export class RecordedActions implements ActionSource {
       const hit = (r: ActionRow | undefined) => !!r && r[2] === 'UnitDamageChanged' && n(r, 2) > n(r, 3) && !carried.has(r);
       const chassisOf = (key: string) => {
         const u = units1.get(key) ?? a.units.find((x) => unitKey(x) === key);
-        return u ? UNITS[(cat.units[num(u.type)] ?? '').replace(/^UNIT_/, '')] : undefined;
+        return u ? UNITS[engineId('unit', cat.units[num(u.type)] ?? '', 'UNIT_', UNITS) ?? ''] : undefined;
       };
       // a unit whose only attack is melee: Combat, no Ranged, no Bombard
       const meleeChassis = (key: string) => {
@@ -856,7 +856,7 @@ export class RecordedActions implements ActionSource {
       const combat = b.combatLog ?? [];
       const used = new Set<number>();
       const cityShot = (x: CombatRow) => {
-        const def = UNITS[x.atkType.replace(/^UNIT_/, '')];
+        const def = UNITS[engineId('unit', x.atkType, 'UNIT_', UNITS) ?? ''];
         return x.atkObj === 1 && x.defObj === 3 && x.atkDmg === 0 && !!def && (!!def.ranged || def.bombard !== undefined);
       };
       // the district a shot struck, which the log names by its district id:
@@ -962,6 +962,12 @@ export class RecordedActions implements ActionSource {
         const countered = !!nx && hit(nx) && n(nx, 0) === actor;
         const defender = `${n(r, 0)}:${n(r, 1)}`;
         let attacker = countered ? `${n(nx, 0)}:${n(nx, 1)}` : acting;
+        // a blow the combat log names a unit of the actor's for is that
+        // unit's (runs/h1_duely1127 t86: Chinese Crouching Tiger 1703937's
+        // shot kills the barbarian Scout 2949130, another unit's activity
+        // last; its tribe's scout lost, a Skirmisher raised at t90)
+        const named = !countered && logged?.atkObj === 1 && logged.atkCiv === actor ? `${actor}:${logged.atkId}` : undefined;
+        if (named !== undefined && pos.has(named)) attacker = named;
         let from = attacker === undefined ? undefined : pos.get(attacker);
         const at = pos.get(defender);
         // a blow the combat log names a district's is its city's shot, though

@@ -63,7 +63,7 @@ import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
-import { barbarianTactics, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
+import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
 import { barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, holdBarbBattles, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
@@ -773,6 +773,8 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   // run in the tactical pass, a scout's report's start
   const opLines: string[] = [];
   traceBarbOps((l) => opLines.push(l));
+  // their Movement as the turn opens, before their rules grant its techs
+  const opened = barbMovesNow(state);
   barbarianRules(state, closing);
   for (const land of ctx.barbBattles.splice(0)) land();
   // where the pair's first record holds each unit its moves took off
@@ -804,7 +806,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
     if (isBarbSeat(u.seat) && !before.has(u) && state.units.includes(u)) u.slot = slotOfKey(key);
   }
   barbSlots(state);
-  barbarianAi(ctx, b, closing, before, from);
+  barbarianAi(ctx, b, closing, before, from, opened);
   // each unit looks from each plot the record's steps of the turn entered,
   // after the AI's planning read the plots revealed as the turn opened, the
   // units walking one after another in the record's order — those yet to
@@ -839,7 +841,8 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
  *  before their camps raised this turn's back where the pair's first record
  *  holds them (`from`, else where they stand): its moves tallied
  *  (`tallyTactics`) */
-function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlySet<Unit>, from: ReadonlyMap<Unit, number>): void {
+function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlySet<Unit>, from: ReadonlyMap<Unit, number>,
+  opened: ReadonlyMap<number, number>): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
   const twin = new Map<Unit, Unit>();
@@ -934,7 +937,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     const at = from.get(u);
     if (at !== undefined) c.tileIndex = at;
   }
-  refreshBarbarians(copy);
+  refreshBarbarians(copy, opened);
   // the AI's "Random Direction" draws are the game's: the barbarians take the
   // turn's last ones, one a Wander row of the game's tactical log in its
   // order; a unit the game wandered draws its own, one it did not runs free

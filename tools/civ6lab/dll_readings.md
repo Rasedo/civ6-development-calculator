@@ -6861,6 +6861,35 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   attack plots taken only on a plot the player sees now.
 - MEASURED (--aiscore, five duely duels): see the hand-back.
 
+## C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)
+
+`search`'s fromFull (planUnit) and `barbMovesNow` / `refreshBarbarians` in
+cpu/core/tactical.ts; `_tac_search`'s from_full (`_tac_plan`, the plain
+planning, the raid's fresh planning in sim_barbops.py) and `_barb_reset_mp`'s
+opened in gpu/core.
+
+- THE PLANNING'S START (READ): UnitPlanning 0x791e00 calls the
+  breadth-first search 0x26dcd0 with its third argument 1 (flags 0x115),
+  which installs the start callback 0x26eea0 at +0xa8; GeneratePath calls it
+  first, and it sets the start node's Movement (+0x1bc, read by the step
+  cost 0x26e920 for the start) to GetMaxMoves (0x56e130, through 0x266660
+  on the formation) << 8 — the unit's full Movement, not its Movement left.
+  The "unmoved" flag 0x100 stays the formation's own (+0x4b8).
+- THE RESTORE (FIT): the barbarians' Movement is restored as their turn
+  opens, before the barbarian manager's turn (0x1514a0) grants the turn's
+  techs (0x14f530). runs/h1_duely1121 t61: the Quadriremes 1900549 /
+  2228245 and the Galley 2293780 (maxMoves 3 in record 61, 4 in record 62)
+  wander to plots 4 away — the planning's reach, the "Random Direction"
+  draws over its candidates the game's — and stop 3 along (21:7, 23:7,
+  20:8, the record's).
+- THE REPLAY'S BLOWS (harness, cpu/harness/replayActions.ts): a blow the
+  combat log names a unit of the actor's for is that unit's, and a chassis
+  reads through the catalog's aliases (`engineId`: UNIT_CHINESE_CROUCHING_TIGER
+  is CROUCHING_TIGER). runs/h1_duely1127 t86: the Crouching Tiger 1703937's
+  shot kills the barbarian Scout 2949130; the replay gave the blow to the
+  city at 12:6 (a city's shot lowers no tribe count), so tribe 2's scout
+  count stood and the game's t90 Skirmisher had no tribe.
+
 ## C-95: the danger map and Move to Safety — READ, ported
 
 `dangerPlane`, `flees`, `safePlot`, `moveToSafety`, `homelandSafety` in cpu/core/tactical.ts; `_danger_plane`, `_tac_flees`, `_tac_safe_plot`, `_tac_move_to_safety` in gpu/core/sim_tactics.py. The barbarians' lists take Move to Safety after Attack Medium Priority and in their homeland; the city-states' after Attack High Priority and in their homeland; the Free Cities' after Attack Medium Priority.

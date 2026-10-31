@@ -1970,15 +1970,20 @@ class SimOrders:
         pct = self._fx_by_row("wmdup")[:, row].to(self.dtype)
         return gold * (100.0 + pct) / 100.0
 
-    def _barb_reset_mp(self) -> None:
-        """barbarianPhase's own reset: each barbarian's `movesLeft` and
-        `movesFull` to `unitFullMoves + generalAuraMP` (`_full_mp`, which
-        reads the barbarians' own research for the Mathematics rung) and its
-        `attacksLeft` to `attacksPerTurn`. The hostile pool also holds the
-        Free Cities' units, which are no barbarians and keep theirs.
+    def _barb_reset_mp(self, opened: torch.Tensor | None = None, stood: torch.Tensor | None = None) -> None:
+        """barbarianPhase's own reset (`refreshBarbarians`): each barbarian's
+        `movesLeft` and `movesFull` to `unitFullMoves + generalAuraMP`
+        (`_full_mp`, which reads the barbarians' own research for the
+        Mathematics rung) — a unit that stood as the turn opened (`stood`
+        [B, P]) to its Movement then (`opened` [B, P], before their rules
+        grant the turn's techs) — and its `attacksLeft` to `attacksPerTurn`.
+        The hostile pool also holds the Free Cities' units, which are no
+        barbarians and keep theirs.
         """
         barb = self.barb_unit_seat == BARB_SEAT
         f = self._full_mp("barb")
+        if opened is not None:
+            f = torch.where(stood, opened, f)
         self.barb_unit_mp_full.copy_(torch.where(barb, f, self.barb_unit_mp_full))
         self.barb_unit_mp.copy_(torch.where(barb, f, self.barb_unit_mp))
         self.barb_unit_attacks.copy_(torch.where(barb, self._full_attacks("barb"), self.barb_unit_attacks))
@@ -1992,9 +1997,12 @@ class SimOrders:
         `_barb_scout_look`)."""
         self._barb_slots()
         acting = self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT)
+        # their Movement as the turn opens, before their rules grant its techs
+        opened = self._full_mp("barb").clone()
         self._barbarian_rules()
         self._barb_slots()
-        self._barb_reset_mp()  # barbarianPhase's own movesLeft reset
+        # a unit the rules raised takes its own full Movement
+        self._barb_reset_mp(opened, acting)
         self._barbarian_tactics(acting)
         self._barb_slots_dying()
 

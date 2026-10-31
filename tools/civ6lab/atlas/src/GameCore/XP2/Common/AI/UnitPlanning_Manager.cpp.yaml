@@ -114,10 +114,15 @@
   kind: function
   name: UnitPlanning
   status: PARTLY
-  impl: [cpu/core/tactical.ts:reachPlots, cpu/core/tactical.ts:planUnit]
+  impl:
+    - cpu/core/tactical.ts:reachPlots
+    - cpu/core/tactical.ts:planUnit
+    - cpu/core/tactical.ts:unmoved
+    - gpu/core/sim_tactics.py:_tac_search
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...h finder pool's count) chunks; N <= 1 plans each unit serially on the calling thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then the wait. The pool (0xf01920, count at +...

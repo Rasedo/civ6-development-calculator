@@ -304,7 +304,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
  */
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false,
-  laterTurns = false): void {
+  laterTurns = false, fromFull = false): void {
   const { map } = state;
   const ground = groundOf(state, unit, !zoc, !zoc, standToAttack);
   const held = heldCostsOf(state, unit);
@@ -315,7 +315,11 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   const fullLand = Math.floor(unitFullMoves(state, naval ? unit : { ...unit, embarked: false }) * FIX / MP_SCALE);
   const fullSea = Math.floor(unitFullMoves(state, naval ? unit : { ...unit, embarked: true }) * FIX / MP_SCALE);
   const unmoved = unit.movesLeft >= (unit.movesFull ?? unitFullMoves(state, unit));
-  const start: PNode = { tile: unit.tileIndex, g: 0, tie: 0, moves: Math.floor(unit.movesLeft * FIX / MP_SCALE),
+  // the planning sets out on the unit's full Movement (0x791e00 -> 0x26dcd0
+  // with its third argument set: 0x26eea0 takes GetMaxMoves, 0x56e130), any
+  // other search on its Movement left
+  const startMoves = fromFull ? unitFullMoves(state, unit) : unit.movesLeft;
+  const start: PNode = { tile: unit.tileIndex, g: 0, tie: 0, moves: Math.floor(startMoves * FIX / MP_SCALE),
     turns: 1, closed: false, parent: null };
   nodes.set(start.tile, start);
   // the start is priced too, linked from itself
@@ -1044,7 +1048,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     // turn's end)
     if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
-  }, entries.length ? onLink : undefined);
+  }, entries.length ? onLink : undefined, false, false, true);
   let wins = false;
   for (const E of entries) {
     if (!E.spots.length) continue;
@@ -2978,28 +2982,42 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
 }
 
-/** each barbarian's Movement and attacks at the start of its turn */
-export function refreshBarbarians(state: GameState): void {
+/** each barbarian's Movement as its turn opens, by unit id: its full
+ *  Movement under the techs it holds before their rules grant the turn's */
+export function barbMovesNow(state: GameState): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const u of state.units) if (isBarbSeat(u.seat)) out.set(u.id, unitFullMoves(state, u) + generalAuraMP(state, u));
+  return out;
+}
+
+/** each barbarian's Movement and attacks at the start of its turn: the
+ *  Movement restored as the turn opened (`opened`, before their rules grant
+ *  the turn's techs: runs/h1_duely1121 t61, the Quadriremes 1900549 / 2228245
+ *  and the Galley 2293780 at 3 walk 3 of the 4 their planning reaches), a
+ *  unit raised since at its full Movement */
+export function refreshBarbarians(state: GameState, opened?: ReadonlyMap<number, number>): void {
   for (const u of state.units) {
     if (!isBarbSeat(u.seat)) continue;
-    u.movesLeft = unitFullMoves(state, u) + generalAuraMP(state, u);
+    u.movesLeft = opened?.get(u.id) ?? unitFullMoves(state, u) + generalAuraMP(state, u);
     u.movesFull = u.movesLeft;
     u.attacksLeft = attacksPerTurn(u);
   }
 }
 
 /**
- * THE BARBARIANS' TURN: their unit pool (`barbSlots`), the game's rules for
- * them (`barbarianRules`: their techs, the camp step, each tribe's turn), their
- * units' AI (`barbarianTactics`: their operations' trees, then their
- * tactical pass), their scouts looking at each step (`barbScoutLook`).
+ * THE BARBARIANS' TURN: their unit pool (`barbSlots`), their Movement as the
+ * turn opens (`barbMovesNow`), the game's rules for them (`barbarianRules`:
+ * their techs, the camp step, each tribe's turn), their units' AI
+ * (`barbarianTactics`: their operations' trees, then their tactical pass),
+ * their scouts looking at each step (`barbScoutLook`).
  */
 export function barbarianPhase(state: GameState): void {
   barbSlots(state);
   const acting = new Set(state.units.filter((u) => isBarbSeat(u.seat)).map((u) => u.id));
+  const opened = barbMovesNow(state);
   barbarianRules(state, state.turn);
   barbSlots(state);
-  refreshBarbarians(state);
+  refreshBarbarians(state, opened);
   // a scout looks at each step it takes, in move order: the sight update of
   // the step (0x58aa90) raises the report (0x153ef0) as its plots come into
   // the barbarian player's view

@@ -87,6 +87,16 @@
   context:
     - "...he formation +0x518): the plot entered (the fifth argument: x, y, the formation's layer 0x2665b0 — 3 the religious one) is in a zone where, first, the functor 0x52f710 over its ring..."
   review: imported
+- addr: 0x266660
+  final: 0x1a3f20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...+0x1bc, read by the step cost 0x26e920 for the start) to GetMaxMoves (0x56e130, through 0x266660 on the formation) << 8 — the unit's full Movement, not its Movement left. The \"unmove..."
+  review: imported
 - addr: 0x266720
   final: 0x1a3fe0
   kind: function

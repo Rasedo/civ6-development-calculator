@@ -450,7 +450,8 @@ class SimTactics:
 
     def _tac_search(self, rows: torch.Tensor, slots: torch.Tensor, seat: int, max_turns: int, zoc: bool,
                     dest: torch.Tensor | None = None, pre: str = "barb", plan: dict | None = None,
-                    full: bool = False, stand: bool = False, later_turns: bool = False) -> dict:
+                    full: bool = False, stand: bool = False, later_turns: bool = False,
+                    from_full: bool = False) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
         the open nodes by (cost, tie) — a node inserted where its cost lies
@@ -472,7 +473,9 @@ class SimTactics:
         included. With `stand` (the danger map's search) an attack is struck
         only from the unit's own plot or one none of its own stacking units
         holds. With `later_turns` (the path's flag 0x1000) a path's turn may
-        end on a plot its own stacking unit holds after its first."""
+        end on a plot its own stacking unit holds after its first. With
+        `from_full` (the planning's, `search`'s fromFull) each unit sets out on
+        its full Movement, unmoved by its Movement left."""
         dev = self.device
         N, T = rows.shape[0], self.T
         NONE = _KEY_NONE
@@ -486,6 +489,11 @@ class SimTactics:
         full_l = torch.div(f_land[rows, slots] * _FIX, self._mp_scale, rounding_mode="floor")
         full_s = torch.div(f_sea[rows, slots] * _FIX, self._mp_scale, rounding_mode="floor")
         unmoved = mp >= granted
+        if from_full:
+            # the planning sets out on the unit's full Movement (0x791e00 ->
+            # 0x26dcd0 -> 0x26eea0: GetMaxMoves), unmoved by its Movement left
+            unmoved = getattr(self, f"{pre}_unit_mp")[rows, slots] >= granted
+            mp = self._tac_full_now(pre)[rows, slots]
         land, wat = self._tac_enter(seat, False)
         # the plots the player revealed (`groundOf`'s known; a path reads
         # every plot as revealed): one it never revealed is entered, and no
@@ -1462,7 +1470,7 @@ class SimTactics:
         et = self.unit_type.gather(1, emb.clamp(min=0)).clamp(min=0, max=self.NU - 1)
         foreign = (ms != seat) | ((es != seat) & self._type_dom_mil.take(et))
         plan = {"tp": tp, "civ": civ, "rng": rng, "fights": self._tac_can_fight(pre)[rows, slots], "foreign": foreign}
-        res = self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre, plan=plan)
+        res = self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre, plan=plan, from_full=True)
         sn = res["spot_n"]
         dealt = torch.zeros(N, E, dtype=torch.long, device=dev)
         taken = torch.zeros(N, E, dtype=torch.long, device=dev)
@@ -3308,7 +3316,7 @@ class SimTactics:
         if rows.numel():
             rowof[rows, slots] = torch.arange(rows.shape[0], device=dev)
             res = (self._tac_plan(rows, slots, tg, pre, seat) if tg is not None
-                   else self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre))
+                   else self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre, from_full=True))
         else:
             empty = torch.full((1, T), -1, dtype=torch.long, device=dev)
             res = {"rank": empty, "turns": empty.clone(), "moves": empty.clone()}

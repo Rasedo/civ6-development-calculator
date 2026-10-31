@@ -1344,7 +1344,7 @@ class SimBarbOps:
             rows = (go & uv[:, i]).nonzero(as_tuple=True)[0]
             if not rows.numel():
                 continue
-            res = self._tac_search(rows, uslot[rows, i], seat, 2, False, pre="barb")
+            res = self._tac_search(rows, uslot[rows, i], seat, 2, False, pre="barb", from_full=True)
             t6 = res["turns"].gather(1, slc[rows])
             m6 = res["moves"].gather(1, slc[rows])
             naval = self.unit_naval.take(ut[rows, uslot[rows, i]])
