@@ -14,7 +14,7 @@ import { isExplored } from './fog';
 import { CITY_STRIKE_RANGE, plotPressureLead } from './phase';
 import { governorSum } from './governors';
 import { CITY_STATE_SUZERAIN_BONUS, MINOR_UPGRADE_GOLD, govInfluence } from '../data/cityStates';
-import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf } from './seats';
+import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf, warsOf } from './seats';
 import { aiStrengths, districtHealth, planUnit, reachPlots, tacticalTargets, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
@@ -461,6 +461,7 @@ export function aiView(state: GameState): AiView {
     players: () => [...new Set([...state.seats.map((s) => s.seat), ...state.cityStates.map((c) => c.seat), ...(state.freeSeat ? [state.freeSeat.seat] : []), BARB_SEAT])]
       .sort((a, b) => a - b),
     atWar: (i, j) => civsAtWar(state, i, j),
+    warCount: (i) => warsOf(state, i).filter(isCiv).length,
     playerYield: (i, type) => {
       const key = YIELD_KEY[type];
       return key ? citiesOf(state, i).reduce((a, c) => a + computeCityStats(state, c).total[key], 0) : 0;

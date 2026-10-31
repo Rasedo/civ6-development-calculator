@@ -4,7 +4,7 @@ import { FX, type AiValueView } from '../../../cpu/core/aiValue';
 
 /** a player with no yield weights: every yield and pseudo-yield at its
  *  DefaultValue */
-const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0 } as unknown as AiValueView;
+const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0, warCount: () => 0 } as unknown as AiValueView;
 
 const plot = (over: Partial<PlotValueFacts> = {}): PlotValueFacts => ({
   view, seat: 0, improvement: null, pillaged: false, resource: null, feature: null,

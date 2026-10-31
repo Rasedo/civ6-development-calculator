@@ -348,7 +348,7 @@
     - recording: h1_duelv1128
       turn: 197
       value: "Qin at war with Rome: the friendship's +20 and the cost's -5"
-  impl: [cpu/core/aiPlotValue.ts:n]
+  impl: [cpu/core/aiPlotValue.ts:n, cpu/core/aiValue.ts:AiValueView]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"

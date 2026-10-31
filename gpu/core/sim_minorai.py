@@ -1831,6 +1831,9 @@ class _PlotFacts:
     def trade_knowledge(self):
         return self._at(self.mf.trade_knowledge())
 
+    def war_count(self):
+        return self._at(self.mf.war_count())
+
     def portal_routes(self):
         """per element the Mountain Portal analyzer's walk of the plot's ring
         (`portalRoutes`): its neighbours with a route, -1 where a neighbour

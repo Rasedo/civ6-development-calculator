@@ -174,10 +174,9 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
     v += Math.floor((pseudoYieldValue(f.view, f.seat, amount * FX, 'PSEUDOYIELD_TOURISM') * eraWeight) / FX);
   }
   // the defence: min(max(n, 1), DefenseModifier) + min(n, GrantFortification),
-  // n a count over the game's players (0x3dfae0, partly read) — LAB: n 0
-  // (runs/h1_duelv1124 Granada's Alcazar, DefenseModifier 4: every row one
-  // 1.0 a turn, 20.11 at T 0, above the value without it)
-  const n = 0;
+  // n the majors the player is at war with (0x3dfae0; runs/h1_duelv1128
+  // Hong Kong's Forts one 1.0 a turn higher from its t196 war with China)
+  const n = f.view.warCount(f.seat);
   v += (Math.min(Math.max(n, 1), imp.defenseModifier) + Math.min(n, imp.grantFortification)) * FX;
   if (imp.buildUnits.some(([, consumes]) => !consumes)) v *= 3;
   let value = between(v, t, h);

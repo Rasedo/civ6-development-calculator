@@ -21,7 +21,7 @@ function modView(over: Record<string, unknown> = {}): AiValueView {
     cities: () => [{ id: 1, capital: true }], cityDistricts: () => ['DISTRICT_CITY_CENTER', 'DISTRICT_HARBOR'],
     cityOwnedPlots: () => plots, cityYield: (_s: number, _c: number, y: string) => (y === 'YIELD_PRODUCTION' ? 7.5 : 3),
     cityStrikes: () => true, cityHasBuilding: (_s: number, _c: number, b: string) => b === 'BUILDING_MONUMENT',
-    traders: () => 0, tradeRouteCapacity: () => 1, tradeKnowledge: () => 4 * 256 + 64, portalRoutes: () => null, unitCost: () => 40,
+    traders: () => 0, tradeRouteCapacity: () => 1, tradeKnowledge: () => 4 * 256 + 64, portalRoutes: () => null, warCount: () => 0, unitCost: () => 40,
     cityItemTurns: () => 8, cityUnitExpected: () => 256, playerUnits: () => [], cityPowerShort: () => false,
     ...over,
   } as unknown as AiValueView;

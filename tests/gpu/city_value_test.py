@@ -85,6 +85,9 @@ class Plot:
     def beside_housing(self):
         return int(self.o["beside"])
 
+    def war_count(self):
+        return 0
+
     def unit_cost(self, unit):
         return 25
 

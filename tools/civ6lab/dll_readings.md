@@ -5895,9 +5895,13 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   Appeal x the percent, each at the player's value (0x7a6690, 0x7a60d0);
   Improvement_Tourism at PSEUDOYIELD_TOURISM x the era factor;
   min(max(n, 1), DefenseModifier) + min(n, GrantFortification), n by
-  0x3dfae0 (partly read: a count over the game's players; ported at n 0, a
-  LAB fit — runs/h1_duelv1124 Granada's Alcazar, DefenseModifier 4, every
-  row 1.0 a turn above the value without it, 104.61 at its t2 plot); the Barbarian Clans traps' properties
+  0x3dfae0 (READ: over the players manager's list +0xb50, each other
+  player below 0x41 with a slot (+0x2b48) and its +0x728 flag set (a
+  major), at war with this one (0x2a92d0) — no city-state, Free City or
+  barbarian counted: every row before a war with a major fits n 0, runs/h1_duelv1124 Granada's Alcazar 1.0 a turn above the
+  value without it, 104.61 at its t2 plot; runs/h1_duelv1128 Hong Kong's
+  Forts one 1.0 a turn (20.11 at T 0) higher from its t196 war with China,
+  1128's Fort rows 2,602 -> 2,795 exact; `warCount` / `war_count`); the Barbarian Clans traps' properties
   (PLOT_DAMAGE_TO_WALKING_INTO / _ADJACENT, hashes 0x7d27db83 /
   0x8634aa0f); x3 where a build unit spends no charge. PV(H) - PV(T); the
   Housing over TilesRequired at the housing value 0x7a3d70; where the

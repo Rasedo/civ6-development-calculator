@@ -376,9 +376,9 @@ class SimCityValue:
             pv = self._cv_pseudo(amt * _FX, "PSEUDOYIELD_TOURISM", f.pseudo_w("PSEUDOYIELD_TOURISM"))
             v = v + torch.div(pv * w, _FX, rounding_mode="floor")
         # the defence: min(max(n, 1), DefenseModifier) + min(n,
-        # GrantFortification), n 0 (LAB, `improvementYieldsValue`)
-        n = 0
-        v = v + (min(max(n, 1), row["defenseModifier"]) + min(n, row["grantFortification"])) * _FX
+        # GrantFortification), n the majors at war with the player (`improvementYieldsValue`)
+        n = _t(f.war_count(), like)
+        v = v + (torch.clamp(n.clamp(min=1), max=row["defenseModifier"]) + n.clamp(max=row["grantFortification"])) * _FX
         if any(not c for _, c in row["buildUnits"]):
             v = v * 3
         value = _between(v, t, h, T["rate"])
@@ -1669,6 +1669,9 @@ class _MinorFacts:
 
     def at_war(self):
         return self.sim.war[:, self.row].any(dim=1)
+
+    def war_count(self):
+        return self.sim.war[:, self.row, : self.sim.n_majors].sum(dim=1)
 
     def yield_pct(self, y):
         # the city's percent less its happiness level's: a minor's -50%
