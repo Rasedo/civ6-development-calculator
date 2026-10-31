@@ -11220,6 +11220,45 @@ The majors' AI is not ported (the replay imposes the recording's majors, trainin
 - Not drawn: the name itself (0xa292a0, one draw over the namer's names
   left; AUDIT C-74).
 
+## C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ
+
+- THE DISTRICT VALUE'S FEATURE (0x7a51f0 at 0x7a5335..0x7a5412): a plot
+  feature the city keeps under the district — 0x17cb00 over the city's
+  pairs at +0x2170 +0x378 (district, feature), written by
+  EFFECT_ADJUST_VALID_FEATURES_DISTRICTS (0xbb9de0 -> 0x183b30; the one
+  install row Egypt's TRAIT_FLOODPLAINS_VALID_GOVERNMENT), or one on the
+  district row's list +0x218 — is left; else a Removable one (Features
+  +0xc1 bit 7) is cleared (0x7a3010), a ValidDistrictPlacement one
+  (Features_XP2 +0x28 bit 2: the three Floodplains and Volcanic Soil,
+  `dll_rowmap.py a603f0`) stood on, and any other values the plot 0
+  (0x7a540a). A city-state's city holds no such pair (`keepsFeature` false
+  in both twins). THE PLACEMENT TEST (0x35f2d0 at 0x35f6ad..0x35f7b0) reads
+  the same two flags: a district row with a +0x218 list needs the plot's
+  feature on it; else a feature neither Removable nor ValidDistrictPlacement
+  refuses the plot — the Reef, the Oasis, the Geothermal Fissure, the
+  fires' (`featureRefusesDistrict`, `canPlaceDistrictIn` and the GPU's
+  static planes `du` / `du0` / `cw`). runs/h1_duely1124 Bologna: the
+  Harbor's choice at 29:8 (a Reef) over 30:7 (t85 466.77 against 463.37,
+  the plot contract the game buys 30:7 with), the verbose duels' DISTRICTS
+  rows hold no Reef plot.
+- THE MOUNTAIN PORTAL'S ANALYZER (EFFECT_MOUNTAIN_PORTAL -> the static
+  0xf04278, vtable 0xd632c8, slot 1 0x6b6610), the Mountain Tunnel's
+  ImprovementModifiers row in 0x7b1320's modifiers term: with the context's
+  plot (+0x88) and player (+0x80), the ring of radius 1 (0x6b1b0 with the
+  functor @0xd64018, 0x6c8fb0): a neighbour with a route (plot +0x47 not
+  0xff) counts, one without a route holding a portal (0x88680, the route
+  manager's per-plot portal) refuses the term, and one of the five mountain
+  terrains (+0x2c in 0x4924) must stand among them; then count x the trade
+  AI's route value K (the knowledge base +0x6d8, 0x7a2df0) x 0.5 (two
+  fixed-point products 0x16e7d0), PV(H) - PV(T) at the context's rate
+  (0x7a2140), its whole part. `portalRoutes` / `portal_routes`, the
+  analyzer in `aiModifiers.ts` / `sim_cityvalue.py`. runs/h1_duelv1124
+  (its K from AI_Knowledge.csv's TRADE row of the turn before): Cardiff
+  12:13 239.34 (three roads beside, K 6.87), 12:12 170.34 (two), Bologna
+  32:9 135.34 (two, K 5.16), 129.34 at K 4.85; the Tunnel's rows 163 -> 402
+  of 414 exact (the rest a road laid within the record's turn, t215-217
+  and t233, and two research-turn lands at t185 / t188).
+
 ## C-100: the plot values' residuals traced — the Farm rows' Food, the Neighbourhood's T, a Campus lump (MEASURED)
 
 - THE FARM ROWS' 15.03 (runs/h1_duelv1117 Caguana, player 3, from t51):
@@ -11636,8 +11675,6 @@ the replay leaves such a unit its city made out of unit.trained.
   the analysis values the Military Engineer's adjacent-plot row on a bare
   mountain of its own, the pick takes it, and no Builder lays it.
   runs/h1_duelv1124 logs those rows (Cardiff 12:13 239.34 at T 0, 12:12
-  170.34; Bologna 32:9 135.34 / 129.34). Not ported: the row valued by
-  `improvementValue` is 32.34 there, a whole term per plot (+207, +138,
-  +103, +97) unread, so with the row in the analysis Cardiff's Ski Resort
-  (127.79 from t226) still out-values it and is laid (five duely duels:
-  builder.improve unmoved, unit.trained 236/252 -> 236/258).
+  170.34; Bologna 32:9 135.34 / 129.34): the plot's own 32.34 and its
+  MOUNTAIN_PORTAL modifier's term (the section "C-100: a district on a
+  feature it may not stand on, and the Mountain Portal's analyzer").

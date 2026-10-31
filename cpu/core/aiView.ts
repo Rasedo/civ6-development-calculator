@@ -5,8 +5,8 @@
  * on copies (`carryLayout`).
  */
 import type { AiCityDefenceView, AiKnownCityView, AiMapPlotView, AiUnitView, AiView } from './aiViewTypes';
-import { DIRECTION_TYPES, hexDistance, neighborTile, tilesWithin } from '../../world/hex';
-import { isCoastalLand, isImpassable, isWater } from '../../world/query';
+import { DIRECTION_TYPES, hexDistance, neighborTile, neighbors, tilesWithin } from '../../world/hex';
+import { isCoastalLand, isImpassable, isMountain, isWater } from '../../world/query';
 import { FX, fmul, fxOf, turnsAt, type AiCityView, type AiDistrictView, type AiPlotView } from './aiValue';
 import { AI_YIELDS, pseudoYieldWeights, yieldWeights } from './aiWeights';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
@@ -20,7 +20,7 @@ import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } fr
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
 import { cityDefenseStrength, cityStrikeStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
-import { outerPool, wallsTier } from './rules';
+import { outerPool, portalAt, wallsTier } from './rules';
 import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
@@ -354,6 +354,16 @@ export function aiView(state: GameState): AiView {
     // (`minorTradeValue`, `freeTradeValue`); a major's
     // is not read
     tradeKnowledge: (i) => (isCityStateSeat(i) || i === FREE_SEAT ? seatOf(state, i)?.tradeValue ?? 0 : null),
+    portalRoutes: (p) => {
+      let routes = 0;
+      let mountain = false;
+      for (const n of neighbors(map, map.tiles[p])) {
+        if (n.road) routes += 1;
+        else if (portalAt(n)) return null;
+        if (isMountain(n)) mountain = true;
+      }
+      return mountain ? routes : null;
+    },
     influenceTokensUsed: (i) => state.cityStates.reduce((n, cs) => n + envoysOf(cs, i), 0),
     tributaries: (i) => state.cityStates.filter((cs) => suzerainOf(cs) === i).length,
     cityStateCount: () => state.cityStates.filter((cs) => cs.centerIndex >= 0).length,

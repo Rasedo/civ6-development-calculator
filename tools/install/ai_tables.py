@@ -635,10 +635,13 @@ def build_city(rows, modifier) -> str:
                   "projects": d_projects[d], "regionalRange": d_range[d], "appealHousing": d_appeal[d]}
                  for d, c in in_game_order("Districts", "DistrictType", keyed(rows("Districts"), "DistrictType"))]
     # the features (a feature a Builder clears for an improvement: Removable,
-    # RemoveTech; the danger map's DangerValue), in DATABASE ORDER
+    # RemoveTech; the danger map's DangerValue; Features_XP2 ValidDistrictPlacement,
+    # a feature a district stands on unremoved), in DATABASE ORDER
     feat_yields = multi("Feature_YieldChanges", "FeatureType")
     feat_removes = multi("Feature_Removes", "FeatureType")
+    feat_xp2 = keyed(rows("Features_XP2"), "FeatureType")
     features = [{"type": f, "removable": c.get("Removable", "").lower() == "true", "removeTech": c.get("RemoveTech") or None,
+                 "validDistrictPlacement": flag(feat_xp2.get(f, {}), "ValidDistrictPlacement"),
                  "appeal": num(c, "Appeal"), "danger": num(c, "DangerValue"),
                  "yields": [[y["YieldType"], num(y, "YieldChange")] for y in feat_yields[f]],
                  "removes": [[y["YieldType"], num(y, "Yield")] for y in feat_removes[f]]}

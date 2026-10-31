@@ -11,7 +11,7 @@ import { cityAppealResolver, cityGovernorPromos } from './governors';
 import { IMPROVEMENTS, type ImprovementDef, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { droughtBars, fireFeature } from '../data/disasters';
 import { isSuzerain } from './cityStates';
-import { FEATURES, isFloodplains } from '../../world/features';
+import { FEATURES, featureRefusesDistrict, isFloodplains } from '../../world/features';
 import { RESOURCES, resourceImprovement } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { GOVERNMENTS } from '../data/policies';
@@ -580,10 +580,7 @@ export function canPlaceDistrictIn(
   if (tile.builtWonder) return no('A wonder occupies this tile.');
   if (naturalWonderAt(tile)) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');
-  if (tile.feature === 'OASIS') return no('Districts cannot be built on an oasis.');
-  // CIV6 (the pack's fire features): neither Removable nor
-  // `ValidDistrictPlacement`, so nothing paves the plot until it regrows
-  if (fireFeature(tile.feature)) return no('A fire has burned here.');
+  if (featureRefusesDistrict(tile.feature)) return no(`Districts cannot be built on ${FEATURES[tile.feature!]?.name ?? tile.feature}.`);
   // GS lets districts be built on every kind of Floodplains (they flood
   // instead of being refused), so there is no floodplain test here.
   //

@@ -37,7 +37,8 @@ export interface DistrictValueFacts extends PlotValueFacts {
   purchaseCost: number;
   /** the plot is a lake (IsLake) */
   lake: boolean;
-  /** the city keeps the feature under the district (0x17cb00) */
+  /** the city keeps the feature under the district (0x17cb00: the city's
+   *  EFFECT_ADJUST_VALID_FEATURES_DISTRICTS pairs, Egypt's Iteru alone) */
   keepsFeature(district: string): boolean;
   /** the district on the plot, null none, and whether it is pillaged; the
    *  plot is the city's centre */
@@ -214,8 +215,12 @@ export function districtValue(f: DistrictValueFacts, district: string, t: number
   if (!row) return FX_MIN;
   let value = 0;
   if (!f.owned) value -= discounted(yieldValue(null, null, f.purchaseCost * FX, 'YIELD_GOLD'), AI_RATE, t);
+  // a feature the city does not keep: cleared where Removable, stood on where
+  // ValidDistrictPlacement (0x7a53bc..0x7a5408: Features +0xc1 bit 7,
+  // Features_XP2 +0x28 bit 2), else nothing to value (a Reef)
   if (f.feature && !f.keepsFeature(district)) {
-    if (!FEATURE.get(f.feature)?.removable) return 0;
+    const fr = FEATURE.get(f.feature);
+    if (!fr?.removable && !fr?.validDistrictPlacement) return 0;
     value += featureRemovalValue(f, f.feature, t, h);
   }
   if (f.resource) {

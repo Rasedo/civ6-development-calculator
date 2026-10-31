@@ -40,3 +40,16 @@
   context:
     - "...UNITS_PRODUCTION, registered 0xc1e610, its arguments' object vt 0xdf78a8, apply +0x60 0xb7e0d0): per Units row whose FormationClass (+0xa0, 0xadd5e0) is not the civilian one (2) and..."
   review: imported
+- addr: 0xbb9de0
+  kind: function
+  name: EFFECT_ADJUST_VALID_FEATURES_DISTRICTS
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 85
+      value: "Bologna's Harbor on 30:7, the game's, over the 29:8 Reef (the keep list empty for a city-state: a Reef neither Removable nor ValidDistrictPlacement refuses the district); the five verbose duels' DISTRICTS rows hold no Reef plot"
+  readings:
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+  context:
+    - ...+0x2170 +0x378 (district, feature), written by EFFECT_ADJUST_VALID_FEATURES_DISTRICTS (0xbb9de0 -> 0x183b30; the one install row Egypt's TRAIT_FLOODPLAINS_VALID_GOVERNMENT), or one on...
+  review: reviewed

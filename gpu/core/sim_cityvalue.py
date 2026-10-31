@@ -585,7 +585,8 @@ class SimCityValue:
         zero = torch.zeros_like(like, dtype=torch.bool)
         feat, res, cur = f.feature(), f.resource(), f.plot_improvement()
         if feat and not f.keeps_feature(district):
-            if not T["feat"].get(feat, {}).get("removable"):
+            fr = T["feat"].get(feat, {})
+            if not fr.get("removable") and not fr.get("validDistrictPlacement"):
                 zero = torch.ones_like(zero)
             value = value + self._cv_feature_removal(f, feat, t, h)
         if res:
@@ -1223,7 +1224,7 @@ class SimCityValue:
                      "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN",
                      "EFFECT_GRANT_UNIT_IN_CITY", "EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER",
                      "EFFECT_GRANT_INFLUENCE_TOKEN", "EFFECT_GRANT_SPY", "EFFECT_GRANT_COMBAT_ADJACENCY",
-                     "EFFECT_ADJUST_UNIT_PRODUCTION", "EFFECT_ADJUST_CITY_FREE_POWER",
+                     "EFFECT_ADJUST_UNIT_PRODUCTION", "EFFECT_ADJUST_CITY_FREE_POWER", "EFFECT_MOUNTAIN_PORTAL",
                      "EFFECT_ADJUST_IMPROVEMENT_HOUSING")
 
     def _cv_check_read(self, m: dict, reads: dict, depth: int = 1) -> None:
@@ -1439,6 +1440,17 @@ class SimCityValue:
             if not city:
                 return zero
             return _t(f.unit_cost(a.get("UnitType", "")), like) * amount
+        if eff == "EFFECT_MOUNTAIN_PORTAL":
+            # `EFFECT_MOUNTAIN_PORTAL`: the plot's ring's neighbours with a
+            # route (`portal_routes`, -1 none) x the route value K x 0.5, from
+            # the start to the horizon; an analysis of no plot nothing
+            pr = getattr(f, "portal_routes", None)
+            if pr is None:
+                return zero
+            n = _t(pr(), like)
+            k = _t(f.trade_knowledge(), like)
+            v = _fmul(_fmul(k, n.clamp(min=0) * _FX), torch.full_like(k, _fx_const(0.5)))
+            return torch.where(n >= 0, between(v) >> 8, zero)
         if eff == "EFFECT_ADJUST_CITY_FREE_POWER":
             # `EFFECT_ADJUST_CITY_FREE_POWER`: the more of half the city's
             # Production where its power is short and the Amount at

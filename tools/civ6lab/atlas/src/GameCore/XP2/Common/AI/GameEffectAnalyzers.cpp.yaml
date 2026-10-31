@@ -790,6 +790,19 @@
   context:
     - "...he prose's \"plus 0.5\" read 0x16eb20 as an add), EFFECT_ADJUST_CITY_YIELD_PER_POPULATION 0x6b6460 and EFFECT_ADJUST_CITY_GOLD_FROM_CITIZENS 0x6b8150 (Amount x the context city's citiz..."
   review: reviewed
+- addr: 0x6b6610
+  final: 0x468190
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      value: "runs/h1_duelv1124   (its K from AI_Knowledge.csv's TRADE row of the turn before): Cardiff   12:13 239.34 (three roads beside, K 6.87), 12:12 170.34 (two), Bologna   32:9 135.34 (two, K 5.16), 129.34 a"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+  context:
+    - "...RTAL'S ANALYZER (EFFECT_MOUNTAIN_PORTAL -> the static 0xf04278, vtable 0xd632c8, slot 1 0x6b6610), the Mountain Tunnel's ImprovementModifiers row in 0x7b1320's modifiers term: with the..."
+  review: reviewed
 - addr: 0x6b76f0
   final: 0x469010
   kind: function

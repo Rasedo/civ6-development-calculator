@@ -110,6 +110,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   context:
     - "...NonFoodYieldModifier change on the city's yield, at least 1.0, from T to the horizon (0x7a2140) — the Arena; a city-state's gold per turn counts its city's Gold (the Economic boost;..."
     - "...part to context +0xc0; \"span\" is PV(horizon) - PV(start) by two 0x7a16e0 calls, \"between\" 0x7a2140; \"weighted\" a yield through 0x7a6690 with the player, \"bare\" without):"
@@ -147,6 +148,19 @@
     - "...e's strengths (the unit value's inputs), the project value 0x7b28c0, the resource value 0x7a21e0 (3 KB: luxuries' amenities over the player's cities, strategics over the units needing..."
     - "...0² or NUCLEAR_WEAPON of 1.0; per improvement the resources near the cities (0x5d45c0 -> 0x7a21e0); the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88 and 0x3d..."
     - ...or the named one, the player's count of it 0x4aa790 x Amount through the resource value 0x7a21e0), EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY 0x6adb20 (the player's yield per...
+  review: reviewed
+- addr: 0x7a2df0
+  final: 0x528ef0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      value: "runs/h1_duelv1124   (its K from AI_Knowledge.csv's TRADE row of the turn before): Cardiff   12:13 239.34 (three roads beside, K 6.87), 12:12 170.34 (two), Bologna   32:9 135.34 (two, K 5.16), 129.34 a"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+  context:
+    - ...stand among them; then count x the trade AI's route value K (the knowledge base +0x6d8, 0x7a2df0) x 0.5 (two fixed-point products 0x16e7d0), PV(H) - PV(T) at the context's rate (0x7a...
   review: reviewed
 - addr: 0x7a2e20
   final: 0x528f20
@@ -194,6 +208,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   context:
     - "## C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b132..."
     - "...eps the feature where MustRemoveFeature is false. A feature it neither keeps nor lists: 0x7a3010, or 0 where not Removable. Then - the charge + 0x7b1320 + the resource value 0x7a21e0 (..."
@@ -365,6 +380,7 @@
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
   review: reviewed
 - addr: 0x7a58f0
@@ -690,6 +706,7 @@
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...litary AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
   context:

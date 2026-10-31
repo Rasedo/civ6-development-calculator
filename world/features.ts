@@ -30,6 +30,9 @@ interface FeatureDef {
    *  CLASS_FLOODPLAINS): one of the three floodplains — the class a flood
    *  strikes and most floodplains rules name (`isFloodplains`). */
   floodplains?: boolean;
+  /** CIV6 (Expansion2_Features.xml `Features_XP2` ValidDistrictPlacement):
+   *  a district stands on the feature unremoved (`featureRefusesDistrict`) */
+  districtPlacement?: boolean;
   /** Gold every INTERNATIONAL trade route out of a city holding the feature
    *  pays (MODIFIER_ALL_CITIES_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL on
    *  a CITY_HAS_<feature> subject), once however many of its plots the city
@@ -46,6 +49,15 @@ interface FeatureDef {
  *  row by name instead. */
 export function isFloodplains(feature: string | null | undefined): boolean {
   return !!feature && FEATURES[feature]?.floodplains === true;
+}
+
+/** CIV6 (the district placement test 0x35f2d0 at 0x35f6ad..0x35f7b0): a
+ *  feature neither Removable nor ValidDistrictPlacement refuses every
+ *  district (a Reef, an Oasis, a Geothermal Fissure, a fire's) */
+export function featureRefusesDistrict(feature: string | null | undefined): boolean {
+  if (!feature) return false;
+  const f = FEATURES[feature];
+  return !f || (!f.removable && !f.districtPlacement);
 }
 
 /** Features a builder can CLEAR — the Deforestation Treaty's target space,
@@ -94,6 +106,7 @@ export const FEATURES: Record<string, FeatureDef> = {
     allowHills: false,
     removable: false,
     floodplains: true,
+    districtPlacement: true,
   },
   OASIS: {
     id: 'OASIS',
@@ -144,6 +157,7 @@ export const FEATURES: Record<string, FeatureDef> = {
     terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'],
     allowHills: true,
     removable: false,
+    districtPlacement: true,
   },
 };
 
@@ -205,8 +219,8 @@ Object.assign(FEATURES, {
 // RequiresRiver, DefenseModifier -2 and Appeal -1 as the desert row, and both
 // in `Feature_Floodplains`.
 Object.assign(FEATURES, {
-  FLOODPLAINS_GRASSLAND: { id: 'FLOODPLAINS_GRASSLAND', name: 'Floodplains (Grassland)', yields: {}, terrains: ['GRASSLAND'], allowHills: false, removable: false, floodplains: true },
-  FLOODPLAINS_PLAINS: { id: 'FLOODPLAINS_PLAINS', name: 'Floodplains (Plains)', yields: {}, terrains: ['PLAINS'], allowHills: false, removable: false, floodplains: true },
+  FLOODPLAINS_GRASSLAND: { id: 'FLOODPLAINS_GRASSLAND', name: 'Floodplains (Grassland)', yields: {}, terrains: ['GRASSLAND'], allowHills: false, removable: false, floodplains: true, districtPlacement: true },
+  FLOODPLAINS_PLAINS: { id: 'FLOODPLAINS_PLAINS', name: 'Floodplains (Plains)', yields: {}, terrains: ['PLAINS'], allowHills: false, removable: false, floodplains: true, districtPlacement: true },
 } satisfies Record<string, FeatureDef>);
 
 // PAITITI, appended after the floodplains. CIV6 (GranColombia_Maya_Features.xml):

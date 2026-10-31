@@ -1828,6 +1828,25 @@ class _PlotFacts:
     def power_short(self):
         return self._at(self.mf.power_short())
 
+    def trade_knowledge(self):
+        return self._at(self.mf.trade_knowledge())
+
+    def portal_routes(self):
+        """per element the Mountain Portal analyzer's walk of the plot's ring
+        (`portalRoutes`): its neighbours with a route, -1 where a neighbour
+        without one holds a portal or none is a mountain"""
+        sim = self.sim
+        nb = sim.neigh[self.tiles]
+        ok = nb >= 0
+        nbc = nb.clamp(min=0)
+        b = self.bb.unsqueeze(1).expand_as(nbc)
+        road = sim.road[b, nbc] & ok
+        imp = sim.improvement[b, nbc]
+        portal = sim._imp_portal.take(imp.clamp(min=0)) & (imp >= 0) & ok
+        mtn = sim.tile_mountain[b, nbc] & ok
+        bad = (portal & ~road).any(dim=1) | ~mtn.any(dim=1)
+        return torch.where(bad, torch.full_like(self.tiles, -1), road.sum(dim=1))
+
     def plot_improvement(self):
         return self._imp
 
@@ -1939,10 +1958,8 @@ class _PlotFacts:
         return (self.sim.terrain[self.bb, self.tiles] == lt).long()
 
     def keeps_feature(self, d):
-        if not self._feat:
-            return False
-        row = self.sim._cv_tables()["feat"].get(self._feat)
-        return not (row and row["removable"])
+        # a city-state's city holds no EFFECT_ADJUST_VALID_FEATURES_DISTRICTS pair
+        return False
 
     def plot_district(self):
         return self.repair_of

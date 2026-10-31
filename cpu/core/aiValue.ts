@@ -280,6 +280,10 @@ export interface AiValueView {
   /** the trade AI's expected route value (the knowledge base's +0x6d8,
    *  AI_Knowledge.csv's TRADE VAL), raw; null where it is not read */
   tradeKnowledge(seat: number): number | null;
+  /** the Mountain Portal analyzer's walk of a plot's ring (0x6b1b0 with
+   *  0x6c8fb0): its neighbours with a route; null where a neighbour without
+   *  one holds a portal (0x88680) or none is a mountain */
+  portalRoutes(plot: number): number | null;
   atWar(seat: number, other: number): boolean;
   /** the envoys `seat` holds in a city-state (its tokens received from it,
    *  0x44c860) */

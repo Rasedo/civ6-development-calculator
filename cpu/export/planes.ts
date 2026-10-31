@@ -26,7 +26,7 @@ import { UNITS } from '../data/units';
 import { stormFamilyAt, STORM_FAMILIES, droughtTerrain } from '../data/disasters';
 import { floodRivers, volcanoOrder } from '../core/disasters';
 import { TERRAINS } from '../../world/terrains';
-import { FEATURES, isFloodplains } from '../../world/features';
+import { FEATURES, featureRefusesDistrict, isFloodplains } from '../../world/features';
 import { RESOURCES, resourceImprovement } from '../../world/resources';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS } from '../data/cityStates';
@@ -145,7 +145,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       ftu: chopUnlockTech(t),
       wt: isWater(t) ? 1 : 0,
       cw:
-        isCoastalWater(map, t) && !naturalWonderAt(t) && !t.builtWonder &&
+        isCoastalWater(map, t) && !naturalWonderAt(t) && !t.builtWonder && !featureRefusesDistrict(t.feature) &&
         !(t.resource && RESOURCES[t.resource].category !== 'bonus') ? 1 : 0,
       fw: hasFreshWater(map, t) ? 1 : 0,
       // statically settleable for civ-seat expansion (mirrors siteQuality's -1s;
@@ -158,19 +158,20 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // it live — the seed 9235/9144 founding-site divergence. Keep `st`
       // purely static: water / impassable / natural wonder / OASIS.
       st: !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && t.feature !== 'OASIS' ? 1 : 0,
-      // canPlaceDistrictIn's STATIC half. GS allows districts on floodplains,
-      // so only the Oasis is refused by feature; the removable-feature TECH
-      // gate is dynamic and lives on `ftu` (the engine reads it per seat).
+      // canPlaceDistrictIn's STATIC half: a feature neither Removable nor
+      // ValidDistrictPlacement refuses (`featureRefusesDistrict`; a fire's is
+      // live, `_fire_plots`); the removable-feature TECH gate is dynamic and
+      // lives on `ftu` (the engine reads it per seat).
       du:
         !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && !t.builtWonder &&
-        t.feature !== 'OASIS' && !t.district &&
+        !featureRefusesDistrict(t.feature) && !t.district &&
         !(t.resource && RESOURCES[t.resource].category !== 'bonus') ? 1 : 0,
       // ...and the same half with the resource clause left OUT: CIV6
       // (Resources.PrereqTech) a strategic a seat cannot see yet is plain
       // ground to it, so the GPU ORs this in where `_res_hidden(row)` holds
       du0:
         !isWater(t) && !isImpassable(t) && !naturalWonderAt(t) && !t.builtWonder &&
-        t.feature !== 'OASIS' && !t.district ? 1 : 0,
+        !featureRefusesDistrict(t.feature) && !t.district ? 1 : 0,
       dadj: PLACEABLE_DISTRICTS.map((id) => {
         // the whole rules' pay; the live-floored rules' joins it on the engine
         const raw = staticAdjRaw(map, t, id);

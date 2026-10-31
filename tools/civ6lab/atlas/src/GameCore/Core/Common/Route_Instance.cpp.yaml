@@ -1,0 +1,18 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x88680
+  final: 0x63cb0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      value: "runs/h1_duelv1124   (its K from AI_Knowledge.csv's TRADE row of the turn before): Cardiff   12:13 239.34 (three roads beside, K 6.87), 12:12 170.34 (two), Bologna   32:9 135.34 (two, K 5.16), 129.34 a"
+  impl: [cpu/core/aiValue.ts:playerUnits]
+  readings:
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+  context:
+    - ...ghbour with a route (plot +0x47 not 0xff) counts, one without a route holding a portal (0x88680, the route manager's per-plot portal) refuses the term, and one of the five mountain...
+  review: imported

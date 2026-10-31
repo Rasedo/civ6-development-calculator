@@ -16,6 +16,7 @@
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb/notes.txt: ...*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8..."
@@ -545,13 +546,18 @@
   review: imported
 - addr: 0x17cb00
   kind: function
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 85
+      value: "Bologna's Harbor on 30:7, the game's, over the 29:8 Reef (the keep list empty for a city-state: a Reef neither Removable nor ValidDistrictPlacement refuses the district); the five verbose duels' DISTRICTS rows hold no Reef plot"
   impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
   readings:
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   context:
     - "...ld value with no player, discounted T, taken off. A feature the district does not keep (0x17cb00) and the Features row does not let it clear: 0; else the feature removal (0x7a3010). A..."
-  review: imported
+  review: reviewed
 - addr: 0x17d1a0
   kind: function
   status: PARTLY
@@ -675,6 +681,19 @@
     - ...WONDER its production completes annexes WONDER_FREE_TILES_UPON_COMPLETION (2) plots (0x17f870, building info +0x158 bit 0x40, -> 0x1a8a30), one picker draw each, before the wonder's...
     - "- A wonder's annex (0x17f870 → AnnexPlots 0x1a8a30) fires its CityTileOwnershipChanged rows BEFORE the WonderComplet..."
   review: imported
+- addr: 0x183b30
+  final: 0x1047b0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 85
+      value: "Bologna's Harbor on 30:7, the game's, over the 29:8 Reef (the keep list empty for a city-state: a Reef neither Removable nor ValidDistrictPlacement refuses the district); the five verbose duels' DISTRICTS rows hold no Reef plot"
+  readings:
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+  context:
+    - ...378 (district, feature), written by EFFECT_ADJUST_VALID_FEATURES_DISTRICTS (0xbb9de0 -> 0x183b30; the one install row Egypt's TRAIT_FLOODPLAINS_VALID_GOVERNMENT), or one on the distr...
+  review: reviewed
 - addr: 0x183db0
   final: 0x1049b0
   kind: function

@@ -284,6 +284,17 @@
   context:
     - "- READ, Ilkum's EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (@f040d0, vtable 0xd63100; its parser 0x6b1d00 stores UnitType +8 and fx(Amount x 0.01f) +0x10): with a player, p..."
   review: imported
+- addr: 0xd632c8
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      value: "runs/h1_duelv1124   (its K from AI_Knowledge.csv's TRADE row of the turn before): Cardiff   12:13 239.34 (three roads beside, K 6.87), 12:12 170.34 (two), Bologna   32:9 135.34 (two, K 5.16), 129.34 a"
+  readings:
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+  context:
+    - "- THE MOUNTAIN PORTAL'S ANALYZER (EFFECT_MOUNTAIN_PORTAL -> the static 0xf04278, vtable 0xd632c8, slot 1 0x6b6610), the Mountain Tunnel's ImprovementModifiers row in 0x7b1320's modifie..."
+  review: imported
 - addr: 0xd63400
   kind: global
   status: PARTLY
@@ -340,6 +351,17 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...yzers: EFFECT_ADJUST_CITY_OUTER_DEFENSE 0x6c4650 (the registry's object @f03cf0, vtable 0xd63a18 slot 1): with arguments and the context's city, its centre's outer damage (0x24ae50 on..."
+  review: imported
+- addr: 0xd64018
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      value: "runs/h1_duelv1124   (its K from AI_Knowledge.csv's TRADE row of the turn before): Cardiff   12:13 239.34 (three roads beside, K 6.87), 12:12 170.34 (two), Bologna   32:9 135.34 (two, K 5.16), 129.34 a"
+  readings:
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+  context:
+    - "...xt's plot (+0x88) and player (+0x80), the ring of radius 1 (0x6b1b0 with the functor @0xd64018, 0x6c8fb0): a neighbour with a route (plot +0x47 not 0xff) counts, one without a route..."
   review: imported
 - addr: 0xd6ced0
   kind: global
@@ -660,6 +682,17 @@
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
   context:
     - "- EFFECT_ADJUST_IMPROVEMENT_HOUSING, READ (registry 0x6c9640: the name's object @0xf03ef8, its vtable @0xd62e78, slot 1 0x6ad2b0): with the modifier's arguments (r8) and the con..."
+  review: imported
+- addr: 0xf04278
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      value: "runs/h1_duelv1124   (its K from AI_Knowledge.csv's TRADE row of the turn before): Cardiff   12:13 239.34 (three roads beside, K 6.87), 12:12 170.34 (two), Bologna   32:9 135.34 (two, K 5.16), 129.34 a"
+  readings:
+    - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+  context:
+    - "- THE MOUNTAIN PORTAL'S ANALYZER (EFFECT_MOUNTAIN_PORTAL -> the static 0xf04278, vtable 0xd632c8, slot 1 0x6b6610), the Mountain Tunnel's ImprovementModifiers row in 0..."
   review: imported
 - addr: 0xf04cb0
   kind: global

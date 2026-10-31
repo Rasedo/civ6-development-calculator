@@ -90,6 +90,9 @@ export interface ValueTerms {
    *  COLLECTION_PLAYER_UNITS walk, kept through a granted ability's own
    *  modifiers; absent, none */
   unit?: { plot: number; type: string; moves: number; level: number };
+  /** the plot the evaluation is of (context +0x88): an improvement's plot
+   *  in its ImprovementModifiers' analysis; absent, none */
+  plot?: number;
   /** a resolution's target hint (0x67dd40's handlers), in the install's
    *  types: the luxury (+0x4c), the yield (+0x64), the government (+0x28),
    *  the great person class (+0x6c), the project (+0x68) */
@@ -920,6 +923,17 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // (@0xf2e22c), each from the start to the horizon (0x7a2140 / 0x7a1240 at
   // start = horizon); an Amount below 0 (its walk over the player's +0x1320)
   // not read, 0
+  // 0x6b6610 (the Mountain Tunnel's MOUNTAIN_PORTAL): over the plot's ring
+  // (`portalRoutes`) its neighbours with a route x the trade AI's route value
+  // K (the knowledge base +0x6d8, 0x7a2df0) x 0.5, from the start to the
+  // horizon; nothing with no plot, a portal beside it or no mountain
+  EFFECT_MOUNTAIN_PORTAL: (t) => {
+    if (t.plot === undefined) return 0;
+    const n = t.view.portalRoutes(t.plot);
+    if (n === null) return 0;
+    const k = t.view.tradeKnowledge(t.seat) ?? 0;
+    return whole(valueBetween(fmul(fmul(k, n * FX), fxConst(0.5)), t.start, t.horizon, t.rate));
+  },
   EFFECT_ADJUST_CITY_FREE_POWER: (t, args, s) => {
     const amount = Number(args.Amount ?? 0) | 0;
     if (s.kind !== 'city' || amount <= 0) return 0;

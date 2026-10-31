@@ -23,7 +23,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory } from './import';
-import { AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
+import { AI_DISTRICTS, AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
 import { AI_RATE, FX } from '../core/aiValue';
 import { modifiersValue } from '../core/aiModifiers';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
@@ -84,9 +84,20 @@ const researching = new Map<string, [string, number]>();
     }
   }
 }
+/** AI_Knowledge.csv's TRADE rows: `${turn}:${player}` -> the route value K
+ *  (an analysis reads its city-state's K of the turn before) */
+const tradeVal = new Map<string, number>();
+{
+  const path = dump.replace(/\.jsonl$/, '.logs/AI_Knowledge.csv');
+  if (existsSync(path)) {
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+      const p = line.split(',').map((x) => x.trim());
+      if (p[2] === 'TRADE') tradeVal.set(`${p[0]}:${p[1]}`, Number(p[4].replace('VAL ', '')));
+    }
+  }
+}
 const W = recs[0].head.W;
 const RES = new Map(AI_RESOURCES.map((r) => [r.type, r] as const));
-const AI_FEATURE_ROWS = new Map(AI_FEATURES.map((r) => [r.type, r] as const));
 /** an engine district's install type: the traitless AI row whose engine id it is */
 const typeOfDistrict = (id: string): string => AI_DISTRICTS.find((r) => r.trait === null && engineId('district', r.type, 'DISTRICT_', DISTRICTS) === id)?.type ?? `DISTRICT_${id}`;
 const YIELD_KEY: Record<string, string> = {
@@ -145,8 +156,10 @@ for (const rec of recs) {
     if (dc?.foodSurplus !== undefined) facts.growth.surplus = Math.round(Number(dc.foodSurplus) * 256);
     const forecast = growthForecast(facts.growth);
     // the modifiers' housing on the same growth (`cityHousingValue`)
+    const k = tradeVal.get(`${turn - 1}:${player}`);
     const modView = { ...facts.view, cityHousingValue: (i: number, id: number, housing: number, t: number, h: number) =>
-      (i === cs.seat ? housingValue(facts.growth, forecast, housing, t, h) : facts.view.cityHousingValue(i, id, housing, t, h)) };
+      (i === cs.seat ? housingValue(facts.growth, forecast, housing, t, h) : facts.view.cityHousingValue(i, id, housing, t, h)),
+      tradeKnowledge: (s: number) => (s === cs.seat && k !== undefined ? Math.round(k * 256) : facts.view.tradeKnowledge(s)) };
     const yctx = makeYieldCtx(state, cs.seat);
     const r = cs.research;
     // the research AI's turns as the game's log gives them: the entry of the
@@ -205,7 +218,7 @@ for (const rec of recs) {
         accumulationPct: accumulationPct(state, cs.seat, tile.terrain),
         era: facts.era,
         modifiers: (mods, t, h) => modifiersValue({ view: modView, seat: cs.seat, start: t, horizon: h, rate: AI_RATE,
-          owner: { cityId: facts.cityId, capital: facts.capital } }, mods),
+          owner: { cityId: facts.cityId, capital: facts.capital }, plot: tile.index }, mods),
       };
       if (districtsMode) {
         const city = minorCity(cs);
@@ -220,7 +233,7 @@ for (const rec of recs) {
           owned: tile.ownerSeat >= 0,
           purchaseCost: tile.ownerSeat >= 0 ? 0 : borderCandidates(state, city).includes(plot) ? tilePurchaseCost(state, city, plot) : -1,
           lake: tile.terrain === 'LAKE',
-          keepsFeature: () => !!f.feature && !AI_FEATURE_ROWS.get(f.feature)?.removable,
+          keepsFeature: () => false,
           district: tile.district ? typeOfDistrict(tile.district) : null,
           districtPillaged: !!tile.districtPillaged,
           isCity: tile.index === cs.centerIndex,

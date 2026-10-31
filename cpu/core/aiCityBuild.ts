@@ -92,6 +92,8 @@ export const AI_BUILDING_INDEX: ReadonlyMap<string, number> = new Map(AI_BUILDIN
 export interface AiFeatureRow {
   type: string;
   removable: boolean;
+  /** Features_XP2 ValidDistrictPlacement: a district stands on it unremoved */
+  validDistrictPlacement: boolean;
   removeTech: string | null;
   appeal: number;
   /** Features.DangerValue: what the plot adds to the AI's danger map */

@@ -306,7 +306,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       accumulationPct: accumulationPct(state, cs.seat, tile.terrain),
       era: facts.era,
       modifiers: (mods, t, h) => modifiersValue({ view: facts.view, seat: cs.seat, start: t, horizon: h, rate: AI_RATE,
-        owner: { cityId: facts.cityId, capital: facts.capital } }, mods),
+        owner: { cityId: facts.cityId, capital: facts.capital }, plot }, mods),
     };
     const ground = owned && !repair ? groundImprovements(state, cs, tile) : new Set<string>();
     // an improvement a drought on the plot bars, which its ground takes
@@ -346,7 +346,8 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       owned: tile.ownerSeat >= 0,
       purchaseCost: tile.ownerSeat >= 0 ? 0 : candidates.has(plot) ? tilePurchaseCost(state, city, plot) : -1,
       lake: tile.terrain === 'LAKE',
-      keepsFeature: () => !!f.feature && !FEATURE_ROW.get(f.feature)?.removable,
+      // a city-state's city holds no EFFECT_ADJUST_VALID_FEATURES_DISTRICTS pair
+      keepsFeature: () => false,
       district: repair ? districtType(tile.district!) : null,
       districtPillaged: repair,
       isCity: false,
