@@ -38,12 +38,12 @@ class SimMinors:
             gained = self._minor_economy(s)
             self._store_unit_strength(s, alive)
             self._minor_build(s, self._minor_production(s))
-            # its city AI's full update reads its growth here, before the growth
+            # its city AI's update reads, between the production and the
+            # growth, the growth its last turn read (its own the first turn)
             g = self._cv_minor_facts(s).growth()
             now = torch.stack([g["surplus"], g["housing"], g["population"], g["stored"], g["multiplier"]], -1)
-            # its Food surplus and Housing as its city AI's last turn read them
             seen = self.citystate_ai_seen[:, s]
-            now[:, :2] = torch.where((seen[:, 2] > 0).unsqueeze(-1), seen[:, :2], now[:, :2])
+            now = torch.where((seen[:, 5] > 0).unsqueeze(-1), seen[:, :5], now)
             self.citystate_ai_growth[:, s] = torch.where(alive.unsqueeze(-1), now, self.citystate_ai_growth[:, s])
             self._minor_growth(s)
             self._minor_research_ai(s)

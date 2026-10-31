@@ -457,9 +457,9 @@
       value: "Caguana's Farm rows: FARM_HOUSING_WITH_MAYAB_TRAIT (its PLAYER_TYPE_MATCHES requirement unregistered, so met) adds the housing value's whole part, 18.00 at t6, 30.00 at t12, 47.00 at t38, 88.00 at t45; Caguana's Farm rows 2,092 exact as with the earlier fit"
   impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_cityvalue.py:_cv_analyze]
   readings:
-    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast's Food surplus and Housing as the last analysis read them (a LAB fit)"
+    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
-    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast's Food surplus and Housing as the last analysis read them (a LAB fit), the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
   notes:
     - the registry 0x6c9640 names it EFFECT_ADJUST_IMPROVEMENT_HOUSING (object @0xf03ef8, vtable @0xd62e78, slot 1); the context's city +0x70, +0x80 set; 0x7a3d70(CityBuildAI, city +0x1788, rate +0xbc, population +0x588, Amount (args +8), start +0xb4, horizon +0xb8), sar 8 into +0xc0
   review: reviewed

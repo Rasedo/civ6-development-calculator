@@ -2821,15 +2821,15 @@
           "note": "the minor city's growth as its city AI's update read it between the turn's production and its growth (the growth forecast's inputs, CityBuildAI +0x6c8): surplus, housing, population, store, multiplier; zeros before its first"
         },
         {
-          "name": "minorAiYieldsSeen",
+          "name": "minorAiGrowthSeen",
           "compare": "exact",
           "covers": [
-            "CityState.aiYieldsSeen"
+            "CityState.aiGrowthSeen"
           ],
           "planes": [
             "citystate_ai_seen"
           ],
-          "note": "the minor city's Food surplus (raw) and Housing as its city AI's last turn read them, before its Builders acted (the next growth forecast's), and 1; zeros before its first"
+          "note": "the minor city's growth as its city AI's last turn read it, before its Builders acted (the next turn's forecast's): surplus, housing, population, store, multiplier, and 1; zeros before its first"
         },
         {
           "name": "minorCombatDesire",

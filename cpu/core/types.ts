@@ -1293,16 +1293,14 @@ export interface CityState extends Seat {
   /** its city's enemy at the gates (CityBuildAI +0x218) as its last update
    *  left it (`cityThreat`); absent, none */
   threatNear?: boolean;
-  /** its city's growth as its city AI's full update read it, between the
-   *  turn's production and its growth (`minorPhase`): the growth forecast's
-   *  inputs (CityBuildAI +0x6c8): its citizens, store and multiplier then,
-   *  its Food surplus and Housing as its last plot analysis read them
-   *  (`aiYieldsSeen`) */
+  /** the growth forecast's inputs (CityBuildAI +0x6c8) its turn reads, set
+   *  between the turn's production and its growth (`minorPhase`): the
+   *  growth its city AI's last turn read (`aiGrowthSeen`) */
   aiGrowth?: CityGrowth;
-  /** its city's Food surplus and Housing as its city AI's last turn read
-   *  them, before its Builders acted (`minorAiTurn`); absent before its
+  /** its city's growth as its city AI's turn read it, before its Builders
+   *  acted (`minorAiTurn`): the next turn's forecast's; absent before its
    *  first */
-  aiYieldsSeen?: { surplus: number; housing: number };
+  aiGrowthSeen?: CityGrowth;
   /** the camps its knowledge base holds, in their order (m_barbarians
    *  +0x638) */
   campsKnown?: number[];

@@ -113,10 +113,13 @@ export function minorPhase(state: GameState): void {
     const gained = minorEconomy(state, cityState);
     storeUnitStrength(state, cityState.seat);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
-    // its city AI's full update reads its growth here, before the growth
-    // (runs/h1_duelv1121 Ayutthaya: the Granary's housing value from the
-    // forecast of the citizens and the store before each turn's growth, t18 - t24)
-    cityState.aiGrowth = { ...minorCityGrowth(state, cityState), ...cityState.aiYieldsSeen };
+    // its city AI's forecast, between the production and the growth: of the
+    // growth its last turn read, before that turn's Builders acted (the
+    // citizens and the store before each turn's growth: runs/h1_duelv1121
+    // Ayutthaya's Granary t18 - t24; runs/h1_duely1117 Caguana 657 t135-t221,
+    // the Farm's Food still in the forecast the turn after its removal), its
+    // own the first turn
+    cityState.aiGrowth = cityState.aiGrowthSeen ?? minorCityGrowth(state, cityState);
     minorGrowth(state, cityState);
     minorResearchAi(state, cityState);
     // its military AI's turn: the Combat Desire and the favoured technology

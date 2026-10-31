@@ -2666,7 +2666,8 @@ export function buildRules() {
           // a row a Builder places on its own ground clause alone
           gnd: def.groundOnly ? 1 : 0,
           // a Builder row standing on WATER on its own terrain list alone
-          wtr: def.waterOnly ? 1 : 0,
+          // (one asking a resource under it is the resource's arm's)
+          wtr: def.waterOnly && !def.resourceOnly ? 1 : 0,
           adj: (def.adjacency ?? []).map((r) => ({
             bres: r.bonusResource ? 1 : 0,
             dist: r.district ? PLACEABLE_DISTRICTS.indexOf(r.district) : -1,

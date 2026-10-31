@@ -11579,7 +11579,7 @@ the replay leaves such a unit its city made out of unit.trained.
   Warriors (Swordsman: Iron) and Men-at-Arms (Musketman: Niter) held at 0
   Gold t144-t250.
 
-## C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast's Food surplus and Housing as the last analysis read them (a LAB fit), the Mountain Tunnel's analysis rows
+## C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows
 
 - EFFECT_ADJUST_IMPROVEMENT_HOUSING, READ (registry 0x6c9640: the name's
   object @0xf03ef8, its vtable @0xd62e78, slot 1 0x6ad2b0): with the
@@ -11607,15 +11607,27 @@ the replay leaves such a unit its city made out of unit.trained.
   the Farm 179.73 over the Batey's 109.68 (the forecast of the surplus
   without it: 89.56, the Batey laid). The plots' yields a Builder changes
   land in the next turn (PlotYieldChanged rows of turn t+1 for each
-  ImprovementRemovedFromMap / AddedToMap of turn t). LAB (a fit): the
-  forecast's Food surplus and Housing as the city AI's last turn read them
-  before its Builders acted (`CityState.aiYieldsSeen`), its citizens, store
-  and multiplier as the turn's update reads them; the fit lands the loop's
-  every turn (1117 t130-t150: 3/8 -> 9/11) and moves runs/h1_duelv1117
-  Caguana's engine-side Farm rows both ways (t27 +62.68 and t58 +171.03
-  gone; t38 -24.26, t45 +34.34, t53 -45.09 new: a surplus changed by a
-  citizen's reassignment is the live one there). The writer of the
-  surplus the forecast reads, unread.
+  ImprovementRemovedFromMap / AddedToMap of turn t). THE FORECAST'S INPUTS
+  (a LAB fit over four candidate rules, the engine's housing-carrying rows
+  against runs/h1_duelv1117 and runs/h1_duelv1124 to t120): the whole growth
+  (surplus, Housing, citizens, store, multiplier) as the city AI's last
+  turn read it, before that turn's Builders acted (`CityState.aiGrowthSeen`),
+  the forecast written after the analysis read the one before. Rows far
+  from the log: 1117 Caguana's Farms 28 (the surplus and Housing alone of
+  the last turn 31, all live 26), its Bateys 22 (29, 37), 1124 Cardiff's
+  Farms 11 (17, 38), Granada's 119 (124, 122); the plots' improvements put
+  back as the last turn left them (the Builder's change deferred, a
+  citizen's live) 29 / 34 / 30 / 120. Still off on every rule:
+  runs/h1_duelv1117 Caguana t38 -24.26, t45 +34.34, t53 -45.09 (a surplus
+  changed by a citizen's reassignment read live there); the forecast's
+  writer (0x5cb570's caller in the full update) unread.
+- THE WATER ARM'S RESOURCE ROWS: the Offshore Oil Rig (EnforceTerrain,
+  Improvement_ValidResources RESOURCE_OIL) is laid only on its resource;
+  `validImprovementsIn`'s water arm offered it on any coast (runs/h1_duely1124
+  Granada's Builder on its bare coast 613 t210-t217, the game laying none:
+  the plot holds no resource in any record). The arm takes the
+  resource-free water rows alone (TS `validImprovementsIn`, the exported
+  `wtr` column the GPU's water arms read).
 - THE MOUNTAIN TUNNEL IN A CITY-STATE'S ANALYSIS: runs/h1_duely1124 Cardiff
   t214-t250 m_bestImprovementToMake (the aimem's city fields: the pick's
   index first; Farm 1, Ski Resort 45 for Bologna t200 as laid) 46, the

@@ -390,10 +390,13 @@ export function validImprovementsIn(
   if (isWater(tile)) {
     // the WATER-ONLY rows (the Offshore Wind Farm): a water plot with no
     // resource under it to insist on a different improvement; each row's own
-    // `terrains` list is the whole ground rule.
+    // `terrains` list is the whole ground rule. A row asking a resource
+    // (Improvement_ValidResources, EnforceTerrain: the Offshore Oil Rig) is
+    // the resource's alone (runs/h1_duely1124 Granada: no Oil Rig on its bare
+    // coast 613 t210-t217)
     const out: ImprovementId[] = [];
     for (const def of Object.values(IMPROVEMENTS)) {
-      if (!def.waterOnly || !unlocked(def.id)) continue;
+      if (!def.waterOnly || def.resourceOnly || !unlocked(def.id)) continue;
       // a WATER row may be a civilization's own (the Polder)
       if (def.uniqueTo && def.uniqueTo !== opts.civ) continue;
       if (!govOk(def)) continue;

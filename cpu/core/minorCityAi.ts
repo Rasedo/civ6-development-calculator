@@ -915,7 +915,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
   // on the one curve of 1.0), and no city modifier yet
   const known = fresh ? () => 0 : minorKnownUnits(cs);
   const facts = minorBuildFacts(state, cs, known, fresh, units);
-  cs.aiYieldsSeen = { surplus: facts.growth.surplus, housing: facts.growth.housing };
+  cs.aiGrowthSeen = { ...facts.growth };
   const tables: CityBuildTables = {
     buildings: buildingTable(facts),
     units: unitTable(facts).map((v) => v ?? FX_MIN),

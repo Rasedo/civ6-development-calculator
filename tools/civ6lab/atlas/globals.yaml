@@ -246,7 +246,7 @@
       value: "its REQUIREMENT_PLAYER_TYPE_MATCHES is not in the registry's   requirement list, so the set holds) is the Farm's second housing term:   runs/h1_duelv1117 Caguana's Farm rows 18.00 at t6, 88.00 at t45,"
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
-    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast's Food surplus and Housing as the last analysis read them (a LAB fit), the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
   context:
     - "..._IMPROVEMENT_HOUSING, READ (registry 0x6c9640: the name's object @0xf03ef8, its vtable @0xd62e78, slot 1 0x6ad2b0): with the modifier's arguments (r8) and the context's player (+0x80)..."
   review: imported
@@ -657,7 +657,7 @@
       value: "its REQUIREMENT_PLAYER_TYPE_MATCHES is not in the registry's   requirement list, so the set holds) is the Farm's second housing term:   runs/h1_duelv1117 Caguana's Farm rows 18.00 at t6, 88.00 at t45,"
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
-    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast's Food surplus and Housing as the last analysis read them (a LAB fit), the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
   context:
     - "- EFFECT_ADJUST_IMPROVEMENT_HOUSING, READ (registry 0x6c9640: the name's object @0xf03ef8, its vtable @0xd62e78, slot 1 0x6ad2b0): with the modifier's arguments (r8) and the con..."
   review: imported
