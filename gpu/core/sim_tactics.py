@@ -293,8 +293,9 @@ class SimTactics:
         -> 0x209dd0), on the mover's own ground, on any with `any_ground` (the
         danger map's); any such unit on ground of the mover's domain, a city
         centre of such a player, an Encampment that blocks a land mover — on
-        plots it revealed; and the fighters' water a land unit its player
-        may embark attacks into too."""
+        plots it revealed, a move order's path (not `planning`) on plots it
+        sees now; and the fighters' water a land unit its player may embark
+        attacks into too."""
         foe = self._tac_hostile(seat)
         fight = torch.zeros_like(foe)
         for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at) if planning else ():
@@ -314,6 +315,11 @@ class SimTactics:
         known = self._tac_known(seat) if revealed_only else None
         if known is not None:
             land, naval, fight_w = land & known, naval & known, fight_w & known
+        if not planning:
+            # a move order's path attacks into no plot the player does not see
+            # now: a city or a unit it last knew there out of its sight bars it
+            sn = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
+            land, naval, fight_w = land & sn, naval & sn, fight_w & sn
         return land, naval, fight_w
 
     def _tac_zoc(self, seat: int, seen: torch.Tensor | None = None, naval: bool | None = None) -> torch.Tensor:

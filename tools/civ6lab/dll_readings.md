@@ -6748,6 +6748,37 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   (`_GameRows`: each job a game, the per-game planes taken by rows), the
   strength routines unchanged.
 
+## C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)
+
+`groundOf`'s attack (not `planning`) in cpu/core/tactical.ts; `_tac_attack_planes` (not `planning`) in gpu/core/sim_tactics.py.
+
+- THE STRIKE (0x771670, READ): its arguments the tactical object (its
+  unit list +0x270, 0x30 a unit: +0x24 dealt, +0x28 taken), the target,
+  its plot, two flags ([rbp+0x108] the exchange filter: taken above dealt
+  skipped; [rbp+0x110] the survival filter: damage + taken — twice taken in
+  the ranged loop — at the unit's health skipped). Barbarian Rampage
+  (0x778b40 at 0x778f57) passes both 0 and its one unit with r13 = 0 at
+  +0x24 / +0x28: no filter. A fighter or COMBAT_DISTRICT target (0x208b80,
+  the type test at 0x7716f4) takes the ranged loop (Ranged or Bombard
+  above 0) then the melee loop, which skips a ranged unit and gives each
+  other one MOVE_TO (0x962030) on the target with flag 0x10 (0x771e44).
+- THE ORDER'S PATH (FIT): a melee unit's MOVE_TO with the attack flag on a
+  target its player does not see now goes nowhere — the city or the unit
+  it last knew there bars the plot. Rampage rows on a COMBAT_DISTRICT,
+  runs/h1_duely1117 and 1124 (the engine's sight at the strike beside the
+  record's end plot): the melee movers whose target the barbarians do not
+  see stay 167 of 169 (runs/h1_duely1117 t13-t21 the Scout at 13:13, 77
+  damage, for Valletta's 14:8; t127-t134 the Man-At-Arms at 37:16 for
+  Longxi's 37:13, t136-t141 at 36:15; t155-t250 the Galley at 25:1 for
+  30:8; h1_duely1124 t114 the Man-At-Arms at 6:3 for Beijing's 5:7, which
+  goes at t115 once the Crossbowman at 6:5 sees the city); those that see
+  it go (1124 t115-t117, 1117 t13). The unit's last-known LOW target in a
+  city (1117 t11, the Scout and the Warrior for Valletta's garrison) the
+  same. The pathfinder's own test (the move's validity 0x2720a0 / the
+  attack test of 0x26e570's twin) is unread; ported as the move order's
+  attack plots taken only on a plot the player sees now.
+- MEASURED (--aiscore, five duely duels): see the hand-back.
+
 ## C-95: the danger map and Move to Safety — READ, ported
 
 `dangerPlane`, `flees`, `safePlot`, `moveToSafety`, `homelandSafety` in cpu/core/tactical.ts; `_danger_plane`, `_tac_flees`, `_tac_safe_plot`, `_tac_move_to_safety` in gpu/core/sim_tactics.py. The barbarians' lists take Move to Safety after Attack Medium Priority and in their homeland; the city-states' after Attack High Priority and in their homeland; the Free Cities' after Attack Medium Priority.

@@ -60,6 +60,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
   context:
     - "...or 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrapper 0x26e570 refuses a node past the turn limit): the list at planning +0x30 (16-byte entries x, y,..."
     - "...centre, an Encampment) as a node whose step spends the Movement left (the valid wrapper 0x26e570: the attack's cost adds the Movement left, 0x1d0 += 0x1d4) and links nothing from it (a..."
@@ -279,6 +280,7 @@
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+    - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x2726b0

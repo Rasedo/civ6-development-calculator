@@ -133,9 +133,12 @@
   cases:
     - recording: 1124
       value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
-  impl: [cpu/core/tactical.ts:strike]
+    - recording: h1_duely1117
+      value: t127-t134 the rampaging Man-At-Arms at 37:16 holds for Longxi's 37:13 out of the barbarians' sight (MOVE_TO flag 0x10 at 0x771e44); args 4/5 the exchange and survival filters, Rampage passes 0
+  impl: [cpu/core/tactical.ts:strike, cpu/core/tactical.ts:groundOf]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
   context:
     - "...lse the nearest (strictly nearer replaces; the list's first of equals), and strikes it (0x771670: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or CO..."
   review: imported
@@ -458,6 +461,7 @@
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
   context:
     - ...ander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage (0x778b40).
     - "- Barbarian Rampage (0x778b40), the target list (0x783980), Attack Civilians, Plunder Trader, Chase Target, Attack Un..."

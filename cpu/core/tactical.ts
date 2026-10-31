@@ -239,6 +239,16 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     },
     attack: (t) => {
       if (!melee || !known(t.index) || isImpassable(t)) return false;
+      // a move order's path attacks into no plot the player does not see now:
+      // a city or a unit it last knew there out of its sight bars the plot
+      // (runs/h1_duely1117 t127-134: the rampaging Man-At-Arms at 37:16 holds
+      // for Longxi's 37:13 out of its sight; h1_duely1124 t114: the
+      // Man-At-Arms at 6:3 holds for Beijing's 5:7, at t115 the Crossbowman
+      // on 6:5 sees the city and it goes)
+      if (!planning) {
+        seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+        if (seenNow[t.index] !== 1) return false;
+      }
       // in the planning, a unit at war that fights (0x26e570 -> 0x209dd0):
       // on ground the mover may take (land for a land mover, and water where
       // its player may embark it; water for a ship) in the planning's reach —
@@ -1318,7 +1328,9 @@ function defendCamps(state: GameState, pass: Pass): void {
  * still pillageable, in the list's order: the units in pool order whose
  * planning reaches it this turn (0x775340 for 1 turn) and that do not stand on such a
  * plot themselves (0x774380) go there, each one's turn done, until one stands
- * on it and pillages it (`hostilePillage`).
+ * on it and pillages it (`hostilePillage`). Both log "Pillage Improvement"
+ * (AI_Tactical.csv: 158 of its rows target a PASSIVE_DISTRICT under that
+ * name over the five duely duels, none is named otherwise).
  */
 function pillage(state: GameState, pass: Pass, districts: boolean): void {
   const { map } = state;
@@ -1342,7 +1354,7 @@ function pillage(state: GameState, pass: Pass, districts: boolean): void {
       }
       const there = u.tileIndex === t.index;
       if (there && hostilePillage(state, u)) dropHeldCosts();
-      finish(pass, u, districts ? 'Pillage District' : 'Pillage Improvement', t.index);
+      finish(pass, u, 'Pillage Improvement', t.index);
       if (there) break;
     }
   }
