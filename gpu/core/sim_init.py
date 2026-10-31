@@ -276,6 +276,8 @@ class SimInit:
         self.citystate_civic_boosted = torch.zeros(B, r_pad, len(rules.c_cost), dtype=torch.bool, device=device)
         self.citystate_barb_kills = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.citystate_tech_ovf = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
+        # the road tier its era last gave its roads (`ResearchState.roadTier`)
+        self.citystate_road_tier = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.citystate_civic_ovf = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         # the research AI's goal (-1 none) and its analysis of the minor's
         # last turn, which a completion's choice reads (`ResearchState.goal`,
@@ -763,6 +765,8 @@ class SimInit:
             # the overflow a completion set aside, paid in with the next
             # turn's Science / Culture (`ResearchState.techOverflow`)
             ("tech_ovf", dtype, 0), ("civic_ovf", dtype, 0),
+            # the road tier its era last gave its roads (`ResearchState.roadTier`)
+            ("road_tier", torch.long, 0),
             ("treasury", dtype, 0),
             # LIFETIME raw carbon. Signed: Carbon Recapture takes it below 0.
             ("co2", dtype, 0), ("co2_turn", dtype, 0),
@@ -1493,6 +1497,9 @@ class SimInit:
             # a METEOR SITE's grant (`Unit.noResourceUpkeep`): it burns no
             # fuel and is never short of it, through any upgrade
             ("no_res_upkeep", torch.bool),
+            # ABILITY_ALPINE_TRAINING (`Unit.alpine`), granted for good on a
+            # plot beside the Matterhorn (`_grant_alpine`), through any upgrade
+            ("alpine", torch.bool),
             # its place in a city-state's or the Free Cities' unit pool (`poolSlots`,
             # the order their tactical AI walks their units in), -1 none yet
             ("pslot", torch.long),
@@ -2653,16 +2660,15 @@ class SimInit:
         self.encamp_hp = torch.zeros(B, T, dtype=torch.long, device=device)
         self.encamp_outer_hp = torch.zeros(B, T, dtype=torch.long, device=device)
         # The ROAD plane (the TS `Tile.road` twin). Laid by trade routes; a
-        # route-to-route step ignores the terrain penalty and pays its tier's
-        # own cost, and every tier above the Ancient road drops the river
-        # charge too (`road_tier`).
+        # route-to-route step ignores the terrain penalty and pays the dearer
+        # of its two plots' routes, across a river only where both bridge it
+        # (`road_tier`).
         self.road = torch.tensor(
             [[bool(t.get("rd", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )
-        # CIV6: "all roads in your territory will upgrade to the next level
-        # automatically" on reaching the era that brings the tier: per game,
-        # latched as its game era begins (`_enter_era`)
-        self.road_tier = torch.zeros(B, dtype=torch.long, device=device)
+        # each plot's road type (`Tile.roadTier`): its layer's era's best road,
+        # re-laid at its owner's era (`_upgrade_all_roads`)
+        self.road_tier = torch.zeros(B, T, dtype=torch.long, device=device)
         self.district_pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         nD = len(self.districts_cat)
         # the COMPLETED specialty districts each district type's price reads
@@ -3937,6 +3943,8 @@ class SimInit:
         self._choke_feats = torch.tensor([int(x) for x in rules.choke_features if int(x) >= 0], dtype=torch.long, device=device)
         self._woods_feats = torch.tensor([int(x) for x in rules.woods_features if int(x) >= 0], dtype=torch.long, device=device)
         self._woods_feat = int(rules.woods_feature)
+        self._alpine_feat = int(rules.alpine_feature)
+        self._alpine_hills_cs = int(rules.alpine_hills_cs)
         self._b_era = rules.b_era.to(device)  # [NB] long — unlock era (Heartbeat of Steam's gate) — per-building training XP (best tier over present buildings)
         # What `_building_dedications` reads besides the era: Free Inquiry pays
         # for a building that provides SCIENCE, Pen Brush and Voice for one
@@ -4494,6 +4502,7 @@ class SimInit:
         self._type_ground_feat = torch.tensor(
             [list(x) + [-1] * (_gfw - len(x)) for x in _gf], dtype=torch.long, device=device)
         self._type_no_hill_cost = _uc("noHillCost", bool, torch.bool)
+        self._type_alpine = _uc("alpine", bool, torch.bool)
         self._type_no_woods_cost = _uc("noWoodsCost", bool, torch.bool)
         self._type_ignore_shores = _uc("ignoreShores", bool, torch.bool)
         self._type_see_through = _uc("seeThrough", bool, torch.bool)

@@ -1450,19 +1450,39 @@ class SimSeats:
         new = (self.game_era > 0) & (self.era_start == int(self.turn) + 1)
         return torch.where(new, self.game_era - 1, self.game_era)
 
-    def _raise_road_tier(self) -> None:
-        """`raiseRoadTier` at the turn's change: the road a player's era
-        brings stands once any player (a major row, a city-state, the Free
-        Cities) reaches that era by its techs and civics (`_civ_era`)"""
-        era = torch.zeros_like(self.road_tier)
-        for row in range(self.n_majors):
-            era = torch.maximum(era, self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]))
-        for row in range(self.citystate_techs.shape[1]):
-            era = torch.maximum(era, self._civ_era(self.citystate_techs[:, row], self.citystate_civics[:, row]))
+    def _row_road_tier(self, row: int) -> torch.Tensor:
+        """[B] `bestRoadTier` of row `row`'s era (a major's, a city-state's,
+        the Free Cities' research): the road its era lays"""
+        if row < self.n_majors:
+            era = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
+        else:
+            c = row - self.n_majors
+            era = self._civ_era(self.citystate_techs[:, c], self.citystate_civics[:, c])
         tier = torch.zeros_like(era)
         for _i, _e in enumerate(self._road_tier_era):
             tier = torch.where(era >= _e, torch.full_like(tier, _i), tier)
-        self.road_tier.copy_(torch.maximum(self.road_tier, tier))
+        return tier
+
+    def _lay_road(self, rows: torch.Tensor, tiles: torch.Tensor, row: int) -> None:
+        """`layRoad`: a road on plots `tiles` of games `rows`, of the type row
+        `row`'s era lays (a road already there takes it)"""
+        self.road[rows, tiles] = True
+        self.road_tier[rows, tiles] = self._row_road_tier(row)[rows]
+
+    def _upgrade_all_roads(self) -> None:
+        """`upgradeAllRoads` at the turn's change: each player whose era
+        brought a new road (`_row_road_tier` above the tier it last gave)
+        re-lays the roads of the plots it owns, the Railroad apart"""
+        rows = list(range(self.n_majors)) + [self.n_majors + c for c in range(self.citystate_techs.shape[1])]
+        for row in rows:
+            held = self.civ_road_tier[:, row] if row < self.n_majors else self.citystate_road_tier[:, row - self.n_majors]
+            tier = self._row_road_tier(row)
+            up = tier > held
+            if not bool(up.count_nonzero()):
+                continue
+            held.copy_(torch.where(up, tier, held))
+            m = up.unsqueeze(1) & self.road & ~self.railroad & (self.tile_seat == int(self._ROW_SEAT[row]))
+            self.road_tier.copy_(torch.where(m, tier.unsqueeze(1).expand_as(self.road_tier), self.road_tier))
 
     def _game_era_turn(self, t: int) -> None:
         """`gameEraTurn` on the turn `t` opens, before its starts. Where no
@@ -5781,14 +5801,20 @@ class SimSeats:
     def _chassis_ability_cs(self, seat: torch.Tensor, types: torch.Tensor, tiles: torch.Tensor,
                             *, def_ranged: bool = False,
                             foe_type: torch.Tensor | None = None,
-                            vs_district: bool = False) -> torch.Tensor:
+                            vs_district: bool = False,
+                            alpine: torch.Tensor | None = None) -> torch.Tensor:
         """`chassisAbilityCS`'s twin, [B] long — every position-dependent
         unique-unit clause, read at the tile the unit FIGHTS FROM. Each `if` below is one UnitAbilities.xml
-        ability; a build whose roster carries none of a clause skips it."""
+        ability; a build whose roster carries none of a clause skips it.
+        `alpine` [B]: the unit holds Alpine Training (`unit_alpine`)."""
         ti = types.clamp(min=0, max=self.NU - 1)
         tl = tiles.clamp(min=0)
         out = torch.zeros_like(tiles)
         live = (seat >= 0) & (types >= 0)
+        # CIV6 (ALPINE_TRAINING_COMBAT_HILLS): the ability's Combat Strength on hills
+        if alpine is not None:
+            on_hill = live & alpine & self.hills.gather(1, tl.unsqueeze(1)).squeeze(1)
+            out = out + on_hill.long() * self._alpine_hills_cs
         # CIV6 (Khevsureti, Highlander): Combat Strength on named ground.
         if bool(self._type_ground_cs.count_nonzero()):
             g = self._type_ground_cs.take(ti)
@@ -12383,7 +12409,8 @@ class SimSeats:
             # passable land only: a portal's mountain carries no road
             _imp = self.improvement[b, at]
             land = ~self.water[b, at] & ~(self._imp_portal[_imp.clamp(min=0)] & (_imp >= 0))
-            self.road[b, at[land]] = True
+            _at = at[land]
+            self._lay_road(torch.full_like(_at, b), _at, row)
 
     def _found_city_grants(self, row: int, made: torch.Tensor, tile: torch.Tensor) -> None:
         """The units a FOUNDING hands the seat, in `foundCityAt`'s order: the
@@ -12543,9 +12570,11 @@ class SimSeats:
         # found none and score 0.
         if major:
             atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
-        atk_e = atk_e + self._chassis_ability_cs(a_seat, at, here, foe_type=d_type).to(atk_e.dtype)
+        atk_e = atk_e + self._chassis_ability_cs(a_seat, at, here, foe_type=d_type,
+                                                 alpine=self.unit_alpine.gather(1, a1).squeeze(1)).to(atk_e.dtype)
         def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
-        def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, foe_type=at).to(def_e.dtype))
+        def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(
+            d_seat, d_type, ttc, foe_type=at, alpine=self.unit_alpine.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype))
         # Great General / Admiral aura. Attacker keyed on its own tile `here`
         # (a CIV attacker gets its civ's aura; a BARB has none); defender
         # keyed on `tgt` — any major seat, or barb (-1). Embarked/naval →
@@ -13433,7 +13462,8 @@ class SimSeats:
         u_promos = self.unit_promos.gather(1, gs1).squeeze(1)
         river_mp = (2 * self._mp_scale) * ((self.river_mask.gather(1, hc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
         terr, riv = self._road_terms(here, dest, river_mp, u_type, u_promos,
-                                     self.unit_seat.gather(1, gs1).squeeze(1))
+                                     self.unit_seat.gather(1, gs1).squeeze(1),
+                                     self.unit_alpine.gather(1, gs1).squeeze(1))
         land_cost = self._mp_scale + terr + riv
         mp = self.unit_mp.gather(1, gs1).squeeze(1)
         full = self.unit_mp_full.gather(1, gs1).squeeze(1)
@@ -13499,6 +13529,8 @@ class SimSeats:
         # reads the new one.
         self._occ_clear(rows, here.take(rows), gs)
         self.unit_tile[rows, gs] = dest.take(rows)
+        # a step beside the Matterhorn: Alpine Training for good (`grantAlpine`)
+        self.unit_alpine[rows, gs] |= self._alpine_grant(rows, dest.take(rows), u_type.take(rows))
         self._air_carry_with(moved, gslot, here, dest)
         # One read of "is anybody riding along": `_escort_rider` hands back an
         # all -1 column set when no formation stands here, and every rider loop
@@ -13791,7 +13823,7 @@ class SimSeats:
         if major:
             atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
             atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tc).to(atk_e.dtype)
-            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True).to(atk_e.dtype)
+            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u]).to(atk_e.dtype)
             atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], atk_naval).to(atk_e.dtype)
         # the district is a CITY target to the roster's rows, as `assaultAtkCS` reads it
         atk_e = atk_e + self._roster_cs(
@@ -14515,7 +14547,7 @@ class SimSeats:
                  + self._assault_promo_cs(at0, a_promos, a_tile[:, u])
                  - self._atk_pens(at0, a_promos, a_tile[:, u], tgt, a_emb[:, u]))
         atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
-        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True).to(atk_e.dtype)
+        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u]).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT, torch.full_like(a_seat[:, u], -1), a_seat[:, u])
         atk_naval = self.unit_naval[at0] | a_emb[:, u]
         atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
@@ -15120,10 +15152,13 @@ class SimSeats:
         if not hostile:
             atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # NEVER gated
         def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
-        def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=at).to(def_e.dtype))
+        def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(
+            d_seat, d_type, ttc, def_ranged=True, foe_type=at,
+            alpine=self.unit_alpine.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype))
         # the attacker's own position clauses — a Varu or Toa beside the
         # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
-        atk_e = atk_e + self._chassis_ability_cs(a_seat, at, a_tile, foe_type=d_type).to(atk_e.dtype)
+        atk_e = atk_e + self._chassis_ability_cs(a_seat, at, a_tile, foe_type=d_type,
+                                                 alpine=self.unit_alpine.gather(1, a1).squeeze(1)).to(atk_e.dtype)
         if not hostile:
             atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
         def_civ_u = torch.where((d_slot >= 0) & ~d_barb, d_seat, neg)
@@ -15461,10 +15496,13 @@ class SimSeats:
             def_e = def_e + torch.where(
                 d_emb, torch.zeros_like(def_e),
                 self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=at0).to(def_e.dtype))
+            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(
+                d_seat, d_type, ttc, def_ranged=True, foe_type=at0,
+                alpine=self.unit_alpine.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype))
             # the attacker's own position clauses — a Varu or Toa beside the
             # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
-            atk_e = atk_e + self._chassis_ability_cs(aseat, at0, a_tile[:, u], foe_type=d_type).to(atk_e.dtype)
+            atk_e = atk_e + self._chassis_ability_cs(aseat, at0, a_tile[:, u], foe_type=d_type,
+                                                     alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u]).to(atk_e.dtype)
             def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)
@@ -16303,7 +16341,7 @@ class SimSeats:
                 # neither does a portal's mountain
                 moved = on & self.passable[bb, nxt.clamp(min=0)]
                 if bool(moved.count_nonzero()):
-                    self.road[bb[moved], nxt[moved]] = True
+                    self._lay_road(bb[moved], nxt[moved], row)
                 self._claim_tile_en_route(row, bb, nxt, on)
                 new_leg = torch.where(on & (lg == 0) & (i == n_len - 1), torch.ones_like(lg),
                                       torch.where(on & (lg == 1) & (i == 0), torch.zeros_like(lg), lg))
@@ -16523,7 +16561,7 @@ class SimSeats:
         # the walker lays road on every LAND tile it stands on; the origin is turn 0
         lr = rows[~self.water[rows, o_ct[rows]]]
         if len(lr) > 0:
-            self.road[lr, o_ct[lr]] = True
+            self._lay_road(lr, o_ct[lr], row)
         # CIV6 (Ortoo): "Starting a Trade Route immediately creates a Trading
         # Post in the destination city" — the post an ordinary route only
         # plants when it COMPLETES (`IMMEDIATE_POST_ROWS`)

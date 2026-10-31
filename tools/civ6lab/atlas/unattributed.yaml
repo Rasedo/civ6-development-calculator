@@ -877,6 +877,16 @@
   context:
     - "- THE SPOTS (the cost callback 0x26d6f0 -> 0x790c60 on every link the planning's two-turn search prices, the start node linked..."
   review: imported
+- addr: 0x26d7f0
+  final: 0x1a6350
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...les add (0x26ee80), +0x38 a carry the rules add (0x26ee90), stored as the node's +0x20 (0x26d7f0: +0x28 Movement, +0x2c turns, +0x20 carry). The next step from a node pays the node's c..."
+  review: imported
 - addr: 0x26d890
   final: 0x1a63f0
   kind: function
@@ -1762,6 +1772,21 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - "...ormation's layer 0x2665b0 — 3 the religious one) is in a zone where, first, the functor 0x52f710 over its ring (0x6aef0, range 1) finds one, else per direction (0..5) a neighbour hol..."
+  review: imported
+- addr: 0x52fa40
+  final: 0x377640
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/units.ts:routeApplies
+    - cpu/core/units.ts:routeStepMp
+    - gpu/core/sim_masks.py:_road_terms
+    - gpu/core/sim_tactics.py:_tac_step_cost
+  readings:
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The step's route term (0x52fa40, in the cost chain of 0x26e920): both plots carry an unpillaged route; where the step c..."
   review: imported
 - addr: 0x52fb90
   final: 0x377790

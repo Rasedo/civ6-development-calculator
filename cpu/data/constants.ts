@@ -292,8 +292,8 @@ export const MP_SCALE = srcConst('mpScale', 4, {
  * own Civilopedia page gives its Movement Cost and whether it bridges:
  *   Ancient 1.0 no bridges | Classical 1.0 bridges
  *   Industrial 0.75 bridges | Modern 0.5 bridges
- * The tier is the game era's, latched as each game era begins (`enterEra`)
- * — "your territory" is a per-seat reading this model does not carry.
+ * Each plot carries its own tier (`Tile.roadTier`): its layer's era's, re-laid
+ * at its owner's era (`upgradeRoads`).
  */
 export const ROAD_TIER_MP: readonly number[] = srcConst('roadTierMp', [4, 4, 3, 2], {
   derived: 'Routes.MovementCost x MP_SCALE for ROUTE_ANCIENT_ROAD, ROUTE_MEDIEVAL_ROAD, '

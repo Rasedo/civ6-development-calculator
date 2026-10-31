@@ -251,8 +251,9 @@ interface Ctx {
   upgradeInto: Set<string>;
   /** this pair's upgrade orders, the new unit's record key to the old's */
   upgradedFrom: Map<string, string>;
-  /** the road tier of the pair's first record, the one its minors move on */
-  roadTierWas?: number;
+  /** each plot's road tier at the pair's first record, -1 no road: the one
+   *  its minors move on */
+  roadTiersWas?: number[];
   /** the barbarian units' plots of this pair the record's steps entered,
    *  in their order, for their scouts' looks at the end of the barbarians'
    *  turn (`barbarianTurn`) */
@@ -1277,12 +1278,15 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     t.districtComplete = r.districtComplete;
     t.districtPillaged = r.districtPillaged;
     t.road = r.road;
+    // ...on the first record's road types: a road a player's era brings lands
+    // at the turn's end (runs/h1_duely1128 t145: China's Industrial era, the
+    // minors' planning on Medieval roads, Industrial ones from record 146);
+    // a road new since, record t+1's
+    const was = ctx.roadTiersWas?.[i] ?? -1;
+    const tier = was >= 0 ? was : (r.roadTier ?? 0);
+    if (tier > 0) t.roadTier = tier;
+    else delete t.roadTier;
   });
-  // ...on the roads' tier of the first record: a tier a player's era brings
-  // lands at the turn's end (runs/h1_duely1128 t145: China's Industrial era,
-  // the minors' planning on Medieval roads, Industrial ones from record 146)
-  if (ctx.roadTierWas === undefined) delete copy.roadTier;
-  else copy.roadTier = ctx.roadTierWas;
   for (const s of [...copy.cityStates, ...(copy.freeSeat ? [copy.freeSeat] : [])]) {
     const slots = copy.units.filter((c) => c.seat === s.seat).map((c) => c.slot ?? -1);
     s.unitPool = { size: Math.max(s === copy.freeSeat ? 0 : 1, ...slots.map((x) => x + 1)), free: [], dying: [] };
@@ -1400,7 +1404,12 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       }
     }
   }
-  tallyMinorTactics(ctx, b, turn, moves, ended, opOf);
+  // a unit the copy upgraded ahead of the pass has no move to compare: the
+  // game's upgrade is a new unit its pass never holds, no tactical row that
+  // turn (runs/h1_duely1121 t61: city-state 2's Swordsman 1310720,
+  // UnitAddedToMap); its end plot is compared
+  const outOfPass = new Set([...upgraded].map((c) => twin.get(c)).filter((u): u is Unit => !!u));
+  tallyMinorTactics(ctx, b, turn, moves, ended, opOf, outOfPass);
 }
 
 /**
@@ -1430,7 +1439,7 @@ function gameJob(ctx: Ctx, turn: number, player: number, id: number): string {
 }
 
 function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<Unit, { move: string; plot: number }>,
-  ended: ReadonlyMap<Unit, number>, opOf: ReadonlyMap<Unit, string>): void {
+  ended: ReadonlyMap<Unit, number>, opOf: ReadonlyMap<Unit, string>, outOfPass: ReadonlySet<Unit>): void {
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
   const rows = ctx.tactical?.others.get(turn);
@@ -1448,7 +1457,7 @@ function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: Readonl
     if (same) t.move += 1;
     if (!same && t.firstMove === undefined) t.firstMove = turn;
     const party = u.seat === FREE_SEAT ? 'freeCities' : 'cityState';
-    if (game !== undefined) score(ctx, `${party}.move.family`, turn, ownerOf(key), `${key} ${u.type}`, same, tacticalCategory(m.move), game);
+    if (game !== undefined && !outOfPass.has(u)) score(ctx, `${party}.move.family`, turn, ownerOf(key), `${key} ${u.type}`, same, tacticalCategory(m.move), game);
     const want = at.get(key);
     const end = ended.get(u);
     if (want === undefined || end === undefined) continue;
@@ -4614,7 +4623,7 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   }
   for (const key of Object.keys(state)) if (!(key in world)) delete (state as unknown as Record<string, unknown>)[key];
   Object.assign(state, world);
-  ctx.roadTierWas = state.roadTier;
+  ctx.roadTiersWas = state.map.tiles.map((t) => (t.road ? (t.roadTier ?? 0) : -1));
   importedWorld(state, imp, a, history);
   ctx.retained = new Map();
 }

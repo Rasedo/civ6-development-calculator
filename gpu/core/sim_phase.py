@@ -126,7 +126,7 @@ class SimPhase:
         # the unique units' position terms, read at the struck tile against a
         # RANGED shot (`chassisAbilityCS` — Ngao Mbeba's +10 included); an
         # embarked target takes the era's flat override instead
-        _ch = self._chassis_ability_cs(d_seat, d_type, tt, def_ranged=True)
+        _ch = self._chassis_ability_cs(d_seat, d_type, tt, def_ranged=True, alpine=self.unit_alpine[bidx, ds0])
         def_cs = def_cs + torch.where(d_emb, torch.zeros_like(_ch), _ch).to(def_cs.dtype)
         # the holder's best ranged made, whoever holds it (`cityStrikeStrength`);
         # a major's Bastions half rides on top

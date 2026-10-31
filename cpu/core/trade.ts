@@ -28,7 +28,7 @@ import { emergencyCsRouteGold } from './emergency';
 import { congressCsRouteFactor, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
 import { ENHANCER_BELIEFS } from '../data/religion';
 import type { RuleResult } from './rules';
-import { dedicationEvent, goldenDedication } from './eras';
+import { dedicationEvent, goldenDedication, layRoad } from './eras';
 import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC, TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE } from '../data/seats';
 
 import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
@@ -81,7 +81,7 @@ export function allRoadsLeadToRome(state: GameState, seat: number, centerIndex: 
   if (!course) return;
   const tiles = state.map.tiles;
   // passable land only: a portal's mountain carries no road
-  for (const at of course) if (!isWater(tiles[at]) && !isImpassable(tiles[at])) tiles[at].road = true;
+  for (const at of course) if (!isWater(tiles[at]) && !isImpassable(tiles[at])) layRoad(state, seat, tiles[at]);
 }
 
 /** The Trading Post this seat holds at a route's foreign DESTINATION: +1
@@ -1137,7 +1137,7 @@ function commitRoute(state: GameState, seat: number, originCenter: number, destC
   route.walkTile = originCenter;
   route.walkLeg = 0;
   // the walker lays road on every LAND tile it stands on; the origin is turn 0
-  if (!isWater(state.map.tiles[originCenter])) state.map.tiles[originCenter].road = true;
+  if (!isWater(state.map.tiles[originCenter])) layRoad(state, seat, state.map.tiles[originCenter]);
   (seatOf(state, seat)!.tradeRoutes ??= []).push(route);
   if (route.toCs !== undefined) questRouteStarted(state, seat, route.toCs);
   // CIV6 (Ortoo): "Starting a Trade Route immediately creates a Trading Post
@@ -1243,7 +1243,7 @@ export function tradeRouteWalk(state: GameState, actor: Seat): void {
     r.walkTile = next;
     // roads go on passable LAND only — a sea leg lays nothing, and
     // neither does a portal's mountain
-    if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) state.map.tiles[next].road = true;
+    if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) layRoad(state, actor.seat, state.map.tiles[next]);
     claimTileEnRoute(state, actor.seat, next);
     if (r.walkLeg === 0 && i === course.length - 1) r.walkLeg = 1;
     else if (r.walkLeg === 1 && i === 0) r.walkLeg = 0;

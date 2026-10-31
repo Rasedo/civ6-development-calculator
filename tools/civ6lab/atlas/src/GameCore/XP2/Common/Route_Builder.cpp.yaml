@@ -1,0 +1,58 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x511700
+  final: 0x360320
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...player on a plot (0x512120): the route of the highest PlacementValue valid on the plot (0x511700) whose PlacementRequiresOwnedTile is met, whose PrereqEra the player's era (GetEra 0x..."
+  review: imported
+- addr: 0x512120
+  final: 0x360920
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/eras.ts:bestRoadTier]
+  readings:
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The best route for a player on a plot (0x512120): the route of the highest PlacementValue valid on the plot (0x511700) whose Placemen..."
+  review: imported
+- addr: 0x512610
+  final: 0x360d30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- A trade route's road (0x554340, from the route placement between cities 0x512610): each path plot takes the route's player's best route where it differs or is pillaged."
+  review: imported
+- addr: 0x513120
+  final: 0x361670
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/eras.ts:layRoad]
+  readings:
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...the bridge flag +0x4d bit 4 is copied from the route's SupportsBridges at placement (0x513120: Route_Builder's place; the era written from the route's PrereqEra)."
+  review: imported
+- addr: 0x5134c0
+  final: 0x3619b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/eras.ts:upgradeRoads]
+  readings:
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The upgrade (0x5134c0, called only from Player_Trade's era handler 0x4d9a70 with LOC_NOTIFICATION_ROADS_UPGRA..."
+  review: imported

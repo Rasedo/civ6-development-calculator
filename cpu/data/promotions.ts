@@ -21,7 +21,7 @@ import {
   SPY_M_FOMENT_UNREST, SPY_M_NEUTRALIZE_GOVERNOR, SPY_M_BREACH_DAM,
   SPY_M_COUNTERSPY, SPY_M_FABRICATE_SCANDAL,
 } from './espionage';
-import { xml, type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
 
 export const PROMO_CLASSES = [
   'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV',
@@ -1280,6 +1280,27 @@ export const UNIT_PROMO_CLASS: Readonly<Record<string, PromoClass>> = {
   SPY: 'ESPIONAGE',
   ROCK_BAND: 'ROCK_BAND',
 };
+
+/** CIV6 (Expansion1_Features_Major.xml MATTERHORN_ADJACENT_UNITS_GRANT_ABILITY,
+ *  MODIFIER_ALL_UNITS_GRANT_ABILITY, Permanent): every player's land unit on
+ *  a plot beside the Matterhorn gains ABILITY_ALPINE_TRAINING for good
+ *  (REQUIRES_LAND_UNIT, REQUIREMENT_PLOT_ADJACENT_FEATURE_TYPE_MATCHES) — the
+ *  feature the requirement names. */
+export const ALPINE_FEATURE = srcConst('promotions.alpineFeature', 'MATTERHORN',
+  xml('RequirementArguments', 'RequirementId=MATTERHORN_REQUIRES_ADJACENT_UNIT&Name=FeatureType', 'Value',
+    { expect: 'FEATURE_MATTERHORN' }));
+/** the classes ABILITY_ALPINE_TRAINING attaches to (its TypeTags: CLASS_RECON,
+ *  CLASS_MELEE, CLASS_RANGED, CLASS_SIEGE, CLASS_HEAVY_CAVALRY,
+ *  CLASS_LIGHT_CAVALRY, CLASS_RANGED_CAVALRY, CLASS_ANTI_CAVALRY), as the
+ *  promotion classes whose chassis carry those tags; a `chariot` chassis
+ *  carries none of the cavalry tags */
+export const ALPINE_CLASSES: readonly PromoClass[] = [
+  'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE',
+];
+/** ALPINE_TRAINING_COMBAT_HILLS: the ability's Combat Strength on a hills
+ *  plot (BALKAN_CAVALRY_PLOT_IS_HILS_REQUIREMENTS) */
+export const ALPINE_HILLS_CS = srcConst('promotions.alpineHillsCs', 3,
+  xml('ModifierArguments', 'ModifierId=ALPINE_TRAINING_COMBAT_HILLS&Name=Amount', 'Value'));
 
 /** the class BIT a chassis presents to another unit's `CS_VS_*` mask. */
 export function classBitOf(unitType: string): number {

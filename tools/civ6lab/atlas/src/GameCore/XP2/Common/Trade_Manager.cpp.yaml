@@ -236,6 +236,17 @@
   context:
     - "- The Trader's sea: the trade path's context (0x558ba0) sets +0x1a1 from 0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0): a game flag, the play..."
   review: imported
+- addr: 0x554340
+  final: 0x390a70
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/eras.ts:layRoad]
+  readings:
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- A trade route's road (0x554340, from the route placement between cities 0x512610): each path plot takes the route's pl..."
+  review: imported
 - addr: 0x5545e0
   kind: function
   status: PARTLY

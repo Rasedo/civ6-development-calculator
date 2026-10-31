@@ -88,3 +88,12 @@
   context:
     - "...nd no bombard as agents, the generalized assignment 0x8b5bf0 (three passes; the start 0x80f9d0, the gain 0x80f6b0 — its multiplier the store at [rsp + 0x28] that dis.sh dropped —, th..."
   review: reviewed
+- addr: 0x8d14a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ute type (+0x47) and its route era (+0x48, PlotRoutes RouteType / RouteEra in the save, 0x8d14a0 / 0x8cf720); the bridge flag +0x4d bit 4 is copied from the route's SupportsBridges at...
+  review: imported

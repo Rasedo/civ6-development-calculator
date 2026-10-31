@@ -515,6 +515,8 @@ class Rules:
     choke_features: list  # the feature indices CHOKE POINTS defends in (hills are their own plane)
     woods_features: list  # the feature indices a 1-MP woods step waives (hills are their own plane)
     woods_feature: int  # the Woods feature itself — the Stave Church's adjacency source
+    alpine_feature: int  # the feature whose neighbours grant ABILITY_ALPINE_TRAINING, -1 none
+    alpine_hills_cs: int  # ALPINE_TRAINING_COMBAT_HILLS: the ability's Combat Strength on hills
     worship_bidx: list  # per Worship belief (WORSHIP_BELIEFS order): the building row it unlocks
     temple_bidx: int  # TEMPLE row (worship prerequisite), -1 if absent
     worship_faith_cost: float  # a worship building's faith price: its row's scaled Cost x the faith rate
@@ -774,6 +776,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         choke_features=list(_P["chokeFeatures"]),
         woods_features=list(_P["woodsFeatures"]),
         woods_feature=int(_P["woodsFeature"]),
+        alpine_feature=int(_P["alpineFeature"]),
+        alpine_hills_cs=int(_P["alpineHillsCs"]),
         worship_bidx=[int(x) for x in r["worshipBidx"]],
         temple_bidx=int(r["templeBidx"]),
         worship_faith_cost=float(r["worshipFaithCost"]),
@@ -1277,16 +1281,16 @@ _MUTABLE = [
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_levy_src", "unit_patrol", "unit_free_city", "unit_no_res_upkeep", "unit_pslot",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_levy_src", "unit_patrol", "unit_free_city", "unit_no_res_upkeep", "unit_alpine", "unit_pslot",
     "unit_escorted", "unit_defender", "military_at", "civilian_at", "support_at", "embarked_at", "war", "ww", "ww_turn",
-    "civ_best_melee", "civ_best_ranged", "civ_builders_trained", "civ_settlers_trained", "civ_discount_districts", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_research_project_pct", "civ_influence", "civ_tech_prog", "civ_tech_ovf", "civ_civic_ovf", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
+    "civ_best_melee", "civ_best_ranged", "civ_builders_trained", "civ_settlers_trained", "civ_discount_districts", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_research_project_pct", "civ_influence", "civ_tech_prog", "civ_tech_ovf", "civ_civic_ovf", "civ_road_tier", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_beliefs_earned", "civ_follower", "civ_founder", "civ_worship", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_religion_type", "civ_inquisition", "civ_first_imp_tech",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_target", "seat_citystate_quest_last",
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
     "citystate_cur_tech", "citystate_cur_civic", "citystate_tech_retain", "citystate_civic_retain",  # the minor's research in hand and kept
     "citystate_tech_catch", "citystate_civic_catch",  # the catch-up's counts its last turn saw
-    "citystate_tech_ovf", "citystate_civic_ovf",
+    "citystate_tech_ovf", "citystate_civic_ovf", "citystate_road_tier",
     "citystate_tech_boosted", "citystate_civic_boosted", "citystate_barb_kills",  # the minor's boosts and barbarian kills
     "citystate_tech_goal", "citystate_fav_tech", "citystate_ai_turns", "citystate_ai_next", "citystate_ai_base", "citystate_ai_score", "citystate_ai_owned",
     "citystate_ai_valid", "citystate_ai_left", "citystate_ai_left_seen",  # the research AI's goal, its last turn's analysis, its turns left

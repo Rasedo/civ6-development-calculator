@@ -60,6 +60,16 @@
   context:
     - "...the step crosses a river (0x531510 on the from / to plots) and the unit is not exempt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x3..."
   review: imported
+- addr: 0x266510
+  final: 0x1a3dd0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...land): MOVEMENT_EMBARK_COST unless a FreeEmbark district (or the ignore-shores ability 0x266510); then, FreeEmbark or not, where the Movement the step starts with exceeds the TO domai..."
+  review: imported
 - addr: 0x2665b0
   final: 0x1a3e70
   kind: function

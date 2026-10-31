@@ -146,16 +146,6 @@
           ]
         },
         {
-          "name": "roadTier",
-          "compare": "exact",
-          "covers": [
-            "GameState.roadTier"
-          ],
-          "planes": [
-            "road_tier"
-          ]
-        },
-        {
           "name": "gameEra",
           "compare": "exact",
           "covers": [
@@ -1090,6 +1080,17 @@
           "planes": [
             "civ_tech_ovf"
           ]
+        },
+        {
+          "name": "seatRoadTier",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.roadTier"
+          ],
+          "planes": [
+            "civ_road_tier"
+          ],
+          "note": "the road tier the seat's era last gave its roads."
         },
         {
           "name": "civicOverflow",
@@ -2251,6 +2252,17 @@
           "planes": [
             "citystate_tech_ovf"
           ]
+        },
+        {
+          "name": "minorRoadTier",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.roadTier"
+          ],
+          "planes": [
+            "citystate_road_tier"
+          ],
+          "note": "the road tier the city-state's era last gave its roads; the Free Cities' rides in freeResearch."
         },
         {
           "name": "minorCivicOverflow",
@@ -3972,6 +3984,17 @@
             "unit_no_res_upkeep"
           ],
           "note": "a Meteor Site's grant, which burns no fuel and is never short of it, through any upgrade."
+        },
+        {
+          "name": "alpine",
+          "compare": "exact",
+          "covers": [
+            "Unit.alpine"
+          ],
+          "planes": [
+            "unit_alpine"
+          ],
+          "note": "ABILITY_ALPINE_TRAINING, granted for good beside the Matterhorn: hills cost a plain move and +3 Combat Strength on hills, through any upgrade."
         }
       ]
     },
@@ -4184,6 +4207,17 @@
           "planes": [
             "road"
           ]
+        },
+        {
+          "name": "roadTier",
+          "compare": "exact",
+          "covers": [
+            "Tile.roadTier"
+          ],
+          "planes": [
+            "road_tier"
+          ],
+          "note": "the plot's road type: its layer's era's best road, re-laid at its owner's era."
         },
         {
           "name": "locked",

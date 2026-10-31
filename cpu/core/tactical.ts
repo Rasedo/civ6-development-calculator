@@ -18,7 +18,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  canEmbark, cityAtIndex, crossesRiver, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious,
+  canEmbark, cityAtIndex, crossesRiver, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious, waterWalks,
   setBarbStepLook, unitsHostile, unitVisibleTo,
   waterEnterable,
 } from './units';
@@ -62,6 +62,10 @@ interface PNode {
   tie: number;
   moves: number;
   turns: number;
+  /** the Movement a shore crossing onto this plot carried past the new
+   *  domain's full Movement (the node's +0x20, the embark and disembark rules
+   *  0x530420 / 0x530240): the next step from it pays it on top */
+  carry?: number;
   closed: boolean;
   /** a plot the unit attacks into: the path ends there */
   attack?: boolean;
@@ -104,13 +108,13 @@ function closedToMinor(state: GameState, seat: number, t: Tile): boolean {
 }
 
 /** the steps' costs a tactical pass holds while it runs, per chassis and
- *  promotions, by plot and DirectionTypes link: the ground holds still but
+ *  promotions and Alpine Training, by plot and DirectionTypes link: the ground holds still but
  *  for a pillage, which drops them (`dropHeldCosts`) */
 let costsHeld: Map<string, Int32Array> | null = null;
 
 function heldCostsOf(state: GameState, unit: Unit): Int32Array | null {
   if (!costsHeld) return null;
-  const k = `${unit.type}:${unit.promos ?? 0}`;
+  const k = `${unit.type}:${unit.promos ?? 0}:${unit.alpine ? 1 : 0}`;
   let a = costsHeld.get(k);
   if (!a) costsHeld.set(k, (a = new Int32Array(state.map.tiles.length * 6).fill(-1)));
   return a;
@@ -376,7 +380,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       onLink?.(to.index, best.tile, s.turns, s.moves, attack);
       const c = nodes.get(to.index);
       if (!c) {
-        const n: PNode = { tile: to.index, g: s.g, tie: 0, moves: s.moves, turns: s.turns, closed: false, parent: best, attack };
+        const n: PNode = { tile: to.index, g: s.g, tie: 0, moves: s.moves, turns: s.turns, carry: s.carry, closed: false, parent: best, attack };
         if (lo && hi && s.g >= lo.g && s.g <= hi.g) n.tie = Math.abs(s.g - lo.g) <= Math.abs(s.g - hi.g) ? -++seq : ++seq;
         nodes.set(n.tile, n);
         (best.kids ??= []).push({ node: n, di });
@@ -411,7 +415,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
 
   /** a step's turns, Movement and cost from the node `p` onto `to` (the cost
    *  callback 0x26e920 and 0x270dd0) */
-  function price(p: PNode, to: Tile, di: number, attack: boolean): { g: number; moves: number; turns: number } {
+  function price(p: PNode, to: Tile, di: number, attack: boolean): { g: number; moves: number; turns: number; carry: number } {
     const from = map.tiles[p.tile];
     let pm = p.moves;
     let turns = p.turns;
@@ -419,10 +423,21 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       turns += 1;
       pm = !naval && isWater(from) ? fullSea : fullLand;
     }
-    let cost = Math.floor(stepCostHeld(state, unit, from, to, di, held) * FIX / MP_SCALE);
+    // the step's rules, then the parent's carry on top (0x26e920: the
+    // parent's +0x20 added to the step's cost)
+    let cost = Math.floor(stepCostHeld(state, unit, from, to, di, held) * FIX / MP_SCALE) + (p.carry ?? 0);
+    // a shore crossing carries the Movement held past the new domain's full
+    // Movement to the next step (0x530420 / 0x530240: Movement left above
+    // the domain's, a FreeEmbark district's crossing too; runs/h1_duely1128
+    // t88: Nazca's Horseman 31:6 (1/4) embarks onto 31:5 (1/1) carrying 2,
+    // 32:4 beyond it (2/0), AI_Planning.csv)
+    const cross = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
+    const maxTo = isWater(to) ? fullSea : fullLand;
+    let carry = cross && pm > maxTo ? pm - maxTo : 0;
     let moves = pm - cost;
     if (moves < 0) {
       moves = 0;
+      carry = 0;
       if (p === start && unmoved) cost = pm;
       else if (p.turns === turns) turns += 1;
       else cost = pm > 0 ? pm : FIX;
@@ -448,15 +463,16 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     const seen = ground.known(to.index);
     const ends = moves <= 0 ? 4 + (seen && tileSeat(to) !== unit.seat ? 3 : 0) : 0;
     const wet = seen && !naval && isWater(to) ? 1000 : 0;
-    return { g: p.g + cost * 1000 + (ends + (seen ? 2 : 3) + wet) * FIX, moves, turns };
+    return { g: p.g + cost * 1000 + (ends + (seen ? 2 : 3) + wet) * FIX, moves, turns, carry };
   }
 
   /** a node made cheaper from `p`: an open one re-keyed after its new
    *  equals (0x79560) */
-  function reparent(c: PNode, p: PNode, s: { g: number; moves: number; turns: number }): void {
+  function reparent(c: PNode, p: PNode, s: { g: number; moves: number; turns: number; carry: number }): void {
     c.g = s.g;
     c.moves = s.moves;
     c.turns = s.turns;
+    c.carry = s.carry;
     c.parent = p;
     if (c.closed) return;
     c.tie = ++seq;
@@ -555,9 +571,16 @@ function walk(state: GameState, unit: Unit, path: number[], avoid?: (tile: numbe
   let mp = unit.movesLeft;
   let from = unit.tileIndex;
   let stop = 0;
+  // a shore crossing's Movement past the new domain's full, paid by the next
+  // step (the pathfinder's `carry`)
+  let carry = 0;
+  const naval = !!UNITS[unit.type]?.naval;
   for (const p of path) {
-    const cost = stepCost(state, unit, tiles[from], tiles[p]);
+    const cost = stepCost(state, unit, tiles[from], tiles[p]) + carry;
     if (mp < cost && mp < full) break;
+    const cross = !naval && !waterWalks(unit.type) && isWater(tiles[from]) !== isWater(tiles[p]);
+    const maxTo = unitFullMoves(state, { ...unit, embarked: isWater(tiles[p]) });
+    carry = cross && mp > maxTo ? mp - maxTo : 0;
     mp = Math.max(0, mp - cost);
     stop += 1;
     from = p;

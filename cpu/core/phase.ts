@@ -124,7 +124,7 @@ import { cityAppealResolver, cityGovernorEstablished, establishedGovernorCityIds
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat, leaderOf, warBanned, cityAtTile, onHomeContinent, BARB_SEAT, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed, majorsMet, setPeaceTurnWith } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
-import { unitKillEvent, buildingDedications, goldenDedication } from './eras';
+import { unitKillEvent, buildingDedications, goldenDedication, layRoad } from './eras';
 import { defaultWarKind, warBuffProdPct, warKindAllowed } from './casusBelli';
 import { WAR_KINDS, WAR_KIND_FORMAL, WAR_KIND_SURPRISE } from '../data/warKinds';
 import { DED_TO_ARMS, DED_STEAM, TO_ARMS_MIL_PROD_MULT, STEAM_WONDER_PROD_MULT } from '../data/seats';
@@ -2150,7 +2150,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
         if (unit.type !== 'MILITARY_ENGINEER' || (unit.charges ?? 0) <= 0) return;
         const owns = (t: Tile) => tileOwnedByCiv(t, actor.seat);
         const did = a === A_BUILD_ROAD
-          ? (canBuildRoad(here, owns) ? ((here.road = true), true) : false)
+          ? (canBuildRoad(here, owns) ? (layRoad(state, actor.seat, here), true) : false)
           : engineerFinish(state, actor.seat, here.index);
         if (!did) return;
         unit.charges = (unit.charges ?? 0) - 1;

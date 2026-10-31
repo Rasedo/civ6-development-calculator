@@ -216,6 +216,9 @@ export interface ResearchState {
   civicProgress: number;
   techs: string[];
   civics: string[];
+  /** the road tier (`ROAD_TIER_MP` index) its era last gave its roads
+   *  (`upgradeRoads`); absent, the Ancient road */
+  roadTier?: number;
   boosted: string[];
   /** Progress PARKED on techs that are not currently being researched. The
    *  tech being researched is never in here — its progress lives in
@@ -473,8 +476,6 @@ export interface GameState {
   gameOver?: boolean;
   victoryType?: number;
   victoryRow?: number;
-  /** the ROAD TIER the world has reached, 0..3 (`ROAD_TIER_MP`). */
-  roadTier?: number;
   /** the GAME ERA (an ERAS index), the turn it began, and the countdown to
    *  the next one (-1 while none runs) — `gameEraTurn`. */
   gameEra?: number;
@@ -752,6 +753,11 @@ export interface Unit {
    *  Meteor Site's grant "has no resource maintenance cost" — it burns no
    *  fuel and is never short of it, through any upgrade. */
   noResourceUpkeep?: boolean;
+  /** CIV6 (ABILITY_ALPINE_TRAINING, granted for good on a plot beside the
+   *  Matterhorn, `grantAlpine`): hills cost it a plain move
+   *  (ALPINE_TRAINING_IGNORE_HILLS) and it fights +3 on hills
+   *  (ALPINE_TRAINING_COMBAT_HILLS), through any upgrade. */
+  alpine?: boolean;
   /** SPY STATE. `spyMission` is SPY_IDLE, SPY_TRAVELLING or a `SPY_MISSIONS`
    *  index; `spyTurns` is the clock it is running; `spyTarget` the centre tile
    *  it is in transit to; `spyLevel` its rank, capped at Master Spy. */

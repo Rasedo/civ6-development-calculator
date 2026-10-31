@@ -50,7 +50,7 @@ import {
 import { logXpWrite, logPopWrite } from './difflog';
 import { eraMatchupCS, getModifiers, governmentUnitCS, governmentXpPct } from './effects';
 import { congressPromoClassCs, congressReligiousCs } from './congress';
-import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS , classBitOf } from '../data/promotions';
+import { ALPINE_HILLS_CS, KILL_SPREAD_RANGE, UNIT_PROMO_CLASS, classBitOf } from '../data/promotions';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
 import { FREE_SEAT, civOf, isFreeSeat, seatsAllied } from './seats';
@@ -168,7 +168,7 @@ export function chassisFlankMult(u: { type: string }): number {
  */
 export function chassisAbilityCS(
   state: GameState,
-  u: { type: string; seat: number; movesLeft?: number },
+  u: { type: string; seat: number; movesLeft?: number; alpine?: boolean },
   atTile: number,
   ctx?: { defendingRanged?: boolean; foeType?: string; vsDistrict?: boolean },
 ): number {
@@ -177,6 +177,8 @@ export function chassisAbilityCS(
   const tile = state.map.tiles[atTile];
   if (!tile) return 0;
   let out = 0;
+  // CIV6 (ALPINE_TRAINING_COMBAT_HILLS): the ability's Combat Strength on hills
+  if (u.alpine && tile.elevation === 'HILLS') out += ALPINE_HILLS_CS;
   // CIV6 (Khevsureti, Highlander): Combat Strength on named ground.
   if (def.groundCS) {
     const g = def.groundCS;

@@ -11678,3 +11678,112 @@ the replay leaves such a unit its city made out of unit.trained.
   170.34; Bologna 32:9 135.34 / 129.34): the plot's own 32.34 and its
   MOUNTAIN_PORTAL modifier's term (the section "C-100: a district on a
   feature it may not stand on, and the Mountain Portal's analyzer").
+
+## C-95 / C-99: the Matterhorn's Alpine Training — READ (install), both twins
+
+`grantAlpine` / `alpineChassis` / `terrainMp` (cpu/core/units.ts),
+`chassisAbilityCS` (cpu/core/combat.ts); `_alpine_grant` (gpu/core/sim_masks.py),
+`_road_terms`, `_tac_step_cost(hill_free)`, `_chassis_ability_cs(alpine=)`.
+- Expansion1_Features_Major.xml MATTERHORN_ADJACENT_UNITS_GRANT_ABILITY
+  (MODIFIER_ALL_UNITS_GRANT_ABILITY, Permanent; REQUIRES_LAND_UNIT,
+  REQUIREMENT_PLOT_ADJACENT_FEATURE_TYPE_MATCHES FEATURE_MATTERHORN): every
+  player's land unit on a plot beside the Matterhorn gains
+  ABILITY_ALPINE_TRAINING for good. The ability (Expansion1_UnitAbilities.xml,
+  TypeTags CLASS_RECON / MELEE / RANGED / SIEGE / HEAVY_CAVALRY /
+  LIGHT_CAVALRY / RANGED_CAVALRY / ANTI_CAVALRY — the War-Cart none, the
+  Nihang CLASS_MELEE) carries ALPINE_TRAINING_IGNORE_HILLS
+  (MODIFIER_PLAYER_UNIT_ADJUST_IGNORE_TERRAIN_COST Type HILLS) and
+  ALPINE_TRAINING_COMBAT_HILLS (+3 on PLOT_IS_HILLS_REQUIREMENT).
+- Confirmed: runs/h1_duely1124 (the Matterhorn on 7:9) Cardiff's Warrior
+  196610 on 8:9 at record 30: its hill first steps (1/0) in AI_Planning.csv
+  at t1-27, (1/1) from t32 on; its Swordsman 851973 (t48), Man-at-Arms
+  1048577 (t77) and t130 upgrade 1835009 keep it (the upgrade carries the
+  ability); Man-at-Arms 1310723 (1/0) at t87, on 8:9 at record 90, (1/1)
+  from t93; Cardiff's other units (1/0) throughout. Grant timing: on the
+  step (or at birth) beside it; a teleport beside it grants nothing in the
+  engines (no recorded case). The replay's import rebuilds it from the
+  records (`foldAlpine`: a unit standing or stepping beside it, an upgrade
+  of a holder).
+
+## C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins
+
+`bestRoadTier` / `layRoad` / `upgradeAllRoads` (cpu/core/eras.ts),
+`routeApplies` / `routeStepMp` (cpu/core/units.ts); `_row_road_tier` /
+`_lay_road` / `_upgrade_all_roads` (gpu/core/sim_seats.py), `_road_terms`,
+`_tac_step_cost`.
+- The plot holds its route type (+0x47) and its route era (+0x48, PlotRoutes
+  RouteType / RouteEra in the save, 0x8d14a0 / 0x8cf720); the bridge flag
+  +0x4d bit 4 is copied from the route's SupportsBridges at placement
+  (0x513120: Route_Builder's place; the era written from the route's
+  PrereqEra).
+- The best route for a player on a plot (0x512120): the route of the
+  highest PlacementValue valid on the plot (0x511700) whose
+  PlacementRequiresOwnedTile is met, whose PrereqEra the player's era
+  (GetEra 0x467eb0, chronology 0x93e9e0) has reached, whose Routes_XP2
+  PrereqTech it holds, BuildOnlyWithUnit ones (the Railroad) only with a
+  unit; then the plot owner's +0x12e0 count (0x6fe50) raises the value by
+  that many rungs — UNREAD which effect sets it (0 in every recorded duel:
+  no road above its owner's era's).
+- The upgrade (0x5134c0, called only from Player_Trade's era handler
+  0x4d9a70 with LOC_NOTIFICATION_ROADS_UPGRADED): when a player's era becomes
+  one some Routes.PrereqEra names, every plot it owns (the plot's owner
+  object +0x1c) that carries a route takes the player's best route where it
+  differs, a pillaged one staying pillaged.
+- A trade route's road (0x554340, from the route placement between cities
+  0x512610): each path plot takes the route's player's best route where it
+  differs or is pillaged.
+- The step's route term (0x52fa40, in the cost chain of 0x26e920): both
+  plots carry an unpillaged route; where the step crosses a river (0x531510)
+  both routes must bridge it (0x530e80: +0x4d & 6 == 4) or no route term
+  applies (the terrain and the river pay); the step costs the dearer of the
+  two routes' MovementCost (maxss), 24.8 fixed point.
+- Confirmed: runs/h1_duely1128 t146-158: China's era Industrial at its t145
+  start (PlayerEraChanged before its PlayerTurnActivated) and its 18 owned
+  road plots Industrial in record 146, the minors' planning on Medieval roads
+  that turn (the upgrade lands by the turn's end: the engines' turn change);
+  city-state 4's two plots at record 154 (its era t153), 3's three at 155,
+  2's three at 157; the unowned 7:8 and 8:8 Industrial at 157 / 158 under
+  China's Trader (the trade road), one Medieval road left at t160.
+  Timing: the engines run the upgrade at the turn's change for each player
+  whose era brought a new road that turn (`ResearchState.roadTier` the tier
+  its era last gave).
+
+## C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins
+
+`search`'s `price` and `walk` (cpu/core/tactical.ts), `price6` and
+`_tac_move_to`'s walk (gpu/core/sim_tactics.py).
+- 0x26e920's context: +0x18 the TO domain's full Movement ([pathfinder +
+  0x180 + domain*4], sea 0, land 8, by the TO plot's water), +0x20 the
+  Movement the step starts with (the parent's, or the new turn's full),
+  +0x34 the cost the rules add (0x26ee80), +0x38 a carry the rules add
+  (0x26ee90), stored as the node's +0x20 (0x26d7f0: +0x28 Movement, +0x2c
+  turns, +0x20 carry). The next step from a node pays the node's carry on
+  top of its rules' cost (0x26ed00: [parent + 0x20] + cost); a step left
+  short clears it.
+- The embark rule 0x530420 (land to water) and the disembark 0x530240
+  (water to land): MOVEMENT_EMBARK_COST unless a FreeEmbark district (or
+  the ignore-shores ability 0x266510); then, FreeEmbark or not, where the
+  Movement the step starts with exceeds the TO domain's full Movement, the
+  excess (0x774c0: +0x20 - +0x18) is carried.
+- Confirmed (AI_Planning.csv, a land start, a paid embark onto P, P's
+  water neighbours only through P): runs/h1_duely1128 t88 Nazca's Horseman
+  31:6 (1/4) -> 31:5 (1/1) carrying 2, 32:4 (2/0); its 29:5 (1/0) from 30:6
+  (1/3) carrying 1, 28:5 (2/0) next turn on 2 - 1 - 1; 1121 city-state 2's
+  Horseman 8:6 (1/4) -> 7:5 (1/1), 8:4 (2/0) (102 rows); 1124 Granada's
+  Knights 35:13 (1/4) (91); 1128's Cavalry 35:6 (1/5) -> 36:6 (1/2), 37:6
+  (2/0); a free embark from a city with nothing above the sea pool goes on
+  (1124 t82 the Heavy Chariot 41:12's centre -> 41:13 (1/1) -> 41:14 (1/0)).
+- LAB: 1128 the Cavalry from 35:7 lists 37:6 and 36:5 (1/1) beside 35:6's
+  (2/0) (12 rows); 1124 21 rows (4, 1) -> (1, 0); the zone-of-control case
+  with a carry (the min cost +0x5c of 0x26f980 under the carry: a wait in
+  the game, the engines' Movement spent).
+
+## C-99: an upgraded unit out of the tactical pass — READ (records), both twins
+
+`upgradeTreesTick` (cpu/core/minorOps.ts, `passEnd`), `_mops_upgrade_trees`
+(gpu/core/sim_minorops.py, `done`).
+- An Upgrade Units tree's upgrade is a new unit (UnitAddedToMap,
+  UnitUpgraded in the record's actions): the tactical pass's unit list was
+  taken before it, and the game logs no tactical row for it that turn —
+  193 of the five duely duels' 217 "(no row)" unit-turns where ours moved
+  (160 HL: End Turn, 19 Operation, 17 Heal ...) are such upgrades.

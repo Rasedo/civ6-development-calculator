@@ -170,29 +170,38 @@ class SimTactics:
             tm = torch.where(mc > 0, (mc - 1) * self._mp_scale, tm)
         return self._mp_scale + tm
 
-    def _tac_step_cost(self) -> torch.Tensor:
+    def _tac_step_cost(self, hill_free: bool = False) -> torch.Tensor:
         """[B, T, 6] long — `stepCost` for a step off each plot along each
         neighbour column onto LAND, in `mp_scale` units: the plot's own cost
         (an improvement's Movement in its place), a route at both ends its
         tier's instead, the river crossing a bridging tier drops and none
         where either plot is a city's (0x531510); a step into a city costs
-        one Movement at most (CITY_MOVEMENT_COST, 0x531660). No chassis here
-        waives terrain."""
+        one Movement at most (CITY_MOVEMENT_COST, 0x531660). `hill_free`: a
+        mover whose hills cost a plain move (`terrainMp`'s Alpine waiver: the
+        promotion, the chassis, Alpine Training); no other waiver here."""
         nb = self.neigh.clamp(min=0)  # [T, 6]
         tm = self._tac_entry()[:, nb] - self._mp_scale
+        if hill_free:
+            tm = (tm - self.hills[:, nb].long() * self._mp_scale).clamp(min=0)
         rr_f = self.railroad.unsqueeze(2)
         rr_t = self.railroad[:, nb]
         rd = (self.road.unsqueeze(2) | rr_f) & (self.road[:, nb] | rr_t)
-        tier = self._road_tier_mp.take(self.road_tier).view(-1, 1, 1)
-        step = torch.where(rr_f & rr_t, torch.full_like(tm, self._railroad_mp), tier.expand_as(tm))
-        terr = torch.where(rd, step - self._mp_scale, tm)
+        # the route term (0x52fa40): the dearer of the two plots' routes,
+        # across a river only where both bridge it
+        tier_f = self.road_tier.unsqueeze(2).expand_as(tm)
+        tier_t = self.road_tier[:, nb]
+        rail = torch.full_like(tm, self._railroad_mp)
+        step = torch.maximum(torch.where(rr_f, rail, self._road_tier_mp.take(tier_f)),
+                             torch.where(rr_t, rail, self._road_tier_mp.take(tier_t)))
+        bridged = (rr_f | self._road_tier_bridges.take(tier_f)) & (rr_t | self._road_tier_bridges.take(tier_t))
         bits = torch.arange(6, device=self.device).view(1, 1, 6)
         river_mp = (2 * self._mp_scale) * ((self.river_mask.unsqueeze(2) >> bits) & 1)
-        bridged = self._road_tier_bridges.take(self.road_tier).view(-1, 1, 1)
-        riv = torch.where(rd & bridged, torch.zeros_like(river_mp), river_mp)
         ctr = self._centre_plane()
         ctr_to = ctr[:, nb]
-        riv = torch.where(ctr.unsqueeze(2) | ctr_to, torch.zeros_like(riv), riv)
+        ctr_any = ctr.unsqueeze(2) | ctr_to
+        route = rd & (bridged | (river_mp == 0) | ctr_any)
+        terr = torch.where(route, step - self._mp_scale, tm)
+        riv = torch.where(route | ctr_any, torch.zeros_like(river_mp), river_mp)
         cost = self._mp_scale + terr + riv
         return torch.where(ctr_to, cost.clamp(max=self._mp_scale), cost)
 
@@ -360,13 +369,13 @@ class SimTactics:
         ign = self._type_zoc_ignore | (self._type_cavalry & ~self._type_chariot)
         return ign.take(utype.clamp(min=0, max=self.NU - 1))
 
-    def _tac_cost(self) -> torch.Tensor:
-        """`_tac_step_cost`, held through a tactical pass until a pillage
-        changes the ground"""
+    def _tac_cost(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """`_tac_step_cost`, plain and hill-free, held through a tactical pass
+        until a pillage changes the ground"""
         if not self._tac_in_pass:
-            return self._tac_step_cost()
+            return self._tac_step_cost(), self._tac_step_cost(True)
         if self._tac_cost_held is None:
-            self._tac_cost_held = self._tac_step_cost()
+            self._tac_cost_held = (self._tac_step_cost(), self._tac_step_cost(True))
         return self._tac_cost_held
 
     def _tac_full(self, pre: str = "barb") -> tuple[torch.Tensor, torch.Tensor]:
@@ -495,12 +504,19 @@ class SimTactics:
         fights = self._type_combat.take(utype) > 0
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows] | (a_fw[rows] & embarks.unsqueeze(1))) \
             & fights.unsqueeze(1) & ~ent_n
-        cost_b = self._tac_cost()  # [B, T, 6]
+        cost_b, cost_hf = self._tac_cost()  # [B, T, 6] each
+        # the units whose hills cost a plain move (`terrainMp`): the Alpine
+        # promotion, the chassis, Alpine Training
+        hill_free = (self._promo_flag(utype, getattr(self, f"{pre}_unit_promos")[rows, slots], "TERRAIN_MOVE_HILLS")
+                     | self._type_no_hill_cost.take(utype) | getattr(self, f"{pre}_unit_alpine")[rows, slots])
+        any_hf = bool(hill_free.count_nonzero())
         # the land/water steps priced (`stepCost`'s transition) where a unit
         # embarks or strikes a plot across the shore
         any_embark = bool(embarks.count_nonzero()) or bool((atk_n & water_n & ~naval.unsqueeze(1)).count_nonzero())
         if any_embark:
             entry_n = self._tac_entry()[rows]
+            if any_hf:
+                entry_n = entry_n - (hill_free.unsqueeze(1) & self.hills[rows]).long() * self._mp_scale
             ctr_n = self._centre_plane()[rows]
             ut_pool = getattr(self, f"{pre}_unit_type")
             ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, slots]
@@ -548,6 +564,11 @@ class SimTactics:
         tie = torch.zeros(N, T, dtype=torch.long, device=dev)
         mv = torch.zeros(N, T, dtype=torch.long, device=dev)
         tn = torch.zeros(N, T, dtype=torch.long, device=dev)
+        # each node's carry (`PNode.carry`, the node's +0x20): the Movement a
+        # shore crossing onto it held past the new domain's full Movement,
+        # which the next step from it pays on top
+        cr = torch.zeros(N, T, dtype=torch.long, device=dev)
+        ww_n = self.unit_water_walk.take(utype)
         st = torch.zeros(N, T, dtype=torch.long, device=dev)
         par = torch.full((N, T), -1, dtype=torch.long, device=dev)
         rank = torch.full((N, T), -1, dtype=torch.long, device=dev)
@@ -581,12 +602,15 @@ class SimTactics:
         def price6(best: torch.Tensor) -> tuple:
             """a step's turns, Movement and cost from each row's node `best`
             onto its six neighbours (the cost callback 0x26e920 and 0x270dd0):
-            the neighbours, their attack flags, turns, Movement, cost, cliffs"""
+            the neighbours, their attack flags, turns, Movement, cost, cliffs,
+            then each step's carry"""
             b1 = best.unsqueeze(1)
             bg, bm, bt = g.gather(1, b1), mv.gather(1, b1), tn.gather(1, b1)  # [N, 1]
             nb = neigh[best]  # [N, 6]
             nbc = nb.clamp(min=0)
             cst = cost_b[rows, best][:, cols]
+            if any_hf:
+                cst = torch.where(hill_free.unsqueeze(1), cost_hf[rows, best][:, cols], cst)
             fw = water_n.gather(1, b1)  # [N, 1]
             cliff6 = None
             if any_embark:
@@ -612,8 +636,17 @@ class SimTactics:
             full_here = torch.where(fw.squeeze(1) & ~naval, full_s, full_l)
             pm = torch.where(fresh, full_here.unsqueeze(1), bm).expand(-1, 6)
             turns = (bt + fresh.long()).expand(-1, 6)
+            # the parent's carry on top (0x26e920); a shore crossing carries
+            # the Movement left above the new domain's full Movement
+            # (0x530420 / 0x530240)
+            cst = cst + cr.gather(1, b1)
+            tw6 = water_n.gather(1, nbc)
+            cross = (fw != tw6) & (nb >= 0) & ~naval.unsqueeze(1) & ~ww_n.unsqueeze(1)
+            max_to = torch.where(tw6, full_s.unsqueeze(1), full_l.unsqueeze(1))
+            carry6 = torch.where(cross & (pm > max_to), pm - max_to, torch.zeros_like(pm))
             moves = pm - cst
             short = moves < 0
+            carry6 = torch.where(short, torch.zeros_like(carry6), carry6)
             moves = moves.clamp(min=0)
             at_start = ((best == start) & unmoved).unsqueeze(1)
             same_turn = bt == turns
@@ -635,7 +668,7 @@ class SimTactics:
             ends = torch.where(moves <= 0, ((tseat[rows.unsqueeze(1), nbc] != seat) & seen6).long() * 3 + 4, 0)
             wet = (seen6 & water_n.gather(1, nbc) & ~naval.unsqueeze(1)).long() * 1000
             gn = bg + cst * 1000 + (ends + 3 - seen6.long() + wet) * _FIX
-            return nb, nbc, a6, turns, moves, gn, cliff6, bt
+            return nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6
 
         def update_parents(rm: torch.Tensor, node: torch.Tensor, seq: torch.Tensor, lo: torch.Tensor) -> tuple:
             """UpdateParents (0x79660, `search`) from each row's re-parented
@@ -654,7 +687,7 @@ class SimTactics:
                     return seq, lo
                 p = stack[ar, (sp - 1).clamp(min=0)].clamp(min=0)
                 sp = sp - m.long()
-                nb, nbc, _a6, turns, moves, gn, _cl, _bt = price6(p)
+                nb, nbc, _a6, turns, moves, gn, _cl, _bt, carry6 = price6(p)
                 lk = m.unsqueeze(1) & linked6[ar, p] & (nb >= 0) & (nb != par[ar, p].unsqueeze(1))
                 if link is not None:
                     link(nbc, p, turns, moves, lk)
@@ -666,6 +699,7 @@ class SimTactics:
                     g[ar, k] = torch.where(bet, gn[:, j], g[ar, k])
                     mv[ar, k] = torch.where(bet, moves[:, j], mv[ar, k])
                     tn[ar, k] = torch.where(bet, turns[:, j], tn[ar, k])
+                    cr[ar, k] = torch.where(bet, carry6[:, j], cr[ar, k])
                     par[ar, k] = torch.where(bet, p, par[ar, k])
                     op = bet & (st[ar, k] == 1)
                     seq = seq + op.long()
@@ -707,7 +741,7 @@ class SimTactics:
             act = act & ~stop & (kn_n.gather(1, b1).squeeze(1) | (best == start))
             if not bool(act.count_nonzero()):
                 continue
-            nb, nbc, a6, turns, moves, gn, cliff6, bt = price6(best)
+            nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6 = price6(best)
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6) & (turns <= max_turns)
             if zoc:
                 stacked = full_n.gather(1, b1) & (turns > bt)
@@ -762,6 +796,7 @@ class SimTactics:
                     g[ar, k] = torch.where(m, gj, g[ar, k])
                     mv[ar, k] = torch.where(m, moves[:, j], mv[ar, k])
                     tn[ar, k] = torch.where(m, turns[:, j], tn[ar, k])
+                    cr[ar, k] = torch.where(m, carry6[:, j], cr[ar, k])
                     par[ar, k] = torch.where(m, best, par[ar, k])
                     tie[ar, k] = torch.where(ins, tj, tie[ar, k])
                     st[ar, k] = torch.where(new, 1, st[ar, k])
@@ -834,6 +869,7 @@ class SimTactics:
             put(g, gn)
             put(mv, moves)
             put(tn, turns)
+            put(cr, carry6)
             put(par, best.unsqueeze(1).expand(-1, 6))
             put(tie, tie6)
             put(st, torch.ones_like(s0), new6)
@@ -939,21 +975,24 @@ class SimTactics:
         return disk.gather(1, to.unsqueeze(1)).squeeze(1) | (frm == to)
 
     def _tac_step(self, rows: torch.Tensor, frm: torch.Tensor, to: torch.Tensor, dcol: torch.Tensor,
-                  utype: torch.Tensor, ign_shore: torch.Tensor) -> torch.Tensor:
+                  utype: torch.Tensor, ign_shore: torch.Tensor, hill_free: torch.Tensor) -> torch.Tensor:
         """[R] long — `stepCost` of one step `frm` -> `to` (neighbour column
         `dcol`) for units of `utype` in the games `rows`, in `mp_scale`
         units: a hull's and an embarked unit's one Movement, a land/water
         step its plot's own cost and the embarking's (waived at a Harbor, a
-        coastal city centre or by `ign_shore`), a land step the held plane's;
-        one Movement at most into a city."""
+        coastal city centre or by `ign_shore`), a land step the held plane's
+        (the hill-free one where `hill_free`); one Movement at most into a
+        city."""
         naval = self.unit_naval.take(utype)
         fw = self.water[rows, frm]
         tw = self.water[rows, to]
         mp1 = torch.full_like(frm, self._mp_scale)
-        land = self._tac_cost()[rows, frm, dcol]
+        plain, hf = self._tac_cost()
+        land = torch.where(hill_free, hf[rows, frm, dcol], plain[rows, frm, dcol])
         ctr = self._centre_plane()
         dock = self._embark_waived(frm.unsqueeze(1), to.unsqueeze(1), rows).squeeze(1)
-        trans = torch.where(tw, mp1, self._tac_entry()[rows, to])
+        entry = self._tac_entry()[rows, to] - (hill_free & self.hills[rows, to]).long() * self._mp_scale
+        trans = torch.where(tw, mp1, entry)
         trans = trans + torch.where(dock | ign_shore, torch.zeros_like(trans),
                                     torch.full_like(trans, self._embark_transition_mp))
         trans = torch.where(ctr[rows, to], trans.clamp(max=self._mp_scale), trans)
@@ -1014,6 +1053,9 @@ class SimTactics:
         naval = self.unit_naval.take(ut)
         ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, sr]
         halts = self._tac_zoc(seat)[rows] & ~self._tac_zoc_ignored(ut).unsqueeze(1)
+        # hills a plain move (`terrainMp`): the Alpine promotion, the chassis, Alpine Training
+        hill_free = (self._promo_flag(ut, getattr(self, f"{pre}_unit_promos")[rows, sr], "TERRAIN_MOVE_HILLS")
+                     | self._type_no_hill_cost.take(ut) | getattr(self, f"{pre}_unit_alpine")[rows, sr])
 
         def own_at(pl: torch.Tensor) -> torch.Tensor:
             return (pl >= 0) & (self.unit_seat[rows].gather(1, pl.clamp(min=0)) == seat)
@@ -1033,6 +1075,12 @@ class SimTactics:
         frm = start.clone()
         stop = torch.zeros(R, dtype=torch.long, device=dev)
         on = torch.ones(R, dtype=torch.bool, device=dev)
+        # a shore crossing's Movement past the new domain's full, paid by the
+        # next step (`walk`'s carry)
+        carry = torch.zeros_like(mp)
+        f_land_w, f_sea_w = self._tac_full(pre)
+        fl_w, fs_w = f_land_w[rows, sr], f_sea_w[rows, sr]
+        ww = self.unit_water_walk.take(ut)
         for i in range(L):
             p = path[:, i]
             on = on & (i < plen)
@@ -1040,8 +1088,12 @@ class SimTactics:
                 break
             pc = p.clamp(min=0)
             dcol = (self.neigh[frm] == pc.unsqueeze(1)).long().argmax(dim=1)
-            c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore)
+            c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, hill_free) + carry
             on = on & ~((mp < c) & (mp < full))
+            tw = self.water[rows, pc]
+            cross = (self.water[rows, frm] != tw) & ~naval & ~ww
+            max_to = torch.where(tw, fs_w, fl_w)
+            carry = torch.where(on & cross & (mp > max_to), mp - max_to, torch.zeros_like(carry))
             mp = torch.where(on, (mp - c).clamp(min=0), mp)
             stop = torch.where(on, torch.full_like(stop, i + 1), stop)
             frm = torch.where(on, pc, frm)

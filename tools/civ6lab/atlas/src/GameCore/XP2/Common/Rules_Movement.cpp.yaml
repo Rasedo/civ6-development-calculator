@@ -27,8 +27,12 @@
     - cpu/core/units.ts:stepCost
     - gpu/core/sim_seats.py:_step_verb
     - gpu/core/sim_tactics.py:_embark_waived
+    - cpu/core/tactical.ts:PNode
+    - cpu/core/tactical.ts:cross
+    - gpu/core/sim_tactics.py:price6
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1   bit 2, `dll_rowmap..."
   context:
@@ -48,8 +52,12 @@
     - cpu/core/units.ts:stepCost
     - gpu/core/sim_seats.py:_step_verb
     - gpu/core/sim_tactics.py:_embark_waived
+    - cpu/core/tactical.ts:PNode
+    - cpu/core/tactical.ts:cross
+    - gpu/core/sim_tactics.py:price6
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeE..."
   context:
@@ -78,6 +86,17 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ted on the unit's `m_bEligibleToHeal` (+0x1590) and its plot's relation to the owner (0x530880: 1 own or allied, 2 unowned, 3 another's; the owner's no-neutral / no-foreign flags +0x..."
+  review: imported
+- addr: 0x530e80
+  final: 0x3789d0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/units.ts:routeApplies]
+  readings:
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...unpillaged route; where the step crosses a river (0x531510) both routes must bridge it (0x530e80: +0x4d & 6 == 4) or no route term applies (the terrain and the river pay); the step cos..."
   review: imported
 - addr: 0x530f50
   final: 0x378a70
@@ -112,9 +131,12 @@
     - cpu/core/units.ts:riverCharge
     - gpu/core/sim_masks.py:_road_terms
     - gpu/core/sim_tactics.py:_tac_step_cost
+    - cpu/core/units.ts:routeApplies
+    - cpu/core/units.ts:riverCrossing
   readings:
     - "C-95: a river crossing's Movement — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...T 1 (0x531660 caps the step, 0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COS..."
   context:

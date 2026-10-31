@@ -477,7 +477,7 @@ class SimOrders:
                 )
                 if bool(_rdm.count_nonzero()):
                     _r = _rdm.nonzero(as_tuple=True)[0]
-                    self.road[_r, hc[_r]] = True
+                    self._lay_road(_r, hc[_r], row)
                     self._spend_build_charge(_r, sc, hc)
 
             # CIV6 (Railroad): "Does not cost a charge, but does cost 1 Iron

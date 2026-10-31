@@ -797,7 +797,7 @@ class SimMinors:
                     self._trade_store_course(row, rows, slot, o_ct[rows], dct[rows])
                     lr = rows[~self.water[rows, o_ct[rows]]]
                     if len(lr) > 0:
-                        self.road[lr, o_ct[lr]] = True
+                        self._lay_road(lr, o_ct[lr], row)
                     self.major_unit_alive[rows, t_slot[rows]] = False
                     self._occ_clear(rows, t_tile[rows], t_slot[rows] + self.POOL_LO["major"])
         self._expire_seat_routes(row)

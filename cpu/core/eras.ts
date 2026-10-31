@@ -1,7 +1,7 @@
-import type { GameState } from './types';
+import type { GameState, ResearchState, Tile } from './types';
 import { boostOnKill, markBoost } from './boosts';
 import { civEraIndex } from './city';
-import { onHomeContinent, seatOf, citiesOf, isBarbSeat, isCiv, civOf, isCityStateSeat } from './seats';
+import { onHomeContinent, seatOf, citiesOf, isBarbSeat, isCiv, civOf, isCityStateSeat, tileSeat } from './seats';
 import { getModifiers } from './effects';
 import { seatWonderSum } from './wonders';
 import { UNITS } from '../data/units';
@@ -227,20 +227,58 @@ export function eraCountdownStep(era: number, start: number, countdown: number, 
   return c >= 0 ? c : ERA_BEGINS;
 }
 
-/** THE ROADS' TIER at the turn's change: the road a player's era brings
- *  (Routes.PrereqEra) stands once any player — a major, a city-state, the
- *  Free Cities — reaches that era by its techs and civics (runs/h1_duely1117
- *  -1128: each seed's first Medieval, Industrial and Modern road in the
- *  record of the turn the first player's era reaches Classical, Industrial,
- *  Modern; 1128 t146 Industrial, the game era Industrial from t120) */
-export function raiseRoadTier(state: GameState): void {
-  let era = 0;
-  for (const s of [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
-    era = Math.max(era, civEraIndex(s.research.techs, s.research.civics));
-  }
+/** the road TIER a player's era lays (0x512120: the route of the highest
+ *  PlacementValue whose PrereqEra its era has reached, the unit-only
+ *  Railroad apart) */
+export function bestRoadTier(era: number): number {
   let tier = 0;
   for (let i = 0; i < ROAD_TIER_ERA.length; i++) if (era >= ROAD_TIER_ERA[i]) tier = i;
-  if (tier > (state.roadTier ?? 0)) state.roadTier = tier;
+  return tier;
+}
+
+/** the road tier `seat`'s era lays (`bestRoadTier` of its techs and civics) */
+function seatRoadTier(state: GameState, seat: number): number {
+  const r = seatOf(state, seat)?.research;
+  return r ? bestRoadTier(civEraIndex(r.techs, r.civics)) : 0;
+}
+
+/** lay `seat`'s best road on a land plot (the route placement 0x513120 at the
+ *  player's `bestRoadTier`): a Trader's step (0x554340, the road already
+ *  there taking the player's type), a Military Engineer's build, Rome's
+ *  founding course (runs/h1_duely1128 t157-158: the unowned 7:8 and 8:8
+ *  Industrial under China's Trader) */
+export function layRoad(state: GameState, seat: number, t: Tile): void {
+  t.road = true;
+  const tier = seatRoadTier(state, seat);
+  if (tier > 0) t.roadTier = tier;
+  else delete t.roadTier;
+}
+
+/** the roads' upgrade as a player's era brings a new one (Player_Trade's era
+ *  signal 0x4d9a70: an era some Routes.PrereqEra names -> 0x5134c0): every
+ *  plot it owns that carries a road takes the player's best road, the
+ *  Railroad apart; `r.roadTier` holds the tier its era last gave
+ *  (runs/h1_duely1128: China's 18 roads Industrial at its t145 era, the
+ *  city-states' plots each at its own, records 154, 155 and 157) */
+function upgradeRoads(state: GameState, seat: number, r: ResearchState): void {
+  const tier = bestRoadTier(civEraIndex(r.techs, r.civics));
+  if (tier <= (r.roadTier ?? 0)) return;
+  r.roadTier = tier;
+  for (const t of state.map.tiles) {
+    if (!t.road || t.railroad || tileSeat(t) !== seat) continue;
+    t.roadTier = tier;
+  }
+}
+
+/** THE ROADS' UPGRADE at the turn's change: each player whose era brought a
+ *  new road this turn re-lays its plots' roads (`upgradeRoads`) — a major,
+ *  a city-state, the Free Cities (runs/h1_duely1128: China's Industrial era
+ *  at its t145 start, the minors' planning on Medieval roads that turn,
+ *  China's Industrial ones from record 146) */
+export function upgradeAllRoads(state: GameState): void {
+  for (const s of [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
+    upgradeRoads(state, s.seat, s.research);
+  }
 }
 
 /** A new GAME ERA begins: its index and first turn, and each major seat's

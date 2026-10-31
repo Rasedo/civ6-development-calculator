@@ -16,7 +16,9 @@
   final: 0x64e7a0
   kind: function
   status: PARTLY
-  readings: ["H-1: the city-states' quests — READ"]
+  readings:
+    - "H-1: the city-states' quests — READ"
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...th RequiresPopulation (+0xe1 bit 6), its era known and at most the actor's (0x93e580, 0x93e9e0), below MaxPerPlayer counting every one it holds (0x4bdd70); the picker over them in...

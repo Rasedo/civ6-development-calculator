@@ -307,7 +307,7 @@ def _research_record(sim, b: int, s: int) -> list:
            float(sim.citystate_tech_prog[b, s]), float(sim.citystate_civic_prog[b, s]),
            int(sim.citystate_cur_tech[b, s]), int(sim.citystate_cur_civic[b, s]), int(sim.citystate_tech_goal[b, s]),
            float(sim.citystate_tech_ovf[b, s]), float(sim.citystate_civic_ovf[b, s]),
-           int(sim.citystate_ai_left[b, s]), int(sim.citystate_ai_left_seen[b, s]),
+           int(sim.citystate_ai_left[b, s]), int(sim.citystate_ai_left_seen[b, s]), int(sim.citystate_road_tier[b, s]),
            *sim.citystate_tech_retain[b, s].tolist(), *sim.citystate_civic_retain[b, s].tolist(),
            *sim.citystate_tech_catch[b, s].tolist(), *sim.citystate_civic_catch[b, s].tolist()]
     tv = bool(sim.citystate_ai_valid[b, s])
@@ -418,7 +418,6 @@ GAME = {
     "congressActive": lambda sim, b, rows: [[int(x) for x in sim.congress_active[b].reshape(-1).tolist()]],
     "emergencyTable": lambda sim, b, rows: [_emg_table(sim, b)],
     "lastSessionTurn": lambda sim, b, rows: [int(sim.last_session_turn[b])],
-    "roadTier": lambda sim, b, rows: [int(sim.road_tier[b])],
     "gameEra": lambda sim, b, rows: [[int(sim.game_era[b]), int(sim.era_start[b]), int(sim.era_countdown[b])]],
     "momentsWorld": lambda sim, b, rows: [[k for k, x in enumerate(sim.moment_world[b].tolist()) if x]],
     "pantheonsClaimed": lambda sim, b, rows: [int(sim.pantheon_claimed_n[b])],
@@ -801,6 +800,7 @@ SEAT = {
     "techProgress": _civ_scalar("civ_tech_prog"),
     "civicProgress": _civ_scalar("civ_civic_prog"),
     "techOverflow": _civ_scalar("civ_tech_ovf"),
+    "seatRoadTier": _civ_scalar("civ_road_tier"),
     "civicOverflow": _civ_scalar("civ_civic_ovf"),
     # one LIST per row (the `wars` shape) — flattening across rows would hand
     # row k a single element while the TS side folds the whole table-order
@@ -965,6 +965,7 @@ CITY_STATE = {
     "minorCivicGovValues": lambda sim, b, rows: [_gov_values_row(sim, b, s) for s in rows],
     "minorResearchLeft": lambda sim, b, rows: [[int(sim.citystate_ai_left[b, s]), int(sim.citystate_ai_left_seen[b, s])] for s in rows],
     "minorTechOverflow": lambda sim, b, rows: [float(sim.citystate_tech_ovf[b, s]) for s in rows],
+    "minorRoadTier": lambda sim, b, rows: [int(sim.citystate_road_tier[b, s]) for s in rows],
     "minorCivicOverflow": lambda sim, b, rows: [float(sim.citystate_civic_ovf[b, s]) for s in rows],
     "minorBoosted": lambda sim, b, rows: [
         [i for i, on in enumerate(sim.citystate_tech_boosted[b, s].tolist()) if on]
@@ -1395,6 +1396,7 @@ UNIT = {
     "patrol": _unit("unit_patrol"),
     "freeCity": _unit("unit_free_city"),
     "noResourceUpkeep": _unit("unit_no_res_upkeep"),
+    "alpine": _unit("unit_alpine"),
 }
 
 
@@ -1444,6 +1446,7 @@ TILE = {
     "encampHp": _tile("encamp_hp"),
     "encampOuterHp": _tile("encamp_outer_hp"),
     "road": _tile("road"),
+    "roadTier": _tile("road_tier"),
     "locked": _tile("tile_locked"),
     "fertility": _tile("fertility"),
     "fertilityProd": _tile("fertility_prod"),

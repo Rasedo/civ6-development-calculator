@@ -25,7 +25,7 @@ import type { ArmyRecord, CityState, GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiView } from './aiView';
-import { cityStateTactics, moveTo, passFinish, plotDistance, reachPlots, stackedAt, swapUnits, type Pass } from './tactical';
+import { cityStateTactics, moveTo, passEnd, passFinish, plotDistance, reachPlots, stackedAt, swapUnits, type Pass } from './tactical';
 import { ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
@@ -297,7 +297,13 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
   for (const u of order(held)) {
     if (upgradeMayGo(state, cs, u)) {
       if (upgradePurchase(eco, MINOR_UPGRADE_GOLD * FX)) {
-        if (minorUpgradeUnit(state, cs, u)) held.delete(u.id);
+        // the upgrade is a new unit, out of the pass: no tactical row that
+        // turn (runs/h1_duely1121 t61 city-state 2's Swordsman 1310720,
+        // UnitAddedToMap, no AI_Tactical.csv row)
+        if (minorUpgradeUnit(state, cs, u)) {
+          held.delete(u.id);
+          passEnd(pass, u);
+        }
         continue;
       }
       if (upgradeUnasked(cs, u) || (promotionCount(u) <= 1 && state.units.filter((x) => x.seat === cs.seat && x.type === u.type).length > 10)) drop(u);

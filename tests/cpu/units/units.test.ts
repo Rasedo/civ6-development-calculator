@@ -56,9 +56,13 @@ describe('movement', () => {
     expect(moveCostInto(state, from, t)).toBe(3 * MP_SCALE);
     from.road = true;
     // CIV6: Industrial Road 0.75, Modern Road 0.5.
-    state.roadTier = 2;
+    from.roadTier = 2;
+    t.roadTier = 2;
     expect(moveCostInto(state, from, t)).toBe(3);
-    state.roadTier = 3;
+    // ...the dearer of the two plots' roads (the route term's max)
+    t.roadTier = 3;
+    expect(moveCostInto(state, from, t)).toBe(3);
+    from.roadTier = 3;
     expect(moveCostInto(state, from, t)).toBe(2);
     // CIV6 (Railroad): 0.25, and only where BOTH ends carry one.
     t.railroad = true;

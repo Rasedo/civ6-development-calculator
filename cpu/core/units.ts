@@ -38,7 +38,8 @@ import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { civUnitAllowed, civUpgradeTarget, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, UNIT_TYPE_IDX, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
 import {
-  BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE, ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS,
+  ALPINE_CLASSES, ALPINE_FEATURE, BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE,
+  ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS,
 } from '../data/promotions';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import {
@@ -161,41 +162,41 @@ function roadStep(from: Tile, to: Tile): boolean {
   return (!!from.road || !!from.railroad) && (!!to.road || !!to.railroad);
 }
 
-/** Is this step RAILROAD-to-RAILROAD, the 0.25 tier? */
-function railStep(from: Tile, to: Tile): boolean {
-  return !!from.railroad && !!to.railroad;
+/** a route plot's own Movement (Routes.MovementCost of its RouteType, in
+ *  MP_SCALE units): the Railroad's 0.25, else its road's tier */
+function routeMp(t: Tile): number {
+  return t.railroad ? RAILROAD_MP : (ROAD_TIER_MP[t.roadTier ?? 0] ?? MP_SCALE);
 }
 
-/** The road TIER the world has reached, 0..3 — latched as each game era
- *  begins (`enterEra`). */
-export function roadTier(state: GameState): number {
-  return state.roadTier ?? 0;
+/** does the plot's route bridge rivers (Routes.SupportsBridges, the plot's
+ *  +0x4d bit 4): every route from the Classical road up, the Railroad too */
+function routeBridges(t: Tile): boolean {
+  return !!t.railroad || !!ROAD_TIER_BRIDGES[t.roadTier ?? 0];
 }
 
-/**
- * Do routes carry BRIDGES yet? The Ancient road has none; every tier from the
- * Classical road up, the Railroad included, "Creates Bridges over Rivers".
- */
-function roadBridges(state: GameState): boolean {
-  return !!ROAD_TIER_BRIDGES[roadTier(state)];
+/** the movement cost's route term (0x52fa40): a step between two plots that
+ *  both carry a route, where it crosses a river (0x531510) only if both
+ *  routes bridge it (0x530e80) */
+function routeApplies(state: GameState, from: Tile, to: Tile): boolean {
+  if (!roadStep(from, to)) return false;
+  return (routeBridges(from) && routeBridges(to)) || !riverCrossing(state, from, to);
 }
 
-/** What a ROUTE-to-ROUTE step costs, in MP_SCALE units: the railroad's own
- *  0.25 where both ends carry one, else the world's current road tier. */
-function routeStepMp(state: GameState, from: Tile, to: Tile): number {
-  if (railStep(from, to)) return RAILROAD_MP;
-  return ROAD_TIER_MP[roadTier(state)] ?? MP_SCALE;
+/** What a ROUTE-to-ROUTE step costs, in MP_SCALE units: the dearer of the two
+ *  plots' routes (0x52fa40's maxss of each route's MovementCost) */
+function routeStepMp(from: Tile, to: Tile): number {
+  return Math.max(routeMp(from), routeMp(to));
 }
 
 /** Civ 6-ish movement cost to ENTER a tile, in MP_SCALE units (river handled
  * separately). Water tiles enter at a flat point (embarked/naval movement —
  * no hills/features on water). Land tiles keep the terrain schedule.
  * A ROUTE-to-ROUTE step ignores the terrain penalty entirely — "roads let a
- * unit pass through Woods or Hills as if it were flat" — and pays its tier's
- * own published cost instead.
+ * unit pass through Woods or Hills as if it were flat" — and pays the dearer
+ * of the two plots' routes instead (where it crosses a river, only both bridged).
  * `from` is the tile being left; passing the same tile twice is harmless. */
 export function moveCostInto(
-  state: GameState, from: Tile, tile: Tile, mover?: { promos?: number; type: string; seat?: number },
+  state: GameState, from: Tile, tile: Tile, mover?: { promos?: number; type: string; seat?: number; alpine?: boolean },
 ): number {
   // CIV6 (Polder, `MovementChange="2"`): an improvement may make its own tile
   // dearer to enter than the flat step. Water only, so `terrainMp` — the half
@@ -204,7 +205,7 @@ export function moveCostInto(
   // a hull in a Canal's or a City Centre's passage pays the water step, not
   // the ground's
   if (mover && UNITS[mover.type]?.naval && hullPassage(tile)) return MP_SCALE;
-  if (roadStep(from, tile)) return routeStepMp(state, from, tile);
+  if (routeApplies(state, from, tile)) return routeStepMp(from, tile);
   if (mover && religiousIgnoresTerrain(state, mover)) return MP_SCALE;
   return terrainMp(tile, mover);
 }
@@ -230,14 +231,15 @@ function improvementMoveCost(tile: Tile): number | undefined {
 
 /** The TERRAIN schedule alone, in MP_SCALE units — what a step costs where no
  *  route waives it. This is the half the fixture ships to the GPU. */
-export function terrainMp(tile: Tile, mover?: { promos?: number; type: string }): number {
+export function terrainMp(tile: Tile, mover?: { promos?: number; type: string; alpine?: boolean }): number {
   let cost = MP_SCALE;
   // CIV6 (Alpine / Ranger): the promotion lets its holder "move onto a tile
   // with the appropriate terrain or terrain feature at the cost of only 1
   // Movement". Ranger names Woods and Jungle; Marsh is nobody's.
   // CIV6 (Khevsureti, Ngao Mbeba): the same waiver, written on the CHASSIS
-  // instead of on a promotion.
-  const hills = !mover || (!promoFlag(mover, 'TERRAIN_MOVE_HILLS') && !UNITS[mover.type]?.ignoresHillCost);
+  // instead of on a promotion; ABILITY_ALPINE_TRAINING on the UNIT.
+  const hills = !mover || (!promoFlag(mover, 'TERRAIN_MOVE_HILLS') && !UNITS[mover.type]?.ignoresHillCost
+    && !mover.alpine);
   const woods = !mover || (!promoFlag(mover, 'TERRAIN_MOVE_WOODS') && !UNITS[mover.type]?.ignoresWoodsCost);
   if (tile.elevation === 'HILLS' && hills) cost += MP_SCALE;
   if (tile.feature === 'MARSH') cost += MP_SCALE;
@@ -257,11 +259,17 @@ export function terrainMp(tile: Tile, mover?: { promos?: number; type: string })
 /** a river crossing's Movement (the river term 0x5301e0): none where either
  *  plot is water or a city's (its test 0x531510) */
 export function riverCharge(state: GameState, from: Tile, to: Tile, mover?: { type: string; seat?: number }): number {
-  if (isWater(to) || isWater(from)) return 0;
-  if (from.district === 'CITY_CENTER' || to.district === 'CITY_CENTER') return 0;
-  if (roadStep(from, to) && roadBridges(state)) return 0;
+  if (!riverCrossing(state, from, to) || routeApplies(state, from, to)) return 0;
   if (mover && religiousIgnoresTerrain(state, mover)) return 0;
-  return crossesRiver(state.map, from, to) ? RIVER_CROSS_MP : 0;
+  return RIVER_CROSS_MP;
+}
+
+/** does the step cross a river (0x531510): never where either plot is water
+ *  or a city's */
+function riverCrossing(state: GameState, from: Tile, to: Tile): boolean {
+  if (isWater(to) || isWater(from)) return false;
+  if (from.district === 'CITY_CENTER' || to.district === 'CITY_CENTER') return false;
+  return crossesRiver(state.map, from, to);
 }
 
 /**
@@ -957,7 +965,7 @@ export function embarkTechMoves(state: GameState, seat: number): number {
 /** What one step from `from` into its neighbour `to` costs this unit, in
  *  MP_SCALE units: the tile's own cost plus a river crossing, or, crossing
  *  the shore, the embark penalty in place of the river. */
-export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number }, from: Tile, to: Tile): number {
+export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number; alpine?: boolean }, from: Tile, to: Tile): number {
   const naval = !!UNITS[unit.type]?.naval;
   const transition = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
   let cost: number;
@@ -978,6 +986,28 @@ export function stepCost(state: GameState, unit: { type: string; seat: number; p
   // CIV6 (GlobalParameters CITY_MOVEMENT_COST 1; the movement cost's city
   // term 0x531660 caps the step's whole cost where it enters a city)
   return to.district === 'CITY_CENTER' ? Math.min(cost, CITY_MOVEMENT_MP) : cost;
+}
+
+/** does ABILITY_ALPINE_TRAINING attach to this chassis (its TypeTags,
+ *  `ALPINE_CLASSES`; a land chassis) */
+export function alpineChassis(type: string): boolean {
+  const def = UNITS[type];
+  const cls = UNIT_PROMO_CLASS[type];
+  return !!def && !def.naval && !def.chariot && cls !== undefined && ALPINE_CLASSES.includes(cls)
+    && unitDomain(type) === 'military';
+}
+
+/** MATTERHORN_ADJACENT_UNITS_GRANT_ABILITY (Permanent): a land unit whose
+ *  chassis takes the ability, standing on a plot beside the Matterhorn —
+ *  stepped onto or born there — holds ABILITY_ALPINE_TRAINING from then on
+ *  (runs/h1_duely1124: Cardiff's Warrior 196610 on 8:9 at record 30, hills
+ *  (1/1) in AI_Planning.csv from t32, (1/0) at t26-27; its Swordsman,
+ *  Man-at-Arms and t130 upgrade keep it) */
+export function grantAlpine(state: GameState, unit: Unit): void {
+  if (unit.alpine || !alpineChassis(unit.type)) return;
+  const at = state.map.tiles[unit.tileIndex];
+  if (!at) return;
+  if (neighbors(state.map, at).some((n) => n.feature === ALPINE_FEATURE)) unit.alpine = true;
 }
 
 /** CITY_MOVEMENT_COST (GlobalParameters), in MP_SCALE units */
@@ -1023,6 +1053,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   carryAirWith(state, unit, from.index);
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
+  grantAlpine(state, unit);
   // the transfer cap: what carries over can never exceed the NEW mode's
   // pool — which becomes the granted pool every later afford this turn reads
   if (transition) {
@@ -1864,6 +1895,7 @@ export function spawnUnit(
     unit.xp = owed;
     logXpWrite(state, unit, 'fp');
   }
+  grantAlpine(state, unit);
   state.units.push(unit);
   // the player's knowledge base records the unit it made at once (player
   // signal +0xc0 -> 0x7874a0, no sight asked): a Trader, which no look

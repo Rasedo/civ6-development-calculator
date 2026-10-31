@@ -33,7 +33,7 @@ import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, majorsAlive, setMetTurnWith } from '../core/seats';
 import { routeOriginCenter, stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
-import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
+import { civEraIndex, cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
 import { tileYields } from '../core/yields';
 import type { EventReplay } from './eventReplay';
 import { floodplainList } from './eventDraws';
@@ -64,7 +64,7 @@ import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP
 import { AGE_GOLDEN } from '../data/seats';
 import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, LEVY_TURNS, MINOR_CATCHUP_PCT } from '../data/cityStates';
 import { researchCost } from '../core/economy';
-import { PROMO_CLASSES } from '../data/promotions';
+import { ALPINE_FEATURE, PROMO_CLASSES } from '../data/promotions';
 import { unitPromoRows } from '../core/promotions';
 import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
@@ -84,9 +84,9 @@ import { LUXURY_IDS } from '../../world/resources';
 import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import type { QueueItem } from '../core/types';
 import { projectCost, settlerCost, unitStepCost } from '../core/game';
-import { builderCost, rangedCombatOf, traderCost, unitDomain } from '../core/units';
+import { alpineChassis, builderCost, rangedCombatOf, traderCost, unitDomain } from '../core/units';
 import { carryLayout, computeUnlocks, governmentSlots } from '../core/effects';
-import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
+import { ERA_BEGINS, bestRoadTier, eraCountdownStep } from '../core/eras';
 import { standingRemovable } from '../core/climate';
 import { districtSiteCost } from '../core/phase';
 import { P, bool, memCity, memField, memWords, num, plotAt, revealedPlots, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
@@ -436,6 +436,7 @@ function tileOf(ctx: Ctx, rec: TurnRecord, i: number): Tile {
     ownerSeat: NO_SEAT,
     ownerCity: -1,
     ...(route >= 0 ? { road: true } : {}),
+    ...(ROAD_ROUTES.indexOf(routeName) > 0 ? { roadTier: ROAD_ROUTES.indexOf(routeName) } : {}),
     ...(routeName === 'ROUTE_RAILROAD' ? { railroad: true } : {}),
     ...digs,
   };
@@ -483,6 +484,8 @@ export interface History {
    *  city-state's player id: a city-state's unit gone at t+1 beside a new
    *  one of its type under the major */
   levied: Map<string, number>;
+  /** units holding Alpine Training, by `owner:id` (`foldAlpine`) */
+  alpine: Set<string>;
   /** the turn each player last seated each governor (`GovernorAssigned` in
    *  the records' action log), by `player:governor` catalog index */
   govSeated: Map<string, number>;
@@ -833,7 +836,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), govSeated: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), alpine: new Set(), govSeated: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
@@ -1858,9 +1861,53 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   if (h.last) foldCultureTourism(h, h.last, rec, cat);
   if (h.last) foldGrowthDrift(h, h.last, rec, cat);
   foldDominance(h, rec);
+  foldAlpine(h, rec, cat);
   h.beforeThat = h.before;
   h.before = h.last;
   h.last = rec;
+}
+
+/** Alpine Training (`grantAlpine`, `History.alpine`): a unit the record finds
+ *  on a plot beside the Matterhorn, or whose logged step (UnitMoved) entered
+ *  one, holds it; a unit upgraded (UnitUpgraded names the new unit) keeps it:
+ *  the holder of its owner's gone since the record before, close by, of its
+ *  experience and level (runs/h1_duely1124 Cardiff's Warrior 196610 ->
+ *  Swordsman 851973 t48 -> Man-at-Arms 1048577 t77) */
+function foldAlpine(h: History, rec: TurnRecord, cat: Catalog): void {
+  const fi = cat.features.indexOf(`FEATURE_${ALPINE_FEATURE}`);
+  if (fi < 0) return;
+  const W = rec.head.W;
+  const H = rec.map.length;
+  const shape = { width: W, height: rec.head.H, wrapX: bool(rec.head.wrapX) };
+  const beside = new Set<number>();
+  rec.map.forEach((row, y) => row.forEach((p, x) => {
+    if (num(p[P.feature] as number) !== fi) return;
+    for (let y2 = Math.max(0, y - 1); y2 <= Math.min(H - 1, y + 1); y2++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const x2 = (x + dx + W) % W;
+        if (hexDistance(shape, x, y, x2, y2) === 1) beside.add(y2 * W + x2);
+      }
+    }
+  }));
+  if (!beside.size) return;
+  for (const u of rec.units) if (beside.has(u.y * W + u.x)) h.alpine.add(`${u.owner}:${u.id}`);
+  const rows = (rec as TurnRecord & { actions?: unknown }).actions;
+  if (!Array.isArray(rows)) return;
+  const upgraded = new Set<string>();
+  for (const a of rows) {
+    if (!Array.isArray(a)) continue;
+    if (a[2] === 'UnitMoved' && beside.has(num(a[6]) * W + num(a[5]))) h.alpine.add(`${a[3]}:${a[4]}`);
+    if (a[2] === 'UnitUpgraded') upgraded.add(`${a[3]}:${a[4]}`);
+  }
+  if (!h.last || !upgraded.size) return;
+  const live = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
+  for (const u of rec.units) {
+    if (!upgraded.has(`${u.owner}:${u.id}`)) continue;
+    const was = h.last.units.find((g) => g.owner === u.owner && !live.has(`${g.owner}:${g.id}`)
+      && h.alpine.has(`${g.owner}:${g.id}`) && num(g.xp) === num(u.xp) && num(g.level) === num(u.level)
+      && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
+    if (was) h.alpine.add(`${u.owner}:${u.id}`);
+  }
 }
 
 /** Does the building row `bi` of the record pay its city's plots
@@ -2039,15 +2086,6 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
   const state = createGameFromMap(map, num(rec.seed) >>> 0);
   state.turn = rec.turn;
-  // the road tier the record's routes carry: the most advanced road on the
-  // map (Routes.xml in its order, the Railroad apart; runs/h1_duely1128 t120:
-  // Bologna's roads are Medieval, a step 1 Movement, in the Renaissance)
-  let tier = -1;
-  for (let i = 0; i < W * H; i++) {
-    const r = plotAt(rec, i)[P.route] as number;
-    if (r >= 0) tier = Math.max(tier, ROAD_ROUTES.indexOf(cat.routes[r]));
-  }
-  if (tier > 0) state.roadTier = tier;
   if (history) {
     state.gameEra = history.gameEra;
     state.eraStartTurn = history.eraStartTurn;
@@ -2590,6 +2628,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       const k = rows.findIndex((r) => r.id === cat.unitPromotions?.[p]?.replace(/^PROMOTION_/, ''));
       if (k >= 0) unit.promos = (unit.promos ?? 0) | (1 << k);
     }
+    if (history?.alpine.has(`${u.owner}:${u.id}`) && alpineChassis(unit.type)) unit.alpine = true;
     const levy = history?.levied.get(`${u.owner}:${u.id}`);
     if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
     state.units.push(unit);
@@ -2714,6 +2753,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     else delete r.techCatchUp;
     if (c) r.civicCatchUp = c;
     else delete r.civicCatchUp;
+  }
+  // the road tier each player's era last gave its roads (`upgradeRoads`): its
+  // era's, the upgrade landing at the turn's end before the record
+  for (const s of [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
+    const tier = bestRoadTier(civEraIndex(s.research.techs, s.research.civics));
+    if (tier > 0) s.research.roadTier = tier;
   }
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,

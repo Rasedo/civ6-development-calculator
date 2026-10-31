@@ -536,7 +536,6 @@ const GAME: Record<string, Extractor> = {
     return [out];
   },
   lastSessionTurn: (s) => [s.lastSessionTurn ?? -1],
-  roadTier: (s) => [s.roadTier ?? 0],
   gameEra: (s) => [[s.gameEra ?? 0, s.eraStartTurn ?? 1, s.eraCountdown ?? -1]],
   momentsWorld: (s) => [[...(s.momentsWorld ?? [])]],
   pantheonsClaimed: (s) => [s.claimedPantheons.length],
@@ -666,7 +665,7 @@ function researchRecord(r: ResearchState | undefined): number[] {
     techs.length, ...techs, civics.length, ...civics,
     r?.techProgress ?? 0, r?.civicProgress ?? 0,
     idx(TECH_IDX, r?.tech ?? null), idx(CIVIC_IDX, r?.civic ?? null), idx(TECH_IDX, r?.goal ?? null),
-    r?.techOverflow ?? 0, r?.civicOverflow ?? 0, r?.aiLeft ?? 0, r?.aiLeftSeen ?? 0,
+    r?.techOverflow ?? 0, r?.civicOverflow ?? 0, r?.aiLeft ?? 0, r?.aiLeftSeen ?? 0, r?.roadTier ?? 0,
     ...[...TECH_IDX.keys()].map((id) => r?.techRetained[id] ?? 0),
     ...[...CIVIC_IDX.keys()].map((id) => r?.civicRetained[id] ?? 0),
     ...[...TECH_IDX.keys()].map((id) => r?.techCatchUp?.[id] ?? 0),
@@ -798,6 +797,7 @@ const SEAT: Record<string, Extractor> = {
   techProgress: overSeats((s) => s.research.techProgress),
   civicProgress: overSeats((s) => s.research.civicProgress),
   techOverflow: overSeats((s) => s.research.techOverflow ?? 0),
+  seatRoadTier: overSeats((s) => s.research.roadTier ?? 0),
   civicOverflow: overSeats((s) => s.research.civicOverflow ?? 0),
   // PARKED progress, in table order — the GPU side is a plane of the same
   // width, so order is where the two representations meet.
@@ -980,6 +980,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorCivicGovValues: overCityStates((cityState) => govValuesRow(cityState.research)),
   minorResearchLeft: overCityStates((cityState) => [cityState.research.aiLeft ?? 0, cityState.research.aiLeftSeen ?? 0]),
   minorTechOverflow: overCityStates((cityState) => cityState.research.techOverflow ?? 0),
+  minorRoadTier: overCityStates((cityState) => cityState.research.roadTier ?? 0),
   minorCivicOverflow: overCityStates((cityState) => cityState.research.civicOverflow ?? 0),
   // a city-state's boosts, civics past the tech table, and its barbarian kills
   minorBoosted: overCityStates((cityState) => cityState.research.boosted
@@ -1219,6 +1220,7 @@ const UNIT_G: Record<string, Extractor> = {
   gpAt: overUnits((u) => u.gpAt ?? -1),
   freeCity: overUnits((u) => u.freeCity ?? -1),
   noResourceUpkeep: overUnits((u) => (u.noResourceUpkeep ? 1 : 0)),
+  alpine: overUnits((u) => (u.alpine ? 1 : 0)),
 };
 
 const TILE: Record<string, Extractor> = {
@@ -1245,6 +1247,7 @@ const TILE: Record<string, Extractor> = {
   encampHp: overTiles((t) => t.encampHp ?? 0),
   encampOuterHp: overTiles((t) => t.encampOuterHp ?? 0),
   road: overTiles((t) => (t.road ? 1 : 0)),
+  roadTier: overTiles((t) => t.roadTier ?? 0),
   locked: overTiles((t) => (t.locked ? 1 : 0)),
   fertility: overTiles((t) => t.fertility),
   fertilityProd: overTiles((t) => t.fertilityProd),

@@ -82,6 +82,8 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+    - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...out); a land unit whose   player may embark it takes water (a turn starting on the domain's pool:   0x26e920's [r9 + 0x180 + domain*4]); the barbarians' land units take none   (0 of 6,269 of their AI_Planning..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...1121 and 1124 hold a   water plot; the majors' and the minors' do from t62-69). The step's cost   (0x26e920's rules 0x531660..0x530240): into a city at most   CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x..."
@@ -94,10 +96,22 @@
   final: 0x1a74c0
   kind: function
   status: PARTLY
-  readings: ["C-95: a river crossing's Movement — READ"]
+  readings:
+    - "C-95: a river crossing's Movement — READ"
+    - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...empt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x34 += x through 0xac650). A crossing is the terrain's cost plus 2 (`RIVER_CROSS_MP`..."
+  review: imported
+- addr: 0x26ee90
+  final: 0x1a74d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...w turn's full), +0x34 the cost the rules add (0x26ee80), +0x38 a carry the rules add (0x26ee90), stored as the node's +0x20 (0x26d7f0: +0x28 Movement, +0x2c turns, +0x20 carry). The..."
   review: imported
 - addr: 0x26f1d0
   final: 0x1a76a0
@@ -153,6 +167,7 @@
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."

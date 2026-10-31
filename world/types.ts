@@ -220,10 +220,15 @@ export interface Tile {
   encampOuterHp?: number;
   /** a ROAD lies on this tile. Laid by trade routes (real Civ 6:
    *  Traders lay road as they serve a land route). A step from one road tile
-   *  to another ignores the terrain penalty, and from the Classical era on it
-   *  also ignores the river crossing charge (Civ 6's Classical road brings
-   *  bridges). Absent = no road. */
+   *  to another ignores the terrain penalty and pays the dearer of the two
+   *  plots' roads; where it crosses a river both must bridge it (the
+   *  Classical road on). Absent = no road. */
   road?: boolean;
+  /** the plot's road TYPE (the plot's RouteType, `ROAD_TIER_MP` index 0..3:
+   *  Ancient, Medieval, Industrial, Modern): the best road its layer's era
+   *  gives (`bestRoadTier`), re-laid as its owner's era brings a new one
+   *  (`upgradeRoads`). Absent = the Ancient road. */
+  roadTier?: number;
   goodyHut: boolean;
   volcano: boolean;
   /** this volcano is ACTIVE and may erupt. Every volcano starts dormant; the

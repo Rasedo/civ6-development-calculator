@@ -2322,9 +2322,20 @@ class SimMasks:
                 out[b, j] = torch.tensor(ok, dtype=torch.bool, device=self.device)
         return out
 
+    def _alpine_grant(self, rows: torch.Tensor, tiles: torch.Tensor, types: torch.Tensor) -> torch.Tensor:
+        """`grantAlpine`'s test, [N] bool for games `rows`: a chassis
+        ABILITY_ALPINE_TRAINING attaches to (`_type_alpine`) on a plot beside
+        the Matterhorn"""
+        if self._alpine_feat < 0:
+            return torch.zeros_like(tiles, dtype=torch.bool)
+        nb = self.neigh[tiles.clamp(min=0)]  # [N, 6]
+        f = self.feat_id[rows.unsqueeze(1), nb.clamp(min=0)]
+        beside = ((nb >= 0) & (f == self._alpine_feat)).any(dim=1)
+        return beside & (tiles >= 0) & (types >= 0) & self._type_alpine.take(types.clamp(min=0, max=self.NU - 1))
+
     def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river_mp: torch.Tensor,
                     utype: torch.Tensor | None = None, promos: torch.Tensor | None = None,
-                    useat: torch.Tensor | None = None):
+                    useat: torch.Tensor | None = None, alpine: torch.Tensor | None = None):
         """The (terrain, river) MP terms a step pays, route-aware —
         the `moveCostInto` + `riverCharge` twin. A ROUTE-to-ROUTE step ignores
         the terrain penalty entirely ("roads let a unit pass through Woods or
@@ -2358,6 +2369,9 @@ class SimMasks:
             _ut0 = utype.clamp(min=0, max=self.NU - 1)
             hill = self.hills.gather(1, d1).squeeze(1)
             _hw = self._promo_flag(utype, promos, "TERRAIN_MOVE_HILLS") | self._type_no_hill_cost.take(_ut0)
+            # ABILITY_ALPINE_TRAINING on the UNIT (`Unit.alpine`)
+            if alpine is not None:
+                _hw = _hw | alpine
             tm = tm - (hill & _hw).long() * self._mp_scale
             if self._woods_feats.numel():
                 wood = self._feature_live(d1, self._woods_feats).squeeze(1)
@@ -2371,22 +2385,23 @@ class SimMasks:
         if utype is not None and useat is not None and self._enh_zeal_any:
             zeal = self._religious_zeal(utype, useat)
             tm = torch.where(zeal, torch.zeros_like(tm), tm)
-        # both ends at once, [B, 2]: a route-to-route step has a route at
-        # each end, a rail step a railroad at each
+        # both ends at once, [B, 2]: the route term (0x52fa40) needs a route
+        # at each end and pays the dearer of the two plots' routes (a
+        # railroad's own, else its road tier's); across a river (0x531510:
+        # none where either plot is a city's) only where both bridge it
         ends = torch.stack((frm.clamp(min=0), dc), dim=1)
         rr = self.railroad.gather(1, ends)
         rd = (self.road.gather(1, ends) | rr).all(dim=1)
-        step = torch.where(rr.all(dim=1),
-                           torch.full_like(tm, self._railroad_mp),
-                           self._road_tier_mp.take(self.road_tier))
-        terr = torch.where(rd, step - self._mp_scale, tm)
-        bridged = self._road_tier_bridges.take(self.road_tier)
-        riv = torch.where(rd & bridged, torch.zeros_like(river_mp), river_mp)
+        tier = self.road_tier.gather(1, ends)
+        step = torch.where(rr, torch.full_like(tier, self._railroad_mp),
+                           self._road_tier_mp.take(tier)).max(dim=1).values
+        bridged = (rr | self._road_tier_bridges.take(tier)).all(dim=1)
+        ctr = self._centre_plane().gather(1, ends).any(dim=1)
+        route = rd & (bridged | (river_mp == 0) | ctr)
+        terr = torch.where(route, step - self._mp_scale, tm)
+        riv = torch.where(route | ctr, torch.zeros_like(river_mp), river_mp)
         if zeal is not None:
             riv = torch.where(zeal, torch.zeros_like(riv), riv)
-        # the river term's test (0x531510): no crossing where either plot is
-        # a city's
-        riv = torch.where(self._centre_plane().gather(1, ends).any(dim=1), torch.zeros_like(riv), riv)
         return terr, riv
 
     def _religious_zeal(self, utype: torch.Tensor, useat: torch.Tensor) -> torch.Tensor:
@@ -2873,6 +2888,7 @@ class SimMasks:
         self.barb_unit_levied[rows, slot] = False
         self.barb_unit_levy_src[rows, slot] = -1
         self.barb_unit_no_res_upkeep[rows, slot] = False
+        self.barb_unit_alpine[rows, slot] = self._alpine_grant(rows, spot[rows], self.barb_unit_type[rows, slot])
         self.barb_unit_gp_at[rows, slot] = -1
         self.barb_unit_formation[rows, slot] = 0
         self.barb_unit_escorted[rows, slot] = False
@@ -3553,6 +3569,8 @@ class SimMasks:
         getattr(self, f"{pre}_unit_levied")[rows, slot] = False  # no one's levy
         getattr(self, f"{pre}_unit_levy_src")[rows, slot] = -1
         getattr(self, f"{pre}_unit_no_res_upkeep")[rows, slot] = False  # no Meteor Site's grant
+        # born beside the Matterhorn: Alpine Training (`grantAlpine`)
+        getattr(self, f"{pre}_unit_alpine")[rows, slot] = self._alpine_grant(rows, spot.take(rows), type_idx.take(rows))
         # CIV6 (Embrasure): "Military units trained in this city start with a
         # free promotion" — a unit that owes no XP for its first level, which
         # `takePromotion` then zeroes, so nothing carries into the second.

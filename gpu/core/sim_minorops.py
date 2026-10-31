@@ -1377,6 +1377,8 @@ class SimMinorOps:
             if bool(up.any()):
                 rr = up.nonzero(as_tuple=True)[0]
                 held[rr, us[rr]] = False
+                # the upgrade is a new unit, out of the pass (`passEnd`)
+                done[rr, us[rr]] = True
         # THE DELETION (Can Delete, the node's data absent: true): a unit the
         # economic AI did not buy where its upgrade asks no strategic resource
         # (0x591000 -1) or it holds at most one promotion beside more than 10

@@ -12,7 +12,7 @@ import { CONGRESS_CURRENCIES } from '../core/congress';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { questTables } from '../core/quests';
-import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH, unitIsMilitary, classLine } from '../core/units';
+import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH, unitIsMilitary, classLine, alpineChassis } from '../core/units';
 import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_AVOIDS_TERRITORY, METEOR_GRANT_CLASS, FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG, FIRE_APPEAL } from '../data/disasters';
 import { NUCLEAR_DEVICES, FALLOUT_DAMAGE, NUKE_ROBOT_DAMAGE, NUKE_COVER_RANGE, FALLOUT_CLEAN_CHARGES, NUKE_CARRIERS, NUKE_AA_SUPPORT, NUKE_AA_WOUND, NUKE_SILO_DEFENSE, NUKE_SUB_DEFENSE, NUKE_INTERCEPT_DAMAGE } from '../data/nuclear';
 import type { PlunderRow, ImprovementId } from '../core/types';
@@ -27,7 +27,7 @@ import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FR
 import { gpSiteArgOf } from '../core/targetSites';
 import { strategicSlot } from '../core/stockpile';
 import { MAX_LEVEL, XP_PER_LEVEL } from '../core/promotions';
-import { KILL_SPREAD_RANGE } from '../data/promotions';
+import { ALPINE_FEATURE, ALPINE_HILLS_CS, KILL_SPREAD_RANGE } from '../data/promotions';
 import { GP_CLASSES, GP_WORK_CULTURE, GP_WORK_TOURISM, GREAT_PEOPLE, GP_ERA_GPP, GP_FLAT_COST_CLASSES, GP_CLASS_DISTRICT, GW_WORKS_PER_PERSON, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, ARTIST_WORKS, SPECIALIST_YIELDS, SPECIALIST_TIERS } from '../data/greatPeople';
 import { PANTHEONS, RELIGION_TYPES, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, COLONIZE_PRESSURE_EXTRA, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, SPREAD_STRENGTH_PCT, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, PROPHET_MAX_PLAYER_INSTANCES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
@@ -2215,6 +2215,10 @@ export function buildRules() {
       woodsFeatures: ['WOODS', 'RAINFOREST'].map((f) => featIdx.get(f) ?? -1),
       // the Woods FEATURE itself — the Stave Church's adjacency source (Rainforest is not Woods)
       woodsFeature: featIdx.get('WOODS') ?? -1,
+      // the feature whose neighbours grant ABILITY_ALPINE_TRAINING, and the
+      // ability's Combat Strength on hills
+      alpineFeature: featIdx.get(ALPINE_FEATURE) ?? -1,
+      alpineHillsCs: ALPINE_HILLS_CS,
     },
     // The trainable roster (mirrors trainableUnits + UNITS data). `civilian`
     // marks builder-type units (charges) — they hold the civilian stacking
@@ -2330,6 +2334,7 @@ export function buildRules() {
       groundHills: u.groundCS?.hills ? 1 : 0,
       groundFeat: (u.groundCS?.features ?? []).map((f) => FEAT_IDS.indexOf(f)),
       noHillCost: u.ignoresHillCost ? 1 : 0,
+      alpine: alpineChassis(u.id) ? 1 : 0,
       noWoodsCost: u.ignoresWoodsCost ? 1 : 0,
       ignoreShores: u.ignoresShores ? 1 : 0,
       seeThrough: u.seesThrough ? 1 : 0,

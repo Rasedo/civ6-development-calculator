@@ -77,3 +77,14 @@
   context:
     - ...luded); the posts counted on it (0x5500b0) times the player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-tile bonus (0x4d9620, the player trade vector +0xeb8 that E...
   review: imported
+- addr: 0x4d9a70
+  final: 0x33e250
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/eras.ts:upgradeRoads]
+  readings:
+    - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The upgrade (0x5134c0, called only from Player_Trade's era handler 0x4d9a70 with LOC_NOTIFICATION_ROADS_UPGRADED): when a player's era becomes one some Routes.Prer..."
+  review: imported
