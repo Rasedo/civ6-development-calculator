@@ -184,15 +184,12 @@ export function improvementYieldsValue(f: PlotValueFacts, imp: AiImprovementRow,
   if (imp.housing > 0) {
     const hv = f.housingValue(imp.housing, t, h);
     value += Math.trunc((hv * FX) / (Math.max(imp.tilesRequired, 1) * FX));
-    // the Housing again at its whole value — LAB: its source in 0x7a58f0 /
-    // 0x7b1320 unread (runs/h1_duelv1117 Caguana's Farms: the log's each the
-    // value without it plus the housing value's whole part, 18.00 at t6,
-    // 88.00 at t45)
-    value += Math.trunc(hv / FX) * FX;
   }
   // its modifiers (ImprovementModifiers) in the plot's city's analysis
   // (0x7a4b20 at 0x7b23d8): a Solar Farm's 2 Power 40.00 over a city-state's
-  // horizon (runs/h1_duelv1117)
+  // horizon (runs/h1_duelv1117); the Farm's FARM_HOUSING_WITH_MAYAB_TRAIT
+  // (its requirement unregistered, so met) its Housing's whole value again
+  // (runs/h1_duelv1117 Caguana's Farms, 18.00 at t6, 88.00 at t45)
   if (imp.modifiers.length) value += f.modifiers(imp.modifiers, t, h);
   return value;
 }

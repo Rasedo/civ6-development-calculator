@@ -144,6 +144,9 @@ for (const rec of recs) {
     // rows' 15.03 a Food of housing value)
     if (dc?.foodSurplus !== undefined) facts.growth.surplus = Math.round(Number(dc.foodSurplus) * 256);
     const forecast = growthForecast(facts.growth);
+    // the modifiers' housing on the same growth (`cityHousingValue`)
+    const modView = { ...facts.view, cityHousingValue: (i: number, id: number, housing: number, t: number, h: number) =>
+      (i === cs.seat ? housingValue(facts.growth, forecast, housing, t, h) : facts.view.cityHousingValue(i, id, housing, t, h)) };
     const yctx = makeYieldCtx(state, cs.seat);
     const r = cs.research;
     // the research AI's turns as the game's log gives them: the entry of the
@@ -201,7 +204,7 @@ for (const rec of recs) {
         },
         accumulationPct: accumulationPct(state, cs.seat, tile.terrain),
         era: facts.era,
-        modifiers: (mods, t, h) => modifiersValue({ view: facts.view, seat: cs.seat, start: t, horizon: h, rate: AI_RATE,
+        modifiers: (mods, t, h) => modifiersValue({ view: modView, seat: cs.seat, start: t, horizon: h, rate: AI_RATE,
           owner: { cityId: facts.cityId, capital: facts.capital } }, mods),
       };
       if (districtsMode) {

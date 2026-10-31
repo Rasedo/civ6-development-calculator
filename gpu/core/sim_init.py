@@ -344,6 +344,10 @@ class SimInit:
         # turn's production and its growth: surplus, housing, population,
         # store, multiplier (raw 24.8 but the housing and population)
         self.citystate_ai_growth = torch.zeros(B, s_pad, 5, dtype=torch.long, device=device)
+        # its city's Food surplus (raw 24.8) and Housing as its city AI's last
+        # turn read them, before its Builders acted, and 1 once it has
+        # (`CityState.aiYieldsSeen`)
+        self.citystate_ai_seen = torch.zeros(B, s_pad, 3, dtype=torch.long, device=device)
         # its military AI's Combat Desire (raw 24.8), its PSEUDOYIELD_UNIT_COMBAT
         # weight; the Free Cities' on the row `FR`
         self.citystate_combat_desire = torch.zeros(B, r_pad, dtype=torch.long, device=device)

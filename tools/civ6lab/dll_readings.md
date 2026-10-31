@@ -5858,15 +5858,9 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T,
   0x79f0c0); its modifiers 0x7a4b20; at the top level its ring's
   neighbours revalued (below). Unported: the claims and the neighbours
-  terms. LAB: the
-  Housing counted a second time at its whole value (the housing value's
-  whole part, as an analyzer's): runs/h1_duelv1117 Caguana's Farm rows
-  each the value without it plus exactly that whole part (18.00 at t6, 30.00
-  at t12, 47.00 at t38, 88.00 at t45), the Batey over a Farm as much below;
-  1,115 -> 1,623 of Caguana's 2,716 Farm rows exact with it. Its writer in
-  0x7a58f0 / 0x7b1320 / the modifiers 0x7a4b20 unread (0x7b1320 calls the
-  housing value once, over TilesRequired; 0x6ad2b0, an analyzer beside
-  EFFECT_ADJUST_DISTRICT_AMENITY, calls it too).
+  terms. The Farm's Housing counted a second time is its modifier
+  FARM_HOUSING_WITH_MAYAB_TRAIT (EFFECT_ADJUST_IMPROVEMENT_HOUSING 0x6ad2b0,
+  the section "C-127: the improvement loop's housing" below).
 - 0x7A58F0'S OLD IMPROVEMENT, READ: an unpillaged improvement on the plot
   other than the candidate takes off 0x7b1320 of it (T, H) and the resource
   value 0x7a21e0 of -1 copy of the plot's resource, as ported. The loop
@@ -11499,3 +11493,54 @@ the replay leaves such a unit its city made out of unit.trained.
   Specialization's Scouts never in a record; runs/h1_duelw1128 Hong Kong's
   Warriors (Swordsman: Iron) and Men-at-Arms (Musketman: Niter) held at 0
   Gold t144-t250.
+
+## C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast's Food surplus and Housing as the last analysis read them (a LAB fit), the Mountain Tunnel's analysis rows
+
+- EFFECT_ADJUST_IMPROVEMENT_HOUSING, READ (registry 0x6c9640: the name's
+  object @0xf03ef8, its vtable @0xd62e78, slot 1 0x6ad2b0): with the
+  modifier's arguments (r8) and the context's player (+0x80) set, on the
+  context's city (+0x70): 0x7a3d70(CityBuildAI 0x0a5c20, the city's growth
+  +0x1788, the rate +0xbc, the population +0x588, the Amount (arguments
+  +0x08), start +0xb4, horizon +0xb8), its whole part (sar 8) added to
+  +0xc0. The Farm's ImprovementModifiers row FARM_HOUSING_WITH_MAYAB_TRAIT
+  (Amount 1; its REQUIREMENT_PLAYER_TYPE_MATCHES is not in the registry's
+  requirement list, so the set holds) is the Farm's second housing term:
+  runs/h1_duelv1117 Caguana's Farm rows 18.00 at t6, 88.00 at t45, the
+  plotValueLab's 7,708 Farm rows exact (2,092 of Caguana's) as with the
+  earlier fit. Port: `aiModifiers.ts` (EFFECT_ADJUST_IMPROVEMENT_HOUSING),
+  `sim_cityvalue.py` (`_cv_analyze`); the fit in `improvementYieldsValue`
+  deleted.
+- 0x7a3d70 re-read whole, as ported: the growth object's Food surplus
+  (0x1b5620) and Housing (0x1b5840) live, the population the argument, the
+  forecast's steps CityBuildAI's (+0x6c8 / +0x738 / +0x7a8). THE LOOP
+  (runs/h1_duely1117 Caguana 657, its Builder 1114117): t135 the Batey over
+  the Farm above 0 removes the Farm (Clear Plot, the remove operation
+  -1314704092), t136 the Farm laid on the bare plot (492889976), t137 removed
+  again, and so to t221. On the bare plot the Farm wins only on a forecast
+  that still holds the Farm's Food (7) beside the live surplus without it
+  (5): pop 13, Housing 11, lost 5.25 a turn, 3.00 a turn of housing value,
+  the Farm 179.73 over the Batey's 109.68 (the forecast of the surplus
+  without it: 89.56, the Batey laid). The plots' yields a Builder changes
+  land in the next turn (PlotYieldChanged rows of turn t+1 for each
+  ImprovementRemovedFromMap / AddedToMap of turn t). LAB (a fit): the
+  forecast's Food surplus and Housing as the city AI's last turn read them
+  before its Builders acted (`CityState.aiYieldsSeen`), its citizens, store
+  and multiplier as the turn's update reads them; the fit lands the loop's
+  every turn (1117 t130-t150: 3/8 -> 9/11) and moves runs/h1_duelv1117
+  Caguana's engine-side Farm rows both ways (t27 +62.68 and t58 +171.03
+  gone; t38 -24.26, t45 +34.34, t53 -45.09 new: a surplus changed by a
+  citizen's reassignment is the live one there). The writer of the
+  surplus the forecast reads, unread.
+- THE MOUNTAIN TUNNEL IN A CITY-STATE'S ANALYSIS: runs/h1_duely1124 Cardiff
+  t214-t250 m_bestImprovementToMake (the aimem's city fields: the pick's
+  index first; Farm 1, Ski Resort 45 for Bologna t200 as laid) 46, the
+  MOUNTAIN_TUNNEL, on x 12 (m_bestPlotToClear), no "Build City Improvement"
+  tree held, its Builder on 628 with one charge never laying:
+  the analysis values the Military Engineer's adjacent-plot row on a bare
+  mountain of its own, the pick takes it, and no Builder lays it.
+  runs/h1_duelv1124 logs those rows (Cardiff 12:13 239.34 at T 0, 12:12
+  170.34; Bologna 32:9 135.34 / 129.34). Not ported: the row valued by
+  `improvementValue` is 32.34 there, a whole term per plot (+207, +138,
+  +103, +97) unread, so with the row in the analysis Cardiff's Ski Resort
+  (127.79 from t226) still out-values it and is laid (five duely duels:
+  builder.improve unmoved, unit.trained 236/252 -> 236/258).

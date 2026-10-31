@@ -41,6 +41,9 @@ class SimMinors:
             # its city AI's full update reads its growth here, before the growth
             g = self._cv_minor_facts(s).growth()
             now = torch.stack([g["surplus"], g["housing"], g["population"], g["stored"], g["multiplier"]], -1)
+            # its Food surplus and Housing as its city AI's last turn read them
+            seen = self.citystate_ai_seen[:, s]
+            now[:, :2] = torch.where((seen[:, 2] > 0).unsqueeze(-1), seen[:, :2], now[:, :2])
             self.citystate_ai_growth[:, s] = torch.where(alive.unsqueeze(-1), now, self.citystate_ai_growth[:, s])
             self._minor_growth(s)
             self._minor_research_ai(s)

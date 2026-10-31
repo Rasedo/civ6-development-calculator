@@ -116,7 +116,7 @@ export function minorPhase(state: GameState): void {
     // its city AI's full update reads its growth here, before the growth
     // (runs/h1_duelv1121 Ayutthaya: the Granary's housing value from the
     // forecast of the citizens and the store before each turn's growth, t18 - t24)
-    cityState.aiGrowth = minorCityGrowth(state, cityState);
+    cityState.aiGrowth = { ...minorCityGrowth(state, cityState), ...cityState.aiYieldsSeen };
     minorGrowth(state, cityState);
     minorResearchAi(state, cityState);
     // its military AI's turn: the Combat Desire and the favoured technology

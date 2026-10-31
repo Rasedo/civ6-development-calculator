@@ -1068,6 +1068,15 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // forecast)
   EFFECT_ADJUST_POLICY_HOUSING: (t, args, s) =>
     s.kind === 'city' ? whole(t.view.cityHousingValue(s.seat, s.id, (Number(args.Amount ?? 0) | 0) > 0 ? 1 : 0, t.start, t.horizon)) : 0,
+  // 0x6ad2b0 (the registry's object @0xf03ef8, vtable @0xd62e78): a subject
+  // and the context's city (+0x70); the Amount's Housing more in it at its
+  // population (+0x588) from the start to the horizon (0x7a3d70 on its
+  // CityBuildAI's growth forecast)
+  EFFECT_ADJUST_IMPROVEMENT_HOUSING: (t, args) => {
+    const c = ownerCity(t);
+    if (!c || c.kind !== 'city') return 0;
+    return whole(t.view.cityHousingValue(c.seat, c.id, Number(args.Amount ?? 0) | 0, t.start, t.horizon));
+  },
   // 0x6beb00: a city subject's Food surplus (its growth object's 0x1b5620),
   // with none 2.0, x fx(Amount x 0.01), as bare Food from the start to the
   // horizon (0x7a2140)

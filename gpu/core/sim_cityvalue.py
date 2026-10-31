@@ -385,8 +385,6 @@ class SimCityValue:
         if row["housing"] > 0:
             hv = f.housing_value(row["housing"], t, h)
             value = value + torch.div(hv * _FX, max(row["tilesRequired"], 1) * _FX, rounding_mode="trunc")
-            # the Housing again, its whole value (LAB, `improvementYieldsValue`)
-            value = value + torch.div(hv, _FX, rounding_mode="trunc") * _FX
         # its modifiers in the plot's city's analysis (0x7a4b20)
         if row.get("modifiers"):
             value = value + self._cv_modifiers(f, row["modifiers"], t, h)
@@ -1216,7 +1214,8 @@ class SimCityValue:
                      "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN",
                      "EFFECT_GRANT_UNIT_IN_CITY", "EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER",
                      "EFFECT_GRANT_INFLUENCE_TOKEN", "EFFECT_GRANT_SPY", "EFFECT_GRANT_COMBAT_ADJACENCY",
-                     "EFFECT_ADJUST_UNIT_PRODUCTION", "EFFECT_ADJUST_CITY_FREE_POWER")
+                     "EFFECT_ADJUST_UNIT_PRODUCTION", "EFFECT_ADJUST_CITY_FREE_POWER",
+                     "EFFECT_ADJUST_IMPROVEMENT_HOUSING")
 
     def _cv_check_read(self, m: dict, reads: dict, depth: int = 1) -> None:
         """refuse a modifier whose analysis the TS evaluator reads through an
@@ -1421,6 +1420,12 @@ class SimCityValue:
                 return zero
             pct = _fx_const(_f32(amount * _f32(0.01)))
             return _t(self._cv_unit_prod_value(f, a["UnitType"], pct, t, h), like)
+        if eff == "EFFECT_ADJUST_IMPROVEMENT_HOUSING":
+            # 0x6ad2b0: the context's city, the Amount's Housing more at its
+            # population from the start to the horizon (0x7a3d70)
+            if sub["kind"] == "nocity":
+                return zero
+            return _t(f.housing_value(amount, t, h) >> 8, like)
         if eff == "EFFECT_GRANT_UNIT_IN_CITY":
             if not city:
                 return zero

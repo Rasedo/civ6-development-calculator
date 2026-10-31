@@ -235,6 +235,19 @@
   context:
     - "...0x198310) adds Amount raw. EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 (@f03d20, vtable 0xd62ad0): the centre's strike 0x249ee0, its whole part above 0, x Amount / 100 truncated (0x51e..."
   review: imported
+- addr: 0xd62e78
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 6
+      value: "its REQUIREMENT_PLAYER_TYPE_MATCHES is not in the registry's   requirement list, so the set holds) is the Farm's second housing term:   runs/h1_duelv1117 Caguana's Farm rows 18.00 at t6, 88.00 at t45,"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast's Food surplus and Housing as the last analysis read them (a LAB fit), the Mountain Tunnel's analysis rows"
+  context:
+    - "..._IMPROVEMENT_HOUSING, READ (registry 0x6c9640: the name's object @0xf03ef8, its vtable @0xd62e78, slot 1 0x6ad2b0): with the modifier's arguments (r8) and the context's player (+0x80)..."
+  review: imported
 - addr: 0xd630b8
   kind: global
   status: PARTLY
@@ -630,6 +643,19 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - .../ CollectionType hash in the registry 0x6c9640 (EFFECT_ADJUST_CITY_YIELD_CHANGE -> object 0xf03d80, vtable 0xd63400; COLLECTION_OWNER ...), the requirement set and the arguments. 0x6cede0...
+  review: imported
+- addr: 0xf03ef8
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 6
+      value: "its REQUIREMENT_PLAYER_TYPE_MATCHES is not in the registry's   requirement list, so the set holds) is the Farm's second housing term:   runs/h1_duelv1117 Caguana's Farm rows 18.00 at t6, 88.00 at t45,"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast's Food surplus and Housing as the last analysis read them (a LAB fit), the Mountain Tunnel's analysis rows"
+  context:
+    - "- EFFECT_ADJUST_IMPROVEMENT_HOUSING, READ (registry 0x6c9640: the name's object @0xf03ef8, its vtable @0xd62e78, slot 1 0x6ad2b0): with the modifier's arguments (r8) and the con..."
   review: imported
 - addr: 0xf04cb0
   kind: global

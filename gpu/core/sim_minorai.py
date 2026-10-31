@@ -179,6 +179,11 @@ class SimMinorAi:
         # A: the city's update
         f = self._cv_minor_facts(s)
         f.units_before = units
+        # its Food surplus and Housing as this turn reads them, before its
+        # Builders act: the next turn's growth forecast's (`aiYieldsSeen`)
+        g = f.growth()
+        seen = torch.stack([g["surplus"], g["housing"], torch.ones_like(g["surplus"])], -1)
+        self.citystate_ai_seen[:, s] = torch.where(alive.unsqueeze(-1), seen, self.citystate_ai_seen[:, s])
         # a founding turn's first look: the unit production table with no
         # known unit (`minorAiTurn`)
         f.no_known = fresh

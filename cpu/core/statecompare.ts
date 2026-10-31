@@ -1042,6 +1042,10 @@ const CITY_STATE_G: Record<string, Extractor> = {
     const g = cityState.aiGrowth;
     return g ? [g.surplus, g.housing, g.population, g.stored, g.multiplier] : [0, 0, 0, 0, 0];
   }),
+  minorAiYieldsSeen: overCityStates((cityState) => {
+    const y = cityState.aiYieldsSeen;
+    return y ? [y.surplus, y.housing, 1] : [0, 0, 0];
+  }),
   minorCombatDesire: overCityStates((cityState) => cityState.combatDesire ?? 0),
   minorStandingArmyShort: overCityStates((cityState) => cityState.standingArmyShort ?? 0),
   minorUnitValues: overCityStates((cityState) => [...(cityState.unitValues ?? [])]),
