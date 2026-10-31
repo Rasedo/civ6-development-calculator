@@ -903,7 +903,8 @@ class SimCityValue:
     def _cv_refused(self, f, b: dict) -> torch.Tensor:
         """`refused`: what CanConstruct refuses outright"""
         like = f.like()
-        no = _t(f.has_building(b["type"]), like).bool()
+        # a pillaged copy stands to be repaired
+        no = _t(f.has_building(b["type"]), like).bool() & ~_t(f.building_pillaged(b["type"]), like).bool()
         for x in b["exclusive"]:
             no = no | _t(f.has_building(x), like).bool()
         if b["capital"]:
@@ -1705,6 +1706,12 @@ class _MinorFacts:
             return self._bools(False)
         return self.sim.city_bldg[:, self.row, 0, bi]
 
+    def building_pillaged(self, b):
+        bi = self._building_index(b)
+        if bi < 0:
+            return self._bools(False)
+        return self.sim.city_bldg_pillaged[:, self.row, 0, bi]
+
     def city_has_building(self, b):
         # a civilization's own building (BUILDING_TSIKHE, the engine's
         # Renaissance Walls) in no minor's city
@@ -2396,6 +2403,12 @@ class _FreeFacts(_MinorFacts):
         if bi < 0:
             return self._bools(False)
         return self.sim.city_bldg[:, self.row, self.j, bi]
+
+    def building_pillaged(self, b):
+        bi = self._building_index(b)
+        if bi < 0:
+            return self._bools(False)
+        return self.sim.city_bldg_pillaged[:, self.row, self.j, bi]
 
     def _district_done(self, dv: int):
         sim = self.sim

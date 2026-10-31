@@ -4023,7 +4023,25 @@ building tables).
   valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and
   train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0;
   a wonder 0x7a4d40 at its plot with valueHorizons[2]. T beyond the
-  horizon values FX(-9999).
+  horizon values FX(-9999). The building loop (0x5cfb10..0x5cfca5) values a
+  row CanConstruct (0x170450 on the queue +0x2170) does not refuse for good
+  (its result's second byte [rbp-0x1f]): a pillaged building the city holds
+  is not refused — its repair stands — so it is valued as unbuilt
+  (`refused`; h1_duelv1124 Granada t73-t78, its pillaged Lighthouse logged
+  76.11-162.61 where ours read -9999: 474 -> 491 of 491 Lighthouse rows
+  valid, its value still about a fifth of the log's — the repair's per-turn
+  value unread).
+- The building value's defence terms past the city's own (0x7a84c0..
+  0x7a8758, OuterDefenseHitPoints rows): over the player's cities, one whose
+  CityBuildAI +0x1b8 is above -1 adds 4.0 (once); the city holding the
+  building with its walls damaged (0x197ff0 on +0x1880 above 0) x4; then
+  over every player (0x483b50 +0xb50) at war with the owner, denounced by
+  it or denouncing it, one whose PlayerStats +0xf0 (the best melee trained)
+  passes the centre's GetDefenseStrength (0x24ae80, flag 1) whole x2, once.
+  Not ported: the +4.0 on the threat our lab reads moves 1124 Granada's
+  Walls rows 140 -> 131 within 0.005 (t24-t56, v 6 -> 10 where the log
+  holds 6), so the threat the analysis reads is not ours of the turn; the
+  x2 moved no row (no recorded foe's best melee above a centre).
 - The rate and the horizons: GlobalAI (game +0x408) +0x290 is the discount
   rate, AI_DISCOUNT_RATE x 100 / the speed's CostMultiplier (the initializer
   0x6ddb40; 4.0 online, `cpu/data/aiValue.ts`); `m_valueHorizons` (+0x298,

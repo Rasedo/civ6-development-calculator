@@ -189,6 +189,8 @@ export interface CityBuildFacts {
   /** the player's version of a unit (player +0x12e8 +0x1c0), or null */
   unitVersion(unit: string): string | null;
   hasBuilding(building: string): boolean;
+  /** the city holds the building pillaged */
+  buildingPillaged(building: string): boolean;
   /** the city holds the district complete (one under construction is not
    *  held: runs/h1_duelv1124 Bologna t16 counts its Campus's turns) */
   hasDistrict(district: string): boolean;
@@ -369,12 +371,14 @@ export function housingValue(g: CityGrowth, forecast: readonly GrowthStep[], hou
 const turnsOver = (f: CityBuildFacts, b: AiBuildingRow): number => Math.max(f.techTurns(b.tech), f.civicTurns(b.civic));
 
 /** what CanConstruct (its test with the research waived) refuses outright:
- *  a building the city holds or one it excludes, a Capital-only row, a
+ *  a building the city holds whole (a pillaged one stands to be repaired:
+ *  runs/h1_duelv1124 Granada t73-t78, its pillaged Lighthouse valued) or one
+ *  it excludes, a Capital-only row, a
  *  government building above the tier run, a worship building the city's
  *  religion does not offer, a riverside building away from a river, and
  *  what the city's ground refuses */
 export function refused(f: CityBuildFacts, b: AiBuildingRow): boolean {
-  if (f.hasBuilding(b.type) || b.exclusive.some((x) => f.hasBuilding(x))) return true;
+  if ((f.hasBuilding(b.type) && !f.buildingPillaged(b.type)) || b.exclusive.some((x) => f.hasBuilding(x))) return true;
   if (b.capital && !f.capital) return true;
   if (b.governmentTier > f.governmentTier) return true;
   if (b.religion && f.worship !== b.type) return true;
@@ -425,8 +429,9 @@ export function buildingPerTurn(f: CityBuildFacts, b: AiBuildingRow): number {
     if (f.hasWonder) d += FX;
     d += (Math.trunc(f.population / 5) + 1) * FX;
     if (f.atWar) d += 2 * FX;
-    // the threat terms (CityBuildAI +0x1b8, x4 for a damaged own copy, x2
-    // against a stronger enemy) are not read
+    // the threat terms (0x7a84c0..0x7a8758: +4.0 where a city of the player
+    // is threatened, x4 for a damaged own copy, x2 against a stronger foe)
+    // are not read
     v += d;
   }
   v += b.outerDefenseStrength * FX;

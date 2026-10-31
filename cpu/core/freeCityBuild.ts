@@ -35,6 +35,7 @@ import { citiesOf, isCityStateSeat, isFreeSeat, seatOf } from './seats';
 import { minorCity } from './cityStates';
 import { cityLowlands, coastalLowlandCounts } from './climate';
 import { stockFree } from './stockpile';
+import { buildingPillaged } from './yields';
 import { buildingCostIn, worshipOffered } from './rules';
 import { builderCost, cityNavalCapable, traderCost } from './units';
 import { districtCost, projectCost, settlerCost, unitStepCost, unitsAcquired } from './game';
@@ -168,6 +169,10 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
     hasBuilding: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !!id && has.has(id);
+    },
+    buildingPillaged: (b) => {
+      const id = engineId('building', b, 'BUILDING_', BUILDINGS);
+      return !!id && buildingPillaged(city, id);
     },
     hasDistrict: (d) => {
       const id = engineId('district', d, 'DISTRICT_', DISTRICTS);

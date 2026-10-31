@@ -1497,6 +1497,10 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !!id && has.has(id);
     },
+    buildingPillaged: (b) => {
+      const id = engineId('building', b, 'BUILDING_', BUILDINGS);
+      return !!id && buildingPillaged(city, id);
+    },
     hasDistrict: (d) => {
       const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
       return id === 'CITY_CENTER' || (!!id && (cityState.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete));
