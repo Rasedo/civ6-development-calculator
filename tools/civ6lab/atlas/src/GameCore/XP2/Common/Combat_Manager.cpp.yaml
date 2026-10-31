@@ -47,6 +47,18 @@
   context:
     - "...always) — raised as AI_EVENT_UNIT_CAPTURED (@f2e088) on the player's signals (+0x2b8, 0x200e10). The barbarians' triggered trees (BarbarianTriggeredTrees: TRIGGER_CAPTURE_BARBARIAN,..."
   review: imported
+- addr: 0x202440
+  final: 0x1541a0
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_UnitEfficiency.csv
+      value: "the unit-efficiency job's simulated combats: 20,736 of 20,736 entries at the printed 0.01"
+  readings:
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+  context:
+    - "...s 17 on a land defender, a land unit's ranged blow 17 on a naval one. THE AIR STRIKE (0x202440 -> 0x203cb0, the interceptor +0x10 and the anti-air cover +0x18 null): on an air target..."
+  review: reviewed
 - addr: 0x203cb0
   final: 0x155510
   kind: function
@@ -56,9 +68,11 @@
     - cpu/core/combat.ts:interceptFight
     - cpu/core/combat.ts:airAnswers
     - gpu/core/sim_seats.py:_air_answers
+    - cpu/core/aiUnitEfficiency.ts:airStrike
   readings:
     - "B-89 tail: an air strike's XP — READ, one term open"
     - "C-34: the interception's damage, XP, weariness and the answers"
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "Rules_Combat 0x5197e0 (called by every resolver; the air strike 0x203cb0 picks the combat type 0x204451: BOMBARD when the plane's Bombard > its Ranged). Check: `d..."
@@ -89,7 +103,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: Attack Units — READ, ported"
-    - "C-98: the unit efficiencies — READ (0x79a440's simulation, exchanges and range term), ported for every pair its terms cover"
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
   context:
     - "...ombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both..."
   review: imported
@@ -138,7 +152,10 @@
     - gpu/core/sim_seats.py:_melee_exchange
     - cpu/core/combat.ts:defDef
     - cpu/core/combat.ts:struck
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+    - cpu/core/aiUnitEfficiency.ts:blow
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the at..."
   review: imported
@@ -182,6 +199,18 @@
   context:
     - ...15 (RANGED 50, BOMBARD 100; +0x1a4, +0x1a8, +0x1a0). The ranged (0x204b10) and bombard (0x2074b0) attacks draw twice (hit points, defense) and nothing for the attacker. The log carries...
   review: imported
+- addr: 0x207a80
+  final: 0x158320
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_UnitEfficiency.csv
+      value: "the unit-efficiency job's simulated combats: 20,736 of 20,736 entries at the printed 0.01"
+  readings:
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+  context:
+    - "...100 leaves the attacker at 99 (the overshoots equal, 0x206d01 `jle`). The ranged result 0x207a80: the attacker takes none. The domain term (0x51c810, \"H-1: the melee result, a ranged..."
+  review: reviewed
 - addr: 0x208b80
   final: 0x159250
   kind: function
@@ -219,6 +248,19 @@
     - "...s with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a Mili..."
     - "...live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's unit list stands before the in-turn player's start while the plot reads t..."
   review: imported
+- addr: 0x209550
+  final: 0x159b60
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_UnitEfficiency.csv
+      value: "the unit-efficiency job's simulated combats: 20,736 of 20,736 entries at the printed 0.01"
+  impl: [cpu/core/aiUnitEfficiency.ts:combatType]
+  readings:
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+  context:
+    - "- THE SIMULATION'S COMBAT (0x205720 -> the type of 0x209550): an air attacker's COMBAT_AIR; else RANGED where RangedCombat tops Bombard and Comba..."
+  review: reviewed
 - addr: 0x209dd0
   final: 0x15a2b0
   kind: function

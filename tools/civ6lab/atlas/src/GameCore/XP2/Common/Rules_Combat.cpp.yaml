@@ -57,12 +57,16 @@
     - recording: 1120
       turn: 13
       value: 1120 t13 17 / 32 (a defender at 18 HP).
-  impl: [cpu/core/opsOrders.ts:endangered]
+  impl:
+    - cpu/core/opsOrders.ts:endangered
+    - cpu/core/aiUnitEfficiency.ts:damageTo
+    - cpu/data/constants.ts:COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the attacker's damage — is never drawn where the defender is embarked (..."
   review: imported
@@ -116,7 +120,10 @@
     - cpu/core/combat.ts:rangedDomainCS
     - cpu/data/constants.ts:COMBAT_BOMBARD_VS_UNIT
     - gpu/core/sim_masks.py:_ranged_domain_cs
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+    - cpu/core/aiUnitEfficiency.ts:domainTerm
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
   context:
     - "- A ranged blow's domain term (0x51c810, the unit-vs-unit attack strength): a bombard attack (combat type 0x4fc9163d) loses C..."
     - ...IER_UNIT_ADJUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.
@@ -137,7 +144,9 @@
     - recording: 1124
       turn: 14
       value: "- Not explained by this reading (C-94 ASK): a +5 a barbarian unit carries on   some attacks and not others (1124 t14 a Spearman and a Warrior on Rome's   Scout, t32, t37, t84;"
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
   context:
     - "...pportLive` / `_flank_support_live` read each player's civics. The defender's composer 0x51f070 calls 0x521ed0 for the combat type 0x5e2f7468 and 0x5228c0 for every other; 0x5228c0 ad..."
     - ...JUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.

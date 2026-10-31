@@ -94,7 +94,7 @@ def build() -> str:
         s = rsets.get(rid, {})
         return {"test": {"REQUIREMENTSET_TEST_ANY": "ANY", "REQUIREMENTSET_TEST_NONE": "NONE"}.get(s.get("RequirementSetType"), "ALL"),
                 "reqs": [{"type": reqs.get(r, {}).get("RequirementType", "?"),
-                          "inverse": reqs.get(r, {}).get("Inverse", "").lower() == "true",
+                          "inverse": reqs.get(r, {}).get("Inverse", "").lower() in ("true", "1"),
                           "args": rargs.get(r, {})} for r in rset_reqs[rid]]}
 
     amods: dict[str, list[str]] = collections.defaultdict(list)
@@ -478,6 +478,27 @@ def build_city(rows, modifier) -> str:
             "modifiers": [modifier(r["ModifierId"]) for r in bmods[b]],
         })
     tags = multi("TypeTags", "Type")
+    # a unit's abilities' strength modifiers: the UnitAbilities not Inactive
+    # whose class tag the unit carries (TypeTags), their modifiers in
+    # UnitAbilityModifiers' order whose effect moves a combat strength (what
+    # the unit-efficiency job's simulated combats read)
+    ability_tags = multi("TypeTags", "Tag")
+    ability_mods = multi("UnitAbilityModifiers", "UnitAbilityType")
+    inactive = {k for k, c in keyed(rows("UnitAbilities"), "UnitAbilityType").items()
+                if str(c.get("Inactive", "")).lower() in ("true", "1")}
+    strength_effects = {"EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER", "EFFECT_ADJUST_UNIT_PER_UNUSED_MOVEMENT_COMBAT_BONUS",
+                        "EFFECT_ATTACH_MODIFIER", "EFFECT_GRANT_STRENGTH_PER_ADJACENT_UNIT_TYPE",
+                        "EFFECT_ADJUST_NUMBER_ALLIES_UNIT_COMBAT_BONUS", "EFFECT_ADJUST_ADJACENT_LEVIED_UNIT_COMBAT_BONUS"}
+
+    def abilities(u):
+        out = []
+        for t in tags[u]:
+            for a in ability_tags[t.get("Tag")]:
+                ab = a.get("Type", "")
+                if ab.startswith("ABILITY_") and ab not in inactive and ab not in out:
+                    out.append(ab)
+        mods = [modifier(r["ModifierId"]) for ab in out for r in ability_mods[ab]]
+        return [m for m in mods if m["effect"] in strength_effects]
     unit_bld = multi("Unit_BuildingPrereqs", "Unit")
     uxp2 = keyed(rows("Units_XP2"), "UnitType")
     units = []
@@ -493,6 +514,9 @@ def build_city(rows, modifier) -> str:
             "range": num(c, "Range"), "moves": num(c, "BaseMoves"), "maintenance": num(c, "Maintenance"),
             "cost": num(c, "Cost"), "domain": c.get("Domain", "DOMAIN_LAND"),
             "civilian": c.get("FormationClass") == "FORMATION_CLASS_CIVILIAN",
+            "support": c.get("FormationClass") == "FORMATION_CLASS_SUPPORT",
+            "tags": [t["Tag"] for t in tags[u]],
+            "abilities": abilities(u),
             "pseudo": c.get("PseudoYieldType"), "promotionClass": c.get("PromotionClass"),
             "resource": c.get("StrategicResource"), "trait": c.get("TraitType"),
             "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "district": c.get("PrereqDistrict"),
@@ -617,9 +641,6 @@ def build_city(rows, modifier) -> str:
                  "yields": [[y["YieldType"], num(y, "YieldChange")] for y in feat_yields[f]],
                  "removes": [[y["YieldType"], num(y, "Yield")] for y in feat_removes[f]]}
                 for f, c in in_game_order("Features", "FeatureType", keyed(rows("Features"), "FeatureType"))]
-    eff_units, eff = efficiency_table()
-    if eff_units != [u["type"] for u in units]:
-        raise SystemExit("AI_UnitEfficiency.csv's units differ from the Units rows")
     # the database's own rows: the install reader also takes a persona pack's
     # project (PROJECT_COURT_FESTIVAL) the recorded games did not load — their
     # logged PROJECTS rows hold the database's 37
@@ -679,30 +700,8 @@ def build_city(rows, modifier) -> str:
         "/** the district lists by leader trait (AiFavoredItems of the AiLists of\n"
         " *  System Districts): district -> +1 favored, -1 not */\n"
         "export const AI_DISTRICT_LISTS: Readonly<Record<string, Readonly<Record<string, number>>>> = "
-        f"{json.dumps(dict(sorted(dl_by_trait.items())), indent=1)};\n\n"
-        "/** THE UNIT EFFICIENCIES (UnitProduction's m_efficiencies, GlobalAI\n"
-        " *  +0x3c8): row the opposing unit, column the unit valued, AI_UNITS'\n"
-        " *  order, raw 24.8 — the table the game computes once a game (0x79a440)\n"
-        " *  and logs as AI_UnitEfficiency.csv, the same in every recording, read\n"
-        " *  at its printed 0.01 */\n"
-        f"export const AI_UNIT_EFFICIENCY: readonly (readonly number[])[] = [\n"
-        + ",\n".join(" [" + ",".join(str(v) for v in row) + "]" for row in eff) + "\n];\n"
+        f"{json.dumps(dict(sorted(dl_by_trait.items())), indent=1)};\n"
     )
-
-
-def efficiency_table() -> tuple[list[str], list[list[int]]]:
-    """AI_UnitEfficiency.csv beside the recordings: every one the same; each
-    value raw (24.8), the printed two decimals rounded to the nearest step"""
-    texts = {open(f, encoding="utf-8").read() for f in glob.glob(str(RUNS / "h1_duel*.logs" / "AI_UnitEfficiency.csv"))}
-    if len(texts) != 1:
-        raise SystemExit(f"AI_UnitEfficiency.csv: {len(texts)} different tables beside the recordings")
-    lines = [ln for ln in next(iter(texts)).splitlines() if ln.strip()]
-    head = [x.strip() for x in lines[0].split(",")[1:] if x.strip()]
-    rows = []
-    for ln in lines[1:]:
-        p = [x.strip() for x in ln.split(",")]
-        rows.append([round(float(v) * 256) for v in p[1:1 + len(head)]])
-    return head, rows
 
 
 def order_check(policies: list[str]) -> tuple[int, int]:

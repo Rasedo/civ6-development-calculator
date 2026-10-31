@@ -1599,6 +1599,7 @@
     - cpu/data/constants.ts:COMBAT_MAX_HIT_POINTS
     - cpu/harness/replayActions.ts:unit
     - cpu/core/opsOrders.ts:endangered
+    - cpu/data/constants.ts:COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
@@ -5758,6 +5759,7 @@
     - "H-1: the great person's spawn — READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
   context:
     - "...the spawn plot: the class row (+0x70 its district, +0x98 its unit) and the unit's domain (0xadd590 on unit info +0x1c). A land unit (domain 2): walk the player's cities (+0x12f0 -> +0xd8,..."
   review: imported
@@ -5779,6 +5781,18 @@
   context:
     - "...`m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 through 0xadd5e0 (unread) and the player's +0x1048 equals the global at 0xf2f978 (the currency the resolut..."
   review: imported
+- addr: 0xb028c0
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_UnitEfficiency.csv
+      value: "the unit-efficiency job's simulated combats: 20,736 of 20,736 entries at the printed 0.01"
+  impl: [cpu/core/aiUnitEfficiency.ts:holds]
+  readings:
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+  context:
+    - "...e (their opponent test reads the defender). A unit requirement with no plot is unmet (0xb028c0 in-owner-territory, 0xb12d50 home-continent, 0xb95b80 coast: return 1 where the unit's..."
+  review: reviewed
 - addr: 0xb02c60
   kind: function
   status: READ
@@ -5794,6 +5808,18 @@
   context:
     - "...m_iMaxMeleeStrengthTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x..."
   review: imported
+- addr: 0xb12d50
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_UnitEfficiency.csv
+      value: "the unit-efficiency job's simulated combats: 20,736 of 20,736 entries at the printed 0.01"
+  impl: [cpu/core/aiUnitEfficiency.ts:holds]
+  readings:
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+  context:
+    - "...s the defender). A unit requirement with no plot is unmet (0xb028c0 in-owner-territory, 0xb12d50 home-continent, 0xb95b80 coast: return 1 where the unit's plot is null), its Inverse me..."
+  review: reviewed
 - addr: 0xb2f410
   final: 0x84cdd0
   kind: function
@@ -5964,6 +5990,19 @@
   context:
     - "- The first impression (MODIFIER_PLAYER_DIPLOMACY_RANDOM, init 0xb8edb0: RandomRange 3, DifficultyOffset 0): floor(v x (2R + 1) / 100) - R at the meeting (v..."
   review: imported
+- addr: 0xb95b80
+  final: 0x8e7150
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_UnitEfficiency.csv
+      value: "the unit-efficiency job's simulated combats: 20,736 of 20,736 entries at the printed 0.01"
+  impl: [cpu/core/aiUnitEfficiency.ts:holds]
+  readings:
+    - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+  context:
+    - "...equirement with no plot is unmet (0xb028c0 in-owner-territory, 0xb12d50 home-continent, 0xb95b80 coast: return 1 where the unit's plot is null), its Inverse met; the plot's, the neig..."
+  review: reviewed
 - addr: 0xb96bf0
   kind: function
   name: SETTLED_CITIES

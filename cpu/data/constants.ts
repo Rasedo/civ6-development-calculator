@@ -653,6 +653,9 @@ export const CITY_MIN_STRIKE_CS = srcConst('combat.cityMinStrike', 3, gp('COMBAT
  *  attack loses on a naval unit (0x51c810, `rangedDomainCS`) */
 export const COMBAT_BOMBARD_VS_UNIT = srcConst('combat.bombardVsUnit', 17, gp('COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER'));
 export const COMBAT_MAX_HIT_POINTS = srcConst('combat.maxHitPoints', 100, gp('COMBAT_MAX_HIT_POINTS'));
+/** the percent of its hit points a side of base strength 0 takes from a
+ *  blow (0x51a240: GlobalParameters +0x1f0) */
+export const COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT = srcConst('combat.minCivilianDamagePct', 65, gp('COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT'));
 /** the DLL's COMBAT_POWER_SCALING in 1/256ths, truncated (0x519370): 10 */
 export const COMBAT_POWER_SCALING_256 = Math.trunc(COMBAT_POWER_SCALING * 256);
 /** the reach of the exported factor table, in 1/256ths of the exponent: a

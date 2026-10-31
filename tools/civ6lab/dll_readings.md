@@ -4260,8 +4260,8 @@ building tables).
 
 `unitValue` / `unitTurns` / `unitTable` in `cpu/core/aiCityBuild.ts`,
 `unitProductionTable` in `cpu/core/aiUnitProduction.ts`; the efficiency
-table `AI_UNIT_EFFICIENCY` in `cpu/data/aiBuildTables.ts`
-(tools/install/ai_tables.py). Check: `cpu/harness/cityBuildLab.ts` (the UNITS
+table `unitEfficiency` in `cpu/core/aiUnitEfficiency.ts` ("C-98: the unit
+efficiencies"). Check: `cpu/harness/cityBuildLab.ts` (the UNITS
 rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
 `--nodesire` the engine's own inputs).
 
@@ -4389,7 +4389,7 @@ rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
   rounded up) added where the domains match, AntiAirCombat terms against
   air; M[a][b] = a's exchanges-to-die over b's. Logged once a game as
   AI_UnitEfficiency.csv (", %3.2f"), the same in every recording; the port
-  reads that table at its 0.01 (the job is unported).
+  computes it ("C-98: the unit efficiencies").
 - THE COMBAT DESIRE: the military AI's turn (0x71fb80, 0x721302..0x7219ee)
   writes the PSEUDOYIELD_UNIT_COMBAT weight (+0x790): from its strengths
   (+0x398 its own, +0x3f8 the enemy's, +0x458 the others', logged as
@@ -4842,7 +4842,7 @@ ARMY lines, COMBAT DESIRE against AI_Military.csv).
   [rbp+0xc00], the entry's unit +0 of its 0x168-byte record); the log
   (0x79b8a0) prints row r, column c as data[width x r + c], so the value
   reads AI_UnitEfficiency.csv's row the opposing unit, column the entry
-  (`AI_UNIT_EFFICIENCY[i][k]`). The other way round the lab's units within
+  (`unitEfficiency()[i][k]`). The other way round the lab's units within
   0.005 fall 7,815 -> 6,099 on runs/h1_duelv1117. The entry's value is its
   +0x160 (0x79ca90), N over the summed products (+0x30), 1.0 where nothing
   opposes.
@@ -5588,43 +5588,93 @@ operations' contracts, the improvement values below, the purchases).
   Monument at 26.7, Granada / Mexico City / 1128 Bologna 18.1, 1124 Bologna
   30.2, the six others 24.0 — before it 9 of 15.
 
-## C-98: the unit efficiencies — READ (0x79a440's simulation, exchanges and range term), ported for every pair its terms cover
+## C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's
+
+`unitEfficiency` in `cpu/core/aiUnitEfficiency.ts` (the job), from the
+install's Units rows and their abilities' strength modifiers
+(tools/install/ai_tables.py: `support`, `tags`, `abilities`); the GPU reads
+the exported table (`rules.unitEfficiency`).
 
 - THE JOB 0x79a440 (once a game): the neutral player's units allocated off
-  the map (0x4eeb70 with plot -1, -1: no terrain, full health); per pair of
-  Units rows i < j (the inner loop from i + 1, 0x79a8b7) that both hold a
-  strength (max(Combat +0x48, RangedCombat +0x6c, Bombard +0x40) or
-  AntiAirCombat +0x34), two combat simulations (0x205720 with its flag set:
-  the damage law's expectation), each attacking the other; per unit its
-  damage over both (results +0x7c / +0xc4 words, << 8, at least 1.0), its
-  exchanges 0x640000 / damage (100 / damage, 24.8, truncated); the range
-  term (0x79ab16..0x79abeb): the earlier row's ceil((Range - 1) / the
-  other's BaseMoves +0x38) where its Range +0x68 is above the other's and
-  at least the other's moves, else the later row's ceil((its Range - 1) /
-  the earlier's moves) where its Range is at least those moves; neither
-  where the two differ in AntiAirCombat > 0 and in their domain (0x79aafa);
-  the term << 8 added to that unit's exchanges; M[i][j] = (ex_i << 8) /
-  ex_j, M[j][i] the other way (0x79af67, 0x79b064), both truncated. The
-  simulations' strengths: a melee blow at Combat against Combat, both
-  damaged; a ranged or bombard blow at RangedCombat (Bombard) against
-  Combat, the attacker undamaged, the domain term (`rangedDomainCS`, 17);
-  the class matchups (melee +5 on anti-cavalry, anti-cavalry +10 on
-  cavalry) for the attacker alone. AntiAirCombat's float terms
-  (0x79b115..) unported.
-- CHECKED against AI_UnitEfficiency.csv (", %3.2f"): every land and sea
-  melee, ranged and siege pair of the early and middle units agrees at
-  0.01; the misses are unique units' abilities (Berserker, Carolean,
-  Redcoat, Hoplite), anti-air and air units, the Giant Death Robot and the
-  late ships' range terms. The port (`unitEfficiency`, cpu/core/
-  aiUnitEfficiency.ts) takes the job's raw value wherever it lies within
-  1/256 of the printed table both ways, the printed table's elsewhere; the
-  GPU reads the exported table (`rules.unitEfficiency`).
+  the map (0x4eeb70 with plot -1, -1: no terrain, full health). The
+  diagonal 1.0 (0x79a7c5). Per pair of Units rows i < j (the inner loop
+  from i + 1, 0x79a8b7), a row is weak where max(Combat +0x48, RangedCombat
+  +0x6c, Bombard +0x40) is 0 and AntiAirCombat +0x34 not above 0: i weak and
+  j strong M[i][j] 0.01 (raw 2: floor 0 | trunc(0.01 x 256)) and M[j][i]
+  100.0; i strong and j weak M[i][j] 100.0 and M[j][i] 1.0 (0x79a9fd); both
+  weak 1.0 both ways (0x79a95e). Two strong rows: two combat simulations
+  (0x205720 with its flag set: the damage law's expectation), i on j
+  (+0xf80) and j on i (-0x30); per unit its damage over both (results
+  +0x7c the attacker's / +0xc4 the defender's words, << 8, at least 1.0),
+  its exchanges 0x640000 / damage (100 / damage, 24.8, truncated); the
+  range term (0x79ab16..0x79abeb): the earlier row's ceil((Range - 1) /
+  the other's BaseMoves +0x38) where its Range +0x68 is above the other's
+  and at least the other's moves, else the later row's ceil((its Range - 1)
+  / the earlier's moves) where its Range is at least those moves; neither
+  where the two differ both in AntiAirCombat > 0 and in being air units
+  (0x79aafa: the domain lookup 0xadd590 == 1, DOMAIN_AIR); the term << 8
+  added to that unit's exchanges; M[i][j] = (ex_i << 8) / ex_j, M[j][i] the
+  other way (0x79af67, 0x79b064), both truncated. THE ANTI-AIR TERM
+  (0x79b115..0x79b63f): i holding AntiAirCombat against an air j, t =
+  AntiAirCombat << 8 x 0.05 (raw 12) >> 8; M[j][i] -= min(t, M[j][i]) and
+  M[i][j] += max(M[i][j], t) (the cmovge picks); else j holding it against
+  an air i, the same with the two entries swapped.
+- THE SIMULATION'S COMBAT (0x205720 -> the type of 0x209550): an air
+  attacker's COMBAT_AIR; else RANGED where RangedCombat tops Bombard and
+  Combat, BOMBARD where Bombard tops both, else MELEE (the Giant Death
+  Robot's 120 under its 130 Combat fights melee). Each side's strength is
+  its base (GetCombat 0x56dc90, GetRangedCombat 0x56e3e0, GetBombardCombat
+  0x56daa0) plus the strength terms (0x51c810 attacking, 0x51f070
+  defending); the damage 0x51a240: a side of base 0 or less takes
+  trunc(COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT 65 (GlobalParameters +0x1f0) x
+  0.01 x 100) = 65; else the law 0x519090: the struck side's strength 0
+  takes COMBAT_MAX_HIT_POINTS, the striker's 0 deals COMBAT_MINIMUM_DAMAGE,
+  else trunc(30 x e^(x) + 0.5) clamped [1, 100]. The melee result 0x206960:
+  a defender of formation 2 takes nothing either way (0x206a1f; no strong
+  row's: the civilians are weak rows); one of formation 1 takes its whole
+  hit points after the law (0x206bf0) — the support class: the Anti-Air Gun
+  and Mobile SAM fit it at 165 a pair (100 + 65), their attacker 2 (1 + 1),
+  M = 82.58 against every melee unit; both at 100 leaves the attacker at
+  99 (the overshoots equal, 0x206d01 `jle`). The ranged result 0x207a80:
+  the attacker takes none. The domain term (0x51c810, "H-1: the melee
+  result, a ranged blow's domain"): a bombard blow loses 17 on a land
+  defender, a land unit's ranged blow 17 on a naval one. THE AIR STRIKE
+  (0x202440 -> 0x203cb0, the interceptor +0x10 and the anti-air cover
+  +0x18 null): on an air target the dogfight at Combat (MELEE), else at
+  RangedCombat or Bombard, whichever is larger (0x204451); the target
+  defends at its AntiAirCombat where it holds one and is no fighter
+  (PROMOTION_CLASS_AIR_FIGHTER, 0x203d3f), else at Combat; the plane takes
+  damage only from a fighter or an anti-air target ([rsp+0x68], 0x2047f2).
+- THE STRENGTH MODIFIERS: every unit carries its type's abilities (the
+  UnitAbilities not Inactive whose class tag it holds). In the simulation
+  both units are the neutral player's, so every COLLECTION_UNIT_COMBAT
+  EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER of EITHER unit whose requirements
+  hold — PLAYER_IS_ATTACKING met, the opponent the defender — counts for the
+  attacker: the Berserker's +10 (UNIT_STRONG_WHEN_ATTACKING) raises its
+  attack and its attacker's on it (+10 / -10 against everything, the
+  WEAK_WHEN_DEFENDING -5 never met); the Redcoat's +10 and the Digger's +5
+  (UNIT_ON_HOME_CONTINENT, UNIT_IN_OWNER_TERRITORY inverted: met with no
+  plot) likewise; ANTI_SPEAR / ANTI_CAVALRY count for the attacker alone
+  (their opponent test reads the defender). A unit requirement with no plot
+  is unmet (0xb028c0 in-owner-territory, 0xb12d50 home-continent, 0xb95b80
+  coast: return 1 where the unit's plot is null), its Inverse met; the
+  plot's, the neighbours' and the formation's tests likewise. The
+  Carolean's per-unused-Movement term (EFFECT_ADJUST_UNIT_PER_UNUSED_
+  MOVEMENT_COMBAT_BONUS) is its own strength, +3 x its 3 BaseMoves both
+  ways. REQUIREMENT_OPPONENT_IS_STRONGER (the Gaesatae) is met where the
+  defender's Combat tops the attacker's — a fit on the table (its 19 pairs),
+  the requirement's code unread.
+- CHECKED: the job against AI_UnitEfficiency.csv (", %3.2f", the same
+  beside every recording): 20,736 of 20,736 entries at the printed 0.01
+  (the Berserker, Carolean, Redcoat, Digger, Gaesatae, the Anti-Air Gun and
+  Mobile SAM at 82.58 / 130.61 against every land unit, the air units, the
+  Giant Death Robot, the late ships' range terms among them). The install
+  reader took a requirement's Inverse "1" as false (the Digger's); it reads
+  "1" and "true".
 - CONFIRMED: runs/h1_duelv1117 Valletta t2 / t3 UNITS rows, Heavy Chariot
   3.33 / 5.67 (the job's Warrior row 137, the printed 0.54's 138 gave
   3.30 / 5.61), Spearman 1.25 / 2.12 (213 for 212); h1_duely1117 t3 p2
-  Wheel 153.9 and Bronze Working 212.7 as logged. MEASURED (five duely
-  duels, full length): researchScore.minor 47753 -> 49600 of 53807
-  (88.7% -> 92.2%), aimem 48104 -> 49984 (89.4% -> 92.9%).
+  Wheel 153.9 and Bronze Working 212.7 as logged.
 
 ## C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)
 

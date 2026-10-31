@@ -531,6 +531,12 @@ export interface AiUnitRow {
   domain: string;
   /** FormationClass FORMATION_CLASS_CIVILIAN */
   civilian: boolean;
+  /** FormationClass FORMATION_CLASS_SUPPORT */
+  support: boolean;
+  /** TypeTags */
+  tags: readonly string[];
+  /** its active abilities' strength modifiers (UnitAbilityModifiers) */
+  abilities: readonly AiModifier[];
   pseudo: string | null;
   promotionClass: string | null;
   /** StrategicResource */
