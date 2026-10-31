@@ -552,6 +552,7 @@
     - cpu/core/aiProjectValue.ts:ProjectValueFacts
     - gpu/core/sim_cityvalue.py:_cv_building_per_turn
     - gpu/core/sim_cityvalue.py:_cv_building
+    - cpu/core/aiCityBuild.ts:value
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"

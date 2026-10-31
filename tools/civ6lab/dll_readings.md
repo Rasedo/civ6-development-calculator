@@ -4050,8 +4050,24 @@ building tables).
   v becomes PV(v, rate, H) - PV(v, rate, T) (0x7a16e0 twice). After it,
   already discounted: Entertainment (+0x2c) > 0 adds 0x79f7c0 for this city
   (RegionalRange +0x48 <= 1) or over the player's cities in range, capped at
-  50.0; the Buildings_XP2 row (0x28a940 on 0xad50d0: +0x28 > 0 -> 0x7a67f0,
-  +0x48 bit 1 -> 0x39110); each free unit (+0x298) through 0x7b62c0; Housing
+  50.0; else (0x7a8daa) a RegionalRange above 1: with the Buildings_XP2
+  row's ResourceTypeConvertedToPower (+0x58, its resource +0x14) the
+  player's stock of it less its reservations (0x4ab6c0 -> 0x4aa790,
+  ownership 0) none -> the whole value 0 (0x7a9098); else the value x the
+  player's cities within the range (0x7a90d0: with a converted resource
+  those whose city +0x30d0 is above 0, and the city itself; without, every
+  one); the Buildings_XP2 row (0x28a940 on 0xad50d0, `dll_rowmap.py
+  a5ab30`): RequiredPower +0x28 > 0 -> 0x7a67f0 of -RequiredPower;
+  BlocksCoastalFlooding +0x48 bit 1 -> 0xa39110 over the XP2 terrain
+  manager's lowland list (+0xb0; entries of 0x20 bytes: +0 the level, +4
+  the plot, +0x1b a flag that drops the plot — 0xa3a210) of the city's
+  plots, the lambda 0x79ecc0 counting each kept plot and those of them
+  holding a district: + (districts x 15 + plots) x 100.0, the whole value 0
+  with no plot (0x7a93b4). Measured (`cityBuildLab.ts --logtech`): the
+  city-states' Flood Barrier rows runs/h1_duelv1121 0 -> 47 of 56 within
+  0.005 (Hunza t208-220 +300.00 on its three lowlands, Antioch +100.00),
+  h1_duelv1124 0 -> 48 of 56; the Coal / Fossil Fuel Power Plants 0 -> 147
+  / 102 of 147 / 102 (1124, every row 0.00), 1121 0 -> 4 of 4; each free unit (+0x298) through 0x7b62c0; Housing
   (+0x34) > 0 through 0x7a3d70 (CityBuildAI, city +0x1788, population +0x588,
   T, H); a building on player +0x1310's list (0x39dcd0) through 0x7a10c0 (a
   Gold value per plot of a walk); the modifiers through 0x7a4b20 ("the AI's

@@ -33,7 +33,8 @@ import { researchCost } from './economy';
 import { getModifiers, prodBoostPct, seatGovernment } from './effects';
 import { citiesOf, isCityStateSeat, isFreeSeat, seatOf } from './seats';
 import { minorCity } from './cityStates';
-import { cityLowlands } from './climate';
+import { cityLowlands, coastalLowlandCounts } from './climate';
+import { stockFree } from './stockpile';
 import { buildingCostIn, worshipOffered } from './rules';
 import { builderCost, cityNavalCapable, traderCost } from './units';
 import { districtCost, projectCost, settlerCost, unitStepCost, unitsAcquired } from './game';
@@ -179,6 +180,11 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       if (!id) return true;
       return !!BUILDINGS[id].floodBarrier && cityLowlands(state, city).length === 0;
+    },
+    coastalLowlands: () => coastalLowlandCounts(state, city),
+    stocked: (res) => {
+      const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
+      return !!id && stockFree(state, seat, id) > 0;
     },
     amenity,
     regionalAmenities: (range) => own.filter((c) => hexDistance(state.map, state.map.tiles[c.centerIndex].col, state.map.tiles[c.centerIndex].row,

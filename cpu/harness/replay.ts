@@ -45,7 +45,7 @@ import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, dis
   placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
   seatPhase, worldCongress } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
-import { CP_ACCEPTED, CP_IN_PROGRESS } from '../core/aiContracts';
+import { CP_ACCEPTED, CP_CANCELLED, CP_IN_PROGRESS, contractById } from '../core/aiContracts';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, unitFullMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained, recordAttacker, unitMadeAnew, FORTIFY_MAX_TURNS } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
@@ -4451,6 +4451,12 @@ function bindQueuedContracts(ctx: Ctx, cs: CityState, imp: Imported, turn: numbe
     c.progress = CP_IN_PROGRESS;
     c.queued = true;
     c.city = minorCity(cs).id;
+    // the contract our turn queued in its place, its item no longer the
+    // city's, CANCELLED as the in-hand check leaves it (`inHandCheck`; runs/
+    // h1_duely1117 Antananarivo t72: our Theater contract 31, the game's
+    // Builder queued at t73, else IN PROGRESS in its tree to t249)
+    const was = contractById(ai, ai.inHand[c.city] ?? -1);
+    if (was && was !== c && was.progress === CP_IN_PROGRESS) was.progress = CP_CANCELLED;
     ai.inHand[c.city] = c.id;
     cs.prodSetValue = c.value;
   }

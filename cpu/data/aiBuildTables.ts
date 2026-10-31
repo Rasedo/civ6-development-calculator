@@ -47,6 +47,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "MONUMENT_LOYALTY",
@@ -140,6 +142,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "PALACE_ADJUST_GARRISON_STRENGTH",
@@ -196,6 +200,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "BARRACKS_TRAINED_UNIT_XP_MODIFIER",
@@ -281,6 +287,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -326,6 +334,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -373,6 +383,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_MISSIONARY"
   ],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -408,6 +420,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -452,6 +466,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "WATERMILL_ADDRICEFOOD",
@@ -556,6 +572,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -596,6 +614,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "LIGHTHOUSE_TRAINED_UNIT_XP_MODIFIER",
@@ -720,6 +740,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "MARKET_TRADE_ROUTE_CAPACITY",
@@ -776,6 +798,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "STABLE_TRAINED_UNIT_XP_MODIFIER",
@@ -862,6 +886,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_GURU"
   ],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -921,6 +947,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_GURU"
   ],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "STAVE_CHURCH_FAITHWOODSADJACENCY",
@@ -1032,6 +1060,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -1069,6 +1099,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "CASTLE_PREVENT_MELEE_ATTACK_OUTER_DEFENSES",
@@ -1123,6 +1155,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -1175,6 +1209,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   ],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -1220,6 +1256,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -1270,6 +1308,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_MILITARY_ENGINEER"
   ],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "ARMORY_TRAINED_UNIT_XP_MODIFIER",
@@ -1367,6 +1407,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   ],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "SHIPYARD_TRAINED_UNIT_XP_MODIFIER",
@@ -1459,6 +1501,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -1496,6 +1540,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "STAR_FORT_PREVENT_MELEE_ATTACK_OUTER_DEFENSES",
@@ -1572,6 +1618,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -1634,6 +1682,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_ARCHAEOLOGIST"
   ],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -1681,6 +1731,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -1728,6 +1780,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "ELECTRONICSFACTORY_CULTURE",
@@ -1798,6 +1852,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -1845,6 +1901,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "MILITARY_ACADEMY_TRAINED_UNIT_XP_MODIFIER",
@@ -1934,6 +1992,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -1971,6 +2031,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "ZOO_RAINFOREST_SCIENCE",
@@ -2054,6 +2116,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "HANGAR_TRAINED_AIRCRAFT_XP_MODIFIER",
@@ -2132,6 +2196,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "SEAPORT_TRAINED_UNIT_XP_MODIFIER",
@@ -2235,6 +2301,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": "RESOURCE_URANIUM",
   "modifiers": []
  },
  {
@@ -2294,6 +2362,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -2353,6 +2423,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "FILMSTUDIO_ENHANCEDLATETOURISM",
@@ -2410,6 +2482,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -2452,6 +2526,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "AIRPORT_TRAINED_AIRCRAFT_XP_MODIFIER",
@@ -2516,6 +2592,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 2,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "STADIUM_10_POPULATION_TOURISM",
@@ -2606,6 +2684,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -2652,6 +2732,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -2698,6 +2780,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -2740,6 +2824,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "MOSQUE_ADJUST_SPREAD_CHARGES",
@@ -2803,6 +2889,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "PAGODA_ADJUST_FAVOR",
@@ -2854,6 +2942,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -2900,6 +2990,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -2942,6 +3034,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -2984,6 +3078,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -3024,6 +3120,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "STONEHENGE_GRANT_PROPHET",
@@ -3102,6 +3200,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "HANGING_GARDEN_ADDGROWTH",
@@ -3151,6 +3251,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "PYRAMID_ADJUST_BUILDER_CHARGES",
@@ -3225,6 +3327,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "ORACLE_GREATGENERALPOINTS",
@@ -3429,6 +3533,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GREATLIGHTHOUSE_ADJUST_SEA_MOVEMENT",
@@ -3510,6 +3616,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "COLOSSUS_ADDTRADEROUTE",
@@ -3563,6 +3671,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "PETRA_YIELD_MODIFIER",
@@ -3634,6 +3744,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "COLOSSEUM_IDENTITY",
@@ -3715,6 +3827,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GREAT_LIBRARY_ANCIENT_CLASSICAL_TECH_BOOSTS",
@@ -3777,6 +3891,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "MAHABODHITEMPLE_APOSTLE",
@@ -3839,6 +3955,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "TERRACOTTA_ARMY_ARCHAEOLOGIST_OPEN_BORDERS",
@@ -3906,6 +4024,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "HAGIA_SOPHIA_ADJUST_RELIGIOUS_CHARGES",
@@ -3955,6 +4075,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "ALHAMBRA_MILITARY_GOVERNMENT_SLOT",
@@ -3999,6 +4121,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "CHICHEN_ITZA_JUNGLE_CULTURE",
@@ -4129,6 +4253,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "MONT_ST_MICHEL_GRANT_MARTYR",
@@ -4178,6 +4304,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "VENETIAN_ARSENAL_EXTRANAVALMELEE",
@@ -4253,6 +4381,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GREAT_ZIMBABWE_ADDTRADEROUTE",
@@ -4320,6 +4450,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "FORBIDDEN_CITY_WILDCARD_GOVERNMENT_SLOT",
@@ -4373,6 +4505,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "POTALA_PALACE_DIPLOMATIC_GOVERNMENT_SLOT",
@@ -4428,6 +4562,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "RUHRVALLEY_ADDPRODUCTIONYIELD",
@@ -4523,6 +4659,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "BOLSHOI_THEATRE_FREE_CIVICS",
@@ -4581,6 +4719,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "OXFORD_ADDSCIENCEYIELD",
@@ -4646,6 +4786,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "BIG_BEN_ECONOMIC_GOVERNMENT_SLOT",
@@ -4713,6 +4855,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -4748,6 +4892,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "EIFFEL_TOWER_ADDAPPEAL",
@@ -4814,6 +4960,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "BROADWAY_ADDCULTUREYIELD",
@@ -4874,6 +5022,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "CRISTOREDENTOR_BEACHTOURISM",
@@ -4934,6 +5084,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -4986,6 +5138,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -5024,6 +5178,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -5062,6 +5218,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -5100,6 +5258,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -5149,6 +5309,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -5184,6 +5346,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "HUEY_ADDENTERTAINMENT",
@@ -5326,6 +5490,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    "UNIT_GURU"
   ],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "PRASAT_CULTURE_POPULATION",
@@ -5385,6 +5551,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "ANGKORWAT_ADDPOPULATION",
@@ -5447,6 +5615,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "SUKIENNICE_DOMESTICGOLD",
@@ -5522,6 +5692,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "JEBELBARKAL_GRANT_FOUR_IRON_PER_TURN",
@@ -5579,6 +5751,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "BASILIKOI_PAIDES_TRAINED_UNIT_XP_MODIFIER",
@@ -5663,6 +5837,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "APADANA_AWARD_TWO_INFLUENCE_TOKEN",
@@ -5727,6 +5903,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "HALICARNASSUS_ADJUST_ENGINEER_CHARGES",
@@ -5821,6 +5999,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "ORDU_TRAINED_UNIT_XP_MODIFIER",
@@ -5908,6 +6088,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "TSIKHE_PREVENT_MELEE_ATTACK_OUTER_DEFENSES",
@@ -5981,6 +6163,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -6016,6 +6200,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "KILWA_SINGLE_ADDSCIENCEYIELD",
@@ -6364,6 +6550,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "KOTOKU_ADDFAITHYIELD",
@@ -6423,6 +6611,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "CONTRATACION_GOVERNOR_POINTS",
@@ -6546,6 +6736,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "STBASILS_ADDFOOD",
@@ -6735,6 +6927,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "TAJ_MAHAL_EXTRA_ERA_SCORE",
@@ -6780,6 +6974,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "STATUELIBERTY_CITIES_ALWAYS_LOYAL",
@@ -6854,6 +7050,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "AMUNDSEN_ADDSCIENCEYIELD",
@@ -6959,6 +7157,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "FERRIS_WHEEL_TOURISM",
@@ -7005,6 +7205,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "AQUARIUM_SEARESOURCE_SCIENCE",
@@ -7090,6 +7292,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 2,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "AQUATICS_CENTER_WONDER_TOURISM",
@@ -7156,6 +7360,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GOV_TALL_AMENITY_BUFF",
@@ -7249,6 +7455,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GOV_SETTLER_COST_REDUCTION",
@@ -7306,6 +7514,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GOV_PRODUCTION_BOOST_FROM_CAPTURE",
@@ -7362,6 +7572,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "BUILDING_GOV_CITYSTATES_UNIT_STRENGTH",
@@ -7464,6 +7676,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GOV_GRANT_SPY",
@@ -7538,6 +7752,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GOV_FAITH_PURCHASE_RECON",
@@ -7678,6 +7894,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GOV_HEAL_AFTER_DEFEATING_UNIT",
@@ -7743,6 +7961,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -7786,6 +8006,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GOV_PROJECT_ABILITY",
@@ -7837,6 +8059,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -7879,6 +8103,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 1,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "SHOPPING_MALL_TOURISM",
@@ -7923,6 +8149,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": true,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -7958,6 +8186,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "HYDROELECTRIC_DAM_FREE_POWER",
@@ -8040,6 +8270,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   ],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": "RESOURCE_COAL",
   "modifiers": []
  },
  {
@@ -8090,6 +8322,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": "RESOURCE_OIL",
   "modifiers": []
  },
  {
@@ -8137,6 +8371,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GRANDBAZAAR_AMENITIES_LUXURIES",
@@ -8189,6 +8425,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "MARAE_FAITH_FEATURES",
@@ -8336,6 +8574,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -8378,6 +8618,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "THERMALBATH_ADDTOURISM",
@@ -8456,6 +8698,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GREATBATH_FLOODFAITH",
@@ -8506,6 +8750,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "MACHUPICCHU_COMMERCIALHUB_GRASSMOUNTAIN_GOLD",
@@ -8727,6 +8973,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "MEENAKSHITEMPLE_FREE_GURU",
@@ -8901,6 +9149,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "SANKORE_TRADE_OFFER_SCIENCE",
@@ -8990,6 +9240,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "ORSZAGHAZ_DOUBLE_FAVOR_SUZERAIN",
@@ -9039,6 +9291,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -9074,6 +9328,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "GOLDENGATE_CITYAPPEAL",
@@ -9158,6 +9414,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "STAUEZEUS_ANTI_CAVALRY_PRODUCTION",
@@ -9231,6 +9489,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "BIOSPHERE_ADJUST_APPEAL_RAINFOREST",
@@ -9301,6 +9561,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -9336,6 +9598,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": []
  },
  {
@@ -9371,6 +9635,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "CONSULATE_INFLUENCEPOINTS",
@@ -9444,6 +9710,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "CHANCERY_INFLUENCEPOINTS",
@@ -9503,6 +9771,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "PALGUM_ADDFOOD",
@@ -9574,6 +9844,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "NAVIGATION_SCHOOL_NAVAL_UNIT_PRODUCTION",
@@ -9634,6 +9906,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "ETEMENANKI_SCIENCE_MARSH",
@@ -9848,6 +10122,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "copies": [],
   "units": [],
   "entertainmentWithPower": 0,
+  "blocksCoastalFlooding": false,
+  "convertsToPower": null,
   "modifiers": [
    {
     "id": "TORREDEBELEM_TRADE_GOLD_LUXURIES",

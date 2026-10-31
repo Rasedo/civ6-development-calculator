@@ -48,7 +48,7 @@ import { minorCity, minorPlaceCitizens, minorReplaceCitizens, suzerainOf } from 
 import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from './effects';
 import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
-import { cityLowlands, floodBarrierCost, repairBehindBarrier } from './climate';
+import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorTrade, tradeCapacity } from './trade';
 import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitIsMilitary, unitMadeAnew } from './units';
@@ -1505,6 +1505,11 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       if (!id) return true;
       return !!BUILDINGS[id].floodBarrier && cityLowlands(state, city).length === 0;
+    },
+    coastalLowlands: () => coastalLowlandCounts(state, city),
+    stocked: (res) => {
+      const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
+      return !!id && stockFree(state, cityState.seat, id) > 0;
     },
     amenity,
     // a city-state holds one city

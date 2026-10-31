@@ -475,6 +475,8 @@ def build_city(rows, modifier) -> str:
             "copies": [[r["OldYieldType"], r["NewYieldType"]] for r in copies[b]],
             "units": [r["Unit"] for r in unit_pre[b]],
             "entertainmentWithPower": num(x, "EntertainmentBonusWithPower"),
+            "blocksCoastalFlooding": x.get("BlocksCoastalFlooding", "").lower() == "true",
+            "convertsToPower": x.get("ResourceTypeConvertedToPower") or None,
             "modifiers": [modifier(r["ModifierId"]) for r in bmods[b]],
         })
     tags = multi("TypeTags", "Type")

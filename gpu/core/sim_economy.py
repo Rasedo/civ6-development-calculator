@@ -1285,6 +1285,15 @@ class SimEconomy:
                & self.city_alive[:, row].unsqueeze(1))
         return per.sum(dim=1)
 
+    def _city_lowland_district_count(self, row: int) -> torch.Tensor:
+        """[B, RC] — of each city's coastal-lowland tiles those holding a
+        district (`coastalLowlandCounts`)"""
+        low = (self.tile_lowland > 0) & (self.tile_seat == int(self._ROW_SEAT[row])) & (self.district >= 0)
+        ids = self.city_id[:, row]
+        per = (low.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1))
+               & self.city_alive[:, row].unsqueeze(1))
+        return per.sum(dim=1)
+
     def _flood_barrier_cost(self, row: int) -> torch.Tensor:
         """[B, RC] — CIV6: "(80 x coastal lowland tiles) + (80 x coastal
         lowland tiles x flood level)" (`floodBarrierCost`)."""

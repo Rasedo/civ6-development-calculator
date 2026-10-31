@@ -79,6 +79,10 @@ export interface AiBuildingRow {
   copies: readonly (readonly [string, string])[];
   units: readonly string[];
   entertainmentWithPower: number;
+  /** Buildings_XP2 BlocksCoastalFlooding (+0x48 bit 1) */
+  blocksCoastalFlooding: boolean;
+  /** Buildings_XP2 ResourceTypeConvertedToPower (+0x58), null none */
+  convertsToPower: string | null;
   modifiers: readonly AiModifier[];
 }
 
@@ -195,6 +199,12 @@ export interface CityBuildFacts {
   /** what the city's own ground refuses (a Flood Barrier with no coastal
    *  lowland) */
   groundRefuses(building: string): boolean;
+  /** the city's coastal lowland plots the sea has not taken, and those of
+   *  them holding a district (the XP2 terrain manager's list, 0xa39110) */
+  coastalLowlands(): { plots: number; districts: number };
+  /** the player's stock of the strategic resource less its reservations
+   *  is above 0 (0x4ab6c0 -> 0x4aa790, ownership 0) */
+  stocked(resource: string): boolean;
   /** the city's current production, an item type, or null with nothing in
    *  hand (city +0x2350) */
   current: string | null;
@@ -494,6 +504,20 @@ export function buildingValue(f: CityBuildFacts, b: AiBuildingRow, t: number, h 
     let e = 0;
     for (const c of cities) e += valueBetween(amenityPerTurn(f, c), t, h);
     value += b.regionalRange <= 1 ? e : Math.min(e, 50 * FX);
+  } else if (b.regionalRange > 1 && b.convertsToPower && !f.stocked(b.convertsToPower)) {
+    // a regional power plant whose fuel the player holds none of is worth
+    // nothing so far (0x7a9089..0x7a909b: runs/h1_duelv1124, every Coal
+    // Power Plant row of the city-states 0.00)
+    value = 0;
+  }
+  // a building that blocks coastal flooding (0x7a92b6): 100.0 a coastal
+  // lowland plot of the city's the sea has not taken, 1,500.0 a such plot
+  // holding a district, after the PV; the whole value 0 with no such plot
+  // (runs/h1_duelv1121 Hunza t208-220: the Flood Barrier 300.0 over the
+  // rest on its three lowlands, Antioch 100.0 on its one)
+  if (b.blocksCoastalFlooding) {
+    const l = f.coastalLowlands();
+    value = l.plots === 0 ? 0 : value + (l.districts * 15 + l.plots) * 100 * FX;
   }
   // its units (Unit_BuildingPrereqs) but an Archaeologist, each at its unit
   // value (`unitValue`; a unit whose value is not read counts its exits)

@@ -21,3 +21,32 @@
   context:
     - "...te 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\") and its territory (0xa36ff0: \"Random Desert\", \"Sea\", \"Ocean\", \"Mountain Range\", \"Volcano\"; 0xa36400 \"Random Lake Ra..."
   review: imported
+- addr: 0xa39110
+  final: 0x738470
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1121
+      turn: 208
+      value: "Measured (`cityBuildLab.ts --logtech`): the   city-states' Flood Barrier rows runs/h1_duelv1121 0 -> 47 of 56 within   0.005 (Hunza t208-220 +300.00 on its three lowlands, Antioch +100.00),   h1_duelv"
+    - recording: 1124
+      value: the Coal / Fossil Fuel Power Plants 0 -> 147   / 102 of 147 / 102 (1124, every row 0.00), 1121 0 -> 4 of 4;
+  impl: [cpu/core/aiCityBuild.ts:coastalLowlands, cpu/core/climate.ts:coastalLowlandCounts]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...iredPower +0x28 > 0 -> 0x7a67f0 of -RequiredPower; BlocksCoastalFlooding +0x48 bit 1 -> 0xa39110 over the XP2 terrain manager's lowland list (+0xb0; entries of 0x20 bytes: +0 the level..."
+  review: imported
+- addr: 0xa3a210
+  final: 0x7393c0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1121
+      turn: 208
+      value: "Measured (`cityBuildLab.ts --logtech`): the   city-states' Flood Barrier rows runs/h1_duelv1121 0 -> 47 of 56 within   0.005 (Hunza t208-220 +300.00 on its three lowlands, Antioch +100.00),   h1_duelv"
+    - recording: 1124
+      value: the Coal / Fossil Fuel Power Plants 0 -> 147   / 102 of 147 / 102 (1124, every row 0.00), 1121 0 -> 4 of 4;
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...0; entries of 0x20 bytes: +0 the level, +4 the plot, +0x1b a flag that drops the plot — 0xa3a210) of the city's plots, the lambda 0x79ecc0 counting each kept plot and those of them h..."
+  review: imported

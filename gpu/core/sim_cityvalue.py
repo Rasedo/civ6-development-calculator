@@ -1036,6 +1036,15 @@ class SimCityValue:
                 add = torch.where(t == h, _discounted(a, r, t), _present_value(a, r, h) - _present_value(a, r, t))
                 e = e + (torch.where(c[2], add, torch.zeros_like(add)) if len(c) > 2 else add)
             value = value + (e if b["regionalRange"] <= 1 else e.clamp(max=50 * _FX))
+        elif b["regionalRange"] > 1 and b["convertsToPower"]:
+            # a regional power plant whose fuel the player holds none of
+            value = torch.where(_t(f.stocked(b["convertsToPower"]), like).bool(), value, torch.zeros_like(value))
+        if b["blocksCoastalFlooding"]:
+            # 100.0 a coastal lowland plot, 1,500.0 one holding a district;
+            # the whole value 0 with none (0x7a92b6)
+            plots, dists = f.coastal_lowlands()
+            plots, dists = _t(plots, like), _t(dists, like)
+            value = torch.where(plots == 0, torch.zeros_like(value), value + (dists * 15 + plots) * 100 * _FX)
         for u in b["units"]:
             if u == "UNIT_ARCHAEOLOGIST":
                 continue
@@ -1722,6 +1731,19 @@ class _MinorFacts:
             return self.sim._city_lowland_count(self.row)[:, 0] == 0
         return 0
 
+    def coastal_lowlands(self):
+        """`coastalLowlandCounts`: the city's lowland plots, those holding a district"""
+        return self.sim._city_lowland_count(self.row)[:, 0], self.sim._city_lowland_district_count(self.row)[:, 0]
+
+    def stocked(self, res):
+        """the stock of the strategic resource less its reservations above 0"""
+        sim = self.sim
+        ri = self.E["resource"].get(res, -1)
+        k = int(sim._strat_slot_of[ri]) if ri >= 0 else -1
+        if k < 0:
+            return self._bools(False)
+        return (sim._stock_bank(self.row) - sim._stock_reserved(self.row))[:, k] > 0
+
     def _base(self):
         """the city yields' attribute bases (`amenityCityOf`)"""
         return self._get("base", lambda: self.sim._seat_city_base(self.row))
@@ -2381,6 +2403,13 @@ class _FreeFacts(_MinorFacts):
         if bi == int(self.sim._barrier_bidx):
             return self.sim._city_lowland_count(self.row)[:, self.j] == 0
         return 0
+
+    def coastal_lowlands(self):
+        return self.sim._city_lowland_count(self.row)[:, self.j], self.sim._city_lowland_district_count(self.row)[:, self.j]
+
+    def stocked(self, res):
+        # the engine accrues the Free Cities no strategic stock (`accrueStockpiles`)
+        return self._bools(False)
 
     def amenity(self):
         tot = self._base()[:, self.j]

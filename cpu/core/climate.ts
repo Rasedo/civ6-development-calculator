@@ -151,6 +151,14 @@ export function cityLowlands(state: GameState, city: City): Tile[] {
   return state.map.tiles.filter((t) => t.ownerCity === city.id && t.ownerSeat === city.seat && t.lowland);
 }
 
+/** the city's coastal lowland plots the sea has not taken, and those of them
+ *  holding a district (the AI's Flood Barrier value, 0xa39110 over the XP2
+ *  terrain manager's list) */
+export function coastalLowlandCounts(state: GameState, city: City): { plots: number; districts: number } {
+  const low = cityLowlands(state, city);
+  return { plots: low.length, districts: low.filter((t) => !!t.district).length };
+}
+
 /** CIV6 (Flood Barrier): "Initial build cost and per turn maintenance are
  *  variable based on the number of Coastal Lowlands in this city and the
  *  current sea level" — the one multiplier of both: the city's coastal
