@@ -1687,10 +1687,14 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
       return !!id && (cityState.prodItem === `building:${id}` || cityState.prodItem === `repair:${id}`);
     },
     canConstruct: (b) => constructibleNow(facts, AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]),
+    // a pillaged prerequisite stands for none (runs/h1_duely1127 Muscat
+    // t156: its Market pillaged and under repair, the event's Pike and Shot
+    // at 3.0 where the Bank values 21.23; the Bank's contract t163, the
+    // Market repaired)
     reasonsClear: (b) => {
       const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
       if (row.district && !facts.hasDistrict(row.district)) return false;
-      return !row.prereqs.length || row.prereqs.some((p) => facts.hasBuilding(p));
+      return !row.prereqs.length || row.prereqs.some((p) => facts.hasBuilding(p) && !facts.buildingPillaged(p));
     },
     canTrain: (u) => {
       const id = engineId('unit', u, 'UNIT_', UNITS);
@@ -2095,10 +2099,14 @@ export function freeCityPickFacts(state: GameState, city: City, facts: CityBuild
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !!id && freeCityBuildingOk(state, city, id, unlocks) && constructibleNow(facts, AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]);
     },
+    // a pillaged prerequisite stands for none (runs/h1_duely1127 Muscat
+    // t156: its Market pillaged and under repair, the event's Pike and Shot
+    // at 3.0 where the Bank values 21.23; the Bank's contract t163, the
+    // Market repaired)
     reasonsClear: (b) => {
       const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
       if (row.district && !facts.hasDistrict(row.district)) return false;
-      return !row.prereqs.length || row.prereqs.some((p) => facts.hasBuilding(p));
+      return !row.prereqs.length || row.prereqs.some((p) => facts.hasBuilding(p) && !facts.buildingPillaged(p));
     },
     canTrain: (u) => {
       const id = engineId('unit', u, 'UNIT_', UNITS);

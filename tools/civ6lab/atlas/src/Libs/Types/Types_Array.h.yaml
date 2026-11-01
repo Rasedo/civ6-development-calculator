@@ -9,6 +9,7 @@
   status: PARTLY
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
+    - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
   context:
     - "- The set-up draws (\"Random Diplomatic Value\", the diplomacy object's constructor 0x3ffdd0): every player slot in use, in player order, draws one value over 100 toward each of th..."
   review: imported

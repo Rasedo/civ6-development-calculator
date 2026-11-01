@@ -12422,3 +12422,29 @@ update in `_mops_upgrade_trees` (gpu/core/sim_minorops.py).
   records is no trigger either (with it 8 / 5 / 13; 1128 Hong Kong t5, t16
   re-placed, 1117 Caguana t37, t50 kept). What re-places a city-state's
   citizens between its records stays unread.
+
+## C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins
+
+- 0x723bb0 (the unit value's promotion class weight) reads player +0x12a0,
+  AI::Military (constructor 0x71a960): +0x708 its m_defaultUnitPreferences
+  and +0x778 its m_modifiedUnitPreferences (the names its constructor
+  registers), each an int vector of fixed point indexed by promotion class
+  (0x4c1cd0: data +0, size +0x10); the weight max(default + modified, 0.1),
+  0 where the default is 0. The default holds the lists' Values / 100
+  (MinorCivUnitBuilds RECON / NAVAL_CARRIER -100), the modified one's writer
+  is unread: no instruction of 0x400000..0xc00000 addresses +0x778 of the
+  Military but its constructor, destructor, sizing (0x71d970) and 0x723bb0
+  (the displacement and immediate scans), so it is written through a
+  pointer held elsewhere. No AI list names a RANGED or SIEGE class. The
+  engines hold the modified term 0. Cases it would explain: 1121 Antioch
+  t150 the Field Cannon at +0.29 a turn (its table 2.786 on the game's own
+  records, 5 Maintenance at 0.5) under the game's obsolete Warrior at 0;
+  1117 Caguana t88 the Trebuchet at 22 (ours 25.20) over the Catapult (ours
+  25.81).
+- The event building's reasons (0x5d0860 flags 0, 0): a prerequisite
+  building pillaged stands for none. CONFIRMED: runs/h1_duely1127 Muscat
+  t156, its Market pillaged and under repair: the game's Build City Building
+  event takes the Pike and Shot at 3.0 (the engines' 3.07) where the Bank
+  values 21.23; its Bank contract at t163, the Market repaired t159.
+  Ported (`minorPickFacts` / the Free Cities' `reasonsClear`,
+  `event_building`).

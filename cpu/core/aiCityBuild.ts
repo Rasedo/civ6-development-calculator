@@ -682,7 +682,7 @@ export interface PickFacts {
   canConstruct(building: string): boolean;
   /** CanConstruct's reasons clear (its result aside): the building's
    *  district stands in the city and, where it has prerequisites, one of
-   *  them is held */
+   *  them is held unpillaged */
   reasonsClear(building: string): boolean;
   /** CanTrain (0x172820) */
   canTrain(unit: string): boolean;

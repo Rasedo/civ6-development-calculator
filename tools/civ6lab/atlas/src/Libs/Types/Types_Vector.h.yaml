@@ -149,6 +149,21 @@
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
+- addr: 0x4c1cd0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1121
+      turn: 150
+      value: "Cases it would explain: 1121 Antioch   t150 the Field Cannon at +0.29 a turn (its table 2.786 on the game's own   records, 5 Maintenance at 0.5) under the game's obsolete Warrior at 0;"
+    - recording: 1117
+      turn: 88
+      value: 1117 Caguana t88 the Trebuchet at 22 (ours 25.20) over the Catapult (ours   25.81).
+  readings:
+    - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
+  context:
+    - "...constructor registers), each an int vector of fixed point indexed by promotion class (0x4c1cd0: data +0, size +0x10); the weight max(default + modified, 0.1), 0 where the default is..."
+  review: imported
 - addr: 0x58aa90
   final: 0x3b4040
   kind: function

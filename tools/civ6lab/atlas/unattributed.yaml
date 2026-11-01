@@ -3362,6 +3362,22 @@
   context:
     - "..., none of its own stacking with it (0x585eb0); the weighted vector's weights (influence 0x716a60, the plot's owner +0x60, revealed 0x2d2220) are never read: ONE \"Random Direction\" draw..."
   review: imported
+- addr: 0x71d970
+  final: 0x4cb210
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1121
+      turn: 150
+      value: "Cases it would explain: 1121 Antioch   t150 the Field Cannon at +0.29 a turn (its table 2.786 on the game's own   records, 5 Maintenance at 0.5) under the game's obsolete Warrior at 0;"
+    - recording: 1117
+      turn: 88
+      value: 1117 Caguana t88 the Trebuchet at 22 (ours 25.20) over the Catapult (ours   25.81).
+  readings:
+    - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
+  context:
+    - ...000..0xc00000 addresses +0x778 of the Military but its constructor, destructor, sizing (0x71d970) and 0x723bb0 (the displacement and immediate scans), so it is written through a poin...
+  review: imported
 - addr: 0x71e370
   final: 0x4cb740
   kind: function

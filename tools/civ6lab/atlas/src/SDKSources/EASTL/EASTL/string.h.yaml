@@ -187,6 +187,7 @@
   readings:
     - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
   context:
     - "...LAB: +0x4b8's writer (the only displacement writes are the military AI's constructor 0x71a960 at 0x71b68a and 0x264296); the Free Cities Raid's target as an operation near the city..."
   review: imported

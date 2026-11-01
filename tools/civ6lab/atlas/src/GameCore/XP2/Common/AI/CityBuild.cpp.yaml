@@ -498,6 +498,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
+    - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...in gnames.json (value = string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick building if bv>=uv &&..."
   context:

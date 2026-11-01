@@ -419,7 +419,8 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
 
 /** 0x5d0860 with neither the checks nor the defensive filter: the best
  *  building not queued (a held one valued at none, a pillaged one valued
- *  as unbuilt) whose prerequisite building and district stand
+ *  as unbuilt) whose prerequisite building stands unpillaged and whose
+ *  district stands
  *  (CanConstruct's reasons clear), FX(-9999) none */
 export function eventBuilding(t: CityBuildTables, pf: PickFacts): { index: number; value: number } {
   let index = -1;
