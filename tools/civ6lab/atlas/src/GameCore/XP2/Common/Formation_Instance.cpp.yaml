@@ -6,6 +6,7 @@
 - addr: 0x265ac0
   final: 0x1a3460
   kind: function
+  semantics: "the path finder's stacking test of a plot's unit (-> 0x265af0): with no member any unit; else alive (+0x770 clear, +0xcf0 below its hit points), not air (+0x650 1), on the group leader's plot (the first member +0x728, +0x220 / +0x224), no Spy (+0x1ba bit 2) nor +0x1b9 bit 0x40; with one member a civilian (formation class 2) beside a support leader (1) or a support unit beside a civilian leader refused; none of its formation's units of a member's formation class or of the air class (4)."
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -18,7 +19,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ".... The ring test 0x815d50 takes a plot holding a unit of the mover's player only where 0x265ac0 -> 0x265af0 passes it on the mover's path finder (+0x738 0: any; else formation classes..."
-  review: imported
+  review: reviewed
 - addr: 0x265af0
   final: 0x1a3490
   kind: function
@@ -73,6 +74,7 @@
 - addr: 0x2665b0
   final: 0x1a3e70
   kind: function
+  semantics: the path finder init's +0x1a4 value.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -86,7 +88,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   context:
     - "...he formation +0x518): the plot entered (the fifth argument: x, y, the formation's layer 0x2665b0 — 3 the religious one) is in a zone where, first, the functor 0x52f710 over its ring..."
-  review: imported
+  review: reviewed
 - addr: 0x266660
   final: 0x1a3f20
   kind: function
@@ -110,6 +112,7 @@
 - addr: 0x266720
   final: 0x1a3fe0
   kind: function
+  semantics: the formation's domain.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -122,10 +125,11 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - "...s hit points, +0x770 clear), of the mover's domain (+0x650 against the fourth argument, 0x266720), exerting (0x56d6c0: not embarked, +0x1410) and seen by the mover's player (0x5033a0:..."
-  review: imported
+  review: reviewed
 - addr: 0x266950
   final: 0x1a4160
   kind: function
+  semantics: the path finder's formation domain flag test (2 / 3).
   status: PARTLY
   cases:
     - recording: h1_duelw1105
@@ -144,10 +148,11 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   context:
     - "...f its domain (+0x650), with Combat (0x56dc90), whose formation holds none of its class (0x266950): of those its planning reaches within two turns (0x791300) the strongest, else the n..."
-  review: imported
+  review: reviewed
 - addr: 0x2669d0
   final: 0x1a41e0
   kind: function
+  semantics: the formation is of a domain.
   status: READ
   cases:
     - recording: h1_duelw1128
@@ -159,7 +164,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   context:
     - "...(0, finder, plot, flags): the unit's own plot 0; a plot off the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0..."
-  review: imported
+  review: reviewed
 - addr: 0x2673f0
   final: 0x1a4940
   kind: function

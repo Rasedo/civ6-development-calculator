@@ -6,6 +6,7 @@
 - addr: 0x16e7d0
   final: 0x27fe90
   kind: function
+  semantics: "fixed-point multiply: (a b) >> 8 (24.8)."
   status: PARTLY
   impl: [cpu/core/operations/evaluate.ts:mul]
   readings:
@@ -24,10 +25,11 @@
     - "...70, sar 8); the share q = (B<<16) / (cost<<8) (0x16e940, a truncating divide), times 100 (0x16e7d0); plus the player's m_iModifiedBoost (+0xf8, `<< 8`: Dynastic Cycle's 10, a golden Free I..."
     - "...x t / 256), t = trunc(256 x left / max) (the fixed-point divide 0x16e940 and multiply 0x16e7d0): intact walls let 1 through after the clamp. Then the clamp to [+0x1c, +8]. On the out..."
     - "...floor(f) << 8 | trunc(frac x 256), so fx(0.01) = 2; mul (a b) >> 8 (0x16eb20 in place, 0x16e7d0), div (a << 8) / b truncated (0x16e940), add 0xac650, sub 0x16ec10; a \"percent\" produ..."
-  review: imported
+  review: reviewed
 - addr: 0x16e940
   final: 0x705200
   kind: function
+  semantics: "fixed-point divide: (a << 8) / b, truncated (24.8)."
   status: READ
   cases:
     - recording: h1_duelw1112
@@ -58,11 +60,12 @@
     - "...rm: both 0 → 0; own 0 → −MAX_LOYALTY; foreign 0 → +MAX_LOYALTY; else r = hi / lo in 24.8 (0x16e940), clamped into [NEUTRAL_RATIO, MAX_RATIO] (gp +0x480 / +0x478, floats cut to 1/256); t =..."
     - "...ier's Happinesses.GrowthModifier as (percent << 8) / 100 through the fixed-point divide 0x16e940 (an integer idiv: −15% −38, −30% −76);"
     - "...IENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed-point divide by 100 << 8 (0x16e940): floor(pop · pct · 256 / 100) / 256 — Culture 0.3 a citizen reads 76/256 at size 1, 15..."
-  review: imported
+  review: reviewed
 - addr: 0x16eb20
   final: 0x14a640
   kind: function
   name: fx_mul_assign
+  semantics: "fixed-point multiply in place: a = (a b) >> 8 (24.8, CivTech Math_FixedPointT)."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -80,11 +83,12 @@
   context:
     - "...xedPointT): fx(f) = floor(f) << 8 | trunc(frac x 256), so fx(0.01) = 2; mul (a b) >> 8 (0x16eb20 in place, 0x16e7d0), div (a << 8) / b truncated (0x16e940), add 0xac650, sub 0x16ec10;..."
     - "...N 0x6abc40 (Amount as fx(x 0.01f), 0x6ab8a0): the city's Culture x it, weighted, + 0.5 (0x16eb20), span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth object's surpl..."
-  review: imported
+  review: reviewed
 - addr: 0x16ec10
   final: 0x321580
   kind: function
   name: fx_sub_assign
+  semantics: fixed-point subtract in place (24.8).
   status: PARTLY
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
@@ -92,7 +96,7 @@
     - ".claude/scratchpad/cb/notes.txt: .... fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8f100).  LOG: AI_CityBuild.csv lines: DS '%d, %d, %s, , , %s, %s, ,..."
   context:
     - "...(0x16eb20 in place, 0x16e7d0), div (a << 8) / b truncated (0x16e940), add 0xac650, sub 0x16ec10; a \"percent\" product is a b / 25600 truncated toward 0 (the /100 magic 0xa3d70a3d70a3..."
-  review: imported
+  review: reviewed
 - addr: 0x16f050
   final: 0xf5080
   kind: function
@@ -137,17 +141,19 @@
   review: imported
 - addr: 0x16f7b0
   kind: function
+  semantics: one of the player's cities may advance the project.
   status: PARTLY
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...costliest (+0x20) project of row +0xe8 bit 2 (SpaceRace) one of its cities may advance (0x16f7b0), else, pursuing conquest, of bit 8 (WMD); B, not pursuing the technology victory, the...
-  review: imported
+  review: reviewed
 - addr: 0x170450
   final: 0xf61c0
   kind: function
   name: CanConstruct
+  semantics: "CanConstruct (the pick's): true with its reason fields +0x54 / +0x68 clear; its result's second byte says refused for good. Refuses a held building (not a pillaged one: its repair stands), one MutuallyExclusiveBuildings names, a Capital row off the capital, a government building above the tier, a worship building the city's religion does not offer, RequiresAdjacentRiver off a river, a Flood Barrier with no coastal lowland; not a district no plot can hold yet."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -169,12 +175,16 @@
   notes: ["label: CanConstruct(city.buildQueue,...)"]
   context:
     - "...lain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not MustPurchase (Buildings +0x159 bi..."
-  review: imported
+  review: reviewed
 - addr: 0x1714d0
   kind: function
   name: CanConstruct
+  semantics: "the queue's CanConstruct (0x5c9ea0's): refuses a building of a pillaged district (its byte [rbp-0x16] -> LOC_BUILDING_CONSTRUCT_DISTRICT_IS_PILLAGED at 0x1716d2), which the pick's 0x170450 does not."
   status: PARTLY
   cases:
+    - recording: h1_duelv1128
+      turn: 26
+      value: Nazca's Shrine under its pillaged Holy Site refused t26-t31
     - recording: h1_duelv1128
       turn: 26
       value: runs/h1_duelv1128   Nazca t26-t31, its Holy Site pillaged at t24, the pick's Shrine at 30.4   over the log's own tables, NO BUILDS AT ALL each turn;
@@ -190,11 +200,12 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...0x5ca5a0 / 0x5ca450; with none, or the queue refusing it (0x5c9ea0's queue CanConstruct 0x1714d0, which the pick's 0x170450 is not: a building of a pillaged district refused, its byte..."
-  review: imported
+  review: reviewed
 - addr: 0x172820
   final: 0xf86d0
   kind: function
   name: CanTrain
+  semantics: "CanTrain(city, unit, ..., sixth argument): the sixth argument set (+0xe8, the CityBuildAI's call with the player AI +0x12a0 +0xba8 flag) skips the PrereqTech and PrereqCivic checks (0x172951..0x1729ab), so a locked unit is valued on the research AI's turns."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -239,15 +250,17 @@
 - addr: 0x175730
   final: 0xfb520
   kind: function
+  semantics: "the train order (\"pFront->eDirective == ORDER_TRAIN\"): makes each unit through the city's create 0x1e6570."
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "- A UNIT A CITY MAKES (READ): the train order (0x175730, \"pFront->eDirective == ORDER_TRAIN\") makes each unit through the city's create 0x1e657..."
-  review: imported
+  review: reviewed
 - addr: 0x175d10
   final: 0xfb9b0
   kind: function
+  semantics: clears the city's production.
   status: PARTLY
   impl: [cpu/core/aiCityTrees.ts:CityTreeWorld, cpu/core/aiContracts.ts:ContractNodeWorld]
   readings:
@@ -255,6 +268,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...+0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where the value passes CityBuildAI +0xa48 and the production was set this turn or the...
+  review: reviewed
 - addr: 0x177d10
   kind: function
   name: City_BuildQueue
@@ -293,6 +307,7 @@
   review: imported
 - addr: 0x178c50
   kind: function
+  semantics: a district's project production modifier.
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -303,7 +318,7 @@
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
   context:
     - "...roject's modifier 0x17a8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x17a680 (OuterDefenseRepair's own; else the cost progression model: game..."
-  review: imported
+  review: reviewed
 - addr: 0x179510
   final: 0xfd020
   kind: function
@@ -336,6 +351,7 @@
 - addr: 0x179860
   final: 0xfd370
   kind: function
+  semantics: the unit at the head of the city's queue (city +0x2170).
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -351,9 +367,10 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...it plus 20 exceeds B; the player itself adds each city's unit at the head of its queue (0x179860 on city +0x2170) of such strength — Regional (+0x398); a player at war (0x469cd0) or..."
-  review: imported
+  review: reviewed
 - addr: 0x179dd0
   kind: function
+  semantics: the city's extra copies of a unit a training yields (the unit value's x(copies + 1)).
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -372,7 +389,7 @@
   context:
     - "...e (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON. The tail: x (the city's extra copies + 1, 0x179dd0), the promotion class weight, a strategic resource the player lacks and no city of its..."
     - "...MDCapable (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON; x (the city's extra copies + 1, 0x179dd0); x the promotion class weight 0x723bb0 (PromotionClass +0x288: 1.0 with none; 0 where..."
-  review: imported
+  review: reviewed
 - addr: 0x17a600
   final: 0xfdc70
   kind: function
@@ -414,6 +431,7 @@
 - addr: 0x17a8c0
   final: 0xfde60
   kind: function
+  semantics: a project's production modifier in the city.
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -424,11 +442,12 @@
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
   context:
     - "...o 1.0 fixed point, 30 being +11.7%, over the city's Production x the project's modifier 0x17a8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x1..."
-  review: imported
+  review: reviewed
 - addr: 0x17b1e0
   final: 0xfe420
   kind: function
   name: turnsToBuildBuilding
+  semantics: "the building's build turns, the queue's own estimate: 0x8c4540's ceil((cost - progress) / Production toward the item), the progress the item's kept part plus the store an idle step or a completion left."
   status: PARTLY
   cases:
     - recording: AI_Research.csv
@@ -450,12 +469,17 @@
   context:
     - ...ite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0, the queue's own estimate) + 10 while the city builds something else (city +0x2350 se...
     - "...the record of the turn after's, the record keeping only the whole part; the build turns 0x17b1e0 are 0x8c4540's ceil((cost - progress) / Production toward the item) — the progress ke..."
-  review: imported
+  review: reviewed
 - addr: 0x17b5a0
   final: 0xfe610
   kind: function
   name: turnsToBuildDistrict
+  semantics: "the turns to build the building's prerequisite district: its build turns, +10 when it is not the city's current production; a district under construction not held counts likewise."
   status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 16
+      value: Bologna's Campus T 24 = 2 + 12 + 10
   impl:
     - cpu/core/aiContracts.ts:ContractCity
     - cpu/core/aiValue.ts:AiValueView
@@ -471,10 +495,11 @@
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
   context:
     - ...T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0, the queue's own es...
-  review: imported
+  review: reviewed
 - addr: 0x17b890
   kind: function
   name: turnsToBuildProject
+  semantics: "a project's build turns (Amount added raw to 1.0 fixed point): over the city's Production x the project's modifier 0x17a8c0 (the queue's per-project +0x2f0 and its district's 0x178c50), the cost 0x17a680 less the progress kept +0x260 and the store +0x1f4, through 0x8c4540."
   status: PARTLY
   impl:
     - cpu/core/aiModifiers.ts:ANALYZERS
@@ -488,6 +513,7 @@
 - addr: 0x17bb40
   kind: function
   name: turnsToTrainUnit
+  semantics: "the unit's train turns in the city (unit, 0, &extra): the city's Production (0x1cb9f0) x (the unit's production multiplier 0x17c1c0 + extra), the cost (0x17bfa0) less the unit's progress (+0x230)."
   status: READ
   cases:
     - recording: 1124
@@ -512,10 +538,11 @@
     - "...t, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot wit..."
     - "...buildings' turns (+0x258), then, but for MustPurchase (+0x1b9 bit 128), the train turns 0x17bb40 and +10 while the city builds another item; negative T values FX(-9999). Measured: the..."
     - "...eir inputs unported): EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (per city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected count 0x5d4750 x its Production [+0x10..."
-  review: imported
+  review: reviewed
 - addr: 0x17bfa0
   final: 0xfeb80
   kind: function
+  semantics: a unit's cost in the city.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -530,9 +557,10 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...Production (0x1cb9f0) x (the unit's production multiplier 0x17c1c0 + extra), the cost (0x17bfa0) less the unit's progress (+0x230). The expected count 0x5d4750: 1.0 where the unit hol..."
-  review: imported
+  review: reviewed
 - addr: 0x17c1c0
   kind: function
+  semantics: "a unit's production modifier in a city: city +0x2c0[unit] + player +0x12e8 +0x4a0[unit]."
   status: PARTLY
   cases:
     - recording: h1_duelv1121
@@ -543,7 +571,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...EndEra, the Amount onto the city's per-unit production modifier (0xc6f950; read back by 0x17c1c0: city +0x2c0[unit] + player +0x12e8 +0x4a0[unit]) — support units too (runs/h1_duelv112..."
-  review: imported
+  review: reviewed
 - addr: 0x17c2e0
   final: 0xfec80
   kind: function
@@ -580,6 +608,7 @@
   review: imported
 - addr: 0x17cb00
   kind: function
+  semantics: the district keeps the feature.
   status: READ
   cases:
     - recording: h1_duely1124
@@ -594,6 +623,7 @@
   review: reviewed
 - addr: 0x17d1a0
   kind: function
+  semantics: the unit holds progress in the city.
   status: PARTLY
   impl: [cpu/core/minorBuild.ts:minorUnitExpected]
   readings:
@@ -602,7 +632,7 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "...t check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it..."
-  review: imported
+  review: reviewed
 - addr: 0x17d210
   final: 0xff720
   kind: function
@@ -621,6 +651,7 @@
 - addr: 0x17d660
   final: 0xff9f0
   kind: function
+  semantics: the city can build a unit of the domain (the unit value's exit).
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -640,12 +671,16 @@
   context:
     - ...unit not the player's version (player +0x12e8 +0x1c0); a domain the city cannot build (0x17d660); a player that is neither CIVILIZATION_LEVEL_FULL_CIV (0x469db0, hash 0x253718b0) nor...
     - ...nit not the player's version (player +0x12e8 +0x1c0), a domain the city cannot train (0x17d660), a non-full, non-tribe player at peace with more than five units, a Spy for a non-full...
-  review: imported
+  review: reviewed
 - addr: 0x17e690
   final: 0x1005d0
   kind: function
+  semantics: "IsBuildingQueued: walks the queue's entries (+0x1d0, count +0x1e0, 0x38 bytes each) for directive (+0x30) 1 and type (+0x14) the building. A held building is CanConstruct's to refuse; a pillaged one is not and its queue entry repairs it."
   status: READ
   cases:
+    - recording: h1_duely1117
+      turn: 134
+      value: "Valletta t134-141: its pillaged Lighthouse picked, refused, NO BUILDS AT ALL; queued t143"
     - recording: h1_duely1117
       turn: 134
       value: "Valletta t134-141: its pillaged Lighthouse picked under the pillaged Harbor (NO BUILDS AT ALL each turn), queued t143 as its repair"

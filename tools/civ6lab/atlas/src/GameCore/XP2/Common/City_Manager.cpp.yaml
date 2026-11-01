@@ -6,8 +6,12 @@
 - addr: 0x1e6570
   final: 0x141330
   kind: function
+  semantics: "the city's unit create: picks the plot (the centre; a district for a domain that needs one) and places the unit with 0x586d40(unit, plot, 1, 0). A trained unit lands on the centre whatever of its owner's stands there, stacked until one of them moves."
   status: READ
   cases:
+    - recording: h1_dueld1128
+      turn: 19
+      value: Hong Kong's Warrior 327683 added on 9:7 with its Warrior 196610 there
     - recording: 1112
       turn: 213
       value: "Records: 1112 China's Mechanized Infantry   made at sea at t213 (an upgrade, xp 0) left the centres at 80 until the   corps upgraded on land at t216 read 95."
@@ -20,9 +24,10 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...saved as m_iMaxMeleeStrengthTrained): 0x4c1a30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0..."
-  review: imported
+  review: reviewed
 - addr: 0x1e7b70
   kind: function
+  semantics: the world's copies of a building.
   status: PARTLY
   impl: [cpu/core/aiValue.ts:AiValueView]
   readings:
@@ -30,4 +35,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ings +0x159 bit 16), +0x15 its MaxWorldInstances (+0x40) reached by the world's copies (0x1e7b70); for a district its PrereqTech / PrereqCivic, +0x14 set): with the player and the co..."
-  review: imported
+  review: reviewed

@@ -6,16 +6,18 @@
 - addr: 0x412880
   final: 0x2c98d0
   kind: function
+  semantics: the player is in a Dark Age.
   status: PARTLY
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - ...h a score above 0 (+0x978 [civic] +0x14); a Dark Age / Golden Age card needs the age (0x412880 / 0x412910); the game era (the player's era object +0x158 -> Eras +0x1c) inside the win...
-  review: imported
+  review: reviewed
 - addr: 0x412910
   final: 0x2c9920
   kind: function
+  semantics: the player is in a Golden Age.
   status: PARTLY
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - ...above 0 (+0x978 [civic] +0x14); a Dark Age / Golden Age card needs the age (0x412880 / 0x412910); the game era (the player's era object +0x158 -> Eras +0x1c) inside the window; then t...
-  review: imported
+  review: reviewed

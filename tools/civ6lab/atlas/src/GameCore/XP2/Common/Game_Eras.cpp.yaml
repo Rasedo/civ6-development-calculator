@@ -42,6 +42,7 @@
 - addr: 0x2c3660
   final: 0x1e5460
   kind: function
+  semantics: the eras manager (its per-player vector of records).
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -51,7 +52,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...d (pseudo index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) [the record +0x6c of the 0x2c3660 manager's per-player vector] valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0, and...
-  review: imported
+  review: reviewed
 - addr: 0x2c37c0
   final: 0x1e54c0
   kind: function
@@ -127,20 +128,22 @@
 - addr: 0x2c4110
   final: 0x1e5ca0
   kind: function
+  semantics: the eras record's +0x2c golden-age points of a civic (0 for a city-state).
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "...2 — and a later one adds PSEUDOYIELD_GOLDENAGE_POINT of the player's eras record +0x2c (0x2c4110, 0 for a city-state); per unit the player's version, the cities' average City Analysis..."
-  review: imported
+  review: reviewed
 - addr: 0x2c4170
   final: 0x1e5cf0
   kind: function
+  semantics: the eras' golden-age points of a research row.
   status: PARTLY
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "...of an era before the game's x (game - era + 1), else + PSEUDOYIELD_GOLDENAGE_POINT of 0x2c4170(player). Each term is paid from landing to the horizon: PV(H) - PV(turns) (0x7a16e0: a(..."
-  review: imported
+  review: reviewed
 - addr: 0x2c41d0
   final: 0x1e5d40
   kind: function
@@ -161,6 +164,7 @@
 - addr: 0x2c4230
   final: 0x1e5d90
   kind: function
+  semantics: "the eras manager's (0x2c3660) per-player record's +0x6c: the golden-age points a great person class's pseudo-yield adds."
   status: PARTLY
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -173,7 +177,7 @@
     - ..., for the GP pseudo-yields (@0xf2e218 GPP_GENERAL .. @0xf2e238 GPP_MUSICIAN), the eras' 0x2c4230 points as GOLDENAGE_POINT; the military AI's turn 0x71fb80 writes +0x7e8 for UNIT_COM...
     - ...); then a Great Person class's pseudo-yield (pseudo index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) [the record +0x6c of the 0x2c3660 manager's per-player vector] valued as PSEUDOYI...
     - ...east -1.0, @0xd136f4; a Great Person class adds the golden-age points its person earns, 0x2c4230, valued as PSEUDOYIELD_GOLDENAGE_POINT; the DISTRICT one a term of the player's distric...
-  review: imported
+  review: reviewed
 - addr: 0x2c4290
   final: 0x1e5de0
   kind: function
@@ -193,6 +197,7 @@
 - addr: 0x2c43b0
   final: 0x1e5ed0
   kind: function
+  semantics: the eras' golden-age points for an EXPLORER / SETTLER / SPY unit.
   status: PARTLY
   cases:
     - recording: 1124
@@ -205,7 +210,7 @@
   context:
     - "...cts / 56, 10) and the eras' points. EXPLORER / SETTLER / SPY: 1.0 + the eras' points (0x2c43b0) as PSEUDOYIELD_GOLDENAGE_POINT. THE TAIL (0x7b709f): WMDCapable (+0x1ba bit 64) PSEUDO..."
     - "- Unread: the unit value 0x7b62c0's tail (the Settler's: GOLDENAGE_POINT of 0x2c43b0 + 1.0, the copies, the promotion weight, PSEUDOYIELD_UNIT_SETTLER, the maintenance, the..."
-  review: imported
+  review: reviewed
 - addr: 0x2c4470
   final: 0x1e5f70
   kind: function

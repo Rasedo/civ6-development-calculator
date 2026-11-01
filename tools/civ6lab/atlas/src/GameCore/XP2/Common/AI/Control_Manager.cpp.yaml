@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x6075b0
   kind: function
+  semantics: raises player signal +0x1c8 (the second recruit offer).
   status: READ
   cases:
     - recording: h1_duelv1121
@@ -14,10 +15,11 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "...the first offer (the units in no job, not done, alive) player signal +0x1c8 is raised (0x6075b0) with the recruit's priority (the tree's +0x5a8, else its operation's 0x723b90: the roo..."
-  review: imported
+  review: reviewed
 - addr: 0x608580
   final: 0x401050
   kind: function
+  semantics: runs the +0x388 job list from pass 4 down to 0, each pass again until every job answers true, then the +0x3a0 list, then the next pass.
   status: PARTLY
   impl: [cpu/core/operations/manager.ts:CITY_AI_PASS, cpu/core/operations/manager.ts:operationsRun]
   readings:
@@ -25,10 +27,11 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs the +0x388 list from 4 down to 0, each pass again until every job answers tru...
-  review: imported
+  review: reviewed
 - addr: 0x608870
   final: 0x4012f0
   kind: function
+  semantics: "the AI turn start: sets the pass (Control Manager +0x278) to 4 and runs the +0x370 job list at passes 4, 3, 2, 1, 0."
   status: PARTLY
   impl: [cpu/core/operations/manager.ts:CITY_AI_PASS]
   readings:
@@ -36,10 +39,11 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...its watched setter 0x731d10 on +0x220) and acts only in its own pass: the turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs..."
-  review: imported
+  review: reviewed
 - addr: 0x609060
   final: 0x4019f0
   kind: function
+  semantics: "the Control Manager's control by id: its pages (+0x110 in FinalRelease; 8 entries of 0x18 a page, the entry's +0 the control: +0 its id, +4 its kind, +0x10 its object; a free entry holds the next free index)."
   status: PARTLY
   cases:
     - recording: 1117
@@ -50,10 +54,11 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...trol: +0 its id, +4 its kind, +0x10 its object; a free entry holds the next free index; 0x609060 (FinalRelease 0x4019f0) the lookup by id). A contract's watched fields (vtable, owner,..."
-  review: imported
+  review: reviewed
 - addr: 0x6092c0
   final: 0x401ba0
   kind: function
+  semantics: lists a control's units by the units' control field (FinalRelease unit +0x300).
   status: PARTLY
   impl:
     - cpu/core/barbarianOps.ts:recruit
@@ -83,12 +88,12 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...able slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list..."
-  review: imported
+  review: reviewed
 - addr: 0x6096c0
   final: 0x401fa0
   kind: function
   name: aiTurnJobs
-  semantics: "the player AI's turn: three job lists — the unit evaluator, the barbarian manager, the planning, the targets, ..., the operation manager; then the targets' update and the tactical pass; then the homeland"
+  semantics: "the Control Manager's turn: pushes three job lists (std::function, 0x40 bytes each) — +0x370 (0x60e8c0: the cities 0x5c2650, ..., research 0x760980, the Economic AI 0x687bf0, the military 0x722690), +0x388 (0x60e960: 0x785ec0, the second city hook 0x5c2610, the tree manager's tick 0x7ffdd0, 0x74f5a0, 0x70a250, the tactical pass 0x771530) and +0x3a0 (0x60e820: 0x7ffed0, ...). Each job takes a pass number (Control Manager +0x278, its watched setter 0x731d10 on +0x220) and acts only in its own pass: the turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs the +0x388 list from 4 down to 0, each pass again until every job answers true, then the +0x3a0 list, then the next pass. The Economic AI keeps pass 3, the military 2, a CityBuildAI 2: the city's second hook runs in pass 2, after the trees of priority 4 (City Defense, Settle New City, Barbarian City Assault) and 3 (Attack Barb Camp, the assaults), before those of priority 2 (Naval Superiority, the city trees). A city founded during the turn exists for the +0x388 list only (the Default Specialization, no events)."
   status: PARTLY
   cases:
     - recording: 1124
@@ -115,6 +120,7 @@
 - addr: 0x60a440
   final: 0x402d20
   kind: function
+  semantics: "the unit-created handler (player signals +0x60, raised by 0x4eeb70): sets the turn done for an AI player whose Control Manager's job list (+0x2b8) holds an entry with +8 == 0."
   status: READ
   cases:
     - recording: h1_duely1124
@@ -131,12 +137,16 @@
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
   context:
     - ...a30), the espionage AI (0x695660), a retreat (0x212500), and the unit-created handler 0x60a440 (player signals +0x60, raised by the unit's creation 0x4eeb70) for an AI player whose C...
-  review: imported
+  review: reviewed
 - addr: 0x60a8c0
   final: 0x403190
   kind: function
+  semantics: "the recruit's offer: the player's units with no operation (+0x7d0 == -1), their turn not done (+0x530 clear) and alive (+0x770 clear), then the evaluator's test (0x816380 -> 0x738050); the satisfied test (vtable @0xd760f8 +8, 0xb3c380) answers false always, so player signal +0x1c8 is raised (0x6075b0) with the recruit's priority (the tree's +0x5a8, else 0x723b90), its value, its job and Allow Stealing; each tree's listener (0x7d1e40) answers with its units, which are offered again."
   status: READ
   cases:
+    - recording: h1_duelv1121
+      turn: 7
+      value: city-state 2's Attack Barb Camp logs its No recruits pair twice
     - recording: h1_duely1124
       turn: 72
       value: city-state 3's City Defense recruits none, its Heavy Chariot bought that turn (turn done); t73 it takes the Chariot
@@ -177,11 +187,12 @@
     - "...is not yet recruitable (W at t7 recruited at t8, the t9 W not at t9): LAB — the evaluator 0x60a8c0 is unread. The raid operation's own end (its tree's last Notify Owner, which opens the ci..."
     - "...71530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tact..."
     - "...Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations..."
-  review: imported
+  review: reviewed
 - addr: 0x60bb50
   final: 0x403c70
   kind: function
   name: the contract submission
+  semantics: "the contract submission: SUBMITTED, then the player's signal +0x270 runs each city's listener 0x5d6050 in city order and the economic AI's 0x68ab40; any taker makes it ACCEPTED."
   status: READ
   cases:
     - recording: h1_duelv1121

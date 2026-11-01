@@ -7,6 +7,7 @@
   final: 0x559670
   kind: function
   name: Contract Manager Decorator
+  semantics: "the Contract Manager Decorator: a counter +0x50 over the turn limit, reset when every contract it holds is alive (parent 0x7f1500)."
   status: READ
   cases:
     - recording: h1_duelv1124

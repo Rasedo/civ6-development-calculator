@@ -75,6 +75,7 @@
   review: reviewed
 - addr: 0x5eadb0
   kind: function
+  semantics: an enemy's known units within a distance of a plot at least a threshold strong (the knowledge base's army records).
   status: PARTLY
   impl:
     - cpu/core/operations/evaluate.ts:armyStrength
@@ -102,10 +103,11 @@
   context:
     - "...strength, else the knowledge base's army strength of the player within 10 of the rally (0x5eadb0: per unit type max(Combat, RangedCombat) x the known units in range, each less its dama..."
     - "...0 set), value the city value 0x79fef0 (the \"CITY VALUES\" lines; unread), enemy strength 0x5eadb0 within 3 where the player's best combat exceeds the enemy's by 30."
-  review: imported
+  review: reviewed
 - addr: 0x5eb0f0
   final: 0x3f2530
   kind: function
+  semantics: "the known strength (kb, player, &area, &region, maxAge): over the Units in order, the player's records of the type (0x5ef870: record +0x18 the area or +0x1c the region given, -1 for none — a record on a plot of no region counts at any area), each of age (+0xc) at most maxAge adding the unit's max(Combat +0x48, RangedCombat +0x6c)."
   status: READ
   cases:
     - recording: h1_duely1121
@@ -129,6 +131,7 @@
   final: 0x3f2700
   kind: function
   name: a known city's defense
+  semantics: "a known city's defense: per district the walls' strongest + 10 where its walls stand (+0x18), else its defense (+0x14); without the byte the strongest of defense - 10 and walls."
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -166,6 +169,7 @@
   final: 0x3f2960
   kind: function
   name: a known city's defenses and walls counted
+  semantics: "a known city's defenses and walls: per district +0x14 > 0 and +0x18 > 0."
   status: PARTLY
   impl:
     - cpu/core/operations/evaluate.ts:enemyCities
@@ -183,6 +187,7 @@
   final: 0x3f29b0
   kind: function
   name: CivKnowledge
+  semantics: "CivKnowledge's count of a unit type in a player's army records (AI_Knowledge.csv ARMY lines \"UNIT_X count age\")."
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -196,11 +201,12 @@
     - "C-96: the unit value's Maintenance at the player's Gold weight — READ (0x7b62c0 at 0x7b729e..0x7b72de), both twins"
   context:
     - "..., over the player list (0x483b50 +0x4a0) the knowledge base's count of it (CivKnowledge 0x5eb650: the player's army records, AI_Knowledge.csv's ARMY lines \"UNIT_X count age\"), N thei..."
-  review: imported
+  review: reviewed
 - addr: 0x5eb680
   final: 0x3f29e0
   kind: function
   name: a known city's wonders
+  semantics: a known city's wonders (buildings flagged +0x158 & 0x40).
   status: PARTLY
   impl: [cpu/core/aiViewTypes.ts:AiKnownCityView, cpu/core/operations/cityValue.ts:cityWorth]
   readings:
@@ -318,6 +324,7 @@
   final: 0x3f3cc0
   kind: function
   name: AI_Knowledge.csv CITY line
+  semantics: AI_Knowledge.csv's CITY line of a known city record.
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -331,6 +338,7 @@
 - addr: 0x5ed280
   final: 0x3f3e90
   kind: function
+  semantics: "writes AI_Knowledge.csv's lines for the player (the ARMY lines through 0x5eceb0, \"TRADE, TO -1, VAL\" the trade route value)."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -349,7 +357,7 @@
     - ".claude/scratchpad/cb4/NOTES.md: ...cd0), whole; needs unit table. - Trade knowledge K logged in AI_Knowledge.csv \"TRADE, TO x, VAL v\" (0x5ed280); writer unread. - Unit value 0x7b62c0 branches by pseudo; religious branch adds tourism terms (min..."
   context:
     - "...e value K (its knowledge base +0x6d8, logged as AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280; its writer unread) from T to min(T + 30, H) (one discounted turn where they meet), plu..."
-  review: imported
+  review: reviewed
 - addr: 0x5ef650
   kind: function
   status: PARTLY
@@ -372,6 +380,7 @@
 - addr: 0x5ef870
   final: 0x3f55f0
   kind: function
+  semantics: a player's records of a unit type in an area (+0x18) or region (+0x1c), -1 none.
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -381,7 +390,7 @@
     - "C-130: Discipline's knowledge records and a levied unit's return"
   context:
     - "...er, &area, &region, maxAge): over the Units in order, the player's records of the type (0x5ef870: record +0x18 the area or +0x1c the region given, -1 for none — so a record on a plot o..."
-  review: imported
+  review: reviewed
 - addr: 0x5ef9a0
   final: 0x3f56e0
   kind: function
@@ -396,8 +405,12 @@
   final: 0x3f57e0
   kind: function
   name: the known city record's districts (fill)
+  semantics: "the known city record (0xe0 bytes): +0x8 / +0xc the plot, +0x1c the population, +0x14 / +0x15 original capital / capital, +0x30 the yields, +0x48 the defensible districts (0x20 each: +0x14 GetDefenseStrength, +0x18 the same while the outer defense holds, +0x1c the strike 0x249ee0), +0x58 their count, +0xa8 the great works, +0xc0 the resources."
   status: READ
   cases:
+    - recording: h1_duelv1117
+      turn: 18
+      value: "Caguana: population 3, one district, 9, yields 24"
     - recording: h1_duelv1117
       turn: 18
       value: Caguana one district, defense 19, no walls
@@ -427,7 +440,12 @@
   final: 0x3f5ca0
   kind: function
   name: the knowledge base adds a camp
+  semantics: "the knowledge base adds a camp (m_barbarians +0x638: the plot, an age, the camp's unit); the look adds each camp on a seen plot or one revealed (+0x2f0, 0x787bee..0x787cd5); the update drops one whose plot is seen or revealed with no camp."
   status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 6
+      value: player 2's camp 8:14 placed t5 logged t6, Attack Barb Camp started t7
   impl:
     - cpu/core/operations/knowledge.ts:lookCamps
     - cpu/core/operations/manager.ts:operationsRun
@@ -444,6 +462,7 @@
 - addr: 0x5f0280
   final: 0x3f5db0
   kind: function
+  semantics: "the look's city arm: a city on a seen plot into the known cities."
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
@@ -473,6 +492,7 @@
 - addr: 0x5f0490
   final: 0x3f5f70
   kind: function
+  semantics: "the look's district arm: a district on a seen plot into the knowledge base."
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"

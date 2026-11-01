@@ -24,6 +24,7 @@
 - addr: 0xa39110
   final: 0x738470
   kind: function
+  semantics: "the XP2 terrain manager's lowland list (+0xb0; 0x20-byte entries: +0 the level, +4 the plot, +0x1b a flag that drops the plot — 0xa3a210) walked over the city's plots with a lambda (0x79ecc0) counting each kept plot and those of them holding a district."
   status: PARTLY
   cases:
     - recording: h1_duelv1121
@@ -35,7 +36,7 @@
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...iredPower +0x28 > 0 -> 0x7a67f0 of -RequiredPower; BlocksCoastalFlooding +0x48 bit 1 -> 0xa39110 over the XP2 terrain manager's lowland list (+0xb0; entries of 0x20 bytes: +0 the level..."
-  review: imported
+  review: reviewed
 - addr: 0xa3a210
   final: 0x7393c0
   kind: function

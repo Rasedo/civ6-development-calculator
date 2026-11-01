@@ -6,9 +6,10 @@
 - addr: 0x8a08a0
   final: 0x63d080
   kind: function
+  semantics: the players' manager's array lookup by id (+0x20).
   status: PARTLY
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - ...ads it; the game's own lookup 0x5d3e0 (FinalRelease 0x44f00) takes game +0x240 +0x20, 0x8a08a0 (FinalRelease 0x63d080)); a Player's id +0xd8, its signals +0x798.
-  review: imported
+  review: reviewed

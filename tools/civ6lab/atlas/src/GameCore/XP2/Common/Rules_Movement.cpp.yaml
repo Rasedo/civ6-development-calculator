@@ -16,6 +16,7 @@
 - addr: 0x530240
   final: 0x377e40
   kind: function
+  semantics: "the disembark rule: waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot)."
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -37,10 +38,11 @@
     - ".claude/scratchpad/mu1/readings_c96.md: ...plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1   bit 2, `dll_rowmap..."
   context:
     - "...city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1 bit 2, `..."
-  review: imported
+  review: reviewed
 - addr: 0x530420
   final: 0x378010
   kind: function
+  semantics: "the embark rule (land to water): waives MOVEMENT_EMBARK_COST at a FreeEmbark district (completion read off the FROM plot)."
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -62,7 +64,7 @@
     - ".claude/scratchpad/mu1/readings_c96.md: ...0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeE..."
   context:
     - ...no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district...
-  review: imported
+  review: reviewed
 - addr: 0x530650
   final: 0x3781e0
   kind: function
@@ -77,6 +79,7 @@
 - addr: 0x530880
   final: 0x378410
   kind: function
+  semantics: "Rules_Movement's plot friendliness: 1 the player's own, a city-state it is suzerain of, an ally's; 2 no one's; 3 another's."
   status: PARTLY
   impl: [cpu/core/opsOrders.ts:groundOf]
   readings:
@@ -86,7 +89,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ted on the unit's `m_bEligibleToHeal` (+0x1590) and its plot's relation to the owner (0x530880: 1 own or allied, 2 unowned, 3 another's; the owner's no-neutral / no-foreign flags +0x..."
-  review: imported
+  review: reviewed
 - addr: 0x530e80
   final: 0x3789d0
   kind: function
@@ -102,8 +105,12 @@
   final: 0x378a70
   kind: function
   name: Rules_Movement
+  semantics: "Rules_Movement's zone of control test (via 0x26f980 from the path cost 0x26e920, the step cost 0x270980 and the walk 0x26fe20 at 0x270800, the answer stored on the formation +0x518): the plot entered (x, y, the formation's layer 0x2665b0, 3 religious) is in a zone where the functor 0x52f710 over its ring (0x6aef0) finds one, else a neighbour holds a district of a player at war that exerts one (0x24c2f0) or a unit not the mover's player's, of a player at war (religious layer: another religion +0x1ce4), alive, of the mover's domain (0x266720), exerting (0x56d6c0) and seen by the mover's player (0x5033a0). An exerter on the path's destination answers no zone unless the plot's stacking count is at its limit (0x585eb0 against +0x58c). The costs then take max(cost, Movement left) (0x26eb7c, 0x270a2d) unless the path flags hold 0x800."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 8
+      value: city-state 2's Warrior 196610 steps beside the camp's Spearman and still attacks
     - recording: h1_duelw1124
       turn: 1
       value: "runs/h1_duelw1124 t1-60 planning rows (the replay's classifier):   855 -> 1,061 of 1,276 equal, the extra plots 609 -> 98, no new miss (65   revealed, 30 unrevealed as before);"
@@ -120,10 +127,11 @@
   context:
     - ...nit's own plot and lies in the unit's enemy zone of control (0x26f980 -> Rules_Movement 0x530f50, the mover's owner, its stacking count 0x585eb0) is refused unless it is an attack (r14...
     - "...mpments exert the zone of control on the land beside them (Civ 6's rule; Rules_Movement 0x530f50 unread). runs/h1_duelw1124 t7-t52: city-state 4's city at 32:8 — the barbarian Scouts b..."
-  review: imported
+  review: reviewed
 - addr: 0x531510
   final: 0x379000
   kind: function
+  semantics: no river crossing where either plot is a city's or water.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -146,4 +154,4 @@
   context:
     - "...movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the unit is not exempt (0x266470), it adds (+0x50c) << 8 —..."
     - ...660 caps the step, 0x272ca0), no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_...
-  review: imported
+  review: reviewed

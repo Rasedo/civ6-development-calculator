@@ -7,6 +7,7 @@
   final: 0x53ff60
   kind: function
   name: the finished tree destroy
+  semantics: "destroys a finished tree: +0x368 set, or +0x308 set with its root neither RUNNING nor FRESH."
   status: PARTLY
   cases:
     - recording: 1121
@@ -22,6 +23,7 @@
 - addr: 0x7cb3d0
   final: 0x53ffe0
   kind: function
+  semantics: "the tree manager's walk by priority, the highest first (tree +0x548): each tree's units each tick (0x7d2190)."
   status: PARTLY
   impl:
     - cpu/core/behaviorTree.ts:BT_SUCCESS
@@ -33,7 +35,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...SUCCESS, RUNNING or FAILURE every node left SUCCESS or RUNNING executes in node order (0x7cb3d0); a root RUNNING or FRESH resets the tree for the next turn, else the tree is done (the...
-  review: imported
+  review: reviewed
 - addr: 0x7cb8b0
   final: 0x5401d0
   kind: function
@@ -45,15 +47,17 @@
   final: 0x540250
   kind: function
   name: m_name
+  semantics: a behaviour tree's m_name (+0x268 FinalRelease) for the contract line.
   status: PARTLY
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - ...x1e0 m_requestPriority, +0x1f8 m_recruitPriority, +0x210 m_presentValue, +0x268 m_name (0x7cb930 (FinalRelease 0x540250) returns it for the contract line), +0x370 m_operationId, +0x3...
-  review: imported
+  review: reviewed
 - addr: 0x7cbb40
   final: 0x540460
   kind: function
+  semantics: binds a tree's +0x628 to the recruit listener 0x7d1e40.
   status: READ
   cases:
     - recording: h1_duelv1121
@@ -63,11 +67,12 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "...node's Allow Stealing (TreeData +0x60, no default: false); each behaviour tree listens (0x7cbb40 binds tree +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by..."
-  review: imported
+  review: reviewed
 - addr: 0x7cbca0
   final: 0x5405c0
   kind: function
   name: behaviour tree handler tables
+  semantics: "registers the behaviour tree nodes' handler tables (two: update and execution; the slot @0xf2ef18 both share): Decode Trigger 0x7f2970; Contract Manager 0x7f17a0 (parent 0x7f1500); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0; Check Plot 0x7f6ea0; Find Available Unit 0x7ec7b0; Cancel Contract 0x7f5200 / 0x7f4980; Protect Unit 0x7f07c0; Move Unit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670; Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0."
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -102,6 +107,7 @@
 - addr: 0x7d1e40
   final: 0x543830
   kind: function
+  semantics: "a tree's recruit listener: a tree not the requester's job, marked (+0x3c8) or asked with Allow Stealing, of a priority below the request's (or marked, equal priority and a lower value), answers with its units (0x6092c0 by its job +0x488) alive and alone (+0x1fb8 +0x738 1)."
   status: READ
   cases:
     - recording: h1_duelv1121
@@ -111,10 +117,11 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "...a +0x60, no default: false); each behaviour tree listens (0x7cbb40 binds tree +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by its reset 0x7d3670) or asked w..."
-  review: imported
+  review: reviewed
 - addr: 0x7d2190
   final: 0x543a50
   kind: function
+  semantics: "a tree's units each tick, those not done: the tree marked (+0x3c8) with no operation (+0x888 == -1) releases them, else their turn is done (0x570b40)."
   status: READ
   cases:
     - recording: 1117
@@ -126,20 +133,22 @@
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   context:
     - "...e homeland (0x70a370) release their units (-1) as they end. A tree's units each tick (0x7d2190 from the tree manager 0x7cb3d0), those not done: the tree marked (+0x3c8) with no opera..."
-  review: imported
+  review: reviewed
 - addr: 0x7d22f0
   final: 0x543b70
   kind: function
+  semantics: removes a contract from its tree.
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8 holds weak handles, and 0x5d4d70's he...
-  review: imported
+  review: reviewed
 - addr: 0x7d3670
   final: 0x544020
   kind: function
+  semantics: "a behaviour tree's reset: sets m_allowRecruiting (FinalRelease +0x170's value) to 1."
   status: READ
   cases:
     - recording: h1_duelv1121
@@ -150,7 +159,7 @@
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...e +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by its reset 0x7d3670) or asked with Allow Stealing, of a priority below the request's (or marked, of equal..."
-  review: imported
+  review: reviewed
 - addr: 0x7d3a00
   final: 0x544360
   kind: function
@@ -182,6 +191,7 @@
 - addr: 0x7d3d30
   final: 0x544530
   kind: function
+  semantics: "a behaviour tree's node update: hands each node its data (+8 of its 0xb8-byte block) and writes its status into the statuses (+0x108 FinalRelease, m_actionStates)."
   status: PARTLY
   impl: [cpu/core/behaviorTree.ts:AiTreeNode]
   readings:
@@ -189,4 +199,4 @@
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...e tick 0x7d3a00 runs where the root is FRESH or SKIPPED: each node in order is updated (0x7d3d30; a SKIPPED parent skips it), the walk's next node the larger of its own next (Sequence..."
-  review: imported
+  review: reviewed

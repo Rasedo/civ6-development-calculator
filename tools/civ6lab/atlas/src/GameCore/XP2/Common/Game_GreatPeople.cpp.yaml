@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x2f1ed0
   kind: function
+  semantics: "the player can earn a great person class: its civilization level's CanEarnGreatPeople (0x43a980; a city-state's and the Free Cities' lack it), no trait barring the class, a person left."
   status: PARTLY
   impl: [cpu/core/quests.ts:gpTargets, cpu/core/aiPolicyValue.ts:policyObsolete]
   readings:
@@ -15,7 +16,7 @@
     - "- Recruit Great Person Class (0x84ab50): a class the actor can earn (0x2f1ed0: on offer, not barred by its civilization's or leader's trait — ExcludedGreatPersonCl..."
     - ...is unlocked, 0x39e1e0, or whose RequiresAvailableGreatPersonClass has no person left, 0x2f1ed0); 250.0 for a Dark Age card in a Dark Age or a Golden Age card in a Golden Age; plus th...
     - "...he civic list's jobs (0x61ee30), 0x3930a0 itself, the Great Person class availability 0x2f1ed0 (Strategos scores in the port where the game logs none: 4,739 lines)."
-  review: imported
+  review: reviewed
 - addr: 0x2f23f0
   kind: function
   status: PARTLY
@@ -148,6 +149,7 @@
   review: imported
 - addr: 0x2f7eb0
   kind: function
+  semantics: "the game's great person classes (a class's three timeline entries set): a city-state keeps the GREAT_PEOPLE savings slot apart while any class stands."
   status: PARTLY
   impl:
     - cpu/core/minorCityAi.ts:minorMilitaryTurn
@@ -160,7 +162,7 @@
     - "C-96: the savings' accrual — READ (0x687bf0's slots, remainder and debt), both twins"
   context:
     - "...on >= threshold); Cannot Found Religion (0x7bada0: none founded, no Prophet offered now 0x2f7eb0, none earned 0x2f30c0); Religion Destroyed (0x7bf080); Good Culture (0x7bce30: the play..."
-  review: imported
+  review: reviewed
 - addr: 0x2f8100
   final: 0x20d530
   kind: function

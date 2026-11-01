@@ -53,6 +53,7 @@
   review: imported
 - addr: 0xd136f4
   kind: global
+  semantics: "-1.0: the pseudo-yield weight's floor."
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -61,9 +62,10 @@
   context:
     - ...0x6e3e20 -> +0x748, default +0x760) and the +0x768 / +0x780 list, held at -1.0 at least (@0xd136f4); then a Great Person class's pseudo-yield (pseudo index in [@0xf2e218, @0xf2e238]) adds...
     - ...ndlers; PlayerAI +0x620; the +0x748 / +0x760 and +0x768 / +0x780 lists; at least -1.0, @0xd136f4; a Great Person class adds the golden-age points its person earns, 0x2c4230, valued as...
-  review: imported
+  review: reviewed
 - addr: 0xd20458
   kind: global
+  semantics: "0.5f: the Combat Desire's floor rise for an at-war non-tribe player; the halving of EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION; the purchase test's price x 0.5; the expected count's + 0.5."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -81,7 +83,7 @@
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
   context:
     - "...the knowledge base's update 0x783980 from a per-plot visibility word > 0) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, els..."
-  review: imported
+  review: reviewed
 - addr: 0xd267d0
   kind: global
   status: READ
@@ -95,6 +97,7 @@
   review: imported
 - addr: 0xd2f320
   kind: global
+  semantics: "0.1: pseudoYieldValue's magnitude where |q| > |f| and f q < 0."
   status: PARTLY
   impl: [cpu/data/aiValue.ts:AI_SPACE_RACE_SHARE]
   readings:
@@ -106,9 +109,10 @@
   context:
     - "...1358 +0xf8). The value 0x7a60d0: f = 1 + w, q = 0x655840; f q >= 0 -> f + q, else +-0.1 (@0xd2f320, f's sign) where |q| > |f|, else f + q; the amount x (f x DefaultValue). A followed strat..."
     - ...yer] +0x14); when q and 1 + w differ in sign and |q| > |1 + w|, the factor is +-0.1 (@0xd2f320).
-  review: imported
+  review: reviewed
 - addr: 0xd2f324
   kind: global
+  semantics: "0.25f: the Combat Desire's floor M rise for a +0xc58-flagged other player."
   status: PARTLY
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
@@ -117,9 +121,10 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - ...h twice the cost in hand; then the heroes) gets a contract, and the boost takes -0.25 (@0xd2f324) once the balance passes its cost, -0.25 more once the Faith per turn (0x496fd0) passes...
-  review: imported
+  review: reviewed
 - addr: 0xd2f32c
   kind: global
+  semantics: "1.5f: the favored multiplier."
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
@@ -127,9 +132,10 @@
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - ...nothing), x1.5 if favored ([+0x268], the leader's Civics lists' AiFavoredItems; 1.5 at 0xd2f32c).
-  review: imported
+  review: reviewed
 - addr: 0xd55ff0
   kind: global
+  semantics: "0.05f: the Combat Desire's step (Enemy - Regional) below the enemy's strength."
   status: PARTLY
   cases:
     - recording: AI_Military.csv
@@ -143,14 +149,15 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "..._Military.csv's Regional / Enemy / Other Strength) — below the enemy's (enemy - own) x @0xd55ff0, below a target (target - own) / +0xd8, 20 past the enemy a negative term toward the ot..."
-  review: imported
+  review: reviewed
 - addr: 0xd59af0
   kind: global
+  semantics: "the City Analysis job's vtable: its run entry 0x5ce910 calls 0x5ce970 per plot evaluation."
   status: PARTLY
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...ty hook 0x79a320, and the City Analysis job (0x5ce3f0: the job object at +0xcc0, vtable 0xd59af0 -> 0x5ce910 -> 0x5ce970 once per plot evaluation, 0x78 bytes each, `m_plotEvaluations`..."
-  review: imported
+  review: reviewed
 - addr: 0xd5aff4
   kind: global
   status: PARTLY
@@ -159,15 +166,17 @@
   review: imported
 - addr: 0xd5b948
   kind: global
+  semantics: "the contract's vtable: progress (+0x100) 1 CLAIMED, 2 SUBMITTED, 3 ACCEPTED, 4 FAILED, 5 IN PROGRESS, 6 CANCELLED, 7 COMPLETED; vt +0x20 purchase (0x5f3c40), +0x38 queue (0x5f3710), +0x50, +0x68 evaluation (0x5f5d50), +0x80, +0x98 eligibility (0x5f6050), +0xa8 log line (0x5f4cd0)."
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- A contract (vtable 0xd5b948; progress +0x100: 1 CLAIMED, 2 SUBMITTED, 3 ACCEPTED, 4 FAILED, 5 IN PROGRESS, 6 CANCEL..."
-  review: imported
+  review: reviewed
 - addr: 0xd5bae8
   kind: global
+  semantics: the Tech Contract's research-AI interface vtable (+0x40 0x5f36e0, +0x10).
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -176,15 +185,16 @@
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "...search AI's list (+0x210, 0x10 an entry) walked, each live contract's interface (vtable 0xd5bae8) called at +0x40 = 0x5f36e0: 0x761980(research AI, the contract's tech +0x408, its va..."
-  review: imported
+  review: reviewed
 - addr: 0xd5d420
   kind: global
+  semantics: the Civic Tree Analysis job's vtable (-> 0x621e20).
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "...HE ANALYSIS, the \"Civic Tree Analysis\" job (0x61fa20 launches the job at +0x838, vtable 0xd5d420; 0x621e20 runs 0x621a20 on each entry): turns := -1, value := 0, next := row; a non-rep..."
-  review: imported
+  review: reviewed
 - addr: 0xd5fed0
   kind: global
   name: desireFloor
@@ -202,6 +212,7 @@
   review: reviewed
 - addr: 0xd624b8
   kind: global
+  semantics: "COLLECTION_PLAYER_CITIES' walk vtable (the registry's object @f03bb8): begin 0x69e9e0, next 0x69ea00, end 0x69efa0 — at least five subjects, the cities then empty ones."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -212,7 +223,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...in runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128). COLLECTION_PLAYER_CITIES' walk (vtable 0xd624b8, the registry's object @f03bb8: begin 0x69e9e0 clears +0x70 and the counters +0xd0 / +0xd..."
-  review: imported
+  review: reviewed
 - addr: 0xd626c8
   kind: global
   status: PARTLY
@@ -485,6 +496,7 @@
   review: imported
 - addr: 0xd71be8
   kind: global
+  semantics: the neighbours functor's vtable (-> 0x79ed40).
   status: READ
   cases:
     - recording: h1_duelv1127
@@ -494,7 +506,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...ontext's plot list +0x10 empty): a walk of radius 1 (0x6b1b0) with a functor (vtable @0xd71be8, invoke 0x7b8a20 -> 0x79ed40): a neighbour holding a district (+0x1e) adds valueConstru..."
-  review: imported
+  review: reviewed
 - addr: 0xd71c24
   kind: global
   status: PARTLY
@@ -603,13 +615,14 @@
   review: imported
 - addr: 0xe36190
   kind: global
+  semantics: the none byte a city's event handle's first byte is tested against.
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...1) and the city's event handle 3 (+0xb18 +0x18) live (its first byte not the none byte @0xe36190), the pick +0x648 (-1 none), its best plot 0x5d1cb0(city, pick, -1, 0) and the pick's v...
-  review: imported
+  review: reviewed
 - addr: 0xefedf0
   kind: global
   status: PARTLY
@@ -736,13 +749,14 @@
   review: imported
 - addr: 0xf03d80
   kind: global
+  semantics: EFFECT_ADJUST_CITY_YIELD_CHANGE's analyzer object (vtable 0xd63400).
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - .../ CollectionType hash in the registry 0x6c9640 (EFFECT_ADJUST_CITY_YIELD_CHANGE -> object 0xf03d80, vtable 0xd63400; COLLECTION_OWNER ...), the requirement set and the arguments. 0x6cede0...
-  review: imported
+  review: reviewed
 - addr: 0xf03ef8
   kind: global
   status: READ
@@ -769,6 +783,7 @@
   review: imported
 - addr: 0xf04cb0
   kind: global
+  semantics: "-9999: a value past the horizon."
   status: PARTLY
   impl: [cpu/core/aiValue.ts:FX]
   readings:
@@ -776,7 +791,7 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04cb0). The own term: PSEUDOYIELD_TECHNOLOGY of 1.0 (0x7a60d0: amount x DefaultValue x max(0,..."
-  review: imported
+  review: reviewed
 - addr: 0xf0bf40
   kind: global
   status: READ
@@ -1685,12 +1700,13 @@
 - addr: 0xf2e2b4
   kind: global
   name: PSEUDOYIELD_STANDING_ARMY_VALUE
+  semantics: "PSEUDOYIELD_STANDING_ARMY_VALUE's global (DefaultValue 0.1): the cities' CityBuildAI +0x2d8 added to the Combat Desire through 0x7a60d0."
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
-  review: imported
+  review: reviewed
 - addr: 0xf2e2b8
   kind: global
   name: PSEUDOYIELD_TECHNOLOGY

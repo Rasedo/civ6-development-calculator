@@ -14,11 +14,12 @@
   review: imported
 - addr: 0x392cb0
   kind: function
+  semantics: "CanChangeGovernment: unlocked (0x39df60), not the current."
   status: PARTLY
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - "...n (+0x700 -> +0x758) and returns. The government: every one CanChangeGovernment admits (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to..."
-  review: imported
+  review: reviewed
 - addr: 0x3930a0
   final: 0x27ba20
   kind: function
@@ -35,6 +36,7 @@
 - addr: 0x3932d0
   final: 0x27bc50
   kind: function
+  semantics: the civic is researchable now.
   status: PARTLY
   impl: [cpu/core/aiCivics.ts:researchable]
   readings:
@@ -42,11 +44,12 @@
   context:
     - "...·) here — through 0x8c4540; -1 with no Culture, then the cost), a row not researchable (0x3932d0) adds its unowned prerequisites (0x29a250, the install's order: the walk's next step, t..."
     - "...s not positive; else the higher score, the first on a tie. Its next step, researchable (0x3932d0), is queued; else one draw \"Random Civic Choice\" over the rows neither held nor unres..."
-  review: imported
+  review: reviewed
 - addr: 0x393400
   final: 0x27bd40
   kind: function
   name: CanSlot
+  semantics: "CanSlot: not banned (+0x890), not slotted (+0x820), valid under the government (0x3930a0: the Policy_GovernmentExclusives_XP2 cards only in theirs), the slot's type or AllowsAnyPolicy."
   status: PARTLY
   readings:
     - "C-94: the slot rebuild — READ"
@@ -55,7 +58,7 @@
   context:
     - "- SetSlotPolicy 0x3a3990: CanSlot 0x393400 (refuses a card already flagged slotted), flag the card, signal REMOVED for the card th..."
     - "...bsolete card, dropped); each policy in order scoring above the bar that CanSlot admits (0x393400: not banned +0x890, not slotted +0x820, valid under the government 0x3930a0 — the exclu..."
-  review: imported
+  review: reviewed
 - addr: 0x393670
   final: 0x27bf30
   kind: function
@@ -116,6 +119,7 @@
 - addr: 0x394830
   final: 0x27ca80
   kind: function
+  semantics: "Player_Culture's tourism toward a player: per city (+0x12f0 +0xd8) its tourism (city +0x1ac8: 0x1ab5f0, then 0x1ab2a0 added), the first part cut by the target's culture defence percent and by GlobalParameters +0x6d4 where the majority religions differ, raised by the city's +0x1b1c percent under its era bonus; the sum x (100 + +0x1248 + trade route +0x6e4 + open borders (0x3dab70) +0x6dc + the governments' tier difference x +0x6cc + 0x8f1530 / 0x8f3700 / 0x8f2910 - the target's +0xf90, at least -100) / 100."
   status: PARTLY
   readings:
     - "C-94: trade posts and cultural dominance — READ"
@@ -123,7 +127,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...l one is), then per other player it has met (0x3daaf0) the tourism toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refreshed (0x39f610), then 0x393af0 the dominance,...
-  review: imported
+  review: reviewed
 - addr: 0x394fa0
   final: 0x27ce10
   kind: function
@@ -186,19 +190,21 @@
   review: imported
 - addr: 0x399260
   kind: function
+  semantics: a government held before (PlayerCulture +0x350[government]).
   status: PARTLY
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - ...when start >= horizon, or for one held before (PlayerCulture +0x350 [government] != 0, 0x399260) that is not the current; per Government_SlotCounts row, the type's best / 10 (x 0x66...
-  review: imported
+  review: reviewed
 - addr: 0x399690
   final: 0x27e570
   kind: function
+  semantics: the government's slot count.
   status: PARTLY
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - "...ows, \"C-94: the slot rebuild\") and logged. Then each slot of the government in order (0x399690 the count, 0x399ab0 the card): the bar is its card's score (-1.0 with none, or for an o..."
-  review: imported
+  review: reviewed
 - addr: 0x3996b0
   final: 0x27e590
   kind: function
@@ -211,6 +217,7 @@
 - addr: 0x399810
   final: 0x27e700
   kind: function
+  semantics: "the percent of civics held: 100 x held / possible."
   status: READ
   cases:
     - recording: h1_duelw1112
@@ -225,10 +232,11 @@
   context:
     - "...(Lua `GetCostToUnlockPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Check: `dll_policy.py`."
     - "..._ESCALATION(1000)/100 − base)·P/100 in integers, P = max(tech %, civic %) (0x4c9cf0 / 0x399810, the 77 / 61 of `gameProgressPct`); on a plot holding an improvement (+0x44) A·(100 − H..."
-  review: imported
+  review: reviewed
 - addr: 0x399a90
   final: 0x27e900
   kind: function
+  semantics: the civic in hand (-1 none).
   status: PARTLY
   cases:
     - recording: 1103
@@ -238,10 +246,11 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "- WHEN: the AI's turn (0x620110) chooses with key -1 only where nothing is in hand (0x399a90 = -1). A COMPLETION fires the delegate 0x6293e0 — the government pass 0x625d70, then 0x..."
-  review: imported
+  review: reviewed
 - addr: 0x399ab0
   kind: function
   name: GetSlotPolicy
+  semantics: GetSlotPolicy.
   status: PARTLY
   readings:
     - "C-94: the slot rebuild — READ"
@@ -250,7 +259,7 @@
   context:
     - "...ector of {slot type, policy} pairs (+0x3d8, read at +0x430, count +0x440; `GetSlotPolicy` 0x399ab0); a byte per policy (+0x7c8, read at +0x820) marks it slotted (`IsPolicyActive` 0x39dff0..."
     - "...ot rebuild\") and logged. Then each slot of the government in order (0x399690 the count, 0x399ab0 the card): the bar is its card's score (-1.0 with none, or for an obsolete card, droppe..."
-  review: imported
+  review: reviewed
 - addr: 0x399b90
   final: 0x27e960
   kind: function
@@ -297,16 +306,18 @@
 - addr: 0x39c0e0
   final: 0x2806c0
   kind: function
+  semantics: "a civic's turns left: the cost 0x29a010 less the progress kept and the bank (+0xb40), no max(0, .), through 0x8c4540; -1 with no Culture."
   status: PARTLY
   impl: [cpu/core/aiCivics.ts:turnsLeft, gpu/core/sim_civics.py:_cai_analysis]
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "...owned. Else the research AI's three-level walk: each walked row adds its turns left (0x39c0e0: the cost 0x29a010 less the progress kept on it and the bank [+0xb40] — no max(0, ·) he..."
-  review: imported
+  review: reviewed
 - addr: 0x39c1f0
   final: 0x280770
   kind: function
+  semantics: the turns left on the civic in hand; -1 with none.
   status: PARTLY
   cases:
     - recording: AI_Research.csv
@@ -318,7 +329,7 @@
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...x621920): the civics AI's entry turns plus the turns left on the civic in hand, live (0x39c1f0; -1 with none)."
-  review: imported
+  review: reviewed
 - addr: 0x39c330
   final: 0x280860
   kind: function
@@ -400,6 +411,7 @@
 - addr: 0x39d190
   final: 0x281220
   kind: function
+  semantics: the civic is boosted.
   status: READ
   cases:
     - recording: AI_GovtPolicies.csv
@@ -412,10 +424,11 @@
     - "...for a civic that is not in this game\"), past its \"already held / already boosted\" gates (0x39d190 / 0x39d1f0), marks m_abBoostTriggered, finds the item's Boosts row (0x3990d0) and, in the..."
     - "...Trigger Tech / Civic Boost (0x84d630, 0x84cb90): neither held nor boosted (0x4cb290 / 0x39d190), with a boost, of the actor's era; the pickers over them in the tables' order (0x84d..."
     - "...able order at +0x978 (count +0x988): +0 the player, +8 the row, +0xc owned, +0xe boosted (0x39d190), +0xf repeatable, +0x10 its own value, +0x14 its score, +0x18 turns, +0x1c its next step..."
-  review: imported
+  review: reviewed
 - addr: 0x39d1f0
   final: 0x281280
   kind: function
+  semantics: the player holds the civic.
   status: READ
   cases:
     - recording: 1117
@@ -440,17 +453,18 @@
     - "...c that is not in this game\"), past its \"already held / already boosted\" gates (0x39d190 / 0x39d1f0), marks m_abBoostTriggered, finds the item's Boosts row (0x3990d0) and, in the 24.8 fixed..."
     - ...its Improvement_Tourism row pays only with its PrereqTech (+0x60, the player's techs 0x39d1f0) and its second link (+0x68, the civics 0x4cb2f0) held; source 6 (Appeal) reads the plo...
     - "...Level is FULL_CIV (0x469db0, hash 0x253718b0) and the receiver lacks the item (0x4cb2f0 / 0x39d1f0) and is neither FULL_CIV nor TRIBE (0x469ce0, 0xd959ec24) — a city-state or the Free Citi..."
-  review: imported
+  review: reviewed
 - addr: 0x39d3d0
   final: 0x281460
   kind: function
+  semantics: the player holds the civic (the improvement pick's test).
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...value (0 or above, strictly higher), the tech (+0x1338, 0x4cb4d0) and civic (+0x1310, 0x39d3d0) tests and the Builder's (0x35ede0 with UNIT_BUILDER), the plot it picks on also writte...
-  review: imported
+  review: reviewed
 - addr: 0x39d490
   final: 0x281520
   kind: function
@@ -476,15 +490,17 @@
 - addr: 0x39dd20
   final: 0x281db0
   kind: function
+  semantics: the civics' list holds the district.
   status: PARTLY
   readings:
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - ...(0x1b4450) at the housing value 0x7a3d70; where the civics' list holds the district (0x39dd20) the claimed plots (0x7a10c0); a Dam (Districts_XP2 +0x28 bit 3) 100.0 an improved and...
-  review: imported
+  review: reviewed
 - addr: 0x39de20
   final: 0x281e60
   kind: function
+  semantics: the civics' list (+0x1380) holds the improvement.
   status: PARTLY
   cases:
     - recording: 1127
@@ -494,15 +510,16 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - ...ed at the housing value 0x7a3d70; where the civics' list +0x1380 holds the improvement (0x39de20) the claimed plots 0x7a10c0 (each neighbour within 3 of the city another owns, without...
-  review: imported
+  review: reviewed
 - addr: 0x39df60
   final: 0x281f60
   kind: function
+  semantics: the government is unlocked.
   status: PARTLY
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - "...) and returns. The government: every one CanChangeGovernment admits (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to valueHorizons[0];..."
-  review: imported
+  review: reviewed
 - addr: 0x39dff0
   final: 0x281ff0
   kind: function
@@ -517,20 +534,22 @@
   final: 0x282030
   kind: function
   name: ObsoletePolicies
+  semantics: "a policy obsolete: an ObsoletePolicies row whose ObsoletePolicy is unlocked (0x39e1e0), or whose RequiresAvailableGreatPersonClass the player cannot earn (0x2f1ed0)."
   status: PARTLY
   impl: [cpu/core/aiPolicyValue.ts:policyObsolete, cpu/core/aiPolicyValue.ts:policyObsolete]
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - "- The value (0x7b26b0): FX_MIN when start >= horizon or the card is obsolete (0x39e050: an ObsoletePolicies row whose ObsoletePolicy is unlocked, 0x39e1e0, or whose RequiresA..."
-  review: imported
+  review: reviewed
 - addr: 0x39e1e0
   final: 0x282110
   kind: function
+  semantics: the policy is unlocked.
   status: PARTLY
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - "...card is obsolete (0x39e050: an ObsoletePolicies row whose ObsoletePolicy is unlocked, 0x39e1e0, or whose RequiresAvailableGreatPersonClass has no person left, 0x2f1ed0); 250.0 for a..."
-  review: imported
+  review: reviewed
 - addr: 0x39ec60
   final: 0x2828e0
   kind: function

@@ -39,6 +39,7 @@
 - addr: 0x74f5a0
   final: 0x4ecf20
   kind: function
+  semantics: "the religious AI's turn: m_yieldPriorityBoost 0; when a religious unit is wanted, -0.25 once the faith balance (player +0x1340 +0x100) passes its faith cost and -0.25 more once the faith per turn (0x496fd0) passes half of it."
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -49,7 +50,7 @@
     - "...m_yieldPriorityBoost (0x4681a0 -> GlobalAI +0x628 per player, data +0x340): Faith only. 0x74f5a0 each turn: 0; when a religious unit is wanted, -0.25 once the faith balance (player +0x..."
     - "- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start 0x74ea60 (..."
     - "- THE FAITH BOOST (0x74f5a0, m_yieldPriorityBoost [Faith]): 0 each turn; for a full civilization's AI with a favore..."
-  review: imported
+  review: reviewed
 - addr: 0x74fbf0
   final: 0x4ed570
   kind: function

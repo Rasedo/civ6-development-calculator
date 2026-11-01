@@ -38,6 +38,7 @@
 - addr: 0x1ae530
   final: 0x11e9e0
   kind: function
+  semantics: the city's district of a type.
   status: PARTLY
   impl:
     - cpu/core/aiModifiers.ts:adjacencyValue
@@ -51,7 +52,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...nt stored as fx(Amount x 0.01f)): a city subject with the district (context +0x78, else 0x1ae530 by DistrictType); per building of the district type (Districts +0x130 list, the first r..."
-  review: imported
+  review: reviewed
 - addr: 0x1ae8a0
   final: 0x11eae0
   kind: function
@@ -72,6 +73,7 @@
   final: 0x11eb20
   kind: function
   name: City_Districts count (flags)
+  semantics: "the city's districts counted with flags: not InternalOnly (+0xe1 bit 2), complete (+0xb08), RequiresPopulation (+0xe1 bit 6), pillaged or not."
   status: READ
   cases:
     - recording: h1_duelw1117

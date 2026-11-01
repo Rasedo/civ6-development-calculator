@@ -6,12 +6,13 @@
 - addr: 0x142e90
   final: 0xd8660
   kind: function
+  semantics: a tribe-data copy.
   status: PARTLY
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...0xb4 in 0x140000..0x160000 or 0x7c0000..0x7d0000 but the copies 0x14c930 / 0x142650 / 0x142e90 / 0x7ca670 and the decrements). runs/h1_duely1128 tribe 2 raises each clock t89-166 at...
-  review: imported
+  review: reviewed
 - addr: 0x1433b0
   final: 0xd8b30
   kind: function
@@ -46,73 +47,81 @@
 - addr: 0x144610
   final: 0xd9c80
   kind: function
+  semantics: a force's counts per class.
   status: PARTLY
   impl: [cpu/core/barbarianOps.ts:hooksOf, cpu/core/barbarianOps.ts:recruit]
   readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...own). Barbarian Recruit (0x7c7580) under a Turn Limiter (10 / 15): the force's counts (0x144610, each class the barbarians cannot raise dropped, 0x147e70); the units it finds join, su..."
-  review: imported
+  review: reviewed
 - addr: 0x144940
   final: 0xd9f20
   kind: function
+  semantics: the camp's defender (uncounted).
   status: PARTLY
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...counts, not its living units: +0x34 (zeroed at the tribe's init 0x147fc0, the defender 0x144940 uncounted) grows by each unit the melee and ranged raises place (0x144b20 / 0x144bf0 at..."
-  review: imported
+  review: reviewed
 - addr: 0x144b20
   final: 0xda100
   kind: function
+  semantics: "a melee raise: places the unit, +0x34 + 1 (0x144bb8)."
   status: PARTLY
   impl: [cpu/harness/replay.ts:adoptByTribe]
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...the defender 0x144940 uncounted) grows by each unit the melee and ranged raises place (0x144b20 / 0x144bf0 at 0x144bb8 / 0x144c88), the operation's asked units (0x144fb0 straight, 0x1...
-  review: imported
+  review: reviewed
 - addr: 0x144bf0
   final: 0xda1d0
   kind: function
+  semantics: "a ranged raise: places the unit, +0x34 + 1 (0x144c88)."
   status: PARTLY
   impl: [cpu/harness/replay.ts:adoptByTribe]
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...er 0x144940 uncounted) grows by each unit the melee and ranged raises place (0x144b20 / 0x144bf0 at 0x144bb8 / 0x144c88), the operation's asked units (0x144fb0 straight, 0x148af1) and...
-  review: imported
+  review: reviewed
 - addr: 0x144cc0
   final: 0xda2a0
   kind: function
+  semantics: "a scout raise: +0x28 + 1 (0x144dc4)."
   status: PARTLY
   impl: [cpu/harness/replay.ts:adoptByTribe]
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...and the siege and support raises (0x144e00 / 0x144ed0) uncounted; +0x28 by each scout 0x144cc0 places (0x144dc4). Only a battle lowers them (0x1540b0 -> 0x148e90, the dead unit the b...
-  review: imported
+  review: reviewed
 - addr: 0x144e00
   final: 0xda3e0
   kind: function
+  semantics: a siege raise (uncounted).
   status: PARTLY
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...operation's asked units (0x144fb0 straight, 0x148af1) and the siege and support raises (0x144e00 / 0x144ed0) uncounted; +0x28 by each scout 0x144cc0 places (0x144dc4). Only a battle lo...
-  review: imported
+  review: reviewed
 - addr: 0x144ed0
   final: 0xda4b0
   kind: function
+  semantics: a support raise (uncounted).
   status: PARTLY
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...asked units (0x144fb0 straight, 0x148af1) and the siege and support raises (0x144e00 / 0x144ed0) uncounted; +0x28 by each scout 0x144cc0 places (0x144dc4). Only a battle lowers them...
-  review: imported
+  review: reviewed
 - addr: 0x144fb0
   final: 0xda590
   kind: function
+  semantics: "raises an asked unit straight (uncounted): the queue's class name resolved through 0x147470 when it raises (its flag +0xe0 clear)."
   status: PARTLY
   impl:
     - cpu/core/barbarians.ts:raise
@@ -122,10 +131,11 @@
     - "H-1: the raids — READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  review: reviewed
 - addr: 0x147470
   final: 0xdb480
   kind: function
+  semantics: "the tribe's unit chooser: the first unit of the highest Combat in the tag that the barbarians' techs and civics allow."
   status: PARTLY
   impl:
     - cpu/core/barbarians.ts:barbUnitFor
@@ -138,20 +148,22 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...47fc0: a CLASS_ANTI_CAVALRY defender on the camp, the scouts within 3; the unit chooser 0x147470 takes the first unit of the highest Combat in the tag that the barbarians' techs and ci..."
-  review: imported
+  review: reviewed
 - addr: 0x147640
   final: 0xdb650
   kind: function
+  semantics: "a raid's force: the name's then the tribe's BarbarianTribeForces rows, RaidingForce matching, Min/MaxTargetDifficulty holding the target owner's handicap."
   status: PARTLY
   impl: [cpu/data/barbarians.ts:BarbForce, cpu/data/barbarians.ts:barbForce]
   readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...rbarian City Attack\" (BehaviorTrees.xml): Barbarian Spawn Change (0x7c6e50): the force (0x147640: the name's then the tribe's BarbarianTribeForces rows, RaidingForce matching, Min/MaxT..."
-  review: imported
+  review: reviewed
 - addr: 0x1479e0
   final: 0xdb9a0
   kind: function
+  semantics: "a rampaging unit with no target: of the cities its raid (+0x48) then its assault (+0x60) wait for that the player holds, the nearest its camp within 16, else the player's nearest within 16 (0x93d570); it moves to the first plot of its reach this turn within its range (at least 1) of the city with none of its own stacking (0x775c60); no row logged."
   status: READ
   cases:
     - recording: 1124
@@ -161,7 +173,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - "...stacking; else MOVE_TO the target's plot with the attack flag 0x10). With no target (0x1479e0): of the cities its raid (+0x48) then its assault (+0x60) wait for that the player hold..."
-  review: imported
+  review: reviewed
 - addr: 0x147c20
   kind: function
   status: PARTLY
@@ -175,15 +187,17 @@
 - addr: 0x147e70
   final: 0xdbd50
   kind: function
+  semantics: drops a class the barbarians cannot raise.
   status: PARTLY
   readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ".../ 15): the force's counts (0x144610, each class the barbarians cannot raise dropped, 0x147e70); the units it finds join, success; else the missing units go to the tribe's queue (0x1..."
-  review: imported
+  review: reviewed
 - addr: 0x147fc0
   final: 0xdbe60
   kind: function
+  semantics: "a tribe's init: writes the camp's plot to tribe +0x10 (+0x18 the camp standing); a CLASS_ANTI_CAVALRY defender on the camp (0x144940, uncounted), the scouts within 3; counts +0x34 zeroed."
   status: PARTLY
   impl:
     - cpu/core/barbarians.ts:raiseCamp
@@ -196,12 +210,12 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Tribe init 0x147fc0: a CLASS_ANTI_CAVALRY defender on the camp, the scouts within 3; the unit chooser 0x147..."
-  review: imported
+  review: reviewed
 - addr: 0x148270
   final: 0xdc0a0
   kind: function
   name: tribeTreeNotified
-  semantics: "a tribe's tree done: the scout's starts the raid (RaidingBoldness) or lists its city; the raid's offers the city assault (CityAttackBoldness) or lists it"
+  semantics: "a tribe's tree done: the scout's tree, threshold RaidingBoldness (BarbarianTribes +0x24, a name's +0x38 override): boldness at it, no raid running (+0x3c) and no bribe -> the raid starts at once (0x149980), else the city to the raid list (+0x48); a raid's tree, threshold CityAttackBoldness (+0x1c): the city assault (0x1497d0) or its list (+0x60)."
   status: READ
   cases:
     - recording: h1_duelw1117-1128
@@ -247,6 +261,7 @@
 - addr: 0x1488a0
   final: 0xdc820
   kind: function
+  semantics: "a tribe's turn: the clock counts to TurnsToWarriorSpawn (speed scaled) and resets. On a spawn turn (0x148ab6..0x148c08), the first that applies: the asked list (+0x90, count +0xa0) its head raised (0x144fb0, uncounted) and popped (0x149f30); else a pending melee +0xa8 > 0 (0x144b20, counted), ranged +0xac (0x144bf0), siege +0xb0 (0x144e00), support +0xb4 (0x144ed0), each decremented; else, +0x34 under NumMilitary +0x30, the roll Barbarian Ranged unit roll rand(100) < PercentRangedUnits picks ranged, else melee. Off a spawn turn a tribe short of its scout (+0x28) counts 5 turns (+0x2c) and raises one (0x144cc0)."
   status: PARTLY
   impl:
     - cpu/core/barbarians.ts:tribeTurn
@@ -263,10 +278,11 @@
     - "- Tribe turn 0x1488a0: the clock counts to TurnsToWarriorSpawn (speed scaled) and resets; under 5 units \"Barb..."
     - "- Boldness (tribe +0x20): +BARBARIAN_BOLDNESS_PER_TURN (2) each tribe turn (0x148ca3); a battle's dead (0x1540b0 -> 0x148e90: the defender dead, else the attacker): an enem..."
     - "- The tribe turn after its spawn (0x148cad..): an operation gone is forgotten (0x148c6b); an assault city waiting (+0x70), no assa..."
-  review: imported
+  review: reviewed
 - addr: 0x148e90
   final: 0xdce10
   kind: function
+  semantics: "a tribe's dead unit (from 0x1540b0: the defender dead, else the attacker): boldness (+0x20) +BARBARIAN_BOLDNESS_PER_KILL 15 for an enemy a tribe's unit killed, PER_UNIT_LOST -10 for a tribe's unit lost, PER_SCOUT_LOST -5 for a scout; a scout (AI type +0x1c0 2) +0x28 - 1 and its wait +0x2c to 0; any other but a support unit (formation class 1) +0x34 - 1. A unit gone any other way still counts."
   status: PARTLY
   impl:
     - cpu/core/barbarians.ts:barbBattleDeath
@@ -280,4 +296,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ARBARIAN_BOLDNESS_PER_TURN (2) each tribe turn (0x148ca3); a battle's dead (0x1540b0 -> 0x148e90: the defender dead, else the attacker): an enemy a tribe's unit killed +PER_KILL (15),..."
-  review: imported
+  review: reviewed

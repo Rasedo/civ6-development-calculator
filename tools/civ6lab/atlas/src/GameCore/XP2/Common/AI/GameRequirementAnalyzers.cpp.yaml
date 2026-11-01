@@ -57,6 +57,7 @@
   final: 0x492160
   kind: function
   name: HAS_ANY_IMPROVEMENT
+  semantics: REQUIREMENT_PLOT_HAS_ANY_IMPROVEMENT's plot evaluator (+0x44).
   status: PARTLY
   cases:
     - recording: 1124
@@ -65,10 +66,11 @@
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00, HAS_ANY_IMPROVEMENT 0x6cfcd0 (+0x44) — the Water Mill 121 -> 163 of 1124's; EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0..."
-  review: imported
+  review: reviewed
 - addr: 0x6cfd60
   kind: function
   name: REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT
+  semantics: "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT: the context's city (+0x70): an owner with no capital (0x36f460) holds; else the city's plot continent (+0x30) against the owner's PlayerCities m_eHomeContinent (0x467cd0 -> +0x160, named in 0x36a870); an empty subject fails (no city), so the inverse admits it."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -83,7 +85,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...ard the limit, 0x1ae8f0, is at least Amount), REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT 0x6cfd60 (no capital holds; else the city's continent equals the capital's; not ported: Colonial O..."
-  review: imported
+  review: reviewed
 - addr: 0x6d03d0
   final: 0x492810
   kind: function
@@ -101,6 +103,7 @@
 - addr: 0x6d08c0
   kind: function
   name: REQUIREMENT_DISTRICT_TYPE_MATCHES
+  semantics: "REQUIREMENT_DISTRICT_TYPE_MATCHES: the district subject's type (context +0x78); else the district type the evaluation is of (+0x1c)."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:EVALUATORS]
   readings:
@@ -108,7 +111,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...so a subject passes only by 0x6cf3c0. Read evaluators: REQUIREMENT_DISTRICT_TYPE_MATCHES 0x6d08c0 (the district subject's type, context +0x78; else the district type the evaluation is of,..."
-  review: imported
+  review: reviewed
 - addr: 0x6d0af0
   final: 0x492f30
   kind: function
@@ -126,6 +129,7 @@
   final: 0x493d70
   kind: function
   name: RESOURCE_TYPE
+  semantics: REQUIREMENT_PLOT_RESOURCE_TYPE_MATCHES's plot evaluator (+0x40).
   status: PARTLY
   cases:
     - recording: 1124
@@ -134,10 +138,11 @@
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...hted) and the plot evaluators TERRAIN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00, HAS_ANY_IMPROVEMENT 0x6cfcd0 (+0x44) — the Water Mi..."
-  review: imported
+  review: reviewed
 - addr: 0x6d1c00
   kind: function
   name: RESOURCE_VISIBLE
+  semantics: REQUIREMENT_PLOT_RESOURCE_VISIBLE's plot evaluator.
   status: PARTLY
   cases:
     - recording: 1124
@@ -146,10 +151,11 @@
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...IN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00, HAS_ANY_IMPROVEMENT 0x6cfcd0 (+0x44) — the Water Mill 121 -> 163 of 1124's; EFFECT_A..."
-  review: imported
+  review: reviewed
 - addr: 0x6d1dd0
   final: 0x48f400
   kind: function
+  semantics: REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES's plot evaluator (+0x2c).
   status: PARTLY
   cases:
     - recording: 1124
@@ -158,7 +164,7 @@
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...mpassable: half the Amount's PV(H) - PV(T), unweighted) and the plot evaluators TERRAIN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00,..."
-  review: imported
+  review: reviewed
 - addr: 0x6d22c0
   final: 0x48f810
   kind: function
@@ -185,6 +191,7 @@
   final: 0x48f920
   kind: function
   name: REQUIREMENT_PLAYER_IS_AT_PEACE
+  semantics: "REQUIREMENT_PLAYER_IS_AT_PEACE: a context player (+0x40) the player is not at war with."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -200,6 +207,7 @@
   final: 0x48fbc0
   kind: function
   name: REQUIREMENT_PLAYER_IS_MINOR
+  semantics: "REQUIREMENT_PLAYER_IS_MINOR (@f04448): the evaluating player (context +0x80) is no full civilization (0x469db0) and no barbarian (0x469ce0)."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:EVALUATORS, gpu/core/sim_policy.py:_pol_admits]
   readings:
@@ -207,7 +215,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e suzerain (0x44c850) is not the player, +10 raw. Its set's REQUIREMENT_PLAYER_IS_MINOR 0x6d2760 (@f04448) reads the evaluating player (context +0x80): no full civilization (0x469db0..."
-  review: imported
+  review: reviewed
 - addr: 0x6d27a0
   final: 0x48fc00
   kind: function
@@ -223,6 +231,7 @@
   final: 0x490c90
   kind: function
   name: REQUIREMENT_CITY_HAS_BUILDING
+  semantics: "REQUIREMENT_CITY_HAS_BUILDING: a city subject holding it; a wonder (Buildings +0x158 & 0x40) only when the evaluation is of that city (context +0x10..+0x14)."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:EVALUATORS]
   readings:
@@ -230,11 +239,12 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...+0x78; else the district type the evaluation is of, +0x1c), REQUIREMENT_CITY_HAS_BUILDING 0x6d3830 (a city subject holding it; a wonder (Buildings +0x158 & 0x40) only when the evaluation i...
-  review: imported
+  review: reviewed
 - addr: 0x6d4190
   final: 0x4915f0
   kind: function
   name: REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS
+  semantics: "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS: a city subject whose count of finished districts counting toward the limit (0x1ae8f0) is at least Amount."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -249,10 +259,11 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - ...uns/h1_duelw1117 / 1121 / 1124 / 1127 / 1128), REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS 0x6d4190 (a city subject whose City_Districts count of districts counting toward the limit, 0x1ae8...
-  review: imported
+  review: reviewed
 - addr: 0x6d4380
   final: 0x4917e0
   kind: function
+  semantics: REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES's plot evaluator.
   status: PARTLY
   cases:
     - recording: 1124
@@ -261,13 +272,16 @@
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - ...PV(H) - PV(T), unweighted) and the plot evaluators TERRAIN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00, HAS_ANY_IMPROVEMENT 0x6cfcd...
-  review: imported
+  review: reviewed
 - addr: 0x6d4420
   final: 0x491880
   kind: function
   name: REQUIREMENT_CITY_HAS_GARRISON_UNIT
+  semantics: "REQUIREMENT_CITY_HAS_GARRISON_UNIT: a city subject whose population (City +0x588) is at least 9 — no unit is read."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      value: every city-state's Retainers line first logged the turn its city grows to 9
     - recording: h1_duelw1117
       value: every city-state's Retainers line is first logged the turn its city grows to 9, runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128), REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS 0x6d4190 (a city subject whos
     - recording: h1_duelw1121
@@ -280,7 +294,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...the evaluation is of that city, context +0x10..+0x14), REQUIREMENT_CITY_HAS_GARRISON_UNIT 0x6d4420 (a city subject whose population, City +0x588, is at least 9 — no unit is read; every cit..."
-  review: imported
+  review: reviewed
 - addr: 0x6d4490
   final: 0x4918f0
   kind: function
@@ -298,6 +312,7 @@
   final: 0x491a10
   kind: function
   name: REQUIREMENT_PLAYER_HAS_GIVEN_INFLUENCE_TOKENS
+  semantics: "REQUIREMENT_PLAYER_HAS_GIVEN_INFLUENCE_TOKENS: the tokens received from the player (0x44c860: store +0x5d0 and a posted governor's 0x44caa0) plus the context's n reach MinimumTokens (parser 0x6d4490)."
   status: READ
   cases:
     - recording: h1_duelw1117

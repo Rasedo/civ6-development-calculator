@@ -6,6 +6,7 @@
 - addr: 0x4c8c40
   final: 0x333410
   kind: function
+  semantics: the technology is researchable now.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -28,10 +29,11 @@
   context:
     - "...olshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each draw erasing its pick — a row the first grant opens is not offered (1117 t226: two..."
     - ...er to rate x the truncated quotient; with no Science the cost); a row not researchable (0x4c8c40) adds its unowned prerequisites, each level's rows once, the next step the last one add...
-  review: imported
+  review: reviewed
 - addr: 0x4c9cf0
   final: 0x333d30
   kind: function
+  semantics: "the percent of techs held: 100 x held / possible."
   status: READ
   cases:
     - recording: h1_duelw1112
@@ -46,18 +48,20 @@
   context:
     - "...ckPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Check: `dll_policy.py`."
     - "...ase·GAME_COST_ESCALATION(1000)/100 − base)·P/100 in integers, P = max(tech %, civic %) (0x4c9cf0 / 0x399810, the 77 / 61 of `gameProgressPct`); on a plot holding an improvement (+0x4..."
-  review: imported
+  review: reviewed
 - addr: 0x4c9f40
   final: 0x333f10
   kind: function
+  semantics: the player's Science rate.
   status: PARTLY
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "...on it [+0x388] and the bank [+0x1e8] read through max(0, ·), ceil over the Science rate 0x4c9f40 — 0x8c4540 compares the remainder to rate x the truncated quotient; with no Science t..."
-  review: imported
+  review: reviewed
 - addr: 0x4c9f90
   final: 0x333f60
   kind: function
+  semantics: the research queue head's turns left (-> 0x4ca000).
   status: PARTLY
   cases:
     - recording: 1127
@@ -71,10 +75,11 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...write is GetTurnsLeft 0x4ca120: -1 with the queue empty (+0x188 0) or its head -1, else 0x4c9f90 -> 0x4ca000 at the player's Science, whose 0x8c4540 gives -1 at no Science with no fall..."
-  review: imported
+  review: reviewed
 - addr: 0x4ca000
   final: 0x333fd0
   kind: function
+  semantics: "a technology's turns left: the cost 0x353a70 in fixed point less the progress kept (+0x388) and the bank (+0x1e8) through max(0, .), ceil over the Science rate 0x4c9f40 (0x8c4540), -1 with no Science."
   status: PARTLY
   impl: [cpu/core/aiResearch.ts:researchTurnsLeft]
   readings:
@@ -88,6 +93,7 @@
 - addr: 0x4ca120
   final: 0x334080
   kind: function
+  semantics: "GetTurnsLeft: -1 with the queue empty (+0x188 0) or its head -1, else 0x4c9f90 -> 0x4ca000 at the player's Science (-1 at no Science)."
   status: PARTLY
   cases:
     - recording: AI_Research.csv
@@ -226,13 +232,14 @@
 - addr: 0x4cb4d0
   final: 0x334ea0
   kind: function
+  semantics: the player holds the technology (the improvement pick's test).
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...valuation's best improvement by value (0 or above, strictly higher), the tech (+0x1338, 0x4cb4d0) and civic (+0x1310, 0x39d3d0) tests and the Builder's (0x35ede0 with UNIT_BUILDER),...
-  review: imported
+  review: reviewed
 - addr: 0x4cb590
   final: 0x334f60
   kind: function

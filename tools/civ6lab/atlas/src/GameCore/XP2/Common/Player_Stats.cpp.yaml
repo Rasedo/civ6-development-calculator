@@ -7,6 +7,7 @@
   final: 0x32a6f0
   kind: function
   name: m_iMilitaryStrength
+  semantics: m_iMilitaryStrength (the AI's combat strength, flag 0).
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -22,7 +23,7 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "...gth the rank conditions read (PlayerStats m_iMilitaryStrength, data +0x210, computed at 0x4bb1e0, stored as each player's turn starts, before its production): per unit max(Combat, Ra..."
-  review: imported
+  review: reviewed
 - addr: 0x4bc720
   kind: function
   status: PARTLY
@@ -48,6 +49,7 @@
 - addr: 0x4bcd30
   final: 0x32b990
   kind: function
+  semantics: "PlayerStats' strongest unit of a promotion class: over the Units in order, its own version (player +0x12e8 +0x1c0[i] = i), not MustPurchase (+0x1b9 bit 7), of the PromotionClass +0x288, PrereqTech +0x280 and PrereqCivic +0x270 held, the last of the greatest max(Combat, RangedCombat), from 0."
   status: PARTLY
   impl:
     - cpu/core/aiModifiers.ts:ANALYZERS
@@ -58,11 +60,12 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - ...they outnumber), the unit-tag production 0x6bc9e0 (the military AI's unit of the class 0x4bcd30, CityBuildAI's production 0x6c8dd0, PSEUDOYIELD_UNIT_COMBAT), the policy amenity 0x6b45...
-  review: imported
+  review: reviewed
 - addr: 0x4bd030
   final: 0x32bb10
   kind: function
   name: m_iMaxRangedStrengthTrained
+  semantics: max(PlayerUnits +0x150 (the strongest ranged strength trained), COMBAT_MINIMUM_CITY_STRIKE_STRENGTH).
   status: READ
   cases:
     - recording: 1120
@@ -75,11 +78,12 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "...ke strength (0x207080 → 0x249ee0): max(PlayerStats +0x150, m_iMaxRangedStrengthTrained (0x4bd030), COMBAT_MINIMUM_CITY_STRIKE_STRENGTH 3) plus the city's district attack bonus (+0x1890..."
-  review: imported
+  review: reviewed
 - addr: 0x4bd0d0
   final: 0x32bb70
   kind: function
   name: PlayerStats per-domain strength
+  semantics: "PlayerStats' strength in a domain (-1 every one): +0x210 - +0x390, m_iMilitaryStrength less m_iMilitaryStrengthFromGold as stored at the turn start (0x4bb1e0)."
   status: PARTLY
   cases:
     - recording: h1_duelw1104
@@ -167,6 +171,7 @@
 - addr: 0x4be880
   final: 0x32d150
   kind: function
+  semantics: the religious unit's spread / heal charge counts the value reads.
   status: PARTLY
   cases:
     - recording: 1124
@@ -176,19 +181,21 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...gth (+0x78) x 0.01, SpreadCharges (+0x7c) or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCha..."
-  review: imported
+  review: reviewed
 - addr: 0x4bf200
   final: 0x5147d0
   kind: function
+  semantics: PlayerStats' known WMD count (+0x11f0).
   status: PARTLY
   readings:
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...re its negative passes the value; with any known WMD of the player (PlayerStats +0x11f0 0x4bf200) or the diplomacy's +0xf30 flag: -10000 without the owner's own, then at most 0; with t..."
-  review: imported
+  review: reviewed
 - addr: 0x4bf7c0
   kind: function
+  semantics: PlayerStats' yield per turn of a yield.
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
@@ -197,7 +204,7 @@
   context:
     - "...yer and every major it has met (0x483b50's list, 0x3daaf0) with x their yield per turn (0x4bf7c0 on player +0x1330): n, max, mean; n > 1, sd = sqrt(sum (x - mean)^2 / (n - 1)) > 0 and..."
     - ...EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY 0x6adb20 (the player's yield per turn 0x4bf7c0 x Amount x the tributaries, weighted, between; the parser's scaling unread), EFFECT_ADJ...
-  review: imported
+  review: reviewed
 - addr: 0x4bffa0
   final: 0x32e560
   kind: function

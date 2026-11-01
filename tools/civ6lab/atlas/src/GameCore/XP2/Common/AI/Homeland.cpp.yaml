@@ -28,6 +28,7 @@
 - addr: 0x70a370
   final: 0x4bb0c0
   kind: function
+  semantics: the homeland's turn (after the tactical pass); releases its units (-1) as it ends.
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -35,10 +36,11 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...tree ticks) — then a second — 0x785ec0, the tactical pass 0x771530 — then the homeland 0x70a370. The operations' trees tick after the tribes' turn and before the tactical pass, on t..."
-  review: imported
+  review: reviewed
 - addr: 0x70a440
   final: 0x4bb190
   kind: function
+  semantics: the homeland's unit moves (each sets the turn done).
   status: PARTLY
   impl: [cpu/core/tactical.ts:exploreLand, cpu/core/tactical.ts:homelandPlunder]
   readings:
@@ -49,7 +51,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...he chosen list; the round's move orders (0x962030) are carried out together as it ends (0x70a440); another round only where one moved.
-  review: imported
+  review: reviewed
 - addr: 0x70a6c0
   final: 0x4bb410
   kind: function

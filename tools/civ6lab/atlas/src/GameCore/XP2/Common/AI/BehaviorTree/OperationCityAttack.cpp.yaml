@@ -22,6 +22,7 @@
 - addr: 0x8109e0
   kind: function
   name: Operation Attack City (execution)
+  semantics: "Operation Attack City's execution: the members with Movement left against the COMBAT_DISTRICT targets within 3 of the target (0x80f280) through 0x776140 (unequal blows dropped, no suicide), logged \"Operation City Attack\"; a district target's health floor(maxHP x ATTACK_HEALTH / 256) - damage, its blow the city combat prediction."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:CITY_ATTACK_RANGE
@@ -41,8 +42,12 @@
   final: 0x570bf0
   kind: function
   name: Garrison City (execution)
+  semantics: "Garrison City's execution: the unit on the city — the operation's garrison, or with none a military unit of the seat standing there (0x81100a: formation class 0 or 3 takes the garrison's branch at 0x811129) — has its turn ended (0x570b40 with dl 1) before the swap and fortify tests; a candidate it moves in (0x811038) or beside the city (0x8111d7) likewise."
   status: PARTLY
   cases:
+    - recording: h1_dueldA1117
+      turn: 24
+      value: "Antananarivo: City Defense's Warrior on 32:5 stays, only 29:3 moves (-> 30:3)"
     - recording: h1_duely1117
       turn: 85
       value: "Antananarivo's garrisoned Catapult (Range 2) keeps its Movement: Operation Move takes it 32:5 -> 32:6; h1_dueldA1117 t24 its garrisoned Warrior (Range 0) fortified, no Operation Move row"
@@ -92,6 +97,7 @@
 - addr: 0x811e80
   kind: function
   name: Operation Siege City (execution)
+  semantics: "Operation Siege City's execution: without ABILITY_AUTO_SIEGE, the six plots round the city (0x812950) as slots, the members with Movement left and no bombard as agents, the generalized assignment 0x8b5bf0 (start 0x80f9d0, gain 0x80f6b0, move 0x80f4a0) logged \"From, Goal:, Move\"; encircled (0x24bf70) the ranged members strike \"Operation Siege City Attack\"."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:SiegeSlot
@@ -112,6 +118,7 @@
   final: 0x5728a0
   kind: function
   name: Siege City's slots
+  semantics: "Siege City's slots: the six plots round the city of the domain, passable, connected."
   status: PARTLY
   impl: [cpu/core/operations/assault.ts:SiegeSlot, cpu/core/operations/assault.ts:siegeSlots]
   readings:
@@ -123,6 +130,7 @@
   final: 0x572ab0
   kind: function
   name: Can Alpha City (decision)
+  semantics: "Can Alpha City: FAILURE with the target gone or no city; else the sum over the teams' units with Movement left of the largest predicted damage of their planning's entry for the city (0x793210, 0x791470) against half the centre's hit points left: SUCCESS at or above."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES
@@ -152,6 +160,7 @@
   final: 0x572f30
   kind: function
   name: Operation Air Assault (update)
+  semantics: "Operation Air Assault's update: the Attack City district test, SUCCESS."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES
@@ -166,6 +175,7 @@
   final: 0x572ff0
   kind: function
   name: Operation Attack City (update)
+  semantics: "Operation Attack City's update: SUCCESS with the target gone; FAILURE where the target plot holds no city nor a district whose row's +0xe2 is set; RUNNING while the operation holds units (0x6092c0), else FAILURE."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES
@@ -221,6 +231,7 @@
   final: 0x5732d0
   kind: function
   name: Operation Siege City (update)
+  semantics: "Operation Siege City's update: SUCCESS with the target gone, ERROR with no enemy, SUCCESS with units, else FAILURE."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES

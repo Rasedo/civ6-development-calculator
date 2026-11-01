@@ -41,6 +41,7 @@
 - addr: 0x4eeb70
   final: 0x34d020
   kind: function
+  semantics: "a unit's creation: raises player signal +0x60."
   status: READ
   cases:
     - recording: 1117
@@ -63,10 +64,11 @@
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
   context:
     - "...l falls 40, 39, 38 ... as storms and Spies take names. Which units: the unit's creation 0x4eeb70 calls 0x486bf0 → 0x486c20 where the unit info's Spy (+0x1ba bit 2) or ExtractsArtifac..."
-  review: imported
+  review: reviewed
 - addr: 0x4f2310
   final: 0x2c4360
   kind: function
+  semantics: "Player::Units' unit by id: the units' pages (FinalRelease +0x98, laid as the controls'); a unit's type +0xc8 (FinalRelease)."
   status: PARTLY
   readings:
     - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
@@ -75,7 +77,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...1 — seen at the last look, not at this turn's — whose unit (+0, the player's unit list 0x4f2310) still stands (+0x770 clear) within 2 of the plot recorded (+0x10 / +0x14): the unit's..."
-  review: imported
+  review: reviewed
 - addr: 0x4f23a0
   final: 0x34ef70
   kind: function
@@ -92,23 +94,26 @@
 - addr: 0x4f2ac0
   final: 0x34f4f0
   kind: function
+  semantics: the units manager's land Corps (+0xaa8) / Army (+0xb08) civic.
   status: PARTLY
   impl: [cpu/core/aiCivics.ts:civicValue]
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - ...and the upgrades' gold (0x5376d0, 20.0 at least); PSEUDOYIELD [0xf2e254] of 100 where 0x4f2ac0 names the row; per building the player's version 0.5, a wonder PSEUDOYIELD_WONDER of 0....
-  review: imported
+  review: reviewed
 - addr: 0x4f2af0
   final: 0x34f520
   kind: function
+  semantics: the units manager's Corps / Army TECH (-1 in the install).
   status: PARTLY
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - ...ts upgrade sources' gold (0x5376d0 -> 0x7a6690); PSEUDOYIELD_UNIT_COMBAT of 100 where 0x4f2af0 names the row; PSEUDOYIELD_TOURISM of the +0xe8 list's count; per building 0.5, a wonde...
-  review: imported
+  review: reviewed
 - addr: 0x4f2b20
   kind: function
+  semantics: a unit's current Production cost.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -138,7 +143,7 @@
     - "...at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUCTION_PERCENT_COST (+0x74c, 100) / 100, never below 0; cost = base +..."
     - "...90 fills per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x4f2b20, `m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 throug..."
     - "...nt as fx. EFFECT_GRANT_UNIT_IN_CITY 0x6abe40: the greater of the unit's current cost (0x4f2b20) and its value 0x7b62c0, x Amount, added whole. EFFECT_ADD_RELIGIOUS_BUILDING 0x6bb1f0:..."
-  review: imported
+  review: reviewed
 - addr: 0x4f2b50
   final: 0x34f550
   kind: function
@@ -151,6 +156,7 @@
 - addr: 0x4f2c90
   final: 0x34f6b0
   kind: function
+  semantics: the player holds a unit of the type (an obsolete unit's entry kept while one is held).
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -166,7 +172,7 @@
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
   context:
     - ...Tech +0x240, ObsoleteCivic +0x248 / Tech +0x250 held) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers; per...
-  review: imported
+  review: reviewed
 - addr: 0x4f2cc0
   final: 0x34f6e0
   kind: function

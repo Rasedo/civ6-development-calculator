@@ -54,6 +54,7 @@
 - addr: 0x5254d0
   final: 0x36f6f0
   kind: function
+  semantics: speed(x) = x x GameSpeeds.CostMultiplier / 100 (through 0x525400).
   status: READ
   cases:
     - recording: 1109
@@ -108,7 +109,7 @@
     - "...op 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, speed scaling 0x5254d0). Check: `dll_plunder.py`."
     - "...xTurn 0x2c37c0 = start + scale(GameEraMaximumTurns) (Eras_XP1 row +0x24 / +0x2c), scale 0x5254d0 = x × GameSpeeds. CostMultiplier / 100 truncated: online 20 / 30. The first era's start..."
     - "...drought's end turn (0x2922ff, beside \"Pick Drought Start Plot\"): the current turn plus 0x5254d0(the row's Duration) — the game speed's CostMultiplier / 100, truncated: online 2 (MAJOR..."
-  review: imported
+  review: reviewed
 - addr: 0x525500
   final: 0x36f720
   kind: function
@@ -123,6 +124,7 @@
   final: 0x36f7b0
   kind: function
   name: CostMultiplier
+  semantics: x 100 / the speed's CostMultiplier ([speed+0x28]).
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -137,7 +139,7 @@
   context:
     - "...RESSURE, the Bishop) + the queue term) / 100, the percents SUMMED, then the game speed (0x525590). The queue term: the city's build queue (+0x2170, head 0x179650; -1 when empty) name..."
     - "...er (0x6ddb40..0x6ddba3) writes AI_DISCOUNT_RATE (GlobalParameters +0x10, 2.0) through 0x525590 — x 100 / the speed's CostMultiplier ([speed+0x28]) — over the constructor's 0x200 (0x6..."
-  review: imported
+  review: reviewed
 - addr: 0x5256d0
   final: 0x36f860
   kind: function
@@ -174,6 +176,7 @@
 - addr: 0x526330
   final: 0x3700f0
   kind: function
+  semantics: "a trade route's origin yields per yield (last argument: the path term on the potential course)."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -190,10 +193,11 @@
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
   context:
     - "...T). 0x78e0a0 (per known city of the knowledge base +0xe0 entries, the routes' yields 0x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the unit table: that is 0x7989e..."
-  review: imported
+  review: reviewed
 - addr: 0x5267a0
   final: 0x3703c0
   kind: function
+  semantics: the cost progression (type 1 takes n as given; GlobalParameters +0x37c).
   status: PARTLY
   impl:
     - cpu/core/effects.ts:policyEscalated
@@ -208,10 +212,11 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...etCostToUnlockPolicies` 0x398e70 (Lua `GetCostToUnlockPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Check: `dll_policy.py`."
-  review: imported
+  review: reviewed
 - addr: 0x5275a0
   final: 0x370f40
   kind: function
+  semantics: the amenity need of a population.
   status: PARTLY
   readings:
     - "B-D-S1: the war-weariness split — CLOSED (structure)"
@@ -222,7 +227,7 @@
   context:
     - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL inser..."
     - ...es (0x4a1fd0 -> 0x4a0f60, stable) ascending by non-luxury + granted - amenities needed (0x5275a0), i.e. neediest first, once before the first resource and again after each;
-  review: imported
+  review: reviewed
 - addr: 0x527610
   final: 0x370fb0
   kind: function
@@ -287,6 +292,7 @@
 - addr: 0x527850
   final: 0x371120
   kind: function
+  semantics: the happiness level of an amenity balance.
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -304,7 +310,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...h n Amenities: the balance (GetAmenities less the need of +0x588, 0x5275a0), its level (0x527850) and that of balance + n; one level: PSEUDOYIELD_HAPPINESS of n; else PSEUDOYIELD_HAPPI..."
-  review: imported
+  review: reviewed
 - addr: 0x527a50
   final: 0x371260
   kind: function
@@ -321,6 +327,7 @@
 - addr: 0x527b40
   final: 0x371350
   kind: function
+  semantics: "a happiness level's percent: the Happinesses row's NonFoodYieldModifier (+0x3c, its flag +0x38; the loader 0xac62c0) plus the city's own per-level rows (+0x11d8, 0x1cb0f0)."
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -338,10 +345,11 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...0x1c64d0's attribute) x (after + 100) / (before + 100) - 1, the level's percent being 0x527b40: the Happinesses row's NonFoodYieldModifier (+0x3c, its flag +0x38; the loader 0xac62c0..."
-  review: imported
+  review: reviewed
 - addr: 0x527ca0
   final: 0x371420
   kind: function
+  semantics: "the housing growth factor of the housing left: 0 below CITY_HOUSING_LEFT_ZERO_GROWTH (-4), 0.25 to _25PCT (0), 0.5 at _50PCT (1), else 1."
   status: PARTLY
   cases:
     - recording: 1124
@@ -350,7 +358,7 @@
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left) = 0 below CITY_HOUSING_LEFT_ZERO_GROWTH (-4), 0.25 to _25PCT (0), 0.5 at _50PCT (..."
-  review: imported
+  review: reviewed
 - addr: 0x527d80
   kind: function
   name: votesForFavor
@@ -366,6 +374,7 @@
 - addr: 0x527e30
   final: 0x3715b0
   kind: function
+  semantics: the district type counts toward the city's limit (Districts.RequiresPopulation).
   status: READ
   cases:
     - recording: 1124
@@ -375,4 +384,4 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - "...lse of the plot — and a PASSIVE_DISTRICT where its type counts toward the city's limit (0x527e30: Districts.RequiresPopulation; a Neighborhood, an Aqueduct none: 1124 t201, the Ironcla..."
-  review: imported
+  review: reviewed

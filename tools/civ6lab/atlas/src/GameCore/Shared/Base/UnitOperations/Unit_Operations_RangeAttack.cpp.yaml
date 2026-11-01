@@ -6,10 +6,11 @@
 - addr: 0x964a40
   final: 0x66f570
   kind: function
+  semantics: a ranged strike order.
   status: PARTLY
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...180); the civilian taken ends the target; then each ranged one within range strikes it (0x964a40).
-  review: imported
+  review: reviewed

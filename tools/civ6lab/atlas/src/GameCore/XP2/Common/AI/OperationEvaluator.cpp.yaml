@@ -6,6 +6,7 @@
 - addr: 0x746920
   final: 0x4e6130
   kind: function
+  semantics: "the operation candidate evaluation: walks m_operationStartPoints as the candidate's rallies."
   status: PARTLY
   cases:
     - recording: h1_duely1117
@@ -28,4 +29,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The evaluation (job \"Op Evaluation\", 0x746920): MustBeAtWar, MustHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each tar..."
-  review: imported
+  review: reviewed

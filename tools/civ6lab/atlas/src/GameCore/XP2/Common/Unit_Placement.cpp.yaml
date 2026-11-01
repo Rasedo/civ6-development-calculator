@@ -7,6 +7,7 @@
   final: 0x3affd0
   kind: function
   name: FindAlternateLocation
+  semantics: "FindAlternateLocation(unit, target, range): over the game's axial steps (dx, dy), dx outer from -range to range, dy inner, the plot at the step within range (0x1e000: x - y//2 + dx, then back; the distance max(|dx|, |dy|) where the signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag 0x40), the player revealed it, no other player's unit on it and none of its own that it may not stack with (0x9406e0); the nearest the target, a plot of another area (plot +8) counted three times as far; strictly nearer replaces. A placement's range 10."
   status: PARTLY
   cases:
     - recording: AI_Tactical.csv
@@ -26,10 +27,11 @@
   context:
     - "...030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none: FindAlternateLocation (0x585940) round the city within 3, moved to with flag 0x1000, else the skip 0x95eae0 (\"Wander Ba..."
     - "- FIND ALTERNATE LOCATION (0x585940): over the game's axial steps (dx, dy), dx outer from -range to range, dy inner, the pl..."
-  review: imported
+  review: reviewed
 - addr: 0x585d90
   final: 0x3b0370
   kind: function
+  semantics: "a plot's unit keeps the mover out: its own of its class (vtable +0xb8); another player's where 0x518f40 refuses the pair."
   status: PARTLY
   cases:
     - recording: 1124
@@ -50,10 +52,11 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   context:
     - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
-  review: imported
+  review: reviewed
 - addr: 0x585eb0
   final: 0x3b0490
   kind: function
+  semantics: the plot holds a unit of the mover's own stacking class.
   status: READ
   cases:
     - recording: AI_Tactical.csv
@@ -95,10 +98,11 @@
     - "...of turns 1 with no unit at war with it (0x5862e0) and none of its own stacking with it (0x585eb0, the unit itself counted: its own plot is never one), within 5 of the camp and, where t..."
     - ...he city (0x1deb0), no unit at war with it (0x5862e0), none of its own stacking with it (0x585eb0); the weighted vector's weights (influence 0x716a60, the plot's owner +0x60, revealed...
     - "...path (0x586360), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the..."
-  review: imported
+  review: reviewed
 - addr: 0x585fc0
   final: 0x3b0550
   kind: function
+  semantics: a unit at war that fights stands on the plot (-> 0x523520; 0x5237e0 the religious units' twin).
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -108,10 +112,11 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - "...step leaves a node whose +0x51 bit 0x40 is set — 0x5861f0's out-flag on a seen plot, 0x585fc0 -> 0x523520: a unit at war that fights stands there (0x5237e0 the religious units' twin..."
-  review: imported
+  review: reviewed
 - addr: 0x5861f0
   final: 0x3b0770
   kind: function
+  semantics: a seen plot's attack out-flag (planning node +0x51 bit 0x40).
   status: PARTLY
   impl: [cpu/core/tactical.ts:safePlot, cpu/core/tactical.ts:Ground]
   readings:
@@ -120,10 +125,11 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...eb0) with a unit of its own stacking with it (itself counted), none with a unit at war (0x5861f0); against the best so far, the first taken — of no danger over one of danger; of two..."
-  review: imported
+  review: reviewed
 - addr: 0x5862e0
   final: 0x3b0860
   kind: function
+  semantics: the plot holds a unit the mover is at war with (Operation Move's barred goal).
   status: READ
   cases:
     - recording: AI_Tactical.csv
@@ -156,12 +162,16 @@
     - "...(0x771250): from its planning reach, the plots of turns 1 with no unit at war with it (0x5862e0) and none of its own stacking with it (0x585eb0, the unit itself counted: its own plot..."
     - ...ing reach the plots of turn 1 within 5 of the city (0x1deb0), no unit at war with it (0x5862e0), none of its own stacking with it (0x585eb0); the weighted vector's weights (influence...
     - "...at least 1 where the goal is barred — no path (0x586360), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class..."
-  review: imported
+  review: reviewed
 - addr: 0x586360
   final: 0x3b08e0
   kind: function
+  semantics: "the unit location test: refuses a plot for its terrain (impassable, the unit's domain), another player's closed borders, a unit type that needs a district off one, or a hostile defender there (0x208b80) — never for the owner's own units. The domain test reads the unit's domain (+0x650; DOMAIN_SEA 0, DOMAIN_LAND 2): a sea unit stands on water, on a plot not of water only where a district stands (plot virtual +0x40) whose info word +0x14 carries the water bit (0x81240 argument 0, bit 1); a land unit the same with the land bit (argument 2, bit 4) on water it may not embark onto. A City Centre's word answers both: a hull stands on its centre."
   status: READ
   cases:
+    - recording: h1_dueld1128
+      turn: 56
+      value: Rome's Galley 1245190 trained onto its centre 42:20
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
@@ -197,10 +207,11 @@
     - ...ist at the player's +0x1308 -> +0xd8) other than its own plot where it may be placed (0x586360), a city centre only for a unit of a domain other than land; the first strictly nearest...
     - ...tance max(|dx|, |dy|) where the signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag 0x40), the player revealed it, no other player's unit on it and none of its own...
     - "...tside its own territory heads for its player's nearest city (first of equals) — where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no influence map: every plot read..."
-  review: imported
+  review: reviewed
 - addr: 0x586900
   final: 0x3b0e80
   kind: function
+  semantics: "a unit may end on the plot (flags: 1 the finder's 0x10, 8 its 0x4): another player's unit at peace it passes and never ends on; a city-state's unit never takes a major's territory the major's Early Empire closes and no war opens."
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -223,10 +234,11 @@
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:
     - "...PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a plot only where 0x586900 lets the unit end — another player's unit at peace it passes and never ends on (runs/h1..."
-  review: imported
+  review: reviewed
 - addr: 0x586d40
   final: 0x3b11b0
   kind: function
+  semantics: "places a unit at a plot (unit, plot, flags, ...): flags 1 run the location test 0x586360 with no flag bit set; a refused plot goes to FindAlternateLocation 0x585940 (range 10)."
   status: PARTLY
   impl: [cpu/core/fog.ts:majorLookMeets, cpu/core/units.ts:spawnUnit]
   readings:
@@ -241,7 +253,7 @@
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."
     - "...The triggers: a unit placed on a plot another player sees (0x5246f0, from the placement 0x586d40: each player whose visibility count of the plot is above 0); a plot coming into view me..."
-  review: imported
+  review: reviewed
 - addr: 0x587ca0
   final: 0x3b20a0
   kind: function

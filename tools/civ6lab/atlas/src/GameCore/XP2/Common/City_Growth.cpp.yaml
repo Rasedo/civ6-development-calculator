@@ -162,14 +162,17 @@
 - addr: 0x1b6180
   final: 0x124750
   kind: function
+  semantics: "the city's growth percent: adds its game-config growth term to CityGrowth +0x84 (m_iOtherGrowthModifier)."
   status: PARTLY
   impl: [cpu/core/city.ts:m256, cpu/harness/import.ts:foldGrowthDrift]
-  readings: ["C-94: the growth modifier — READ (the accumulator's writer unread)"]
+  readings:
+    - "C-94: the growth modifier — READ (the accumulator's writer unread)"
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...tyGrowth 0x1b62d0, beside housing 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c) and occupation 0x1b6120 (+0x20). 0x1b62d0:"
     - "- r += other (0x1b6180): a game-configuration percent turned to fixed point through float (floor of the value,..."
-  review: imported
+  review: reviewed
 - addr: 0x1b62d0
   kind: function
   name: CityGrowth
@@ -192,6 +195,7 @@
   final: 0x1249b0
   kind: function
   name: turnsToGrow
+  semantics: "turnsToGrow: (the threshold 0x5276e0 less the store +0x80) over S x the overall growth multiplier 0x1b62d0, rounded up; -1 with no surplus."
   status: PARTLY
   cases:
     - recording: 1124
@@ -202,4 +206,4 @@
     - ".claude/scratchpad/cb4/NOTES.md: ...(code): - aiCityBuild.ts: CityGrowth/growthForecast (0x5cb570)/housingValue (0x7a3d70)/turnsToGrow (0x1b6390); unitValueExit   (0x7b62c0 exits: T>=H, version, non-full non-tribe at peace >5 units, Spy non-ful..."
   context:
     - ...or g (0x1b5f70); where g < 1 a step (0, S(1 - g), pop); the turns to the next citizen 0x1b6390 (the threshold 0x5276e0 less the store +0x80 over S x the overall growth multiplier 0x1...
-  review: imported
+  review: reviewed

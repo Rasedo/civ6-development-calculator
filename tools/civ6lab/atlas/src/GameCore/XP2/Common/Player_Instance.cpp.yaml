@@ -6,6 +6,7 @@
 - addr: 0x467cd0
   final: 0x2f7db0
   kind: function
+  semantics: PlayerCities m_eHomeContinent (+0x160).
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -16,10 +17,11 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - ...else the city's plot continent, +0x30, against the owner's PlayerCities m_eHomeContinent, 0x467cd0 -> +0x160, named in the constructor 0x36a870; a city-state's one city on it, the Free Cit...
-  review: imported
+  review: reviewed
 - addr: 0x467eb0
   final: 0x2f7ed0
   kind: function
+  semantics: the player's era (player +0x1358 +0xf8).
   status: READ
   cases:
     - recording: 1104
@@ -45,7 +47,7 @@
     - "- A player's era (0x467eb0, the techs object +0xf8) is the highest era of its techs and civics as of its turn's en..."
     - "...x6c4); when TOURISM_ADVANCED_ERA_WONDER (GP +0x6c0) is set, plus the owner's era index (0x467eb0) less the wonder's — its PrereqTech's era (+0x210 → +0xc0), else its PrereqCivic's (+..."
     - "...of its PrereqTech's and PrereqCivic's, none for a unit with neither) the actor's era (0x467eb0: the latest era of its techs and civics); the picker draws \"Choosing random unit..."
-  review: imported
+  review: reviewed
 - addr: 0x467f50
   final: 0x2f7f50
   kind: function
@@ -79,6 +81,7 @@
   final: 0x2f80e0
   kind: function
   name: m_yieldPriorityBoost
+  semantics: "AI::Religious m_yieldPriorityBoost of a player (GlobalAI +0x628 per player, data +0x340): Faith only."
   status: PARTLY
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -87,7 +90,7 @@
   context:
     - ...(Gold 0.5) x (1 + min(w[y], 9.0)), w[y] = 0x702ad0, the sum of five per-player arrays (0x4681a0 +0x340, player +0x1288 +0x528, the AI yields' +0x638, +0x7a8, the +0x6b0 list or +0x6c8...
     - "- AI::Religious m_yieldPriorityBoost (0x4681a0 -> GlobalAI +0x628 per player, data +0x340): Faith only. 0x74f5a0 each turn: 0; when a..."
-  review: imported
+  review: reviewed
 - addr: 0x4681c0
   final: 0x3e7b70
   kind: function
@@ -224,6 +227,7 @@
 - addr: 0x469d40
   final: 0x2f97f0
   kind: function
+  semantics: the player is the Free Cities (civilization level 0x4e6b0a0, CIVILIZATION_LEVEL_FREE_CITIES).
   status: PARTLY
   cases:
     - recording: 1117
@@ -235,7 +239,7 @@
     - ".claude/scratchpad/cb4/NOTES.md: ...0 MakeTradeRoute, bit 2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDENAGE_POINT, f2e214 GOVERNOR, f2e218..."
   context:
     - ...OM_FREE_CITIES / _CITY_STATES (gp +0x40c / +0x408) where P is a Free City / city-state (0x469d40 / 0x469de0); for each p CAPITAL_IDENTITY_PRESSURE (0x1a0140; MAXIMUM / MINIMUM 0) and i...
-  review: imported
+  review: reviewed
 - addr: 0x469d70
   final: 0x2f9820
   kind: function
@@ -299,6 +303,7 @@
 - addr: 0x469de0
   final: 0x2f9890
   kind: function
+  semantics: the player is a city-state (0xc2577075).
   status: PARTLY
   impl: [cpu/core/aiResource.ts:ResourceFacts]
   readings:
@@ -311,4 +316,4 @@
     - ".claude/scratchpad/cb4/NOTES.md: ...2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDENAGE_POINT, f2e214 GOVERNOR, f2e218 GPP_GENERAL..f2e238 G..."
   context:
     - ...ERS writes it). A major's city adds X as it stands. A minor's city with a bonus type (0x469de0, 0x467f50) adds X x (100 + a) / 100 where a is the ORIGIN player's Congress entry for t...
-  review: imported
+  review: reviewed

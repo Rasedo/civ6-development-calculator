@@ -66,6 +66,7 @@
 - addr: 0x4a72c0
   final: 0x31e910
   kind: function
+  semantics: adds a power plant's burn << 8 to Player_Resources +0x440 (called only by the power pass 0x4a7cc0).
   status: READ
   cases:
     - recording: 1128
@@ -77,7 +78,7 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "...from DoTurn) sets against +0x350 for its shortage. +0x440 is the power plants' burn: 0x4a72c0, called only by the power pass 0x4a7cc0 (xExtraPowerAvailable), adds each burn << 8 to..."
-  review: imported
+  review: reviewed
 - addr: 0x4a7400
   kind: function
   status: PARTLY
@@ -121,6 +122,7 @@
 - addr: 0x4a79e0
   final: 0x31eb90
   kind: function
+  semantics: "the resources' turn (from DoTurn): sets +0x440 plus the units' bill against the income +0x350 for its shortage."
   status: READ
   cases:
     - recording: 1128
@@ -132,10 +134,11 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "...it plus the units' fuel bill (0x4ab270: +0x12e8 +0x1168, << 8) — the same sum the turn (0x4a79e0, from DoTurn) sets against +0x350 for its shortage. +0x440 is the power plants' burn:..."
-  review: imported
+  review: reviewed
 - addr: 0x4a7cc0
   final: 0x31ed80
   kind: function
+  semantics: the power pass (xExtraPowerAvailable).
   status: PARTLY
   impl: [cpu/core/stockpile.ts:resolveSeatPower, gpu/core/sim_seats.py:_resolve_seat_power]
   readings:
@@ -143,7 +146,7 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - ...resource skips it), the copies 0x44eff0 hands a resource's recipients, the power ledger 0x4a7cc0.
-  review: imported
+  review: reviewed
 - addr: 0x4a8ed0
   final: 0x31f520
   kind: function
@@ -402,6 +405,7 @@
 - addr: 0x4ab270
   final: 0x320ba0
   kind: function
+  semantics: the units' fuel bill of a resource (+0x12e8 +0x1168, << 8).
   status: PARTLY
   impl:
     - cpu/core/aiUnitProduction.ts:UnitProductionRow
@@ -412,7 +416,7 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "...PARTLY READ: the strategic stockpile terms — Player_Resources +0x350 (0x4aa700) against 0x4ab270 (the player's +0x12e8 +0x1168) where their difference is negative, the cap 0x4aabe0 les..."
-  review: imported
+  review: reviewed
 - addr: 0x4ab4b0
   final: 0x320d20
   kind: function
@@ -527,6 +531,7 @@
 - addr: 0x4ac140
   final: 0x3215d0
   kind: function
+  semantics: the suzerain sees the resource (the plot test's reading of an unrevealed resource).
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -553,7 +558,7 @@
     - "...40, count +0x42 > 0) when the plot's owner is the player, the resource's condition holds (0x4ac140, the revealing tech), and EITHER a district stands there — any type, the city centre incl..."
     - "0x4ac140 (a player's resource condition, 0x4ab4b0's): the player's own reveal bit (+0xf0), then —..."
     - "...StrategicResources — a RESOURCECLASS_STRATEGIC resource whose condition the player meets (0x4ac140) with its stockpile (0x4aa790) below the cap (0x4aabe0). The engines take CityState, Stra..."
-  review: imported
+  review: reviewed
 - addr: 0x4ac2e0
   final: 0x321710
   kind: function
@@ -565,6 +570,7 @@
 - addr: 0x4ade20
   final: 0x322770
   kind: function
+  semantics: clears Player_Resources +0x440.
   status: READ
   cases:
     - recording: 1128
@@ -576,7 +582,7 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "...lled only by the power pass 0x4a7cc0 (xExtraPowerAvailable), adds each burn << 8 to it, 0x4ade20 clears it. The port sets the income against the units' bill alone: no city-state of t..."
-  review: imported
+  review: reviewed
 - addr: 0x4ae4e0
   final: 0x322f00
   kind: function

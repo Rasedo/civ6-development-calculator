@@ -7,7 +7,7 @@
   final: 0x1905f0
   kind: function
   name: District::GetYield
-  semantics: none where +0xc88; the adjacency at the district's plot (0x366df0) + 0x24acc0 + 0x249db0 of the yield, x (100 + 0x249940) / 100
+  semantics: "District::GetYield: none where the district's +0xc88 is set; the adjacency at its plot +0x218 (0x366df0), plus 0x24acc0 and 0x249db0 of the yield, x (100 + 0x249940) / 100."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -56,6 +56,7 @@
   review: imported
 - addr: 0x249e40
   kind: function
+  semantics: a district's strike reach.
   status: PARTLY
   impl: [gpu/core/sim_tactics.py:_ATTACK_SIGHT]
   readings:
@@ -66,10 +67,11 @@
     - ".claude/scratchpad/st1/reading.md: ...e the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player's own cities: the centre 0,..."
   context:
     - "...er sees: its strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the player's own cities: the..."
-  review: imported
+  review: reviewed
 - addr: 0x249ee0
   final: 0x190be0
   kind: function
+  semantics: the city centre's ranged strike strength.
   status: READ
   cases:
     - recording: 1120
@@ -95,10 +97,11 @@
   context:
     - "- A city's strike strength (0x207080 → 0x249ee0): max(PlayerStats +0x150, m_iMaxRangedStrengthTrained (0x4bd030), COMBAT_MINIMUM_CITY_S..."
     - "...h city whose centre the player sees: its strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the..."
-  review: imported
+  review: reviewed
 - addr: 0x24a000
   final: 0x190cc0
   kind: function
+  semantics: "a district's defence base: 0 unless its DistrictInfo has hit points (+0x58 set, +0x5c > 0)."
   status: READ
   cases:
     - recording: 1127
@@ -112,10 +115,11 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "- A district's GetDefenseStrength (Lua 0x98ca00 -> 0x24ae80) is computed live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's un..."
-  review: imported
+  review: reviewed
 - addr: 0x24a180
   final: 0x190d90
   kind: function
+  semantics: "a district's defence terms past the base: its garrison first (the best defender on the district's plot, 0x208b80 flags 0x10: its Combat << 8 less the wounded loss 0x522630, less the base, where positive), then the walls and the rest the centre reads."
   status: READ
   cases:
     - recording: 1108
@@ -150,7 +154,7 @@
     - "- The centre's garrison term (0x24a180): FP(Combat incl. formation, 0x56dc90) less the wounded loss, less the base, where posi..."
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units i..."
     - "...h (Lua 0x98ca00 -> 0x24ae80) is computed live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's unit list stands before the in-tur..."
-  review: imported
+  review: reviewed
 - addr: 0x24aae0
   final: 0x191400
   kind: function
@@ -180,6 +184,7 @@
 - addr: 0x24ae50
   final: 0x191650
   kind: function
+  semantics: a district's outer damage (+0x8d8).
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -197,7 +202,7 @@
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "...ble 0xd63a18 slot 1): with arguments and the context's city, its centre's outer damage (0x24ae50 on 0x6da56a3d: district +0x8d8) below its outer maximum (0x24b290 -> City +0x1880, 0x..."
-  review: imported
+  review: reviewed
 - addr: 0x24ae80
   final: 0x191680
   kind: function
@@ -263,6 +268,7 @@
 - addr: 0x24b290
   final: 0x1919b0
   kind: function
+  semantics: a district's outer defence maximum (-> City +0x1880, 0x198310).
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
   readings:
@@ -271,7 +277,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...uilds the law's struct: +0 / +4 the two strengths, +8 the district's maximum hit points 0x24b290, +0xc / +0x10 the outer defense's damage and maximum, +0x14 the pool's hash, +0x1c CO..."
-  review: imported
+  review: reviewed
 - addr: 0x24b4b0
   final: 0x191b50
   kind: function
@@ -288,7 +294,7 @@
   final: 0x191c00
   kind: function
   name: districtYield
-  semantics: "District::GetYield (0x249850) + 0x24aae0 (per entry of the district's +0x3e0 list keyed by the yield, unread): no building's yield"
+  semantics: "a district's yield: District::GetYield 0x249850 + 0x24aae0 (the same per entry of the district's +0x3e0 list keyed by the yield)."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -328,6 +334,7 @@
 - addr: 0x24b960
   final: 0x191f10
   kind: function
+  semantics: "a district's strike stands: its outer damage (+0x8d8) below its outer maximum."
   status: READ
   cases:
     - recording: 1108
@@ -339,7 +346,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "...OuterDefenseStrength (+0x44) and the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the district's outer damage (+0x8d8) below its outer maximum — a breached peri..."
-  review: imported
+  review: reviewed
 - addr: 0x24bf70
   final: 0x1924e0
   kind: function
@@ -354,6 +361,7 @@
 - addr: 0x24c2f0
   final: 0x1928a0
   kind: function
+  semantics: the district defends / exerts a zone (a City Center, an Encampment).
   status: READ
   cases:
     - recording: 1124
@@ -365,10 +373,11 @@
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
   context:
     - "...IENDLY_CITY; a player's at war (0x469cd0) a COMBAT_DISTRICT where the district defends (0x24c2f0: a City Center, an Encampment) — and then nothing else of the plot — and a PASSIVE_DIST..."
-  review: imported
+  review: reviewed
 - addr: 0x24c3a0
   final: 0x192910
   kind: function
+  semantics: the district is pillaged.
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -391,7 +400,7 @@
     - "...ct), is complete (District +0xb08, Lua IsComplete 0x9c83d0) and not pillaged (+0xc88, 0x24c3a0); AdjacentTerrain: the plot's terrain (+0x2c) alone; AdjacentFeature (+0x3c); AdjacentI..."
     - "...s id) is complete (district +0xb08, Lua `District:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers the plot's resource (+0x40, c..."
     - "...he MITIGATING player — the owner (0x24b4b0) of the first complete (+0xb08), unpillaged (0x24c3a0) Dam on the river's plot list, else the Great Bath's (0xa2c280); a mitigating player..."
-  review: imported
+  review: reviewed
 - addr: 0x24c3b0
   final: 0x192920
   kind: function

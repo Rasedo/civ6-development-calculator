@@ -6,6 +6,7 @@
 - addr: 0x5c2610
   final: 0x3d90f0
   kind: function
+  semantics: "the second city hook's job: each city through 0x5ce5b0."
   status: PARTLY
   impl:
     - cpu/core/minorCityAi.ts:minorSecondHook
@@ -16,10 +17,11 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...es, military), then A (the cities 0x5c2650 -> 0x5ce680), then C (the second city hook 0x5c2610 -> 0x5ce5b0: the Default Specialization where the queue is empty, then TryPurchaseUnits..."
-  review: imported
+  review: reviewed
 - addr: 0x5c2650
   final: 0x3d9130
   kind: function
+  semantics: "the player's AI turn: walks its cities through the city AI turn 0x5ce680."
   status: PARTLY
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -31,4 +33,4 @@
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   context:
     - "- The city's turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantage..."
-  review: imported
+  review: reviewed

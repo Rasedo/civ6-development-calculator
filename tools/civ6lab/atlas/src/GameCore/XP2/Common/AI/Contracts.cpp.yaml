@@ -19,16 +19,18 @@
 - addr: 0x5f47c0
   final: 0x3f9300
   kind: function
+  semantics: makes a unit contract.
   status: PARTLY
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...hat unit stays, any other is cancelled (0x5cc8e0) and leaves the tree — a new contract (0x5f47c0): the unit, the Recruit Value (x 3 for a unit row +0x40 above 0), the Time Limit as its..."
-  review: imported
+  review: reviewed
 - addr: 0x5f4be0
   final: 0x3f96f0
   kind: function
+  semantics: "logs \"Tech Contract %d\"."
   status: PARTLY
   cases:
     - recording: AI_Research.csv
@@ -36,10 +38,11 @@
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "...NG / GOAL / BOOSTED, the score and the turns; a row with turns < 0 unowned is not logged; 0x5f4be0 \"Tech Contract %d\")."
-  review: imported
+  review: reviewed
 - addr: 0x5f4cd0
   final: 0x3f97e0
   kind: function
+  semantics: "the CONTRACT log line: the contract's status name (0x600800), its owner tree's name, its value (m_extraPresentValue)."
   status: PARTLY
   impl: [cpu/core/aiContracts.ts:contractLine, cpu/harness/cityBuildLog.ts:BuildLine]
   readings:
@@ -50,11 +53,12 @@
     - ".claude/scratchpad/cb/notes.txt: ...od Adv = adv[YIELD_PRODUCTION] (0x5d83c0 per yield), weights printed from r14+0x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCHASE 0x5f3ee0; queued '... CONTRACT %d' 0x5f3710. YIELD globals: f2f9..."
   context:
     - "...ced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: the contract line 0x5f4cd0, the queued line 0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancellatio..."
-  review: imported
+  review: reviewed
 - addr: 0x5f5650
   final: 0x3f9fa0
   kind: function
   name: the unit contract completion
+  semantics: a unit contract's completion signal.
   status: READ
   cases:
     - recording: h1_duelv1121
@@ -70,6 +74,7 @@
 - addr: 0x5f5940
   final: 0x3fa2a0
   kind: function
+  semantics: "the Tech Contract's check (vt +0x70): no tech (+0x408 -1) CANCELLED, fails; IN PROGRESS with the research (0x761940) other than its next step (+0x468) CANCELLED, fails; the tech held COMPLETED; the tech the research: next step := it, IN PROGRESS; the tech researchable: next step := it; else a next step still researchable stays; else the prerequisites walked from the tech (0x353cb0) to an unheld researchable one."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -81,4 +86,4 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...the row unowned (+0x18 clear); a contract IN PROGRESS (5) or ACCEPTED (3) whose +0x70 (0x5f5940) holds is also called at +0x10, any other released (0x600b00) after the add (`researchA..."
-  review: imported
+  review: reviewed

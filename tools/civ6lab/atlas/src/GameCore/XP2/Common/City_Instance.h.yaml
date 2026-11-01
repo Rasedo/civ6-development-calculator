@@ -29,8 +29,12 @@
 - addr: 0xb7e0d0
   kind: function
   name: EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION
+  semantics: "EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION's apply (vt 0xdf78a8 +0x60, registered 0xc1e610): per Units row whose FormationClass (+0xa0, 0xadd5e0) is not the civilian one (2) and whose PrereqCivic's / PrereqTech's era (+0x270 / +0x280) lies in StartEra..EndEra, the Amount onto the city's per-unit production modifier (0xc6f950) — support units too."
   status: PARTLY
   cases:
+    - recording: h1_duelv1121
+      turn: 17
+      value: Hunza's Battering Ram valued at its Spearman's 22 turns, -3.10 as logged
     - recording: h1_duelv1121
       turn: 17
       value: "read back by 0x17c1c0: city +0x2c0[unit] +   player +0x12e8 +0x4a0[unit]) — support units too (runs/h1_duelv1121 t17   Hunza's Battering Ram valued at its Spearman's 22 turns, -3.10 as logged,   again"
@@ -39,7 +43,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...UNITS_PRODUCTION, registered 0xc1e610, its arguments' object vt 0xdf78a8, apply +0x60 0xb7e0d0): per Units row whose FormationClass (+0xa0, 0xadd5e0) is not the civilian one (2) and..."
-  review: imported
+  review: reviewed
 - addr: 0xbb9de0
   kind: function
   name: EFFECT_ADJUST_VALID_FEATURES_DISTRICTS

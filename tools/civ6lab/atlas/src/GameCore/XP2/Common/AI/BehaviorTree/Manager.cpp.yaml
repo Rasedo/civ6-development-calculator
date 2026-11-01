@@ -6,6 +6,7 @@
 - addr: 0x7ff7b0
   final: 0x5636d0
   kind: function
+  semantics: makes a tree in the tree manager's pool (+0x3a0) through 0x7fef20.
   status: READ
   cases:
     - recording: h1_duelw1110
@@ -18,10 +19,11 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...31: \"Barbarian City Assault, Started\" first). THE TREE POOL (the manager +0x3a0, READ): 0x7ff7b0 makes a tree in the pool by 0x7fef20 — the slot its free list's head (+0x2c, each entry..."
-  review: imported
+  review: reviewed
 - addr: 0x7ff9a0
   final: 0x563840
   kind: function
+  semantics: makes a behaviour tree (the events'); never ticked by its event.
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -30,4 +32,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...nt 0x5ccc10 (slot 3), 0x5cd4e0; then 0x5d4d70 where the queue is empty. A tree is made (0x7ff9a0) and seeded (0x7cb230) by its event, never ticked there: no city-tree contract of the f..."
-  review: imported
+  review: reviewed

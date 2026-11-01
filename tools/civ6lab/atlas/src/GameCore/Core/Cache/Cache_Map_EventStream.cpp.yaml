@@ -6,6 +6,7 @@
 - addr: 0x154c0
   final: 0xfce80
   kind: function
+  semantics: the plot is revealed (the planning node's +0x51 bit 0).
   status: PARTLY
   impl: [cpu/core/tactical.ts:ex, cpu/core/tactical.ts:ignoresZoc]
   readings:
@@ -15,4 +16,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...— save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0, 0x154c0) the step costs the parent's or 1 and no rule runs."
-  review: imported
+  review: reviewed

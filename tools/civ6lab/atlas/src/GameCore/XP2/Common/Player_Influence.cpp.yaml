@@ -6,6 +6,7 @@
 - addr: 0x449940
   final: 0x2e8f10
   kind: function
+  semantics: the player may give Influence (its civilization level's flag +0x28 bit 6).
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
@@ -15,10 +16,11 @@
   context:
     - ...or, both alive (+0x728), the client a minor and the actor a major (Influence 0x449cc0 / 0x449940), the client has met the actor (0x3daaf0) and is not at war with it (0x3dcec0), then...
     - "...FECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN 0x6afcd0 (a player that may take Influence, 0x449940: the Game +0x3f8 +0x1650 list's count x Player_Influence +0x270 x the amount as PSEUDOY..."
-  review: imported
+  review: reviewed
 - addr: 0x449b70
   final: 0x2e90f0
   kind: function
+  semantics: "the levy (Allow Levying, \"LEVIED FROM\")."
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:recruitContract]
   readings:
@@ -26,7 +28,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0), the tree's, submitted (0x60bb50) and held under the tag. The levy (Allow Levying, 0x449b70, \"LEVIED FROM\") and the stealing signal's gate (player signal +0x1c8, Allow Stealing) a..."
-  review: imported
+  review: reviewed
 - addr: 0x449cc0
   final: 0x2e9200
   kind: function
@@ -46,6 +48,7 @@
   review: imported
 - addr: 0x44a440
   kind: function
+  semantics: the player's envoys placed.
   status: PARTLY
   impl: [cpu/core/aiValue.ts:AiValueView]
   readings:
@@ -53,9 +56,10 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...KEN 0x6a9550 (a yield filter, context +0x64, -1 or the YieldType): the envoys placed (0x44a440) x Amount, weighted, between."
-  review: imported
+  review: reviewed
 - addr: 0x44a5a0
   kind: function
+  semantics: the city-states the player is suzerain of.
   status: PARTLY
   impl: [cpu/core/aiValue.ts:AiValueView]
   readings:
@@ -63,7 +67,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ELD_CHANGE_PER_TRIBUTARY 0x6ac7f0 (the same filter): the city-states it is suzerain of (0x44a5a0) x Amount, weighted, span."
-  review: imported
+  review: reviewed
 - addr: 0x44c4b0
   kind: function
   status: READ
@@ -104,6 +108,7 @@
 - addr: 0x44c850
   final: 0x2ea6e0
   kind: function
+  semantics: a city-state's suzerain.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -116,10 +121,11 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "...yer's own reveal bit (+0xf0), then — where its influence component's suzerain (+0x1368 -> 0x44c850) is a player — the SUZERAIN's resource condition, recursively; then the reveal modifiers,..."
-  review: imported
+  review: reviewed
 - addr: 0x44c860
   kind: function
   name: GetTokensReceived
+  semantics: GetTokensReceived (the store +0x5d0 and a governor's 0x44caa0).
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -134,7 +140,7 @@
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
   context:
     - "...AS_GIVEN_INFLUENCE_TOKENS 0x6d45b0: the tokens the city-state received from the player (0x44c860, the store +0x5d0 and a posted governor's 0x44caa0) plus the context's n reach Minimu..."
-  review: imported
+  review: reviewed
 - addr: 0x44caa0
   kind: function
   status: PARTLY
@@ -167,12 +173,13 @@
 - addr: 0x44eaa0
   final: 0x2ebbb0
   kind: function
+  semantics: "a government's adoption: adds its InfluencePointsThreshold at the speed to Player_Influence +0x270."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - "...rt; +0x270 is the government's InfluencePointsThreshold at the speed, added on adoption 0x44eaa0). PARTLY: Discipline's 0x6bef40 (a combat unit; the barbarians' units the AI knows with..."
-  review: imported
+  review: reviewed
 - addr: 0x44eff0
   final: 0x2ebe60
   kind: function
@@ -238,6 +245,7 @@
   final: 0x2edf10
   kind: function
   name: Player_Influence
+  semantics: "the suzerain's update (\"Attempting to update the suzerain\"): a major sees what each city-state it is suzerain of sees (0x508330)."
   status: PARTLY
   impl: [cpu/core/barbarians.ts:plotsSeenNow]
   readings:
@@ -245,4 +253,4 @@
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - "- A suzerain CHANGE (Player_Influence 0x451b20, reached from the envoy setters 0x44a040 / 0x450fb0 / 0x451460; old != new or it return..."
-  review: imported
+  review: reviewed

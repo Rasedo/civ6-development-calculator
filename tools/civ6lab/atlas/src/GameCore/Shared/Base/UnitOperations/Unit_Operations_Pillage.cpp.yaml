@@ -6,6 +6,7 @@
 - addr: 0x963190
   final: 0x66dd30
   kind: function
+  semantics: the pillage mission (Operation Pillage's, Defend Units' plunder).
   status: PARTLY
   impl: [cpu/core/operations/assault.ts:pillageExecute, cpu/core/tactical.ts:passPillage]
   readings:
@@ -14,10 +15,11 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...a member standing on it with Movement left, on land, no bombard strength, pillages it (0x963190; \"Operation Pillage City\")."
-  review: imported
+  review: reviewed
 - addr: 0x9633c0
   final: 0x66dee0
   kind: function
+  semantics: "the pillage: raises game signal +0x8d0 (the tribe's raid score)."
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -25,4 +27,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...a game signal for the target. The score: the game signal +0x8d0 — raised by the pillage 0x9633c0, the coastal raids 0x95ba10 / 0xa4fbc0 and a district's pillage in combat 0x20bae0 — ru..."
-  review: imported
+  review: reviewed

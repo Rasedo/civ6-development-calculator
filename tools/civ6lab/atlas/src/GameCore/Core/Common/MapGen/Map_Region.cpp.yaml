@@ -17,6 +17,7 @@
   final: 0x2c360
   kind: function
   name: cube rounding
+  semantics: "cube rounding: each component roundf'd; where they no longer sum to 0 the one furthest by the sum's sign rebuilt."
   status: PARTLY
   impl: [cpu/core/operations/assault.ts:cubePlot, cpu/core/operations/assault.ts:updateTeam]
   readings:

@@ -6,6 +6,7 @@
 - addr: 0x725000
   final: 0x4d07f0
   kind: function
+  semantics: "the manager ends an operation whose tree is gone (\"Operation complete\", -> 0x7353d0)."
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -13,10 +14,11 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x73a840 finds the operation's tree gone and the manager ends it (\"Operation complete\", 0x725000 -> 0x7353d0)."
-  review: imported
+  review: reviewed
 - addr: 0x7ff430
   final: 0x563440
   kind: function
+  semantics: a new block of tree pool slots.
   status: READ
   cases:
     - recording: h1_duelw1110
@@ -29,4 +31,4 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...slot its free list's head (+0x2c, each entry's +8 the next) names, else a new block's (0x7ff430); the id (+0x28 += 0x10000) | slot; the used list (head +0x38, tail +0x40, each entry's...
-  review: imported
+  review: reviewed

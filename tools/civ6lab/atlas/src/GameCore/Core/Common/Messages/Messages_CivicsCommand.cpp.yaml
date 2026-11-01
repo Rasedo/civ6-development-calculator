@@ -6,6 +6,7 @@
 - addr: 0x44bb0
   final: 0x34840
   kind: function
+  semantics: the civics command (1 a government, 0 a policy).
   status: PARTLY
   readings:
     - "C-94: the slot rebuild — READ"
@@ -14,4 +15,4 @@
   context:
     - "...it), store, signal ADDED. ClearPolicySlot 0x394730: unflag, REMOVED. The civics command 0x44bb0 (type 0 set one slot, 1 government, 2 clear one slot, 3 the UI's clear list then add li..."
     - "...orizons[0]; the first strictly highest; a different one is commanded (civics command 1, 0x44bb0; the slot rebuild follows, \"C-94: the slot rebuild\") and logged. Then each slot of the..."
-  review: imported
+  review: reviewed

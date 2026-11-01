@@ -34,6 +34,7 @@
 - addr: 0x82a10
   final: 0x5fe00
   kind: function
+  semantics: the city has water (a NAVAL unit's exit with no Harbor).
   status: PARTLY
   cases:
     - recording: 1124
@@ -52,7 +53,7 @@
     - "...ture, no river (plot byte +0x37), not water and not beside an ocean-sized water body (0x82a10), Plains / Grassland (hills too), not under an event — its score 0x28ff20 = 1 + min(hex..."
     - "...city holds no aircraft, else 5.0 a free slot; NAVAL FX(-9999) at a city with no water (0x82a10) and no Harbor (0xcbecc739) for a unit of no RangedCombat (+0x6c). TRADE: 0x7a7110 thro..."
     - "...plot (PROMISE_DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30), coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min, 0 with none); the danger (the..."
-  review: imported
+  review: reviewed
 - addr: 0x82c20
   final: 0x60010
   kind: function
@@ -124,6 +125,7 @@
 - addr: 0x834d0
   final: 0x60820
   kind: function
+  semantics: the plot is water.
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -149,10 +151,11 @@
     - "...rrying both (or neither) is neither land nor water. Without a district: land = not water (0x834d0). Who writes word +0x14 is unread; the records fix the answers (below)."
     - ...eveal condition) adds RESOURCE_COST when d <= 3, any other plot adds WATER_COST if water (0x834d0) and RING_COST when d > 3; an improvement adds RING_COST if it is the barbarian camp (0x3...
     - "...e strike, per plot of the record (a fire is Hexes 1: its plot): unless the plot is water (0x834d0) or impassable (byte +0x3a bit 3), each `RandomEvent_Yields` row whose Turn (+0x30, gated..."
-  review: imported
+  review: reviewed
 - addr: 0x84340
   final: 0x61280
   kind: function
+  semantics: the visibility of an improvement's ring.
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -164,10 +167,11 @@
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - "..., a plot's owner (0x84760, territory: none for the barbarians), an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0: the plot and the six beside it, no line of sig..."
-  review: imported
+  review: reviewed
 - addr: 0x84760
   final: 0x616a0
   kind: function
+  semantics: "SetOwner: a plot's owner changes the visibility count on the plot and its six neighbours."
   status: READ
   cases:
     - recording: h1_duelw1124

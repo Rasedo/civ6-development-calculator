@@ -54,6 +54,7 @@
   final: 0x131a10
   kind: function
   name: the city trains a domain
+  semantics: "the city trains a domain: a district of the domain, land, or the sea where the centre's plot's +0x40 and its flags +0x14 bit 0 hold."
   status: PARTLY
   cases:
     - recording: h1_duely1121
@@ -141,6 +142,7 @@
 - addr: 0x1cb8b0
   kind: function
   name: City::GetYield
+  semantics: City::GetYield.
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
@@ -151,10 +153,11 @@
   context:
     - "...x(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption 0x5276c0 of the new population. One entry per free slot of e..."
     - ...- PV(start), 0x7a2140); EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90 (min(City::GetYield 0x1cb8b0, 100) x the percent x 0.01f, weighted, the same span); EFFECT_ADJUST_PLAYER_YIELD_CHA...
-  review: imported
+  review: reviewed
 - addr: 0x1cb9f0
   final: 0x1334c0
   kind: function
+  semantics: the city's Production.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -171,7 +174,7 @@
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
   context:
     - "...its whole part added. The train turns 0x17bb40(unit, 0, &extra): the city's Production (0x1cb9f0) x (the unit's production multiplier 0x17c1c0 + extra), the cost (0x17bfa0) less the un..."
-  review: imported
+  review: reviewed
 - addr: 0x1cbd10
   kind: function
   status: READ

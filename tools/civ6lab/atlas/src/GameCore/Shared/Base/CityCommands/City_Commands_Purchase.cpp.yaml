@@ -6,6 +6,7 @@
 - addr: 0x977490
   final: 0x6809a0
   kind: function
+  semantics: the building purchase request (city +0x158, the yield).
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -25,12 +26,16 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - ...ryPurchaseUnits' savings test without its threatened-city balance; the purchase request 0x977490 (city +0x158, YIELD_GOLD) and the command vt +0x48 / +0x50; the spend SLUSH -= max(0, p...
-  review: imported
+  review: reviewed
 - addr: 0x977570
   final: 0x680a80
   kind: function
+  semantics: "the unit purchase request: a land unit bought stands on the city's centre, refused where a unit of its stacking class stands there (a Trader holds no slot)."
   status: PARTLY
   cases:
+    - recording: h1_duelm1117
+      turn: 24
+      value: "Antananarivo t24-t26 threat 4, Archer at 120, a Warrior on the centre: none bought"
     - recording: h1_duelu1117
       turn: 195
       value: "an obsolete unit refused: Valletta's Warrior contract 680 passes the savings test t195-t220 and is never bought; the record's purchase list holds no obsolete unit (the command's own CanTrain test, unread)"
@@ -47,4 +52,4 @@
     - "builds the purchase request; the command it submits validates it — the CanTrain refusal is read off the records, its code unread"
   context:
     - "...I +0x1b8's low byte) set — the balance (+0x1b8) at or above it; the purchase request (0x977570, the game core's +0x48 / +0x50); then the spend: UNITS then SLUSH for the overflow, a t..."
-  review: imported
+  review: reviewed

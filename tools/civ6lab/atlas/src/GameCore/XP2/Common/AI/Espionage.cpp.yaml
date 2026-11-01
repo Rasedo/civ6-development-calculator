@@ -15,6 +15,7 @@
   review: imported
 - addr: 0x695660
   kind: function
+  semantics: the espionage AI's unit move (sets the turn done).
   status: READ
   cases:
     - recording: 1128
@@ -25,4 +26,4 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...s), the homeland (0x70a440), Defend Units, a conversion (0x590a30), the espionage AI (0x695660), a retreat (0x212500), and the unit-created handler 0x60a440 (player signals +0x60, ra...
-  review: imported
+  review: reviewed

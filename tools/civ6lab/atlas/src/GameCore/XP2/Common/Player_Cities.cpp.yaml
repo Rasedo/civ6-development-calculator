@@ -18,6 +18,7 @@
 - addr: 0x36f460
   final: 0x265450
   kind: function
+  semantics: the player's capital (none -> null).
   status: READ
   cases:
     - recording: h1_duelw1109
@@ -35,10 +36,11 @@
   context:
     - ...rst city wins a tie) takes the spawn, on its centre (+0x158); none, the capital's centre (0x36f460), else the player's start plot (+0x1398). A sea unit (domain 0) walks the player's distri...
     - "...tes a Relic through 0x495860 → 0x296c00 (\"Choosing a Relic\") with the player's capital (0x36f460). No record shows it (no Kandy suzerain discovered a wonder in the duels). `revealAroun..."
-  review: imported
+  review: reviewed
 - addr: 0x36f660
   final: 0xff430
   kind: function
+  semantics: the unit's city (unit +0x11d0, its group).
   status: PARTLY
   cases:
     - recording: AI_Tactical.csv
@@ -49,7 +51,7 @@
     - ".claude/scratchpad/mu1/readings_c96.md: ...x469db0, CIVILIZATION_LEVEL_FULL_CIV)   only DEFENDER units, round the unit's city (+0x11d0 through 0x36f660),   the garrison test 0x5cdce0 first (\"Garrison\" rows, a draw over one plot);   for anyone else eve..."
   context:
     - "...IVILIZATION_LEVEL_FULL_CIV) only DEFENDER units, round the unit's city (+0x11d0 through 0x36f660), the garrison test 0x5cdce0 first (\"Garrison\" rows, a draw over one plot); for anyon..."
-  review: imported
+  review: reviewed
 - addr: 0x36f6c0
   final: 0x265510
   kind: function

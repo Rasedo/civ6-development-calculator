@@ -6,15 +6,17 @@
 - addr: 0x149f30
   final: 0xdd870
   kind: function
+  semantics: pops the asked list's head.
   status: PARTLY
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...list (+0x90, count +0xa0) — its head raised straight (0x144fb0, uncounted) and popped (0x149f30); else a pending melee count +0xa8 > 0 — a melee raise (0x144b20, counted) and +0xa8 lo..."
-  review: imported
+  review: reviewed
 - addr: 0x25d5f0
   final: 0x19c640
   kind: function
+  semantics: the player ranks in the top quarter of a running competition.
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
@@ -22,7 +24,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...x P + W x P / r^2, r one less per running competition it ranks in the top quarter of, 0x25d5f0); PLAYER_GRIEVANCE_GENERATION 0x6c3bc0 (on itself gaining: its grievances x Amount / 10..."
-  review: imported
+  review: reviewed
 - addr: 0x273a40
   final: 0x1ab5c0
   kind: function
@@ -82,6 +84,7 @@
   review: reviewed
 - addr: 0x2d2220
   kind: function
+  semantics: the plot is revealed to the player.
   status: PARTLY
   cases:
     - recording: AI_Tactical.csv
@@ -94,7 +97,7 @@
     - ".claude/scratchpad/mu1/readings_c96.md: ...(0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the   move 0x962030 to the plot drawn..."
   context:
     - "...; the weighted vector's weights (influence 0x716a60, the plot's owner +0x60, revealed 0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the move 0x962030 to the p..."
-  review: imported
+  review: reviewed
 - addr: 0x2e04e0
   kind: function
   name: addTrust
@@ -121,22 +124,24 @@
   review: imported
 - addr: 0x35e320
   kind: function
+  semantics: the governor holds the promotion.
   status: PARTLY
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - ...at its best slot value, an appointed one at each promotion of its set it does not hold (0x35e320) and may take (0x431400) at the promotion's score; the first strictly highest above 0...
-  review: imported
+  review: reviewed
 - addr: 0x3ffaf0
   final: 0x2bf180
   kind: function
+  semantics: a trading partner's value (TradingPartners' sum; its list unread).
   status: PARTLY
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...he option, the context): TradingPartners 0x682fb0 (+0x40: the alive majors met, a value 0x3ffaf0 sums of each — its list unread, the port reads 0 —, A the last not at war at or above t..."
-  review: imported
+  review: reviewed
 - addr: 0x487650
   kind: function
   name: recordCongressOption
@@ -167,6 +172,7 @@
 - addr: 0x58aa90
   final: 0x3b4040
   kind: function
+  semantics: "the unit sight update: raises game signal +0x10c8 per plot whose owner's visibility count went from 0 to more (0x508d50 answering 2); a move adds the new sight before dropping the old."
   status: PARTLY
   impl:
     - cpu/harness/drawSites.ts:DRAW_SITES
@@ -186,7 +192,7 @@
   context:
     - ...is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2:...
     - "- A plot first revealed to a player (0x534950, from the sight update 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\") and its territory (0xa36ff0: \"Ra..."
-  review: imported
+  review: reviewed
 - addr: 0x5c9700
   final: 0x3de990
   kind: function
@@ -317,13 +323,14 @@
   review: imported
 - addr: 0x6fde70
   kind: function
+  semantics: "applies the leader's and the civilization's trait lists (AiLists LeaderType one of their traits; a row kept when the player's handicap, player +0x908, is within its MinDifficulty..MaxDifficulty) to the list systems' arrays. A major's DefaultYieldBias (TRAIT_LEADER_MAJOR_CIV): Production +25, Gold +20, Science +10, Culture +10, Faith -25; no city-state trait has a Yields list."
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...lAI +0x2360, registered in 0x6dd9a0 with the retrieval 0x6e3fe0 -> +0x7a8). 0x6fece0 -> 0x6fde70 applies the leader's and the civilization's trait lists (AiLists LeaderType = one of th...
-  review: imported
+  review: reviewed
 - addr: 0x6fe240
   kind: function
   status: PARTLY
@@ -345,13 +352,14 @@
 - addr: 0x6fece0
   final: 0x4b39a0
   kind: function
+  semantics: rebuilds the list systems' arrays (-> 0x6fde70).
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...tem (GlobalAI +0x2360, registered in 0x6dd9a0 with the retrieval 0x6e3fe0 -> +0x7a8). 0x6fece0 -> 0x6fde70 applies the leader's and the civilization's trait lists (AiLists LeaderType...
-  review: imported
+  review: reviewed
 - addr: 0x700630
   final: 0x4b5160
   kind: function
@@ -374,7 +382,7 @@
 - addr: 0x702ad0
   kind: function
   name: YieldType
-  semantics: "the AI's yield weight w[y] (this AI::GrandStrategic, player +0x1290): AI::Religious' Faith boost (GlobalAI +0x628 data +0x340) + AI::Economic's Gold boost (+0x1288 +0x528) + the victory manager's Yields (+0x638) + the Yields list system (+0x7a8) + the sensitivity boost (+0x6b0 / +0x6c8), each 24.8."
+  semantics: "the AI's yield weight w[y] (this AI::GrandStrategic at player +0x1290, its members named by the constructor 0x6f6e10, a named member's data at its descriptor + 0x58): the sum of five 24.8 parts — AI::Religious m_yieldPriorityBoost (0x4681a0 -> GlobalAI +0x628 per player, data +0x340; Faith only), AI::Economic m_yieldPriorityBoost (player +0x1288, data +0x528; Gold only), the victory manager's Yields (GrandStrategic +0x508, inner +0xd8 = +0x638), the Yields list system (+0x7a8) and m_yieldSensitivityBoost (data +0x6b0, default +0x6c8). No floor. A city-state's w is 0 for every yield but Gold and Faith."
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -396,6 +404,7 @@
   review: reviewed
 - addr: 0x715ff0
   kind: function
+  semantics: "the danger map's district ring lambda: 1 on each plot beside a district with no strike."
   status: PARTLY
   impl: [cpu/core/tactical.ts:dangerPlane]
   readings:
@@ -405,7 +414,7 @@
     - ".claude/scratchpad/st1/reading.md: ...centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player's own cities: the centre 0, each plot their strike covers down by   its strengt..."
   context:
     - "...ts strike (0x249ee0) over its reach (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the player's own cities: the centre 0, each plot their strike covers down by i..."
-  review: imported
+  review: reviewed
 - addr: 0x716400
   final: 0x4c52d0
   kind: function
@@ -431,9 +440,11 @@
 - addr: 0x717460
   kind: function
   name: buildInfluenceMap
-  semantics: "the danger map: hostile units seen over their one-turn reach and a second list (range, a raider's land ring), hostile cities' defence and strike, own cities zeroed and covered"
+  semantics: "the danger map (read by 0x716a90), built at the player's DoTurn (0x4e4560 -> 0x46cdd0 at 0x4e4aa4). Per player at war (0x469cd0), each unit it sees (0x5033a0), not dead, with a combat, ranged or bombard strength, adds its danger (0x716400) once per list entry (loops 0x71690c / 0x7169a1): the one-turn search (0x7921e0 -> 0x26df90, flags 0x311) from where it stands; a second list of the plots within its range (0x1e000) outside them; for a CanRaid unit (+0x18bd) the land plots beside them (ring 0x6b0a0, lambda 0x715f40, water skipped). An air unit (+0x650 1): the plots within its range. Each district of such a player (player +0x1308 -> +0xd8, built or not, wonders included) on a seen plot: its defence (0x24ae80) >> 8 on its plot; its strike (0x249ee0) >> 8 over its strike's reach (0x249e40) less its plot, else 1 on each plot beside it (0x6b1b0 -> 0x691f0, lambda 0x715ff0). A district's defence base (0x24a000) is 0 unless its DistrictInfo has hit points (+0x58, +0x5c > 0); its strike 0 unless 0x24b960 holds. Then the player's own districts: one with a defence its plot 0; each plot of its strike's reach down by the strike, to 1 at least. Last the features' DangerValue (+0x2c): burning forest / jungle 80, the Bermuda Triangle 10."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      value: "the replay's barbarian Current Danger rows: 34 of 35 equal"
     - recording: h1_duelw1117-1128
       turn: all
       value: "the barbarians' logged Current Danger 114 of 240 equal; HL: Move To Safety ends 184 of 371"
@@ -458,8 +469,15 @@
 - addr: 0x71fb80
   kind: function
   name: the military AI's regional strengths
+  semantics: "the military AI's turn (a city-state from 0x7204bc). The strengths: the yardstick B = max(1, PlayerUnits +0xf0 (the best melee Combat made), 0x4bd030); per player in the players list (0x483b50 +0x50) the strength summed over the military AI's primary region list (+0x1290 +0x2f0, every region within three of its cities) of the records 0x5eb430 returns (no area; the record's +0x1c, its plot's region, against the region's id; age at most 2), each unit's max(Combat, RangedCombat) where it plus 20 exceeds B; the player itself adds each city's unit at the head of its queue (0x179860) of such strength — Regional (+0x398); a player at war (0x469cd0) or flagged (+0xd18) gives Enemy (+0x3f8) its max and, not a tribe (0x469ce0), raises the floor M (from -0.5, 0xd5fed0) by 0.5 (0xd20458); any other gives Other (+0x458) its max and, flagged at +0xc58, raises M by 0.25 (0xd2f324). The Combat Desire (0x721302; PSEUDOYIELD_UNIT_COMBAT, +0x790): W := 0; Regional below Enemy: (Enemy - Regional) x 0.05 (0xd55ff0); else below the target, the cities (player +0x12f0 +0xc0) times B: (target - Regional) / B, whole; else Regional - 20 above Enemy: where Regional + 60 is below Other, (Other - Regional - 60) x 0.025 (0xd6ced0) capped at 2.0, else (Enemy - max(Other - 60, Regional)) x 0.025 capped at 3.0. W below -M is 0, else at least M; with no war footing (+0x4b8) and no city's CityBuildAI +0x1b8 at or above 0 at most 2.0; plus PSEUDOYIELD_STANDING_ARMY_VALUE (@0xf2e2b4, 0x7a60d0) of the cities' CityBuildAI +0x2d8 summed. Logged as AI_Military.csv Regional / Enemy / Other Strength and Combat Desire. Also PSEUDOYIELD_UNIT_EXPLORER (desired +0x930 - held +0x9f0) - 1.0 and NAVAL_COMBAT (+0x990 - +0xa50) - 1.0 (0x7204c3..0x7205ae); +0x7e8 for UNIT_COMBAT, NAVAL, EXPLORER, NUCLEAR, STANDING_ARMY."
   status: READ
   cases:
+    - recording: h1_duelv1124
+      turn: 43
+      value: "minor 3: 20/30 -> 0.5 + 0.2 = 0.7; t50 20/50 -> 1.7; t56 0/0 -> 1.0 + 0.2"
+    - recording: h1_duelv1124
+      turn: 9
+      value: "Cardiff's Combat Desire 0.1: the Warrior 10.73 -> 11.05 at the same table value"
     - recording: AI_Military.csv
       value: "- THE COMBAT DESIRE: the military AI's turn (0x71fb80, 0x721302..0x7219ee)   writes the PSEUDOYIELD_UNIT_COMBAT weight (+0x790): from its strengths   (+0x398 its own, +0x3f8 the enemy's, +0x458 the ot"
     - recording: 1124
@@ -498,8 +516,12 @@
   final: 0x4ceb70
   kind: function
   name: the operation candidates (manager +0x328)
+  semantics: "the war gate, per player of the game's list +0x4a0 but the seat: at war (0x469cd0), or flagged in m_prepareForWarWith (+0xbb0 autovariable, data +0xc58) or +0xd18: each allowed definition whose EnemyType is WAR (the +0x178 list, 0x80 each) is a candidate; else allied (0x3da560 / 0x3de4e0): the ALLY ones."
   status: READ
   cases:
+    - recording: h1_duelv1117
+      turn: 20
+      value: China's first war eval line against 3, its desire first positive t18
     - recording: h1_duelv1117
       turn: 20
       value: China's Attack Enemy City against Caguana (3) once prepared for war, no war declared
@@ -515,6 +537,7 @@
   final: 0x4d0770
   kind: function
   name: PrepareForWarWith
+  semantics: "PrepareForWarWith (Lua 0x9bbaa0): set by the war declarations' not-ready hook (0x6742d0) where the players at war or prepared for number at most half the +0xb50 list and the player is neither a declared friend nor an ally; cleared by 0x650890."
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -538,6 +561,7 @@
 - addr: 0x727510
   final: 0x4d26e0
   kind: function
+  semantics: "the military AI's operations log (AI_Operation.csv \"%s running\" lines): walks its operation list. At 0x7277d0: the manager's CITY VALUES lines: each known city of another player, \"%d, %d, -1, CITY VALUES, %3.1f, %s\"; a turn's evaluation reads what the turn before logged."
   status: PARTLY
   impl:
     - cpu/core/barbarianOps.ts:barbarianTrees
@@ -556,11 +580,12 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The manager (0x722690 -> 0x727510). The candidates (0x722d70, 0x70-byte entries at +0x328), built and evaluated before th..."
-  review: imported
+  review: reviewed
 - addr: 0x747230
   final: 0x4e67f0
   kind: function
   name: the operation target walk
+  semantics: "the district walk (COMBAT_DISTRICT / PASSIVE): an enemy needed; each known city of the enemy with a valid plot; TargetParameter 0 skips a city whose districts' defenses and walls (0x5eb600) outnumber its districts; the running operation's own target and any active operation's (0x724dd0) skipped; one of the player's cities must list it (CityBuildAI +0x870, 0x78e010); MustHaveNukes asks 0x2d1f20 / 0x2d2090; the value 0x79fef0(fifth MustHaveNukes, sixth 1); the enemy strength — where the player's best combat strength passes the enemy's by more than 30 — the enemy's known units within 3 (0x5eadb0); above MaxTargetDefense (+0x70) skipped."
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -593,6 +618,7 @@
   review: imported
 - addr: 0x75d3d0
   kind: function
+  semantics: "the research AI's listener on player signal +0x168 (functor vt 0xd6f258 bound in 0x761d30): answers where m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0; a unit locked by a civic alone never answers."
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -601,14 +627,17 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...ereqTech or PrereqCivic unheld, 0x4cb590 / 0x39d490; the one listener the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: its m_turnsToResearchUnit (+0x388, data +0x3e0)..."
-  review: imported
+  review: reviewed
 - addr: 0x763020
   final: 0x4fa9a0
   kind: function
   name: researchChoice
-  semantics: "the research choice (key): comparator 0x75d530 (same next step: larger turns; next step on the key loses; unowned first; researchable leaf first; higher score, first on a tie); else a standing goal; else one 'BT Research Choice' draw over the researchable."
+  semantics: "the research choice (key): the comparator 0x75d530 over the entries; a best row with turns > 0 and a researchable next step: goal := row, research := next; else a goal still unowned stays; else one \"BT Research Choice\" draw over the researchable rows in table order."
   status: PARTLY
   cases:
+    - recording: h1_duelv1124
+      turn: 1
+      value: "range 5: the five roots"
     - recording: AI_Research.csv
       value: "- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,   measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,   the research turns from AI_Research.csv): the an"
     - recording: 1124
@@ -634,6 +663,7 @@
 - addr: 0x763b00
   final: 0x4fb250
   kind: function
+  semantics: "fills m_turnsToResearchUnit (research AI +0x388) from 0x761090 on player signal +0x228 (the turn's end after the city AI): zeroed, then per technology entry whose turns (+0x1c) are >= 0 each unit the technology unlocks (the entry's list +0x20, 0x761b70) takes those turns."
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -642,7 +672,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...30: its m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0 — the vector 0x763b00 fills from 0x761090 on player signal +0x228, the turn's end after the city AI: zeroed,..."
-  review: imported
+  review: reviewed
 - addr: 0x78f5d0
   kind: function
   status: PARTLY
@@ -653,14 +683,19 @@
   review: imported
 - addr: 0x7e7d20
   kind: function
+  semantics: "Add Goal Tech's update: its kept contracts first (+0x94 tech, +0x9c civic: SUBMITTED / FAILED / COMPLETED / 0 released, IN PROGRESS RUNNING); no list in its data ERROR. The lists: Desired Techs and Civics the player lacks, each desired unit's, building's and improvement's PrereqTech / PrereqCivic it lacks; per improvement, on the Goal Plot, the resource the player sees there (0x4ab4b0): one it works keeps the feature where MustRemoveFeature is false, one it does not adds its Resource_Harvests' PrereqTech; then a feature it neither keeps nor lists: not Removable FAILURE, else its RemoveTech. \"Add Techs For All\" clear: an item lacking its own SUCCEEDS at once. Then the Goal Plot alone: each improvement working the seen resource adds its PrereqTech, and a removable feature's RemoveTech. The tech list sorted (0x7e7080), the first the goal; none SUCCESS, else RUNNING."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 2
+      value: Granada's Alcazar tree on plot 570's Rainforest posts Bronze Working, contract 7 at 104.0
   impl: [cpu/core/aiCityTrees.ts:addGoalTech, gpu/core/sim_citytrees.py:_u_add_goal_tech]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x50 over the turn limit, reset when every contract it holds is alive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tr..."
-  review: imported
+  review: reviewed
 - addr: 0x7ec7b0
   final: 0x554b10
   kind: function
@@ -680,6 +715,7 @@
 - addr: 0x7f4e00
   final: 0x55c550
   kind: function
+  semantics: "Build Unit's update: its \"already held\" test reads the city's buildings (0x18e9f0 City_Buildings -> 0x18fe60 HasBuilding), not its queue."
   status: PARTLY
   cases:
     - recording: h1_duely1128
@@ -699,10 +735,11 @@
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
   context:
     - "...ab0 — WEAK to the backup, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the uni..."
-  review: imported
+  review: reviewed
 - addr: 0x7f7da0
   final: 0x55ef10
   kind: function
+  semantics: "Reserve Plot: reserves the plot for the tree; another tree's reservation yields to a value 20.0 above it (0x5d74c0)."
   status: PARTLY
   impl: [cpu/core/aiCityTrees.ts:reservePlot, gpu/core/sim_citytrees.py:_u_reserve_plot]
   readings:
@@ -711,7 +748,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reservation yields to a value 20.0 above it); Check Plot 0x7f..."
-  review: imported
+  review: reviewed
 - addr: 0x80f4a0
   final: 0x56f4d0
   kind: function
@@ -734,6 +771,7 @@
   review: imported
 - addr: 0xc6f950
   kind: function
+  semantics: adds to the city's per-unit production modifier (city +0x2c0[unit]).
   status: PARTLY
   cases:
     - recording: h1_duelv1121
@@ -743,4 +781,4 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...280) lies in StartEra..EndEra, the Amount onto the city's per-unit production modifier (0xc6f950; read back by 0x17c1c0: city +0x2c0[unit] + player +0x12e8 +0x4a0[unit]) — support unit..."
-  review: imported
+  review: reviewed

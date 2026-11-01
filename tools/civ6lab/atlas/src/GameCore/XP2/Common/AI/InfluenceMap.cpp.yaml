@@ -6,6 +6,7 @@
 - addr: 0x716a90
   final: 0x28220
   kind: function
+  semantics: the danger map's value at a plot index (x + y x width).
   status: PARTLY
   cases:
     - recording: 1121
@@ -35,15 +36,16 @@
     - "...alth (0x56e0d0) AND whose plot reads above 0 on the AI's influence map (player +0x12d8, 0x716a90 — its builder unread); any such unit and the node answers 2, the concurrent's Move Unit..."
     - "...mage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queue's moves: a unit not of the sea domain (+0x650: 0 se..."
     - "...82c20); the nearest own city (a min, 0 with none); the danger (the influence map below, 0x716a90); the Loyalty pressure (0x19d470 >> 8); and per ring plot revealed: one owned by anothe..."
-  review: imported
+  review: reviewed
 - addr: 0x716b10
   kind: function
+  semantics: the religious danger map (added for a unit of religious strength +0x1ce8 > 0).
   status: PARTLY
   readings: ["C-95: the danger map and Move to Safety — READ, ported"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...== 1: a land unit). A unit of religious strength (+0x1ce8 > 0) adds the religious map (0x716b10) to the danger: no party on the tactical core holds one. A goal plot argument (0x497d20..."
-  review: imported
+  review: reviewed
 - addr: 0x716b90
   final: 0x4c59b0
   kind: function

@@ -194,6 +194,7 @@
 - addr: 0x3da560
   final: 0x2a6a50
   kind: function
+  semantics: the two players are allies.
   status: PARTLY
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -207,7 +208,7 @@
   context:
     - "...er (0x783980 0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else NEUTRAL_CITY — each where..."
     - ...0 = diplomacy 0x3dcec0) or flagged (+0xc58 / +0xd18, unread), an ALLY one where allied (0x3da560, 0x3de4e0); then each allowed definition with EnemyType NONE (one with ActiveEmergency,...
-  review: imported
+  review: reviewed
 - addr: 0x3da5e0
   kind: function
   name: the other player has denounced the owner
@@ -220,6 +221,7 @@
 - addr: 0x3da770
   final: 0x2a6c50
   kind: function
+  semantics: the player is a declared friend.
   status: READ
   cases:
     - recording: AI_Diplomacy.csv
@@ -229,7 +231,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   context:
     - ...number at most the +0xb50 list's size >> 1 and the player is neither a declared friend (0x3da770) nor an ally (0x3da560), PrepareForWarWith(player, 1) (0x724f30). The pick skips a pl...
-  review: imported
+  review: reviewed
 - addr: 0x3da8e0
   kind: function
   name: hasDenounced
@@ -309,6 +311,7 @@
 - addr: 0x3dcf50
   final: 0x2a8740
   kind: function
+  semantics: the player is at war with a living player of the players manager's +0xb50 list (not the barbarians).
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -328,11 +331,12 @@
     - ...l (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), population / 5 + 1, +2 at war (0x3dcf50), the city's CityBuildAI +0x1b8 where above -1, +4 where any city of the player has i...
     - "...VEL_FULL_CIV (0x469db0, hash 0x253718b0) nor _TRIBE (0x469ce0, 0xd959ec24), not at war (0x3dcf50) and holding more than five units (player +0x12e8 +0xc0); a Spy (Units +0x1ba bit 2 — t..."
     - ...21e0); the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88 and 0x3dcf50 holds; + the row's modifiers analysed (0x7a4b20). The discount is the GlobalAI's +0x290...
-  review: imported
+  review: reviewed
 - addr: 0x3dd9a0
   final: 0x2a9030
   kind: function
   name: CanDoAction
+  semantics: CanDoAction (a diplomatic action toward a player).
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
@@ -344,10 +348,11 @@
   context:
     - "...by the owner's or p's preference, with desire <= 0, refused by the game's CanDoAction (0x3dd9a0), or NOT READY (0x672ef0: the per-player per-action flag +0x6390, then the can-do funct..."
     - ...Declare Friendship, the war declarations, Propose Trade and the deals), CanDoAction (0x3dd9a0), and the checks CanDenounce / CanGoToWar / CanOfferAlliance.
-  review: imported
+  review: reviewed
 - addr: 0x3de4e0
   final: 0x2a9b50
   kind: function
+  semantics: the two players are allied (the ALLY candidates).
   status: PARTLY
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
@@ -356,7 +361,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...acy 0x3dcec0) or flagged (+0xc58 / +0xd18, unread), an ALLY one where allied (0x3da560, 0x3de4e0); then each allowed definition with EnemyType NONE (one with ActiveEmergency, +0x18, on...
-  review: imported
+  review: reviewed
 - addr: 0x3dfae0
   final: 0x2aad00
   kind: function

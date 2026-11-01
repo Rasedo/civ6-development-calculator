@@ -6,16 +6,18 @@
 - addr: 0x774c0
   final: 0x71030
   kind: function
+  semantics: 24.8 fixed to float.
   status: PARTLY
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
   context:
     - "...es first, above the tail last; else |f - tail| against |f - head| (24.8 fixed to float, 0x774c0): nearer the tail (strictly) the walk from the tail puts it after its equals, else the..."
-  review: imported
+  review: reviewed
 - addr: 0xaa740
   kind: function
   name: GameAttribute::Value
+  semantics: "GameAttribute::Value: base + base x modifier / 100, the modifier held by the attribute's clamps +0x30 / +0x38."
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -39,11 +41,12 @@
   context:
     - "- A city's yield (Lua City:GetYield 0x981dd0 -> 0xaa060 -> GameAttribute value 0xaa740): ONE fixed-point modifier per attribute, clamped to (-1000, 1000), value = base + base..."
     - ".../ 1116 Xi'an 1.296875, 1.59765625, 1.8984375, 4.19921875). A city yield's one modifier (0xaa740) truncates toward zero: 1108 Xi'an t95, 16 Production at −10% reads 14.40234375 (floor..."
-  review: imported
+  review: reviewed
 - addr: 0xac650
   final: 0x2f7d90
   kind: function
   name: fx_add_assign
+  semantics: fixed-point add in place (24.8).
   status: READ
   cases:
     - recording: 1115
@@ -67,10 +70,11 @@
     - "...aits for the next step. With nothing queued the step adds B to the overflow (0x16f62d → 0x0ac650). Records: 1115 / 1116 Xi'an, queue empty at t3, a Builder at 0 at t4 and 10 at t5 on..."
     - "...ul (a b) >> 8 (0x16eb20 in place, 0x16e7d0), div (a << 8) / b truncated (0x16e940), add 0xac650, sub 0x16ec10; a \"percent\" product is a b / 25600 truncated toward 0 (the /100 magic..."
     - "...50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x34 += x through 0xac650). A crossing is the terrain's cost plus 2 (`RIVER_CROSS_MP`, the GPU's `river_mp`)."
-  review: imported
+  review: reviewed
 - addr: 0x1b22d0
   final: 0x1216a0
   kind: function
+  semantics: a unit's Gold purchase price in the city.
   status: PARTLY
   impl: [cpu/core/aiEconomic.ts:PurchaseCity]
   readings:
@@ -79,7 +83,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...take the first. 0x68be60 (Economic, city or all, unit, flag): per city, the Gold price 0x1b22d0 (below 0 skipped); the UNITS and SLUSH slots together above it with UNITS above half..."
-  review: imported
+  review: reviewed
 - addr: 0x1b6d80
   final: 0x122d20
   kind: function
@@ -96,6 +100,7 @@
 - addr: 0x1ee5c0
   final: 0x1474f0
   kind: function
+  semantics: the unpowered notification (prints +0x58 against +0x30 plus the free power).
   status: PARTLY
   cases:
     - recording: h1_duelv1117
@@ -110,10 +115,11 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - ...ere +0xa8 > 0) is below its required power (+0x58, 0x1f02f0; the unpowered notification 0x1ee5c0 prints +0x58 against +0x30 plus the free power), half its Production (City::GetYield...
-  review: imported
+  review: reviewed
 - addr: 0x1f0020
   final: 0x147c50
   kind: function
+  semantics: "a city's free power: City_Power +0x08 x (100 + +0xa8)% where +0xa8 > 0."
   status: PARTLY
   cases:
     - recording: h1_duelv1117
@@ -128,7 +134,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "...art. 0x7a67f0 for an Amount above 0: where the city's free power (City_Power +0x30d0: 0x1f0020, +0x08 x (100 + +0xa8)% where +0xa8 > 0) is below its required power (+0x58, 0x1f02f0;..."
-  review: imported
+  review: reviewed
 - addr: 0x1f43c0
   final: 0x14a6f0
   kind: function
@@ -142,6 +148,7 @@
 - addr: 0x29a010
   final: 0x1c82b0
   kind: function
+  semantics: a civic's cost.
   status: PARTLY
   readings:
     - "H-1: a boost lands as progress — READ"
@@ -150,10 +157,11 @@
   context:
     - "...ed point: B = 0x161d60 = floor(Boost x cost / 100) (the row's +0x18 times the item's cost 0x29a010 / 0x353a70, sar 8); the share q = (B<<16) / (cost<<8) (0x16e940, a truncating divide), ti..."
     - "...research AI's three-level walk: each walked row adds its turns left (0x39c0e0: the cost 0x29a010 less the progress kept on it and the bank [+0xb40] — no max(0, ·) here — through 0x8c45..."
-  review: imported
+  review: reviewed
 - addr: 0x353a70
   final: 0x251340
   kind: function
+  semantics: a technology's cost.
   status: PARTLY
   readings:
     - "H-1: a boost lands as progress — READ"
@@ -162,7 +170,7 @@
   context:
     - ...= 0x161d60 = floor(Boost x cost / 100) (the row's +0x18 times the item's cost 0x29a010 / 0x353a70, sar 8); the share q = (B<<16) / (cost<<8) (0x16e940, a truncating divide), times 100 (0x...
     - "..., value 0. Else three levels: each walked row adds its turns left (0x4ca000: the cost 0x353a70 in fixed point less the progress kept on it [+0x388] and the bank [+0x1e8] read through..."
-  review: imported
+  review: reviewed
 - addr: 0x3640e0
   kind: function
   status: PARTLY
@@ -270,6 +278,7 @@
 - addr: 0x5d83c0
   final: 0x3eae80
   kind: function
+  semantics: the city's yield advantage per yield (read by the log 0x5cdd70 as Food Adv. / Prod. Adv.).
   status: PARTLY
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -281,7 +290,7 @@
     - "...ed by 0x5cdd70: Food Adv. / Prod. Adv. are adv[YIELD_FOOD] / adv[YIELD_PRODUCTION] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the m..."
     - "...>= the row's); Good Faith / Tech / Culture City (0x7bcd60: some city's yield advantage 0x5d83c0, flag 0, >= threshold << 8); Fewer Cities (cities <= threshold); Handicap at or below (..."
     - "- The advantage (0x5d83c0, flag 0): x = the greater of the city AI's stored yield (CityBuildAI +0x1118, unread: t..."
-  review: imported
+  review: reviewed
 - addr: 0x647f10
   kind: function
   name: threatTurn
@@ -340,6 +349,7 @@
 - addr: 0x6fafc0
   kind: function
   name: GrandStrategic
+  semantics: "GrandStrategic's turn; m_yieldSensitivityBoost (0x6fbdf1..0x6fc771): for a yield whose sensitivity s = +0x788[y] (the YieldSensitivities system, GlobalAI +0x2508) is > 0, over the player and every major it has met (0x483b50's list, 0x3daaf0) with x their yield per turn (0x4bf7c0 on player +0x1330): n, max, mean; n > 1, sd = sqrt(sum (x - mean)^2 / (n - 1)) > 0 and the player's x < max -> s x (max - x) / sd, else 0."
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -355,12 +365,16 @@
     - "- GrandStrategic m_yieldSensitivityBoost (data +0x6b0, default +0x6c8), each turn in 0x6fafc0 (0x6fbdf1..0x6fc771): for a yield whose sensitivity s = +0x788[y] (the YieldSensitiviti..."
     - "- The regions (0x6fafc0, the \"Settle City Evaluation\" jobs, one per map region of the regions list, run and wai..."
     - "- The island (GrandStrategic 0x6fafc0, after the apply; AI_ISLAND_COAST_PERCENTAGE 20): while +0x440 (a city's landmass more..."
-  review: imported
+  review: reviewed
 - addr: 0x700810
   final: 0x4b52a0
   kind: function
-  semantics: "the pseudo-yield weight: [+0x12a0] +0x7e8[p] + +0x620[p] + the PseudoYields list (+0x748, default +0x760) + the +0x768 / +0x780 list, at least -1.0 (@0xd136f4); a Great Person class adds 0x2c4230's golden-age points; PSEUDOYIELD_DISTRICT 0.5 x the era's ChronologyIndex. The +0x620 array's writer is unread."
+  semantics: "the pseudo-yield weight (this the GrandStrategic): [player +0x12a0] +0x7e8[p] + +0x620[p] + the PseudoYields list system's array (GlobalAI +0x2010, retrieval 0x6e3e20 -> +0x748, default +0x760) + the +0x768 / +0x780 list, held at -1.0 at least (@0xd136f4); a Great Person class's pseudo-yield (index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0; PSEUDOYIELD_DISTRICT (@0xf2e274) adds 0.5 x Eras.ChronologyIndex (+0x1c) of the player's era (0x467eb0: player +0x1358 +0xf8). The +0x620 array's writer is unread."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 2
+      value: "minor 3's Astrology 124.0: the Holy Site at 1.5 x PSEUDOYIELD_DISTRICT"
   impl:
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/aiValue.ts:pseudoYieldValue
@@ -385,6 +399,7 @@
   final: 0x4cf3b0
   kind: function
   name: the promotion class weight
+  semantics: "the promotion class weight: PromotionClass (Units +0x288) none -> 1.0; the class's base (+0x708) 0 -> 0 (a city-state's RECON, MinorCivUnitBuilds -100); else max(base + the +0x778 term, 0.1)."
   status: READ
   cases:
     - recording: 1124
@@ -403,7 +418,7 @@
     - ".claude/scratchpad/cb4/NOTES.md: ...ous branch adds tourism terms (minor TOURISM weight -1 => 0); tail: extra copies,   promotion class 0x723bb0, strategic resource gate (0x4aa790 / 0x5d45c0 => value 0), maintenance < handicap 3, PV...  NEXT: u..."
   context:
     - "...NUCLEAR_WEAPON; x (the city's extra copies + 1, 0x179dd0); x the promotion class weight 0x723bb0 (PromotionClass +0x288: 1.0 with none; 0 where the class's base +0x708 is 0 — a city-st..."
-  review: imported
+  review: reviewed
 - addr: 0x74cf50
   final: 0x4eb610
   kind: function
@@ -416,8 +431,12 @@
 - addr: 0x78e0a0
   final: 0x5199e0
   kind: function
+  semantics: "the trader's destination (from 0x687bf0, the economic AI's turn, per idle Trader standing in a city): over the city's trade list (CityBuildAI +0x870) and the knowledge base's +0xe0 city entries in their order, each 0x78e010 admits: an international one whose owner the player is not at war with (0x469cd0) is valued sum yieldValue(0x7a6690) over the route's origin yields 0x526330 (last argument 0), times 1, x3 where the diplomatic AI's vt+0x30 (focus player +0x6780) names the owner, + (1 + the Player_Diplomacy +0x480 sum) where 0x4d9830 finds no Trading Post of the player in any city of the owner; a domestic one (origin + destination) yields, x3 where 0x54ad70 is 0. Sorted highest first (0x78d510); the first CanStartRoute (0x54efc0) admits is the order (WakeUnit, MAKE_TRADE_ROUTE). A city-state's multiplier is 2 to an owner without its post, 1 with."
   status: PARTLY
   cases:
+    - recording: h1_duely1127
+      turn: 53
+      value: Mexico City takes Hattusa (3 Gold 1 Science, x2) over Xi'an (its post; 4/1/1, x1)
     - recording: h1_duelv1124
       value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
     - recording: AI_Knowledge.csv
@@ -430,7 +449,7 @@
     - ".claude/scratchpad/cb3/NOTES.md: ...MIN sums,  trader value (knowledge base +0x6d8), plot-yield modifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pic..."
   context:
     - ...turn before logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T). 0x78e0a0 (per known city of the knowledge base +0xe0 entries, the routes' yields 0x526330 / 0x52...
-  review: imported
+  review: reviewed
 - addr: 0x79ed40
   final: 0x526bc0
   kind: function
@@ -451,6 +470,7 @@
 - addr: 0x79f7c0
   final: 0x5272a0
   kind: function
+  semantics: "the amenity value (out, player, city, n, &rate, start, horizon) with n Amenities: the balance (GetAmenities less the need of +0x588, 0x5275a0), its level (0x527850) and that of balance + n; one level: PSEUDOYIELD_HAPPINESS of n; else PSEUDOYIELD_HAPPINESS of the levels' difference plus, per yield but Food (@f2f974), CityBuildAI's yield (+0x1028's vector +0x1080) x (after + 100) / (before + 100) - 1, the level's percent 0x527b40, at the player's weight, the total at least n; then, n > 0 and the balance below 0, PSEUDOYIELD_GOLDENAGE_POINT of -(GlobalParameters +0x6b4 THRESHOLD_SHIFT_PER_MISSING_AMENITY x the balance), n < 0 and the balance at most 0 the same subtracted; from start to horizon (0x7a2140). A building's Entertainment passes n = 1."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -480,13 +500,17 @@
     - "...rate, T) (0x7a16e0 twice). After it, already discounted: Entertainment (+0x2c) > 0 adds 0x79f7c0 for this city (RegionalRange +0x48 <= 1) or over the player's cities in range, capped a..."
     - "...are, from the start to start + the train turns), EFFECT_ADJUST_POLICY_AMENITY 0x6b45a0 (0x79f7c0: the Happiness level before and after, PSEUDOYIELD_HAPPINESS of the step and each yie..."
     - ...OYIELD_UNIT_COMBAT), the policy amenity 0x6b45a0 and housing 0x6b5eb0 (C-96's evaluator 0x79f7c0 / 0x7a3d70), the ability grant 0x6b5b30 (the ability's own modifiers analyzed in a copy...
-  review: imported
+  review: reviewed
 - addr: 0x79fef0
   final: 0x5275b0
   kind: function
   name: the city value
+  semantics: "the city value (K, P, ..., fifth MustHaveNukes, sixth): W the worth 0x7a0ac0; with the fifth max(W, 0). Else A / B the land strength of P / the owner E (0x4bd0d0 domain 2, +0x2d0), C / D their best combat strengths (PlayerStats +0xf0 via 0x4d9320); N P's nearest city; G the city's defense (0x5eb2c0 with its byte); H E's known units within 3 of K at least C - 30 strong (0x5eadb0) and E's known districts' strikes there (+0x1c); T = H + D, + min(1, 2 dist(N, K) / speed(25)) x B where B > 2 (H + D). With C > 0: less PSEUDOYIELD_CITY_DEFENSES of G / C where G >= C; with the sixth argument and N, per other known city X of E no further from K than N and on N's side of K (axial dot product above 0), less 2 x CITY_DEFENSES of X's defense / C, twice where X is within 5 of K; where C < D + 30: x 0.25 (@d2f324) where C < D - 15 or B > 3A, less PSEUDOYIELD_CITY_DEFENDING_UNITS of T / C. Plus the knowledge base's war record +0xc toward E (kb +0x668, 0x10 an entry); never below 0."
   status: PARTLY
   cases:
+    - recording: h1_duelv1117
+      turn: 18
+      value: China's value of Caguana 682.9
     - recording: h1_duelv1117
       turn: 37
       value: Antananarivo 657.3 (ours 657.1), 665.4 (665.2) at t38
@@ -510,6 +534,7 @@
   final: 0x5340b0
   kind: function
   name: the war value's balance
+  semantics: "the war value's balance: S, T the two players' military strengths (+0x210), R the military AI's m_regionalMilitaryStrength[p] (mil +0x588, 0x71fb80's second loop: the records of the player's units seen within two turns in the areas of the owner's cities, each max(Combat, RangedCombat) past the yardstick less 20): -R where T / 4 > R, else -min(S, T) where T + 30 > S; + (S - T) x (2 where S <= T, else 1); + the deal items (0x64d320)."
   status: PARTLY
   cases:
     - recording: 1127
@@ -528,6 +553,7 @@
   final: 0x534220
   kind: function
   name: the war value's spoils
+  semantics: "the war value's spoils: the largest current unit cost (m_aCurrentUnitCost) of what a known civilian of the player becomes when captured; each known city of the player valued (0x79fef0) x (1 + 0.02 x GrandStrategic +0x204), sorted ascending, summed v_i / rank, the rank from n + 1 down to 2 (a negative value skipped, its rank spent); x 0.5 per other major and x 0.8 per city-state the owner fights where the player is a major, x 0.75 / x 0.9 where it is a city-state; x 1.25 per major and x 1.1 per city-state the player fights; the war record (kb +0x668[p] +0xc) a floor where positive, a cut to 0 where its negative passes the value; with any known WMD of the player (PlayerStats +0x11f0, 0x4bf200) or the diplomacy's +0xf30 flag: -10000 without the owner's own, then at most 0; with the owner's and none of the player's at least 0; nothing known -9999."
   status: PARTLY
   cases:
     - recording: 1127
@@ -545,6 +571,7 @@
 - addr: 0x8c4540
   kind: function
   name: turnsAt
+  semantics: "turnsAt: ceil((cost - progress) / rate)."
   status: PARTLY
   cases:
     - recording: AI_Research.csv
@@ -567,7 +594,7 @@
     - "...he turn after's, the record keeping only the whole part; the build turns 0x17b1e0 are 0x8c4540's ceil((cost - progress) / Production toward the item) — the progress kept on the item..."
     - "...] and the bank [+0x1e8] read through max(0, ·), ceil over the Science rate 0x4c9f40 — 0x8c4540 compares the remainder to rate x the truncated quotient; with no Science the cost); a r..."
     - "...29a010 less the progress kept on it and the bank [+0xb40] — no max(0, ·) here — through 0x8c4540; -1 with no Culture, then the cost), a row not researchable (0x3932d0) adds its unowned..."
-  review: imported
+  review: reviewed
 - addr: 0x968e20
   final: 0x673490
   kind: function

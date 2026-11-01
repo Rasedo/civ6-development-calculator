@@ -6,6 +6,7 @@
 - addr: 0x962030
   final: 0x66cd90
   kind: function
+  semantics: "MoveTo: the unit's move order to a plot with its flags (Operation Move: 0x1001, 0x80 where the game's +0x590 is above 0, 8 for a unit with no combat or 0x266950(2) on its formation, 0x8000 a formation of domain 2 without 0x266950(3), 0x10 the goal barred)."
   status: PARTLY
   cases:
     - recording: AI_Tactical.csv
@@ -37,10 +38,11 @@
     - ".claude/scratchpad/mu1/readings_c96.md: ...+0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the   move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none:   FindAlternateLocation (0x585940) rou..."
   context:
     - "...vealed 0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none: FindAlternateLocation (0x5..."
-  review: imported
+  review: reviewed
 - addr: 0x962190
   final: 0x66cef0
   kind: function
+  semantics: a move order with flags.
   status: PARTLY
   impl: [cpu/core/tactical.ts:homelandPlunder]
   readings:
@@ -50,7 +52,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40,..."
-  review: imported
+  review: reviewed
 - addr: 0x962380
   final: 0x66d0e0
   kind: function

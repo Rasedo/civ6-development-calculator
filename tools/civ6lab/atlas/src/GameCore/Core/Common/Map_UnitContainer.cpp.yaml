@@ -20,6 +20,7 @@
 - addr: 0x75c50
   final: 0x56a20
   kind: function
+  semantics: the plot's units.
   status: READ
   cases:
     - recording: 1124
@@ -38,10 +39,11 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
   context:
     - "...x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0: combat, ranged or bombard above 0) — no doma..."
-  review: imported
+  review: reviewed
 - addr: 0x75ce0
   final: 0x56ab0
   kind: function
+  semantics: a plot's unit list (the look walks each unit on a seen plot).
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"

@@ -18,6 +18,7 @@
   final: 0x743c0
   kind: function
   name: shared getter of +0xf0 (PlayerStats m_iMaxMeleeStrengthTrained)
+  semantics: "PlayerStats +0xf0: the strongest melee strength the player trained (a city-state's 25 at the start)."
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -80,6 +81,7 @@
 - addr: 0x4d9830
   final: 0x33e0f0
   kind: function
+  semantics: the player holds a Trading Post in some city of the owner.
   status: PARTLY
   cases:
     - recording: Game_TradeManager.csv
@@ -89,7 +91,7 @@
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...focus player +0x6780) names the owner, + (1 + the Player_Diplomacy +0x480 sum) where 0x4d9830 finds no Trading Post of the player in any city of the owner. A domestic one: (origin +..."
-  review: imported
+  review: reviewed
 - addr: 0x4d9a70
   final: 0x33e250
   kind: function

@@ -157,6 +157,7 @@
 - addr: 0x54ff90
   final: 0x38dc20
   kind: function
+  semantics: the trade manager's route count from one player to another.
   status: PARTLY
   readings:
     - "H-1: the city-states' quests — READ"
@@ -164,7 +165,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Send Trade Route (0x84b520): the actor runs no route to the minor (0x54ff90 == 0); done when the actor starts one to it (0x84b570)."
-  review: imported
+  review: reviewed
 - addr: 0x5500b0
   final: 0x38dd40
   kind: function

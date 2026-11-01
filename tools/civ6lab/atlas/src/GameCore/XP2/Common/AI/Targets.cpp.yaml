@@ -6,8 +6,12 @@
 - addr: 0x783570
   final: 0x5127c0
   kind: function
-  semantics: one unit into the records (0x5f0440) from a game signal
-  status: PARTLY
+  semantics: "records one unit through 0x5f0440 (its id +0x100, owner +0x2e0, type +0x160, plot +0x220) with no sight asked: the record found takes age 0 and the plot, else one is added. From the combat signal: the attacker where it stands once the combat is done (after a melee victor's advance); an attacker the combat killed is not recorded."
+  status: READ
+  cases:
+    - recording: h1_dueld1121
+      turn: 23
+      value: Hunza's tactical read holds the barbarians' Quadrireme on 9:1 at age 0 after its strike
   impl: [cpu/core/units.ts:recordAttacker, gpu/core/sim_minors.py:_kb_attacked]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
@@ -18,7 +22,7 @@
 - addr: 0x7838a0
   final: 0x5129d0
   kind: function
-  semantics: "game signal +0x2e8's handler (with 0x783570): a unit's record outside the look"
+  semantics: "game signal +0x2e8's handler: walks a city's list (+0x1a50) into the known cities, not a unit."
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
@@ -29,6 +33,7 @@
 - addr: 0x783980
   final: 0x512ac0
   kind: function
+  semantics: "the targets update after the ageing and the look in 0x785f30; writes AI_Knowledge.csv's lines (0x7858b7 -> 0x5ed280 -> 0x5eceb0). The target list: the plots in index order, a plot the player sees (+0x290 > 0) giving, by its district (0x810d0): the player's own FRIENDLY_CITY; an ally's (0x3da560) ALLY_SUPPORT; a player's at war (0x469cd0) COMBAT_DISTRICT where it defends (0x24c2f0), then nothing else of the plot, and PASSIVE_DISTRICT where it counts toward the limit (0x527e30), complete (+0xb08) and not pillaged (0x24c3a0); else NEUTRAL_CITY; each where the player's type flags (+0xb0) take it. Else its defender (0x208b80) LOW (an aircraft AIR_UNIT); else a CAMP, a goody hut, a Trader at war (one entry each), the plot's one civilian (CIVILIAN at war, else NEUTRAL_CIVILIAN; a fighter in that layer LOW), its religious unit, an unpillaged improvement of a player at war. A plot only revealed gives its camp, goody hut, improvement and districts. Then 0x786d50, and the player's priorities hook (+0xa8)."
   status: READ
   cases:
     - recording: 1124
@@ -63,10 +68,11 @@
     - ".../ Pillage Improvement (0x77a810): each target of the kind in the tactical target list (0x783980, PARTLY READ: the visible plots in index order; the engines take the plots the barbaria..."
     - "- Barbarian Rampage (0x778b40), the target list (0x783980), Attack Civilians, Plunder Trader, Chase Target, Attack Units and Move to Safety: the..."
     - "- THE TARGET LIST (0x783980): the plots in index order, a plot the player sees (the word plane +0x290 > 0) giving,..."
-  review: imported
+  review: reviewed
 - addr: 0x785ec0
   final: 0x514670
   kind: function
+  semantics: a job of the second list (before the tactical pass).
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -75,7 +81,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...operation manager 0x722690 (0x727510: each operation's tree ticks) — then a second — 0x785ec0, the tactical pass 0x771530 — then the homeland 0x70a370. The operations' trees tick af..."
-  review: imported
+  review: reviewed
 - addr: 0x785f30
   final: 0x5146e0
   kind: function
@@ -83,6 +89,8 @@
   semantics: "player signal +0x1f8: the knowledge update (0x5ebb30, the ageing) then the look (0x7877e0), then the target list 0x783980"
   status: READ
   cases:
+    - recording: h1_duelm1117
+      value: "the reader's site 1 (FinalRelease 0x5146e0): signal reaches every player's Targets with edx 4..0, the step runs where r8b is set and edx is Targets +0x108 (4)"
     - recording: h1_duelv1124
       turn: 17
       value: minor 3's dead Warrior 131073 stays on its ARMY line from t17 to t38, gone at t39
@@ -122,6 +130,7 @@
 - addr: 0x786160
   final: 0x2a6aa0
   kind: function
+  semantics: the player's knowledge base (player +0x12b8).
   status: PARTLY
   readings:
     - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
@@ -131,7 +140,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "....+0x4a8) and, for each its player is at war with (0x469cd0), asks its knowledge base (0x786160) for that player's units (0x5eb8b0, age 1, distance 2): per unit type in DB order, each..."
-  review: imported
+  review: reviewed
 - addr: 0x7861d0
   kind: function
   status: PARTLY
@@ -144,6 +153,7 @@
 - addr: 0x7864c0
   final: 0x514a60
   kind: function
+  semantics: "binds the tactical AI's signal handlers: player signal +0xc0 -> 0x7874a0 (at 0x786b25)."
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
@@ -152,10 +162,11 @@
   context:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "...ement (plot +0x44 the barbarians') -> 0x5f0110. Player signal +0xc0 (0x7874a0, bound in 0x7864c0 at 0x786b25) records a unit of the player's own through 0x5f0440 with no sight asked: t..."
-  review: imported
+  review: reviewed
 - addr: 0x786d50
   final: 0x5152e0
   kind: function
+  semantics: a LOW target sharing its plot with a unit that cannot fight becomes MEDIUM.
   status: READ
   cases:
     - recording: 1124
@@ -167,10 +178,11 @@
     - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   context:
     - "...s not seen follow (LOW, CIVILIAN where the unit cannot fight): unported (AUDIT). Then 0x786d50: a LOW unit sharing its plot with one that cannot fight is MEDIUM; the barbarians' prio..."
-  review: imported
+  review: reviewed
 - addr: 0x786e70
   final: 0x515400
   kind: function
+  semantics: "the barbarians' prioritization (TacticalAI +0xa8): every LOW or MEDIUM unit within BARBARIAN_DEFENSE_ALL_UNITS 4 of a CAMP, a ranged one within its range + BARBARIAN_DEFENSE_RANGED_UNITS 1 (GlobalParameters +0xb0 / +0xb4), HIGH."
   status: READ
   cases:
     - recording: 1124
@@ -181,10 +193,11 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - ...sharing its plot with one that cannot fight is MEDIUM; the barbarians' prioritization (0x786e70, the member at +0xa8 for a barbarian player 0x469ce0) makes HIGH every LOW or MEDIUM un...
-  review: imported
+  review: reviewed
 - addr: 0x787000
   final: 0x515590
   kind: function
+  semantics: "the non-barbarian priorities (TacticalAI +0xa8 for any player 0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a district of the player's own, its centre too) and each ALLY_SUPPORT one, in list order, makes each LOW or MEDIUM unit that threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength within its range (0x56e3d0), any other nearer than twice its Movement (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT."
   status: PARTLY
   impl: [cpu/core/tactical.ts:tacticalTargets, cpu/core/tactical.ts:ARMY_RECORD_AGE]
   readings:
@@ -193,7 +206,7 @@
     - ".claude/scratchpad/mu1/readings_c96.md: ...no   influence map: every plot reads no danger. - THE NON-BARBARIAN PRIORITIES (TacticalAI +0xa8 = 0x787000 for any player   0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a   district of..."
   context:
     - "- THE NON-BARBARIAN PRIORITIES (TacticalAI +0xa8 = 0x787000 for any player 0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a d..."
-  review: imported
+  review: reviewed
 - addr: 0x7874a0
   final: 0x515a30
   kind: function

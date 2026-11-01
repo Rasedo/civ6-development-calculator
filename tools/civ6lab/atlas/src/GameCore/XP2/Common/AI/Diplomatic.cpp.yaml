@@ -15,6 +15,7 @@
 - addr: 0x64ba90
   kind: function
   name: the diplomatic sender's pick
+  semantics: "the diplomatic sender's pick: each action toward a player whose desire is above 0: CanDoAction (0x3dd9a0) failing is \"action invalid\"; passing, 0x672ef0 false is \"not ready\" and calls the action's +0x68 hook through 0x6744a0. Skips a player whose entry it made this turn (+0x1a). Runs before the operations (0x722690)."
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
@@ -30,13 +31,14 @@
 - addr: 0x64d320
   final: 0x42ef50
   kind: function
+  semantics: the deal items between two players (the war value's balance).
   status: PARTLY
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...0 / 0x723cf0) and GoToWar's preparation, Propose Trade's desire (the deal AI 0x82dff0 / 0x64d320) and its can-do (0x673460: the last action + AI_TURNS_BETWEEN_TRADES), the alliance's o..."
-  review: imported
+  review: reviewed
 - addr: 0x64efa0
   kind: function
   name: ownPreference
@@ -119,6 +121,7 @@
   final: 0x431530
   kind: function
   name: the diplomatic AI's handler clearing PrepareForWarWith
+  semantics: "the diplomatic AI's handler (a game signal, taken as peace): clears PrepareForWarWith and completes the operations whose enemy the owner no longer fights (+0x138 below 4)."
   status: PARTLY
   cases:
     - recording: 1117
@@ -144,6 +147,7 @@
   final: 0x4322c0
   kind: function
   name: AI::Diplomatic init (influence modifiers +0x6868)
+  semantics: "the city-state's diplomatic AI's influence list: its leader's InheritFrom chain's and civilization's trait modifiers (query @0xe261e0) whose requirements name a type tagged INFLUENCE_REQUIREMENT."
   status: PARTLY
   cases:
     - recording: h1_duelw1117

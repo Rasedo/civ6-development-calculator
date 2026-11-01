@@ -23,10 +23,11 @@
 - addr: 0x76f210
   final: 0x501810
   kind: function
+  semantics: a stable sort on +8.
   status: PARTLY
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...order, a strength to fight with, a DEFENDER held until another unit goes in; the sort 0x76f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c..."
-  review: imported
+  review: reviewed

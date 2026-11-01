@@ -6,6 +6,7 @@
 - addr: 0x7989e0
   kind: function
   name: the military AI's unit production table
+  semantics: "the military AI's unit production table (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in the Units' order, for each unit the player's version of itself, an obsolete one (0x538460) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers. Per entry its flags (+0x08 obsolete, +0x0b Units +0x1ba bit 128, +0x0c TraitType +0x2d0, +0x0e a held strategic resource), Cost +0x38, Range +0x68, max(Combat, RangedCombat), Combat, the Units_XP2 maintenance resource and amount, a per-player vector of 64. The opposition: per Units row of Combat above 0 not obsolete to the player with a combat pseudo-yield (or none), over the player list (0x483b50 +0x4a0) the knowledge base's count of it (0x5eb650), N their total (the at-war ones, 0x469cd0, apart); each entry's +0x30 sums count x efficiency[that row][the entry] (GlobalAI +0x3c8), +0x2c the at-war counts, the per-player vector likewise. With N = 0 every entry reads 1.0. Value +0x160 = N / +0x30 (0x16e940, truncated); x1.25 (@0xd70c98) for a TraitType unit; a shortfall of the maintenance resource scales it; the player's units of each type counted into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The value 0x799b9d computes from the counts (+0x510, +0x4a0) feeds asserts only."
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -41,6 +42,7 @@
 - addr: 0x79a320
   final: 0x5236c0
   kind: function
+  semantics: "the military AI's city hook: copies the unit production table per city, the +0x2c / +0x30 times the city's extra copies."
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -54,11 +56,12 @@
   context:
     - "...ityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0x5ce3f0: the job object at +0xcc0, vtable 0xd59af0 -> 0x5c..."
     - ...9d computes from the player's counts (+0x510, +0x4a0) feeds asserts only. The city hook 0x79a320 copies the table per city, the +0x2c / +0x30 times the extra copies.
-  review: imported
+  review: reviewed
 - addr: 0x79a440
   final: 0x5237a0
   kind: function
   name: the unit efficiencies job
+  semantics: "the unit efficiencies job (\"Could not find a neutral player\"): per pair of Units rows both without strength (max(Combat, RangedCombat, Bombard) 0 and AntiAirCombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both, 100 / damage the exchanges to kill, a range advantage ((Range - 1) / the other's moves, rounded up) added where the domains match, AntiAirCombat terms against air; M[a][b] = a's exchanges-to-die over b's. Logged once a game as AI_UnitEfficiency.csv (\", %3.2f\")."
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -100,6 +103,7 @@
   review: imported
 - addr: 0x79ba50
   kind: function
+  semantics: raises the player signal +0x168 for a not-yet-trainable unit (its PrereqTech or PrereqCivic unheld, 0x4cb590 / 0x39d490); its one listener the research AI's 0x75d3d0.
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -109,11 +113,12 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - ...r holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers; per entry its flags (+0x08 obsolete, +0x0b Units +0x1ba bit 128, +0x0c TraitT...
-  review: imported
+  review: reviewed
 - addr: 0x79bd30
   final: 0x5243c0
   kind: function
   name: the military AI's unit choice
+  semantics: "the military AI's unit choice: over the unit production table (+0x268) sorted (0x7976f0, comparator 0x79d3e0), the walk (0x79bfe6): the first entry standing (+0x0e, not +0x08) of a needed type (GlobalAI bitfield +0x408 +0x400 by unit, bit by UnitAiTypes index) and no full type; a later one replaces it where its type is a Priority one (UnitAiTypes +0x31: UNITTYPE_SIEGE_SUPPORT) over a non-priority one, or with both sums above the chosen's (from -1.0). The maintenance test (0x79c277): an entry whose +0x24 is a resource stands only where Player_Resources (+0x1320) +0x350 of it exceeds +0x440 of it plus the units' fuel bill (0x4ab270)."
   status: READ
   cases:
     - recording: h1_duelv1128
@@ -137,6 +142,7 @@
 - addr: 0x79ca90
   final: 0x524e30
   kind: function
+  semantics: "the military AI's unit production value of a unit: player AI +0x1290 +0x268, a linear find in its 0x168-byte entries, the entry's +0x160; 0 for a unit it lacks."
   status: PARTLY
   cases:
     - recording: 1124
@@ -157,7 +163,7 @@
     - ".claude/scratchpad/cb/notes.txt: ...en PV diff. trade -> 0x7a7110; religious etc. CONCLUSION so far: full value port needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons..."
   context:
     - "..._UNIT_COMBAT where none): COMBAT / NAVAL / AIR: the military AI's unit production value 0x79ca90 (player AI +0x1290 +0x268: a linear find in its 0x168-byte entries, +0x160; 0 for a u..."
-  review: imported
+  review: reviewed
 - addr: 0x79cb30
   final: 0x524ed0
   kind: function
@@ -174,6 +180,7 @@
   final: 0x524f50
   kind: function
   name: the military AI's unit choice check
+  semantics: "the unit choice's check: the old unit to build still taken."
   status: READ
   cases:
     - recording: h1_duelv1128
@@ -192,6 +199,7 @@
 - addr: 0x79d040
   final: 0x5253e0
   kind: function
+  semantics: allocates the unit efficiency table the job 0x79a440 fills.
   status: PARTLY
   cases:
     - recording: AI_UnitEfficiency.csv
@@ -200,4 +208,4 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "- THE EFFICIENCIES (0x79d040 allocates, the job 0x79a440 fills, \"Could not find a neutral player\"): per pair of Unit..."
-  review: imported
+  review: reviewed

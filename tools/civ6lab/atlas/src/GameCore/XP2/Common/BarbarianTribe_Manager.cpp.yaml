@@ -6,6 +6,7 @@
 - addr: 0x14f530
   final: 0xe1e20
   kind: function
+  semantics: "the barbarians' techs: the BarbarianFree techs (SAILING, BRONZE_WORKING, SHIPBUILDING) and any tech or civic at least max(1, (BARBARIAN_TECH_PERCENT 50 x living majors + 50) / 100) living majors hold."
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -25,19 +26,21 @@
   context:
     - "- Techs 0x14f530: the BarbarianFree techs (SAILING, BRONZE_WORKING, SHIPBUILDING) and any tech or civic..."
     - "...city-state or the Free Cities — it counts the players of the game's list +0xb50 (the list 0x14f530 reads for the barbarians' techs: the majors in the game) holding the item, and where at l..."
-  review: imported
+  review: reviewed
 - addr: 0x14fc30
   final: 0xe2220
   kind: function
+  semantics: the spawn interval at the speed (-> 0x149760).
   status: PARTLY
   readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ing the target owner's handicap) sets the spawn interval to its SpawnRate at the speed (0x14fc30 -> 0x149760, +0x88; 0 or less: the tribe's own). Barbarian Recruit (0x7c7580) under a T..."
-  review: imported
+  review: reviewed
 - addr: 0x14fcc0
   kind: function
   name: campStep
+  semantics: "the camp step: target = max camps (+0x110) x the land plots no major sees (0x50b2d0) / all land plots, less the standing camps (+0x170); the first step that adds adds BARBARIAN_CAMP_FIRST_TURN_PERCENT_OF_TARGET_TO_ADD (33)% of it, every later one 1. Over the regions (+0x620, 0x153290) each keeps its best-scored plots (the job Barbarian Camp Evaluation per region, 0x14fd6f, waited at 0x14fe72); Barbarian camp region placement weighs the regions at the global top score by their plot counts, Barbarian camp location is uniform over the region's plots, the region's weight then 0; adding more than one, a plot within 7 of a tribe is passed over."
   status: PARTLY
   impl:
     - cpu/core/barbarians.ts:campStep
@@ -48,7 +51,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Camp step 0x14fcc0: target = max camps (+0x110) x the land plots no major sees (0x50b2d0 on hash 0x253718b..."
-  review: imported
+  review: reviewed
 - addr: 0x150a30
   final: 0xe2c50
   kind: function
@@ -61,6 +64,7 @@
 - addr: 0x1514a0
   final: 0xe30f0
   kind: function
+  semantics: "the barbarian manager's turn, first in the turn's close: the techs 0x14f530, the camp step 0x14fcc0, each living tribe's turn (0x1488a0) in the tribes' order, then the clans' 0x8e1bf0."
   status: PARTLY
   readings:
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
@@ -69,7 +73,7 @@
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context: ["## H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
-  review: imported
+  review: reviewed
 - addr: 0x151550
   final: 0xe31a0
   kind: function
@@ -88,8 +92,12 @@
 - addr: 0x151fa0
   final: 0xe32b0
   kind: function
+  semantics: "a camp plot's score: unowned, seen by no living player (0x50b180), camp terrain and feature, no resource at all (0x35fd60 for player -1, 0x5112f0 hands player -1 every resource), no major city nearer than 4, no camp within 7; score = max(0, nearest + second-nearest tribe distance, dead tribes counted, + 0x152b50) + the farthest major city within 7."
   status: READ
   cases:
+    - recording: 1126
+      turn: 3
+      value: 996 and 1041 tie at 52, ranges 2 / 2, the game's pick 996
     - recording: 1118
       turn: 1
       value: "- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the   player manager's +0x4a0 list, every living player), camp terrain and   feature, no resource at all (0x35fd60 is asked for"
@@ -100,19 +108,21 @@
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   context:
     - "- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the player manager's +0x4a0 list, ev..."
-  review: imported
+  review: reviewed
 - addr: 0x152460
   kind: function
+  semantics: "Barb Tribe Roll: one draw over the kind's names no tribe holds."
   status: PARTLY
   impl: [cpu/core/barbarians.ts:freeNames, cpu/harness/drawSites.ts:DRAW_SITES]
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...VALRY with an unowned Horses plot within ResourceRange 3, else MELEE. \"Barb Tribe Roll\" 0x152460 draws over the kind's names no tribe holds."
-  review: imported
+  review: reviewed
 - addr: 0x152b50
   final: 0xe3f60
   kind: function
+  semantics: the least plot distance to the manager's camp list (+0x4a0, every camp ever raised), 0 when empty.
   status: READ
   cases:
     - recording: 1118
@@ -125,7 +135,7 @@
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   context:
     - "...camp's plot index at tribe creation (0x154642) and is cleared only at init (0x155aae); 0x152b50 returns the least plot distance to it, 0 when empty — every camp ever raised, so the ne..."
-  review: imported
+  review: reviewed
 - addr: 0x152c00
   kind: function
   name: tribeScore
@@ -160,6 +170,7 @@
 - addr: 0x152df0
   final: 0xe40d0
   kind: function
+  semantics: "a tribe's camp taken: tribe +0x18 clear, +0x1c the taker's player (written by 0x154830)."
   status: READ
   cases:
     - recording: 1124
@@ -169,7 +180,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
     - "- BARBARIAN RAMPAGE (0x778b40): the tribes whose camp a unit took (0x152df0: tribe +0x18 clear, +0x1c the taker's player, written by the camp's removal 0x154830)..."
-  review: imported
+  review: reviewed
 - addr: 0x152eb0
   final: 0xe4190
   kind: function
@@ -189,6 +200,7 @@
 - addr: 0x153290
   final: 0xe4620
   kind: function
+  semantics: "fills the manager's Map_Region list (+0x620) from the map's region container (vfunc +0x108): a region taken when its plot count (+4) or its area's (+0xc m_area, vfunc +0xd8) is over 10."
   status: PARTLY
   impl: [cpu/core/barbarians.ts:campStep, cpu/data/barbarians.ts:BARB_REGION_MIN]
   readings:
@@ -198,7 +210,7 @@
   context:
     - "...of it, every later one 1. The regions are the map's Map_Region list (+0x620, filled at 0x153290 from the map's region container, vfunc +0x108): a region is taken when its plot count..."
     - ...more than 10 plots or on an area (m_area, looked up at the game's time) of more than 10 (0x153290).
-  review: imported
+  review: reviewed
 - addr: 0x153420
   kind: function
   status: PARTLY
@@ -224,6 +236,7 @@
 - addr: 0x153d60
   final: 0xe4fb0
   kind: function
+  semantics: the plot's area (plot +8, the CvArea, 0x25990) and its plot count (+4).
   status: PARTLY
   impl:
     - cpu/core/barbarians.ts:tribeFits
@@ -234,7 +247,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...154220: the first BarbarianTribes row the camp meets — NAVAL on an AREA under 15 plots (0x153d60 reads the plot's +8, the CvArea pointer Plot:GetArea returns (0x25990), and its +4 plot..."
-  review: imported
+  review: reviewed
 - addr: 0x153e40
   final: 0xe5090
   kind: function
@@ -255,19 +268,23 @@
 - addr: 0x153ea0
   final: 0xe50f0
   kind: function
+  semantics: the tribe's Notify Owner handler (-> 0x148270).
   status: PARTLY
   readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The scout home (Notify Owner 0x7c6fa0 -> 0x153ea0 -> 0x148270): for the scout's tree, threshold RaidingBoldness (BarbarianTribes +0x24, a..."
-  review: imported
+  review: reviewed
 - addr: 0x153ef0
   final: 0xe5140
   kind: function
   name: the barbarian scout's look
-  semantics: "per plot newly visible to the barbarian player (signal +0x10c8): an owned plot; for an EXPLORE unit, the owner's throttle passed, an improvement (+0x44) or a district (0x810d0): the scout's tree starts (0x1485c0) and the throttle is written"
+  semantics: "the barbarian scout's report (bound at 0x153b0d to the game signal +0x10c8 the sight update 0x58aa90 raises per plot newly visible to the barbarian player, 0x508d50 answering 2): a tribe's scout (unit +0x1c0 2) seeing an owned plot of a city, its owner's throttle (manager +0x3d8, data +0x430) passed: 0x1485c0 starts the tribe's ScoutingBehaviorTree when none runs (+0x38) and the owner is a full civ (0x484a10); the throttle becomes turn + max(0, BARBARIAN_MAX_THROTTLE_PER_RAID 18 - handicap x BARBARIAN_LOWER_THROTTLE_PER_DIFFICULTY 3), handicap player +0x908, written whether or not a tree starts."
   status: READ
   cases:
+    - recording: h1_dueld1128
+      turn: 76
+      value: the Skirmisher 4259868's step to 15:14 starts the scout's tree
     - recording: h1_duelw1128
       turn: 6
       value: "the scout's tree from its t6 move (the trees at t6 and t8, raids t11): the replay's starts on those turns"
@@ -285,7 +302,7 @@
   context:
     - "- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout (unit +0x1c0 == 2) seeing an owne..."
     - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update..."
-  review: imported
+  review: reviewed
 - addr: 0x1540b0
   final: 0xe52f0
   kind: function
@@ -312,6 +329,7 @@
 - addr: 0x154220
   final: 0xe5440
   kind: function
+  semantics: "a tribe's kind: the first BarbarianTribes row the camp meets — NAVAL on an area under 15 plots (0x153d60) or with 4 water neighbours one not lake, CAVALRY with an unowned Horses plot within ResourceRange 3, else MELEE; Barb Tribe Roll 0x152460 over the kind's names no tribe holds. Adds the camp's plot index to the camp list (0x154642)."
   status: READ
   cases:
     - recording: 1118
@@ -328,10 +346,11 @@
   context:
     - ...+0x4a0, the AutoVariable at +0x448) takes each new camp's plot index at tribe creation (0x154642) and is cleared only at init (0x155aae); 0x152b50 returns the least plot distance to...
     - "- Tribe kind 0x154220: the first BarbarianTribes row the camp meets — NAVAL on an AREA under 15 plots (0x153d..."
-  review: imported
+  review: reviewed
 - addr: 0x154830
   final: 0xe5930
   kind: function
+  semantics: "a camp's removal: writes the tribe's taken flags (+0x18, +0x1c)."
   status: READ
   cases:
     - recording: 1124
@@ -344,7 +363,7 @@
   context:
     - ...uts EXPLORE, the rest COMBAT; a camp destroyed turns its tribe's DEFENDER units COMBAT (0x154830).
     - "...(0x152df0: tribe +0x18 clear, +0x1c the taker's player, written by the camp's removal 0x154830); each of their units, in pool order, takes of the planning's targets of that player th..."
-  review: imported
+  review: reviewed
 - addr: 0x154b80
   final: 0xe5be0
   kind: function
@@ -384,6 +403,7 @@
 - addr: 0x155b50
   final: 0xe6490
   kind: function
+  semantics: "Barbarian Recruit's failure path (0x7c7ae9 -> here -> 0x149750 -> 0xf03b0): ASSIGNS the request's missing list to the tribe's queue (+0x90)."
   status: PARTLY
   impl: [cpu/core/barbarianOps.ts:taken]
   readings:
@@ -393,4 +413,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e70); the units it finds join, success; else the missing units go to the tribe's queue (0x155b50 -> 0x149750, +0x90) and it runs again next turn. Success or the limiter's end: Spawn Ch..."
-  review: imported
+  review: reviewed

@@ -6,6 +6,7 @@
 - addr: 0x7ee630
   final: 0x556710
   kind: function
+  semantics: Make Formation's execution.
   status: PARTLY
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
@@ -13,12 +14,12 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...the lower-priority unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0...
-  review: imported
+  review: reviewed
 - addr: 0x7eeba0
   final: 0x556c30
   kind: function
   name: moveUnitExec
-  semantics: "Move Unit's execution: the unit's planning plot at To Range this turn, else the location; no move into danger unless allowed; MoveTo"
+  semantics: "Move Unit's execution: the kept unit, else each of its units, moves — the unit's planned walk (0x791300, one turn), the location aside taking none ending on a plot of danger (0x7eed65 -> 0x7ef0bb)."
   status: PARTLY
   impl:
     - cpu/core/barbarianOps.ts:SCOUT_NODES
@@ -51,6 +52,7 @@
 - addr: 0x7ef0e0
   final: 0x557180
   kind: function
+  semantics: Protect Unit's execution.
   status: PARTLY
   impl: [cpu/core/barbarianOps.ts:SCOUT_NODES]
   readings:
@@ -61,7 +63,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...Difficulty Range 0x7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation...
-  review: imported
+  review: reviewed
 - addr: 0x7ef530
   final: 0x5575f0
   kind: function
@@ -96,6 +98,7 @@
 - addr: 0x7efd70
   final: 0x557e40
   kind: function
+  semantics: Make Formation's update (execution 0x7ee630).
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:planFormations]
   readings:
@@ -104,12 +107,12 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...e units of the lower-priority unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7...
-  review: imported
+  review: reviewed
 - addr: 0x7f0020
   final: 0x5580a0
   kind: function
   name: moveUnitUpdate
-  semantics: Move Unit's update; with no Location (0x7f067c) SUCCESS where every tree unit with a target (+0x830) has a planning (+0x1fc0) reaching it this turn on the danger map (Allow Danger false) or with Movement left, else RUNNING; no units SUCCESS
+  semantics: "Move Unit's update: its kept unit (+0x50, kept across turns; an id of 0 or -1 none) alive with a planning: SUCCESS where the planning reaches the location within one turn (0x791300, the flag clear), else RUNNING. None kept: over its units in order, the first reaching it this turn with Movement left (the flag set) is kept and it SUCCEEDS; else the first reaching it this turn, where none is kept yet, or the one whose path (0x272a60) takes the fewest turns, is kept, RUNNING; none FAILURE. \"Allow Danger\" 0 (every city tree's): the location read on the player's danger map (0x7f040d: 0x716a60 on player +0x12d8, x + y x width into 0x716a90); a location of danger lets the kept unit that reaches it go (+0x50 -1, SUCCESS), and a unit is kept by its path only where the location is clear (0x7f057e). With no Location (0x7f067c) SUCCESS where every tree unit with a target is done."
   status: PARTLY
   cases:
     - recording: h1_duely1128
@@ -131,12 +134,12 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
-  review: imported
+  review: reviewed
 - addr: 0x7f07c0
   final: 0x558870
   kind: function
   name: protectUnitUpdate
-  semantics: "Protect Unit's update: no unit FAILURE; a unit hurt past Damage Percentage on a dangerous plot RUNNING; else SUCCESS"
+  semantics: "Protect Unit's update: over the tag's units, else the tree's job's (0x6092c0), each damaged (+0xcf0) at least its Damage Percentage of its hit points (COMBAT_MAX_HIT_POINTS; every city tree's 0) on a plot of danger counts (+0x20): RUNNING with one, SUCCESS with none, FAILURE with no unit."
   status: PARTLY
   cases:
     - recording: 1121

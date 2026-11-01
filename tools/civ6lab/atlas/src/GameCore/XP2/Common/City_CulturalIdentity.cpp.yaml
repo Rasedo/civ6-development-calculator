@@ -66,6 +66,7 @@
   final: 0x114a80
   kind: function
   name: a player's identity sources at a plot
+  semantics: "a player's identity sources at a plot: for P alone OWNERSHIP_IDENTITY_PRESSURE_FROM_* (0x1a1050) and IDENTITY_PER_TURN_FROM_FREE_CITIES / _CITY_STATES (gp +0x40c / +0x408); for each p CAPITAL_IDENTITY_PRESSURE (0x1a0140) and its cities' terms near the plot (0x1a08d0 / 0x1a0ae0 / 0x1a0cc0), each where p's +0x728 is set."
   status: PARTLY
   cases:
     - recording: 1117
@@ -78,17 +79,19 @@
 - addr: 0x19d200
   final: 0x114c80
   kind: function
+  semantics: the city's Loyalty a turn (the identity sum, city +0x2a78).
   status: PARTLY
   impl: [cpu/core/aiViewTypes.ts:AiView]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "- the player's city else: its Loyalty a turn (0x19d200 on city +0x2a78, the identity sum), less the governor's IdentityPressure (+0x20) wher..."
-  review: imported
+  review: reviewed
 - addr: 0x19d470
   final: 0x114d90
   kind: function
   name: loyalty at a plot for a player
+  semantics: "the loyalty lead at a plot for a player: per player p of the game's list 0x19cd80, added for P and taken off for every other p; then the citizens' own - foreign (0x1a1ae0 over CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF, no ratio)."
   status: PARTLY
   cases:
     - recording: h1_duelv1117
@@ -193,6 +196,7 @@
 - addr: 0x1a1ae0
   final: 0x117460
   kind: function
+  semantics: the citizens' identity pressure at a plot (own - foreign) over the radius cutoff.
   status: PARTLY
   cases:
     - recording: h1_duelw1112
@@ -210,4 +214,4 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - 0x1a1ae0 (City_CulturalIdentity.cpp) turns a city's own and foreign citizen pressure (24.8 fixed p...
-  review: imported
+  review: reviewed

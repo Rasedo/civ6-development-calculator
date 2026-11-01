@@ -6,16 +6,20 @@
 - addr: 0x886dd0
   final: 0x5d0f30
   kind: function
+  semantics: "the region flood's visitor: counts and stamps each plot it closes."
   status: PARTLY
-  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  readings:
+    - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ssable (byte +0x3a bit 3) and not water seeds a region, and a flood (0x77d10, the visitor 0x886dd0 counting and stamping each plot it closes, m_area its area) takes every plot the step tes...
-  review: imported
+  review: reviewed
 - addr: 0x887810
   final: 0x5d16c0
   kind: function
   name: Region_Builder
+  semantics: "Region_Builder: the chokepoint analysis 0x86c030 on the builder's +0x20, a chokepoint object per record (its line's plots, 0x371d0), then in plot index order a plot of no region, not impassable (+0x3a bit 3) and not water seeds a region flooded (0x77d10, visitor 0x886dd0 stamping each plot, m_area its area) under the step test 0x887aa0."
   status: READ
   cases:
     - recording: 1103
@@ -23,17 +27,22 @@
     - recording: 1126
       value: the port was checked stage by stage against the DLL itself run under an emulator (unicorn, the analysis 0x86c030 called on each duel's regenerated grid with the map's plot, area and log objects faked)
   impl: [cpu/core/barbarians.ts:campStep]
-  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  readings:
+    - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - "...Chokepoints builds — the binding (0x2b500 -> 0x8923f0) jumps straight into Region_Builder 0x887810, which first runs the chokepoint analysis (MapAnalysis.cpp, 0x86c030 on the builder's +0x..."
-  review: imported
+  review: reviewed
 - addr: 0x887aa0
   final: 0x5d18e0
   kind: function
+  semantics: "the region flood's step test: passable land not yet the flood's; free off every chokepoint line; per chokepoint holding either plot — both on its line: free when the step misses the segment, else refused unless both lie on the line; one on it: refused when the step meets the segment, unless the target lies on the line and the source off it, then taken only while no region holds it."
   status: PARTLY
   impl: [cpu/core/barbarians.ts:campStep]
-  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  readings:
+    - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ounting and stamping each plot it closes, m_area its area) takes every plot the step test 0x887aa0 admits: passable land not yet the flood's own; free between plots off every chokepoint li..."
-  review: imported
+  review: reviewed

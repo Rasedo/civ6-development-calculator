@@ -6,8 +6,12 @@
 - addr: 0x6ed750
   kind: function
   name: AI::Governors seats
+  semantics: "the governors' seats: the slots (no city, the player's cities, every city-state with a capital) and the generalized assignment 0x8b5bf0, one pass, with the start 0x6ecee0, the gain 0x6ece40 (the value whole, -1 for one not appointed or a slot its analysis lacks, 0x6eff30), the move 0x6ed060, the knapsack 0x616570 -> 0x61ddb0; the occupant record of the slot the winner left is not cleared; every governor on a slot assigned there (ASSIGN_GOVERNOR 0xf97c278b)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 205
+      value: Merchant Handan 46 -> Xiurong 69; the Resource Manager then takes Chengdu
     - recording: h1_duelw1117
       turn: 205
       value: Merchant Handan 46 -> Xiurong 69 outgains the Resource Manager's 20, which takes Chengdu (the log's two assignments)
@@ -19,6 +23,7 @@
 - addr: 0x6edfc0
   final: 0x4a79b0
   kind: function
+  semantics: starts the Governor Analyzer job on the player's signal for a full civilization (0x6eee50 runs it).
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
@@ -26,11 +31,12 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e / Great Work Collection Analysis (0x4136b0), Espionage (0x45cf70), Governor Analyzer (0x4a79b0), Victory Conditions + Settle City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), T...
-  review: imported
+  review: reviewed
 - addr: 0x6ee100
   final: 0x4a7ad0
   kind: function
   name: AI::Governors turn (choice)
+  semantics: "the governor AI's turn: the log (0x6ef6a0); a human player stops there. While the player holds a title (0x430ee0 / 0x431ac0): over the governors in order, an unappointed one at its best slot value, an appointed one at each promotion of its set it does not hold (0x35e320) and may take (0x431400) at its score; the first strictly highest above 0 is appointed (APPOINT_GOVERNOR 0xa68659ab) or promoted (PROMOTE_GOVERNOR 0x7d3da99d), executed at once (0x48a330 / 0x49a50); one action a turn; then the seats 0x6ed750."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -46,6 +52,7 @@
   final: 0x4a7f80
   kind: function
   name: AI::Governors analysis (one governor)
+  semantics: "a governor's analysis: the arrays sized to 1 + the player's cities + the game's city-states (Game +0x1650), ids {-1, 2, -1}, values 0; nothing more for a governor neither appointed (0x433450) nor open to the player (0x4316f0). Slot 0: 0x7b0e40(no city) / the secret society's level (1.0 else, 0x16e940); slot 1 + i the player's i-th city; with AssignCityState (+0x48 bit 0) slot 1 + cities + k the k-th city-state's capital where it has one (0x36f460) and the player has met it (0x3daaf0)."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -61,6 +68,7 @@
   final: 0x4a8490
   kind: function
   name: AI::Governors promotion score
+  semantics: "a promotion's score: from 5.0, over the governors whose set holds it: -1.0 (and done) where one is not appointed; else the best of its level x 250.0 for a secret society's governor plus the modifiers' sum in a context of the player and the city the governor sits in (0x432d80); at least 10.0."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -76,6 +84,7 @@
   final: 0x4a8530
   kind: function
   name: Governor Analyzer job
+  semantics: "the Governor Analyzer job: each governor's analysis 0x6ee5f0, each promotion's score 0x6eedb0."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -98,6 +107,7 @@
 - addr: 0x6eef10
   final: 0x4a85f0
   kind: function
+  semantics: "opens AI_Governors.csv (header \"Game Turn, Player, Governor, Assignment, Promotions\")."
   status: PARTLY
   cases:
     - recording: AI_Governors.csv
@@ -106,11 +116,12 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "AI::Governors (AI/Governors.cpp, the player AI's; its log AI_Governors.csv, opener 0x6eef10, header \"Game Turn, Player, Governor, Assignment, Promotions\"). Port: `ai/major/governors..."
-  review: imported
+  review: reviewed
 - addr: 0x6ef120
   final: 0x4a87b0
   kind: function
   name: AI::Governors tables setup
+  semantics: "sets up the governor AI's tables (game-synchronized variables, data +0x1d0 and +0x280): per governor in the Governors table's order (0xad57f0) 0x40 bytes — +0x8 the governor, +0x10 the slots' cities ({owner, type 2, city id}, m_cityIds), +0x28 the slots' values (m_values, 24.8); per promotion in the GovernorPromotions order (0xad5830) 0x38 bytes, +0x30 its score."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -125,6 +136,7 @@
   final: 0x4a8b10
   kind: function
   name: AI_Governors.csv writer
+  semantics: "AI_Governors.csv: per governor \"%d, %d, %s, %d\" (its slot values' largest whole part), then \", %d:%s\" per promotion."
   status: READ
   cases:
     - recording: h1_duelw1117

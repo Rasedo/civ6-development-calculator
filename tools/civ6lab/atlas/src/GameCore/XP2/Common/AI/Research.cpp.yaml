@@ -6,8 +6,12 @@
 - addr: 0x7604e0
   final: 0x4f8460
   kind: function
+  semantics: "the propagation: a row in reach adds the +0x10 of its unowned prerequisites one and two levels up (each level's rows once; a negative one adds 0), then x1.5 if favored (+0x4b0)."
   status: PARTLY
   cases:
+    - recording: h1_duelv1124
+      turn: 1
+      value: Rome's Animal Husbandry 90.4 = 60.3 x 1.5
     - recording: 1124
       turn: 1
       value: a negative   one adds 0), then x1.5 if favored (Rome's Animal Husbandry 90.4 = 60.3 x   1.5 at 1124 t1, China's Masonry -14908.1 = -9938.8 x 1.5).
@@ -18,10 +22,11 @@
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "- THE PROPAGATION, 0x7604e0: a row in reach adds the +0x10 of its unowned prerequisites one and two levels up (each..."
-  review: imported
+  review: reviewed
 - addr: 0x760890
   final: 0x4f87e0
   kind: function
+  semantics: the Tech Tree Analysis job (0x761170 per row).
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
@@ -30,11 +35,15 @@
   context:
     - "...+ Settle City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), Tech Tree Analysis (0x4f87e0). Spawned and waited at once: Barbarian Camp Evaluation, Settle City Evaluation (0x4b15..."
     - "- THE ANALYSIS, 0x761170 (the \"Tech Tree Analysis\" job 0x760890): next := row, turns := -1; a non-repeatable row the player holds is owned, value 0...."
-  review: imported
+  review: reviewed
 - addr: 0x760980
   kind: function
+  semantics: the research AI's turn job (list B, before the Economic AI).
   status: PARTLY
   cases:
+    - recording: h1_duelv1124
+      turn: 6
+      value: "player 4: Writing 251.0 = 124.0 + its Tech Contract 127.0"
     - recording: AI_Research.csv
       value: "- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,   measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,   the research turns from AI_Research.csv): the an"
     - recording: 1124
@@ -55,10 +64,11 @@
   context:
     - "...h the research in hand — a tracked int (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research..."
     - "- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the score), the propagation, then: with..."
-  review: imported
+  review: reviewed
 - addr: 0x761090
   final: 0x4f8f10
   kind: function
+  semantics: "the research AI's player-signal +0x228 handler: refills m_turnsToResearchUnit through 0x763b00."
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -67,11 +77,12 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...esearchUnit (+0x388, data +0x3e0) at the unit is not 0 — the vector 0x763b00 fills from 0x761090 on player signal +0x228, the turn's end after the city AI: zeroed, then per technology..."
-  review: imported
+  review: reviewed
 - addr: 0x7610e0
   final: 0x4f8f60
   kind: function
   name: turnsToResearchTech
+  semantics: "the technology's turns for the city build tables: the research AI's entry turns (+0x1c; 500 at 0 or below), plus the research AI's +0x528 where the entry's walk does not lead through the research in hand — a tracked int (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research in hand; the analysis reads the value before its own turn rewrites it."
   status: READ
   cases:
     - recording: AI_Research.csv
@@ -104,20 +115,22 @@
 - addr: 0x761170
   final: 0x4f8ff0
   kind: function
+  semantics: "the tech tree analysis (job \"Tech Tree Analysis\" 0x760890): next := row, turns := -1; a non-repeatable row held is owned, value 0. Else three levels: each walked row adds its turns left (0x4ca000; the walk takes the cost where the turns are not above 0, 0x7612ea); a row not researchable (0x4c8c40) adds its unowned prerequisites, each level's rows once, the next step the last added that is not the research in hand. Rows still added at the third level leave the entry out of reach (turns -1). Else turns = max(0, sum), value = 0x7b3e50(row, turns, H, discount), score = value."
   status: PARTLY
   impl: [cpu/core/aiResearch.ts:walk]
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "- THE ANALYSIS, 0x761170 (the \"Tech Tree Analysis\" job 0x760890): next := row, turns := -1; a non-repeatable row..."
-  review: imported
+  review: reviewed
 - addr: 0x761940
   final: 0x4f97d0
   kind: function
+  semantics: the research in hand.
   status: PARTLY
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "...CCEPTED ones): no tech (+0x408 -1) CANCELLED (6), fails; IN PROGRESS with the research (0x761940) other than its next step (+0x468) CANCELLED, fails; the tech held COMPLETED (7); the t..."
-  review: imported
+  review: reviewed
 - addr: 0x761980
   final: 0x4f9810
   kind: function
@@ -139,6 +152,7 @@
 - addr: 0x761b70
   final: 0x4f9990
   kind: function
+  semantics: a technology entry's unlocked units (the entry's list +0x20).
   status: PARTLY
   cases:
     - recording: AI_Research.csv
@@ -149,7 +163,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - "...next step, +0x10 its own value, +0x14 its score, +0x18 owned, +0x19 boosted, +0x1a leaf (0x761b70: no row lists it as a prerequisite), +0x1b Repeatable (`Technologies` +0x70 bit 8), +0x1c..."
-  review: imported
+  review: reviewed
 - addr: 0x761d30
   final: 0x4f9b50
   kind: function
@@ -165,6 +179,7 @@
 - addr: 0x762b40
   final: 0x4fa5c0
   kind: function
+  semantics: "the research log line (AI_Research.csv \"%d, %d, Tech, %s, %3.1f, %s, %d\": OWNED / RESEARCHING / GOAL / BOOSTED, the score and the turns; a row with turns < 0 unowned not logged)."
   status: PARTLY
   cases:
     - recording: AI_Research.csv
@@ -172,12 +187,16 @@
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "...(AiFavoredItems of the leader's Technologies list) at +0x4b0. Its log is AI_Research.csv (0x762b40: \"%d, %d, Tech, %s, %3.1f, %s, %d\" — OWNED / RESEARCHING / GOAL / BOOSTED, the score and..."
-  review: imported
+  review: reviewed
 - addr: 0x762d60
   final: 0x4fa7e0
   kind: function
+  semantics: "a research completion (the row): the in-hand turns +0x528 zeroed (0x731d10 on +0x4d0), the propagation again, the contract list walked again (IN PROGRESS / ACCEPTED add their value and are called at +0x10, any other released), per row 0x68d090, then the choice with the row as the key."
   status: PARTLY
   cases:
+    - recording: h1_duelw1117
+      turn: 14
+      value: "Caguana: Celestial Navigation 477.1 + contract 36's 40.0 over Iron Working's 480.7"
     - recording: 1124
       turn: 6
       value: "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on   the entries as they stand, then the choice with the row as the key   (1124 t6: minors 2 and 3 pass Writing, Currency and Ir"
@@ -191,4 +210,4 @@
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on the entries as they stand, then the c..."
-  review: imported
+  review: reviewed

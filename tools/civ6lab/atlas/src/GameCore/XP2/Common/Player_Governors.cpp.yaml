@@ -14,12 +14,13 @@
 - addr: 0x430ee0
   final: 0x2dd760
   kind: function
+  semantics: "a title for an appointment: spent below earned and a governor of the list not appointed."
   status: PARTLY
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...player stops there. While the player holds a title for an appointment or a promotion (0x430ee0: spent below earned, and a governor of the list not appointed — Ibrahim, whom only Sule..."
-  review: imported
+  review: reviewed
 - addr: 0x430fa0
   final: 0x2dd820
   kind: function
@@ -32,17 +33,19 @@
 - addr: 0x431400
   final: 0x2ddbb0
   kind: function
+  semantics: the governor may take the promotion.
   status: PARTLY
   impl: [cpu/core/aiViewTypes.ts:AiView]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - ...appointed one at each promotion of its set it does not hold (0x35e320) and may take (0x431400) at the promotion's score; the first strictly highest above 0 is appointed (APPOINT_GOV...
-  review: imported
+  review: reviewed
 - addr: 0x4316f0
   final: 0x2dddd0
   kind: function
   name: Player_Governors CanAppoint (open to the player)
+  semantics: "CanAppoint: no TraitType, or a trait its civilization or leader holds; a secret society's governor its society's."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -80,6 +83,7 @@
 - addr: 0x432d80
   final: 0x2de990
   kind: function
+  semantics: the city a governor sits in.
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -89,7 +93,7 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...plus the modifiers' sum in a context of the player and the city that governor sits in (0x432d80, none where it sits in none). The score is at least 10.0 (runs/h1_duelw1117 t24: Mess..."
-  review: imported
+  review: reviewed
 - addr: 0x433180
   final: 0x2ded40
   kind: function
@@ -103,9 +107,10 @@
 - addr: 0x433450
   final: 0x2def90
   kind: function
+  semantics: the governor is appointed.
   status: PARTLY
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...every id {-1, 2, -1} and every value 0; nothing more for a governor neither appointed (0x433450) nor open to the player (0x4316f0: no TraitType, or a trait its civilization or leade..."
-  review: imported
+  review: reviewed

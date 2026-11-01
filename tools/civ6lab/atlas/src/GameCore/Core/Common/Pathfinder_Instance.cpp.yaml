@@ -46,6 +46,7 @@
   final: 0x588e0
   kind: function
   name: LinkChild
+  semantics: "LinkChild: the cost (+0x48, 0x270dd0) first, then a new node AddToOpen, an open one re-keyed where strictly cheaper, a closed one UpdateParents."
   status: PARTLY
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
@@ -55,7 +56,7 @@
   context:
     - "...a float midpoint, so a tie lands first or last by the side it scanned from). LinkChild 0x78750: a child is linked only when the valid callback passed; an open child is re-parented on..."
     - "...game's (x - y//2, y) — NE, E, SE, SW, W, NW), each the valid callback admits (LinkChild 0x78750)."
-  review: imported
+  review: reviewed
 - addr: 0x793f0
   final: 0x58f30
   kind: function
@@ -74,6 +75,7 @@
   final: 0x590a0
   kind: function
   name: UpdateOpenNode
+  semantics: "UpdateOpenNode: moves a node made cheaper toward the head past those of higher f only (after its new equals)."
   status: PARTLY
   impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:reparent, cpu/core/tactical.ts:PathDanger]
   readings:
@@ -84,7 +86,7 @@
   context:
     - ...allback passed; an open child is re-parented on a STRICTLY cheaper cost (UpdateOpenNode 0x79560), a closed one likewise with UpdateParents 0x79660, a new one opened. The trade path's...
     - "...st equal). A node re-keyed while open walks toward the head past strictly greater keys (0x79560). The step pops the head (0x781e0: NotifyList 2 then 3, closed) and links its neighbour..."
-  review: imported
+  review: reviewed
 - addr: 0x79660
   kind: function
   name: UpdateParents

@@ -6,6 +6,7 @@
 - addr: 0x508330
   final: 0x359f00
   kind: function
+  semantics: "AddOutgoingVisibility: a player's visibility added to another's."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -17,10 +18,11 @@
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - ...al 0x50d390 is reached from the visibility count change 0x508d50 alone for a barbarian (0x508330 is the diplomatic sharing, 0x50ccc0 the war / peace one, 0x50d080 RevealAllPlots and th...
-  review: imported
+  review: reviewed
 - addr: 0x508d50
   final: 0x35a7f0
   kind: function
+  semantics: the visibility count change.
   status: PARTLY
   impl:
     - cpu/core/barbarians.ts:othersSee
@@ -36,7 +38,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2: the plot's visibility count fo..."
-  review: imported
+  review: reviewed
 - addr: 0x50a690
   kind: function
   status: PARTLY
@@ -49,6 +51,7 @@
 - addr: 0x50b180
   final: 0x35bdc0
   kind: function
+  semantics: the plot is seen by a living player (the player manager's +0x4a0 list).
   status: READ
   cases:
     - recording: 1118
@@ -61,17 +64,18 @@
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   context:
     - "- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the player manager's +0x4a0 list, every living player), camp terrain and featur..."
-  review: imported
+  review: reviewed
 - addr: 0x50b2d0
   final: 0x35bf10
   kind: function
+  semantics: "the plot is seen now by no living player of a class (FULL_CIV 0x253718b0: every player of +0x50 but a tribe 0xd959ec24 and a city-state 0xc2577075, so the Free Cities count): per player its team's visibility count +0x290 above 0."
   status: PARTLY
   impl: [cpu/core/barbarians.ts:campStep, gpu/core/sim_barb.py:_barb_camp_step]
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Camp step 0x14fcc0: target = max camps (+0x110) x the land plots no major sees (0x50b2d0 on hash 0x253718b0) / all land plots, less the standing camps (+0x170); the first step..."
-  review: imported
+  review: reviewed
 - addr: 0x50ccc0
   final: 0x35d8c0
   kind: function
@@ -100,6 +104,7 @@
   review: imported
 - addr: 0x50d390
   kind: function
+  semantics: the reveal of plots off the visibility count change (0x508d50), for every player.
   status: READ
   cases:
     - recording: 1127
@@ -118,4 +123,4 @@
   context:
     - "...Kandy's MINOR_CIV_KANDY_GRANT_RELIC_BONUS, Amount 1): the visibility manager's reveal 0x50d390 (Player_Visibility_Manager.cpp, the natural-wonder discovery notification), for i below..."
     - "- WORLD_CIRCUMNAVIGATED: on a plot revealed (0x50d390, the visibility manager), a player without the flag (+0x8a8) whose team has revealed a..."
-  review: imported
+  review: reviewed

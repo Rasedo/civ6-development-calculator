@@ -59,6 +59,7 @@
 - addr: 0x496fd0
   final: 0x315210
   kind: function
+  semantics: the player's faith per turn.
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -67,7 +68,7 @@
   context:
     - ...(player +0x1340 +0x100) passes its faith cost and -0.25 more once the faith per turn (0x496fd0) passes half of it.
     - ...-0.25 (@0xd2f324) once the balance passes its cost, -0.25 more once the Faith per turn (0x496fd0) passes half of it.
-  review: imported
+  review: reviewed
 - addr: 0x497030
   final: 0x315270
   kind: function
@@ -121,6 +122,7 @@
 - addr: 0x4979f0
   final: 0x3158b0
   kind: function
+  semantics: "the player's religion entry: the religion manager's +0xa0 entry of the player's +0x128 holding more than 0."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
@@ -128,7 +130,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...value. GOVERNMENTBONUS_FAITH_PURCHASES (0xc25143f9): where the player's religion entry (0x4979f0: the religion manager's +0xa0 entry of the player's +0x128 holding more than 0) — 0.1 x..."
-  review: imported
+  review: reviewed
 - addr: 0x497cc0
   final: 0x315b30
   kind: function
@@ -142,12 +144,13 @@
 - addr: 0x497d20
   final: 0x315b80
   kind: function
+  semantics: a plot argument is valid (the safe plot's goal; both callers pass none).
   status: PARTLY
   readings: ["C-95: the danger map and Move to Safety — READ, ported"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x716b10) to the danger: no party on the tactical core holds one. A goal plot argument (0x497d20 valid) puts the nearer to it first off its own territory: both callers pass none."
-  review: imported
+  review: reviewed
 - addr: 0x497d40
   final: 0x315ba0
   kind: function

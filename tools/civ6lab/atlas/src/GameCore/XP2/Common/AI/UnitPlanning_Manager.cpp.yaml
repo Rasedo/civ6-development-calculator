@@ -105,6 +105,7 @@
 - addr: 0x791b20
   final: 0x51ca20
   kind: function
+  semantics: the planning's turn job (the units' plannings the trees and the tactical pass read).
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -112,7 +113,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...aluator 0x5c2650, the barbarian manager's turn 0x1514a0 (barbarians only), the planning 0x791b20, the target list 0x785f30, ..., the operation manager 0x722690 (0x727510: each operatio..."
-  review: imported
+  review: reviewed
 - addr: 0x791e00
   kind: function
   name: UnitPlanning
@@ -143,6 +144,7 @@
 - addr: 0x7921e0
   final: 0x51cec0
   kind: function
+  semantics: the one-turn reach search of a unit (-> 0x26df90) the danger map runs.
   status: PARTLY
   impl: [cpu/core/tactical.ts:dangerPlane]
   readings:
@@ -154,9 +156,10 @@
     - ".claude/scratchpad/st1/reading.md: ...t less;   otherwise the larger of combat and ranged) onto the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd als..."
   context:
     - ...otherwise the larger of combat and ranged) onto the plots of its 1-turn planning reach (0x7921e0 -> 0x26df90) and every plot within its range (0x56e3d0) of them; a unit with the flag +...
-  review: imported
+  review: reviewed
 - addr: 0x792c90
   kind: function
+  semantics: the planning's turn-start read of the revealed plots (once at the AI's turn start).
   status: PARTLY
   impl:
     - cpu/core/tactical.ts:barbarianTactics
@@ -172,7 +175,7 @@
   context:
     - "- \"AI Unit Planning\" (0x792c90) is a fork-join: N = min(units, the path finder pool's count) chunks; N <= 1 plans each..."
     - "- The planning's reach (AI Unit Planning 0x792c90 -> 0x791e00 -> the breadth-first search 0x26dcd0 for 2 turns, flags 0x115 | 0x800 | 0x1..."
-  review: imported
+  review: reviewed
 - addr: 0x792f90
   final: 0x51da80
   kind: function
@@ -194,9 +197,10 @@
 - addr: 0x793210
   final: 0x51dcd0
   kind: function
+  semantics: "the planning's entry for a target: the predicted damage per spot (+0x64)."
   status: PARTLY
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "...90: +0xdb0 > 0) of the largest predicted damage of their planning's entry for the city (0x793210, +0x64 per spot; 0x791470 runs the combat under the simulation flag) against half the c..."
-  review: imported
+  review: reviewed

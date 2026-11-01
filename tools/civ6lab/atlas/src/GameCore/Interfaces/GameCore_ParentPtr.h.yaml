@@ -15,6 +15,7 @@
 - addr: 0x198310
   final: 0x111920
   kind: function
+  semantics: "the city's outer defence maximum: the Free Cities (0x469d40) a table's row (0x276310 / 0x276370, +0x1c); any other player its +0x12f0 +0xf4 where above 0, else the sum of its buildings' OuterDefenseHitPoints (+0x58 where +0x54); then + City +0x14, at least 0. (FinalRelease reads Player::Cities +0xec.)"
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -32,7 +33,7 @@
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...50 on 0x6da56a3d: district +0x8d8) below its outer maximum (0x24b290 -> City +0x1880, 0x198310) adds Amount raw. EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 (@f03d20, vtable 0xd62ad0):..."
-  review: imported
+  review: reviewed
 - addr: 0x1f6360
   final: 0x14b720
   kind: function

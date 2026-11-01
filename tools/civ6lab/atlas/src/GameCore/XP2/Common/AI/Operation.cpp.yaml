@@ -6,6 +6,7 @@
 - addr: 0x737610
   final: 0x4db690
   kind: function
+  semantics: "the team update's ring lambda: a unit of the member's player on the ring."
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -13,7 +14,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ights, where no unit of the member's player stands on its ring (0x6b1b0 over the lambda 0x737610) and the member's plot holds danger (0x716a60) or the entry is HIGH, within the unit's...
-  review: imported
+  review: reviewed
 - addr: 0x737920
   final: 0x4db820
   kind: function
@@ -36,6 +37,7 @@
   final: 0x4dbd90
   kind: function
   name: addMember
+  semantics: "addMember: a unit to an operation's team; writes the operation's id to the unit (+0x720) and keeps the join order."
   status: READ
   cases:
     - recording: 1117
@@ -49,18 +51,20 @@
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   context:
     - "...job the unit is in — the tactical pass's, the homeland's, an operation's (`addMember` 0x737e80 writes the operation's id +0x720) — listed by job through 0x6092c0. The tactical pass (..."
-  review: imported
+  review: reviewed
 - addr: 0x737f90
   final: 0x4dbea0
   kind: function
+  semantics: "adds a unit to a team: pushes it to the members (+0x18) and to the joined list (+0x48, its count +0x58)."
   status: PARTLY
   impl: [cpu/core/operations/operation.ts:addMember]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  review: reviewed
 - addr: 0x738050
   kind: function
+  semantics: the team's evaluator of a recruit offer.
   status: PARTLY
   impl:
     - cpu/core/operations/nodes.ts:recruitUnits
@@ -73,7 +77,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "...e Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations); Lock Units..."
-  review: imported
+  review: reviewed
 - addr: 0x7383d0
   final: 0x4dc3f0
   kind: function
@@ -83,9 +87,12 @@
 - addr: 0x738f20
   kind: function
   name: teamUpdate
-  semantics: "a team's update: strengths, endangered list, battle points and line (+0x90 in battle)"
+  semantics: "the team update (from 0x73f7d0; goals at team +0xe8 + 8 x slot): per member its axial column and row summed; per tactical target (kb +0x370) within twice its base Movement (0x56d9f0): the team's attack strength (+0x98) once per member that can strike it (0x791300), the damage the target would deal it (0x51a240 / 0x519370 under the danger map), the target into the team's list (+0xb8) and the enemy strength (+0x94); a member the expected damage would kill is endangered (+0xa0). Then slot 3 (+0x100) the centre; slot 5 (+0x110) the march point — the enemy not at war: from the target back toward the rally in single-precision axial steps (0x38070), the first plot P may enter (its own, no one's, open borders / alliance 0x3dab70, or an owner not enforcing its borders, diplomacy +0x6c0), the rally where reached; no enemy or at war: the target; with targets slot 4 (+0x108) the battle line, halfway between the centre and the targets' average, the team engaged (+0x90). Logged \"Battle line, %d:%d, %d endangered\". The endangered list (+0xa0, cleared each tick): a unit entry that fights adds its blow where no unit of the member's player stands on its ring (0x6b1b0 over 0x737610) and the member's plot holds danger or the entry is HIGH; a district's city (0x408770) its strike within range; a member joins where the sum is above 0 and it does not fight (a lone unit on land: 0x739659), else where its damage plus the sum passes its hit points — a captive in its escort's formation is never listed."
   status: PARTLY
   cases:
+    - recording: h1_duely1128
+      turn: 85
+      value: Builder Capture's Settler 4718622 on 12:13 stays
     - recording: h1_duelv1117
       turn: 20
       value: Battle line 31:15, 0 endangered
@@ -128,6 +135,7 @@
   review: reviewed
 - addr: 0x739f60
   kind: function
+  semantics: the goal a team's member storage was kept for (the store kept while the goal holds).
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -135,7 +143,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x737920, slots +0x78 and +0x74, made on its first tick) with the goal it was kept for (0x739f60): the list the store while the goal holds, else empty, the team's +0x48 units added u..."
-  review: imported
+  review: reviewed
 - addr: 0x73a120
   final: 0x4ddd60
   kind: function
@@ -176,6 +184,7 @@
   final: 0x4de400
   kind: function
   name: an operation's target gone
+  semantics: "an operation's target gone: no city on its plot."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:isCityThreatened
@@ -196,6 +205,7 @@
   final: 0x4de580
   kind: function
   name: an operation ready
+  semantics: "an operation ready: +0x5d0, its contract gone, or every team ready (0x73ab20)."
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:paired, cpu/core/tactical.ts:passMoveExec]
   readings:
@@ -210,6 +220,7 @@
 - addr: 0x73ab20
   final: 0x4de640
   kind: function
+  semantics: a team's gather check (its members arrived).
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:operationMove]
   readings:
@@ -220,7 +231,7 @@
   context:
     - "...MOVE'S UPDATE (0x81a130). Per team (the first one only for the head's test): a team the 0x73ab20 check passes with no member skipped; the goal its slot (Move To: 0 the rally +0xe8, 1 t..."
     - "...x816cb0): none where the operation's teams gather (0x73aa60: op +0x5d0, or every team's 0x73ab20) and the update found it arrived; per team its members listed at +0x74 \"Nonmoving\" (the..."
-  review: imported
+  review: reviewed
 - addr: 0x73abf0
   final: 0x4de710
   kind: function
@@ -243,6 +254,7 @@
 - addr: 0x73b360
   final: 0x4dee80
   kind: function
+  semantics: an operation's team count (FinalRelease +0x160; teams 0x118 bytes inline at +0x150).
   status: PARTLY
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
@@ -251,16 +263,17 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ning lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
-  review: imported
+  review: reviewed
 - addr: 0x73b4f0
   final: 0x4def30
   kind: function
+  semantics: prints an operation team's members (+0x18 the unit ids, count +0x28) through Player::Units' lookup 0x4f2310.
   status: PARTLY
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...or it), +0x2f8 m_treeManagerId. A team: +0x18 its members' unit ids, their count +0x28 (0x73b4f0 (FinalRelease 0x4def30) prints them through Player::Units' lookup 0x4f2310 (FinalReleas..."
-  review: imported
+  review: reviewed
 - addr: 0x73b6c0
   final: 0x4df100
   kind: function
@@ -299,7 +312,12 @@
 - addr: 0x73d1f0
   final: 0x4e09f0
   kind: function
+  semantics: "Defend Units' release: the unit's assignment +0x778 to -1 (0x1e60f0); then per team (stride 0x118) the team is copy-constructed onto the stack (0x735110), the unit's id erased from the COPY's member list, the copy destroyed — the team keeps the unit, and its +0x7d0 holds: a released unit stays its operation's member."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1130
+      turn: 19
+      value: tribe 0's Warrior 851979 stays in the raid's team W/S/W through t31
   impl:
     - cpu/core/operations/nodes.ts:DefendOrders
     - cpu/core/opsOrders.ts:us
@@ -314,7 +332,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t is suzerain of, an ally's; 2 no one's; 3 another's) is released from the operation (0x73d1f0: its operation field +0x778 to -1, out of every team); one fortified afloat to its safe..."
-  review: imported
+  review: reviewed
 - addr: 0x73e610
   final: 0x4e1620
   kind: function
@@ -342,6 +360,7 @@
 - addr: 0x73e7d0
   final: 0x4e1850
   kind: function
+  semantics: "sets an operation's target and rally: the target to op +0x2a8, the rally through the autovariable at op +0x2c0 (0x7eb220) to op +0x318, then each team's goals, slot 0 (+0xe8) the rally and slot 1 (+0xf0) the target."
   status: PARTLY
   impl:
     - cpu/core/barbarianOps.ts:barbOpStart
@@ -354,7 +373,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
   notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  review: reviewed
 - addr: 0x73e870
   final: 0x4e18f0
   kind: function
@@ -370,6 +389,7 @@
 - addr: 0x73ea10
   final: 0x4e1aa0
   kind: function
+  semantics: an operation's teardown (from 0x7353d0).
   status: READ
   cases:
     - recording: 1117
@@ -379,7 +399,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...-1) releases them, else their turn is done (0x570b40). The operation's end (0x7353d0 -> 0x73ea10, the teams' destructor 0x735790) writes no unit, and the release 0x73d1f0 is Defend U...
-  review: imported
+  review: reviewed
 - addr: 0x73eb60
   final: 0x4e1bf0
   kind: function
@@ -411,6 +431,7 @@
 - addr: 0x73f7d0
   final: 0x4e2670
   kind: function
+  semantics: "the team rebuild (before the team update): lists the operation's units by its id (0x6092c0 on +0x720) and adds each one alive that no team of it holds to its first team (0x737f90); resets no field."
   status: PARTLY
   impl: [cpu/core/operations/assault.ts:WEIGHED, cpu/core/operations/nodes.ts:refreshStrengths]
   readings:
@@ -423,11 +444,12 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...f none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")..."
-  review: imported
+  review: reviewed
 - addr: 0x73fba0
   final: 0x4e29b0
   kind: function
   name: the team update (counts, readiness, unit to build)
+  semantics: "the team update: per requirement (0x1c bytes: +0 AiType, +4 Dependence, +8 MinNumber, +0xc MaxNumber, +0x10 MinPercentage, +0x14 MaxPercentage, +0x18 ReconsiderWhilePreparing) the members carrying its type (one with a Dependence counts only where a member carries that type). Below its MinNumber (with none, its MinPercentage of the members above its count) needed and the minimums unmet (+0x10), else had; at its MaxNumber (with none, where one more passes MaxPercentage of one more member, 0x740562) full. Ready (+0x11): the minimums met and, with an InitialStrengthAdvantage, the members' strength at the enemy's plus the desired (0x723ab0) or more; +0x12 likewise with the OngoingStrengthAdvantage. The unit to build (+0x14): readiness unchanged, the old one where 0x79cba0 still takes it; else 0x79bd30 over the needed types (the had ones where none is needed), barring the full, against the operation's enemy (op +0x888). At 0x740016 a member's assignment to -1 where its slot is flagged, op +0x890 clear and its formation holds one."
   status: READ
   cases:
     - recording: h1_duelv1128

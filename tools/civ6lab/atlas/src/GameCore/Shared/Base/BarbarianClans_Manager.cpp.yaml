@@ -6,9 +6,10 @@
 - addr: 0x8e1bf0
   final: 0x620400
   kind: function
+  semantics: the clans' turn (Barbarian Clans mode).
   status: PARTLY
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...the techs, the camp step, each living tribe's turn in the tribes' order, then the clans' 0x8e1bf0 (no clans in these games).
-  review: imported
+  review: reviewed

@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x26dcd0
   kind: function
+  semantics: "the planning's breadth-first search: keeps the pool's heuristic (+0x30/+0x38, null in the pool 0x26f330 sets) and zeroes the destination test (+0x20/+0x28); the destination (-9999, -9999), so it runs out. A node's key (+0x18 f, +0x1c g), f = g."
   status: PARTLY
   impl:
     - cpu/core/tactical.ts:reachPlots
@@ -18,9 +19,10 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...The planning's reach (AI Unit Planning 0x792c90 -> 0x791e00 -> the breadth-first search 0x26dcd0 for 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrappe...
-  review: imported
+  review: reviewed
 - addr: 0x26df90
   kind: function
+  semantics: "the reach search with flags (0x311 the danger map's: 0x200 skips the planning's zone refusal, no 0x800 keeps the zone's spend-everything step)."
   status: PARTLY
   impl:
     - cpu/core/tactical.ts:dangerPlane
@@ -39,12 +41,16 @@
   context:
     - ...; bombard less GlobalParameters +0x188) to every plot of its one-turn reach (the search 0x26df90, flags 0x311) and to each plot within its range of those; an aircraft a disk of its r...
     - ...e larger of combat and ranged) onto the plots of its 1-turn planning reach (0x7921e0 -> 0x26df90) and every plot within its range (0x56e3d0) of them; a unit with the flag +0x18bd also...
-  review: imported
+  review: reviewed
 - addr: 0x26e570
   final: 0x1a6e00
   kind: function
+  semantics: "the planning search's valid wrapper. Attack test: a district at war with hit points (DistrictInfo +0x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0), no domain test; the attack's cost adds the Movement left (0x1d0 += 0x1d4) and nothing is linked from it (0x26e5cd: a parent with node flag +0x51 & 0x40 refused). At 0x26e83e..0x26e8ae, flag 0x200 clear, a step whose parent is not the unit's own plot and lies in the unit's enemy zone of control (0x26f980 -> 0x530f50) is refused unless it is an attack."
   status: READ
   cases:
+    - recording: h1_duelv1121
+      turn: 4
+      value: city-state 4's Warrior at 32:22 lists the Scout's 33:23 across the river (2/0)
     - recording: 1124
       turn: 9
       value: "AI_Planning.csv lists them (1124 t9:   the barbarian Warrior at 40:22 holds 39:23 (1/0), China's Warrior there);"
@@ -68,12 +74,16 @@
   context:
     - "...or 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrapper 0x26e570 refuses a node past the turn limit): the list at planning +0x30 (16-byte entries x, y,..."
     - "...centre, an Encampment) as a node whose step spends the Movement left (the valid wrapper 0x26e570: the attack's cost adds the Movement left, 0x1d0 += 0x1d4) and links nothing from it (a..."
-  review: imported
+  review: reviewed
 - addr: 0x26e920
   final: 0x1a7150
   kind: function
+  semantics: "the step's cost rules (0x531660..0x530240): into a city at most CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1 bit 2) stands at the FROM or the TO plot, the completion (0x811b0) read off the FROM plot's district in both cases; a land unit whose player may embark it takes water (a turn on the domain's pool: [r9 + 0x180 + domain*4])."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 72
+      value: city-state 2's Swordsman embarking from 15:6 onto its Harbor 14:7 plans 1/0
     - recording: h1_duelw1117
       turn: 52
       value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
@@ -95,6 +105,7 @@
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
     - "C-99: the carry under a zone of control — READ (0x26e920), both twins"
+  review: reviewed
 - addr: 0x26ee80
   final: 0x1a74c0
   kind: function
@@ -155,6 +166,7 @@
 - addr: 0x26f330
   final: 0x1a7840
   kind: function
+  semantics: "sets the planning pool: no heuristic."
   status: READ
   cases:
     - recording: h1_duelw1128
@@ -169,7 +181,7 @@
     - "...er_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair is null), so a node's key is its cost. The op..."
     - "...r a unit +0x738 above 1 holding 0x2669d0 2 or 4; then the A* 0x7a630 over the callbacks 0x26f330 sets: the validity 0x2720a0, the cost 0x26e920), its turns the answer. The planning's..."
     - ...eadth-first search 0x26dcd0 keeps the pool's heuristic (+0x30/+0x38, null in the pool 0x26f330 sets) and zeroes the destination test (+0x20/+0x28); the destination is (-9999, -9999),...
-  review: imported
+  review: reviewed
 - addr: 0x26f7d0
   final: 0x1a7ce0
   kind: function
@@ -193,6 +205,7 @@
 - addr: 0x26f980
   final: 0x1a7e90
   kind: function
+  semantics: the zone of control query (finder, from, to, the path's destination) -> 0x530f50.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -217,7 +230,7 @@
     - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."
     - "- THE ZONE OF CONTROL'S TEST (Rules_Movement 0x530f50, READ; through 0x26f980(finder, from, to, the path's destination) from the path cost 0x26e920, the move's step..."
     - ...whose parent is not the unit's own plot and lies in the unit's enemy zone of control (0x26f980 -> Rules_Movement 0x530f50, the mover's owner, its stacking count 0x585eb0) is refused...
-  review: imported
+  review: reviewed
 - addr: 0x26fe20
   kind: function
   status: READ
@@ -277,8 +290,12 @@
 - addr: 0x270dd0
   final: 0x1a9060
   kind: function
+  semantics: "a step's path cost: an unrevealed plot's step +3 with no +3 off the territory, a revealed one +2 and +3 more off it where it ends the turn; at 0x2712be, on a revealed water plot for a formation of the land domain (finder +0x1f2 = 0x2669d0(formation, 2)) +1000 (0x3e800) where its player is not human (+0x1f6 clear) or one of its units holds +0x590 (the path and the planning's lists alike); the embark / disembark tests (0x52fe90 / 0x52fb90, +1e6 where refused), mountain and canyon +1e6."
   status: READ
   cases:
+    - recording: h1_duely1117
+      turn: 69
+      value: Valletta's Archer closes its Harbor's 14:7 (1/0) after the land's 12:8 and 12:9
     - recording: AI_Planning.csv
       turn: 69
       value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
@@ -296,7 +313,7 @@
     - "- The cost (0x270dd0): 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no..."
     - ...tep), its step costing +3 where a revealed plot's costs +2 and no +3 off the territory (0x270dd0); a path (the move order's pathfinder) reads every plot as revealed. A plot only reve...
     - "...past those of higher f only (after its new equals). LinkChild 0x78750: the cost (+0x48, 0x270dd0) first, then a new node AddToOpen, an open one re-keyed where strictly cheaper, a close..."
-  review: imported
+  review: reviewed
 - addr: 0x271490
   final: 0x30c70
   kind: function
@@ -341,6 +358,7 @@
 - addr: 0x271be0
   final: 0x1a9a40
   kind: function
+  semantics: a planning node's flags on its first visit (the list test's bits).
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -355,10 +373,11 @@
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
     - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."
-  review: imported
+  review: reviewed
 - addr: 0x2720a0
   final: 0x1a9f00
   kind: function
+  semantics: "the path validity: flag 1 lets no step leave a plot the player never revealed but the unit's own; 0x1000 lets a later turn end on its own stacking unit."
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -399,7 +418,7 @@
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."
     - ...rrior for Valletta's garrison) the same. The pathfinder's own test (the move's validity 0x2720a0 / the attack test of 0x26e570's twin) is unread; ported as the move order's attack pl...
-  review: imported
+  review: reviewed
 - addr: 0x2726b0
   final: 0x1aa510
   kind: function

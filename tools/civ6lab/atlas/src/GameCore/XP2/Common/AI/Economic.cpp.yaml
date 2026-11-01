@@ -69,6 +69,7 @@
 - addr: 0x6892d0
   final: 0x457b80
   kind: function
+  semantics: connects the economic AI's contract listener 0x68ab40 to signal +0x270.
   status: READ
   cases:
     - recording: h1_duelv1128
@@ -78,7 +79,7 @@
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...bmission's signal +0x270 also runs the economic AI's listener (0x68ab40, connected in 0x6892d0): a contract for a unit or a building — no district — whose PurchaseYield is YIELD_GOLD..."
-  review: imported
+  review: reviewed
 - addr: 0x689610
   final: 0x457ec0
   kind: function
@@ -134,6 +135,7 @@
   final: 0x458ac0
   kind: function
   name: the economic AI's contract listener
+  semantics: "the economic AI's contract listener: takes a unit or building contract it may buy with gold into its purchase list (+0x5d0)."
   status: READ
   cases:
     - recording: h1_duelv1128
@@ -181,8 +183,12 @@
   final: 0x458d00
   kind: function
   name: the building contract's purchase
+  semantics: "the building contract's purchase: Buildings +0x159 & 0x10 refused; the queue's CanConstruct 0x1714d0 (city +0x2170); the price 0x1b18c0 (city +0x1688, YIELD_GOLD @0xf2f97c) << 8; the city's analysis value 0x5d4920 (flags 0) below 0x16e7d0(yieldValue 0x7a6690 of the price, 0.25 @0xd2f324) refuses; a price below 0 refuses; UNITS (slot 1) + SLUSH (slot 0) at or below the price refuses; UNITS above price x 0.5 or SLUSH above price x 2, else refused; the purchase request 0x977490 (city +0x158, YIELD_GOLD), the command vt +0x48 / +0x50; the spend SLUSH -= max(0, price - UNITS), UNITS = max(0, UNITS - price), the balance +0x1b8 lowered by the price."
   status: READ
   cases:
+    - recording: h1_duely1121
+      turn: 178
+      value: Hunza's Stock Exchange of contract 533, 660 Gold, treasury 955.9 -> 307.2
     - recording: h1_duely1121
       turn: 178
       value: "Hunza's Stock Exchange of contract 533 (submitted t177), 660 Gold, treasury 955.9 -> 307.2; our t177 table 31.8 under the 82.5 floor (our research a turn late): the value test unconfirmed"
@@ -203,6 +209,7 @@
   final: 0x459320
   kind: function
   name: TryPurchaseUnits
+  semantics: "TryPurchaseUnits(Economic, city or all, unit, flag): per city, the Gold price 0x1b22d0 (below 0 skipped); the UNITS and SLUSH slots together above it with UNITS above half of it or SLUSH above twice it, or — the city threatened (0x68c027: CityBuildAI +0x1b8's sign bit clear) — the balance (+0x1b8) at or above it; the purchase request (0x977570, the game core's +0x48 / +0x50); then the spend: UNITS then SLUSH for the overflow, a threatened city's from each slot in order; the balance less the price (0x68c0ad: the sum strictly above the price). 0x5ce5b0's tail loops the pick 0x5d2810 (domain -1) and this (flag 0) until either fails."
   status: PARTLY
   impl:
     - cpu/core/aiEconomic.ts:tryPurchaseUnits

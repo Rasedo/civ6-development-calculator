@@ -15,6 +15,7 @@
 - addr: 0x7bb870
   final: 0x5366c0
   kind: function
+  semantics: "a strategy stopped: takes its Strategy_YieldPriorities and Strategy_Priorities lists off."
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -24,7 +25,7 @@
     - "...strategy's Strategy_YieldPriorities rows add fx(PercentageDelta x 0.01) (0x7bf160 on, 0x7bb870 off). The install has no such row: 0."
     - ...160 -> 0x7ba440 adds a followed strategy's Strategy_Priorities lists to the same array, 0x7bb870 takes them off. A row adds fx(Value x 0.01) (0x6dd1b0; Favored false subtracts). A ma...
     - ...he strategy (a disqualified one stays off) and stamps +0x90 = turn + 20 (0x7bf160 on, 0x7bb870 off). The log prints Forbidden / Following / Stopped, and Exclusive for the forced stop...
-  review: imported
+  review: reviewed
 - addr: 0x7bc580
   final: 0x536b00
   kind: function
@@ -127,6 +128,7 @@
 - addr: 0x7bf160
   final: 0x538fb0
   kind: function
+  semantics: "a strategy followed: its Strategy_YieldPriorities rows add fx(PercentageDelta x 0.01) to the victory manager's Yields; its Strategy_Priorities lists go to the list systems (-> 0x7ba440)."
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -136,4 +138,4 @@
     - "...\"): a followed strategy's Strategy_YieldPriorities rows add fx(PercentageDelta x 0.01) (0x7bf160 on, 0x7bb870 off). The install has no such row: 0."
     - ...when the player's handicap, player +0x908, is within its MinDifficulty..MaxDifficulty); 0x7bf160 -> 0x7ba440 adds a followed strategy's Strategy_Priorities lists to the same array, 0x7...
     - ...he amount x (f x DefaultValue). A followed strategy's lists go to the list system through 0x7bf160 -> 0x7ba440 (the list's SQL rows, each item's own MinDifficulty / MaxDifficulty columns 6...
-  review: imported
+  review: reviewed

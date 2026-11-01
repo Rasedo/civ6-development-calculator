@@ -6,10 +6,11 @@
 - addr: 0x967100
   final: 0x671aa0
   kind: function
+  semantics: the improvement removal operation.
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x53e20, the request's vt +0x60): the plot's improvement there (+0x44 set) its removal (0x967100); else, the node's \"Resource Harvesting\" (tag Harvest) set, the harvest (0x95fb20); els..."
-  review: imported
+  review: reviewed

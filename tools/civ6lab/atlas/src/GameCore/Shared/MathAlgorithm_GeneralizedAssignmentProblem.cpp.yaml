@@ -7,7 +7,7 @@
   final: 0x5f9630
   kind: function
   name: generalizedAssignment
-  semantics: "MathAlgorithm_GeneralizedAssignmentProblem: one pass over the spots, the knapsack at capacity 1, gain and move lambdas"
+  semantics: "the generalized assignment at weight and capacity 1: per pass, per slot in order, each agent's gain there (where it sits elsewhere, its gain there less its gain where it sits), the first largest above 0 takes the slot, unseating its holder; passes repeat while one moved (Siege City three passes; the governors' seats once)."
   status: READ
   cases:
     - recording: h1_duelw1124

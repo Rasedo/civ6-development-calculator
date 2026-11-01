@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x8163a0
   kind: function
+  semantics: Operation Change Target's execution.
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -12,11 +13,12 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
-  review: imported
+  review: reviewed
 - addr: 0x8163f0
   final: 0x5760d0
   kind: function
   name: Operation Diplomacy (execution)
+  semantics: "Operation Diplomacy's execution: an AI owner; DENOUNCE (@f2e584) where it desires denouncement and has neither denounced nor gone to war; with Desires War it sets AllowUnitConstruction (op +0x5d8) and, not at war, DECLARE_SURPRISE_WAR (@f2e5a8); the action to the contract manager (0x60bb50) as a diplomatic contract (+0x368 type 4) at the tree's present value."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES
@@ -78,6 +80,7 @@
   final: 0x578920
   kind: function
   name: "Recruit Units (execution: the recruit contract)"
+  semantics: "Recruit Units' execution: for an AI player with a unit asked and a Contract ID — the tag's contract accepted or in progress for that unit stays, any other is cancelled (0x5cc8e0) and leaves the tree — a new contract (0x5f47c0): the unit, the Recruit Value (x 3 for a unit row +0x40 above 0), the Time Limit as its turn limit (autovariable +0x168, the contract's +0x1c0), submitted (0x60bb50) and held under the tag."
   status: READ
   cases:
     - recording: h1_duelv1128
@@ -93,6 +96,7 @@
 - addr: 0x8196d0
   final: 0x579560
   kind: function
+  semantics: Operation Change Target's update (execution 0x8163a0).
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:changeTarget, gpu/core/sim_minorops.py:_u_change_target]
   readings:
@@ -101,11 +105,12 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - "- Leaves READ: Decode Trigger 0x7f2970; Operation Change Target 0x8196d0 (INVALID -> the backup of the same kind, else \"No backup\" FAILURE; Always Swap; Fail..."
-  review: imported
+  review: reviewed
 - addr: 0x819db0
   final: 0x579bf0
   kind: function
   name: Operation Diplomacy (update)
+  semantics: "Operation Diplomacy's update: ERROR without its flags or an enemy; Had Denounced and not denounced (0x3da8e0) SUCCESS; Is At War and not at war FAILURE; with a Contract, Desires Denouncement SUCCESS, Desires War RUNNING until at war; else SUCCESS."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES
@@ -119,6 +124,7 @@
 - addr: 0x81a090
   final: 0x579e90
   kind: function
+  semantics: Operation Is Ready's update.
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:operationIsReady, gpu/core/sim_minorops.py:_u_is_ready]
   readings:
@@ -127,7 +133,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
   context:
     - ...a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the target is gone, 0x73a8e0; RUNNING with uni...
-  review: imported
+  review: reviewed
 - addr: 0x81a130
   final: 0x579f00
   kind: function

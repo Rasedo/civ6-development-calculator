@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x7ba440
   kind: function
+  semantics: adds a followed strategy's lists to the list systems' arrays (each item's MinDifficulty / MaxDifficulty columns 6 / 7 against the handicap).
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -12,7 +13,7 @@
   context:
     - ...yer's handicap, player +0x908, is within its MinDifficulty..MaxDifficulty); 0x7bf160 -> 0x7ba440 adds a followed strategy's Strategy_Priorities lists to the same array, 0x7bb870 takes...
     - ...(f x DefaultValue). A followed strategy's lists go to the list system through 0x7bf160 -> 0x7ba440 (the list's SQL rows, each item's own MinDifficulty / MaxDifficulty columns 6 / 7 against...
-  review: imported
+  review: reviewed
 - addr: 0x7fff50
   final: 0x563b30
   kind: function

@@ -6,6 +6,7 @@
 - addr: 0x61ee30
   final: 0x412c00
   kind: function
+  semantics: "the civics propagation (the turn's first step): a row in reach scores its own value and its prerequisites' one and two levels up (owned ones walked at no value; each level once; a negative value counts 0), x1.5 if favored (+0x268; 1.5 at 0xd2f32c)."
   status: PARTLY
   impl:
     - cpu/core/aiCivics.ts:lineage
@@ -18,19 +19,24 @@
   context:
     - "- THE PROPAGATION, 0x61ee30 (the turn 0x620110's first step, on each entry): a row in reach scores its own value an..."
     - ...nt evaluators but DISTRICT_TYPE_MATCHES and CITY_HAS_BUILDING, the civic list's jobs (0x61ee30), 0x3930a0 itself, the Great Person class availability 0x2f1ed0 (Strategos scores in th...
-  review: imported
+  review: reviewed
 - addr: 0x61fa20
   kind: function
+  semantics: launches the Civic Tree Analysis job (culture AI +0x838, vtable 0xd5d420).
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "- THE ANALYSIS, the \"Civic Tree Analysis\" job (0x61fa20 launches the job at +0x838, vtable 0xd5d420; 0x621e20 runs 0x621a20 on each entry): tur..."
-  review: imported
+  review: reviewed
 - addr: 0x620110
   kind: function
+  semantics: "the civics AI's turn job (list B, before the Economic AI: the policy jobs read the gold boost its last turn wrote)."
   status: PARTLY
   cases:
+    - recording: h1_duely1117
+      turn: 15
+      value: "Caguana: Charismatic Leader first 14.0 at t15, Political Philosophy 1.5 above from t17"
     - recording: 1103
       turn: 12
       value: "A COMPLETION fires the delegate 0x6293e0 — the   government pass 0x625d70, then 0x626600 with the completed civic as the   key — over the entries the AI's last turn left, before this turn's   analysis"
@@ -58,11 +64,12 @@
     - "- THE PROPAGATION, 0x61ee30 (the turn 0x620110's first step, on each entry): a row in reach scores its own value and its prerequisites..."
     - "- WHEN: the AI's turn (0x620110) chooses with key -1 only where nothing is in hand (0x399a90 = -1). A COMPLETION fires..."
     - "The policy AI (the player AI's civics part, the object 0x620110 runs on; its log AI_GovtPolicies.csv). Check: `dll_govtpolicies.py` (the choice on the lo..."
-  review: imported
+  review: reviewed
 - addr: 0x621920
   final: 0x414b20
   kind: function
   name: turnsToCompleteCivic
+  semantics: "the civic's turns for the city build tables: the civics AI's entry turns plus the turns left on the civic in hand, live (0x39c1f0; -1 with none)."
   status: PARTLY
   cases:
     - recording: AI_Research.csv
@@ -88,28 +95,31 @@
     - "...a wonder is valued on the city centre only: T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) +..."
     - "...e logged them; t6 after a completion: 21 + Astrology's 10 the choice set). The civic's (0x621920): the civics AI's entry turns plus the turns left on the civic in hand, live (0x39c1f..."
     - "...fuses; else T = max(the research AI's turns 0x7610e0 to PrereqTech + 5, the civics AI's 0x621920 to PrereqCivic + 5) — the +5 (`lea ebx, [rax+5]`) whenever the column is set, the techn..."
-  review: imported
+  review: reviewed
 - addr: 0x621a20
   kind: function
+  semantics: "a civic's analysis: turns -1, value 0, next := row; a non-repeatable row held is owned; else the three-level walk (each row's turns left 0x39c0e0; a row not researchable 0x3932d0 adds its unowned prerequisites 0x29a250 in the install's order, the next step the last added that is not the civic in hand); rows still added at the third level out of reach; else turns = max(0, sum), value = 0x7a9a10."
   status: PARTLY
   impl: [cpu/core/aiCivics.ts:walk]
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "...Tree Analysis\" job (0x61fa20 launches the job at +0x838, vtable 0xd5d420; 0x621e20 runs 0x621a20 on each entry): turns := -1, value := 0, next := row; a non-repeatable row held is owne..."
-  review: imported
+  review: reviewed
 - addr: 0x621e20
   final: 0x4150e0
   kind: function
+  semantics: runs 0x621a20 on each civic entry.
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "...S, the \"Civic Tree Analysis\" job (0x61fa20 launches the job at +0x838, vtable 0xd5d420; 0x621e20 runs 0x621a20 on each entry): turns := -1, value := 0, next := row; a non-repeatable ro..."
-  review: imported
+  review: reviewed
 - addr: 0x621eb0
   final: 0x415170
   kind: function
+  semantics: "the policy job: score -1.0; a card not a Dark Age card needs its PrereqCivic held (0x39d1f0) or on the civic list with a score above 0 (the analysis job's own value); a Dark / Golden Age card needs the age (0x412880 / 0x412910); the game era (+0x158 -> Eras +0x1c) inside the window; then 0x7b26b0(policy, the rate 0x6fec30, start 0, valueHorizons[0] via 0x5d2bc0, the player, the card's modifier list +0xb80[policy])."
   status: PARTLY
   impl:
     - cpu/data/aiValue.ts:AI_POLICY_HORIZON
@@ -122,7 +132,7 @@
   context:
     - ...ents it unlocks, each max(v - v(the current), v / 2) of the government values [+0xb38] (0x621eb0 -> 0x7b26b0, unread); then a civic of an era at or before the game's ([player+0x1358]...
     - "- The policy job (0x621eb0): score -1.0; a card that is not a Dark Age card needs its PrereqCivic held (0x39d1f0)..."
-  review: imported
+  review: reviewed
 - addr: 0x622140
   kind: function
   name: evaluateResolutions
@@ -167,6 +177,7 @@
 - addr: 0x623b90
   final: 0x416600
   kind: function
+  semantics: a policy card's score (the policy jobs' of the last turn).
   status: PARTLY
   impl:
     - cpu/core/aiModifiers.ts:ValueTerms
@@ -183,7 +194,7 @@
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   context:
     - "...he horizon; its policies: the best new policy's value less the weakest slotted one's (0x623b90, the policy AI's), at least 20.0 (0x7aacb1); and the civic's modifiers analysed (0x7a4b..."
-  review: imported
+  review: reviewed
 - addr: 0x623bd0
   kind: function
   name: a civic contract's value onto its civic's score
@@ -200,14 +211,16 @@
 - addr: 0x624060
   final: 0x416b60
   kind: function
+  semantics: "fills the policy list (culture AI +0x9e8, database order, 0x50 each: +0x28 the policy, +0x2c its slot type, +0x30 / +0x31 RequiresDarkAge / RequiresGoldenAge, +0x34 / +0x38 the era bounds, +0x48 the score)."
   status: PARTLY
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - "...s, logged while turns >= 0); policies at +0x9e8 in DATABASE ORDER (0x50 each, filled by 0x624060: +0x28 the policy, +0x2c its slot type, +0x30 / +0x31 Policies_XP1 RequiresDarkAge / Re..."
-  review: imported
+  review: reviewed
 - addr: 0x6255f0
   final: 0x417e90
   kind: function
+  semantics: "the civics log line (AI_GovtPolicies.csv \"%d, %d, Civic, %s, %3.1f, %d\", every row with turns >= 0)."
   status: PARTLY
   cases:
     - recording: AI_GovtPolicies.csv
@@ -218,11 +231,11 @@
   context:
     - "...ep, +0x20 the governments it unlocks, +0x38 its policies. Its log is AI_GovtPolicies.csv (0x6255f0: \"%d, %d, Civic, %s, %3.1f, %d\" — the score and the turns of every row with turns at leas..."
     - "...P1 RequiresDarkAge / RequiresGoldenAge, +0x34 / +0x38 the era bounds, +0x48 the score); 0x6255f0 logs every score above 0 (\"Policies\"). Every logged list of the 29 duels runs in the..."
-  review: imported
+  review: reviewed
 - addr: 0x625d70
   final: 0x4182b0
   kind: function
-  semantics: "the government and policy choice: the government 0x7b0330 values strictly highest commanded; then per slot the best CanSlot-admitted card above the slot's own commanded."
+  semantics: "the government and policy choice (on 0x6293e0 with the civic, from 0x620110 with -1 when +0x758 is set): on a civic logged \"Completed Civic\"; with no card at 0 or more it requests the next turn (+0x700 -> +0x758). The government: every one CanChangeGovernment admits (0x392cb0) and the current, valued by 0x7b0330 to valueHorizons[0]; the first strictly highest; a different one commanded (0x44bb0). Then each slot (0x399690 the count, 0x399ab0 the card): the bar its card's score (-1.0 with none or obsolete); each policy in order scoring above the bar that CanSlot admits (0x393400) and is not obsolete raises it; a best other than the card commanded (type 0); every slot logged \"Slot Policy\"."
   status: READ
   cases:
     - recording: 1103
@@ -242,7 +255,7 @@
   final: 0x418860
   kind: function
   name: civicChoice
-  semantics: "the civic choice (key): comparator 0x6182e0 (unowned first; next step on the key loses; larger turns; higher score); its next step queued; else one 'Random Civic Choice' draw."
+  semantics: "the civic choice (key): the comparator 0x6182e0; the best's next step, researchable (0x3932d0), queued; else one \"Random Civic Choice\" draw over the rows neither held nor unresearchable, in table order (\"RANDOMLY CHOSEN CIVIC\")."
   status: PARTLY
   cases:
     - recording: AI_GovtPolicies.csv
@@ -278,8 +291,12 @@
 - addr: 0x6293e0
   final: 0x41a400
   kind: function
+  semantics: "the civic completion delegate: the government pass 0x625d70, then 0x626600 with the completed civic as the key, over the entries the last turn left."
   status: PARTLY
   cases:
+    - recording: 1103
+      turn: 12
+      value: "minor 2: Craftsmanship completes, Military Tradition (726.8 at t11) taken"
     - recording: 1103
       turn: 12
       value: "A COMPLETION fires the delegate 0x6293e0 — the   government pass 0x625d70, then 0x626600 with the completed civic as the   key — over the entries the AI's last turn left, before this turn's   analysis"
@@ -294,4 +311,4 @@
   context:
     - "...h key -1 only where nothing is in hand (0x399a90 = -1). A COMPLETION fires the delegate 0x6293e0 — the government pass 0x625d70, then 0x626600 with the completed civic as the key — o..."
     - "- The choice (0x625d70; on the completed-civic event 0x6293e0 with the civic, and from the AI turn 0x620110 with -1 when +0x758 is set): on a civic..."
-  review: imported
+  review: reviewed

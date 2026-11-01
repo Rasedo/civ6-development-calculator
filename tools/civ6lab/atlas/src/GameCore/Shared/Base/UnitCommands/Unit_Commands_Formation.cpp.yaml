@@ -6,6 +6,7 @@
 - addr: 0x94bb50
   final: 0x659de0
   kind: function
+  semantics: the join-formation unit operation.
   status: PARTLY
   cases:
     - recording: h1_duelw1105
@@ -21,4 +22,4 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   context:
     - ...the plot (the move order 0x962030), on arrival the formation joined (the unit operation 0x94bb50 with the other's id) and the other's turn done (0x570b40); the unit's turn done and it...
-  review: imported
+  review: reviewed

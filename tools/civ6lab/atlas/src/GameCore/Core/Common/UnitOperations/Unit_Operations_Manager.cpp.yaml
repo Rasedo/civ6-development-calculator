@@ -6,6 +6,7 @@
 - addr: 0x53e20
   final: 0x408f0
   kind: function
+  semantics: WakeUnit.
   status: PARTLY
   readings:
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
@@ -14,4 +15,4 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - ...is turn (0x791300), else the location; a plot of danger only where Allow Danger; woken (0x53e20) and moved (0x972880 / 0x962030).
-  review: imported
+  review: reviewed

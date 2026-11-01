@@ -7,6 +7,7 @@
   final: 0x56c360
   kind: function
   name: Operation Attack (execution)
+  semantics: "Operation Attack's execution (Simple Operation Attack, the camps): per team with a target, each member alive with Movement left: beyond its reach (max(1, range)) to the planner's spot (0x791300) \"Attack Target Move\", none found straight to the target \"Attack Target Move Direct\"; a ranged member at the target where it holds units (Plot +0x4c) \"Attack Target Range Attack\"; each member left onto the target \"Attack Target Melee Attack\"."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:moveOnto

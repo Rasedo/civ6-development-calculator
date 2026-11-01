@@ -1,0 +1,3027 @@
+# The DLL's struct fields: owner, offset, type, what it holds and its writers.
+# `review: reviewed` records; see tools/civ6lab/atlas.py.
+- kind: field
+  owner: AnalysisContext
+  offset: 0x64
+  name: yield
+  type: int
+  semantics: the analysis's yield (-1 none).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: AnalysisContext
+  offset: 0x70
+  name: city
+  semantics: the context's city (COLLECTION_PLAYER_CITIES sets it per subject).
+  status: PARTLY
+  writers: [0x69ea00]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: AnalysisContext
+  offset: 0x78
+  name: district
+  semantics: the context's district.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: AnalysisContext
+  offset: 0x80
+  name: player
+  type: int
+  semantics: the evaluating player.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: AnalysisContext
+  offset: 0x90
+  name: unit
+  semantics: the context's unit (COLLECTION_PLAYER_UNITS).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: AnalysisContext
+  offset: 0xb4
+  name: start
+  type: int
+  semantics: T; +0xb8 H; +0xbc the rate as a float.
+  status: PARTLY
+  writers: [0x7a7590]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: AnalysisContext
+  offset: 0xc0
+  name: sum
+  type: int
+  semantics: the analyzers' whole-number sum (clamped +-0x7fffff).
+  status: PARTLY
+  writers: [0x6cede0]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: BTNodeData
+  offset: 0x30
+  name: turnLimiterFirst
+  type: int
+  semantics: "Turn Limiter's first turn (0 before it ran; Raid City node 5: 6 at t6, 0x21 at t33)."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: BTNodeData
+  offset: 0x40
+  name: clearPlot
+  semantics: Clear Plot's field.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: BTNodeData
+  offset: 0x50
+  name: moveUnitKept
+  type: int
+  semantics: Move Unit's kept unit (0 or -1 none); Build Improvement's unit +0x50 and improvement +0x54; the Contract Manager Decorator's turn counter +0x50.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: BTNodeData
+  offset: 0x88
+  name: recruitDone
+  type: byte
+  semantics: Recruit Units' done flag (set on SUCCESS, clear on RUNNING); +0x8c the unit it asked (-1 none); +0x80 / +0x84 the units before and after its recruit.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: BarbarianManager
+  offset: 0x110
+  name: maxCamps
+  type: int
+  semantics: "an AutoVariable (+0xb8): the living full civs x BARBARIAN_CAMP_MAX_PER_MAJOR_CIV, written once at init (0x153659)."
+  status: PARTLY
+  writers: [0x153659]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
+- kind: field
+  owner: BarbarianManager
+  offset: 0x170
+  name: m_numCamps
+  type: int
+  semantics: the standing camps (up at a tribe's creation, down at its camp's removal 0x154874).
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
+- kind: field
+  owner: BarbarianManager
+  offset: 0x3d8
+  name: raidThrottle
+  semantics: per owner the raid throttle (data +0x430).
+  status: PARTLY
+  writers: [0x153ef0]
+  readings: ["H-1: the raids — READ"]
+  review: reviewed
+- kind: field
+  owner: BarbarianManager
+  offset: 0x4a0
+  name: campList
+  semantics: every camp's plot index (AutoVariable +0x448; cleared at init 0x155aae).
+  status: PARTLY
+  writers: [0x154220]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
+- kind: field
+  owner: BarbarianManager
+  offset: 0x620
+  name: regions
+  semantics: the Map_Region list.
+  status: PARTLY
+  writers: [0x153290]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
+- kind: field
+  owner: BehaviorTree
+  offset: 0x3c8
+  name: m_allowRecruiting
+  type: byte
+  semantics: "marked: with no operation (+0x888 == -1) the tick releases its units."
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: BehaviorTree
+  offset: 0x548
+  name: priority
+  type: int
+  semantics: the tree's tick priority (the walk highest first).
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: BehaviorTree
+  offset: 0x5a8
+  name: recruitPriority
+  type: int
+  semantics: the recruit's priority (else its operation's).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  review: reviewed
+- kind: field
+  owner: BehaviorTree (FinalRelease)
+  offset: 0xa0
+  name: m_numNodes
+  type: int
+  semantics: the node count.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: BehaviorTree (FinalRelease)
+  offset: 0xb8
+  name: m_definitions
+  semantics: "the node blocks: 0xb8 bytes a node in BehaviorTreeNodes order (+0 its shape, +4 its handler's index in the shape's table, +8 the node's data, at 16 x each TreeData row's DefnId its reference {column, DataTypes id, slot})."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: BehaviorTree (FinalRelease)
+  offset: 0xe0
+  name: nodeGraph
+  semantics: "0x14 bytes a node: parent, end (the node after its subtree), first child, last child, the current child (a Sequence's resume: Settle City Op node 3 [0, 28, 4, 27, 5], node 4 succeeded, node 5 running; a decorator done past its child points at its end)."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: BehaviorTree (FinalRelease)
+  offset: 0x108
+  name: m_actionStates
+  type: int[nodes]
+  semantics: the node statuses the tick writes; the root's decides the execution; they stand at the end look as the tick left them.
+  status: PARTLY
+  writers: [0x7d3a00]
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: BehaviorTree (FinalRelease)
+  offset: 0x138
+  name: m_isActive
+  semantics: "watched fields (constructor FinalRelease 0x53e4d0): +0x138 m_isActive, +0x150 m_isTemporary, +0x168 m_markForDestroy, +0x180 m_allowRecruiting (the Release's +0x3c8), +0x1b0 m_controlId, +0x1c8 m_treeId, +0x1e0 m_requestPriority, +0x1f8 m_recruitPriority, +0x210 m_presentValue, +0x268 m_name, +0x370 m_operationId, +0x378 m_managedContracts; the control interface +0x218 (its +8 the tree)."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: BuildQueue
+  offset: 0x1d0
+  name: queueEntries
+  semantics: "the build queue's entries (0x38 bytes each: +0x30 the directive, 1 a building; +0x14 the type); count at +0x1e0. Read by 0x17e690 and 0x5d4d70."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: BuildQueue
+  offset: 0x1e0
+  name: queueCount
+  type: int
+  semantics: the build queue's entry count (entries at +0x1d0).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x28
+  name: DefenseModifier
+  type: int
+  semantics: a defensive pick's building has it or OuterDefenseStrength.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x2c
+  name: Entertainment
+  type: int
+  semantics: "> 0: the entertainment term 0x79f7c0."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x34
+  name: Housing
+  type: int
+  semantics: "> 0: the housing term 0x7a3d70."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x38
+  name: Maintenance
+  type: int
+  semantics: less as Gold in the value.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x44
+  name: OuterDefenseStrength
+  type: int
+  semantics: valued as a whole number.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x48
+  name: RegionalRange
+  type: int
+  semantics: <= 1 this city only; above 1 the cities in range.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x54
+  name: OuterDefenseHitPoints
+  type: int
+  semantics: "with +0x58: the outer defence terms of the value."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x159
+  name: flags
+  type: byte
+  semantics: bit 4 MustPurchase (no row sets it).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x1b0
+  name: GreatPersonPoints
+  semantics: the great person points, each at its class's pseudo-yield.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x1c8
+  name: GreatWorkSlots
+  semantics: the great work slots term.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x1f8
+  name: PrereqChain
+  semantics: "the prerequisite chain: the value x(1 + 2 depth)."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x298
+  name: FreeUnits
+  semantics: "Unit_BuildingPrereqs: each valued through 0x7b62c0 (an Archaeologist skipped)."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings
+  offset: 0x2e0
+  name: YieldChanges
+  semantics: Building_YieldChanges rows.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings_XP2
+  offset: 0x28
+  name: RequiredPower
+  type: int
+  semantics: "> 0: 0x7a67f0 of -RequiredPower."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings_XP2
+  offset: 0x48
+  name: BlocksCoastalFlooding
+  type: byte
+  semantics: "bit 1: the Flood Barrier term."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Buildings_XP2
+  offset: 0x58
+  name: ResourceTypeConvertedToPower
+  semantics: its resource at +0x14.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x14
+  name: outerDefenseExtra
+  type: int
+  semantics: added to the outer defence maximum (0x198310).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x2c0
+  name: unitProductionModifier
+  type: int[units]
+  semantics: the city's per-unit production modifier.
+  status: PARTLY
+  writers: [0xc6f950]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x588
+  name: population
+  type: int
+  semantics: the city's population.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x5e8
+  name: m_bCapital
+  type: bool
+  semantics: the city is its player's capital.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0xbc0
+  name: yieldPercent
+  type: int[yields]
+  semantics: "the city's yield percent per yield: the modifiers' alone, not the happiness level's (read through 0x7a2fa0)."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x1788
+  name: growth
+  semantics: the city's growth object (store +0x80) the housing value and forecast read.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x1880
+  name: districts
+  semantics: the city's district set 0x197ff0 reads the walls' damage on.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x1a50
+  name: unitList
+  semantics: the city's list game signal +0x2e8 walks into the known cities.
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x1a60
+  name: districtCount
+  type: int
+  semantics: the city's districts (0x197ff0's array); 2 or more add +1 to the walls' value.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x2170
+  name: m_buildQueue
+  semantics: the build queue CanConstruct 0x170450 is asked on.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x2340
+  name: currentItem
+  semantics: "the build queue's current item (null: empty; with +0x2350 0 the Default Specialization pick runs)."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x2350
+  name: currentItemSet
+  semantics: set while the city builds something (the build tables' +10).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x2600
+  name: m_iTurnFounded
+  type: int
+  semantics: the turn the city was founded.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x30d0
+  name: powered
+  type: int
+  semantics: "above 0: the city holds power (a regional converted-power building counts it in range)."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City
+  offset: 0x31d0
+  name: m_pCityBuildAI
+  type: AI::CityBuild*
+  semantics: the city's build AI (one per city; log AI_CityBuild.csv).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: City (FinalRelease)
+  offset: 0x960
+  name: m_kGrowth
+  semantics: "value at +0x970: +0x80 m_xFood (24.8), +0x84 m_iOtherGrowthModifier."
+  status: READ
+  cases:
+    - recording: h1_probez1117
+      value: +0x80 the record's food x 256 on 69 / 69 city-records
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: City (FinalRelease)
+  offset: 0xb80
+  name: m_kCulture
+  semantics: "value at +0xb90: +8 m_xCulture (24.8), +0xc m_iPlotsAcquired, +0x10 m_iPlotsAcquiredFromCulture, +0x14 m_iBorderExpansionModifier, +0x1c m_iNextPlot."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      value: +8 the record's culture x 256 on 10,498 of 10,500 city-records
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: City (FinalRelease)
+  offset: 0x10c0
+  name: m_kBuildQueue
+  semantics: "value at +0x10d0, 0x3d8 bytes: the queue's entries, then per-type arrays {begin, capacity, count}; value +0x218 (a building row each) and +0x230 (a unit row each) hold each row's progress (24.8); +0x248 / +0x260 the district and project rows."
+  status: READ
+  cases:
+    - recording: h1_probez1117
+      value: the queue head's progress at its row on 51 / 51 city-records
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: CityBuild (FinalRelease)
+  offset: 0x160
+  name: m_managedContracts
+  semantics: a container (+0x10 a vector of 16-byte handles, +0x18 its capacity, +0x20 the count); the same in the Economic AI (+0x268), Research (+0x178), CultureAi (+0x218), Diplomatic (+0x6158) and each behaviour tree (+0x378). A handle within the count names a live contract or is released (null).
+  status: READ
+  cases:
+    - recording: h1_dueldA1117
+      value: 1,992 end-look records, none naming a contract the manager lacks
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x1b8
+  name: cityThreat
+  type: int
+  semantics: "the city's threat level (-1 none): the defensive pick and the walls' value terms."
+  status: PARTLY
+  writers: [0x5cbd10]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x218
+  name: defensiveFlag
+  semantics: with +0x1b8 above -1 sets the defensive pick.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x2d8
+  name: standingArmy
+  type: fx
+  semantics: added as PSEUDOYIELD_STANDING_ARMY into the Combat Desire.
+  status: PARTLY
+  writers: [0x5ca7e0]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x340
+  name: handInHand
+  semantics: the handle of the contract in hand (its object read at +0x398); released first by 0x5d4d70's head (0x5d4e0e).
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x398
+  name: contractInHand
+  semantics: "the contract in hand: worth at least the unit's value less 1.0 and the project's it takes the turn (its vt +0x38)."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x3a8
+  name: contractList
+  semantics: the city's listed contracts (weak handles); the Default Specialization's head walks them first (their trees' slot +0x98 / +0x68 / +0xa8), skipping an emptied one without a line.
+  status: PARTLY
+  writers: [0x5d6050]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x470
+  name: pass
+  type: int
+  semantics: its job pass 2 (0x5ce680 and 0x5ce5b0 open with the test).
+  status: PARTLY
+  writers: [0x5c4f40]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x528
+  name: favouredItems
+  semantics: the favoured-items list; 0x5d2d10's verdict x2 / x0.5 on a building's value.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x530
+  name: m_bestPlotToClear
+  semantics: the plot the improvement pick picks on (x 241 with none).
+  status: PARTLY
+  writers: [0x5c9a00]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x648
+  name: improvementPick
+  type: int
+  semantics: the improvement pick (-1 none).
+  status: PARTLY
+  writers: [0x5c9a00]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x650
+  name: purchaseList
+  semantics: the city's unit list (0x168 bytes an entry, ranked by +0x30 then +0x2c; +0xe standing).
+  status: PARTLY
+  writers: [0x79a320]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x6c8
+  name: forecastTurns
+  semantics: the growth forecast's step turns (+0x738 withheld Food, +0x7a8 population).
+  status: PARTLY
+  writers: [0x5cb570]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x738
+  name: forecastWithheld
+  semantics: the growth forecast's Food each step withholds.
+  status: PARTLY
+  writers: [0x5cb570]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x780
+  name: cityDefenseTree
+  semantics: slot 5's City Defense tree.
+  status: PARTLY
+  writers: [0x5cced0]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x7a8
+  name: forecastPopulation
+  semantics: the growth forecast's population per step.
+  status: PARTLY
+  writers: [0x5cb570]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x870
+  name: tradeList
+  semantics: the city's trade list (known cities a trade path reaches).
+  status: PARTLY
+  writers: [0x78f210]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x908
+  name: yieldList
+  semantics: the YIELD_* list the advantages are logged over (0x5cdd70).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x978
+  name: resourceCounts
+  type: int[resources]
+  semantics: the plot evaluations with a resource seen by the player.
+  status: PARTLY
+  writers: [0x5c9700]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0xa48
+  name: clearThreshold
+  type: fx
+  semantics: a submitted contract's value past it clears a new city's production.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0xb18
+  name: eventHandles
+  semantics: the city's event handles (handle 3 at +0x18).
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0xb88
+  name: eventSlots
+  type: int[]
+  semantics: "the event slots: 1 building or unit, 2 district, 3 improvement, 5 City Defense (-1 free); slot 3's tree id at +0xb30."
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0xcc0
+  name: analysisJob
+  semantics: the City Analysis job object (vtable 0xd59af0).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0xcf8
+  name: m_plotEvaluations
+  semantics: the plot evaluations (0x78 bytes each, end at +0xd08; the city centre's first); tables BUILDINGS +0x28, PROJECTS +0x38, UNITS +0x40.
+  status: PARTLY
+  writers: [0x5ce970]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x1008
+  name: production
+  type: fx
+  semantics: the city's Production (Ilkum's term).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: CityBuildAI
+  offset: 0x1028
+  name: baseYields
+  semantics: the city's yields before every percent (vector +0x1080); +0xfb0 as they stand.
+  status: PARTLY
+  writers: [0x5cc510]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: City_Power
+  offset: 0x30d0
+  name: power
+  semantics: +0x08 the free power, +0xa8 its percent, +0x58 the required power.
+  status: PARTLY
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+  review: reviewed
+- kind: field
+  owner: CongressPlayer
+  offset: 0x110
+  name: favor
+  type: int
+  semantics: the player's favor.
+  status: PARTLY
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
+- kind: field
+  owner: Contract
+  offset: 0x100
+  name: progress
+  type: int
+  semantics: 1 CLAIMED, 2 SUBMITTED, 3 ACCEPTED, 4 FAILED, 5 IN PROGRESS, 6 CANCELLED, 7 COMPLETED (vtable 0xd5b948).
+  status: PARTLY
+  writers: [0x731d10, 0x7f2220, 0x60bb50]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Contract
+  offset: 0x160
+  name: purchaseRank
+  semantics: the economic AI's purchase sort key, larger first (the constructor's 0).
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Contract
+  offset: 0x408
+  name: unit
+  semantics: the unit contract's unit.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Contract
+  offset: 0x468
+  name: building
+  semantics: the building contract's building.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Contract (FinalRelease)
+  offset: 0xb0
+  name: m_status
+  semantics: "the progress (0x5f4cd0 prints 0x600800's name); watched fields: vtable, owner, value at +0x10 (constructor FinalRelease 0x3fc9d0). Release: +0x100."
+  status: READ
+  cases:
+    - recording: h1_duelm1117
+      value: "every CONTRACT line standing at the end look carries its value: 2,006 / 2,006"
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Contract (FinalRelease)
+  offset: 0xc8
+  name: m_priority
+  semantics: the contract's priority.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Contract (FinalRelease)
+  offset: 0xe0
+  name: m_timeLimit
+  semantics: the contract's time limit.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Contract (FinalRelease)
+  offset: 0xf8
+  name: m_timeEstimate
+  semantics: the contract's time estimate.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Contract (FinalRelease)
+  offset: 0x110
+  name: m_id
+  type: int
+  semantics: the contract's id.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Contract (FinalRelease)
+  offset: 0x128
+  name: m_owner
+  semantics: the control id of the tree that made it (its +0x10 object the tree's control interface).
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Contract (FinalRelease)
+  offset: 0x140
+  name: m_player
+  type: int
+  semantics: the contract's player.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Contract (FinalRelease)
+  offset: 0x158
+  name: m_extraPresentValue
+  type: fx
+  semantics: the CONTRACT line's VALUE (24.8).
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Contract (FinalRelease)
+  offset: 0x160
+  name: handleCount
+  type: int
+  semantics: the handle count (0x600b00 releases one).
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Contract (FinalRelease)
+  offset: 0x178
+  name: m_desiredUnit
+  semantics: "the build contract (vtable FinalRelease 0x3f7480): +0x178 m_desiredUnit, +0x190 m_desiredBuilding, +0x1a8 m_desiredDistrict, +0x1c0 m_desiredLocation x, y, +0x1d8 m_requiredCity, +0x1f0 m_keepControl; the tech contract (0x3f7180): +0x178 m_goalTech, +0x190 m_nextTech, +0x1a8 m_bestController; the civic contract (0x3f6c00): +0x178 m_goalCivic, +0x190 m_nextCivic; Purchase Plot (0x3f7040): +0x178 m_purchasePlot x, y; the diplomatic action's (0x3f6e20): +0x178 m_enemy, +0x190 m_action. The Release's +0x100, +0x1c0, +0x220, +0x3a0, +0x408, +0x468, +0x4c8, +0x528, +0x588, +0x5e8 are these in order."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: ControlManager
+  offset: 0x278
+  name: pass
+  type: int
+  semantics: the job pass (4 down to 0); its watched setter 0x731d10 on +0x220.
+  status: PARTLY
+  writers: [0x608870, 0x731d10]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: ControlManager
+  offset: 0x370
+  name: jobsA
+  semantics: the +0x370 job list (std::function, 0x40 bytes each); +0x388, +0x3a0 the others.
+  status: PARTLY
+  writers: [0x60e8c0]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: CultureAI
+  offset: 0x268
+  name: favored
+  semantics: the leader's Civics lists' AiFavoredItems.
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  review: reviewed
+- kind: field
+  owner: CultureAI
+  offset: 0x348
+  name: resolutionLists
+  type: int[]
+  semantics: the Resolutions lists' preference per resolution (above 0 A, below 0 B).
+  status: PARTLY
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
+- kind: field
+  owner: CultureAI
+  offset: 0x5b8
+  name: slotBest
+  semantics: the best card per slot type (0x7b0330 reads +0x610).
+  status: PARTLY
+  writers: [0x620110]
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  review: reviewed
+- kind: field
+  owner: CultureAI
+  offset: 0x978
+  name: entries
+  semantics: "one 0x50-byte entry per civic (count +0x988): +0 player, +8 row, +0xc owned, +0xe boosted, +0xf repeatable, +0x10 own value, +0x14 score, +0x18 turns, +0x1c next step, +0x20 governments, +0x38 policies."
+  status: PARTLY
+  writers: [0x621a20, 0x61ee30]
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  review: reviewed
+- kind: field
+  owner: CultureAI
+  offset: 0x9e8
+  name: policies
+  semantics: "the policy list in database order (0x50 each: +0x28 policy, +0x2c slot type, +0x30 / +0x31 age flags, +0x34 / +0x38 era bounds, +0x48 score)."
+  status: PARTLY
+  writers: [0x624060, 0x621eb0]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CultureAI
+  offset: 0xa58
+  name: resolutions
+  semantics: "per resolution of the session 0x20 bytes: +0x10 the desire, +0x14 the outcome (1 A), +0x18 / +0x1c the options' values."
+  status: PARTLY
+  writers: [0x622140]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
+- kind: field
+  owner: CultureAI
+  offset: 0xb38
+  name: governmentValues
+  type: fx[gov]
+  semantics: the government values.
+  status: PARTLY
+  writers: [0x620110]
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  review: reviewed
+- kind: field
+  owner: CultureAI
+  offset: 0xb68
+  name: governmentModifiers
+  semantics: per government its modifier list.
+  status: PARTLY
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: CultureAI
+  offset: 0xb80
+  name: policyModifiers
+  semantics: per policy its modifier list.
+  status: PARTLY
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: District
+  offset: 0x8d8
+  name: outerDamage
+  type: int
+  semantics: the outer defences' damage.
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  review: reviewed
+- kind: field
+  owner: DistrictInfo
+  offset: 0x58
+  name: HitPoints
+  type: int
+  semantics: "set: the district defends (+0x5c the amount)."
+  status: PARTLY
+  writers: [0xabfc20]
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  review: reviewed
+- kind: field
+  owner: Districts
+  offset: 0xe1
+  name: flags
+  type: byte
+  semantics: bit 2 FreeEmbark (City Center, Harbor, Cothon, Royal Navy Dockyard).
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: Districts
+  offset: 0x130
+  name: buildings
+  semantics: the district's buildings (their largest RegionalRange).
+  status: PARTLY
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  review: reviewed
+- kind: field
+  owner: Districts
+  offset: 0x1d0
+  name: projects
+  semantics: the district's projects.
+  status: PARTLY
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  review: reviewed
+- kind: field
+  owner: Districts_XP2
+  offset: 0x28
+  name: flags
+  type: byte
+  semantics: bit 0 Canal, bit 3 Dam; PreventsFloods.
+  status: PARTLY
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  review: reviewed
+- kind: field
+  owner: EconomicAI
+  offset: 0x100
+  name: pass
+  type: int
+  semantics: its job pass 3.
+  status: PARTLY
+  writers: [0x685080]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: EconomicAI
+  offset: 0x1b8
+  name: balance
+  type: fx
+  semantics: the savings balance, lowered by a purchase's price.
+  status: PARTLY
+  writers: [0x731d10]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: EconomicAI
+  offset: 0x528
+  name: m_yieldPriorityBoost
+  type: fx
+  semantics: "the Gold boost: 0, or fx(-0.2) x the gold per turn (player +0x13a0 +0x1b8) while negative (held at player +0x1288)."
+  status: PARTLY
+  writers: [0x687bf0]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: EconomicAI
+  offset: 0x5d0
+  name: purchaseList
+  semantics: the contract purchase list (handles; ACCEPTED and vt +0x80 kept).
+  status: PARTLY
+  writers: [0x68ab40]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Eras
+  offset: 0x1c
+  name: ChronologyIndex
+  type: int
+  semantics: PSEUDOYIELD_DISTRICT's 0.5 x it.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: Eras
+  offset: 0x20
+  name: EmbarkedStrength
+  type: int
+  semantics: the era's embarked combat strength.
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  review: reviewed
+- kind: field
+  owner: Features
+  offset: 0x2c
+  name: DangerValue
+  type: int
+  semantics: the danger map's feature term.
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  review: reviewed
+- kind: field
+  owner: Formation
+  offset: 0x518
+  name: zocAnswer
+  semantics: the zone of control answer the walk stores.
+  status: PARTLY
+  writers: [0x26fe20]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  review: reviewed
+- kind: field
+  owner: Game (FinalRelease)
+  offset: 0xc0
+  name: turn
+  type: int
+  semantics: the game turn (game global FinalRelease 0xb8aa68).
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Game (FinalRelease)
+  offset: 0xf0
+  name: syncRandom
+  semantics: "the synchronous generator: its state +0xf8, its draw count +0xfc."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Game (FinalRelease)
+  offset: 0x240
+  name: players
+  semantics: the players' manager (+0x20 the Players by id).
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: GlobalAI
+  offset: 0x290
+  name: discountRate
+  type: fx
+  semantics: AI_DISCOUNT_RATE x 100 / the speed's CostMultiplier (4.0 online).
+  status: PARTLY
+  writers: [0x6ddb40]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: GlobalAI
+  offset: 0x298
+  name: m_valueHorizons
+  type: int[4]
+  semantics: "[speed(50), speed(100), speed(200), 50] (data +0x2f0)."
+  status: PARTLY
+  writers: [0x6dd9a0]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: GlobalAI
+  offset: 0x3c8
+  name: unitEfficiency
+  type: fx[][]
+  semantics: "M[a][b]: a's exchanges-to-die over b's (AI_UnitEfficiency.csv)."
+  status: PARTLY
+  writers: [0x79a440]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: GlobalAI
+  offset: 0x4d0
+  name: requirementSets
+  semantics: the analysed requirement sets (registry +0xc0).
+  status: PARTLY
+  writers: [0x6cef90]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: GlobalAI
+  offset: 0x628
+  name: religiousBoost
+  type: fx[players]
+  semantics: AI::Religious m_yieldPriorityBoost per player (data +0x340).
+  status: PARTLY
+  writers: [0x74f5a0]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: GlobalAI
+  offset: 0x3948
+  name: buildingModifiers
+  semantics: per building its analysed BuildingModifiers.
+  status: PARTLY
+  writers: [0x6dfc70]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: Governors
+  offset: 0x48
+  name: AssignCityState
+  type: byte
+  semantics: "bit 0: the governor may sit in a city-state; +0x20 IdentityPressure."
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: GovernorsAI
+  offset: 0x1d0
+  name: governors
+  semantics: "per governor 0x40 bytes: +0x8 governor, +0x10 m_cityIds, +0x28 m_values; promotions at +0x280 (0x38 bytes, +0x30 the score)."
+  status: PARTLY
+  writers: [0x6ef120, 0x6ee5f0]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: GrandStrategic
+  offset: 0x204
+  name: warFactor
+  type: int
+  semantics: the leader's war factor (read 0; writer unread).
+  status: PARTLY
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  review: reviewed
+- kind: field
+  owner: GrandStrategic
+  offset: 0x508
+  name: victoryYields
+  semantics: the victory manager's Yields (inner +0xd8 = +0x638).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: GrandStrategic
+  offset: 0x6b0
+  name: m_yieldSensitivityBoost
+  type: fx[yields]
+  semantics: the sensitivity boost (default +0x6c8).
+  status: PARTLY
+  writers: [0x6fafc0]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: GrandStrategic
+  offset: 0x748
+  name: pseudoYieldsList
+  type: fx[pseudo]
+  semantics: the PseudoYields list system's array (default +0x760).
+  status: PARTLY
+  writers: [0x6e3e20]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: GrandStrategic
+  offset: 0x788
+  name: sensitivity
+  type: fx[yields]
+  semantics: the YieldSensitivities system's array (GlobalAI +0x2508).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: GrandStrategic
+  offset: 0x7a8
+  name: yieldsList
+  type: fx[yields]
+  semantics: the Yields list system's array (rebuilt, not saved).
+  status: PARTLY
+  writers: [0x6fde70, 0x7ba440]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: Improvements
+  offset: 0x2c
+  name: AirSlots
+  type: int
+  semantics: "the loader 0xac6bb0 (SELECT alphabetical): +0x30 Appeal, +0x34 DefenseModifier, +0x38 DispersalGold, +0x3c GrantFortification, +0x40 Housing, +0x44 MovementChange, +0x60 YieldFromAppealPercent; lists +0x110 Adjacencies, +0x168 Tourism, +0x1b8 ValidBuildUnits, +0x1d0 ValidFeatures, +0x1e8 ValidResources, +0x218 YieldChanges, +0x230 YieldFromAppeal; +0x158 PrereqCivic, +0x160 PrereqTech."
+  status: PARTLY
+  writers: [0xac6bb0]
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+  review: reviewed
+- kind: field
+  owner: Improvements
+  offset: 0x108
+  name: flags
+  semantics: & 0x40 CanBuildOutsideTerritory; +0x34 DefenseModifier.
+  status: PARTLY
+  writers: [0xac6bb0]
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  review: reviewed
+- kind: field
+  owner: KnowledgeBase
+  offset: 0x18
+  name: armyRecords
+  semantics: "per player (0x18-byte vectors, 64 of them) per unit type a list of 0x20-byte records: +0 the unit's id (Unit +0x100), +4 / +8 the unit fields +0xcf0 / +0xc90, +0xc the age (0 on a sight or a birth, + 1 each ageing, erased past 0x14), +0x10 the plot (x, y), +0x18 / +0x1c the plot's two map ids (the second its region)."
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 39
+      value: minor 3's dead Warrior 131073 on its ARMY line t17-t38, gone at t39
+  writers: [0x5e9530, 0x5ebb30]
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: KnowledgeBase
+  offset: 0xe0
+  name: cities
+  semantics: the known city entries (the trader's destination walk).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: KnowledgeBase
+  offset: 0x2f0
+  name: revealed
+  type: byte[plots]
+  semantics: the plots the player revealed (the look's camp walk).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  review: reviewed
+- kind: field
+  owner: KnowledgeBase
+  offset: 0x370
+  name: tacticalTargets
+  semantics: the tactical target list (+0x368 its head).
+  status: PARTLY
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: KnowledgeBase
+  offset: 0x638
+  name: camps
+  semantics: "the camps: 0x10 bytes (x, y, +0xc the value), count +0x648."
+  status: PARTLY
+  writers: [0x5f0110]
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: KnowledgeBase
+  offset: 0x668
+  name: warRecords
+  semantics: 0x10 an entry by player id; +0xc added to the city value.
+  status: PARTLY
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: KnowledgeBase
+  offset: 0x6d8
+  name: tradeRouteValue
+  type: fx
+  semantics: "the trade AI's route value K (logged AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280)."
+  status: PARTLY
+  writers: [0x5e9b20]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: KnowledgeBase
+  offset: 0x6e8
+  name: player
+  type: int
+  semantics: the knowledge base's player.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Map_Region
+  offset: 0x4
+  name: m_plotCount
+  type: int
+  semantics: the region's plot count (+0 id, +0xc m_area).
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0xf8
+  name: pass
+  type: int
+  semantics: its job pass 2.
+  status: PARTLY
+  writers: [0x71a960]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0x2f0
+  name: primaryRegions
+  semantics: the primary region list (every region within three of the player's cities; held at player AI +0x1290 +0x2f0).
+  status: PARTLY
+  writers: [0x6fa5e0]
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0x398
+  name: regionalStrength
+  type: fx
+  semantics: own (AI_Military.csv Regional Strength); +0x3f8 the enemy's, +0x458 the others'.
+  status: PARTLY
+  writers: [0x71fb80]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0x3f8
+  name: enemyStrength
+  type: fx
+  semantics: the at-war / +0xd18-flagged players' max regional strength.
+  status: PARTLY
+  writers: [0x71fb80]
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0x458
+  name: otherStrength
+  type: fx
+  semantics: the other players' max regional strength.
+  status: PARTLY
+  writers: [0x71fb80]
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0x4b8
+  name: defensive
+  semantics: "set: the city's pick is the defensive one."
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0x588
+  name: m_regionalMilitaryStrength
+  type: int[players]
+  semantics: per player its units' strength seen within two turns in the owner's cities' areas.
+  status: PARTLY
+  writers: [0x71fb80]
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0x790
+  name: pseudoYieldDesire
+  type: fx[pseudo]
+  semantics: "the pseudo-yield desires the military AI's turn writes: UNIT_COMBAT the Combat Desire; UNIT_EXPLORER (desired explorers +0x930 - held +0x9f0) - 1.0; UNIT_NAVAL_COMBAT (desired naval +0x990 - held +0xa50) - 1.0 (0x7204c3..0x7205ae; a city-state's both -1.0)."
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 18
+      value: "Caguana's Galley -4.14 at T 19: its Maintenance alone"
+  writers: [0x71fb80]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0x7e8
+  name: pseudoYieldWeight
+  type: fx[pseudo]
+  semantics: the military AI's pseudo-yield weights 0x700810 reads (UNIT_COMBAT, NAVAL, EXPLORER, NUCLEAR, STANDING_ARMY; never GPP_GENERAL); the Combat Desire is clamped against it.
+  status: PARTLY
+  writers: [0x71fb80]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0xbb0
+  name: m_prepareForWarWith
+  semantics: an autovariable (data +0xc58) per player.
+  status: PARTLY
+  writers: [0x724f30, 0x650890]
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0xd88
+  name: favTech
+  type: int
+  semantics: "the favoured technology (\"Fav Tech\")."
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  review: reviewed
+- kind: field
+  owner: OpDefinition
+  offset: 0x60
+  name: MaxTargetDistInRegion
+  type: int
+  semantics: +0x64 InArea, +0x68 InWorld, +0x6c MaxTargetStrength, +0x70 MaxTargetDefense, +0x74 MinOddsOfSuccess, +0x78 SelfStart, +0x79 MustBeAtWar, +0x7a MustHaveNukes, +0x7c MustHaveUnits.
+  status: PARTLY
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: OpMoveNode
+  offset: 0x30
+  name: unitDistance
+  type: int
+  semantics: the node's Unit distance (its slot 3, +0x30 / +0x3c; 1 where none); Can Explore DefnId 6 at +0x60 / +0x6c.
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: OpMoveNode
+  offset: 0x50
+  name: alwaysRunning
+  type: byte
+  semantics: AlwaysRunning (data +0x50, 0x81be70).
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: OpMoveNode
+  offset: 0x6c
+  name: leaderTag
+  semantics: the Leader Tag (+0x7c the tag's AiType; -1 none).
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: OpMoveNode
+  offset: 0x70
+  name: arrived
+  type: byte
+  semantics: "one byte for the node: cleared at entry (0x81a15b), written by each team in turn (0x81b241, 0x81b3cc, 0x81bdf7, 0x81c07b, 0x81c1b7), the last team's standing for the execution."
+  status: PARTLY
+  writers: [0x81a130]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: OpMoveNode
+  offset: 0x74
+  name: nonmoving
+  semantics: "the members listed \"Nonmoving\" (emptied by the update at each team, 0x81c080); +0x78 the member storage."
+  status: PARTLY
+  writers: [0x81a130]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Operation
+  offset: 0x2a8
+  name: target
+  semantics: the operation's target plot.
+  status: PARTLY
+  writers: [0x73e7d0]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Operation
+  offset: 0x318
+  name: rally
+  semantics: the rally plot (through the autovariable at +0x2c0).
+  status: PARTLY
+  writers: [0x73e7d0]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Operation
+  offset: 0x5d0
+  name: gather
+  type: byte
+  semantics: the teams gather (0x73aa60).
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Operation
+  offset: 0x5d8
+  name: AllowUnitConstruction
+  type: byte
+  semantics: set by Operation Diplomacy with Desires War.
+  status: PARTLY
+  writers: [0x8163f0]
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: Operation (FinalRelease)
+  offset: 0xa8
+  name: m_opDefinition
+  semantics: "its first bytes the name (constructor 0x733730): +0x138 m_controlId, +0x150 the teams (0x118 bytes inline, count +0x160), +0x178 / +0x180 / +0x184 m_target (enemy, x, y), +0x1a8 m_rallyPoint, +0x1c0 m_blockedTurns, +0x1d8 m_backupTarget, +0x208 m_forceTargetSwitch, +0x220 m_opStrength, +0x238 m_targetStrength, +0x250 m_currentCombatStrength, +0x268 m_forceReady, +0x280 m_warReady, +0x298 m_isEmergency, +0x2e0 m_treeControlId, +0x2f8 m_treeManagerId."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: OperationTeam
+  offset: 0x8
+  name: definition
+  semantics: the team's definition; +0x10 / +0x11 / +0x12 minimums met / ready / ongoing; +0x14 its unit to build; +0x18 members; +0x30 counts.
+  status: PARTLY
+  writers: [0x73fba0]
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  review: reviewed
+- kind: field
+  owner: OperationTeam
+  offset: 0x10
+  name: requirementsMet
+  type: byte
+  semantics: "0x118 bytes: +0x10 every requirement's minimum met, +0x11 ready, +0x12 ongoing; +0x18 the members' unit ids ({items, capacity, count}: count +0x28); +0x30 per OpTeamRequirements row the members carrying its AI type (count +0x40); +0x48 the units taken in (count +0x58); +0x90 engaged; +0xe8 + 8 x slot the goals (Map Points, -9999 none). +0x14 is not a unit type's index; the team holds no strength."
+  status: READ
+  cases:
+    - recording: h1_duelx1121
+      value: Attack Walled City's City Attack Force 11, its naval team 4
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: OperationTeam
+  offset: 0x18
+  name: members
+  semantics: the members' unit ids (count +0x28), in join order.
+  status: PARTLY
+  writers: [0x737f90, 0x737e80]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: OperationTeam
+  offset: 0x48
+  name: joined
+  semantics: the units added to the team (count +0x58).
+  status: PARTLY
+  writers: [0x737f90]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: OperationTeam
+  offset: 0x90
+  name: inBattle
+  type: byte
+  semantics: the team in battle (the battle points).
+  status: PARTLY
+  writers: [0x738f20]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: OperationTeam
+  offset: 0x98
+  name: attackStrength
+  type: int
+  semantics: the team's attack strength; +0x94 the enemy strength; +0xb8 the targets.
+  status: PARTLY
+  writers: [0x738f20]
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: OperationTeam
+  offset: 0xa0
+  name: endangered
+  semantics: the endangered members (cleared each tick).
+  status: PARTLY
+  writers: [0x738f20]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: OperationTeam
+  offset: 0xe8
+  name: goals
+  semantics: slot 0 (+0xe8) the rally, slot 1 (+0xf0) the target.
+  status: PARTLY
+  writers: [0x73e7d0]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: OperationTeam
+  offset: 0x100
+  name: centre
+  semantics: slot 3 the centre, +0x108 slot 4 the battle line, +0x110 slot 5 the march point.
+  status: PARTLY
+  writers: [0x738f20]
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: PathFinder
+  offset: 0x1f2
+  name: landFormation
+  type: byte
+  semantics: the formation of the land domain (+0x1f1 sea, +0x1f5 embarked, +0x1f6 IsHuman, +0x1f7 a unit's +0x590, +0x198 the owner, +0x1a4 0x2665b0).
+  status: PARTLY
+  writers: [0x2715a0]
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: PlanningNode
+  offset: 0x18
+  name: f
+  type: int
+  semantics: the open list key f (+0x1c g; f = g with no heuristic).
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: PlanningNode
+  offset: 0x50
+  name: flags
+  type: byte
+  semantics: bit 1 seen now, bit 2 mountain, bit 3, bit 4 water, bits 6-7 0x586900; +0x51 bit 0 revealed, bit 7 at the stacking limit; +0x54 the keeping units' count.
+  status: PARTLY
+  writers: [0x271be0]
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: Player
+  offset: 0x290
+  name: visibilityCount
+  semantics: the player's per-plot visibility count; above 0 a plot the look walks.
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Player
+  offset: 0x908
+  name: handicap
+  type: int
+  semantics: below 3 the unit value pays Maintenance.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Player
+  offset: 0x1278
+  name: cultureAI
+  semantics: the civics AI.
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  review: reviewed
+- kind: field
+  owner: Player
+  offset: 0x12a8
+  name: researchAI
+  semantics: the research AI.
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  review: reviewed
+- kind: field
+  owner: Player
+  offset: 0x12b8
+  name: knowledgeBase
+  semantics: the AI knowledge base (CivKnowledge.cpp).
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Player
+  offset: 0x12e8
+  name: units
+  semantics: "the player's units: +0x1c0 the player's versions, +0xc0 the count, +0x4a0 the per-unit production modifier."
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Player
+  offset: 0x12f0
+  name: cities
+  semantics: the player's cities (+0xc0 the count).
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Player
+  offset: 0x1330
+  name: stats
+  semantics: PlayerStats (+0xf0 the strongest melee trained).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Player (FinalRelease)
+  offset: 0xd8
+  name: id
+  type: int
+  semantics: the player's id.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Player (FinalRelease)
+  offset: 0x650
+  name: cityAIManager
+  semantics: "the city AI manager: +0 the Player; +0x98 a list, node +0 a CityBuild, +0x10 the next (walked by 0x5c2650)."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Player (FinalRelease)
+  offset: 0x658
+  name: cultureAI
+  semantics: CultureAi; then +0x660 Diplomatic, +0x668 Economic, +0x670 GrandStrategic, +0x678 Homeland, +0x688 Research, +0x690 Tactical, +0x698 Targets, +0x6a0 the planning manager, +0x6a8 the behaviour tree manager, +0x6b8 the influence map, +0x6c0 Player::Trade, +0x6c8 Player::Units, +0x6e0 PlayerDiplomacy, +0x6f0 PlayerCulture, +0x700 Player::Resources, +0x718 PlayerTechs, +0x720 PlayerReligion, +0x738 PlayerEras, +0x748 PlayerInfluence, +0x750 Player::Quests, +0x770 CulturalIdentity, +0x780 PlayerTreasury (vtables read off each pointer's constructor; the Release's 0xc20 higher).
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Player (FinalRelease)
+  offset: 0x680
+  name: militaryAI
+  semantics: "the military AI: +0x1f0 the operations list (node +0 the operation, +0x10 the next)."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Player (FinalRelease)
+  offset: 0x6b0
+  name: controlManager
+  semantics: "the Control Manager: +0x170 every live contract (count +0x180), +0x110 the controls' pages."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Player (FinalRelease)
+  offset: 0x6c8
+  name: units
+  semantics: "Player::Units: +0xd0 the units' list (node +0 the unit, +0x10 the next), +0x98 the units' pages."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Player (FinalRelease)
+  offset: 0x6d0
+  name: cities
+  semantics: "Player::Cities: +0xec the count (the Release's +0x12f0 +0xf4)."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Player (FinalRelease)
+  offset: 0x710
+  name: stats
+  semantics: "PlayerStats: +0xa0 m_iMaxMeleeStrengthTrained (the Release's +0xf0)."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Player (FinalRelease)
+  offset: 0x798
+  name: signals
+  semantics: the player's signals.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: PlayerAI
+  offset: 0x620
+  name: pseudoYieldWeight
+  type: fx[pseudo]
+  semantics: added into 0x700810's weight; its writer unread.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: PlayerCities
+  offset: 0x160
+  name: m_eHomeContinent
+  type: int
+  semantics: the owner's home continent.
+  status: PARTLY
+  writers: [0x36a870]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: PlayerCulture
+  offset: 0x350
+  name: governmentsHeld
+  type: int[gov]
+  semantics: a government held before (!= 0).
+  status: PARTLY
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: PlayerEras
+  offset: 0x158
+  name: m_eGameEra
+  type: int
+  semantics: the game's era as the player holds it (writer unread).
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  review: reviewed
+- kind: field
+  owner: PlayerResources
+  offset: 0x350
+  name: income
+  type: int[resources]
+  semantics: the turn's income; +0x440 the power plants' burn.
+  status: PARTLY
+  writers: [0x4a72c0, 0x4ade20]
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  review: reviewed
+- kind: field
+  owner: PlayerStats
+  offset: 0xf0
+  name: bestMelee
+  type: int
+  semantics: the best melee strength trained (the walls' x2 against a foe).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: PlayerStats
+  offset: 0x210
+  name: m_iMilitaryStrength
+  type: int
+  semantics: the military strength (+0x390 the part from Gold).
+  status: PARTLY
+  writers: [0x4bb1e0]
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  review: reviewed
+- kind: field
+  owner: PlayerStats
+  offset: 0x2d0
+  name: landStrength
+  type: int
+  semantics: the land strength (0x4bd0d0 domain 2); writer unread.
+  status: PARTLY
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: PlayerUnits
+  offset: 0xf0
+  name: bestMeleeTrained
+  type: int
+  semantics: the best melee Combat made (the Combat Desire's yardstick).
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: PlayerUnits
+  offset: 0x150
+  name: m_iMaxRangedStrengthTrained
+  type: int
+  semantics: the best ranged strength trained (0x4bd030).
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Player_Influence
+  offset: 0x270
+  name: tokenThreshold
+  type: int
+  semantics: the government's InfluencePointsThreshold at the speed.
+  status: PARTLY
+  writers: [0x44eaa0]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Plot
+  offset: 0x3c
+  name: feature
+  semantics: the plot's feature.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Plot
+  offset: 0x40
+  name: resource
+  semantics: the plot's resource.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Plot
+  offset: 0x44
+  name: improvement
+  semantics: the plot's improvement (+0x4d bit 1 pillaged).
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: PlotEvaluation
+  offset: 0x30
+  name: improvementValues
+  type: fx[]
+  semantics: the evaluation's value per improvement (0x78-byte evaluations).
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: PlotEvaluation
+  offset: 0x48
+  name: reservation
+  semantics: the tree reserving the plot.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: PlotEvaluation
+  offset: 0x54
+  name: improvable
+  type: byte
+  semantics: no city, no district, the word +0x1e of the plot's interface -1, not a canyon, an improvement the plot test (0x35fd60, fifth argument 1) takes; a plot holding an improvement is improvable, its own valued 0.00.
+  status: PARTLY
+  writers: [0x5ce970]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: PlotEvaluation
+  offset: 0x55
+  name: districtable
+  type: byte
+  semantics: the district choice's test (with +0x5a or +0x57).
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: PlotEvaluation
+  offset: 0x57
+  name: adjacentOwned
+  type: byte
+  semantics: an adjacent plot of the player's (0x5ceb67).
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: PlotEvaluation
+  offset: 0x5a
+  name: owned
+  type: byte
+  semantics: the plot is the city's.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: ResearchAI
+  offset: 0x210
+  name: contracts
+  semantics: the tech contracts (0x10 an entry).
+  status: PARTLY
+  writers: [0x7635c0]
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  review: reviewed
+- kind: field
+  owner: ResearchAI
+  offset: 0x318
+  name: entries
+  semantics: "one 0x50-byte entry per technology (data +0x370): +0 the row, +4 its next step, +0x10 its own value, +0x14 its score, +0x18 owned, +0x19 boosted, +0x1a leaf, +0x1b Repeatable, +0x1c turns."
+  status: PARTLY
+  writers: [0x761170, 0x7604e0]
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  review: reviewed
+- kind: field
+  owner: ResearchAI
+  offset: 0x388
+  name: m_turnsToResearchUnit
+  type: int[units]
+  semantics: per unit the turns of the technology unlocking it (data +0x3e0).
+  status: PARTLY
+  writers: [0x763b00]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: ResearchAI
+  offset: 0x450
+  name: goal
+  semantics: the goal (tracked +0x3f8).
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  review: reviewed
+- kind: field
+  owner: ResearchAI
+  offset: 0x4b0
+  name: favored
+  semantics: the favored flags (AiFavoredItems of the leader's Technologies list).
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  review: reviewed
+- kind: field
+  owner: ResearchAI
+  offset: 0x528
+  name: turnsLeftInHand
+  type: int
+  semantics: the turns left on the research in hand (tracked int +0x4d0, data +0x58).
+  status: PARTLY
+  writers: [0x7609d7, 0x7630ec]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Resources
+  offset: 0x100
+  name: Units
+  semantics: the units the resource is consumed by (the stockpile cap's analyzer).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: TacticalAI
+  offset: 0xa8
+  name: priorities
+  semantics: the priority hook (0x787000 for a non-barbarian).
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: TacticalAI
+  offset: 0x240
+  name: unitList
+  semantics: the pass's unit list.
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: TacticalAI
+  offset: 0x270
+  name: supportPicks
+  semantics: Support Formation's picks (the unit, the other, the other's plot).
+  status: PARTLY
+  writers: [0x77ae80]
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: Targets
+  offset: 0xb00
+  name: m_operationStartPoints
+  semantics: "an autovariable (vector +0xb58 / count +0xb68, 8 bytes a plot): a barbarian player's the knowledge base's camps in order, any other's its cities' plots in Player_Cities' order; rebuilt at each Targets update (held at player +0x12b8 +0xb00)."
+  status: PARTLY
+  writers: [0x7877e0]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Targets (FinalRelease)
+  offset: 0x98
+  name: player
+  type: int
+  semantics: the Targets' player.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Targets (FinalRelease)
+  offset: 0x108
+  name: stepIndex
+  type: int
+  semantics: "4: the tactical knowledge step runs where the signal's edx equals it."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Targets (FinalRelease)
+  offset: 0x270
+  name: knowledgeBase
+  semantics: the knowledge base (Release +0x3e0); its inner layout the Release's.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: TreeData (FinalRelease)
+  offset: 0x18
+  name: columns
+  semantics: "one table per player, a column per DataTypes id (0 UnitTypesList, 1 TechTypeList, 2 BuildingTypesList, 3 int, 4 bool, 5 Map Point, 6 string, 7 ImprovementList, 8 ID List, 9 float, 10 DistrictList, 11 CivicsList) at + 0x18 + 0x20 x id: +0 entries, +0x10 count, +0x18 free head. Entries: int / bool / float (24.8) 8 bytes, value then link; Map Point 12 (x, y, link); string 16 (pointer); a list 32 ({4-byte items, capacity, count, link}). A tag's nodes share its slot."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: TreeManager
+  offset: 0x3a0
+  name: pool
+  semantics: "the tree pool: free list head +0x2c, generation +0x28 (+= 0x10000), used list head +0x38 / tail +0x40."
+  status: PARTLY
+  writers: [0x7fef20]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x10
+  name: camp
+  semantics: the camp's plot (+0x18 the camp standing).
+  status: PARTLY
+  writers: [0x147fc0]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x18
+  name: campStanding
+  type: byte
+  semantics: clear once a unit took the camp (+0x1c the taker's player).
+  status: PARTLY
+  writers: [0x154830]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x20
+  name: boldness
+  type: int
+  semantics: +BARBARIAN_BOLDNESS_PER_TURN 2 each tribe turn (0x148ca3); the battle terms.
+  status: PARTLY
+  writers: [0x1488a0, 0x148e90]
+  readings: ["H-1: the raids — READ"]
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x28
+  name: scoutCount
+  type: int
+  semantics: the tribe's counted scouts (+0x2c the wait).
+  status: PARTLY
+  writers: [0x144cc0, 0x148e90]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x30
+  name: NumMilitary
+  type: int
+  semantics: the cap of the ranged roll.
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x34
+  name: unitCount
+  type: int
+  semantics: the tribe's counted units (not its living ones).
+  status: PARTLY
+  writers: [0x144b20, 0x144bf0, 0x148e90]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x3c
+  name: raidTree
+  semantics: the raid's tree (+0x40 the assault's); the assault list +0x60.
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x48
+  name: raidCities
+  semantics: the cities the raid waits for (+0x60 the assault's).
+  status: PARTLY
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x58
+  name: raidWaiting
+  semantics: a raid city waiting (+0x70 an assault city).
+  status: PARTLY
+  readings: ["H-1: the raids — READ"]
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x78
+  name: raidScore
+  type: int
+  semantics: the tribe's raid score (+5 a pillage); +0x7c no writer but the serializer.
+  status: PARTLY
+  writers: [0x154b80]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x88
+  name: spawnInterval
+  type: int
+  semantics: the spawn interval.
+  status: PARTLY
+  writers: [0x149760]
+  readings: ["H-1: the raids — READ"]
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0x90
+  name: askedQueue
+  semantics: the asked units (count +0xa0).
+  status: PARTLY
+  writers: [0x149750]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
+- kind: field
+  owner: Tribe
+  offset: 0xa8
+  name: pendingMelee
+  type: int
+  semantics: "pending melee (+0xac ranged, +0xb0 siege, +0xb4 support); written only by the load 0x1433b0 and the copy 0x14c930: they stand at 0."
+  status: PARTLY
+  writers: [0x1433b0, 0x14c930]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x100
+  name: id
+  type: int
+  semantics: the unit's id (the serial in its high half).
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x160
+  name: type
+  semantics: the unit's Units row.
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x188
+  name: passJob
+  type: int
+  semantics: the tactical pass's job id a unit's +0x7d0 may hold.
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x220
+  name: plot
+  semantics: the unit's plot.
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x2e0
+  name: owner
+  type: int
+  semantics: the unit's owner.
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x530
+  name: turnDone
+  type: byte
+  semantics: the turn-done flag (replicated at +0x4d8; game event 0xd70ba51f when set).
+  status: PARTLY
+  writers: [0x570b40, 0x4e4560]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x650
+  name: domain
+  type: int
+  semantics: DOMAIN_SEA 0, DOMAIN_LAND 2 (the location test).
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x720
+  name: operationId
+  type: int
+  semantics: the operation the unit joined.
+  status: PARTLY
+  writers: [0x737e80]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x770
+  name: dead
+  type: byte
+  semantics: the unit is dead.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x778
+  name: control
+  type: int
+  semantics: the control id of the tree or operation holding it (-1 none).
+  status: PARTLY
+  writers: [0x1e60f0]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x7d0
+  name: assignment
+  type: int
+  semantics: the job the unit is in (the value of the watched +0x778; -1 none).
+  status: PARTLY
+  writers: [0x1e60f0]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0xcf0
+  name: damage
+  type: int
+  semantics: the unit's damage.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0xdb0
+  name: movesLeft
+  type: int
+  semantics: the Movement left (through +0xd58).
+  status: PARTLY
+  writers: [0x56d6f0]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0xed0
+  name: buildCharges
+  type: int
+  semantics: the unit's build charges.
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x11d0
+  name: group
+  type: int
+  semantics: the unit's group / city (>= 0 a group).
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x15f0
+  name: hidden
+  semantics: a hidden unit (the look asks 0x5033a0); not +0x1650.
+  status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x1868
+  name: woundReduction
+  type: int
+  semantics: the wounded loss's reduction (0x522630).
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x18bd
+  name: canRaid
+  type: byte
+  semantics: CanRaid (ABILITY_COASTAL_RAID's MODIFIER_UNIT_ADJUST_RAIDING).
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x18c3
+  name: fightsEmbarked
+  type: byte
+  semantics: an embarked unit fighting at its own strength.
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x1939
+  name: flag1939
+  type: byte
+  semantics: skipped by Operation Move's member walk; a solo unit with it set takes an alternate order where no plot at the radius is reached.
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x19f8
+  name: range
+  type: int
+  semantics: the unit's Range (0x56e3d0).
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x1ce8
+  name: religiousStrength
+  type: int
+  semantics: above 0 adds the religious danger map.
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x1fb8
+  name: formation
+  semantics: the unit's formation (+0x738 its member count, +0x728 the first member).
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x1fc0
+  name: planning
+  semantics: the unit's planning (0x791300 reads its reach).
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x21e0
+  name: embarkOverride
+  type: int
+  semantics: "-1: the era's embarked strength applies."
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  review: reviewed
+- kind: field
+  owner: Unit (FinalRelease)
+  offset: 0xb0
+  name: id
+  type: int
+  semantics: the unit's id.
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Unit (FinalRelease)
+  offset: 0x2e8
+  name: dead
+  type: byte
+  semantics: dead (Release +0x770).
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Unit (FinalRelease)
+  offset: 0x300
+  name: control
+  type: int
+  semantics: a tree's, an operation's tree's or the tactical pass's control id (Release +0x778 / +0x7d0).
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: Unit (FinalRelease)
+  offset: 0x960
+  name: m_kExperience
+  semantics: "its object +0x970 (Release +0x1bc0): +8 the promotion flag, +0xc the experience points, +0x10 the level (constructor FinalRelease 0x39b140)."
+  status: PARTLY
+  readings:
+    - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+  review: reviewed
+- kind: field
+  owner: UnitAiTypes
+  offset: 0x31
+  name: Priority
+  type: byte
+  semantics: a Priority type (UNITTYPE_SIEGE_SUPPORT).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  review: reviewed
+- kind: field
+  owner: UnitProductionEntry
+  offset: 0x8
+  name: obsolete
+  type: byte
+  semantics: obsolete (0x538460); +0x0e PrereqTech and PrereqCivic held and the StrategicResource stocked (0x798cc2); +0x18 max(Combat, RangedCombat); +0x24 the maintenance resource; +0x2c / +0x30 / +0x38 the sums (0x168-byte entries).
+  status: PARTLY
+  writers: [0x7989e0]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  review: reviewed
+- kind: field
+  owner: UnitProductionEntry
+  offset: 0x20
+  name: held
+  type: int
+  semantics: the player's units of the type.
+  status: PARTLY
+  writers: [0x7989e0]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: UnitProductionEntry
+  offset: 0x2c
+  name: atWarCount
+  type: int
+  semantics: the at-war opponents' counts.
+  status: PARTLY
+  writers: [0x7989e0]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: UnitProductionEntry
+  offset: 0x30
+  name: opposition
+  type: fx
+  semantics: sum count x efficiency[opposing row][entry].
+  status: PARTLY
+  writers: [0x7989e0]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: UnitProductionEntry
+  offset: 0x160
+  name: value
+  type: fx
+  semantics: N / +0x30 (1.0 with N 0), x1.25 for a TraitType unit.
+  status: PARTLY
+  writers: [0x7989e0]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x38
+  name: Cost
+  type: int
+  semantics: the unit production entry's Cost.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x44
+  name: BuildCharges
+  type: int
+  semantics: a builder unit (not picked by the Default Specialization).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x48
+  name: Combat
+  type: int
+  semantics: a defensive pick's unit has it.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x5c
+  name: Maintenance
+  type: int
+  semantics: less as Gold below handicap 3.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x64
+  name: ParkCharges
+  type: int
+  semantics: PSEUDOYIELD_TOURISM term.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x68
+  name: Range
+  type: int
+  semantics: the unit production entry's Range.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x6c
+  name: RangedCombat
+  type: int
+  semantics: a NAVAL unit without it needs water or a Harbor.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x74
+  name: ReligiousHealCharges
+  type: int
+  semantics: the religious unit value.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x78
+  name: ReligiousStrength
+  type: int
+  semantics: x 0.01 in the religious unit value.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x7c
+  name: SpreadCharges
+  type: int
+  semantics: the religious unit value.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0xa0
+  name: FormationClass
+  semantics: 2 civilian (0xadd5e0).
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x1b9
+  name: flags
+  type: byte
+  semantics: bit 2 FoundCity, bit 64 MakeTradeRoute, bit 128 MustPurchase.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x1ba
+  name: flags2
+  type: byte
+  semantics: bit 2 Spy, bit 64 WMDCapable.
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x238
+  name: MandatoryObsoleteCivic
+  semantics: "with +0x240 MandatoryObsoleteTech, +0x248 ObsoleteCivic, +0x250 ObsoleteTech: 0x538460's obsolescence."
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x258
+  name: BuildingPrereqs
+  semantics: "Unit_BuildingPrereqs: the least of their buildings' turns joins T."
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x270
+  name: PrereqCivic
+  semantics: its era bounds the military production modifier.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x278
+  name: PrereqDistrict
+  semantics: an AIR unit's +30.0 where the district holds no aircraft.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x280
+  name: PrereqTech
+  semantics: its era bounds the military production modifier.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x288
+  name: PromotionClass
+  semantics: the promotion class weight 0x723bb0.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x290
+  name: PseudoYieldType
+  semantics: the unit's pseudo-yield (PSEUDOYIELD_UNIT_COMBAT by default).
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x2c8
+  name: StrategicResource
+  semantics: none held and none near -> the unit value 0.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units
+  offset: 0x2d0
+  name: TraitType
+  semantics: x1.25 in the unit production table.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units_XP2
+  offset: 0x50
+  name: ResourceMaintenanceType
+  semantics: its stockpile out zeroes the unit value.
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed

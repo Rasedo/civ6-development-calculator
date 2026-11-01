@@ -7,6 +7,7 @@
   final: 0x14c400
   kind: function
   name: City_Resources
+  semantics: "City_Resources: the count of a resource class on the city's plots (its first 0x5cbc0(2) + 18 that it owns, known to the owner 0x4ab4b0)."
   status: PARTLY
   impl:
     - cpu/core/trade.ts:routeDestLuxuryGold
@@ -16,4 +17,4 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  review: reviewed

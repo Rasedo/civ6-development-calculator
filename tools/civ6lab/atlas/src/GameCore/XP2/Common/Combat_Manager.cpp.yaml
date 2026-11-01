@@ -30,6 +30,7 @@
 - addr: 0x1fc100
   final: 0x14fa10
   kind: function
+  semantics: "a unit's experience object: asks 0x116f80 of the unit's experience (FinalRelease unit +0x970, the Release's +0x1bc0)."
   status: PARTLY
   cases:
     - recording: 1117
@@ -39,7 +40,7 @@
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...(the Unit constructor FinalRelease 0x39b140), its object +0x970 (the Release's +0x1bc0; 0x1fc100 (FinalRelease 0x14fa10) asks 0x116f80 (FinalRelease 0x2af30) of unit +0x970): +8 the..."
-  review: imported
+  review: reviewed
 - addr: 0x200e10
   kind: function
   status: PARTLY
@@ -96,6 +97,7 @@
 - addr: 0x205720
   final: 0x156ae0
   kind: function
+  semantics: "a combat simulation off the map (the efficiencies' two per pair): the damage each side takes (+0x7c / +0xc4 words)."
   status: PARTLY
   cases:
     - recording: AI_UnitEfficiency.csv
@@ -108,7 +110,7 @@
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
   context:
     - "...ombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both..."
-  review: imported
+  review: reviewed
 - addr: 0x205da0
   kind: function
   status: PARTLY
@@ -267,6 +269,7 @@
 - addr: 0x209dd0
   final: 0x15a2b0
   kind: function
+  semantics: "the unit fights: GetCombat, GetRangedCombat or GetBombardCombat above 0."
   status: READ
   cases:
     - recording: 1121
@@ -290,7 +293,7 @@
   context:
     - "...Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a MilitaryFormation argument (+0x90), compa..."
     - ...'s units from the last to the first; for each one not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's player is at w...
-  review: imported
+  review: reviewed
 - addr: 0x209e30
   final: 0x15a310
   kind: function
@@ -321,6 +324,7 @@
 - addr: 0x20bae0
   final: 0x15bd50
   kind: function
+  semantics: "a district's pillage in combat: raises game signal +0x8d0."
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -328,9 +332,10 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...lage 0x9633c0, the coastal raids 0x95ba10 / 0xa4fbc0 and a district's pillage in combat 0x20bae0 — runs 0x154b80: a barbarian unit of a tribe adds 5 to its +0x78 (+0x7c has no writer b..."
-  review: imported
+  review: reviewed
 - addr: 0x20d280
   kind: function
+  semantics: "the combat log: after its CombatLog.csv line raises game signal +0x4c8 and player signal +0x78 of the defender's owner (0x20d7e5: the unit's +0x2e0) with the attacking unit (0x20d7f8)."
   status: PARTLY
   impl: [cpu/core/units.ts:recordAttacker]
   readings:
@@ -338,7 +343,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
   context:
     - "- War weariness (0x1fb680, from the combat log 0x20d280): it reads only the struct's [+0] and [+8] and the combat's location — the interceptor..."
-  review: imported
+  review: reviewed
 - addr: 0x20e720
   final: 0x15e6b0
   kind: function
@@ -365,6 +370,7 @@
 - addr: 0x212500
   kind: function
   name: Combat_Manager
+  semantics: a retreat (sets the turn done).
   status: PARTLY
   impl:
     - cpu/core/combat.ts:seizeCivilian
@@ -381,7 +387,7 @@
   context:
     - ...e +0x1ba bit 2, and whose player the mover's player is at war with (0x469cd0), it calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 wi...
     - "- 0x212500: a unit info with the +0x1b8 bit 8 (CanRetreatWhenCaptured: the Great People, the Archa..."
-  review: imported
+  review: reviewed
 - addr: 0x212c30
   final: 0x1628f0
   kind: function

@@ -7,6 +7,7 @@
   final: 0x527c50
   kind: function
   name: the city's worth
+  semantics: "the city's worth (K, P): PSEUDOYIELD_CITY_POPULATION of floor(pop / 5); CITY_BASE of 1; ORIGINAL_CAPITAL of 1 for an original capital (K +0x14), 0.5 for a capital (+0x15); PSEUDOYIELD_WONDER of 40 per wonder (0x5eb680); the yield values of 7 x K's Production, Science and Culture (+0x30); then P's loyalty lead there (0x19d470, whole): at or below -20 (gp +0x474) the worth is 0, else + 10 a point up to 5, and below -5 another 10 a point per step of 5 back up; then the culture AI's value of each great work K holds (0x623b30 over CultureAi +0x7b8) and each resource K holds (0x7a21e0 at count 1, turn 0, horizon 100, rate 2.0)."
   status: PARTLY
   cases:
     - recording: h1_duelv1117
@@ -38,6 +39,7 @@
   final: 0x528140
   kind: function
   name: discounted
+  semantics: "discounted(value, rate, turn): one turn's value discounted to the turn."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -63,7 +65,7 @@
     - "...7, k = rate/100, a perpetuity a/k past nk >= 10; the horizon itself one discounted turn 0x7a1240, (1-k)^n with -0.16667). Then: per unlocked unit the player's version, 10 x the cities'..."
     - ...yer AI, as PSEUDOYIELD_INFLUENCE @0xf2e240 with the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's poin...
     - "...(0x6b8ba0): per subject, trunc(PV(H) - PV(T)) of yieldValue(Amount, YieldType) (0x7a2140; 0x7a1240 when T = H). The Monument's MONUMENT_CULTURE_AT_FULL_LOYALTY (REQUIREMENT_CITY_HAS_FULL_L..."
-  review: imported
+  review: reviewed
 - addr: 0x7a16e0
   final: 0x528310
   kind: function
@@ -95,6 +97,7 @@
 - addr: 0x7a2140
   final: 0x528660
   kind: function
+  semantics: "between(value, rate, start, horizon): the value's present value from the start to the horizon."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -122,7 +125,7 @@
     - "...NonFoodYieldModifier change on the city's yield, at least 1.0, from T to the horizon (0x7a2140) — the Arena; a city-state's gold per turn counts its city's Gold (the Economic boost;..."
     - "...part to context +0xc0; \"span\" is PV(horizon) - PV(start) by two 0x7a16e0 calls, \"between\" 0x7a2140; \"weighted\" a yield through 0x7a6690 with the player, \"bare\" without):"
     - "...LD_CHANGE (0x6b8ba0): per subject, trunc(PV(H) - PV(T)) of yieldValue(Amount, YieldType) (0x7a2140; 0x7a1240 when T = H). The Monument's MONUMENT_CULTURE_AT_FULL_LOYALTY (REQUIREMENT_CITY_..."
-  review: imported
+  review: reviewed
 - addr: 0x7a21e0
   final: 0x528700
   kind: function
@@ -173,6 +176,7 @@
   final: 0x528f20
   kind: function
   name: the improvement build unit
+  semantics: "the improvement's build unit: of ValidBuildUnits the player's own version, the cheapest by its current cost (0x4f2b20), 0 for one spending no charge (ConsumesCharge +0x28 bit 0); none FX(-9999)."
   status: READ
   cases:
     - recording: 1127
@@ -189,15 +193,17 @@
 - addr: 0x7a2fa0
   kind: function
   name: cityArrBC0[yield]
+  semantics: "the city's yield percent array (city +0xbc0) at a yield: the modifiers' alone, not the happiness level's."
   status: PARTLY
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - ...+0x2e0) the amount x fx(1 + cityPct[y] 0.01) x fx(1 + bldPct 0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value 0x7a6690 = amount x Yields.DefaultValue (Gold 0.5) x...
-  review: imported
+  review: reviewed
 - addr: 0x7a3010
   final: 0x529020
   kind: function
   name: the feature removal value
+  semantics: "the feature removal value: Feature_Removes' rows escalated x + (10x - x) n / 100, n the larger of the civics' and techs' percent held (0x399810 / 0x4c9cf0; 0x5267a0 type 1, GlobalParameters +0x37c), at the speed (0x5254d0), at DefaultValue, discounted T; less a Builder's charge (the unit hash 0x11d57532) and Feature_YieldChanges at DefaultValue (Appeal x 0.5 Food more where a neighbour holds a district with Housing, 0x79e140) from T to H."
   status: READ
   cases:
     - recording: 1127
@@ -225,6 +231,7 @@
   final: 0x529530
   kind: function
   name: the harvest value
+  semantics: "the harvest value: Resource_Harvests at DefaultValue discounted T, less a charge and Resource_YieldChanges from T to H."
   status: READ
   cases:
     - recording: 1127
@@ -248,6 +255,7 @@
   final: 0x5298e0
   kind: function
   name: housingValue
+  semantics: "housingValue(CityBuildAI, the city's growth +0x1788, rate, population, Housing, T, H): S = the Food surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left). Over the forecast's steps from T (0x5d2c50: the first entry whose turn is past the one given): a step at population p pays 2 x DefaultValue(Food) x (S x (factor(housing - p + Housing) - 1) + the Food the step withholds), PV to min(H, the next step's turn) less PV from max(T, its turn); past the last step, where it withholds Food, to H."
   status: READ
   cases:
     - recording: 1124
@@ -284,13 +292,17 @@
     - ...it 1 -> 0x39110); each free unit (+0x298) through 0x7b62c0; Housing (+0x34) > 0 through 0x7a3d70 (CityBuildAI, city +0x1788, population +0x588, T, H); a building on player +0x1310's li...
     - "- HOUSING 0x7a3d70 (`housingValue`, args: CityBuildAI, the city's growth +0x1788, the rate, population, Ho..."
     - ...percent change x CityBuildAI's yields +0x1080), EFFECT_ADJUST_POLICY_HOUSING 0x6b5eb0 (0x7a3d70 on CityBuildAI and the city's housing +0x1788), EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULAT...
-  review: imported
+  review: reviewed
 - addr: 0x7a46c0
   final: 0x529c60
   kind: function
   name: envoys' worth at a city-state
+  semantics: "an envoys' worth (n, rate, start, horizon, player, city-state, its +0x1280 +0x6868 list): 0 at war; else the list's modifiers summed (0x7a4b20) in a context of the player, the city-state (+0x40) and n envoys (+0x08)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 20
+      value: Caguana 112 for two envoys; t28 186 with Amani's two counted
     - recording: h1_duelw1117
       turn: 20
       value: Caguana 112 for two envoys
@@ -307,24 +319,26 @@
   review: reviewed
 - addr: 0x7a4850
   kind: function
+  semantics: a research value condition worth +5.0.
   status: PARTLY
   readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
   context:
     - ...ays, unread), +1.0 where row +0xc0 is set, +5.0 for EmbarkAll (+0x70 bit 4), +5.0 where 0x7a4850 holds; a row of an era before the game's x (game - era + 1), else + PSEUDOYIELD_GOLDENA...
-  review: imported
+  review: reviewed
 - addr: 0x7a48d0
   kind: function
+  semantics: a favoured project (x3.0).
   status: PARTLY
   impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
   readings:
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - "...it 0) 100.0 x 0x4d9320; its projects (+0x1d0) each 0x7b28c0 x 0.1, x3.0 a favoured one (0x7a48d0), the positive summed, added only where its SpaceRace ones value above 0 — shared by..."
-  review: imported
+  review: reviewed
 - addr: 0x7a4b20
   final: 0x529ed0
   kind: function
-  semantics: "the modifiers' sum: per modifier 0x6cede0 in a copied context; a context naming a yield adds value x DefaultValue, any other min(value, 0x7fffff) << 8."
+  semantics: "the modifiers' sum: per modifier 0x6cede0 in a copied context; a context naming a yield (+0x64) adds the analyzer's whole-number sum (+0xc0) x Yields.DefaultValue, any other min(value, 0x7fffff) << 8 (clamped to +-0x7fffff)."
   status: READ
   cases:
     - recording: 1124
@@ -367,7 +381,12 @@
   final: 0x52a050
   kind: function
   name: valueBuildingAtPlot
+  semantics: "a building's value at a plot (building, T, plot or -9999, horizon): 0x7a7590's value; with no plot (0x7a5182..0x7a51d9) a building the city holds (City_Buildings 0x18e9f0) pillaged (0x18fe60) — or held under damaged walls (0x197ff0 above 0) with OuterDefenseHitPoints (+0x54 / +0x58) — has its value doubled (0x7a5136, x 0x200); T is then the repair's."
   status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 86
+      value: Granada's Lighthouse repair 157.77 / 169.69 / 213.44 / 227.34 t86-t89, 2 x 113.67 at its last
   impl: [cpu/core/aiCityBuild.ts:buildingTable, gpu/core/sim_cityvalue.py:_cv_building_table]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -376,13 +395,17 @@
     - ".claude/scratchpad/cb/notes.txt: ...urrent) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current != bld) + prereq buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H..."
   context:
     - "...nd the current item not this one) + each missing prerequisite building's turns; value = 0x7a4d40(building, T, no plot, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisite..."
-  review: imported
+  review: reviewed
 - addr: 0x7a51f0
   final: 0x52a440
   kind: function
   name: valueDistrictAtPlot
+  semantics: "a district's value at a plot (out, district, &rate, T, H, plot, city, ...; from 0x5ce970's district loop 0x5ced80..0x5cefed: the verdict 0x5d2ae0 -1 writes FX(-9999) first, 1 takes the value x1.5 0xd2f32c; T = 0x17b5a0 + max(tech, civic turns)): T past H FX(-9999). A plot without an owner pays its price (0x1b1cb0, city +0x1688; -1 beyond GlobalParameters +0x124 or no plot beside it the city owner's) at the yield value with no player, discounted T, taken off. A feature the district does not keep (0x17cb00) and may not clear: 0; else 0x7a3010. A resource seen with no harvest row: 0; else 0x7a37d0. An unpillaged improvement: its yields (0x7b1320) and the resource's value at count -1 off. The plot's own district pillaged: the repair, +12500.0 at the city centre, the whole x2. Then 0x7aaf80."
   status: READ
   cases:
+    - recording: h1_duelv1127
+      turn: 2
+      value: the Campus rows exact on every plot, T 15 = 2 + 13
     - recording: h1_duelv1127
       turn: 2
       value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
@@ -399,8 +422,12 @@
   final: 0x52a8c0
   kind: function
   name: valueImprovementAtPlot
+  semantics: "an improvement's value at a plot (impr, rate, T, horizon, plot, city; from 0x5ce970: FX(-9999) where 0x35ede0 refuses the player or 0x35fd60 the plot, T = max(0x7610e0 to PrereqTech +0x160, 0x621920 to PrereqCivic +0x158)): T at or past the horizon FX(-9999); the build unit 0x7a2e20, none FX(-9999); the charge = current cost / (+0x7b0[u] + 3), whole, at the Production DefaultValue, discounted T. The plot's own improvement: 0 unpillaged, its repair pillaged. Another (unpillaged) improvement: 0x7b1320 of it and 0x7a21e0 of -1 copy off. A resource the improvement does not list: its harvest 0x7a37d0 where Resource_Harvests has rows, else 0; one it lists keeps the feature where MustRemoveFeature is false. A feature it neither keeps nor lists: 0x7a3010, or 0 where not Removable. Then - the charge + 0x7b1320 + the resource value 0x7a21e0 (1 copy)."
   status: READ
   cases:
+    - recording: h1_duelv1127
+      turn: 2
+      value: a 25 Builder's charge 8
     - recording: h1_duelv1127
       turn: 2
       value: Farm 72.45, Mine 62.51 at T 4, 48.44 beside a volcano, Farm on Woods 54.34
@@ -424,7 +451,7 @@
   final: 0x52af40
   kind: function
   name: pseudoYieldValue
-  semantics: "pseudoYieldValue(amount, pseudo, player): f = 1 + 0x700810's weight, q = 0x655840; f q >= 0 -> f + q, else +-0.1 where |q| > |f|; amount x that x DefaultValue."
+  semantics: "pseudoYieldValue(amount, pseudo, player): f = 1 + 0x700810's weight, q = 0x655840; f q >= 0 -> f + q, else +-0.1 (@0xd2f320, f's sign) where |q| > |f|, else f + q; the amount x (that x DefaultValue)."
   status: READ
   cases:
     - recording: 1124
@@ -500,14 +527,7 @@
   kind: function
   name: powerValue
   signature: fx* powerValue(fx* out, Player* player, City* city, int amount, fx rate, int T, int H)
-  semantics: |
-    The value of `amount` more free power in the city. Above 0: where the
-    city's free power (City_Power +0x30d0 0x1f0020: +0x08 x (100 + +0xa8)%)
-    is below its required power (+0x58, 0x1f02f0), half its Production
-    (City::GetYield x 0.5f) at its value (0x7a6690) from T to H (0x7a2140);
-    the amount at PSEUDOYIELD_GPP_SCIENTIST (@0xf2e22c) from T to H
-    (0x7a1240 at T = H); the larger. Below 0: a walk of the player's
-    +0x1320 (unread). 0 for 0.
+  semantics: "the power value (player, city, Amount, rate, T, H), Amount above 0: where the city's free power (0x1f0020: City_Power +0x30d0 +0x08 x (100 + +0xa8)% where +0xa8 > 0) is below its required power (+0x58, 0x1f02f0), half its Production (x 0.5 @0xd20458) at its value (0x7a6690) from T to H; the Amount at PSEUDOYIELD_GPP_SCIENTIST (@0xf2e22c, 0x7a60d0) from T to H (0x7a1240 at T = H); the larger. Below 0 walks the player's +0x1320 (unread)."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
@@ -518,7 +538,7 @@
     - ".claude/scratchpad/cb/notes.txt: ...alue port needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
   context:
     - "...ies in range, capped at 50.0; the Buildings_XP2 row (0x28a940 on 0xad50d0: +0x28 > 0 -> 0x7a67f0, +0x48 bit 1 -> 0x39110); each free unit (+0x298) through 0x7b62c0; Housing (+0x34) >..."
-  review: imported
+  review: reviewed
 - addr: 0x7a7110
   final: 0x52b650
   kind: function
@@ -578,9 +598,12 @@
   final: 0x52b900
   kind: function
   name: valueConstructible
-  semantics: "a building's or project's value: per Building_YieldChanges row through 0x7a6690, the pseudo-yields, the defence and great work terms, less Maintenance; PV(H) - PV(T); then the entertainment, regional, power, flood barrier, free unit, housing and modifier terms."
+  semantics: "a building's or project's value (building, T, H, city): per Building_YieldChanges row (Buildings +0x2e0) the amount x fx(1 + cityPct[y] 0.01) x fx(1 + bldPct 0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value 0x7a6690; per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 for a prerequisite of era 5 or later); a second yields pass (0x18e570); a whole number (player +0x1358 +0xf8) when CanConstruct's three reason fields are all -1; the great person points (+0x1b0, each class's pseudo-yield); PSEUDOYIELD_WONDER for a wonder; the era moment (0x93e4e0, 0x3002f0); the outer defence terms (OuterDefenseHitPoints +0x54 / +0x58: +1 for two districts or more (city +0x1a60), +2 for a capital (+0x5e8), +1 with a wonder (0x18e930), population (+0x588) / 5 + 1, +2 at war (0x3dcf50), the city's CityBuildAI +0x1b8 above -1, then 0x7a84c0..0x7a8758: +4.0 once where any city of the player has +0x1b8 above -1, x4 for the city's own copy under damaged walls (0x197ff0 on +0x1880 above 0), x2 once where a player at war with, denounced by or denouncing the owner has PlayerStats +0xf0 (best melee) above the centre's GetDefenseStrength 0x24ae80); OuterDefenseStrength (+0x44) as a whole number; the great work slots (+0x1c8); the prerequisite chain (+0x1f8: x(1 + 2 depth)); less Maintenance (+0x38) as Gold; the sum v becomes PV(v, rate, H) - PV(v, rate, T) (0x7a16e0 twice). After it, discounted: Entertainment (+0x2c) > 0 adds 0x79f7c0 for this city (RegionalRange +0x48 <= 1) or over the player's cities in range, capped at 50.0 — ONE Amenity whatever the Entertainment (0x7a8dcd: r9d 1); else (0x7a8daa) a RegionalRange above 1: with Buildings_XP2 ResourceTypeConvertedToPower (+0x58, resource +0x14) the player's stock less reservations (0x4ab6c0 -> 0x4aa790) none -> value 0 (0x7a9098), else the value x the player's cities within range (0x7a90d0: with a converted resource those whose city +0x30d0 is above 0, and the city itself); RequiredPower (+0x28) > 0 -> 0x7a67f0 of -RequiredPower; BlocksCoastalFlooding (+0x48 bit 1) -> 0xa39110 over the lowland list of the city's plots, + (districts x 15 + plots) x 100.0, value 0 with no plot (0x7a93b4); each free unit (+0x298) through 0x7b62c0 (an Archaeologist skipped); Housing (+0x34) > 0 through 0x7a3d70; a building on player +0x1310's list (0x39dcd0) through 0x7a10c0; the modifiers through 0x7a4b20. Column offsets from the Buildings loader 0xabaaf0."
   status: READ
   cases:
+    - recording: h1_duelv1121
+      turn: 208
+      value: Hunza's Flood Barrier +300.00 on its three lowlands t208-220
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
@@ -614,7 +637,12 @@
 - addr: 0x7a9a10
   final: 0x52caf0
   kind: function
+  semantics: "the civic value (row, &discount, turns, H, player, policies, governments, ...): at or past H -9999. The own term PSEUDOYIELD_CIVIC of 1.0 (0x7a60d0) paid PV(H) - PV(turns); the governments it unlocks, each max(v - v(the current), v / 2) of the government values (culture AI +0xb38), bare; the sum of these two multiplied for a civic of an era before the game's by (that - era) (0x7a9f11; no +1), a later one adding PSEUDOYIELD_GOLDENAGE_POINT of the eras record +0x2c (0x2c4110). Per unit the player's version (+0x170) the cities' average City Analysis value (0x5d4cd0, uncapped, once) and per upgrade source unit max(that - the upgrade's gold, 20.0), whole; PSEUDOYIELD_UNIT_COMBAT of 100 where 0x4f2ac0 names the row and 0x536da0 fails; per building the player's version 0.5, a wonder PSEUDOYIELD_WONDER of 0.5; per district the player may have PSEUDOYIELD_DISTRICT of 0.5; its policies: the best of its cards' scores (0x623b90, 0 at least) less the weakest slotted card's, at least 20.0 (0x7aacb1); the civic's modifiers (0x7a4b20) from landing to the horizon."
   status: PARTLY
+  cases:
+    - recording: h1_duelv1121
+      turn: 44
+      value: Hunza's Military Training 115.9 t44-46 on Equestrian Orders' 37.0
   impl:
     - cpu/core/aiCivics.ts:civicValue
     - cpu/data/aiCivics.ts:CIVIC_AI_POLICY_FLOOR
@@ -629,11 +657,12 @@
   context:
     - ...dded at the third level leave the entry out of reach. Else turns = max(0, sum), value = 0x7a9a10, score = value.
     - "- THE VALUE, 0x7a9a10 (row, &discount, turns, H, player, policies, governments, ...): at or past H, -9999 (th..."
-  review: imported
+  review: reviewed
 - addr: 0x7aaf80
   final: 0x52d500
   kind: function
   name: the district value body
+  semantics: "the district value body: T at or past H FX(-9999); a Coast row on a lake FX(-9999); a flood (unless Districts_XP2 PreventsFloods) or an eruption sooner cuts H. A turn: PSEUDOYIELD_DISTRICT 1.0; per yield the whole adjacency 0x366df0 -> 0x365720, 0 at a plot without an owner; the district's own rows and, where a district the player may build, the city lacks and the plot takes (0x406c00, 0x1aec20, 0x35f2d0) earns more by its rows, that best off (not an Aqueduct, +0xe0 bit 2); HitPoints (+0x58 / +0x5c) x 0.02 x ((d - d f) / d + 1) of PSEUDOYIELD_CITY_DEFENSES; 0.5 x the era's ChronologyIndex x the district pseudo-yield while the city may add a district (not RequiresPopulation +0xe1 bit 6, or 0x1ae8a0 above 0x1ae8f0); a regional reach (the largest RegionalRange of its buildings, +0x130) x (the player's other cities within it holding no such district + 1) x 0.5; Appeal x 0.5 Food beside a district with Housing; its domain (0xadd590: sea 0, air 1, land 2) where 0x1c77c0 says the city does not train it PSEUDOYIELD_UNIT_NAVAL / AIR_COMBAT 5.0, twice where no city of the player's does, then the domain's units' values (0x5d4cd0) once where none does; Maintenance Gold off; District_GreatPersonPoints. PV(H) - PV(T) plus the units' lump; Housing (an Aqueduct's 2, globals +0x13c) plus the AppealHousingChanges band (0x1b4450) at 0x7a3d70; the claimed plots (0x39dd20 -> 0x7a10c0); a Dam (Districts_XP2 +0x28 bit 3) 100.0 an improved and 300.0 a districted plot of the owner's along its rivers (0xa2bf20); a Canal (bit 0) 100.0 x 0x4d9320; its projects (+0x1d0) each 0x7b28c0 x 0.1, x3.0 a favoured one (0x7a48d0), shared by (0x408b60 all + 1); the modifiers (0x7a4b20); at the top level the neighbours (0x79f280)."
   status: PARTLY
   cases:
     - recording: h1_duelv1127
@@ -669,7 +698,7 @@
   final: 0x52fd20
   kind: function
   name: the government value
-  semantics: "a government's value: FX_MIN at start >= horizon, or for one held before (+0x350[g]) not current; per Government_SlotCounts row the slot type's best card / 10 over the slot's place; + Governments_XP2 Favor as PSEUDOYIELD_DIPLOMATIC_FAVOR, PV(horizon) - PV(start); + its modifiers (+0xb68[g]) by 0x7a4b20."
+  semantics: "a government's value: FX_MIN when start >= horizon, or for one held before (PlayerCulture +0x350[government], 0x399260) not the current; per Government_SlotCounts row the type's best / 10 over the slot's place (i + 1; an AllowsAnyPolicy type 1, 1, 2, 3, 3...); + Governments_XP2 Favor as PSEUDOYIELD_DIPLOMATIC_FAVOR, PV(horizon) - PV(start); + a golden-age term of amount 0; + its modifiers (+0xb68[government]) by 0x7a4b20."
   status: READ
   cases:
     - recording: h1_duely1121
@@ -697,6 +726,7 @@
   final: 0x5300f0
   kind: function
   name: promotion value
+  semantics: a promotion's value (promotion, rate, start 0, horizon 100, player, its modifiers, GlobalAI +0x39d8).
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -711,8 +741,12 @@
   final: 0x530330
   kind: function
   name: governor value in a slot
+  semantics: "a governor's value in a slot (governor, rate, start 0, horizon 100, player, city, modifiers): no city 10.0, 20.0 for an AssignToMajor governor; a city for an AssignToMajor governor FX(-9999); a city holding another governor (the assignment list +0x58), or not the player's: 0; the player's city: its Loyalty a turn (0x19d200 on city +0x2a78) less the governor's IdentityPressure (+0x20) where it sits there; at or below 0 its loss as a yield from establishment (start + 5 where it does not sit there) to the horizon (0x7a2140), at least 20.0; where the governor lifts a negative Loyalty above 0, the city's value (0x79fef0) more; then the BaseAbility promotions' modifiers (GlobalAI +0x39c0) summed (0x7a4b20)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 2
+      value: "China t2..t30: Educator 38 = 20 + Librarian's 18; Ambassador 112 at Caguana"
     - recording: h1_duelw1117
       turn: 3
       value: Merchant 23 = 20 + Land Acquisition 3; Educator 30 = 20 + Librarian 10
@@ -726,8 +760,14 @@
   final: 0x530690
   kind: function
   name: the improvement yields value
+  semantics: "the improvement yields value (impr, T, H, plot, ...): T >= H FX(-9999); a drought hitting it 0; the river manager (0xa2cbf0 / 0xa2af70) and the feature manager (0xa1cc70: a volcano beside) cut H to their turns, H <= T 0. A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges and its adjacency (each Improvement_Adjacencies row +0x110..+0x118 handed to 0x365ae0 on its own, the rows summed), YieldFromAppeal at the plot's Appeal x the percent, each at the player's value (0x7a6690, 0x7a60d0); the tourism 0x7b19a0; min(max(n, 1), DefenseModifier) + min(n, GrantFortification), n = 0x3dfae0; the Barbarian Clans traps' properties; x3 where a build unit spends no charge. PV(H) - PV(T); the Housing over TilesRequired at 0x7a3d70; where the civics' list +0x1380 holds the improvement (0x39de20) the claimed plots 0x7a10c0; its ImprovementModifiers (0x7a4b20 at 0x7b23d8) in a context of the player (+0x80), the plot's city (+0x70), T (+0x64), H (+0x68), the rate (+0x6c); at the top level (the context's plot list +0x10 empty) its ring's neighbours revalued (0x6b1b0, functor @0xd71be8 -> 0x79ed40). At 0x7b19a0: the improvement's tourism: per Improvement_Tourism row (+0x168) of source 6 (TOURISMSOURCE_APPEAL) the plot's Appeal x ScalingFactor / 100 (0x1aba40), x (1 + the city's +0x1b20 percent); a turn's PSEUDOYIELD_TOURISM of it x fx(1 - max(5 - era, 0) x 0.1f) (@0xd2f320, @0xcfc9f8 1.0; 0x467eb0)."
   status: PARTLY
   cases:
+    - recording: h1_duelv1124
+      value: Ski Resort rows exact 153 of 315
+    - recording: h1_duelv1124
+      turn: 2
+      value: Granada's Alcazar 104.61 at its t2 plot
     - recording: 1127
       turn: 2
       value: "the charge   = current cost / (+0x7b0[u] + 3), whole, at the Production DefaultValue   with no player, discounted T (1127 t2: a 25 Builder's 8)."
@@ -756,7 +796,11 @@
 - addr: 0x7b26b0
   final: 0x5310d0
   kind: function
+  semantics: "a policy's value: FX_MIN when start >= horizon or the card is obsolete (0x39e050); 250.0 for a Dark Age card in a Dark Age or a Golden Age card in a Golden Age; plus the modifiers' sum 0x7a4b20."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1110
+      value: a city-state's Urban Planning 14 and God King 21 at weight 0, 25 turns, rate 4.0
   impl:
     - cpu/core/aiPolicyValue.ts:policyScore
     - cpu/core/aiPolicyValue.ts:policyScore
@@ -769,7 +813,7 @@
     - ...ovement the resources near the cities (0x5d45c0 -> 0x7a21e0); the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88 and 0x3dcf50 holds; + the row's modifiers analy...
     - ...s, each max(v - v(the current), v / 2) of the government values [+0xb38] (0x621eb0 -> 0x7b26b0, unread); then a civic of an era at or before the game's ([player+0x1358]+0x158 one pas...
     - "...me era (the player's era object +0x158 -> Eras +0x1c) inside the window; then the value 0x7b26b0(policy, the rate 0x6fec30 = GlobalAI +0x290, start 0, horizon `m_valueHorizons[0]` vi..."
-  review: imported
+  review: reviewed
 - addr: 0x7b28c0
   final: 0x531290
   kind: function
@@ -815,7 +859,12 @@
 - addr: 0x7b3e50
   final: 0x531f20
   kind: function
+  semantics: "the research value's TechnologyModifiers term: the row's modifiers analysed from landing (-> 0x7a4b20)."
   status: PARTLY
+  cases:
+    - recording: h1_duely1124
+      turn: 189
+      value: Rocketry's own value 10.0 a turn; Satellites 679.2 at 4 turns
   impl:
     - cpu/core/aiResearch.ts:techValue
     - cpu/data/aiResearch.ts:RESEARCH_AI_EMBARK_ALL
@@ -836,10 +885,11 @@
   context:
     - "...ntouched: 0 for every row the walk never reached). Else turns = max(0, sum) and value = 0x7b3e50(row, turns, H, discount); score = value."
     - "- THE VALUE, 0x7b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04..."
-  review: imported
+  review: reviewed
 - addr: 0x7b5d70
   final: 0x532f00
   kind: function
+  semantics: "the best promotion for a unit (\"Promote\")."
   status: PARTLY
   impl: [cpu/core/promotions.ts:aiPromotionPick]
   readings:
@@ -850,14 +900,17 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x716b90 with the target), \"Operation Protect Units, Move\"; then the hurt: a promotion (0x7b5d70, \"Promote\"), a plunder, a safe plot afloat."
-  review: imported
+  review: reviewed
 - addr: 0x7b62c0
   final: 0x533190
   kind: function
   name: valueUnit
-  semantics: "a unit's value (out, unit, &rate, T, H, player, city): the exits (T >= H, not the player's version, an untrainable domain, a minor at peace past five units, a Spy) FX(-9999); the branch by pseudo-yield (combat via the unit production table, trade via 0x7a7110, religious, explorer); the tail (copies, promotion class weight, a missing strategic -> 0, maintenance, PV(H) - PV(T))."
+  semantics: "a unit's value (out, unit, &rate, T, H, player, city). Exits FX(-9999): T >= H; a unit not the player's version (player +0x12e8 +0x1c0); a domain the city cannot train (0x17d660); a player neither CIVILIZATION_LEVEL_FULL_CIV (0x469db0) nor _TRIBE (0x469ce0), at peace (0x3dcf50) with more than five units (player +0x12e8 +0xc0); a Spy (Units +0x1ba bit 2) for a non-full player. By the pseudo-yield (Units +0x290, PSEUDOYIELD_UNIT_COMBAT where none): COMBAT / NAVAL / AIR the military AI's unit production value 0x79ca90, x3.0 where the entry's obsolete flag (0x79d2d0) is set, + fx(0.5 x the player's cities (player +0x12f0 +0xc0)) where Combat (+0x48) exceeds 0x4d9320 on player +0x1330 (PlayerStats +0xf0, the strongest melee trained); AIR + 30.0 where its PrereqDistrict (+0x278) in the city holds no aircraft, else 5.0 a free slot; NAVAL FX(-9999) at a city with no water (0x82a10) and no Harbor (0xcbecc739) for a unit of no RangedCombat (+0x6c). TRADE (0x7b6525..0x7b6582): 0x7a7110(out, player, &rate, T, T, 0) — T both start and horizon, so one turn's K discounted to T (0x7a1240), x4 — through PSEUDOYIELD_UNIT_TRADE. RELIGIOUS: ReligiousStrength (+0x78) x 0.01, SpreadCharges (+0x7c) or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0), and PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 TourismBomb). ARCHAEOLOGIST: min(artifacts / 56, 10) and the eras' points. EXPLORER / SETTLER / SPY: 1.0 + the eras' points (0x2c43b0) as PSEUDOYIELD_GOLDENAGE_POINT. The tail (0x7b709f): WMDCapable (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON; x (the city's extra copies + 1, 0x179dd0); x the promotion class weight 0x723bb0; a StrategicResource (+0x2c8) the player holds none of (0x4aa790 ownerships 0 and 1) and no city counts near (CityBuildAI +0x978, 0x5d45c0) -> 0 outright; through the pseudo-yield (0x7a60d0); below handicap 3 (player +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0) as Gold at the unweighted DefaultValue (0x7b729e..0x7b72de); then PV(H) - PV(T); a FoundCity unit's 0x6fe2b0 + 0x17a600 turns; ParkCharges' tourism (0 where the culture AI +0x6f8 > 0); a Units_XP2 ResourceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50)."
   status: PARTLY
   cases:
+    - recording: h1_duelv1121
+      turn: 17
+      value: Hunza's Heavy Chariot (Combat 28) its table's 1.16 + 0.5 -> 7.35 as logged
     - recording: h1_duelv1124
       value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
     - recording: AI_Knowledge.csv
