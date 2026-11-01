@@ -72,7 +72,7 @@ class SimCivics:
     def _cai_analysis(self, s: int, cul: torch.Tensor):
         """`civicAnalysis` for minor `s` ([B] Culture a turn): per row (engine
         order) its turns (-1 spent or out of reach), next step, own value,
-        score after the propagation, owned flag"""
+        score after the propagation and the Civic Contracts, owned flag"""
         T = self._cai_tables()
         have = self.citystate_civics[:, s]
         B, NC = have.shape
@@ -110,7 +110,25 @@ class SimCivics:
         idx = lin.clamp(min=0).unsqueeze(0).expand(B, -1, -1)
         g = pos.gather(1, idx.reshape(B, -1)).reshape(idx.shape) * (lin >= 0).long().unsqueeze(0)
         score = torch.where(turns >= 0, g.sum(dim=2), base)
+        score = score + self._cai_contracts(s, score)
         return turns, nxt, base, score, spent
+
+    def _cai_contracts(self, s: int, score: torch.Tensor) -> torch.Tensor:
+        """the seat's Civic Contracts (its city AI's Add Goal Tech contracts on
+        a civic): per row the values of the contracts on it, a row's whose
+        score past the propagation is not negative (0x623bd0); the Free
+        Cities hold none"""
+        from .sim_citytrees import GOAL_CIVIC  # sim_citytrees imports this module
+        add = torch.zeros_like(score)
+        ai = self.cityai
+        if s >= ai.S:
+            return add
+        on = (ai.c_id[:, s] >= 0) & (ai.c_goal_kind[:, s] == GOAL_CIVIC) & (ai.c_goal[:, s] >= 0)
+        if not bool(on.count_nonzero()):
+            return add
+        add.scatter_add_(1, ai.c_goal[:, s].clamp(min=0, max=score.shape[1] - 1),
+                         torch.where(on, ai.c_value[:, s], torch.zeros_like(ai.c_value[:, s])))
+        return torch.where(score >= 0, add, torch.zeros_like(add))
 
     def _cai_value(self, s: int, turns: torch.Tensor) -> torch.Tensor:
         """`civicValue` [B, NC] for minor `s`: landing each row in `turns` turns — its own

@@ -3024,6 +3024,15 @@
   impl: [cpu/core/aiModifiers.ts:pctOf]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0x6c8660
+  final: 0x488490
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - ...filter (+0x64, -1 or the Amount's yield +8), a walk over the city's trade set (+0x1ee0, 0x6c8660 -> 0x1fa000) with a functor (vtable 0xd64048) whose body is unread.
+  review: imported
 - addr: 0x6c8fb0
   final: 0x488cb0
   kind: function

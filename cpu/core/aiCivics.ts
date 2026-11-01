@@ -222,11 +222,23 @@ function researchOf(state: GameState, seat: number): ResearchState {
   return seatOf(state, seat)!.research;
 }
 
+/** a Civic Contract the civics AI holds (its city AI's Add Goal Tech
+ *  contract on a civic): its civic and its value, raw */
+export interface CivicContract {
+  civic: string;
+  value: number;
+}
+
 /** THE ANALYSIS: every civic's entry, in table order, valued and
  *  propagated; `culture` is the seat's Culture a turn, `cityTerm` the value's terms its
- *  cities give (the unlocked units') where the seat's facts give them */
+ *  cities give (the unlocked units') where the seat's facts give them. Then
+ *  each of the seat's Civic Contracts adds its value to its row's score where
+ *  that score is not negative (0x623bd0, the contract's 0x5f3650: +0x3a0 to
+ *  the civic +0x408), past the propagation, which sums own values alone
+ *  (runs/h1_duely1117 Antananarivo t24-35: Drama and Poetry 32.0 above the
+ *  sums, Theology and Recorded History, which carry its own value, not) */
 export function civicAnalysis(state: GameState, seat: number, culture: number,
-  cityTerm?: (civic: string, turns: number) => number): CivicEntry[] {
+  cityTerm?: (civic: string, turns: number) => number, contracts: readonly CivicContract[] = []): CivicEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(culture);
   const pw = pseudoYieldWeights(state, seat);
@@ -239,6 +251,10 @@ export function civicAnalysis(state: GameState, seat: number, culture: number,
   });
   const leader = leaderOf(state, seat);
   propagate(entries, new Set(leader ? CIVIC_AI_FAVORED[leader] ?? [] : []));
+  for (const c of contracts) {
+    const e = entries.find((x) => x.civic === c.civic);
+    if (e && e.score >= 0) e.score += c.value;
+  }
   return entries;
 }
 

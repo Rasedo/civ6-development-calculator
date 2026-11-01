@@ -222,6 +222,14 @@
   context:
     - "- EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (@f03ea0, vtable 0xd626c8; its parser 0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's hash +0xc): a switch on..."
   review: imported
+- addr: 0xd62818
+  kind: global
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...ommunities' EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER 0x6a1380 (@f04068, vtable 0xd62818): per player of the game's list that a trade route joins to the player either way (0x55..."
+  review: imported
 - addr: 0xd62ad0
   kind: global
   status: READ
@@ -303,6 +311,22 @@
   context:
     - "- READ, Ilkum's EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (@f040d0, vtable 0xd63100; its parser 0x6b1d00 stores UnitType +8 and fx(Amount x 0.01f) +0x10): with a player, p..."
   review: imported
+- addr: 0xd63130
+  kind: global
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL 0x6b2aa0 (@f03d60, vtable 0xd63130) and its STRATEGIC twin 0x6b44d0 (@f03d68, vtable 0xd631f0): on the context's city (+0x..."
+  review: imported
+- addr: 0xd631f0
+  kind: global
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...0x6b2aa0 (@f03d60, vtable 0xd63130) and its STRATEGIC twin 0x6b44d0 (@f03d68, vtable 0xd631f0): on the context's city (+0x70), the yield filter (+0x64, -1 or the Amount's yield +8),..."
+  review: imported
 - addr: 0xd632c8
   kind: global
   status: READ
@@ -381,6 +405,14 @@
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   context:
     - "...xt's plot (+0x88) and player (+0x80), the ring of radius 1 (0x6b1b0 with the functor @0xd64018, 0x6c8fb0): a neighbour with a route (plot +0x47 not 0xff) counts, one without a route..."
+  review: imported
+- addr: 0xd64048
+  kind: global
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - ...a walk over the city's trade set (+0x1ee0, 0x6c8660 -> 0x1fa000) with a functor (vtable 0xd64048) whose body is unread.
   review: imported
 - addr: 0xd6ced0
   kind: global

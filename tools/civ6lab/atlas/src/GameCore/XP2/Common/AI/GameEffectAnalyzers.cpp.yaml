@@ -36,6 +36,15 @@
   context:
     - ...building's value 0x7a7590 from the start to the horizon. EFFECT_ADJUST_DISTRICT_AMENITY 0x6a1170 (0x79f7c0), _DISTRICT_HOUSING 0x6a5d20 and _BUILDING_HOUSING 0x6c0490 (0x7a3d70, CityBu...
   review: imported
+- addr: 0x6a1380
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER
+  semantics: per player a trade route joins to the player (0x552fb0), the tourism toward it (0x394830) x Amount x 0.01 as PSEUDOYIELD_TOURISM discounted to the start (0x7a1240), whole, summed; registry object @f04068, vtable 0xd62818
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  notes: ["not ported: 0x394830 for a city-state unread"]
+  review: reviewed
 - addr: 0x6a1700
   final: 0x478a20
   kind: function
@@ -685,6 +694,14 @@
   context:
     - ...THERS (the international analyzer 0x6a49e0), EFFECT_GOVERNOR_ADJUST_CITY_TOKENS_GRANTED 0x6b2850 (the context city's owner's envoys' worth 0x7a46c0 at Amount), EFFECT_ADJUST_SPACE_RA...
   review: reviewed
+- addr: 0x6b2aa0
+  kind: function
+  name: EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL
+  semantics: "on the context's city (+0x70) and yield filter (+0x64): a walk over the city's trade set (+0x1ee0) with a functor (vtable 0xd64048) unread; registry object @f03d60, vtable 0xd63130"
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  review: reviewed
 - addr: 0x6b2b70
   final: 0x464ba0
   kind: function
@@ -695,6 +712,14 @@
   context:
     - ...20 per district it reserves a plot for), EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR 0x6b2b70 (the power value 0x7a67f0), EFFECT_ADJUST_DISTRICT_HOUSING 0x6a5d20 / EFFECT_ADJUST_DIS...
   review: imported
+- addr: 0x6b44d0
+  kind: function
+  name: EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_STRATEGIC_RESOURCE_FOR_INTERNATIONAL
+  semantics: the strategic twin of 0x6b2aa0; registry object @f03d68, vtable 0xd631f0
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  review: reviewed
 - addr: 0x6b45a0
   final: 0x466290
   kind: function

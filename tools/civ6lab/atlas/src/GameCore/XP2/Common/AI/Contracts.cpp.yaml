@@ -3,6 +3,19 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x5f3650
+  kind: function
+  name: a civic contract's apply
+  semantics: the contract's value (+0x3a0) onto its civic (+0x408) through 0x623bd0
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 24
+      value: Antananarivo's civic contract 65 (Drama and Poetry, 32.0) in Drama and Poetry's score
+  impl: [cpu/core/minorBuild.ts:minorResearchTerms, cpu/core/aiCivics.ts:civicAnalysis]
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  review: reviewed
 - addr: 0x5f47c0
   final: 0x3f9300
   kind: function

@@ -182,6 +182,19 @@
   context:
     - "...he horizon; its policies: the best new policy's value less the weakest slotted one's (0x623b90, the policy AI's), at least 20.0 (0x7aacb1); and the civic's modifiers analysed (0x7a4b..."
   review: imported
+- addr: 0x623bd0
+  kind: function
+  name: a civic contract's value onto its civic's score
+  semantics: "(culture AI, civic, &value): where the civic's score (+0x978 entry +0x14) is not negative, the value added to it (fx_add_assign)"
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 24
+      value: Antananarivo's civic contract 65 on Drama and Poetry, 32.0 (aimem), and Drama and Poetry 32.0 above the propagation's sum t24-35, 116.0 with contract 93's 84.0 from t36; Theology and Recorded History equal
+  impl: [cpu/core/aiCivics.ts:civicAnalysis, gpu/core/sim_civics.py:_cai_contracts]
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  review: reviewed
 - addr: 0x624060
   final: 0x416b60
   kind: function

@@ -22,3 +22,12 @@
   context:
     - ...he ORIGIN city or of a city where the player has a constructed trading post (City_Trade 0x1f99d0, false against a player the owner is at war with) refuels it to TRADE_ROUTE_LAND_RANG...
   review: imported
+- addr: 0x1fa000
+  final: 0x14e6b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - ...4, -1 or the Amount's yield +8), a walk over the city's trade set (+0x1ee0, 0x6c8660 -> 0x1fa000) with a functor (vtable 0xd64048) whose body is unread.
+  review: imported

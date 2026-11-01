@@ -117,7 +117,9 @@
   final: 0x27ca80
   kind: function
   status: PARTLY
-  readings: ["C-94: trade posts and cultural dominance — READ"]
+  readings:
+    - "C-94: trade posts and cultural dominance — READ"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...l one is), then per other player it has met (0x3daaf0) the tourism toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refreshed (0x39f610), then 0x393af0 the dominance,...

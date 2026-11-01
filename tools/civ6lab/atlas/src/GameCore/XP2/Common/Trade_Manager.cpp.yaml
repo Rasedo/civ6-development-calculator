@@ -158,7 +158,9 @@
   final: 0x38dc20
   kind: function
   status: PARTLY
-  readings: ["H-1: the city-states' quests — READ"]
+  readings:
+    - "H-1: the city-states' quests — READ"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Send Trade Route (0x84b520): the actor runs no route to the minor (0x54ff90 == 0); done when the actor starts one to it (0x84b570)."
@@ -240,6 +242,15 @@
   context:
     - "...58ba0) sets +0x1a1 from 0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0): a game flag, the player's embark list, or a researched technology with EmbarkAll (T..."
   review: imported
+- addr: 0x552fb0
+  kind: function
+  name: a trade route joins two players
+  semantics: "(trade manager, a, b): 0x54ff90's route count a to b above 0, else b to a above 0"
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  notes: [no port, no confirming case]
+  review: reviewed
 - addr: 0x553680
   kind: function
   status: READ

@@ -43,7 +43,7 @@ import { civEraIndex, computeCityStats, withPercent256 } from './city';
 import { researchCost, selectResearch } from './economy';
 import { CP_ACCEPTED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
-import { civicAnalysis, civicChoice, civicDraw } from './aiCivics';
+import { civicAnalysis, civicChoice, civicDraw, type CivicContract } from './aiCivics';
 import { minorCity, minorPlaceCitizens, minorReplaceCitizens, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from './effects';
 import { buildingPillaged, cityPower, repairBuilding } from './yields';
@@ -238,6 +238,20 @@ function minorTechContracts(cityState: CityState): TechContract[] {
   return out;
 }
 
+/** the minor's Civic Contracts (its city AI's Add Goal Tech contracts on a
+ *  civic): each goal civic and the contract's value */
+function minorCivicContracts(cityState: CityState): CivicContract[] {
+  const ai = cityState.cityAi;
+  if (!ai) return [];
+  const out: CivicContract[] = [];
+  for (const c of ai.contracts) {
+    const goal = ai.techContracts[c.id];
+    const civic = goal === undefined ? null : engineId('civic', goal, 'CIVIC_', CIVICS);
+    if (civic) out.push({ civic, value: c.value });
+  }
+  return out;
+}
+
 /** a city-state's city terms of its research and civics values, off its
  *  city AI's last table and counts */
 function minorCityTerms(state: GameState, cityState: CityState): ReturnType<typeof minorResearchTerms> {
@@ -372,7 +386,7 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
     if (!r.civics.includes(civ)) r.civics.push(civ);
     delete r.civicRetained[civ];
     r.civic = null;
-    takeCivic(r, civicChoice(state, seat, r.civicAiEntries ?? civicAnalysis(state, seat, culture, terms()?.civic), civ, civicDraw(state)));
+    takeCivic(r, civicChoice(state, seat, r.civicAiEntries ?? civicAnalysis(state, seat, culture, terms()?.civic, terms()?.civicContracts), civ, civicDraw(state)));
   }
   return gained;
 }
@@ -410,7 +424,7 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   // value from the analysis of T + 2 (runs/h1_duely1117 Caguana:
   // Charismatic Leader first 14.0 at t15, Political Philosophy's
   // Autocracy and Classical Republic 1.5 above at t17, not t16)
-  r.civicAiEntries = civicAnalysis(state, seat, culture, city()?.civic);
+  r.civicAiEntries = civicAnalysis(state, seat, culture, city()?.civic, city()?.civicContracts);
   const view = aiView(state);
   const scores: ReadonlyMap<string, number> = stood ? policyScores(view, seat) : new Map();
   policyTracer?.(seat, scores);
@@ -1389,10 +1403,12 @@ export function minorResearchTerms(state: GameState, cityState: CityState, units
   counts: ReadonlyMap<string, number> | undefined): {
   tech: (tech: string, turns: number) => number;
   civic: (civic: string, turns: number) => number;
+  civicContracts: CivicContract[];
 } {
   const resources = minorResearchResources(state, cityState, counts);
   const term = minorUnitTerm(state, cityState, units);
   return {
+    civicContracts: minorCivicContracts(cityState),
     tech: (tech, turns) => resources(tech, turns) + term(UNITS_OF_TECH.get(gameTypeOf('tech', tech, 'TECH_')) ?? [], false),
     civic: (civic) => term(UNITS_OF_CIVIC.get(gameTypeOf('civic', civic, 'CIVIC_')) ?? [], true),
   };

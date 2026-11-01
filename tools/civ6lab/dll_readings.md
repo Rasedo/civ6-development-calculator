@@ -6441,6 +6441,31 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   any recording, and t2's Code of Laws at the 20.0 floor (95.9 at 7 turns,
   all five runs/h1_duely duels). Port: `minorResearchTurn`
   (`ResearchState.civicSlotBest`), `sim_civics.py` (`citystate_slot_best`).
+- THE CIVIC CONTRACTS (0x623bd0, READ): a contract's method 0x5f3650
+  calls it with its civic (+0x408) and its value (+0x3a0); where that
+  civic's score (+0x978 entry +0x14) is not negative the value is added to
+  the score — past the propagation, which sums the own values (+0x10)
+  alone, so no other row carries it. The contracts are the city AI's Add
+  Goal Tech contracts on a civic ("Desired Civics"), every one listed
+  (status 3 and 5 alike). runs/h1_duely1117 Antananarivo (aimem): civic
+  contract 65 on Drama and Poetry, 32.0, from t24, a second (93) of 84.0
+  from t36 — Drama and Poetry 32.0 then 116.0 above the propagation's sum,
+  Theology and Recorded History equal. Port: `civicAnalysis` (`CivicContract`,
+  `minorResearchTerms`' civicContracts), `sim_civics.py` (`_cai_contracts`).
+- PARTLY READ, Online Communities' EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER
+  0x6a1380 (@f04068, vtable 0xd62818): per player of the game's list that a
+  trade route joins to the player either way (0x552fb0: 0x54ff90's route
+  count from either side above 0), the player's tourism toward it
+  (Player_Culture 0x394830) x Amount x 0.01, as PSEUDOYIELD_TOURISM,
+  discounted to the start (0x7a1240), whole, summed. Not ported: 0x394830
+  (the tourism toward a player) unread for a city-state.
+- PARTLY READ, Market Economy's per-destination analyzers
+  EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL
+  0x6b2aa0 (@f03d60, vtable 0xd63130) and its STRATEGIC twin 0x6b44d0
+  (@f03d68, vtable 0xd631f0): on the context's city (+0x70), the yield
+  filter (+0x64, -1 or the Amount's yield +8), a walk over the city's trade
+  set (+0x1ee0, 0x6c8660 -> 0x1fa000) with a functor (vtable 0xd64048)
+  whose body is unread.
 - UNREAD, the analyzers 0 in the port that the governments' values name:
   EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER 0x6b2060 (@f04260, vtable
   0xd630e8; Oligarchy's and Theocracy's abilities through EFFECT_GRANT_ABILITY
