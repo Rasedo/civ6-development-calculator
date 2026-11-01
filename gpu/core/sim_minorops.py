@@ -1283,7 +1283,12 @@ class SimMinorOps:
         def city_hook(prio: int) -> None:
             if hook[0] and prio <= _CITY_AI_PASS:
                 hook[0] = False
+                before = self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
                 self._minor_second_hook(s, act)
+                # a unit the hook buys has its turn done at its creation
+                # (0x60a440): the trees after the hook offer it not
+                after = self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
+                done.logical_or_(after & ~before)
         if not bool(on.any()):
             city_hook(_CITY_AI_PASS)
             if upg:
@@ -1292,7 +1297,8 @@ class SimMinorOps:
         tg = op["tg"] if op["tg"] is not None else self._tac_targets(self._mops_seat(s), self._mops_kb(s))
         view = {"op": op, "done": done, "tg": tg, "rows": None, "world": None,
                 "ended": torch.zeros_like(self.major_unit_mp, dtype=torch.bool),
-                "ended_mp": torch.zeros_like(self.major_unit_mp)}
+                "ended_mp": torch.zeros_like(self.major_unit_mp),
+                "robbed": torch.zeros(self.B, N_OPS, dtype=torch.bool, device=self.device)}
         u = self._mops_units(s)
         rows = view["rows"] = self._mops_unit_rows(s, u)
         for k in range(N_OPS):
@@ -1313,6 +1319,13 @@ class SimMinorOps:
                     if int(Tm.defs[d]["priority"]) != prio:
                         continue
                     m = on & (self.mops_def[:, s, k] == d)
+                    if bool(m.any()):
+                        # an operation a recruit left with no unit ends, its
+                        # tree not run (`robbedOps`)
+                        rb = m & view["robbed"][:, k] & ~(self.mops_mem[:, s, k] >= 0).flatten(1).any(dim=1)
+                        view["robbed"][:, k] &= ~m
+                        self._mops_end(s, k, rb)
+                        m = m & ~rb
                     if bool(m.any()):
                         self._mops_tick(s, k, d, m, view)
             if upg and prio == Tm.upgrade_priority:
@@ -2217,10 +2230,15 @@ def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
             for kk in range(N_OPS):
                 if kk == k:
                     continue
+                held = (sim.mops_mem[:, s, kk] >= 0).flatten(1).any(dim=1)
                 for ti in range(N_TEAMS):
                     mem = sim.mops_mem[:, s, kk, ti]
                     keep = ~((mem >= 0) & got.gather(1, mem.clamp(min=0)))
                     sim._mops_compact(s, kk, ti, keep, at)
+                # an operation the recruit leaves with no unit ends at its
+                # tick (`robbedOps`)
+                left = (sim.mops_mem[:, s, kk] >= 0).flatten(1).any(dim=1)
+                view["robbed"][:, kk] |= at & held & ~left
     # the operation's units (the player's walk 0x6092c0) each take their
     # type's own AI type (unit +0x168, 0x79b9c0): a DEFENDER turns COMBAT
     dfd = sim._mops_u(s, "defender")

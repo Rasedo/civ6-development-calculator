@@ -424,7 +424,15 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
     const ops = opsOfMinor(cs);
     const env = minorEnv(state, cs, pass);
     operationsRun(ops, { ...env, trees: [{ priority: UPGRADE_TREE_PRIORITY, tick: () => upgradeTreesTick(state, cs, pass) }],
-      cityHook: () => (hookHeld ?? ((_st, _cs, run) => run()))(state, cs, () => minorSecondHook(state, cs)),
+      // a unit the hook buys has its turn done at its creation (0x60a440):
+      // the trees of priority 2 after the hook offer it not (runs/h1_duely1121
+      // t30 city-state 3's Galley bought under City Defense, Naval
+      // Superiority recruiting none; runs/h1_duely1127 t39 the same)
+      cityHook: () => {
+        const before = new Set(state.units.filter((u) => u.seat === cs.seat).map((u) => u.id));
+        (hookHeld ?? ((_st, _cs, run) => run()))(state, cs, () => minorSecondHook(state, cs));
+        for (const u of state.units) if (u.seat === cs.seat && !before.has(u.id)) passEnd(pass, u);
+      },
       // out of the operations' offers (0x60a8c0: unassigned, turn not done
       // +0x530): the units the trees hold and those whose turn is done — a
       // unit bought this turn among them (runs/h1_duely1124 t72 city-state

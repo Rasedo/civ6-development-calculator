@@ -935,11 +935,19 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // battles: one whose captor an operation holds starts its operation once
   // the trees' walk has ticked that operation (its blow's, `barbarianTrees`),
   // any other at the copy's turn end; a capture the copy's own moves take
-  // adds none (the record's battles are the pair's)
-  copy.barbCaptures = Object.assign([...(state.barbCaptures ?? [])], { push: () => 0 });
+  // adds none (the record's battles are the pair's); either the copy's
+  // seizure or the record's capture landing takes the civilians they seized
+  // (`taken` below)
+  let seizedNow = (): void => undefined;
+  const restored = new Set<number>();
+  copy.barbCaptures = Object.assign([...(state.barbCaptures ?? [])], { push: () => (seizedNow(), 0) });
   delete state.barbCaptures;
   const recordCaptives = new Set((copy.barbCaptures ?? []).map((c) => c.captive));
-  holdBarbCaptures((c, ticked) => recordCaptives.has(c.captive) && (ticked === null || ticked.has(c.captor)));
+  holdBarbCaptures((c, ticked) => {
+    const lands = recordCaptives.has(c.captive) && (ticked === null || ticked.has(c.captor));
+    if (lands || restored.has(c.captive)) seizedNow();
+    return lands;
+  });
   // the units the barbarians' battles of the pair struck (or lost) stand as
   // they were before the first blow, another player's where the blow found
   // it, a barbarian where their turn found it (`barbStart`)
@@ -1013,10 +1021,12 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   const danger = new Map<Unit, number>();
   for (const [c, u] of twin) if (isBarbSeat(c.seat)) danger.set(u, plane[c.tileIndex]);
   // a civilian they seized in the pair is its owner's still at their
-  // tactical turn's ageing and look, on its plot, the seizure after
-  // (runs/h1_dueldA1117 t33: China's Settler steps to 31:14 and the
-  // barbarians' look records it there at age 0 before they take it; their
-  // Settler is first on their end look's records)
+  // tactical turn's ageing and look, on its plot, and in their pass's
+  // targets until the seizure (runs/h1_dueldA1117 t33: China's Settler steps
+  // to 31:14 and the barbarians' look records it there at age 0 before they
+  // take it; their Settler is first on their end look's records;
+  // runs/h1_duely1121 t68: China's Settler on 7:14 Barbarian Attack's Target
+  // 0, its Warrior taking it from 7:15, Barbarian Builder Capture started)
   const seized: [Unit, Pick<Unit, 'id' | 'seat' | 'type' | 'tileIndex' | 'hp'>][] = [];
   const stood: Unit[] = [];
   for (const { u, was } of ctx.barbSeized) {
@@ -1029,17 +1039,16 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
       copy.units.push(x);
       stood.push(x);
     }
+    restored.add(was.id);
   }
   const taken = () => {
     for (const [c, f] of seized.splice(0)) Object.assign(c, f);
     if (stood.length) copy.units = copy.units.filter((x) => !stood.includes(x));
     stood.length = 0;
   };
+  seizedNow = taken;
   const logged = armyLog(ctx);
-  traceKnowledge((seat, turn, records) => {
-    logged(seat, turn, records);
-    if (seat === BARB_SEAT) taken();
-  });
+  traceKnowledge(logged);
   try {
     barbarianTactics(copy, acting);
   } finally {
@@ -4780,6 +4789,18 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   for (const cs of world.cityStates) {
     const o = state.cityStates.find((x) => x.id === cs.id);
     if (o) seatPair(o, cs, true);
+    // a major the record shows the minor met where the engine's turn met it
+    // not (a meeting in the major's start: runs/h1_duely1127 t47, China at
+    // its Spearman's completion meets Hattusa): the meeting points the
+    // minor's trade record at it (`meetCityState`), the record's last
+    if (o) {
+      const pid = imp.playerOfSeat.get(cs.seat);
+      for (const x of (a as { actions?: unknown[][] }).actions ?? []) {
+        if (x[2] !== 'DiplomacyMeet' || (x[3] !== pid && x[4] !== pid)) continue;
+        const s = imp.seatOfPlayer.get((x[3] === pid ? x[4] : x[3]) as number);
+        if (s !== undefined && isCiv(s) && cs.met.includes(s) && !o.met.includes(s)) cs.tradeSeat = s;
+      }
+    }
     // a pillaged building beside another item at the queue's head: its
     // repair waits for that item (runs/h1_duely1127 Muscat t231-240, the
     // Bank pillaged under its Sewer, the Sewer finished first)

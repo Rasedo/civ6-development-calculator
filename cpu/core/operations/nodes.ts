@@ -9,8 +9,8 @@
 import type { OpsSettle } from './types';
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SKIPPED, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
   type BtHandler, type BtNode, type BtRun } from '../behaviorTree';
-import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opDef, opUnit, opUnits, targetGone, teamDef, teamReqs, unitsById, xy, type OpTeam,
-  type Operation } from './operation';
+import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opDef, opUnit, opUnits, robbedOps, targetGone, teamDef, teamReqs, unitsById, xy,
+  type OpTeam, type Operation } from './operation';
 import { chooseUnit, keepUnit } from './unitChoice';
 import type { UnitProductionRow } from '../aiUnitProduction';
 import { AI_UNITS } from '../../data/aiBuildTables';
@@ -323,9 +323,16 @@ const recruitUnits: BtHandler<OpsContext> = {
     const freed = lower.flatMap(opUnits).map((id) => units.get(id)).filter((u): u is AiUnitView => !!u);
     if (freed.length) {
       const taken = recruitOperation(view, ctx.seat, op, [...freed], inProgress, range, units, (l) => ctx.log(l));
+      const held = lower.filter((o) => opUnits(o).length > 0);
       for (const u of taken) {
         for (const o of lower) for (const t of o.teams) t.members = t.members.filter((id) => id !== u.id);
       }
+      // an operation the recruit leaves with no unit ends at its tick
+      // (runs/h1_duely1128 t32: city-state 4's City Defense takes Attack Barb
+      // Camp's Archer, which logs "Operation complete" alone, its recruit's
+      // contract 83 CANCELLED; 1124 t28: Attack Barb Camp, one of its two
+      // Warriors taken, recruits on)
+      for (const o of held) if (opUnits(o).length === 0) robbedOps.add(o);
     }
     // the operation's units (the player's walk 0x6092c0) each take their
     // type's own AI type (unit +0x168, 0x79b9c0)

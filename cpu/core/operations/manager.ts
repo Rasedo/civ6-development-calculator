@@ -34,7 +34,7 @@
  */
 import { AI_LEADER_OP_LISTS, AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_LISTS, AI_TREES } from '../../data/aiOperations';
 import { compileTree, tick, BT_FRESH, type BtNode, type BtRun } from '../behaviorTree';
-import { NO_PLOT, addMember, newTeams, opDef, opUnits, xy, type Operation } from './operation';
+import { NO_PLOT, addMember, newTeams, opDef, opUnits, robbedOps, xy, type Operation } from './operation';
 import { OP_NODES, refreshStrengths, switchToBackup, type DiplomacyRequest, type OpsContext } from './nodes';
 import type { ContractBook, ContractCity, ContractNodeWorld } from '../aiContracts';
 import { evaluate, type Candidate } from './evaluate';
@@ -217,6 +217,11 @@ export function tickOperation(ai: OpsAi, env: OpsEnv, op: Operation): void {
 }
 
 function tickTree(ai: OpsAi, env: OpsEnv, op: Operation): void {
+  if (robbedOps.delete(op) && opUnits(op).length === 0) {
+    env.log(`${op.def}, Operation complete`);
+    endOperation(ai, op);
+    return;
+  }
   const run: BtRun = { name: op.def, nodes: treeOf(opDef(op).tree ?? ''), status: op.status, mem: op.mem,
     blackboard: new Map(Object.entries(op.bb)), done: op.done };
   tick(run, OP_NODES, context(ai, env, op));

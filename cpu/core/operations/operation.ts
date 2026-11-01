@@ -145,6 +145,10 @@ export function opUnits(op: Operation): number[] {
   return op.teams.flatMap((t) => t.members);
 }
 
+/** the operations a higher one's recruit left with no unit in the run: each
+ *  ends at its own tick, no node of its tree run (`tickTree`) */
+export const robbedOps = new WeakSet<Operation>();
+
 /** the operation holds a living unit (a member killed stays in its team) */
 export function holdsUnits(ctx: OpsContext, op: Operation): boolean {
   const live = new Set(ctx.view().units(ctx.seat).map((u) => u.id));

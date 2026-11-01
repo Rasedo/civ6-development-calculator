@@ -333,12 +333,12 @@ export function barbarianCaptures(state: GameState, ticked: ReadonlySet<number> 
   const ai = opsOfBarbs(state);
   for (const c of caps) {
     const { captive, captor } = c;
-    const cu = unitOf(state, captive);
-    if (!cu) continue;
     if (captureHeld && !captureHeld(c, ticked)) {
       (state.barbCaptures ??= []).push(c);
       continue;
     }
+    const cu = unitOf(state, captive);
+    if (!cu) continue;
     const units = [cu, unitOf(state, captor)].filter((u): u is Unit => !!u);
     for (const o of opsOf(ai)) for (const t of o.teams) t.members = t.members.filter((id) => !units.some((u) => u.id === id));
     const op = startOperationAt(ai, barbEnv(state, null), BARB_CAPTURE_DEF, -1, cu.tileIndex, cu.tileIndex);

@@ -66,6 +66,7 @@
       value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-126: the second hook's purchase sits out the trees after it; an operation a recruit empties ends at its tick — the turn-done offer (0x60a8c0, 0x60a440) READ, the empty operation's end a log reading, both twins"
   context:
     - "...node's Allow Stealing (TreeData +0x60, no default: false); each behaviour tree listens (0x7cbb40 binds tree +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by..."
   review: reviewed
@@ -115,8 +116,16 @@
     - recording: h1_duelv1121
       turn: 7
       value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
+    - recording: h1_duely1128
+      turn: 32
+      value: "city-state 4's City Defense takes Attack Barb Camp's only Archer; Attack Barb Camp logs Operation complete alone, its contract 83 CANCELLED (the emptied operation's end: robbedOps, its site unread)"
+  impl:
+    - cpu/core/operations/nodes.ts:recruitUnits
+    - cpu/core/operations/manager.ts:tickTree
+    - gpu/core/sim_minorops.py:_u_recruit
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-126: the second hook's purchase sits out the trees after it; an operation a recruit empties ends at its tick — the turn-done offer (0x60a8c0, 0x60a440) READ, the empty operation's end a log reading, both twins"
   context:
     - "...a +0x60, no default: false); each behaviour tree listens (0x7cbb40 binds tree +0x628 to 0x7d1e40): a tree not the requester's job, marked (+0x3c8, set by its reset 0x7d3670) or asked w..."
   review: reviewed

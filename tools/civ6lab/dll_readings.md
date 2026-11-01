@@ -6480,3 +6480,34 @@ Archery taken in record t42; t47 city-state 2's Currency, t50 its Water Mill
 on a chop (Construction); runs/h1_duely1124 t49 a Quarry (Masonry);
 runs/h1_duely1117 t46 a resource Farm (Irrigation). The research the AI's
 turn left is AI_Research.csv's RESEARCHING row (`Ctx.researchAtTurn`).
+
+## C-126: the second hook's purchase sits out the trees after it; an operation a recruit empties ends at its tick — the turn-done offer (0x60a8c0, 0x60a440) READ, the empty operation's end a log reading, both twins
+
+`cityStateMilitary` (`cityHook`), `robbedOps` (`recruitUnits`, `tickTree`);
+`_mops_run` (`city_hook`, `view["robbed"]`), `_u_recruit`.
+
+- A UNIT THE SECOND HOOK BUYS (its threatened city's TryPurchaseUnits, in
+  pass 2 ahead of the trees of priority 2) has its turn done at its
+  creation (0x60a440 on player signal +0x60), so the recruit's offer
+  (0x60a8c0: turn not done +0x530) of a priority-2 tree after the hook
+  holds it not: runs/h1_duely1121 t30 city-state 3's Galley 524294 bought
+  (CityMadePurchase after City Defense's moves), Naval Superiority logging
+  "No recruits to reach minimum", its target 41:19 kept, City Defense
+  taking the Galley at t31; runs/h1_duely1127 t39 city-state 3 the same.
+  The engines end the turn of each unit the hook made (`passEnd`; the
+  GPU's `done` over the pool slots the hook filled).
+- AN OPERATION A RECRUIT EMPTIES: a higher operation's Recruit Units taking
+  the last unit of an unlocked lower one (the recruit signal +0x1c8 and the
+  tree listener 0x7d1e40) ends the lower one at its tick, no node of its
+  tree run: it logs "Operation complete" alone and its recruit's contract
+  is CANCELLED at the end look. runs/h1_duely1128 t32 city-state 4's
+  City Defense takes Attack Barb Camp's Archer (contract 83 CANCELLED);
+  1124 t19, t29, t42, t99, 1121 t13, t21, 1127 t15, 1128 t37 alike; 1124
+  t28 Attack Barb Camp, one of its two Warriors taken, recruits on. An
+  upgrade tree's take (Find Available Unit) does not: runs/h1_duelw1121 t89
+  Naval Superiority, its Galley taken, logs its recruit and completes after.
+- OPEN: the site that ends the emptied operation (the listener's caller
+  0x7cbb40 or the operation's own update) is unread; the captor of a
+  barbarian capture stays listed in its old operation through the end look
+  (runs/h1_duely1121 t68: Barbarian Attack's three, Builder Capture's
+  Settler and Warrior), the engines drop it at the capture.
