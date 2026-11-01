@@ -7499,3 +7499,45 @@ replay's `minorShots` landed in `minorAi`; GPU `_minor_pass`.
   list 11:12 as an attack the player does not see (no zone, the search going
   on beside it), those on 11:14 and 9:11 as one it sees: the player's sight
   changes between the units' planning rows.
+
+## C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins
+
+`safePlot`'s `goal` / `minMoves` and `passSafePlot` (cpu/core/tactical.ts),
+`passDefend`'s endangered and afloat calls (cpu/core/opsOrders.ts);
+`_tac_safe_plot`'s `goal` / `min_mv` (gpu/core/sim_tactics.py), `_x_defend`'s
+`to_safe` (gpu/core/sim_minorops.py), `_bop_defend_exec`'s `to_safe`
+(gpu/core/sim_barbops.py), `_promo_ready` (gpu/core/sim_masks.py).
+
+- THE SAFE PLOT'S ARGUMENTS (0x716b90): this, the unit, a formation
+  pointer, the taken list (r9), a byte skipping the stacking test 0x585eb0
+  ([rsp+0xd0]), a goal plot pointer ([rsp+0xd8], valid where both
+  coordinates top -9999: 0x497d20) and a whole Movement floor ([rsp+0xe0]:
+  a reach node with +0xc below it << 8 is no candidate, 0x716ca5).
+- THE GOAL (0x716f9a..0x717007): off the player's own territory, with a goal,
+  a plot nearer the goal (GetPlotDistance) than the best so far is taken by
+  a unit that fights (0x56dc90 with 0 above 0), by one that does not where
+  the plot is not the goal itself; otherwise the lower danger, then the
+  farther from the unit, as before. Every take stores the plot's distance to
+  the goal (0x717061). The fort, the no-danger and the own-territory branches
+  come first and read no goal.
+- THE CALLERS: Operation Defend Units (0x80d790) passes the operation's
+  target (+0x2a8 / +0x2ac) to the endangered's call (0x80db1a, the floor 1
+  where the unit has a promotion due (0x116f80 on +0x1bc0) and is hurt to
+  AutoProtect Percentage, the stacking skip for a FoundCity unit, Units
+  +0x1b9 & 2) and to the land unit afloat's (0x80e44a, floor 0); its call
+  on a plot at war or of danger (0x80e8ab), Move to Safety (0x774190), the
+  homeland's (0x70bf90) and Protect Unit (0x7ef0e0) pass -9999 and floor 0.
+  No city-state, barbarian or Free City operation holds a FoundCity unit;
+  the stacking skip is not ported.
+- CONFIRMED (one-seed aimem traces): runs/h1_duely1121 t11 city-state 4's
+  hurt Warrior 131073 on 32:23 (Attack Barb Camp, target 34:23) takes 31:23
+  as logged — 33:24 (danger 45, one from the camp) taken over the own Woods
+  32:22, then 31:23 the first of no danger after it; runs/h1_duely1117 t41
+  its Warrior on 34:7 (target 35:6) takes 35:7 as logged, one from the camp
+  where 33:7 / 34:8 are two; runs/h1_duely1128 t20 / t34 / t35 / t44,
+  h1_duely1124 t51, h1_duely1127 t113 / t138 as logged.
+- OPEN: runs/h1_duely1128 t41 city-state 4's Horseman 589827 on 30:7, its
+  danger move (0x80e8ab, no goal) to 33:10 where ours takes the centre
+  32:11 (a fort, no unit of its own on it in the records); h1_duely1127
+  t88-96 city-state 3's Galley 393216 on 30:19 takes 28:17 where ours
+  29:15 (danger 0 in our map, its Movement 0 there).

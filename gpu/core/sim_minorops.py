@@ -2940,12 +2940,13 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """OPERATION DEFEND UNITS' execution (0x80d790) where marked, per team
     over its members outside Protect Outside Range of the target: the
     endangered — not bombard, with Movement, out of a city — to their safe
-    plots (0x716b90); then the hurt (or a land unit afloat in danger): a
+    plots toward the target (0x716b90; one with a promotion due and hurt to
+    a plot with a whole Movement left); then the hurt (or a land unit afloat in danger): a
     promotion due taken (`_promote_due`); not bombard: a ship (+0x650 == 0)
     off friendly ground released, its orders ending there (0x73d1f0 removes it
     from copies of the teams, so it stays the team's until the next team
     update, in no job of the operation: `mops_rel`); a land unit afloat to its safe
-    plot; one with Movement on a plot paying a plunder pillages it
+    plot toward the target; one with Movement on a plot paying a plunder pillages it
     (`_plunder`); one with no Movement left is left there, its turn not
     done; one on the ground of a player it is at war with or a plot of
     danger to its safe plot; each fortified (its turn ends where it
@@ -2968,7 +2969,9 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     seat = 100 + s
     B, dev = sim.B, sim.device
     b = torch.arange(B, device=dev)
-    target = sim.mops_target[:, s, k].clamp(min=0)
+    goal = sim.mops_target[:, s, k]
+    target = goal.clamp(min=0)
+    no_goal = torch.full_like(goal, -1)
     none_taken = torch.zeros(B, sim.T, dtype=torch.bool, device=dev)
 
     def live(us: torch.Tensor) -> torch.Tensor:
@@ -2990,11 +2993,12 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         ended[b, uc] = ended[b, uc] | m
         sim.major_unit_mp[b, uc] = torch.where(m, torch.zeros_like(mp), mp)
 
-    def to_safe(us: torch.Tensor, m: torch.Tensor, stay_ok: bool) -> None:
+    def to_safe(us: torch.Tensor, m: torch.Tensor, stay_ok: bool, toward: torch.Tensor,
+                min_mv: torch.Tensor | None = None) -> None:
         if not bool(m.any()):
             return
         uc = us.clamp(min=0)
-        dest = sim._tac_safe_plot(m, uc, "major", seat, danger, op["rowof"], op["res"], none_taken)
+        dest = sim._tac_safe_plot(m, uc, "major", seat, danger, op["rowof"], op["res"], none_taken, toward, min_mv)
         done[b, uc] = torch.where(m, True, done[b, uc])
         here = sim.major_unit_tile[b, uc]
         go = m & (dest >= 0) & (stay_ok | (dest != here))
@@ -3019,7 +3023,11 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             ok &= sim._mops_endangered(s, us, ok, view)
             ut = sim.major_unit_type[b, uc].clamp(min=0, max=sim.NU - 1)
             ok &= off(us) & (sim._type_bombard.take(ut) <= 0) & (sim.major_unit_mp[b, uc] > 0) & ~sim._centre_plane()[b, sim.major_unit_tile[b, uc].clamp(min=0)]
-            to_safe(us, ok, True)
+            # toward the target; one with a promotion due and hurt to `pct`
+            # to a plot with a whole Movement left there
+            g = (uc + sim.POOL_LO["major"]).unsqueeze(1)
+            due = sim._promo_ready(g, sim.unit_type.gather(1, g)).squeeze(1) & sim._mops_hurt(s, us, pct)
+            to_safe(us, ok, True, goal, due.long())
         # the hurt
         for jj in range(n_m):
             us = sim.mops_mem[:, s, k, ti, jj]
@@ -3047,7 +3055,7 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             sim.mops_rel[b[rel], s, k, uc[rel]] = True
             ok &= ~rel
             sea = ok & ~ship & wat
-            to_safe(us, sea, True)
+            to_safe(us, sea, True, goal)
             ok &= live(us)
             plot = sim.major_unit_tile[b, uc].clamp(min=0)
             owner = sim.tile_seat[b, plot]
@@ -3059,7 +3067,7 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             # its turn not done
             ok &= sim.major_unit_mp[b, uc] > 0
             dang = danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0
-            to_safe(us, ok & (war | dang), False)
+            to_safe(us, ok & (war | dang), False, no_goal)
             ok &= live(us)
             # fortified, its moves end
             end(us, ok)

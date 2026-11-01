@@ -10,7 +10,7 @@
 import type { GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
-import { aiPromotionPick, attacksLeftOf, takePromotion } from './promotions';
+import { aiPromotionPick, attacksLeftOf, promoReady, takePromotion } from './promotions';
 import { cityStrikeStrength, damageExpected, hostilePillage, hostilePillageAmount, hostileRangedStrike, unitAttackRange } from './combat';
 import { aiStrengths, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish, passMoveExec, passMoveUpdate, passNavalPillage, passPatrol, passSafePlot, plotDistance, rangeOf, swapUnits,
   type Pass } from './tactical';
@@ -164,10 +164,12 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
     execute: (members, target, pct, range, formed, release) => {
       const lines: { type: string; what: string }[] = [];
       const us = unitsOf(members);
-      // the endangered to their safe plots (0x716b90)
+      // the endangered to their safe plots toward the target (0x716b90 at
+      // 0x80db1a), one with a promotion due and hurt to `pct` to a plot with
+      // a whole Movement left there
       for (const u of endangered(state, pass, us, formed)) {
         if (!off(u, target, range) || aiStrengths(state, u).bombard > 0 || moves(u) <= 0 || inCity(u)) continue;
-        const to = passSafePlot(state, pass, u);
+        const to = passSafePlot(state, pass, u, target, promoReady(u) && hurt(u, pct) ? 1 : 0);
         passFinish(pass, u, 'Operation', u.tileIndex);
         if (to >= 0) {
           moveTo(state, u, to, false);
@@ -198,9 +200,9 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
           if (!isBarbSeat(seat)) release(u.id);
           continue;
         }
-        // a land unit afloat to its safe plot
+        // a land unit afloat to its safe plot toward the target (0x80e44a)
         if (landUnit(u) && isWater(state.map.tiles[u.tileIndex])) {
-          const to = passSafePlot(state, pass, u);
+          const to = passSafePlot(state, pass, u, target);
           passFinish(pass, u, 'Operation', u.tileIndex);
           if (to >= 0) {
             moveTo(state, u, to, false);

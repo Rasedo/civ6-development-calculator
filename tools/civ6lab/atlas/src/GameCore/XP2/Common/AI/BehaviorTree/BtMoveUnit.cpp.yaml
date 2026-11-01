@@ -70,6 +70,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...Difficulty Range 0x7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation...

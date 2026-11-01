@@ -194,9 +194,16 @@
 - addr: 0x497d20
   final: 0x315b80
   kind: function
-  semantics: a plot argument is valid (the safe plot's goal; both callers pass none).
-  status: PARTLY
-  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  semantics: "a plot argument is valid: both coordinates above -9999 (the safe plot's goal: Operation Defend Units passes its target at 0x80db1a / 0x80e44a, every other caller -9999)"
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 11
+      value: "city-state 4's Warrior 131073's safe plot toward Attack Barb Camp's 34:23: 31:23 as logged"
+  impl: [cpu/core/tactical.ts:safePlot, gpu/core/sim_tactics.py:_tac_safe_plot]
+  readings:
+    - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x716b10) to the danger: no party on the tactical core holds one. A goal plot argument (0x497d20 valid) puts the nearer to it first off its own territory: both callers pass none."

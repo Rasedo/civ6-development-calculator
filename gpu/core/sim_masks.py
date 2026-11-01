@@ -1118,6 +1118,13 @@ class SimMasks:
         nb = self.neigh
         return here | (here[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).any(dim=2)
 
+    def _promo_ready(self, sc: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
+        """[B, N] `promoReady` — a promotion due (0x116f80): the unit's class
+        has promotion rows and it is owed no more XP for the next level."""
+        cls = self.rules_dev.u_promo_class.take(utype.clamp(min=0))
+        need = self._xp_to_next(self.unit_level.gather(1, sc))
+        return (cls >= 0) & (need > 0) & (self.unit_xp.gather(1, sc) >= need)
+
     def _promo_offer_mask(self, sc: torch.Tensor, utype: torch.Tensor) -> torch.Tensor:
         """[B, N, PCOL] `promoReady && promoAvailable` — the columns a unit may
         take right now: it is owed no more XP, the row exists in its own class
@@ -1126,14 +1133,10 @@ class SimMasks:
         rd = self.rules_dev
         B, N = sc.shape
         cols = torch.arange(rd.promo_cols, device=self.device).view(1, 1, -1)
-        cls = rd.u_promo_class.take(utype.clamp(min=0))
-        clsc = cls.clamp(min=0)
-        level = self.unit_level.gather(1, sc)
-        xp = self.unit_xp.gather(1, sc)
+        clsc = rd.u_promo_class.take(utype.clamp(min=0)).clamp(min=0)
         held = self.unit_promos.gather(1, sc)
         offer = self.unit_promo_offer.gather(1, sc)
-        need = self._xp_to_next(level)
-        ready = (cls >= 0) & (need > 0) & (xp >= need)
+        ready = self._promo_ready(sc, utype)
         bit = torch.ones_like(held).unsqueeze(2) << cols
         exists = cols < rd.promo_rows.take(clsc).unsqueeze(2)
         req = rd.promo_req[clsc]                      # [B, N, PCOL]

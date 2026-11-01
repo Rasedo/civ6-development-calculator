@@ -881,11 +881,12 @@ class SimBarbOps:
         [B] the team in a formation of the operation's), the
         members outside `rng` of `target` (-1: all): the endangered — not
         bombard, with Movement, out of a city centre — to their safe plots
-        (0x716b90); then the hurt (or a land unit afloat in danger), not
-        bombard: a ship released (+0x650 == 0; no plot is the barbarians' own
-        ground; 0x73d1f0 removes it from copies of the teams, so it stays
-        the operation's), its orders ending there; a land unit afloat to
-        its safe plot; one with Movement on a plot paying a plunder pillages
+        toward `target` (0x716b90; one with a promotion due and hurt to a
+        plot with a whole Movement left); then the hurt (or a land unit
+        afloat in danger), not bombard: a ship released (+0x650 == 0; no plot
+        is the barbarians' own ground; 0x73d1f0 removes it from copies of the
+        teams, so it stays the operation's), its orders ending there; a land
+        unit afloat to its safe plot toward `target`; one with Movement on a plot paying a plunder pillages
         it (`_barb_pillage_here`); there a barbarian's orders end (0x469ce0:
         no danger move, no fortification, its turn not done); one arrived on its safe
         plot by the endangered's or the afloat's move has its moves ended
@@ -915,11 +916,11 @@ class SimBarbOps:
             ended[b, uc] = ended[b, uc] | m
             self.barb_unit_mp[b, uc] = torch.where(m, torch.zeros_like(mp), mp)
 
-        def to_safe(us: torch.Tensor, m: torch.Tensor) -> None:
+        def to_safe(us: torch.Tensor, m: torch.Tensor, min_mv: torch.Tensor | None = None) -> None:
             if not bool(m.any()):
                 return
             uc = us.clamp(min=0)
-            dest = self._tac_safe_plot(m, uc, "barb", BARB_SEAT, danger, rowof, res, none_taken)
+            dest = self._tac_safe_plot(m, uc, "barb", BARB_SEAT, danger, rowof, res, none_taken, target, min_mv)
             done[b, uc] = torch.where(m, True, done[b, uc])
             here = self.barb_unit_tile[b, uc]
             go = m & (dest >= 0) & (here != dest) & (self.barb_unit_mp[b, uc] > 0)
@@ -938,7 +939,11 @@ class SimBarbOps:
             ut = self.barb_unit_type[b, uc].clamp(min=0, max=self.NU - 1)
             ok &= (off(us) & (self._type_bombard.take(ut) <= 0) & (self.barb_unit_mp[b, uc] > 0)
                    & ~self._centre_plane()[b, self.barb_unit_tile[b, uc].clamp(min=0)])
-            to_safe(us, ok)
+            # toward the target; one with a promotion due and hurt to `pct`
+            # to a plot with a whole Movement left there
+            gs = (uc + self.POOL_LO["barb"]).unsqueeze(1)
+            due = self._promo_ready(gs, self.unit_type.gather(1, gs)).squeeze(1) & self._bop_hurt(us, pct)
+            to_safe(us, ok, due.long())
         # the hurt
         for us in team:
             ok = g & self._bop_live(us)

@@ -4081,17 +4081,21 @@ class SimTactics:
         return (d > 0) & (weak | torch.where(damage > 0, hurt_flees, whole_flees))
 
     def _tac_safe_plot(self, mask: torch.Tensor, u_b: torch.Tensor, pre: str, seat: int, danger: torch.Tensor,
-                       rowof: torch.Tensor, res: dict, taken: torch.Tensor) -> torch.Tensor:
+                       rowof: torch.Tensor, res: dict, taken: torch.Tensor, goal: torch.Tensor | None = None,
+                       min_mv: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — `safePlot` for the unit at local slot `u_b` in the games of
-        `mask`: of its planning reach's plots of this turn in closing order,
-        none in `taken`, none with a unit of its own stacking with it (itself
+        `mask`: of its planning reach's plots of this turn in closing order
+        with `min_mv` [B] whole Movement left at least (none: 0), none in
+        `taken`, none with a unit of its own stacking with it (itself
         counted), one at war with it or fallout, the first best — a fort (its
         own territory under a city centre or an Encampment) over any plot
         but a fort, of two forts the lower danger; a plot of no danger over
         one of danger, a fort aside; of two of no danger its own territory,
         else less Movement left; of two of danger on its own territory its
         own over another's, the lower danger, then less Movement left, a fort
-        or a plot of no danger kept; off it the lower danger, then the
+        or a plot of no danger kept; off it, with a `goal` [B] (-1 none), one
+        nearer the goal than the best — taken by a unit that fights, else
+        where it is not the goal itself — then the lower danger, then the
         farther; a unit with no combat strength skips a water plot of danger
         while the best is ashore. -1 none."""
         B, dev = self.B, self.device
@@ -4102,6 +4106,8 @@ class SimTactics:
         rt, rk, mv = res["turns"][rr], res["rank"][rr], res["moves"][rr]
         cand = (mask.unsqueeze(1) & (rt == 1) & ~taken & ~self._tac_own_mil(seat) & ~self._tac_hostile(seat)
                 & (self.tile_fallout <= 0))
+        if min_mv is not None:
+            cand = cand & (mv >= (min_mv * _FIX).unsqueeze(1))
         garrison = self._centre_plane()
         if self._encamp_didx >= 0:
             garrison = garrison | (self.district == self._encamp_didx)
@@ -4114,10 +4120,15 @@ class SimTactics:
         here = getattr(self, f"{pre}_unit_tile")[bidx, u_b].clamp(min=0)
         ut = getattr(self, f"{pre}_unit_type")[bidx, u_b].clamp(min=0, max=self.NU - 1)
         no_combat = self._type_combat.take(ut) <= 0
+        # its combat strength as the AI reads it (0x56dc90 with 0)
+        fights = self._ai_combat(pre)[bidx, u_b] > 0
+        has_goal = goal >= 0 if goal is not None else torch.zeros(B, dtype=torch.bool, device=dev)
+        gc = goal.clamp(min=0) if goal is not None else torch.zeros(B, dtype=torch.long, device=dev)
         z = torch.zeros(B, dtype=torch.bool, device=dev)
         b_fort, b_safe, b_own, b_water = z.clone(), z.clone(), z.clone(), z.clone()
         zl = torch.zeros(B, dtype=torch.long, device=dev)
         b_d, b_mv, b_dist = zl.clone(), zl.clone(), zl.clone()
+        b_goal = torch.full((B,), -1, dtype=torch.long, device=dev)
         for k in range(K):
             p = order[:, k]
             on = k < n
@@ -4128,12 +4139,14 @@ class SimTactics:
             water = self.water[bidx, p]
             m = mv[bidx, p]
             dist = self.pair_dist[here, p].to(torch.long)
+            to_goal = torch.where(has_goal, self.pair_dist[p, gc].to(torch.long), -1)
             first = best < 0
             skip = ~b_water & no_combat & water & (d > 0)
             take_fort = ~b_fort | (d < b_d)
             take_safe = ~b_safe | (own & ~b_own) | (m < b_mv)
             take_own = ~b_fort & ~b_safe & (~b_own | (d < b_d) | ((d == b_d) & (m < b_mv)))
-            take_off = (d < b_d) | ((d == b_d) & (dist > b_dist))
+            nearer = has_goal & ((b_goal < 0) | (to_goal < b_goal)) & (fights | (to_goal > 0))
+            take_off = nearer | (d < b_d) | ((d == b_d) & (dist > b_dist))
             take = torch.where(fort, take_fort, torch.where(safe & ~b_fort, take_safe,
                                                             torch.where(own, take_own, take_off)))
             take = on & (first | (~skip & take))
@@ -4145,6 +4158,7 @@ class SimTactics:
             b_d = torch.where(take, d, b_d)
             b_mv = torch.where(take, m, b_mv)
             b_dist = torch.where(take, dist, b_dist)
+            b_goal = torch.where(take, to_goal, b_goal)
         return best
 
     def _tac_move_to_safety(self, live, done: torch.Tensor, order: torch.Tensor, npass: torch.Tensor,

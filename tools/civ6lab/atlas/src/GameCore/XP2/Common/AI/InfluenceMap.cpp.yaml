@@ -50,12 +50,15 @@
   final: 0x4c59b0
   kind: function
   name: safePlot
-  semantics: "the safe plot over the planning reach of this turn: no fallout (0x2d2100); a fort (own plot, district with HitPoints, DistrictInfo +0x58) first, safe over dangerous, own territory, less Movement left, lower danger, farther"
+  semantics: "the safe plot over the planning reach of this turn (args: this, unit, a formation pointer, the taken list r9, the caller's [rsp+0x20] byte skipping the stacking test 0x585eb0, [rsp+0x28] a goal plot pointer valid by 0x497d20, [rsp+0x30] a whole Movement floor: node +0xc below it << 8 skipped at 0x716ca5): no fallout (0x2d2100); a fort (own plot, district with HitPoints, DistrictInfo +0x58) first, safe over dangerous, own territory, less Movement left; off it, with a goal, nearer the goal than the best taken by a unit that fights (0x56dc90 with 0), by one that does not off the goal itself (0x716f9a..0x717007), then lower danger, farther"
   status: READ
   cases:
     - recording: h1_duelw1117-1128
       turn: all
       value: "HL: Move To Safety ends 184 of 371"
+    - recording: h1_duely1117
+      turn: 41
+      value: city-state 4's Warrior on 34:7 (Attack Barb Camp, target 35:6) takes 35:7 (danger 45, one from the camp) over 33:7 (0) and 34:8 (20), two from it, as logged
   impl:
     - cpu/core/tactical.ts:safePlot
     - gpu/core/sim_tactics.py:_tac_safe_plot
@@ -71,6 +74,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
+    - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SAFE PLOT (0x716b90): over the planning reach's plots of this turn (+0x8 <= 1), none taken already, none (0..."

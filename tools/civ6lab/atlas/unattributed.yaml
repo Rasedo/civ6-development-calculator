@@ -732,7 +732,7 @@
       value: Qin's Warrior 131073 at 11 points, as GetExperiencePoints
     - recording: AI_Tactical.csv
       value: "The tactical move Promotion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv);"
-  impl: [cpu/core/tactical.ts:promotion]
+  impl: [cpu/core/tactical.ts:promotion, gpu/core/sim_masks.py:_promo_ready]
   readings:
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -741,6 +741,7 @@
     - "C-99: a unit's experience is never spent — LAB on the records, ported"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-99: a unit's experience is never spent"
+    - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
   context:
     - "...ion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv); 0x774970 then runs..."
   review: reviewed

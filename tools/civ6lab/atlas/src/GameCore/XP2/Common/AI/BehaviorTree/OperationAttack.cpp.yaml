@@ -60,12 +60,15 @@
   final: 0x56d9c0
   kind: function
   name: opDefendUnits
-  semantics: "Operation Defend Units' execution: the endangered members to their safe plots; then every team member hurt to AutoProtect Percentage (damage +0xcf0 >= maxHP x pct x 0.01) or a land unit afloat in danger takes the promotion, the bombard stop, the ship release, the afloat move and, with Movement, the plunder (0x963190 where 0x51a080 / 0x51a160 pays); a barbarian's orders end there"
+  semantics: "Operation Defend Units' execution: the endangered members to their safe plots toward the operation's target (0x716b90 at 0x80db1a: goal +0x2a8 / +0x2ac, a whole Movement floor where a promotion is due (0x116f80) and the unit hurt, the stacking skip for a FoundCity unit); then every team member hurt to AutoProtect Percentage (damage +0xcf0 >= maxHP x pct x 0.01) or a land unit afloat in danger takes the promotion, the bombard stop, the ship release, the afloat move and, with Movement, the plunder (0x963190 where 0x51a080 / 0x51a160 pays); a barbarian's orders end there"
   status: READ
   cases:
     - recording: h1_duely1121
       turn: 157
       value: Line Infantry 4128797 on 9:12 at 38 as the barbarians' turn opens (China's strike 31 -> 38 before it) logs Plunder 9 12; t168 / t169 Line Infantry 4456462 at 39 / 45 Plunder 6 10, t167 at 32 none
+    - recording: h1_duely1121
+      turn: 11
+      value: city-state 4's hurt Warrior 131073 on 32:23 (target 34:23) Protect Units Move 31 23, its safe plot toward the target
   impl:
     - cpu/core/operations/nodes.ts:DefendOrders
     - cpu/core/operations/nodes.ts:operationDefendUnits
@@ -74,6 +77,8 @@
     - gpu/core/sim_barbops.py:to_safe
     - cpu/core/opsOrders.ts:passDefend
     - cpu/harness/replay.ts:barbarianAi
+    - cpu/core/opsOrders.ts:moves
+    - cpu/core/opsOrders.ts:us
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -83,6 +88,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
+    - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
   context:
     - "...0c180 (Attack Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval P..."
   review: reviewed

@@ -322,6 +322,7 @@
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
   context:
     - "...however hurt; a whole one where the danger exceeds its strength + 20 — and moves them (0x774190, unread)."
   review: reviewed

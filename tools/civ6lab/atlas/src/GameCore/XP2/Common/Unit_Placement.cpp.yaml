@@ -132,6 +132,7 @@
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
+    - "C-125: Protect Units' safe plot toward the operation's target — READ (0x716b90 at 0x716ca5 / 0x716f9a..0x717007, 0x80d790 at 0x80db1a / 0x80e44a / 0x80e8ab, 0x497d20), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...hin 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220)..."
   context:

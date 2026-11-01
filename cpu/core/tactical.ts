@@ -1656,8 +1656,10 @@ export function passFinish(pass: Pass, u: Unit, move: string, plot: number): voi
 export const passReachAt = (state: GameState, pass: Pass, u: Unit, goal: number, turns: number, moves: boolean, range: number): number =>
   reachAt(state, pass, u, goal, turns, moves, range);
 
-/** the unit's safe plot in the pass (0x716b90; `safePlot`), -1 none */
-export const passSafePlot = (state: GameState, pass: Pass, u: Unit): number => safePlot(state, pass, u, new Set());
+/** the unit's safe plot in the pass (0x716b90; `safePlot`) toward `goal`
+ *  (-1 none) with `minMoves` whole Movement left at least, -1 none */
+export const passSafePlot = (state: GameState, pass: Pass, u: Unit, goal = -1, minMoves = 0): number =>
+  safePlot(state, pass, u, new Set(), goal, minMoves);
 
 /** a unit's turn in the pass ended by a tree's order, with no move logged */
 export function passEnd(pass: Pass, u: Unit): void {
@@ -2491,16 +2493,23 @@ function garrisonDistrict(state: GameState, t: Tile): boolean {
  * danger the player's own territory, else the one with less Movement left;
  * of two in danger, on the player's own territory, its own over another's,
  * then the lower danger, then less Movement left, a fort or a plot of no
- * danger kept; off it, the lower danger, then the farther from the unit. A
- * unit with no combat strength skips a water plot of danger while the best is
- * on land. -1 none.
+ * danger kept; off it, with a `goal` (Operation Defend Units' target), one
+ * nearer the goal than the best (0x716f9a..0x717007) — taken by a unit that
+ * fights (0x56dc90 with 0), else where it is not the goal itself — then the
+ * lower danger, then the farther from the unit. A plot with less than
+ * `minMoves` whole Movement left there is no candidate (+0xc against the
+ * seventh argument << 8). A unit with no combat strength skips a water plot
+ * of danger while the best is on land. -1 none.
  */
-function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<number>): number {
+function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<number>, goal = -1, minMoves = 0): number {
   const plan = pass.plan.get(u.id);
   if (!plan) return -1;
   // its own combat strength, embarked or not (0x56dc90 with 1)
   const noCombat = (UNITS[u.type]?.combat ?? 0) <= 0;
+  // its combat strength as the AI reads it (0x56dc90 with 0)
+  const fights = aiStrengths(state, u).melee > 0;
   let best = -1;
+  let bGoal = -1;
   let bFort = false;
   let bSafe = false;
   let bOwn = false;
@@ -2509,7 +2518,7 @@ function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<numb
   let bMoves = 0;
   let bDist = 0;
   for (const r of plan.reach) {
-    if (r.turns > 1 || taken.has(r.tile)) continue;
+    if (r.turns > 1 || taken.has(r.tile) || r.moves < minMoves * FIX) continue;
     const t = state.map.tiles[r.tile];
     if (irradiated(t)) continue;
     if (stackedAt(state, u, r.tile) || enemyAt(state, u, r.tile)) continue;
@@ -2519,16 +2528,19 @@ function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<numb
     const fort = own && garrisonDistrict(state, t);
     const water = isWater(t);
     const dist = plotDistance(state, u.tileIndex, r.tile);
+    const toGoal = goal >= 0 ? plotDistance(state, r.tile, goal) : -1;
     if (best >= 0) {
       if (!bWater && noCombat && water && d > 0) continue;
       let take: boolean;
       if (fort) take = !bFort || d < bDanger;
       else if (safe && !bFort) take = !bSafe || (own && !bOwn) || r.moves < bMoves;
       else if (own) take = !bFort && !bSafe && (!bOwn || d < bDanger || (d === bDanger && r.moves < bMoves));
+      else if (goal >= 0 && (bGoal < 0 || toGoal < bGoal) && (fights || toGoal > 0)) take = true;
       else take = d < bDanger || (d === bDanger && dist > bDist);
       if (!take) continue;
     }
     best = r.tile;
+    bGoal = toGoal;
     bFort = fort;
     bSafe = safe;
     bOwn = own;
