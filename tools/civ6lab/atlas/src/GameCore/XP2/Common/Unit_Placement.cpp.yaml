@@ -43,6 +43,9 @@
     - recording: h1_duely1117
       turn: 176
       value: city-state 2's Line Infantry 1179654 draws Random Direction over 28 of its 34 plots within 5 of Valletta, player 0's Warriors on the other six (RandCalls.csv; t181 23, t198 17)
+    - recording: h1_duely1124
+      turn: 82
+      value: "city-state 3's Quadrireme 1048577 on 0:14 draws Random Direction over 10 plots (RandCalls.csv), Granada's centre 41:12 under its Catapult 1245186 and 42:13 under its embarked Heavy Chariot 1114117 among them: the type pair (vtable +0xb8) read as FormationClass"
   impl:
     - cpu/core/tactical.ts:minor
     - gpu/core/sim_tactics.py:_tac_search
@@ -56,6 +59,12 @@
     - cpu/core/tactical.ts:keptOut
     - cpu/core/tactical.ts:peaceHeld
     - gpu/core/sim_tactics.py:_tac_peaceful
+    - cpu/core/tactical.ts:stackClass
+    - cpu/core/tactical.ts:stackedOther
+    - cpu/core/tactical.ts:peaceAt
+    - cpu/core/tactical.ts:walk
+    - gpu/core/sim_tactics.py:_tac_own_mil
+    - gpu/core/sim_tactics.py:_tac_stacked_other
   readings:
     - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
@@ -69,6 +78,7 @@
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
     - "C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins"
+    - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
   context:
     - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
   review: reviewed
@@ -118,6 +128,7 @@
     - cpu/core/tactical.ts:keptOut
     - cpu/core/tactical.ts:crowded
     - cpu/core/units.ts:inEnemyZoc
+    - cpu/core/tactical.ts:walk
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -139,6 +150,7 @@
     - "C-99: the zone-of-control wait's test names no destination — READ (0x26fe20 at 0x2707f4..0x270813, 0x26f980, 0x530f50 at 0x53118a / 0x53129f), both twins"
     - "C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins"
     - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
+    - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...hin 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220)..."
   context:

@@ -6604,6 +6604,7 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
+    - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit w..."
@@ -6611,16 +6612,20 @@
 - addr: 0x972a50
   final: 0x67c860
   kind: function
-  semantics: "UNITOPERATION_SWAP_UNITS' Start: the partner (0x972540); the unit's formation to the target (flags | 4), then the partner's to the unit's plot."
-  status: PARTLY
+  semantics: "UNITOPERATION_SWAP_UNITS' Start: the partner (0x972540); the unit's formation walks to the target by the move 0x26fe20 (the order's flags | 4), then the partner's formation to the unit's old plot by 0x26fe20 with the order's flags, its step's cost spent."
+  status: READ
   cases:
     - recording: h1_duely1128
       turn: 154
       value: "Bologna: its Warrior 2228224 on 4:10 swaps onto its centre with the Trebuchet, then Warrior 2162692 on 5:8 swaps onto it with the first (record t+1)"
+    - recording: h1_duely1124
+      turn: 12
+      value: city-state 4's Warrior 196610 swaps onto 36:7; its Warrior 131073 steps onto 35:7 with its own Movement (1 of 2 left) and cannot pay the Marsh 36:8 it wanders to, ending on 35:7 (record t+1)
+  impl: [cpu/core/tactical.ts:swapUnits, gpu/core/sim_tactics.py:_tac_swap]
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (..."
   review: reviewed

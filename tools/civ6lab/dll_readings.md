@@ -8014,3 +8014,52 @@ Wander Near Camp moves of the barbarians' and the Free Cities' passes
   0x1001) steps to 33:17 as logged, its path's turn 2 ending on player 0's
   Warrior on 33:18. What else closes the land way to the game's path is
   unread.
+
+## C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins
+
+`swapUnits`, `stackClass` in `stackedAt` / `stackedWith` / `stackedOther`,
+`peaceAt` in `walk` and `keptOut`, `aiRanged` (cpu/core/tactical.ts). GPU
+`_tac_swap` (used by `_tac_carry_out` and `_mops_swap`), `_tac_own_mil` with
+the mover's hull (`_tac_hull`), `_tac_stacked_other`, `_tac_move_to`'s
+`own_mil` and `no_end`, `_ai_ranged` (gpu/core/sim_tactics.py).
+
+- THE SWAP'S START (0x972a50): the unit's formation walks onto the partner's
+  plot by the move 0x26fe20 (the order's flags | 4), then the partner's
+  formation walks onto the unit's old plot by 0x26fe20 with the order's
+  flags. The partner's step is an ordinary step and spends its cost.
+  runs/h1_duely1124 t12: city-state 4's Warrior 196610 (Attack Units, "Move
+  36 7 Attack 36 6") swaps with Warrior 131073 on 36:7; 131073 steps onto
+  35:7 (Grassland, 1 of its 2 Movement) and its Wander to the Marsh 36:8
+  (cost 2) cannot be paid, so it ends on 35:7 as recorded.
+- THE COUNT'S TYPE PAIR (0x585d90 at 0x585e13..0x585e35, vtable +0xb8 of the
+  table 0x9406e0 returns, the two units' types): read as Units.xml's
+  FormationClass. A hull (NAVAL) and a land combat unit, embarked or not, do
+  not count against each other. runs/h1_duely1124 t82: city-state 3's
+  Quadrireme 1048577 on 0:14 draws Random Direction over 10 plots
+  (RandCalls.csv, value 4 -> 42:13). Its candidates hold Granada's centre
+  41:12 under its Catapult 1245186 and 42:13 under its embarked Heavy
+  Chariot 1114117. The draws at t76 / t83 / t86 / t88 agree the same way.
+- THE WALK'S END (0x26fe20, the path's turn end 0x2720a0 over 0x585eb0): a
+  move stops short of a plot where the count reaches the stacking limit. Of
+  another player's units the count holds one at peace on the mover's map
+  layer but a Trader or a Spy. A plot under another player's Trader or
+  religious unit is walked onto. runs/h1_duely1128 t104 / t115 / t123:
+  city-state 2's Man-At-Arms 1638405 wanders onto plots under city-state
+  3's Trader; t109: its Crossbowman 1769474 onto 9:8 under player 1's
+  Missionary; t110: its Warrior 2031620 onto 10:8 under the Missionary.
+- THE AI'S RANGED STRENGTH (0x56e3e0, Units' RangedCombat +0x6c): a siege
+  type's is 0. The engines' strike on a unit (Bombard less 17) is not
+  RangedCombat. runs/h1_duely1117 t127-t147: city-state 3's City Defense
+  (Caguana 42:13, no garrison) runs Garrison City (0x810d30) over the
+  Trebuchet 1441792 (slot 0) and the Crossbowman 1376257. The Trebuchet's
+  Bombard 45 less 5 is the first best, and RangedCombat 40 does not pass it.
+  The Trebuchet moves into the city on the odd turns and ends its moves,
+  and Operation Move takes it out to 41:13 on the even turns, as recorded.
+- OPEN: the swap partner's test (vtable +0xc8, 0x972540) is unread and keeps
+  the domain. A city-state's planning lists no plot of a burning forest
+  (runs/h1_duely1128 t50-51, 5:5, city-state 3's Warriors; player 0's lists
+  it), while a plot of danger is listed (runs/h1_duely1124 t10 36:6). The
+  test behind this is unread. A unit made on a city's centre beside its
+  fortified garrison leaves the garrison on a plot beside it by the next
+  record (runs/h1_duely1124 t21 Granada: Warrior 327681 to 40:12 as Warrior
+  393218 is made, no AI_Tactical row). Which code moves it is unread.

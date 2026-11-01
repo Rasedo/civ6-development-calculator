@@ -72,6 +72,7 @@
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap"
     - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
+    - "C-125 / C-99: the swap's partner pays its step, the stacking count's classes, the walk's end among other players' units, a siege unit's RangedCombat — READ (0x972a50, 0x585d90, 0x26fe20 via 0x585eb0, 0x56e3e0), both twins"
   notes:
     - the fortify test's teams' +0x98 less +0x94 (the team update's attack and enemy strengths) unported, taken as held; the swap command 0x972880 unported
   context:

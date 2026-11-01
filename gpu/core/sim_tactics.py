@@ -1541,11 +1541,13 @@ class SimTactics:
             return (pl >= 0) & (self.unit_seat[rows].gather(1, pl.clamp(min=0)) == seat)
 
         # where it may not end: its own unit of its own stacking class (a
-        # military one ashore, afloat or embarked; a civilian; a support
+        # hull, a land combat unit ashore or embarked; a civilian; a support
         # unit), any other player's unit
         civ_u = self._type_civilian.take(ut).unsqueeze(1)
         sup_u = self._type_support.take(ut).unsqueeze(1)
-        own_mil = own_at(self.military_at[rows]) | own_at(self.embarked_at[rows])
+        hull_b = torch.zeros(B, dtype=torch.bool, device=dev)
+        hull_b[rows] = naval
+        own_mil = self._tac_own_mil(seat, hull_b)[rows]
         # a Trader (MakeTradeRoute) keeps none of its player's units out
         # (0x585d90)
         civ_pl = self.civilian_at[rows]
@@ -1559,7 +1561,10 @@ class SimTactics:
             form = ((own_at(civ_pl) & ~civ_trader & not_m(civ_pl)) | (own_at(self.military_at[rows]) & not_m(self.military_at[rows]))
                     | (own_at(self.embarked_at[rows]) & not_m(self.embarked_at[rows])))
             own_same = torch.where((mr >= 0).unsqueeze(1), form, own_same)
-        no_end = own_same | self._tac_foreign(seat)[rows]
+        # ...or another player's unit at peace with it of its map layer, a
+        # Trader none (`walk`'s `peaceAt`)
+        rel_u = (self._rel_strength.take(ut) > 0).unsqueeze(1)
+        no_end = own_same | torch.where(rel_u, self._tac_peaceful(seat, True)[rows], self._tac_peaceful(seat, False)[rows])
         # a zone of control ends the walk (`walk`'s inEnemyZoc on the order's
         # destination, a plot it may not end on at the limit)
         halts = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(ut), dr, no_end)
@@ -2162,14 +2167,10 @@ class SimTactics:
         return out
 
     def _tac_stacked_other(self, us: torch.Tensor, pre: str = "barb", seat: int = BARB_SEAT) -> torch.Tensor:
-        """[B, T] — a military unit of `seat` (ashore, afloat or embarked)
-        other than the one at local slot `us` [B] of pool `pre` holds the
-        plot (`stackedOther`)."""
-        g = (us + self.POOL_LO[pre]).unsqueeze(1)
-        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
-        for pl in (self.military_at, self.embarked_at):
-            out |= (pl >= 0) & (self.unit_seat.gather(1, pl.clamp(min=0)) == seat) & (pl != g)
-        return out
+        """[B, T] — a military unit of `seat` of its stacking class other
+        than the one at local slot `us` [B] of pool `pre` holds the plot
+        (`stackedOther`)."""
+        return self._tac_own_mil(seat, self._tac_hull(us, pre), skip=us + self.POOL_LO[pre])
 
     def _tac_rampage(self, live, done: torch.Tensor, utribe: torch.Tensor, rowof: torch.Tensor, res: dict,
                      tg: dict, order: torch.Tensor, npass: torch.Tensor) -> None:
@@ -2959,6 +2960,25 @@ class SimTactics:
             perm[rows, :L] = sort(rows, perm[rows, :L])
         return perm
 
+    def _tac_swap(self, sw: torch.Tensor, u_b: torch.Tensor, here: torch.Tensor, dest: torch.Tensor, occ: torch.Tensor,
+                  pre: str, seat: int) -> None:
+        """`swapUnits`' exchange in the games of `sw`: the unit at local slot
+        `u_b` of pool `pre` on `here` [B] moves onto `dest` [B], held by its
+        own unit `occ` [B] (a merged slot); arrived, the other steps onto
+        `here` with its own Movement (`stepUnit`, the step's cost spent; a
+        step it cannot afford leaves it on `dest`), else it keeps `dest`"""
+        bidx = torch.arange(self.B, device=self.device)
+        tile_p = getattr(self, f"{pre}_unit_tile")
+        self.military_at[bidx[sw], dest[sw]] = -1
+        self._tac_move_to(sw, u_b, dest, pre, seat, strike=False)
+        there = sw & (tile_p[bidx, u_b] == dest)
+        back = sw & ~there
+        self.military_at[bidx[back], dest[back]] = occ[back]
+        if bool(there.count_nonzero()):
+            dirs = (self.neigh[dest] == here.unsqueeze(1)).long().argmax(dim=1)
+            self._step_verb(there, occ.clamp(min=0), dest, here, dirs, seat, torch.zeros_like(there),
+                            clear_camp=seat != BARB_SEAT)
+
     def _tac_carry_out(self, out: dict, done: torch.Tensor, rowof: torch.Tensor, res: dict, pre: str = "barb",
                        seat: int = BARB_SEAT) -> None:
         """`carryOut` (0x771f80) in the assignment's order: every unit to its
@@ -2988,7 +3008,7 @@ class SimTactics:
             mc = move[:, r].clamp(min=0)
             # UNITOPERATION_SWAP_UNITS first (`swapUnits`): with the unit of
             # its own holding the spot beside it, both with Movement left,
-            # it steps there and the other takes its plot
+            # it steps there and the other steps onto its plot (`_tac_swap`)
             here = tile_p[bidx, u_b].clamp(min=0)
             occ = self.military_at[bidx, mc]
             ut_r = ut_all[bidx, u_b]
@@ -2999,13 +3019,7 @@ class SimTactics:
                   & (mp_pool[bidx, other] > 0)
                   & ~self._type_civilian.take(ut_r) & ~self._type_support.take(ut_r))
             if bool(sw.count_nonzero()):
-                self.military_at[bidx[sw], mc[sw]] = -1
-                self._tac_move_to(sw, u_b, mc, pre, seat, strike=False)
-                there = sw & (tile_p[bidx, u_b] == mc)
-                back = sw & ~there
-                tile_p[bidx[there], other[there]] = here[there]
-                self.military_at[bidx[there], here[there]] = occ[there]
-                self.military_at[bidx[back], mc[back]] = occ[back]
+                self._tac_swap(sw, u_b, here, mc, occ, pre, seat)
             mil = self.military_at[bidx, mc]
             own = (mil >= 0) & (self.unit_seat[bidx, mil.clamp(min=0)] == seat)
             # the order (flags 0, no attack) moves no unit for a spot it would
@@ -3087,7 +3101,7 @@ class SimTactics:
         rt, rk, mv = res["turns"][nn], res["rank"][nn], res["moves"][nn]
         dq = self.pair_dist[goal.clamp(min=0)].to(torch.long)                     # [N, T]
         here = getattr(self, f"{pre}_unit_tile")[rows, us]
-        own = self._tac_own_mil(seat)[rows]
+        own = self._tac_own_mil(seat, self._tac_hull(us, pre, rows))[rows]
         at = torch.where(rng.unsqueeze(1) == 0, self._arange_bt[rows] == goal.unsqueeze(1),
                          (dq == rng.unsqueeze(1)) & (~own | (self._arange_bt[rows] == here.unsqueeze(1))))
         ok = at & (rt >= 0) & (rt <= turns) & ok_row.unsqueeze(1)
@@ -3264,7 +3278,7 @@ class SimTactics:
             # one of its own stacking with it or with its formation's other
             # member (0x585eb0 over the formation)
             nr = torch.arange(rows.numel(), device=dev)
-            o_m = self._tac_own_mil(seat)[rows][nr, gr]
+            o_m = self._tac_own_mil(seat, self._tac_hull(ur, pre, rows))[rows][nr, gr]
             o_c = self._tac_own_class(self.civilian_at, seat)[rows][nr, gr]
             o_s = self._tac_own_class(self.support_at, seat)[rows][nr, gr]
             sup_m = self._type_support.take(ut)
@@ -3564,7 +3578,7 @@ class SimTactics:
             row = rowof[bidx, u_b]
             rtu = torch.where((row >= 0).unsqueeze(1), rturn[row.clamp(min=0)], torch.full((B, T), -1, dtype=torch.long, device=dev))
             rku = rank[row.clamp(min=0)]
-            stacked = self._tac_own_mil(BARB_SEAT)
+            stacked = self._tac_own_mil(BARB_SEAT, self._tac_hull(u_b, "barb"))
             cseat = self.tile_seat[bidx, camp]
             ccity = self.tile_city[bidx, camp]
             bound = (cseat != NO_SEAT) & (ccity != -1)
@@ -3833,12 +3847,31 @@ class SimTactics:
 
     # ------------------------------------- the city-states' and Free Cities' pass
 
-    def _tac_own_mil(self, seat: int) -> torch.Tensor:
-        """[B, T] — a military unit of `seat` (ashore, afloat or embarked)
-        holds the plot (`stackedAt` for a military unit, itself counted)."""
-        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
-        for pl in (self.military_at, self.embarked_at):
-            out |= (pl >= 0) & (self.unit_seat.gather(1, pl.clamp(min=0)) == seat)
+    def _tac_own_mil(self, seat: int, naval: torch.Tensor, skip: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, T] — a military unit of `seat` of the mover's stacking class
+        (`stackClass`: a hull where `naval` [B], else a land combat unit,
+        ashore or embarked) holds the plot (`stackedAt` for a military unit,
+        itself counted; with `skip` [B], a merged slot, that unit not)."""
+        ty = self.unit_type.clamp(min=0, max=self.NU - 1)
+        mil = (self.unit_alive & (self.unit_seat == seat) & (self.unit_tile >= 0) & ~self._type_civilian.take(ty)
+               & ~self._type_support.take(ty) & ~(self._type_air.take(ty) > 0))
+        if self._spy_idx >= 0:
+            mil = mil & (ty != self._spy_idx)
+        same = mil & (self.unit_naval.take(ty) == naval.unsqueeze(1))
+        if skip is not None:
+            same = same & (torch.arange(same.shape[1], device=self.device).unsqueeze(0) != skip.unsqueeze(1))
+        out = torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
+        out.scatter_add_(1, self.unit_tile.clamp(min=0), same.long())
+        return out > 0
+
+    def _tac_hull(self, us: torch.Tensor, pre: str, rows: torch.Tensor | None = None) -> torch.Tensor:
+        """[B] bool — the unit at local slot `us` of pool `pre` is a hull (in
+        the games `rows` [N], `us` [N]; the other games False)"""
+        ut = getattr(self, f"{pre}_unit_type")
+        if rows is None:
+            return self.unit_naval.take(ut.gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1))
+        out = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        out[rows] = self.unit_naval.take(ut[rows, us.clamp(min=0)].clamp(min=0, max=self.NU - 1))
         return out
 
     def _tac_own_class(self, plane: torch.Tensor, seat: int) -> torch.Tensor:
@@ -4023,9 +4056,11 @@ class SimTactics:
 
     def _ai_ranged(self, pre: str | None = None) -> torch.Tensor:
         """[B, P] long — `aiRanged` over pool `pre` (the merged pool for
-        None): the type's ranged strength with its formation's (0x56e3e0)"""
+        None): the type's RangedCombat with its formation's (0x56e3e0), a
+        type with a bombard none"""
         ut = getattr(self, "unit_type" if pre is None else f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
-        return self._ai_formed(pre, self._type_ranged_strength.take(ut))
+        rs = torch.where(self._type_bombard.take(ut) > 0, torch.zeros_like(ut), self._type_ranged_strength.take(ut))
+        return self._ai_formed(pre, rs)
 
     def _ai_bombard(self, pre: str | None = None) -> torch.Tensor:
         """[B, P] long — the type's bombard strength with its formation's
@@ -4072,7 +4107,7 @@ class SimTactics:
         ut = self.unit_type.clamp(min=0, max=self.NU - 1)
         melee = self._ai_combat()
         bomb = self._ai_bombard()
-        rng_s = torch.where(bomb > 0, torch.zeros_like(bomb), self._ai_ranged())
+        rng_s = self._ai_ranged()
         tile = self.unit_tile
         tc = tile.clamp(min=0)
         ok = (self.unit_alive & (tile >= 0) & self._seats_hostile(seat, self.unit_seat) & seen.gather(1, tc)
@@ -4265,7 +4300,7 @@ class SimTactics:
         ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         melee = self._ai_combat(pre)
         bomb = self._ai_bombard(pre)
-        rng_s = torch.where(bomb > 0, torch.zeros_like(bomb), self._ai_ranged(pre))
+        rng_s = self._ai_ranged(pre)
         d = danger.gather(1, getattr(self, f"{pre}_unit_tile").clamp(min=0))
         hp_max = int(self.rules.combat["unitHp"])
         damage = hp_max - getattr(self, f"{pre}_unit_hp")
@@ -4311,7 +4346,7 @@ class SimTactics:
         mask = mask & (row >= 0)
         rr = row.clamp(min=0)
         rt, rk, mv = res["turns"][rr], res["rank"][rr], res["moves"][rr]
-        cand = (mask.unsqueeze(1) & (rt == 1) & ~taken & ~self._tac_own_mil(seat) & ~self._tac_peaceful(seat)
+        cand = (mask.unsqueeze(1) & (rt == 1) & ~taken & ~self._tac_own_mil(seat, self._tac_hull(u_b, pre)) & ~self._tac_peaceful(seat)
                 & ~self._tac_hostile(seat) & (self.tile_fallout <= 0))
         if min_mv is not None:
             cand = cand & (mv >= (min_mv * _FIX).unsqueeze(1))
@@ -4617,7 +4652,7 @@ class SimTactics:
                 continue
             rt, rk = self._seat_reach_turns(op, u_b)
             # none at war with it, none that keeps it out (`keptOut`)
-            cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat) & ~self._tac_peaceful(seat)
+            cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat, self._tac_hull(u_b, pre)) & ~self._tac_peaceful(seat)
                     & (self.pair_dist[home].to(torch.long) <= _WANDER_CITY_RANGE))
             count = cand.sum(dim=1)
             wander = ok & (count > 0)
@@ -4725,7 +4760,7 @@ class SimTactics:
             ccity = self.tile_city[bidx, camp]
             bound = (cseat != NO_SEAT) & (ccity != -1)
             same = (self.tile_seat == cseat.unsqueeze(1)) & (self.tile_city == ccity.unsqueeze(1))
-            cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat) & ~self._tac_peaceful(seat)
+            cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat, self._tac_hull(u_b, pre)) & ~self._tac_peaceful(seat)
                     & (self.pair_dist[camp].to(torch.long) <= _WANDER_CAMP_RANGE)
                     & (~bound.unsqueeze(1) | same))
             count = cand.sum(dim=1)

@@ -931,7 +931,11 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
 /** the walk of a path as far as the unit's Movement carries it this turn,
  *  short of a plot it may not end on, a zone of control ending it
  *  (`inEnemyZoc` on the order's destination `dest`, a plot its own stacking
- *  unit or another player's holds at the limit); true where a step was
+ *  unit or another player's holds at the limit: the count 0x585eb0, another
+ *  player's Trader or unit of another map layer none — runs/h1_duely1128
+ *  t104: city-state 2's Man-At-Arms 1638405 wanders onto 6:9 under
+ *  city-state 3's Trader, t109 its Crossbowman 1769474 onto 9:8 under
+ *  player 1's Missionary); true where a step was
  *  refused (the placement 0x587ca0 refusing: the order done, 0x26fe20 at
  *  0x270933) */
 function walk(state: GameState, unit: Unit, path: number[], dest: number, mates: readonly Unit[]): boolean {
@@ -959,9 +963,9 @@ function walk(state: GameState, unit: Unit, path: number[], dest: number, mates:
     mp = Math.max(0, mp - cost);
     stop += 1;
     from = p;
-    if (mp <= 0 || inEnemyZoc(state, p, unit, dest, stackedWith(state, unit, mates, p) || foreignAt(state, unit, p))) break;
+    if (mp <= 0 || inEnemyZoc(state, p, unit, dest, stackedWith(state, unit, mates, p) || peaceAt(state, unit, p))) break;
   }
-  while (stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || foreignAt(state, unit, path[stop - 1]))) stop -= 1;
+  while (stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || peaceAt(state, unit, path[stop - 1]))) stop -= 1;
   for (let i = 0; i < stop; i++) {
     const r = stepUnit(state, unit, tiles[path[i]]);
     if (r === 'halted') return false;
@@ -990,11 +994,14 @@ function foreignAt(state: GameState, unit: Unit, tile: number): boolean {
 /** UNITOPERATION_SWAP_UNITS onto `tile` (0x972880; its partner 0x972540):
  *  with a unit of its own stacking with it on the plot beside it, both with
  *  Movement left (0x56c690; one whose moves an order of the pass ended has
- *  none), the unit steps there with its Movement and the other takes its
- *  plot; none, nothing (runs/h1_duely1128 t146: Hong Kong's Warrior 2424833
- *  on 9:6 stays beside its centre, whose City Defense garrison fortified;
- *  Bologna t154: its Warrior 2228224 swaps with the Trebuchet its completed
- *  City Defense let go) */
+ *  none), the unit steps there with its Movement, then the other steps onto
+ *  its plot with its own (Start 0x972a50: the partner's formation walked by
+ *  0x26fe20, the step's cost spent); none, nothing (runs/h1_duely1128 t146:
+ *  Hong Kong's Warrior 2424833 on 9:6 stays beside its centre, whose City
+ *  Defense garrison fortified; Bologna t154: its Warrior 2228224 swaps with
+ *  the Trebuchet its completed City Defense let go; runs/h1_duely1124 t12:
+ *  city-state 4's Warrior 196610 swaps onto 36:7, its Warrior 131073 on
+ *  35:7 left one Movement, short of the Marsh 36:8 it wanders to) */
 export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number): void {
   if (unit.movesLeft <= 0 || pass.ended.has(unit.id) || tile < 0 || plotDistance(state, unit.tileIndex, tile) !== 1) return;
   const dom = unitDomain(unit.type);
@@ -1004,7 +1011,8 @@ export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number
   const from = unit.tileIndex;
   other.tileIndex = from;
   moveTo(state, unit, tile, false);
-  if (unit.tileIndex !== tile) other.tileIndex = tile;
+  other.tileIndex = tile;
+  if (unit.tileIndex === tile) stepUnit(state, other, state.map.tiles[from]);
 }
 
 /** a unit of the unit's player on the plot that stacks with it or with a
@@ -1014,20 +1022,32 @@ function stackedWith(state: GameState, unit: Unit, mates: readonly Unit[], tile:
   if (!mates.length) return stackedAt(state, unit, tile);
   const formation = new Set([unit, ...mates]);
   return [unit, ...mates].some((m) => {
-    const dom = unitDomain(m.type);
-    return state.units.some((u) => !formation.has(u) && u.tileIndex === tile && u.seat === m.seat && unitDomain(u.type) === dom
-      && !UNITS[u.type]?.trader && dom !== 'spy');
+    const cls = stackClass(m.type);
+    return state.units.some((u) => !formation.has(u) && u.tileIndex === tile && u.seat === m.seat && stackClass(u.type) === cls
+      && !UNITS[u.type]?.trader && cls !== 'spy');
   });
 }
 
+/** the class a unit type stacks in (the stacking test 0x585d90's type pair,
+ *  vtable +0xb8): Units.xml's FormationClass — a land combat unit, a hull
+ *  (NAVAL), a civilian, a support unit — an aircraft or a spy apart; a land
+ *  unit embarked keeps its class (runs/h1_duely1124 t82: city-state 3's
+ *  Quadrireme 1048577 wanders over 10 plots, among them Granada's centre
+ *  41:12 under its Catapult 1245186 and 42:13 under its embarked Heavy
+ *  Chariot 1114117, RandCalls.csv) */
+function stackClass(type: string): 'civilian' | 'support' | 'military' | 'naval' | 'air' | 'spy' {
+  const d = unitDomain(type);
+  return d === 'military' && UNITS[type]?.naval ? 'naval' : d;
+}
+
 /** a unit of the unit's player on the plot that stacks with it, the unit
- *  itself counted (0x585eb0 -> 0x585d90): none with MakeTradeRoute or Spy
- *  keeps it out (runs/h1_duely1124 Cardiff t113: its Builder onto 582 under
- *  its Trader, the Farm laid that turn) */
+ *  itself counted (0x585eb0 -> 0x585d90, `stackClass`): none with
+ *  MakeTradeRoute or Spy keeps it out (runs/h1_duely1124 Cardiff t113: its
+ *  Builder onto 582 under its Trader, the Farm laid that turn) */
 export function stackedAt(state: GameState, unit: Unit, tile: number): boolean {
-  const dom = unitDomain(unit.type);
-  return state.units.some((u) => u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom
-    && !UNITS[u.type]?.trader && dom !== 'spy');
+  const cls = stackClass(unit.type);
+  return state.units.some((u) => u.tileIndex === tile && u.seat === unit.seat && stackClass(u.type) === cls
+    && !UNITS[u.type]?.trader && cls !== 'spy');
 }
 
 /** a unit on the plot keeps the unit out (0x585eb0 -> 0x585d90 over the
@@ -1037,7 +1057,12 @@ export function stackedAt(state: GameState, unit: Unit, tile: number): boolean {
  *  Infantry wanders over 28 of its 34 plots within 5 of its centre, player
  *  0's Warriors on the other six, RandCalls.csv) */
 function keptOut(state: GameState, unit: Unit, tile: number): boolean {
-  if (stackedAt(state, unit, tile)) return true;
+  return stackedAt(state, unit, tile) || peaceAt(state, unit, tile);
+}
+
+/** another player's unit not at war with the unit on the plot, of its map
+ *  layer, but a Trader (0x585d90's count of another player's units) */
+function peaceAt(state: GameState, unit: Unit, tile: number): boolean {
   const layer = unitReligious(unit.type);
   return state.units.some((x) => x.tileIndex === tile && x.seat !== unit.seat && onMap(x) && unitReligious(x.type) === layer
     && !UNITS[x.type]?.trader && !unitsHostile(state, unit, x));
@@ -1504,7 +1529,7 @@ export function aiStrengths(state: GameState, u: Unit): { melee: number; ranged:
   const d = UNITS[u.type];
   const bombard = aiFormed(u, d?.bombard ?? 0);
   const melee = aiFormed(u, u.embarked && unitDomain(u.type) === 'military' ? embarkedDefenseCS(state, u.seat) : d?.combat ?? 0);
-  return { melee, ranged: bombard > 0 ? 0 : aiRanged(u), bombard };
+  return { melee, ranged: aiRanged(u), bombard };
 }
 
 /** a strength the AI reads with the unit's formation (0x56dc90 at 0x56dd98,
@@ -1515,9 +1540,13 @@ export function aiFormed(u: Unit, strength: number): number {
   return strength > 0 ? strength + formationCS(u) : strength;
 }
 
-/** a unit's ranged strength as the AI reads it (0x56e3e0), with its
- *  formation's */
-export const aiRanged = (u: Unit): number => aiFormed(u, UNITS[u.type]?.ranged?.strength ?? 0);
+/** a unit's ranged strength as the AI reads it (0x56e3e0: Units'
+ *  RangedCombat), with its formation's: a siege type's none, its strike on a
+ *  unit the engine's Bombard less 17 (runs/h1_duely1117 t129: city-state
+ *  3's City Defense garrisons Caguana with its Trebuchet 1441792, its
+ *  Bombard 45 less 5 not passed by the Crossbowman 1376257's RangedCombat
+ *  40) */
+export const aiRanged = (u: Unit): number => (UNITS[u.type]?.bombard ? 0 : aiFormed(u, UNITS[u.type]?.ranged?.strength ?? 0));
 
 /**
  * THE DANGER MAP (InfluenceMap 0x717460, the player's m_influence, a plot
@@ -1874,8 +1903,8 @@ function strike(state: GameState, pass: Pass, u: Unit, e: Target): void {
 /** a unit of the unit's player on the plot that stacks with it, the unit
  *  itself not counted */
 function stackedOther(state: GameState, unit: Unit, tile: number): boolean {
-  const dom = unitDomain(unit.type);
-  return state.units.some((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom);
+  const cls = stackClass(unit.type);
+  return state.units.some((u) => u !== unit && u.tileIndex === tile && u.seat === unit.seat && stackClass(u.type) === cls);
 }
 
 /** the city a rampaging tribe's unit with no target heads for (0x1479e0): of

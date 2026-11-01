@@ -1978,8 +1978,9 @@ class SimMinorOps:
     def _mops_swap(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         """`swapUnits` (UNITOPERATION_SWAP_UNITS 0x972880) for the unit at
         local slot `us` [B] onto `dest` [B] where `mask`: its own military
-        unit there beside it, both with Movement left, changes places with it;
-        [B] the games where such a unit of its own stood beside it"""
+        unit there beside it, both with Movement left, changes places with it
+        (`_tac_swap`); [B] the games where such a unit of its own stood beside
+        it"""
         pre, seat = self._mops_pre(s), self._mops_seat(s)
         b = torch.arange(self.B, device=self.device)
         uc = us.clamp(min=0)
@@ -1994,13 +1995,7 @@ class SimMinorOps:
         beside = m & own & (self.pair_dist[here, dc].to(torch.long) == 1)
         sw = beside & (mp[b, other] > 0)
         if bool(sw.any()):
-            self.military_at[b[sw], dc[sw]] = -1
-            self._tac_move_to(sw, uc, dc, pre, seat, strike=False)
-            there = sw & (tile[b, uc] == dest)
-            back = sw & ~there
-            tile[b[there], other[there]] = here[there]
-            self.military_at[b[there], here[there]] = occ[there]
-            self.military_at[b[back], dc[back]] = occ[back]
+            self._tac_swap(sw, uc, here, dc, occ, pre, seat)
         return beside
 
     def _mops_strike(self, s: int, us: torch.Tensor, plot: torch.Tensor, mask: torch.Tensor) -> None:

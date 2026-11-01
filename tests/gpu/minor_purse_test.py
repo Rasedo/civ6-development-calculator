@@ -208,7 +208,7 @@ def test_wander(rules, path) -> None:
     ctr = int(sim.citystate_center[B0, s])
     res = sim._tac_search(torch.tensor([B0]), torch.tensor([u]), seat, 2, False, pre="major")
     turns, rank = res["turns"][0].tolist(), res["rank"][0].tolist()
-    own = sim._tac_own_mil(seat)[B0].tolist()
+    own = sim._tac_own_mil(seat, sim._tac_hull(torch.full((sim.B,), u, device=sim.device), "major"))[B0].tolist()
     cand = sorted((rank[t], t) for t in range(sim.T)
                   if turns[t] == 1 and not own[t] and int(sim.pair_dist[ctr, t]) <= 5)
     tiles = [t for _r, t in cand]

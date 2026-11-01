@@ -321,7 +321,7 @@ def scalar_safe_plot(sim, s, res, danger, b=0):
     rk = res["rank"][0].tolist()
     rt = res["turns"][0].tolist()
     mv = res["moves"][0].tolist()
-    own_mil = sim._tac_own_mil(BARB_SEAT)[b].tolist()
+    own_mil = sim._tac_own_mil(BARB_SEAT, sim._tac_hull(torch.full((sim.B,), s, device=sim.device), "barb"))[b].tolist()
     foe = sim._tac_hostile(BARB_SEAT)[b].tolist()
     here = int(sim.barb_unit_tile[b, s])
     no_combat = int(sim._type_combat[int(sim.barb_unit_type[b, s])]) <= 0
