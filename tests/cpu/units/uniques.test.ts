@@ -74,7 +74,7 @@ describe('the seat plays a civilization', () => {
     expect(civUpgradeTarget('NORWAY', 'QUADRIREME')).toBe(UNITS.QUADRIREME.upgradesTo);
     const state = makeState(makeMap(8, 8));
     state.seats[0].civ = 0; // Rome: Warrior -> Legion charges the Legion's Iron
-    expect(upgradeResourceCost(state, 0, 'WARRIOR')).toEqual({ id: 'IRON', n: 20 });
+    expect(upgradeResourceCost(state, 0, 'WARRIOR')).toEqual({ id: 'IRON', n: 10 });
     state.seats[0].civ = 2; // Norway: Swordsman (Iron) -> Berserker (Iron) is free
     expect(upgradeResourceCost(state, 0, 'SWORDSMAN')).toBeUndefined();
   });

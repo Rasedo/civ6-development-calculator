@@ -295,19 +295,25 @@ describe('the danger map and Move to Safety', () => {
     const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 10, 10).index, 0)!;
     foe.movesLeft = 0;
     const d = dangerPlane(state, BARB_SEAT);
-    // the danger search takes no zone of control (flag 0x200 set): the reach
-    // with the eye off the map, its zone gone, its plot a strike the path
-    // ends on (a mountain there, the plot added back)
+    // the walk with the eye off the map, its plot a strike the path ends on
+    // (a mountain there, the plot added back)
     const units = state.units;
     const eyeTile = state.map.tiles[eye.tileIndex];
     const elevation = eyeTile.elevation;
     state.units = units.filter((u) => u !== eye);
     eyeTile.elevation = 'MOUNTAIN';
-    const reach = new Set(reachPlots(state, { ...foe, movesLeft: grantedMoves(state, foe) }, 1).map((e) => e.tile));
-    reach.add(eye.tileIndex);
+    const walk = reachPlots(state, { ...foe, movesLeft: grantedMoves(state, foe) }, 1).map((e) => e.tile);
     eyeTile.elevation = elevation;
     state.units = units;
+    // the danger search pays the zone of control the foe's player sees (flags
+    // 0x311): a step into the eye's zone spends the Warrior's two Movement,
+    // so a plot two steps off is reached only through a plot outside it
+    const zoned = (p: number) => plotDistance(state, p, eye.tileIndex) <= 1;
+    const reach = new Set(walk.filter((p) => plotDistance(state, p, foe.tileIndex) < 2
+      || walk.some((q) => plotDistance(state, q, foe.tileIndex) === 1 && plotDistance(state, q, p) === 1 && !zoned(q))));
+    reach.add(eye.tileIndex);
     expect(reach.size).toBeGreaterThan(7);
+    expect(walk.filter((p) => !reach.has(p)).length).toBeGreaterThan(0);
     for (const t of state.map.tiles) {
       if (plotDistance(state, t.index, eye.tileIndex) > 2 && plotDistance(state, t.index, foe.tileIndex) > 2) continue;
       expect(d[t.index]).toBe(reach.has(t.index) ? 20 : 0);

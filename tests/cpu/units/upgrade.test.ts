@@ -92,15 +92,15 @@ describe('the upgrade ladder', () => {
     // is the one that pays: Horses -> Horses is free, but Warrior -> Swordsman
     // moves from nothing to Iron.
     expect(UNITS.WARRIOR.requiresResource).toBeUndefined();
-    expect(upgradeResourceCost(state, 0, 'WARRIOR')).toEqual({ id: 'IRON', n: 20 });
+    expect(upgradeResourceCost(state, 0, 'WARRIOR')).toEqual({ id: 'IRON', n: 10 });
   });
 
   it('the bank has to cover the new chassis, and the upgrade draws it down', () => {
     const { state, tile, seat } = upState('IRON_WORKING');
     const u = spawnUnit(state, 'WARRIOR', tile.index, 0)!;
-    seat.stockpile = STRATEGIC_IDS.map((r) => (r === 'IRON' ? 19 : 0));
-    expect(canUpgradeUnit(state, u, 0)).toBe(false); // 19 does not pay for a 20
-    seat.stockpile = STRATEGIC_IDS.map((r) => (r === 'IRON' ? 20 : 0));
+    seat.stockpile = STRATEGIC_IDS.map((r) => (r === 'IRON' ? 9 : 0));
+    expect(canUpgradeUnit(state, u, 0)).toBe(false); // 9 does not pay for a 10 (20 on online speed)
+    seat.stockpile = STRATEGIC_IDS.map((r) => (r === 'IRON' ? 10 : 0));
     expect(canUpgradeUnit(state, u, 0)).toBe(true);
     expect(upgradeUnit(state, u, 0).ok).toBe(true);
     expect(u.type).toBe('SWORDSMAN');

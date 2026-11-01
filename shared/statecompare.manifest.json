@@ -4677,6 +4677,10 @@
         "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary."
       },
       {
+        "path": "Seat.armyCounted",
+        "why": "a city-state's unit production table for its city AI's turn (`minorKnownUnits`): written by minorPhase before minorAiTurn and deleted right after it, so it is never live at a turn boundary; the records it counts are compared as minorArmyKnown."
+      },
+      {
         "path": "Tile.mountainRange",
         "why": "a derived MAP fact, not state, and static for a stronger reason than `continent`: `deriveMountainRanges` flood-fills the MOUNTAIN components once at map creation and the exporter ships the ids per tile, and mountains are the one terrain nothing in the game converts. A Mountain Tunnel is built ON a range and never changes which range a tile belongs to."
       },

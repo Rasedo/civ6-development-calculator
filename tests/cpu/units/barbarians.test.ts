@@ -173,9 +173,11 @@ describe('a barbarian raid', () => {
     const scout = state.units.find((u) => u.id === tribe.scouts[0])!;
     farmInSight(state, camp.index, scout.tileIndex);
     scout.hp = 53;
-    // a Warrior two plots from the scout: its turn's reach takes the scout in
+    // a Warrior beside the scout: its turn's reach takes the scout in (one
+    // further off steps into the scout's zone of control, which spends its
+    // Movement short of the strike)
     const at = state.map.tiles[scout.tileIndex];
-    const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, at.col, at.row + 2).index, 0)!;
+    const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, at.col, at.row + 1).index, 0)!;
     barbScoutLook(state, scout);
     const pass = () => {
       barbSlots(state);
