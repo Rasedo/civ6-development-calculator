@@ -40,6 +40,8 @@ N_TREE_UNITS = 4
 
 # a contract's goal kind (the techContracts / plotContracts maps)
 GOAL_NONE, GOAL_TECH, GOAL_CIVIC, GOAL_PLOT = 0, 1, 2, 3
+# a city tree's priority (BehaviorTree +0x548; `CITY_TREE_PRIORITY`)
+CITY_TREE_PRIORITY = 2
 
 
 def _l(x, like: torch.Tensor) -> torch.Tensor:
@@ -237,6 +239,8 @@ class CityAi:
         self.c_goal = torch.full((B, S, C), -1, dtype=L, device=dev)
         self.c_plot = torch.full((B, S, C), -1, dtype=L, device=dev)
         self.c_value = torch.zeros(B, S, C, dtype=L, device=dev)
+        # its priority (FinalRelease +0xc8): Build Unit's Build Priority, else its tree's
+        self.c_priority = torch.zeros(B, S, C, dtype=L, device=dev)
         self.c_city = torch.full((B, S, C), -1, dtype=L, device=dev)
         self.c_max_turns = torch.zeros(B, S, C, dtype=L, device=dev)
         self.c_turns = torch.full((B, S, C), -1, dtype=L, device=dev)
@@ -314,7 +318,7 @@ def new_contract(ai: CityAi, s: int, mask: torch.Tensor, **f) -> torch.Tensor:
     ai.c_serial[:, s] += mask.long()
     _cset(ai.c_id, s, j, cid, mask)
     defaults = {"tree": -1, "unit": -1, "building": -1, "district": -1, "goal_kind": GOAL_NONE, "goal": -1, "plot": -1,
-                "value": 0, "city": -1, "max_turns": 0, "turns": -1, "progress": CP_CLAIMED,
+                "value": 0, "priority": CITY_TREE_PRIORITY, "city": -1, "max_turns": 0, "turns": -1, "progress": CP_CLAIMED,
                 "shown": -1}
     for k, d in defaults.items():
         v = f.get(k, d)
@@ -789,6 +793,7 @@ class _Ctx:
         self.mb = ai.tr_mem_b[:, s, k]
         self.bb = ai.tr_bb[:, s, k]
         self.ref = ai.tr_id[:, s, k]
+        self.priority = CITY_TREE_PRIORITY
 
     def tag(self, i: int, name: str) -> torch.Tensor:
         t = self.tree.tag(i, name)
@@ -1394,7 +1399,7 @@ def _x_build_unit(c: _Ctx, i: int, at: torch.Tensor) -> None:
                      building=torch.where(~hd & ~hu & hb, bld, -1),
                      district=torch.where(hd, dist, -1),
                      plot=torch.where(loc != NONE, loc, -1),
-                     value=val,
+                     value=val, priority=c.priority if (bp := c.tree.int_(i, "Build Priority")) is None else bp,
                      city=torch.where((hd | ~hu) & (city != NONE), city, -1),
                      progress=CP_CLAIMED, assign=not (rel or False), in_tree=True)
     c.mb[:, i] = torch.where(go, _cget(ai.c_id, s, j), c.mb[:, i])

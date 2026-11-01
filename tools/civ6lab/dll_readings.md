@@ -5977,3 +5977,34 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   (t84 4:917509 ours 342 // 252, t88 4:1114113 341 // 252); runs/h1_duely1127
   city-state 3's Galley 393216 under Naval Superiority (Naval Patrol's explore
   target, `passPatrol`) t62-97 822 // 866.
+
+## C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins
+
+- CityBuildAI's expected count of a unit 0x5d4750 (FinalRelease 0x3e7c80):
+  0.2f x the most priority of the city's listed contracts of the unit +
+  0.5f, as a 24.8 with the fraction truncated — the priority Release +0x160,
+  FinalRelease +0xc8 m_priority (the AI memory's `priority`; Release +0x160
+  is not the FinalRelease handle count) (`expectedOfPriority`,
+  `minorUnitExpected`; `_expected_of_priority`, `unit_expected`).
+- A contract's priority (`AiContract.priority`, `c_priority`): Build Unit's
+  execution 0x7f4240 takes its Build Priority datum (0x7f43a3), else its
+  operation's priority (0x7f43bc -> 0x723b90, the definition's Priority),
+  else its tree's +0x548 (0x7f43c6); Add Goal Tech (0x7e7200), Purchase Plot
+  (0x7f6820) and Find Available Unit (0x7ec7b0) read the tree's +0x548. A
+  city tree's +0x548 is 2 on every city tree of the runs/h1_duely AI memory
+  (its writer unread: `CITY_TREE_PRIORITY`); Build City District's and the
+  wonder district's Build Priority 4, as their contracts hold.
+- Confirmed: runs/h1_duely1121 Hunza's Ilkum (EFFECT_ADJUST_UNIT_PRODUCTION
+  0x6b2350) 1.0 at t23 / t24 / t26 on Builder contract 57 of priority 2
+  (0.8984375), 0 at t18-22 with none listed, as logged.
+- 0x4bd0d0(-1, r8b) is +0x210 with r8b set, +0x210 less +0x390 without:
+  Mercenary Companies' 0x6b47f0 passes r8b = YieldType != YIELD_GOLD
+  (0x6b4a8f), so a Gold debuff compares the strengths without the
+  treasury's term (`militaryStrength(seat, withGold)`); one function holds
+  the strength, its unit term `aiStrengths`' combat (0x56dc90 with 0) and
+  its treasury term the 24.8 gold / 12.
+- The economic AI's purchase list (0x684bf0, a stable insertion / merge sort,
+  0x6846d0 at 0x684738) holds the higher priority first, of equals in arrival
+  order (`purchaseContracts`; `_minor_contract_purchases`).
+- Open: Ilkum 0 for the logged 1.0 on runs/h1_duely1117 p2 t23-32 and p3
+  t44-51.

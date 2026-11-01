@@ -62,6 +62,14 @@ def _f32(x: float) -> float:
     return struct.unpack("f", struct.pack("f", x))[0]
 
 
+def _expected_of_priority(p: torch.Tensor) -> torch.Tensor:
+    """`expectedOfPriority` (0x5d4750): 0.2f x the priority `p` [B] + 0.5f
+    as a 24.8, its fraction truncated"""
+    f = (p.to(torch.float32) * torch.tensor(0.2, dtype=torch.float32)) + torch.tensor(0.5, dtype=torch.float32)
+    w = torch.floor(f)
+    return w.long() * _FX + torch.trunc((f - w) * 256).long()
+
+
 def _engine_rows(rows: list, engine: list, n: int) -> torch.Tensor:
     """[n] per engine index the AI row naming it, a row no civilization
     owns before one that does; -1 none"""
@@ -2226,8 +2234,8 @@ class _MinorFacts:
 
     def unit_expected(self, u):
         """`minorUnitExpected` (0x5d4750), raw: 1.0 with progress kept on
-        the unit, 0 where the city cannot train it, else 0.5 and 0.2 more
-        with a contract of it listed"""
+        the unit, 0 where the city cannot train it, else 0.5 and 0.2 x the
+        most priority of its listed contracts of it"""
         sim, s = self.sim, self.s
         k = self._item_key(u)
         like = torch.zeros(sim.B, dtype=torch.long, device=sim.device)
@@ -2237,11 +2245,12 @@ class _MinorFacts:
         if self.unit_version(u) is None:
             return torch.where(kept > 0, like + _FX, like)
         can = _t(self.can_train(u), like).bool()
-        # 0.2 more where its city lists a contract of the unit (its +0x160
-        # read as 1, LAB)
+        # 0.2f x the most priority of its city's listed contracts of the
+        # unit + 0.5f, the fraction truncated (`expectedOfPriority`)
         row = next((i for i, r in enumerate(self.T["unit_rows"]) if r["type"] == u), -1)
-        listed = (sim.cai_c_listed[:, s] & (sim.cai_c_id[:, s] >= 0) & (sim.cai_c_unit[:, s] == row)).any(dim=1)
-        open_ = like + _FX // 2 + torch.where(listed, _fx_const(0.2), 0)
+        listed = sim.cai_c_listed[:, s] & (sim.cai_c_id[:, s] >= 0) & (sim.cai_c_unit[:, s] == row)
+        most = torch.where(listed, sim.cai_c_priority[:, s], torch.zeros_like(sim.cai_c_priority[:, s])).max(dim=1).values
+        open_ = like + _expected_of_priority(most)
         return torch.where(kept > 0, like + _FX, torch.where(can, open_, like))
 
     # the projects table's facts: a minor completes no once-only project

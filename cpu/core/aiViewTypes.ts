@@ -176,8 +176,9 @@ export interface AiView extends AiValueView {
   handicap(seat: number): number;
   /** the technologies the seat holds, install types */
   techsHeld(seat: number): ReadonlySet<string>;
-  /** PlayerStats' m_iMilitaryStrength (0x4bb1e0) */
-  militaryStrength(seat: number): number;
+  /** PlayerStats' strength over every domain (0x4bd0d0 with -1): +0x210,
+   *  m_iMilitaryStrength (0x4bb1e0), less +0x390 without `withGold` */
+  militaryStrength(seat: number, withGold: boolean): number;
   /** the pair's standing declared friendship (the alliance: `allied`) */
   declaredFriends(a: number, b: number): boolean;
   // THE OPERATIONS' VIEW (cpu/core/operations/)

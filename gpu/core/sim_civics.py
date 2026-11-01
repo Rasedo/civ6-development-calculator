@@ -230,14 +230,14 @@ class SimCivics:
     def _store_unit_strength(self, s: int, live: torch.Tensor) -> None:
         """`storeUnitStrength` where `live` [B]: minor `s`'s (the Free
         Cities' at `FR`) strength over every domain as its turn starts,
-        before its production — per unit the greater of its combat and
-        ranged strengths x its hit points left over its most, 24.8
+        before its production — per unit the greater of its combat
+        (`_ai_combat`, 0x56dc90 with 0) and ranged strengths x its hit points left over its most, 24.8
         truncated; with the treasury's gold / 12 in 24.8 the sum's whole
         part, less the whole part of the gold / 12 (+0x210 less +0x390)"""
         seat = FREE_SEAT if s == self.FR else 100 + s
         mine = self.major_unit_alive & (self.major_unit_seat == seat)
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        st = torch.maximum(self._type_combat.take(mt), self._type_ranged_strength.take(mt)) << 8
+        st = torch.maximum(self._ai_combat("major"), self._type_ranged_strength.take(mt)) << 8
         left = self.major_unit_hp.clamp(min=0) << 8
         hp = int(self.rules.combat["unitHp"]) << 8
         per = torch.div(torch.div(st * left, 256, rounding_mode="trunc") * 256, hp, rounding_mode="trunc")

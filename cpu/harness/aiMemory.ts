@@ -158,6 +158,7 @@ export interface GameContract {
   id: number;
   owner: number;
   value: number;
+  priority: number;
   timeLimit?: number;
   timeEstimate?: number;
   keepControl?: number;

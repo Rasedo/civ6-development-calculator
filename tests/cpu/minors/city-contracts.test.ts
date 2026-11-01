@@ -24,7 +24,7 @@ const city = (over: Partial<ContractCity> = {}): ContractCity => ({
 
 const contract = (over: Partial<AiContract> = {}): AiContract => ({
   id: 1, tree: 1, treeName: 'Build City Building', unit: null, building: 'BUILDING_MONUMENT', district: null, plot: -1,
-  value: 50 * FX, city: -1, maxTurns: 0, turns: -1, progress: CP_CLAIMED, assign: true, ...over,
+  value: 50 * FX, priority: 2, city: -1, maxTurns: 0, turns: -1, progress: CP_CLAIMED, assign: true, ...over,
 });
 
 describe('the contracts (Contracts.cpp)', () => {

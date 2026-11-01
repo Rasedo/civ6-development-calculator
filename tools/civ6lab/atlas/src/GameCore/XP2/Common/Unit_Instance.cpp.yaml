@@ -180,6 +180,7 @@
     - gpu/core/sim_tactics.py:_ai_combat
     - cpu/core/aiViewTypes.ts:AiUnitView
     - cpu/core/tactical.ts:passMoveExec
+    - gpu/core/sim_civics.py:_store_unit_strength
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-94: the wounded law and the garrison — READ"
@@ -193,6 +194,7 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-126 / C-130: who may plunder a route (0x9555a0) and the treasury turn's city term (0x4dd3b0) — READ, the plunder ported in both twins"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...he player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the..."
   context:

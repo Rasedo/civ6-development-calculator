@@ -1145,10 +1145,10 @@ function traitBuildingCost(state: GameState, cityState: CityState, type: string,
  *  progress kept on it (City_BuildQueue's unit progress, 0x17d1a0); 0 where
  *  the city cannot train it (a unit not the minor's version, a Settler among
  *  them, or not `minorCanTrain`); else 0.5 plus 0.2 x the most its contract
- *  list's (+0x3a8, its data +0x400) contracts of the unit (+0x408) hold at
- *  +0x160 — read as 1 for a listed one (LAB: the base contract's constructor
- *  writes 0 and its writer is unread; runs/h1_duelw1117 Valletta's Ilkum 1
- *  while its Builder contract 47 stays listed, t16-24) */
+ *  list's (+0x3a8, its data +0x400) contracts of the unit (+0x408) hold as
+ *  their priority (Release +0x160, FinalRelease +0xc8 m_priority, the
+ *  FinalRelease twin 0x3e7c80) — runs/h1_duely1121 Hunza's Ilkum 1 at t23 /
+ *  t24 / t26 on its Builder contract 57 of priority 2 (0.8984375) */
 export function minorUnitExpected(state: GameState, cityState: CityState, unit: string): number {
   const item = minorItemOfType(unit);
   if (!item || !('unit' in item)) return 0;
@@ -1157,8 +1157,20 @@ export function minorUnitExpected(state: GameState, cityState: CityState, unit: 
   if (kept > 0) return FX;
   if (!minorUnitVersion(unit) || !minorCanTrain(state, cityState, item.unit)) return 0;
   const book = cityState.cityAi;
-  const listed = !!book && (book.city[-1] ?? []).some((id) => contractById(book, id)?.unit === unit);
-  return fxConst(0.5) + (listed ? fxConst(0.2) : 0);
+  let most = 0;
+  for (const id of book?.city[-1] ?? []) {
+    const c = contractById(book!, id);
+    if (c?.unit === unit) most = Math.max(most, c.priority);
+  }
+  return expectedOfPriority(most);
+}
+
+/** 0x5d4750's count of the most priority `p`: 0.2f x p + 0.5f as a 24.8,
+ *  its fraction truncated */
+export function expectedOfPriority(p: number): number {
+  const f = Math.fround(Math.fround(p * Math.fround(0.2)) + Math.fround(0.5));
+  const whole = Math.floor(f);
+  return whole * FX + Math.trunc(Math.fround(Math.fround(f - whole) * 256));
 }
 
 /** An install item type as the minor's item in hand: BUILDING_X, DISTRICT_X

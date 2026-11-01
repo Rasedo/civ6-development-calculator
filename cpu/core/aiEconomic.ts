@@ -187,8 +187,9 @@ export function purchaseSpend(e: EconomicMemory, cost: number, threatened: boole
 /** THE CONTRACT PURCHASES (0x687bf0 after the savings, 0x688920): the
  *  purchase list (AI::Economic +0x5d0, the contracts its listener 0x68ab40
  *  took at their submission) keeps the contracts still alive, ACCEPTED and
- *  goldPurchasable (vt +0x80), in arrival order (0x684bf0, a stable sort on
- *  contract +0x160, which no read writer sets); then, for a player no human
+ *  goldPurchasable (vt +0x80), the higher priority first, of equals in arrival
+ *  order (0x684bf0, a stable sort on
+ *  the contract's priority +0x160); then, for a player no human
  *  drives, each tries its purchase (vt +0x50 true, vt +0x20 0x5f3c40): a
  *  unit's through TryPurchaseUnits in the city the contract binds (every
  *  city of the player where it binds none), a building's through 0x68afe0
@@ -206,7 +207,7 @@ export function purchaseContracts(e: EconomicMemory, book: ContractBook, human: 
   book.purchase = book.purchase.filter((id) => {
     const c = contractById(book, id);
     return !!c && c.progress === CP_ACCEPTED && goldPurchasable(c);
-  });
+  }).sort((a, b) => contractById(book, b)!.priority - contractById(book, a)!.priority);
   const bought: AiContract[] = [];
   if (human) return bought;
   for (const id of book.purchase) {

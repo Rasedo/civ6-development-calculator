@@ -589,12 +589,16 @@ const decodeTrigger: BtHandler<Ctx> = {
   },
 };
 
+/** a city tree's priority (BehaviorTree +0x548): every city tree of the
+ *  five runs/h1_duely recordings' AI memory holds 2 (its writer unread) */
+const CITY_TREE_PRIORITY = 2;
+
 /** what the shared contract nodes read of a city tree: the seat's book, the
  *  tree, its cities, the city's own buildings and districts */
 function contractWorld(ctx: Ctx): ContractNodeWorld {
   const { w } = ctx;
   return {
-    book: ctx.ai, tree: ctx.tree, turn: w.turn, cities: w.cities, newContractId: () => w.newContractId(),
+    book: ctx.ai, tree: ctx.tree, treePriority: CITY_TREE_PRIORITY, turn: w.turn, cities: w.cities, newContractId: () => w.newContractId(),
     clearProduction: (city) => w.clearProduction(city), techHeld: (x) => w.techHeld(x), civicHeld: (x) => w.civicHeld(x),
     holds: (item) => (item.building ? ctx.city.buildingHeld(item.building) : item.district ? ctx.city.districtHeld(item.district) : false),
     submitted: (city, k) => {
@@ -663,7 +667,7 @@ const addGoalTech: BtHandler<Ctx> = {
     if (ids.some((id) => treeContract(ctx, id))) return;
     const c: AiContract = {
       id: ctx.w.newContractId(), tree: ctx.tree.id, treeName: ctx.tree.name, unit: null, building: null, district: null, plot: -1,
-      value: (Number(tagOf(run, node, 'Tech Value')) || 0) * FX, city: -1, maxTurns: 0, turns: -1, progress: CP_ACCEPTED, assign: false,
+      value: (Number(tagOf(run, node, 'Tech Value')) || 0) * FX, priority: CITY_TREE_PRIORITY, city: -1, maxTurns: 0, turns: -1, progress: CP_ACCEPTED, assign: false,
       goalHeld: true,
     };
     ctx.ai.contracts.push(c);
@@ -937,7 +941,7 @@ const purchasePlot: BtHandler<Ctx> = {
     const plot = tagOf(run, node, 'Plot') as number;
     const c: AiContract = {
       id: ctx.w.newContractId(), tree: ctx.tree.id, treeName: ctx.tree.name, unit: null, building: null, district: null, plot,
-      value: 0, city: -1, maxTurns: 0, turns: -1, progress: CP_ACCEPTED, assign: false,
+      value: 0, priority: CITY_TREE_PRIORITY, city: -1, maxTurns: 0, turns: -1, progress: CP_ACCEPTED, assign: false,
     };
     ctx.ai.contracts.push(c);
     ctx.ai.plotContracts[c.id] = plot;

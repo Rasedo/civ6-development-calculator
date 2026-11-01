@@ -166,6 +166,8 @@ class _OpCtx:
         T = sim._mops_tables()
         self.T = T
         self.tree: _Tree = T.trees[d]
+        # the tree's priority: the operation definition's (0x723b90)
+        self.priority = int(T.defs[d]["priority"])
         self.st = sim.mops_st[:, s, k]
         self.ma = sim.mops_ma[:, s, k]
         self.mb = sim.mops_mb[:, s, k]
@@ -2291,7 +2293,7 @@ def _x_recruit(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     limit = tree.int_(i, "Time Limit")
     limit = limit if limit is not None and limit > 0 else 0
     cid = ai.c_serial[:, s].clone()
-    jj = new_contract(ai, s, go, tree=c.ref, unit=unit, value=value, max_turns=limit, assign=True, in_tree=True,
+    jj = new_contract(ai, s, go, tree=c.ref, unit=unit, value=value, priority=c.priority, max_turns=limit, assign=True, in_tree=True,
                       progress=CP_CLAIMED)
     submit_contract(ai, s, jj, sim._mops_world(s, c.view), int(sim.turn), go)
     c.bb[:, tag] = torch.where(go, cid, c.bb[:, tag])

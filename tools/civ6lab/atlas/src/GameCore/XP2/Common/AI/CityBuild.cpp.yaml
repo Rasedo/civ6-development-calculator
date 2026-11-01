@@ -879,9 +879,12 @@
 - addr: 0x5d4750
   final: 0x3e7c80
   kind: function
-  semantics: "a city's expected count of a unit: 1.0 where the unit holds progress (0x17d1a0); 0 where CanTrain (0x172820) refuses; else 0.2 x the most +0x160 of the city's listed contracts of the unit (CityBuildAI +0x3a8's data +0x400, contract +0x408 the unit) + 0.5 (@d5aff0, @d20458)."
-  status: PARTLY
+  semantics: "a city's expected count of a unit: 1.0 where the unit holds progress (0x17d1a0); 0 where CanTrain (0x172820) refuses; else 0.2f x the most priority (Release +0x160, FinalRelease +0xc8 m_priority in 0x3e7c80) of the city's listed contracts of the unit (CityBuildAI +0x3a8's data +0x400, contract +0x408 the unit) + 0.5f (@d5aff0, @d20458), a 24.8 with the fraction truncated."
+  status: READ
   cases:
+    - recording: h1_duely1121
+      turn: 23
+      value: Hunza's Ilkum 1.0 at t23 / t24 / t26 on Builder contract 57 of priority 2 (0.8984375), as logged
     - recording: h1_duelw1117
       turn: 16
       value: Valletta's Ilkum 1 while its Builder contract 47 stays listed, t16-24
@@ -892,9 +895,12 @@
     - cpu/core/minorBuild.ts:minorUnitExpected
     - gpu/core/sim_cityvalue.py:_cv_unit_prod_value
     - gpu/core/sim_cityvalue.py:unit_expected
+    - cpu/core/minorBuild.ts:expectedOfPriority
+    - gpu/core/sim_cityvalue.py:_expected_of_priority
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected count 0x5d4750 x its Production [+0x1008], bare, from the start to start + the train turns), EFFECT_AD...

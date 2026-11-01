@@ -381,7 +381,7 @@ function recruitContract(node: BtNode, run: BtRun, ctx: OpsContext): void {
   const limit = dataInt(node, 'Time Limit');
   const c: AiContract = {
     id: w.newContractId(), tree: w.tree.id, treeName: w.tree.name, unit, building: null, district: null, plot: -1,
-    value, city: -1, maxTurns: limit !== undefined && limit > 0 ? limit : 0, turns: -1, progress: CP_CLAIMED, assign: true,
+    value, priority: w.treePriority, city: -1, maxTurns: limit !== undefined && limit > 0 ? limit : 0, turns: -1, progress: CP_CLAIMED, assign: true,
   };
   w.tree.contracts.push(c.id);
   submitContract(w.book, c, w.cities, w.turn, (city) => w.clearProduction(city), (city, k) => w.submitted(city, k));

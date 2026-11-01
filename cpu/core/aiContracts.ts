@@ -48,6 +48,9 @@ export interface AiContract extends ContractItem {
   plot: number;
   /** its value (+0x3a0), raw fixed point */
   value: number;
+  /** its priority (FinalRelease +0xc8, Release +0x160): Build Unit's Build
+   *  Priority, else its tree's (0x7f4240 at 0x7f43a3 / 0x7f43c1 / 0x7f43c6) */
+  priority: number;
   /** the city it binds to (+0x588): the one the tree named, else the one
    *  that queues it; -1 any */
   city: number;
@@ -365,6 +368,9 @@ export interface ContractNodeWorld {
   book: ContractBook;
   /** the tree: its instance id, its name, the contracts it made */
   tree: { id: number; name: string; contracts: number[] };
+  /** the tree's priority (BehaviorTree +0x548; an operation's its
+   *  definition's Priority, 0x723b90) */
+  treePriority: number;
   turn: number;
   /** the player's cities that may take a contract up */
   cities: readonly ContractCity[];
@@ -541,7 +547,8 @@ export function buildUnitNode<C>(world: (ctx: C) => ContractNodeWorld): BtHandle
       building: districts.length || units.length ? null : buildings[0] ?? null,
       district: districts[0] ?? null,
       plot: typeof loc === 'number' ? loc : -1,
-      value: value * FX, city: districts.length || !units.length ? (typeof cityTag === 'number' ? cityTag : -1) : -1,
+      value: value * FX, priority: dataInt(node, 'Build Priority') ?? w.treePriority,
+      city: districts.length || !units.length ? (typeof cityTag === 'number' ? cityTag : -1) : -1,
       maxTurns: 0, turns: -1, progress: CP_CLAIMED,
       assign: !(dataBool(node, 'Release Unit When Built') ?? false),
     };

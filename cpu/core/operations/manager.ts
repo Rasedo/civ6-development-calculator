@@ -395,6 +395,7 @@ function contractWorld(ai: OpsAi, env: OpsEnv, op: Operation): ContractNodeWorld
   return {
     book: env.book(),
     tree: { id: op.id, name: opDef(op).tree ?? op.def, get contracts() { return op.contracts; }, set contracts(v) { op.contracts = v; } },
+    treePriority: opDef(op).priority,
     turn: env.turn,
     get cities() { return env.contractCities(); },
     newContractId: () => env.newContractId(),

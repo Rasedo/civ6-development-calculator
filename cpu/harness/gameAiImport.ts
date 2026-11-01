@@ -343,7 +343,7 @@ function contractOf(w: ImportWorld, c: GameContract, trees: Record<string, GameT
     unit: build ? item(c.unit, n.units) : null, building: build ? item(c.building, n.buildings) : null,
     district: build ? item(c.district, n.districts) : null,
     plot: plot && plot[0] >= 0 && plot[1] >= 0 ? plot[1] * w.W + plot[0] : -1,
-    value: c.value, city: -1, maxTurns: Math.max(0, c.timeLimit ?? 0), turns: c.timeEstimate ?? -1, progress: c.status,
+    value: c.value, priority: c.priority, city: -1, maxTurns: Math.max(0, c.timeLimit ?? 0), turns: c.timeEstimate ?? -1, progress: c.status,
     assign: (c.keepControl ?? 0) !== 0, queued: c.status === CP_IN_PROGRESS,
   };
 }

@@ -31,7 +31,7 @@
 - addr: 0x4bc720
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiView.ts:storeUnitStrength]
+  impl: [cpu/core/aiView.ts:storeUnitStrength, cpu/core/aiView.ts:militaryStrength]
   readings:
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
@@ -102,6 +102,8 @@
     - cpu/core/aiView.ts:domainStrength
     - cpu/core/aiView.ts:storeUnitStrength
     - cpu/core/types.ts:Seat
+    - cpu/core/aiView.ts:militaryStrength
+    - cpu/core/aiViewTypes.ts:AiView
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
@@ -109,6 +111,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   context:
     - "...h, -10 where +0x6780 names p, + (20 - T in mode 1) where the owner's military strength (0x4bd0d0(-1): PlayerStats +0x210) is above twice p's or its era (player +0x1358 +0xf8, the Eras..."
   review: reviewed

@@ -128,7 +128,7 @@ class SimMinorAi:
     def _minor_contract_purchases(self, s: int, act: torch.Tensor) -> None:
         """`purchaseContracts` where `act` (0x687bf0 after the savings): the
         purchase list keeps the contracts alive, ACCEPTED and gold-bought;
-        each unit's, in id order, tries TryPurchaseUnits in the minor's city
+        each unit's, the higher priority first, of equals in id order, tries TryPurchaseUnits in the minor's city
         (its price; the purchase request: the city may train the unit, the
         purse covers it, the centre takes the unit) and is COMPLETED where it
         buys (`minorBuyUnit`)"""
@@ -145,7 +145,9 @@ class SimMinorAi:
         E = self._cv_tables()["engine"]
         eu = torch.tensor(E["unit"] or [-1], dtype=torch.long, device=self.device)
         eb = torch.tensor(E["building"] or [-1], dtype=torch.long, device=self.device)
-        order = torch.where(units | blds, ai.c_id[cs], torch.full_like(ai.c_id[cs], 1 << 40)).argsort(dim=1)
+        # the higher priority first, of equals in arrival (id) order (0x684bf0)
+        key = ai.c_id[cs] - (ai.c_priority[cs] << 32)
+        order = torch.where(units | blds, key, torch.full_like(ai.c_id[cs], 1 << 40)).argsort(dim=1)
         seat = 100 + s
         ctr = self.citystate_center[:, s].clamp(min=0)
         gold_w = self._cv_minor_facts(s).yield_w("YIELD_GOLD") if bool(blds.any()) else 0

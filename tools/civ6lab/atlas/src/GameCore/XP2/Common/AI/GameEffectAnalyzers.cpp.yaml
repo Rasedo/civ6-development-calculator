@@ -733,6 +733,7 @@
     - gpu/core/sim_policy.py:_pol_analyze
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- PARTLY (their inputs unported): EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (per city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected..."
@@ -807,9 +808,10 @@
     - recording: h1_duelv1127
       turn: 161
       value: the port's option values against World_Congress.csv's OPTIONS and VOTES
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiModifiers.ts:SETS]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiModifiers.ts:SETS, cpu/core/aiModifiers.ts:v]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   review: reviewed
 - addr: 0x6b4e80
   final: 0x466b50

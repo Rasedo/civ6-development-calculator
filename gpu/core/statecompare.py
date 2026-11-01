@@ -1195,7 +1195,7 @@ def _minor_upgrading(sim, b: int, s: int) -> list[int]:
 
 def _ai_contracts(sim, b: int, s: int) -> list[int]:
     """the contracts by id: [id, tree, unit, building, district rows, goal
-    kind, goal, plot, value, city, most turns, turns, progress, assign,
+    kind, goal, plot, value, priority, city, most turns, turns, progress, assign,
     queued, held by its tree, listed, the progress its last log line printed,
     held by the research or culture AI]"""
     rows = []
@@ -1208,7 +1208,7 @@ def _ai_contracts(sim, b: int, s: int) -> list[int]:
             or any(int(sim.mops_def[b, s, k]) >= 0 and int(sim.mops_id[b, s, k]) == tree for k in range(sim.mops_id.shape[2]))
         rows.append([cid, tree, int(sim.cai_c_unit[b, s, j]), int(sim.cai_c_building[b, s, j]), int(sim.cai_c_district[b, s, j]),
                      int(sim.cai_c_goal_kind[b, s, j]), int(sim.cai_c_goal[b, s, j]), int(sim.cai_c_plot[b, s, j]),
-                     int(sim.cai_c_value[b, s, j]), int(sim.cai_c_city[b, s, j]), int(sim.cai_c_max_turns[b, s, j]),
+                     int(sim.cai_c_value[b, s, j]), int(sim.cai_c_priority[b, s, j]), int(sim.cai_c_city[b, s, j]), int(sim.cai_c_max_turns[b, s, j]),
                      int(sim.cai_c_turns[b, s, j]), int(sim.cai_c_progress[b, s, j]), int(bool(sim.cai_c_assign[b, s, j])),
                      int(bool(sim.cai_c_queued[b, s, j])), int(bool(sim.cai_c_in_tree[b, s, j]) and live),
                      int(bool(sim.cai_c_listed[b, s, j])), int(sim.cai_c_shown[b, s, j]), int(bool(sim.cai_c_goal_held[b, s, j]))])

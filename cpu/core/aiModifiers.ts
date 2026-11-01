@@ -412,8 +412,10 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     }
     if (a >= 0 || t.other === t.seat) return 0;
     const v = yieldValue(t.view, t.seat, pct(fxOf(t.view.playerYield(t.other, y)), a), y);
+    // the strengths with the treasury's term but for a Gold debuff (0x6b4a8f)
+    const g = y !== 'YIELD_GOLD';
     const f = t.view.atWar(t.seat, t.other)
-      ? (t.view.militaryStrength(t.seat) > t.view.militaryStrength(t.other) ? 2 * FX : fxConst(0.25)) : fxConst(Math.fround(0.33));
+      ? (t.view.militaryStrength(t.seat, g) > t.view.militaryStrength(t.other, g) ? 2 * FX : fxConst(0.25)) : fxConst(Math.fround(0.33));
     return whole(valueBetween(fmul(v, f), t.start, t.horizon, t.rate));
   },
   // 0x6a2270 (Patronage, A): on the player's own subject, the class named

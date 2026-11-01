@@ -3181,6 +3181,7 @@
       value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   context:
     - ...true (a remove-if, 0x688961 / 0x6889b0); a stable merge sort (0x684bf0 -> 0x6839c0 -> 0x6846d0) orders it by contract +0x160, the larger first (the constructor's 0; no writer read);...
   review: imported
@@ -3199,9 +3200,10 @@
     - recording: 1124
       turn: 27
       value: 1124 p3 t27 and t72 (Granada's Builder and Heavy   Chariot) pass only folded.
-  impl: [cpu/core/aiEconomic.ts:purchaseContracts]
+  impl: [cpu/core/aiEconomic.ts:purchaseContracts, gpu/core/sim_minorai.py:_minor_contract_purchases]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   context:
     - ...ve, ACCEPTED and vt +0x80 true (a remove-if, 0x688961 / 0x6889b0); a stable merge sort (0x684bf0 -> 0x6839c0 -> 0x6846d0) orders it by contract +0x160, the larger first (the construc...
   review: reviewed
@@ -3873,9 +3875,11 @@
     - recording: h1_duelv1121
       turn: 7
       value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
+  impl: [cpu/core/aiContracts.ts:ContractNodeWorld, gpu/core/sim_minorops.py:__init__]
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   context:
     - "...raised (0x6075b0) with the recruit's priority (the tree's +0x5a8, else its operation's 0x723b90: the root tree's +0x548, its definition's Priority, 0x73a120 -> 0x7cb230), its value, i..."
   review: reviewed
@@ -4946,6 +4950,7 @@
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the turn limit, reset when every contract it holds is alive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reserv..."
@@ -5215,6 +5220,7 @@
   impl: [cpu/core/aiContracts.ts:buildUnitNode, gpu/core/sim_citytrees.py:_x_build_unit]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...y contract it holds is alive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reservation yields to a value 20.0 a..."
@@ -5258,6 +5264,7 @@
   impl: [cpu/core/aiCityTrees.ts:purchasePlot]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...nit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670; Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
@@ -7517,4 +7524,18 @@
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...(the tree +0x218; its +8 the tree): the tree's watched fields (constructor FinalRelease 0x53e4d0) +0x138 m_isActive, +0x150 m_isTemporary, +0x168 m_markForDestroy, +0x180 m_allowRecrui..."
+  review: imported
+- addr: 0x7f4240
+  binary: F
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiContracts.ts:AiContract]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x7f42b0
+  binary: F
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiContracts.ts:AiContract]
+  notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported

@@ -263,7 +263,7 @@ function opsRecord(ai: OpsAi | undefined, seat: number, defs: readonly string[],
 }
 
 /** the minor's contracts by id, each [id, tree, unit, building, district
- *  rows, goal kind (1 tech, 2 civic, 3 plot), goal, plot, value, city, most
+ *  rows, goal kind (1 tech, 2 civic, 3 plot), goal, plot, value, priority, city, most
  *  turns, turns, progress, assign, queued, held by its tree, listed, the progress its last log line printed (-1 none),
  *  held by the research or culture AI] */
 function cityAiContracts(cs: CityState): number[] {
@@ -276,7 +276,7 @@ function cityAiContracts(cs: CityState): number[] {
     const tree = ai.trees.find((t) => t.id === c.tree) ?? (cs.ops ? opsOf(cs.ops).find((o) => o.id === c.tree) : undefined);
     return [c.id, c.tree, c.unit ? AI_UNIT_INDEX.get(c.unit) ?? -1 : -1, c.building ? AI_BUILDING_INDEX.get(c.building) ?? -1 : -1,
       c.district ? DISTRICT_ROW.get(c.district) ?? -1 : -1, kind, kind === 1 ? techCode(goal) : kind === 2 ? civicCode(goal) : -1,
-      c.plot, c.value, c.city, c.maxTurns, c.turns, c.progress, c.assign ? 1 : 0, c.queued ? 1 : 0,
+      c.plot, c.value, c.priority, c.city, c.maxTurns, c.turns, c.progress, c.assign ? 1 : 0, c.queued ? 1 : 0,
       tree && tree.contracts.includes(c.id) ? 1 : 0, listed.has(c.id) ? 1 : 0, c.shown ?? -1, c.goalHeld ? 1 : 0];
   });
 }
