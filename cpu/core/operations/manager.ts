@@ -34,7 +34,7 @@
  */
 import { AI_LEADER_OP_LISTS, AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_LISTS, AI_TREES } from '../../data/aiOperations';
 import { compileTree, tick, BT_FRESH, type BtNode, type BtRun } from '../behaviorTree';
-import { NO_PLOT, addMember, newTeams, opDef, opUnits, robbedOps, xy, type Operation } from './operation';
+import { NO_PLOT, addMember, newTeams, opDef, opJobUnits, opUnits, robbedOps, xy, type Operation } from './operation';
 import { OP_NODES, refreshStrengths, switchToBackup, type DiplomacyRequest, type OpsContext } from './nodes';
 import type { ContractBook, ContractCity, ContractNodeWorld } from '../aiContracts';
 import { evaluate, type Candidate } from './evaluate';
@@ -243,8 +243,9 @@ function endOperation(ai: OpsAi, op: Operation): void {
 /** the seat's running operations of an OperationType */
 const count = (ai: OpsAi, type: string | null): number => opsOf(ai).filter((o) => opDef(o).operationType === type).length;
 
-/** the seat's units in any operation */
-const assigned = (ai: OpsAi): Set<number> => new Set(opsOf(ai).flatMap(opUnits));
+/** the seat's units in a job of its operations (unit +0x7d0): those released
+ *  are free */
+const assigned = (ai: OpsAi): Set<number> => new Set(opsOf(ai).flatMap(opJobUnits));
 
 /** a unit a city trained for a contract an operation's tree made joins the
  *  operation's first team, where no operation holds it already (the

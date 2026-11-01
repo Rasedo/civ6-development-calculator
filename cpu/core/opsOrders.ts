@@ -161,7 +161,7 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
       if (endangered(state, pass, us, formed).length) return true;
       return us.some((u) => hurt(u, pct) || afloatInDanger(state, pass, u));
     },
-    execute: (members, target, pct, range, formed) => {
+    execute: (members, target, pct, range, formed, release) => {
       const lines: { type: string; what: string }[] = [];
       const us = unitsOf(members);
       // the endangered to their safe plots (0x716b90)
@@ -189,9 +189,15 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
           changed();
         }
         if (aiStrengths(state, u).bombard > 0) continue;
-        // a ship (+0x650 == 0) off friendly ground is released (0x73d1f0):
-        // its orders end there, its team keeps it
-        if (UNITS[u.type]?.naval && groundOf(state, seat, u.tileIndex) !== 1) continue;
+        // a ship (+0x650 == 0) off friendly ground is released (0x73d1f0): its
+        // orders end there, its team keeps it until the next team update, in
+        // no job of the operation — a city-state's free for its tactical pass
+        // (runs/h1_duely1127 t66 city-state 3's hurt Galley 393216 on 30:19
+        // goes to safety, t114-128 heals); a barbarian's stays in its job
+        if (UNITS[u.type]?.naval && groundOf(state, seat, u.tileIndex) !== 1) {
+          if (!isBarbSeat(seat)) release(u.id);
+          continue;
+        }
         // a land unit afloat to its safe plot
         if (landUnit(u) && isWater(state.map.tiles[u.tileIndex])) {
           const to = passSafePlot(state, pass, u);

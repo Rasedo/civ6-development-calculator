@@ -162,8 +162,12 @@ export function recruitOperation(view: AiView, seat: number, op: Operation, offe
       const t = teamDef(op, team);
       const adv = inProgress ? t.ongoingStrengthAdvantage : t.initialStrengthAdvantage;
       const desired = desiredStrength(view, seat, op.enemy, adv, op.enemyStrength);
-      const rest = pool.filter((u) => !taken.includes(u));
-      const str = recruitStrength(view, team, rest, taken, op.enemyStrength, desired, log, op.def, units);
+      // the strength's offer is the team's whole, the units the minimums
+      // took among them (runs/h1_duely1127 t68: city-state 3's one Galley,
+      // "Recruiting minimums" then "Recruiting strength"; 165 of the five
+      // duely duels' 332 minimums lines followed so, none by "No recruits to
+      // match strength")
+      const str = recruitStrength(view, team, pool, taken, op.enemyStrength, desired, log, op.def, units);
       taken = dedupe([...taken, ...str.taken]);
     }
     for (const u of taken) {

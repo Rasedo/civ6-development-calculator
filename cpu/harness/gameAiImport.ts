@@ -27,7 +27,8 @@
  * rally, its strengths (op +0x220, +0x238), its tree's run, its trigger (the
  * Decode Trigger's units and value), its lock (a Lock Units node that
  * succeeded), its contracts; per team (op +0x150, 0x118 bytes each, in the
- * definition's order) its members (+0x18), the counts per requirement
+ * definition's order) its members (+0x18) — those whose assignment (unit +0x300)
+ * is not the operation's released (`Operation.released`) —, the counts per requirement
  * (+0x30), every requirement's minimum met, its readiness and the ongoing
  * one (+0x10, +0x11, +0x12), engaged (+0x90), the units it took in (+0x58)
  * and its goals (+0xe8 + 8 x the slot). Its team's unit to build and
@@ -215,7 +216,8 @@ function teamRows(def: string, n: number): string[] | null {
 /** one game operation onto ours (`base` the one of ours it matches, else
  *  a new one under the game's tree id); null where its rows are not ours or
  *  its tree ended */
-function opOf(w: ImportWorld, g: GameOperation, tree: GameTree | undefined, base: Operation | undefined, turn: number): Operation | null {
+function opOf(w: ImportWorld, g: GameOperation, tree: GameTree | undefined, base: Operation | undefined, turn: number,
+  assigned: Readonly<Record<string, number>>): Operation | null {
   const def = AI_OP_DEFS[g.name ?? ''];
   const rows = def ? AI_TREES[def.tree ?? ''] : undefined;
   if (!def || !rows || !tree) return null;
@@ -236,6 +238,10 @@ function opOf(w: ImportWorld, g: GameOperation, tree: GameTree | undefined, base
   });
   const target = plotOf(w, g.targetX, g.targetY);
   const backup = plotOf(w, g.backupX, g.backupY);
+  // the members whose assignment (unit +0x300) is not the operation's:
+  // released (Operation Defend Units' 0x73d1f0), left to the next team update
+  const released = g.teams.flat().filter((m) => assigned[String(m[0])] !== g.treeControlId)
+    .flatMap((m) => { const u = w.unitOf(m[0]); return u === undefined ? [] : [u]; });
   return {
     id: base?.id ?? g.treeControlId,
     def: def.name, enemy: g.enemy, target, rally: plotOf(w, g.rallyX, g.rallyY),
@@ -247,6 +253,7 @@ function opOf(w: ImportWorld, g: GameOperation, tree: GameTree | undefined, base
     contracts: (tree.contracts ?? []).filter((c) => c >= 0),
     formations: base?.formations ?? [],
     ...(base?.killed !== undefined ? { killed: base.killed } : {}),
+    ...(released.length ? { released } : {}),
   };
 }
 
@@ -277,7 +284,7 @@ export function importOps(ai: OpsAi, read: GameMemoryRead, w: ImportWorld, turn:
     if (!base && !whole) continue;
     // one whose rows are not ours stays ours where we hold it, its
     // contracts the game's
-    const op = opOf(w, g, tree, base, turn) ?? base;
+    const op = opOf(w, g, tree, base, turn, read.assigned ?? {}) ?? base;
     if (!op) continue;
     if (op === base) base.contracts = (tree?.contracts ?? []).filter((c) => c >= 0);
     // a linked seat's trigger names its tribe (the barbarians: its index

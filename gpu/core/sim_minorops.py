@@ -274,6 +274,11 @@ class SimMinorOps:
         self.mops_tstr = torch.zeros(B, S, NO, NTM, dtype=L, device=device)
         # the units each team has taken in (its join's second list, team +0x58)
         self.mops_join = torch.zeros(B, S, NO, NTM, dtype=L, device=device)
+        # the members Operation Defend Units released (0x73d1f0: their
+        # assignment, unit +0x7d0, to -1, the teams untouched), over the
+        # holder's pool: still members until the next team update drops
+        # them, in no job of the operation (`Operation.released`)
+        self.mops_rel = torch.zeros(B, S, NO, P, dtype=torch.bool, device=device)
         # Operation Move's stores: per move node per team the members held out
         # (over the holder's pool, its first slots) and the goal they are held
         # for (-1 none: no store yet)
@@ -681,12 +686,23 @@ class SimMinorOps:
 
     def _mops_held(self, s: int) -> torch.Tensor:
         """[B, P] the units in a job of holder `s` but the pass's (`jobOf`):
-        any of its operations' teams lists, its "Upgrade Units" trees hold"""
+        any of its operations' teams lists but those its Defend Units
+        released, its "Upgrade Units" trees hold"""
         P = self._mops_u(s, "alive").shape[1]
-        m = self.mops_mem[:, s].reshape(self.B, -1)
-        out = torch.zeros(self.B, P + 1, dtype=torch.bool, device=self.device)
-        out.scatter_(1, torch.where(m >= 0, m, P), True)
-        return out[:, :P] | self.mops_upg[:, s, :P]
+        return self._mops_jobs(s, torch.ones_like(self.mops_def[:, s], dtype=torch.bool)) | self.mops_upg[:, s, :P]
+
+    def _mops_jobs(self, s: int, run: torch.Tensor) -> torch.Tensor:
+        """[B, P] the units in a job of holder `s`'s operations where `run`
+        [B, NO] (unit +0x7d0, `opJobUnits`): their teams' members but those
+        released"""
+        P = self._mops_u(s, "alive").shape[1]
+        out = torch.zeros(self.B, P, dtype=torch.bool, device=self.device)
+        for k in range(N_OPS):
+            m = torch.where(run[:, k].unsqueeze(1), self.mops_mem[:, s, k].reshape(self.B, -1), -1)
+            o = torch.zeros(self.B, P + 1, dtype=torch.bool, device=self.device)
+            o.scatter_(1, torch.where(m >= 0, m, P), True)
+            out |= o[:, :P] & ~self.mops_rel[:, s, k, :P]
+        return out
 
     def _mops_add_member(self, s: int, k: int, ti: int, uid: torch.Tensor, mask: torch.Tensor) -> None:
         """`addMember` where `mask`: the unit [B] joins the team's members, each
@@ -944,6 +960,15 @@ class SimMinorOps:
         on = live & (self.mops_def[:, s, k] >= 0)
         if not bool(on.any()):
             return
+        # the team update's members (0x73fba0 -> 0x732cd0): those whose
+        # assignment (unit +0x7d0) is no longer the operation's leave
+        rel = self.mops_rel[:, s, k]
+        if bool((rel & on.unsqueeze(1)).any()):
+            for ti in range(N_TEAMS):
+                mem = self.mops_mem[:, s, k, ti]
+                gone = (mem >= 0) & rel.gather(1, mem.clamp(min=0))
+                self._mops_compact(s, k, ti, ~gone, on)
+            self.mops_rel[:, s, k] = rel & ~on.unsqueeze(1)
         tgt = self.mops_target[:, s, k]
         estr = self._ops_enemy_str(self._mops_seat(s), self._mops_kb(s), tgt, self.mops_enemy[:, s, k])
         self.mops_estr[:, s, k] = torch.where(on, estr, self.mops_estr[:, s, k])
@@ -1011,6 +1036,7 @@ class SimMinorOps:
             self.mops_unit[rows, s, kk] = -1
             self.mops_tstr[rows, s, kk] = 0
             self.mops_join[rows, s, kk] = 0
+            self.mops_rel[rows, s, kk] = False
             self.mops_mvs[rows, s, kk] = False
             self.mops_mvg[rows, s, kk] = -1
             # the definition's teams, those whose Condition holds, in order
@@ -1043,6 +1069,7 @@ class SimMinorOps:
         self.mops_enemy[rows, s, k] = -1
         self.mops_tm[rows, s, k] = -1
         self.mops_mem[rows, s, k] = -1
+        self.mops_rel[rows, s, k] = False
         nf = self.mops_nfree[rows, s]
         self.mops_free[rows, s, nf] = k
         self.mops_nfree[rows, s] = nf + 1
@@ -1062,13 +1089,9 @@ class SimMinorOps:
         return self._mops_op_units(s) | self.mops_upg[:, s, :self._mops_u(s, "alive").shape[1]]
 
     def _mops_op_units(self, s: int) -> torch.Tensor:
-        """[B, P] the units listed in any running operation of holder `s`"""
-        P = self._mops_u(s, "alive").shape[1]
-        m = torch.where((self.mops_def[:, s] >= 0).unsqueeze(2).unsqueeze(3), self.mops_mem[:, s], torch.full_like(self.mops_mem[:, s], -1))
-        flat = m.reshape(self.B, -1)
-        out = torch.zeros(self.B, P + 1, dtype=torch.bool, device=self.device)
-        out.scatter_(1, torch.where(flat >= 0, flat, P), True)
-        return out[:, :P]
+        """[B, P] the units in a job of any running operation of holder `s`:
+        listed in its teams, not released"""
+        return self._mops_jobs(s, self.mops_def[:, s] >= 0)
 
     def _mops_compact(self, s: int, k: int, ti: int, keep: torch.Tensor, mask: torch.Tensor) -> None:
         """the team's members kept where `keep` [B, NM] (in order) where `mask`"""
@@ -1671,7 +1694,9 @@ class SimMinorOps:
                     desired = adv * ours.to(torch.float64)
                 tgt = estr.to(torch.float64) + desired
                 in_taken = (offer.unsqueeze(2) == taken.unsqueeze(1)).any(dim=2) & valid
-                rest = valid & ~in_taken
+                # the strength's offer is the team's whole, the minimums'
+                # units among them
+                rest = valid
                 go &= (tgt > 0) & rest.any(dim=1)
                 if bool(go.any()):
                     ntak = (taken >= 0).sum(dim=1)
@@ -2845,7 +2870,8 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     plots (0x716b90); then the hurt (or a land unit afloat in danger): a
     promotion due taken (`_promote_due`); not bombard: a ship (+0x650 == 0)
     off friendly ground released, its orders ending there (0x73d1f0 removes it
-    from copies of the teams, so it stays the team's); a land unit afloat to its safe
+    from copies of the teams, so it stays the team's until the next team
+    update, in no job of the operation: `mops_rel`); a land unit afloat to its safe
     plot; one with Movement on a plot paying a plunder pillages it
     (`_plunder`); one with no Movement left is left there, its turn not
     done; one on the ground of a player it is at war with or a plot of
@@ -2942,8 +2968,11 @@ def _x_defend(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             if not bool(ok.any()):
                 continue
             # a ship (+0x650 == 0) off friendly ground released, its orders
-            # ending there; a land unit afloat to its safe plot
-            ok &= ~(ship & (sim.tile_seat[b, plot] != seat))
+            # ending there, in no job of the operation; a land unit afloat to
+            # its safe plot
+            rel = ok & ship & (sim.tile_seat[b, plot] != seat)
+            sim.mops_rel[b[rel], s, k, uc[rel]] = True
+            ok &= ~rel
             sea = ok & ~ship & wat
             to_safe(us, sea, True)
             ok &= live(us)
@@ -2970,8 +2999,20 @@ def _u_naval_units(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     return torch.where(_n_units(sim, c) > 0, BT_RUNNING, BT_FAILURE)
 
 
+def _job_members(sim, s: int, k: int) -> torch.Tensor:
+    """[B, M] slot `k`'s job units (its members but those released) in the
+    player's unit order (pool order), -1 padded"""
+    B = sim.B
+    mem = sim.mops_mem[:, s, k].reshape(B, -1)
+    mc = mem.clamp(min=0)
+    mem = torch.where((mem >= 0) & ~sim.mops_rel[:, s, k].gather(1, mc), mem, -1)
+    key = torch.where(mem >= 0, sim.major_unit_pslot.gather(1, mc).clamp(min=0), torch.full_like(mem, 1 << 30))
+    return mem.gather(1, key.argsort(dim=1, stable=True))
+
+
 def _x_naval_patrol(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
-    """NAVAL PATROL's execution (0x803060): over the operation's units in the
+    """NAVAL PATROL's execution (0x803060): over the operation's job units
+    (0x6092c0: the released not among them) in the
     player's unit order (pool order), each alive with Movement left takes HL
     Explore's target (`_tac_explore_pick` on a chosen list of its own, the
     fallbacks taken), its turn done, and moves there (no line)."""
@@ -2980,10 +3021,7 @@ def _x_naval_patrol(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     B, T = sim.B, sim.T
     b = torch.arange(B, device=dev)
     seat = 100 + s
-    mem = sim.mops_mem[:, s, k].reshape(B, -1)
-    mc = mem.clamp(min=0)
-    key = torch.where(mem >= 0, sim.major_unit_pslot.gather(1, mc).clamp(min=0), torch.full_like(mem, 1 << 30))
-    mem = mem.gather(1, key.argsort(dim=1, stable=True))
+    mem = _job_members(sim, s, k)
     danger = c.view["op"]["danger"]
     treg = sim._tac_seen_regions(seat)
     for j in range(mem.shape[1]):
@@ -3008,7 +3046,7 @@ def _x_naval_patrol(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
 
 def _x_naval_pillage(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """NAVAL PILLAGE's execution (0x803250, `passNavalPillage`): the operation's
-    units alive with Movement left listed (pool order); then each listed unit
+    job units alive with Movement left listed (pool order); then each listed unit
     still with Movement left and a planning takes the first of its planning's
     targets that is a COMBAT_DISTRICT with a spot, else — a unit with a range
     — the first LOW, MEDIUM or HIGH one; the attack assignment of the whole
@@ -3024,10 +3062,7 @@ def _x_naval_pillage(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     B, T = sim.B, sim.T
     b = torch.arange(B, device=dev)
     seat = 100 + s
-    mem = sim.mops_mem[:, s, k].reshape(B, -1)
-    mc = mem.clamp(min=0)
-    key = torch.where(mem >= 0, sim.major_unit_pslot.gather(1, mc).clamp(min=0), torch.full_like(mem, 1 << 30))
-    mem = mem.gather(1, key.argsort(dim=1, stable=True))
+    mem = _job_members(sim, s, k)
 
     def live(us: torch.Tensor) -> torch.Tensor:
         uc = us.clamp(min=0)

@@ -6599,3 +6599,46 @@ turn left is AI_Research.csv's RESEARCHING row (`Ctx.researchAtTurn`).
 - Open: the bankruptcy's victim — the game's 1128 t132 Man-at-Arms 2031619
   and t178 Line Infantry 2490374 stand after units with upkeep earlier in
   the record's roster (`bankruptcy` takes the first).
+
+## C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins
+
+`Operation.released`, `opJobUnits` (cpu/core/operations/operation.ts), the
+release in `passDefend` (cpu/core/opsOrders.ts) through `DefendOrders.execute`,
+the drop in `refreshStrengths` (cpu/core/operations/nodes.ts), the job sets
+`assigned` (manager.ts), `minorOpUnits` (minorOps.ts), `jobOf` (tactical.ts),
+Naval Patrol / Naval Pillage over `opJobUnits`; the importer's released
+members (cpu/harness/gameAiImport.ts). GPU `mops_rel`, `_mops_jobs`
+(`_mops_op_units`, `_mops_held`), `_x_defend`, `_mops_refresh`,
+`_job_members` (gpu/core/sim_minorops.py).
+
+- THE RELEASE (0x73d1f0, Defend Units' execution, the hurt branch: a ship off
+  friendly ground): the unit's assignment (the watched +0x778, its value
+  +0x7d0) to -1; the erase from the teams runs on stack copies of them, so
+  the team keeps the unit as a member through the tick — Operation Move
+  (over the team's members) still moves it — but it is in no job of the
+  operation: Naval Patrol and Naval Pillage (0x6092c0 on +0x7d0) skip it,
+  the recruit's offer (+0x7d0 == -1) and the tactical pass take it free.
+- THE DROP (0x73fba0, called with the operation's id from the refresh
+  0x73f7d0): at 0x73fc75 the members are filtered (remove_if 0x732cd0, the
+  count +0x28 cut) to those alive (+0x770) whose +0x7d0 is the operation's
+  id — the released (and the dead) leave before the team line and the
+  readiness, so the operation reads "Not Ready" and its Recruit Units takes
+  the unit back (its minimums, then its strength over the same offer).
+- THE RECRUIT'S STRENGTH OFFER: the units the minimums took stay in the
+  offer the strength reads (the five duely duels: 165 of their 332 minimums
+  lines are followed by the same unit's "Recruiting strength", none by "No
+  recruits to match strength") (`recruitOperation`, `_mops_recruit_team`).
+- THE IMPORT (`--memory aimem`): a member whose assignment at the end look
+  (unit +0x300 FinalRelease) is not the operation's tree id is released.
+- CONFIRMED (runs/h1_duely1127 city-state 3's Galley 393216, damage 60, a
+  one-seed aimem trace t60-150): t66 / 68 / 72 / 74 / 76 / 102 / 106 / 108
+  Move to safety; t67 "Not Ready", Recruiting minimums and strength
+  UNIT_GALLEY, "1 units, Recruited 1", Operation Move 30:16 -> 30:19 and no
+  patrol after (t89 / 93 / 95 / 97 / 101 likewise); t114-128 and t139-144
+  Heal on 27:15 / 27:12 as AI_Tactical.csv logs.
+- OPEN: the barbarians' release (their hurt ships keep their job); the
+  Galley's Operation Move ring plots once Naval Patrol no longer moves it on
+  (t103 29:17, t109 / t113: the game's move order refused, the Galley holds);
+  its Protect Units safe plot after the re-recruit (t88 / 92 / 94 / 96: the
+  game's 28:17, ours 29:15); t129 Move to safety from 27:15 (our danger map
+  0 there, the game's 30).

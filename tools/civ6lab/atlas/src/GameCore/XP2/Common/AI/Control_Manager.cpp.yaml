@@ -93,6 +93,9 @@
     - cpu/core/operations/assault.ts:held
     - gpu/core/sim_minorops.py:_x_garrison
     - cpu/core/opsOrders.ts:unitOf
+    - cpu/core/operations/nodes.ts:navalPatrol
+    - cpu/core/operations/operation.ts:opJobUnits
+    - gpu/core/sim_minorops.py:_x_naval_patrol
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -110,6 +113,7 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
     - "C-96: the standing army and the Combat Desire's city terms"
+    - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...able slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list..."

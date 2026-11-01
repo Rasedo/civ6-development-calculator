@@ -3,6 +3,23 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x732cd0
+  final: 0x4d7700
+  kind: function
+  name: the team's members kept
+  semantics: "remove_if over a team's member ids (from 0x73fba0 at 0x73fcac, the predicate's state [r8]: the team, the operation's id): a member is kept where Player::Units holds it (0x4f2310), alive (+0x770 clear) and assigned to the operation (+0x7d0 == the id); the caller cuts the count (+0x28) to the kept. A member Defend Units released (0x73d1f0) or killed leaves its team here."
+  status: READ
+  cases:
+    - recording: h1_duely1127
+      turn: 67
+      value: "city-state 3's Galley 393216, released at t66 and still listed at t67's log site: Naval Superiority's team line \"Not Ready\" with no unit, then Recruiting minimums UNIT_GALLEY, \"1 units, Recruited 1\""
+  impl:
+    - cpu/core/operations/nodes.ts:refreshStrengths
+    - gpu/core/sim_minorops.py:_mops_refresh
+    - cpu/core/operations/nodes.ts:targets
+  readings:
+    - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
+  review: reviewed
 - addr: 0x737610
   final: 0x4db690
   kind: function
@@ -319,30 +336,32 @@
 - addr: 0x73d1f0
   final: 0x4e09f0
   kind: function
-  semantics: "Defend Units' release: the unit's assignment +0x778 to -1 (0x1e60f0); then per team (stride 0x118) the team is copy-constructed onto the stack (0x735110), the unit's id erased from the COPY's member list, the copy destroyed — the team keeps the unit, and its +0x7d0 holds: a released unit stays its operation's member. What releases a hurt ship from Naval Superiority's team on one turn and keeps it on another is unread (a LAB)."
-  status: PARTLY
+  semantics: "Defend Units' release: the unit's assignment (the watched +0x778, its value +0x7d0) to -1 (0x1e60f0); then per team (stride 0x118) the team is copy-constructed onto the stack (0x735110), the unit's id erased from the COPY's member list (0x7083f0), the copy destroyed — the team keeps the unit as a member through the tick (Operation Move still moves it), but it is in no job of the operation: the job lists (0x6092c0 on +0x7d0) and the recruit's offer read it free, the tactical pass takes it, and the next team update drops it (0x73fba0 -> 0x732cd0). No line."
+  status: READ
   cases:
     - recording: h1_duely1127
+      turn: 66
+      value: "city-state 3's hurt Galley 393216 on 30:19 (assignment 458758 at the log site, -1 at the end look): Move to safety (Current Danger 30); t67 \"Not Ready\" with no member, Recruiting minimums UNIT_GALLEY, Operation Move 30:16 -> 30:19 with no patrol after"
+    - recording: h1_duely1127
       turn: 114
-      value: the Galley 393216 leaves its team at t113-114, but stays in it t66-75 (damage 34 then 60, 30:19)
-    - recording: h1_duelw1130
-      turn: 19
-      value: tribe 0's Warrior 851979 stays in the raid's team W/S/W through t31
+      value: t114-128 the Galley re-recruited each turn, released by Defend Units, Heal on 27:15 (AI_Tactical.csv)
   impl:
     - cpu/core/operations/nodes.ts:DefendOrders
-    - cpu/core/opsOrders.ts:us
-    - gpu/core/sim_barbops.py:_bop_defend_exec
+    - cpu/core/opsOrders.ts:passDefend
+    - cpu/core/operations/operation.ts:opJobUnits
     - gpu/core/sim_minorops.py:_x_defend
+    - gpu/core/sim_minorops.py:_mops_jobs
+    - gpu/core/sim_barbops.py:_bop_defend_exec
+    - cpu/core/operations/operation.ts:Operation
+    - cpu/core/opsOrders.ts:us
+    - cpu/harness/gameAiImport.ts:released
     - gpu/core/sim_barbops.py:to_safe
+    - gpu/core/sim_minorops.py:_init_minor_ops
   readings:
-    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
-    - "C-99: Move Unit's update with no Location ends the Upgrade Units trees"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
-  context:
-    - "...t is suzerain of, an ally's; 2 no one's; 3 another's) is released from the operation (0x73d1f0: its operation field +0x778 to -1, out of every team); one fortified afloat to its safe..."
   review: reviewed
 - addr: 0x73e610
   final: 0x4e1620
@@ -458,6 +477,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...f none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")..."
@@ -466,7 +486,7 @@
   final: 0x4e29b0
   kind: function
   name: the team update (counts, readiness, unit to build)
-  semantics: "the team update: per requirement (0x1c bytes: +0 AiType, +4 Dependence, +8 MinNumber, +0xc MaxNumber, +0x10 MinPercentage, +0x14 MaxPercentage, +0x18 ReconsiderWhilePreparing) the members carrying its type (one with a Dependence counts only where a member carries that type). Below its MinNumber (with none, its MinPercentage of the members above its count) needed and the minimums unmet (+0x10), else had; at its MaxNumber (with none, where one more passes MaxPercentage of one more member, 0x740562) full. Ready (+0x11): the minimums met and, with an InitialStrengthAdvantage, the members' strength at the enemy's plus the desired (0x723ab0) or more; +0x12 likewise with the OngoingStrengthAdvantage. The unit to build (+0x14): readiness unchanged, the old one where 0x79cba0 still takes it; else 0x79bd30 over the needed types (the had ones where none is needed), barring the full, against the operation's enemy (op +0x888). At 0x740016 a member's assignment to -1 where its slot is flagged, op +0x890 clear and its formation holds one."
+  semantics: "the team update: per requirement (0x1c bytes: +0 AiType, +4 Dependence, +8 MinNumber, +0xc MaxNumber, +0x10 MinPercentage, +0x14 MaxPercentage, +0x18 ReconsiderWhilePreparing) the members carrying its type (one with a Dependence counts only where a member carries that type). Below its MinNumber (with none, its MinPercentage of the members above its count) needed and the minimums unmet (+0x10), else had; at its MaxNumber (with none, where one more passes MaxPercentage of one more member, 0x740562) full. Ready (+0x11): the minimums met and, with an InitialStrengthAdvantage, the members' strength at the enemy's plus the desired (0x723ab0) or more; +0x12 likewise with the OngoingStrengthAdvantage. The unit to build (+0x14): readiness unchanged, the old one where 0x79cba0 still takes it; else 0x79bd30 over the needed types (the had ones where none is needed), barring the full, against the operation's enemy (op +0x888). At 0x740016 a member's assignment to -1 where its slot is flagged, op +0x890 clear and its formation holds one. Called with the operation's id (0x73f7d0: op +0x720), it first keeps of the members (+0x18, remove_if 0x732cd0, the count +0x28 cut) those alive (+0x770 clear) whose assignment +0x7d0 is that id."
   status: READ
   cases:
     - recording: h1_duelv1128
@@ -481,6 +501,8 @@
     - gpu/core/sim_minorops.py:_mops_team_update
     - gpu/core/sim_barbops.py:_barb_ops_refresh
     - gpu/core/sim_barbops.py:_bcap_refresh
+    - cpu/core/operations/nodes.ts:targets
+    - gpu/core/sim_minorops.py:_mops_refresh
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
@@ -489,5 +511,6 @@
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+    - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

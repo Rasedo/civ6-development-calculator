@@ -9,7 +9,7 @@
 import type { OpsSettle } from './types';
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SKIPPED, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
   type BtHandler, type BtNode, type BtRun } from '../behaviorTree';
-import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opDef, opUnit, opUnits, robbedOps, targetGone, teamDef, teamReqs, unitsById, xy,
+import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opDef, opJobUnits, opUnit, opUnits, robbedOps, targetGone, teamDef, teamReqs, unitsById, xy,
   type OpTeam, type Operation } from './operation';
 import { chooseUnit, keepUnit } from './unitChoice';
 import type { UnitProductionRow } from '../aiUnitProduction';
@@ -45,14 +45,15 @@ export interface DiplomacyRequest {
  *  member endangered (the team update's list, 0x738f20), hurt to the
  *  percentage or a land unit afloat in danger; `execute` the execution's —
  *  the endangered to their safe plots; the hurt promoted where a promotion
- *  is due, a ship released off friendly ground (0x73d1f0: its assignment cleared, its
- *  team untouched — the member's removal runs on a copy of each team, so it
- *  stays the operation's), pillaging where the plot pays a plunder, moved
- *  off a plot of danger (a barbarian not), fortified — its lines */
+ *  is due, a ship off friendly ground released (`release`, 0x73d1f0: its
+ *  assignment cleared, its team untouched — the member's removal runs on a
+ *  copy of each team, so it stays a member until the next team update),
+ *  pillaging where the plot pays a plunder, moved off a plot of danger (a
+ *  barbarian not), fortified — its lines */
 export interface DefendOrders {
   flagged(members: readonly number[], pct: number, formed: readonly number[]): boolean;
-  execute(members: readonly number[], target: number, pct: number, range: number, formed: readonly number[]):
-    readonly { type: string; what: string }[];
+  execute(members: readonly number[], target: number, pct: number, range: number, formed: readonly number[],
+    release: (id: number) => void): readonly { type: string; what: string }[];
 }
 
 export interface OpsContext {
@@ -417,6 +418,13 @@ export function refreshStrengths(ctx: OpsContext): void {
   op.enemyStrength = op.target === NO_PLOT ? 0 : enemyStrengthAbout(ctx, view);
   let total = 0;
   const targets = view.attackTargets(ctx.seat);
+  // the team update's members (0x73fba0 -> 0x732cd0): those whose assignment
+  // (unit +0x7d0) is no longer the operation's leave (runs/h1_duely1127 t67:
+  // city-state 3's Galley 393216, released at t66, "Not Ready" with no
+  // member, then "Recruiting minimums ... UNIT_GALLEY")
+  const gone = op.released;
+  delete op.released;
+  if (gone) for (const t of op.teams) t.members = t.members.filter((id) => !gone.includes(id));
   for (const t of op.teams) {
     teamUpdate(ctx, t);
     updateTeam(view, ctx.seat, op, t, targets);
@@ -703,18 +711,19 @@ const navalUnitsRunning: BtHandler<OpsContext> = {
   update: (_node, _run, ctx) => (opUnits(ctx.op).length > 0 ? BT_RUNNING : BT_FAILURE),
 };
 
-// NAVAL PILLAGE's execution (0x803250): the operation's units' blows on
+// NAVAL PILLAGE's execution (0x803250): the operation's job units' blows on
 // their planning's district or unit target (no line)
 const navalPillage: BtHandler<OpsContext> = {
   ...navalUnitsRunning,
-  execute: (_node, _run, ctx) => ctx.pillage?.(opUnits(ctx.op)),
+  execute: (_node, _run, ctx) => ctx.pillage?.(opJobUnits(ctx.op)),
 };
 
-// NAVAL PATROL's execution (0x803060): the operation's units, each with
+// NAVAL PATROL's execution (0x803060): the operation's job units (0x6092c0:
+// those Defend Units released not among them), each with
 // Movement left, to HL Explore's target (no line)
 const navalPatrol: BtHandler<OpsContext> = {
   ...navalUnitsRunning,
-  execute: (_node, _run, ctx) => ctx.patrol?.(opUnits(ctx.op)),
+  execute: (_node, _run, ctx) => ctx.patrol?.(opJobUnits(ctx.op)),
 };
 
 /** the unit targets Naval Choose Target's list takes (0x802ea0:
@@ -795,7 +804,8 @@ const turnLimiter: BtHandler<OpsContext> = {
 // AutoProtect Percentage (33) of its hit points, or a land unit afloat in
 // danger; the
 // marked node's execution protects the members outside Protect Outside
-// Range (-1: all) of the target; a unit it releases stays in its team
+// Range (-1: all) of the target; a unit it releases stays in its team, in no
+// job of the operation (`Operation.released`)
 const operationDefendUnits: BtHandler<OpsContext> = {
   update(node, run, ctx) {
     const pct = dataInt(node, 'AutoProtect Percentage') ?? 33;
@@ -810,8 +820,12 @@ const operationDefendUnits: BtHandler<OpsContext> = {
     const pct = dataInt(node, 'AutoProtect Percentage') ?? 33;
     const range = dataInt(node, 'Protect Outside Range') ?? -1;
     const formed = ctx.op.formations.flat();
-    for (const t of ctx.op.teams) {
-      for (const x of d.execute(t.members, ctx.op.target, pct, range, formed)) ctx.log(`${ctx.op.def}, Operation Protect Units, ${x.type}, ${x.what}`);
+    const { op } = ctx;
+    const release = (id: number) => {
+      if (!op.released?.includes(id)) (op.released ??= []).push(id);
+    };
+    for (const t of op.teams) {
+      for (const x of d.execute(t.members, op.target, pct, range, formed, release)) ctx.log(`${op.def}, Operation Protect Units, ${x.type}, ${x.what}`);
     }
   },
 };

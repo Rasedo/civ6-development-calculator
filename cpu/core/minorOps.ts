@@ -29,7 +29,7 @@ import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passReac
 import { ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
-import { NO_PLOT, opDef, opUnits } from './operations/operation';
+import { NO_PLOT, opDef, opJobUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
 import { installType, minorCanUpgrade, minorSetItem, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
@@ -200,8 +200,9 @@ export function minorOpNear(state: GameState, cs: CityState, player: number, plo
   return opsOf(cs.ops).some((o) => o.enemy === player && o.target !== NO_PLOT && plotDistance(state, o.target, plot) <= dist);
 }
 
-/** the units the minor's running operations hold */
-export const minorOpUnits = (cs: CityState): number[] => (cs.ops ? opsOf(cs.ops).flatMap(opUnits) : []);
+/** the units in a job of the minor's running operations (unit +0x7d0): their
+ *  members but those Operation Defend Units released */
+export const minorOpUnits = (cs: CityState): number[] => (cs.ops ? opsOf(cs.ops).flatMap(opJobUnits) : []);
 
 /** the units in a job of the minor (unit +0x7d0): its running operations'
  *  and its "Upgrade Units" trees' */
@@ -438,7 +439,7 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
       // unit bought this turn among them (runs/h1_duely1124 t72 city-state
       // 3's City Defense recruits no Heavy Chariot bought that turn, t73 it)
       held: () => [...(cs.upgrading ?? []), ...pass.done] });
-    for (const id of opsOf(ops).flatMap(opUnits)) {
+    for (const id of opsOf(ops).flatMap(opJobUnits)) {
       const u = state.units.find((x) => x.id === id && x.seat === cs.seat);
       if (u) passFinish(pass, u, 'Operation', u.tileIndex);
     }

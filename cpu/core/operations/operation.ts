@@ -85,6 +85,10 @@ export interface Operation {
   formations: [number, number][];
   /** the members killed that left its teams (the barbarians' operations) */
   killed?: number;
+  /** the members Operation Defend Units released (0x73d1f0: their
+   *  assignment, unit +0x7d0, to -1, the teams untouched): still its teams'
+   *  members until the next team update drops them, but in no job of it */
+  released?: number[];
 }
 
 /** the operation's AiOperationDefs row */
@@ -148,6 +152,13 @@ export function opUnits(op: Operation): number[] {
 /** the operations a higher one's recruit left with no unit in the run: each
  *  ends at its own tick, no node of its tree run (`tickTree`) */
 export const robbedOps = new WeakSet<Operation>();
+
+/** the units whose assignment (unit +0x7d0) is the operation, in team then
+ *  join order (0x6092c0 by its id): its members but those released */
+export function opJobUnits(op: Operation): number[] {
+  const out = opUnits(op);
+  return op.released ? out.filter((id) => !op.released!.includes(id)) : out;
+}
 
 /** the operation holds a living unit (a member killed stays in its team) */
 export function holdsUnits(ctx: OpsContext, op: Operation): boolean {

@@ -35,7 +35,7 @@ import { barbScoutLook, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow,
 import { barbarianCaptures, barbarianOpsTurn, barbarianTrees } from './barbarianOps';
 import { opsOf } from './operations/manager';
 import { lookCamps } from './operations/knowledge';
-import { opUnits } from './operations/operation';
+import { opJobUnits } from './operations/operation';
 import { BT_RUNNING, BT_SUCCESS } from './behaviorTree';
 import { generalAuraMP } from './aura';
 import { aiPromotionPick, attacksLeftOf, attacksPerTurn, takePromotion } from './promotions';
@@ -1850,7 +1850,7 @@ const UPGRADE_JOB = -3;
 function jobOf(state: GameState, pass: Pass, u: Unit): number {
   const cs = isBarbSeat(u.seat) ? undefined : state.cityStates.find((c) => c.seat === u.seat);
   const ai = isBarbSeat(u.seat) ? state.barbSeat.ops : cs?.ops;
-  if (ai) for (const o of opsOf(ai)) if (opUnits(o).includes(u.id)) return o.id;
+  if (ai) for (const o of opsOf(ai)) if (opJobUnits(o).includes(u.id)) return o.id;
   if (cs?.upgrading?.includes(u.id)) return UPGRADE_JOB;
   return pass.units.includes(u) ? PASS_JOB : -1;
 }
