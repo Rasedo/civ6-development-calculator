@@ -258,7 +258,9 @@ export function seatResearchTurns(state: GameState, seat: number): (type: string
     civic = civicAnalysis(state, seat, culture).map((e) => ({ id: e.civic, next: e.next, turns: e.turns, owned: e.owned }));
     techLeft = r.tech ? turnsAt(researchCost(state, r.tech, false, seat) * FX - fxOf(r.techProgress), fxOf(science)) : -1;
   }
-  const civicLeft = r.civic ? turnsAt(researchCost(state, r.civic, true, seat) * FX - fxOf(r.civicProgress), fxOf(culture)) : -1;
+  // GetTurnsLeftOnCurrentCivic (0x39c1f0 -> 0x39c0e0): the civic's progress
+  // plus the completion overflow its next Culture pays in (+0xb40)
+  const civicLeft = r.civic ? turnsAt(researchCost(state, r.civic, true, seat) * FX - fxOf(r.civicProgress + (r.civicOverflow ?? 0)), fxOf(culture)) : -1;
   return (type) => {
     if (type?.startsWith('CIVIC_')) return analysedTurns(civic, engineId('civic', type, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft);
     return analysedTurns(tech, type ? engineId('tech', type, 'TECH_', TECHS) : null, r.techs, r.tech, techLeft);

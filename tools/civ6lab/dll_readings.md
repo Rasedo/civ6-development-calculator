@@ -6008,3 +6008,46 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   order (`purchaseContracts`; `_minor_contract_purchases`).
 - Open: Ilkum 0 for the logged 1.0 on runs/h1_duely1117 p2 t23-32 and p3
   t44-51.
+
+## C-127: the civic in hand's turns left carry the completion overflow (0x39c1f0 -> 0x39c070 -> 0x39c0e0) — READ, both twins
+
+- THE CIVIC'S TURNS (0x621920, `analysedTurns` through `seatResearchTurns`):
+  0 for -1 or an owned entry (+0xc); else the civics AI's entry turns
+  (+0x18, 500 at 0 or below), plus, below 500, GetTurnsLeftOnCurrentCivic
+  (0x39c1f0) where the civic in hand (GetProgressingCivic 0x399a90) is neither
+  the entry's next step (+0x1c) nor the entry (+0x8). 0x39c1f0 takes the
+  queue head (+0xad0 while +0xae0 is set) into 0x39c070: the player's Culture
+  (0x392260, GameAttribute::Value) into 0x39c0e0, the cost less the progress
+  kept on it plus the bank +0xb40 — the overflow a completion leaves, which
+  the next turn's Culture pays in. The engines' turns left on the civic in
+  hand now add it (`civicLeft` in `seatResearchTurns`: `civicOverflow`;
+  `_civic_left` x2 in gpu/core/sim_cityvalue.py: `citystate_civic_ovf`), as
+  the walk's rows (0x39c0e0 from 0x621a20) already did.
+- Confirmed on runs/h1_duelv1128 Nazca (`cityBuildLab.ts --logtech`, the
+  lab deriving the overflow from the pair: the civic the record before held
+  in hand, now held, at its progress or its catch-up's cost less one, plus
+  that record's Culture): t46 Political Philosophy completed off its
+  catch-up (54 + 4.5 - 55 = 3.5): Drama and Poetry 12, Mysticism 4,
+  Theology 29 as AI_GovtPolicies logs them (13 / 5 / 32 without), the
+  Temple's T 29 + 12 + 5 + 1 = 47 and its 15.22 as logged (before: T 51,
+  past the horizon); t51 Drama and Poetry's 3.80: Mysticism in hand 4,
+  Theology 17, T 49 and 5.57 as logged. Nazca's tables 931 -> 933 exact,
+  the Temple valid on all 158 logged rows.
+- THE SIX-UNIT CUT's count (0x7b62c0's exit, `unitValueExit`): the player's
+  units as its city's analysis stands — after the turn's production (a unit
+  it made counts: duelv1128 Bologna t100 the Warrior off 313 Production,
+  cut), before its purchases (t77 Bologna's bought Builder uncounted,
+  valid) and before its units act or later players' turns (t75 Bologna's
+  Builder spending its last charge, Hong Kong t78's Swordsman killed by a
+  barbarian, t98 / t106 Bologna's two Men-at-Arms: counted that turn, cut;
+  gone the turn after, valid). The engine's `minorPhase` counts there
+  already (`units` before `minorMilitaryTurn`); the lab read the record
+  after and now counts the record before plus the unit its production made
+  (an upgrade on its unit's plot not added): Temple / Shrine onlyOurs on p2
+  7 / 8 -> 1 / 0, p3 11 / 11 -> 1 / 1.
+- Open: runs/h1_duelv1128 Bologna t133: three Men-at-Arms disbanded in
+  turn 132 at a 0 treasury (Player_Stats land units 6 / 5 / 3 at t131-133,
+  no combat) still count at the t133 analysis (Temple 4 x FX(-9999),
+  -39406.50), valid at t134: a bankrupt disband's units stay in the count
+  (player +0x12e8 +0xc0) a turn, where `bankruptcy` removes them at the
+  economy step.

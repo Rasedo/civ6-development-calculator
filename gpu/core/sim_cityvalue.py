@@ -2077,12 +2077,12 @@ class _MinorFacts:
                                sim.citystate_ai_valid[:, s]))
 
     def _civic_left(self):
-        """the turns left on the civic in hand at the city's Culture (-1
-        with none)"""
+        """the turns left on the civic in hand, its progress plus the
+        completion overflow, at the city's Culture (-1 with none)"""
         sim, s = self.sim, self.s
         cur = sim.citystate_cur_civic[:, s]
         cost = sim._research_cost(True).gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1).long()
-        prog = torch.floor(sim.citystate_civic_prog[:, s].double() * _FX + 0.5).long()
+        prog = torch.floor((sim.citystate_civic_prog[:, s].double() + sim.citystate_civic_ovf[:, s]) * _FX + 0.5).long()
         rate = torch.floor(self._total(4) * _FX + 0.5).long()
         left = _turns_at(cost * _FX - prog, rate)
         return torch.where(cur >= 0, left, torch.full_like(left, -1))
@@ -2718,12 +2718,12 @@ class _FreeFacts(_MinorFacts):
         return (self.sim.city_current[:, self.row, self.j, 0] == k) & (k >= 0)
 
     def _civic_left(self):
-        """the turns left on the civic in hand at the Free Cities' Culture
-        (-1 with none)"""
+        """the turns left on the civic in hand, its progress plus the
+        completion overflow, at the Free Cities' Culture (-1 with none)"""
         sim, s = self.sim, self.s
         cur = sim.citystate_cur_civic[:, s]
         cost = sim._research_cost(True).gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1).long()
-        prog = torch.floor(sim.citystate_civic_prog[:, s].double() * _FX + 0.5).long()
+        prog = torch.floor((sim.citystate_civic_prog[:, s].double() + sim.citystate_civic_ovf[:, s]) * _FX + 0.5).long()
         tot = self._stats()[0]
         alive = sim.city_alive[:, self.row, : tot.shape[1]]
         rate = torch.floor((tot[:, :, 4] * alive.double()).sum(dim=1) * _FX + 0.5).long()

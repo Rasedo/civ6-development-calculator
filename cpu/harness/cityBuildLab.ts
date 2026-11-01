@@ -40,7 +40,9 @@ import { researchAnalysis } from '../core/aiResearch';
 import { civicAnalysis } from '../core/aiCivics';
 import { computeCityStats } from '../core/city';
 import { minorCity } from '../core/cityStates';
-import { isCiv } from '../core/seats';
+import { isCiv, majorsAlive } from '../core/seats';
+import { researchCost } from '../core/economy';
+import { MINOR_CATCHUP_PCT } from '../data/cityStates';
 import { UNITS } from '../data/units';
 import { FX_MIN, fxConst } from '../core/aiValue';
 import { loadCityBuildCentre, loadCityBuildPicks, loadCityBuildTables, loadKnownUnits, newCityBuildTally, tallyBuildings, tallyRow, type CityBuildTally } from './cityBuildLog';
@@ -268,6 +270,21 @@ for (let i = 0; i + 1 < recs.length; i++) {
     const stats = computeCityStats(state, minorCity(cs));
     inHandAtAnalysis(state, cs, player, imp.dumpOfMinor.get(cs)!.name, recs[i], b, stats.total.production);
     cs.research.aiEntries = researchAnalysis(state, cs.seat, stats.total.science);
+    // the completion overflow the turn's Culture left (no record holds it):
+    // the civic the record before held in hand, now held, at its progress
+    // there (or its catch-up's cost less one) plus that record's Culture
+    {
+      const was = prevImp!.minorOfPlayer.get(player);
+      const civ = was?.research.civic;
+      if (was && civ && cs.research.civics.includes(civ) && !was.research.civics.includes(civ)) {
+        const cost = researchCost(prevImp!.state, civ, true, was.seat);
+        const majors = majorsAlive(state);
+        const caught = majors.filter((s) => state.seats[s].research.civics.includes(civ)).length >= Math.max(1, Math.floor((MINOR_CATCHUP_PCT * majors.length + 50) / 100));
+        const from = caught ? Math.max(was.research.civicProgress, cost - 1) : was.research.civicProgress;
+        const ovf = from + computeCityStats(prevImp!.state, minorCity(was)).total.culture - cost;
+        cs.research.civicOverflow = ovf > 0 ? ovf : 0;
+      }
+    }
     cs.research.civicAiEntries = civicAnalysis(state, cs.seat, stats.total.culture);
     const kb = knownUnits.get(`${turn + kbShift}:${player}`);
     // the growth its city's update read before the turn's growth: the
@@ -276,7 +293,25 @@ for (let i = 0; i + 1 < recs.length; i++) {
     if (before && before.centerIndex >= 0) cs.aiGrowth = minorCityGrowth(prevImp!.state, before);
     // the resource counts its last update kept (CityBuildAI +0x978)
     if (before && before.centerIndex >= 0) cs.resourceCounts = Object.fromEntries(minorResourceCounts(prevImp!.state, before));
-    const facts = minorBuildFacts(state, cs, args.includes('--enginekb') ? minorKnownUnits(cs) : (u) => kb?.get(u) ?? 0);
+    // its units as its turn's analysis counts them: those the record before
+    // holds, its turn's own uses and losses after the analysis kept, and
+    // the one its production made (a new unit where its queue headed a unit
+    // in the record before; a purchase follows the analysis, an upgrade
+    // stands on the plot of the unit it replaces)
+    const ownBefore = recs[i].units.filter((u) => u.owner === player);
+    const beforeIds = new Set(ownBefore.map((u) => u.id));
+    const afterIds = new Set(b.units.filter((u) => u.owner === player).map((u) => u.id));
+    const vacated = new Set(ownBefore.filter((u) => !afterIds.has(u.id)).map((u) => `${u.x}:${u.y}`));
+    const ca = recs[i].cities.find((c) => c.owner === player);
+    const cb = b.cities.find((c) => c.owner === player && c.name === ca?.name);
+    const head = ca ? minorHead(cat, ca, recs[i].head.W) : undefined;
+    const headAfter = cb ? minorHead(cat, cb, b.head.W) : undefined;
+    const completed = !!head && 'unit' in head && (!headAfter || minorItemKey(headAfter) !== minorItemKey(head)
+      || (Number(cb?.queueProgress?.[0]) || 0) < (Number(ca?.queueProgress?.[0]) || 0));
+    const made = !!head && 'unit' in head && b.units.some((u) => u.owner === player && !beforeIds.has(u.id) && !vacated.has(`${u.x}:${u.y}`)
+      && (engineRowOf(cat, 'unit', u.type) === head.unit || completed));
+    const units = ownBefore.length + (made ? 1 : 0);
+    const facts = minorBuildFacts(state, cs, args.includes('--enginekb') ? minorKnownUnits(cs) : (u) => kb?.get(u) ?? 0, false, units);
     // the inputs the port does not read, as the game's logs give them: the
     // trade AI's route value (AI_Knowledge.csv) and, under --zero, the
     // pseudo-yields whose weights are not read set to -1.0 (factor 0)
@@ -387,7 +422,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
         const parts = [facts.techTurns(brow.tech), facts.civicTurns(brow.civic), brow.district && !facts.hasDistrict(brow.district) ? facts.buildTurns(brow.district) : -1, facts.buildTurns(brow.type), facts.current];
         const rlog = brow.tech ? research.get(`${turn}:${player}:${brow.tech}`) ?? null : null;
         const cur = researching.get(`${turn}:${player}`) ?? null;
-        rows.push({ nu: state.units.filter((u) => u.seat === cs.seat).length, war: facts.atWar, t: turn, p: player, b: brow.type, log: g, ours: o, T, v, parts, rlog, cur, pop: cs.population, prod: stats.total.production, item: cs.prodItem ?? null, g: brow.housing > 0 ? { ...facts.growth, fc: facts.forecast, hv: housingValue(facts.growth, facts.forecast, brow.housing, T, 50) / 256 } : undefined });
+        rows.push({ nu: facts.unitCount, war: facts.atWar, t: turn, p: player, b: brow.type, log: g, ours: o, T, v, parts, rlog, cur, pop: cs.population, prod: stats.total.production, item: cs.prodItem ?? null, g: brow.housing > 0 ? { ...facts.growth, fc: facts.forecast, hv: housingValue(facts.growth, facts.forecast, brow.housing, T, 50) / 256 } : undefined });
       });
     }
   }
