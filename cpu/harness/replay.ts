@@ -104,7 +104,7 @@ import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
-import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
+import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, recordRoutes, type History, type Imported } from './import';
 import { AI_UNITS } from '../data/aiBuildTables';
 import { loadCityBuildCentre, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
 import { buildingTable } from '../core/aiCityBuild';
@@ -1291,6 +1291,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     mine.push(c);
   }
   copy.units = copy.units.filter((c) => !gone.has(c));
+  // ...its Traders counted against its routes as record t+1 holds them: the
+  // city's turn reads the routes its trade step after it starts and ends
+  // (runs/h1_duely1121 t150: Antioch's route ends in its turn, its Trader
+  // still out, the Scout over a Trader)
+  markRoutedTraders(ctx, b, copy, (u) => back.get(u));
   // — a city-state's units as its own engine turn left them: a unit its city
   // trained where it was made, a Builder's charges before the turn's orders
   // (record t+1's spent them); a Builder record t+1 lost (its last charge
@@ -3799,6 +3804,25 @@ function unitKeyOf(ctx: Ctx, u: Unit): string {
   return '';
 }
 
+/** each Trader of `st` on one of record `a`'s live routes, `routed`: its
+ *  route counts it against the trade capacity and no route verb spends it
+ *  (runs/h1_duely1127 t78: Hattusa's Trader 90 on its route, one Trader of a
+ *  capacity of 2, the game's UNIT_TRADER at 197.2); no more of a player's
+ *  than the routes `st` carries for it. `twin`: the unit of `st` a replay unit is */
+function markRoutedTraders(ctx: Ctx, a: TurnRecord, st = ctx.state, twin: (u: Unit) => Unit | undefined = (u) => u): void {
+  const out = new Set(recordRoutes(a).map((r) => `${r.TraderUnitPlayer}:${r.TraderUnitID}`));
+  const left = new Map<number, number>();
+  for (const [k, x] of ctx.units) {
+    const u = twin(x);
+    if (!u || u.type !== 'TRADER') continue;
+    delete u.routed;
+    if (!out.has(k) || !st.units.includes(u)) continue;
+    const n = left.get(u.seat) ?? (seatOf(st, u.seat)?.tradeRoutes ?? []).length;
+    if (n > 0) u.routed = true;
+    left.set(u.seat, n - 1);
+  }
+}
+
 /** every unit of the record (of player `only`) on its record plot with the
  *  record's moves; `keepMoves`: a unit the record holds where the engine
  *  left it keeps the engine's moves, which its rest reads */
@@ -5139,6 +5163,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const staged = stagePolicies(ctx, ds);
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);
+    markRoutedTraders(ctx, a);
     const standing = new Set(state.units);
     ctx.standing = standing;
     ctx.routeSpent = new Map();

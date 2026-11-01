@@ -757,6 +757,11 @@ export interface Unit {
    *  LEVY (`levyUnits`); absent on every other unit. It survives an upgrade
    *  (the Raven King's discount reads it) and clears when the unit returns. */
   leviedFrom?: number;
+  /** a Trader walking one of its owner's routes while it stands on the map
+   *  (the replay's record of it): the route already counts it against the
+   *  trade capacity, and no route verb spends it. An engine route spends its
+   *  Trader, so no engine game sets it. */
+  routed?: boolean;
   /** CIV6 (GOODY_METEOR_UNIT_REFUND_COST, IGNORE_RESOURCE_MAINTENANCE): a
    *  Meteor Site's grant "has no resource maintenance cost" — it burns no
    *  fuel and is never short of it, through any upgrade. */

@@ -352,7 +352,10 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
       }));
     },
     tradeRouteCapacity: (i) => tradeCapacity(state, i),
-    traders: (i) => unitsOf(state, i).filter((u) => UNITS[u.type]?.trader).length,
+    // a Trader out on a route is one of them: the engine's route spent its
+    // unit, a record's stands on the map, `routed`
+    traders: (i) => (seatOf(state, i)?.tradeRoutes ?? []).length
+      + unitsOf(state, i).filter((u) => UNITS[u.type]?.trader && !u.routed).length,
     // a city-state's or the Free Cities' trade AI's route value
     // (`minorTradeValue`, `freeTradeValue`); a major's
     // is not read

@@ -275,7 +275,8 @@ export interface AiValueView {
   /** the plots the city owns within its three rings (the
    *  COLLECTION_CITY_PLOT_YIELDS walk, 0x69feb0) */
   cityOwnedPlots(seat: number, cityId: number): readonly AiPlotView[];
-  /** the seat's trade units (Units +0x1b9 bit 6) */
+  /** the seat's trade units (Units +0x1b9 bit 6), those out on its routes
+   *  with them */
   traders(seat: number): number;
   /** the trade AI's expected route value (the knowledge base's +0x6d8,
    *  AI_Knowledge.csv's TRADE VAL), raw; null where it is not read */

@@ -1287,7 +1287,7 @@ export function trainableUnits(
     // active routes (each active route embodies a spent Trader).
     if (d.trader && !state.sandbox) {
       const owned =
-        state.units.filter((u) => u.seat === seat && u.type === 'TRADER').length +
+        state.units.filter((u) => u.seat === seat && u.type === 'TRADER' && !u.routed).length +
         (seatOf(state, seat)?.tradeRoutes ?? []).length;
       if (owned >= tradeCapacity(state, seat)) return false;
     }

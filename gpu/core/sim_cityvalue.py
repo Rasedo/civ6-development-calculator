@@ -2406,8 +2406,8 @@ class _MinorFacts:
         return torch.minimum(sim.city_outer_hp[:, self.row, 0].long(), mx) > 0
 
     def traders(self):
-        sim = self.sim
-        return (self._mine() & (sim.major_unit_type == sim._trader_idx)).sum(dim=1)
+        # its trade units, those out on its routes with them
+        return self.sim._minor_traders(self.s)
 
     def trade_capacity(self):
         return self.sim._trade_capacity(self.row)

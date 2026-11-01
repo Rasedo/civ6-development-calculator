@@ -4672,6 +4672,10 @@
         "why": "the per-city wonder registry (see City.districts); placements are compared per tile."
       },
       {
+        "path": "Unit.routed",
+        "why": "set only by a recorded game's replay (the record's Trader standing on the map while its route runs); an engine route spends its Trader, so every engine game holds it unset."
+      },
+      {
         "path": "Unit.id",
         "why": "the join key is (tile, military/civilian); the GPU has no unit-id plane."
       },

@@ -410,7 +410,7 @@ export function routePlunderGold(state: GameState, raider: number, owner: Seat, 
 export function freeTrader(state: GameState, seat: number): Unit | undefined {
   let best: Unit | undefined;
   for (const u of state.units) {
-    if (u.seat !== seat || u.type !== 'TRADER') continue;
+    if (u.seat !== seat || u.type !== 'TRADER' || u.routed) continue;
     if (!best || u.tileIndex < best.tileIndex) best = u;
   }
   return best;

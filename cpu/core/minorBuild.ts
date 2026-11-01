@@ -878,10 +878,10 @@ function minorProjectOk(state: GameState, cityState: CityState, id: string): boo
 }
 
 /** How many Traders the minor has out or standing — what its trade capacity
- *  bounds. */
+ *  bounds: its routes, and its Traders on none. */
 function minorTraders(state: GameState, cityState: CityState): number {
   let n = (cityState.tradeRoutes ?? []).length;
-  for (const u of state.units) if (u.seat === cityState.seat && u.type === 'TRADER') n += 1;
+  for (const u of state.units) if (u.seat === cityState.seat && u.type === 'TRADER' && !u.routed) n += 1;
   return n;
 }
 
