@@ -758,13 +758,17 @@ export class RecordedActions implements ActionSource {
     });
     out0.push(...levies.values());
     // a levy's end: a major's unit removed and its city-state's added on the
-    // same plot in the next event, the same chassis, at the minor's turn
-    // (runs/h1_duelw1117 t43: China's levied Warriors home to Antananarivo;
-    // 1121 t57)
+    // same plot in the next event past the minor's research and civic
+    // changes, the same chassis, at the minor's turn (runs/h1_duelw1117 t43:
+    // China's levied Warriors home to Antananarivo; 1121 t57; h1_duely1117
+    // t120: China's Crossbowman 3080200 home to city-state 3 as 1376257 past
+    // its ResearchChanged)
     const homes = new Map<number, Extract<Decision, { kind: 'levyEnd' }>>();
     const typeOf = (key: string) => (units1.get(key) ?? a.units.find((x) => unitKey(x) === key))?.type;
     ev.forEach((r, i) => {
-      const nx = ev[i + 1];
+      let j = i + 1;
+      while (ev[j] && (ev[j][2] === 'ResearchChanged' || ev[j][2] === 'CivicChanged')) j += 1;
+      const nx = ev[j];
       if (r[2] !== 'UnitRemovedFromMap' || !nx || nx[2] !== 'UnitAddedToMap' || !majorIds.has(n(r, 0)) || !minors.has(n(nx, 0))) return;
       const from = `${n(r, 0)}:${n(r, 1)}`;
       const to = `${n(nx, 0)}:${n(nx, 1)}`;

@@ -237,7 +237,8 @@ export function holdMinorStart(fn: ((state: GameState, cityState: CityState) => 
 /** the levied army is the minor's again where it stands. The game removes
  *  each unit and makes it anew under the minor (runs/h1_duelw1117 t42:
  *  China's three levied Warriors removed, three Warriors of city-state 3
- *  added on their plots): every knowledge base's record of the unit before
+ *  added on their plots; one no plot takes is destroyed, `jumpMadeAnew`):
+ *  every knowledge base's record of the unit before
  *  is that of a unit gone, aging on (`unitMadeAnew`), and the minor's own
  *  takes the unit at its tactical turn's look, not at its return (no unit
  *  signal 0x7874a0): its own Warrior records 5 -> 8 on the turn's line;
@@ -253,11 +254,16 @@ function sendLevyHome(state: GameState, cityState: CityState): void {
 
 /** one levied unit home to its minor, made anew there (`sendLevyHome`) */
 function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
+  const major = u.seat;
   u.seat = cityState.seat;
   delete u.leviedFrom;
-  unitMadeAnew(state, u);
-  // where the minor may stand (`jumpMadeAnew`)
-  jumpMadeAnew(state, u);
+  // where the minor may stand (`jumpMadeAnew`); where none, the major's unit
+  // is gone and none of the minor's stands
+  if (jumpMadeAnew(state, u)) unitMadeAnew(state, u);
+  else {
+    u.seat = major;
+    disbandUnit(state, u.id);
+  }
 }
 
 /**

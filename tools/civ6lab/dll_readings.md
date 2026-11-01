@@ -2154,11 +2154,10 @@ UNITS rows; `--kb -1`, `--enginekb`, `--nodesire`).
   writer (C-20).
 - THE REPLAY (C-129): `holdMinorStart`, each look against the log's order,
   units made anew at a levy (`unitMadeAnew`, `levyUnits`, `levyUnitHome`,
-  `_kb_unit_anew`, `_minor_levy_return`), a city-state's own losses at its turn
-  start (`recordOwnLoss` / `_kb_own_loss`), the founding Settler's record
+  `_kb_unit_anew`, `_minor_levy_return`), the founding Settler's record
   (`placeCityStateAt`'s `settlerSeen`), the roster by serial
   (runs/h1_duely1117 t179); runs/h1_dueld1117 t77, runs/h1_dueld1121, h1_duely1121 / 1124 / 1127 / 1128.
-  Open: the second kind of turn-start loss (C-129).
+  Open: the bankruptcy's victim (C-129).
 - LAYER 0: no ARMY line names a religious unit or another's Trader; the own
   Trader ages from birth (runs/h1_duelw1117 city-state 3's t32 Trader)
   (`_kb_birth`).
@@ -6558,3 +6557,45 @@ turn left is AI_Research.csv's RESEARCHING row (`Ctx.researchAtTurn`).
   strike (Attack Units / Wander): the enemy ships and units beside them
   now reach their plots; 1121 t28 the Scout 1441809 on 7:17 takes 8:17, the
   game's 7:15 (our danger 15 from player 1's Slinger 327682 on 6:14).
+
+## C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins
+
+- THE TRANSFER (0x93fa10, the unit manager's vtable +0x80 at 0xd92c18; the
+  levy's return 0x4502b0 calls it with the 5th argument 1): the old unit is
+  destroyed (vtable +0x60, 0x941130), a new one of the new owner made off
+  the map (vtable +0x48), then placed at the old plot by 0x586d40 with flags
+  1 and 0x10. Placement answering 0 destroys the new unit (0x93ff0b): no
+  unit of the new owner stands. 0x4502b0 destroys each levied unit instead
+  of transferring it where the minor is dead (Player +0x728, the alive flag
+  IsAtWarWith and CanEarnGreatPeople read). The placement's own plot is the
+  location test 0x586360: terrain, another player's closed ground or
+  district, a hostile defender; never another's civilian nor the owner's
+  own units.
+- Ported: `jumpMadeAnew` / `_jump_made_anew` answer whether a plot took the
+  unit; `levyUnitHome` and `levyUnits` destroy the unit where none did (its
+  records not those of a unit made anew: no unit stands under the new id),
+  `_jump_made_anew` clears it from the pool. The unit's own plot is kept
+  past another player's civilian and its own units, refused by a hostile
+  military unit (`unitIsMilitary` and `unitsHostile`; the GPU's military and
+  embarked planes through `_seats_hostile`).
+- Confirmed: runs/h1_duely1124 t82, China's levied Warrior 1638402 on
+  city-state 2's ground 13:14 removed at city-state 3's start with no unit
+  added (no plot round it revealed to city-state 3): city-state 3's and
+  city-state 2's knowledge bases t82-t103 as the aimem log sites hold them.
+  runs/h1_duely1117 t42, the levied Warrior 720902 home as 655361 on 36:13
+  under China's Trader, city-state 3's records at t42 as logged.
+- A BANKRUPTCY'S DISBAND (`bankruptcy`) comes at the player's start between
+  its research and civic steps, before the tactical look (0x785f30): the
+  disbanded unit's own record keeps its last sighting, aging on. Every
+  city-state loss of the five duely duels at its start removed between the
+  ResearchChanged and CivicChanged events, the treasury at 0 after it, logs
+  one age past its last sighting (1117 t184 Bombard 1835012; 1121 t165
+  Skirmisher 2293760, t178 2818053, t185 2883588; 1128 t132 Man-at-Arms
+  2031619, t178 Line Infantry 2490374); the losses after ResearchChanged(-1)
+  (the AI's research job, its tactical look before) with gold left log age
+  0 (1117 t104 / t179 / t240, 1124 t118 / t130, 1127 t51 / t122, 1128
+  t98 / t117). The engines record no loss (`bankruptcy` /
+  `_bankruptcy`).
+- Open: the bankruptcy's victim — the game's 1128 t132 Man-at-Arms 2031619
+  and t178 Line Infantry 2490374 stand after units with upkeep earlier in
+  the record's roster (`bankruptcy` takes the first).

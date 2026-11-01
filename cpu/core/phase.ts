@@ -14,7 +14,7 @@ import type { FeatureId } from '../../world/types';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { atRngPoint, randRange } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatTallies, seatGrowth, commitProduction } from './seatTurn';
-import { cityAtIndex, spawnUnit, unitStackSlot, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
+import { cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
@@ -67,7 +67,7 @@ import { logDistrictCost } from './difflog';
 import { canBuildRoad, canBuildRailroad, canPlaceDistrictIn, canPlaceWonder, suzerainNames, adjacentPlotRowOk, adjacentPlotTarget, portalExit, PORTAL_MP, validImprovementsIn, wonderExists } from './rules';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
-import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, recordOwnLoss, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons } from './units';
+import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, unitMadeAnew, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, cityGarrisons } from './units';
 import { killUnit } from './combat';
 import { adoptBeliefs, itemCost, unitProdCost, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -403,11 +403,11 @@ const JUMP_RADIUS = 12;
 /**
  * A UNIT MADE ANEW (a levy, its return) stands where its new owner may: its
  * own plot where no other player's district or wonder stands, nor (for a
- * minor's unit) another player's ground, nor another player's unit or one of
- * its stacking class; else the first plot of the rings round it in the
- * game's ring order (`ringPlots`) passing the same and revealed to its owner,
- * that it may enter (`tileFreeForUnit`: a major's where the borders stand
- * open). runs/h1_duely1117 t42 China's Warrior on its centre 561 home to
+ * minor's unit) another player's ground, nor a hostile defender; else the
+ * first plot of the rings round it in the game's ring order (`ringPlots`)
+ * passing the first two, revealed to its owner, that it may enter
+ * (`tileFreeForUnit`: no other player's unit nor one of its stacking class,
+ * a major's where the borders stand open). runs/h1_duely1117 t42 China's Warrior on its centre 561 home to
  * city-state 3 on 648, the first ground of no owner two rings out (608 and
  * 692, unowned, kept); t74 city-state 3's Heavy Chariot levied off its
  * centre 614 onto 613, the ring's second plot (its first water); t76 the
@@ -415,8 +415,13 @@ const JUMP_RADIUS = 12;
  * runs/h1_duely1121 t56 Hunza's Warriors off China's ground 405 -> 361,
  * 404 -> 360 (361 taken), 493 -> 494, and two past the plots Hunza never
  * revealed (534 -> 359, 577 -> 316).
+ * Where no plot passes, the unit is not placed and is destroyed (the
+ * transfer 0x93fa10: the placement 0x586d40 answering 0, the unit manager's
+ * destroy 0x941130): false (runs/h1_duely1124 t82, China's levied Warrior
+ * 1638402 on city-state 2's ground 13:14, removed at city-state 3's start
+ * with no unit added, none of the plots round it revealed to city-state 3).
  */
-export function jumpMadeAnew(state: GameState, u: Unit): void {
+export function jumpMadeAnew(state: GameState, u: Unit): boolean {
   const revealed = isCityStateSeat(u.seat)
     ? state.cityStates.find((c) => c.seat === u.seat)?.revealed
     : seatOf(state, u.seat)?.explored;
@@ -434,15 +439,19 @@ export function jumpMadeAnew(state: GameState, u: Unit): void {
     if (foreign && !isCiv(u.seat)) return false;
     // a plot it goes to revealed to its owner
     if (p !== here && revealed && !revealed[p]) return false;
-    // where it stands, no other player's unit nor one of its stacking class
-    if (p === here) return unitsAt(state, p).every((x) => x === u || (x.seat === u.seat && unitStackSlot(x) !== unitStackSlot(u)));
+    // where it stands, the location test (0x586360): a hostile defender
+    // alone refuses it, never another's civilian nor its own units
+    // (runs/h1_duely1117 t42: China's levied Warrior 720902 home to
+    // city-state 3 as 655361 on 36:13 under China's Trader)
+    if (p === here) return unitsAt(state, p).every((x) => x === u || !(unitIsMilitary(x.type) && unitsHostile(state, u, x)));
     return tileFreeForUnit(state, p, u.seat, u);
   };
   for (const p of ringPlots(state, here, JUMP_RADIUS)) {
     if (!ok(p)) continue;
     u.tileIndex = p;
-    return;
+    return true;
   }
+  return false;
 }
 
 /**
@@ -468,10 +477,14 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
   }
   for (const u of army) {
     // the game removes it and adds it anew under the suzerain, where the
-    // suzerain may stand
-    unitMadeAnew(state, u);
+    // suzerain may stand, or not at all
     u.seat = seat;
-    jumpMadeAnew(state, u);
+    if (!jumpMadeAnew(state, u)) {
+      u.seat = cityState.seat;
+      disbandUnit(state, u.id);
+      continue;
+    }
+    unitMadeAnew(state, u);
     // the mark the Raven King's clauses read (its +2 Movement, +5 Combat and
     // 75% upgrade discount) and what brings the unit home
     u.leviedFrom = cityState.seat;
@@ -992,7 +1005,15 @@ function threatened(state: GameState, city: City): boolean {
  *  (runs/bankrupt_m15_20260926T083048Z.jsonl,
  *  runs/bankrupt_m35_20260926T083304Z.jsonl). The roster order is
  *  `state.units`, spawn order, the one order both engines own (the GPU's pool
- *  appends, so its lowest slot is the same unit); nothing is refunded. */
+ *  appends, so its lowest slot is the same unit); nothing is refunded. The
+ *  disband comes before the turn's tactical look: a city-state's knowledge
+ *  base keeps the unit's record as last seen, aging on (every unit the five
+ *  duely duels' city-states lose to their treasury below 0 at their start,
+ *  removed between the research and the civic steps, one age past its last
+ *  sighting on the line: 1117 t184 city-state 4's Bombard 1835012, 1121
+ *  t165 / t178 / t185 city-state 4's, 1128 t132 city-state 3's Man-at-Arms
+ *  2031619 and t178's; one lost after the AI's research job, its look
+ *  before, is at age 0) */
 export function bankruptcy(state: GameState, s: Seat, upkeepOf: (unit: Unit) => number): void {
   s.goldShortfall = goldShortfall(s.treasury);
   if (s.treasury < 0) s.treasury = 0;
@@ -1000,7 +1021,6 @@ export function bankruptcy(state: GameState, s: Seat, upkeepOf: (unit: Unit) => 
   for (let k = 0; k < n; k++) {
     const victim = state.units.find((u) => u.seat === s.seat && upkeepOf(u) > 0);
     if (!victim) return;
-    recordOwnLoss(state, victim);
     disbandUnit(state, victim.id);
   }
 }

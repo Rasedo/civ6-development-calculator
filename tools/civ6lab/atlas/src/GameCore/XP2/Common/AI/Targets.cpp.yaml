@@ -117,6 +117,7 @@
     - "C-96 / C-129: a city-state's unit production table counts the records its look's ageing keeps, none its sightings add — the aimem sites read, both twins"
     - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
     - "C-96 / C-129: a city-state's unit production table counts the records its look's ageing keeps, none its sightings add"
+    - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
   context:
     - "- THE AGEING (0x5ebb30, the first step of the tactical AI's turn 0x785f30 on player signal +0x1f8): every record's age + 1; one whose age before the step was a..."
     - "...877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785f30 and again on player signal +0x228): over every plot the player's visibility count (+0x2..."

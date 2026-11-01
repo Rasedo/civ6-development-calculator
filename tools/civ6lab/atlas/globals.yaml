@@ -564,6 +564,20 @@
   context:
     - "...FROM\") is unread. THE SECOND OFFER (0x60a8c0): the evaluator's satisfied test (vtable @0xd760f8 +8, 0xb3c380) answers false always, so after the first offer (the units in no job, not..."
   review: imported
+- addr: 0xd92c18
+  kind: global
+  name: UnitManager vtable
+  semantics: "the unit manager's vtable (set by its factory 0x93ffe0, the registry's \"UnitManager\" 0xa55410 -> 0x9417c0, index global 0xf07660, the instance 0x9406e0): +0x48 0x940f70 the create, +0x60 0x941130 the destroy, +0x80 0x93fa10 the transfer."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 82
+      value: China's levied Warrior 1638402 on city-state 2's ground 13:14 removed at city-state 3's start, no unit added
+  readings:
+    - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
+  context:
+    - "- THE TRANSFER (0x93fa10, the unit manager's vtable +0x80 at 0xd92c18; the levy's return 0x4502b0 calls it with the 5th argument 1): the old unit is destro..."
+  review: reviewed
 - addr: 0xdb11b8
   kind: global
   semantics: "the volcano component's vtable: +0x68 0xa1d2b0, +0x50 0xa1d310, +0x58 0xa1d130, +0x60 0xa1d450."

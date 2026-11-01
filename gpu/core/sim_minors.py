@@ -337,32 +337,6 @@ class SimMinors:
         self.citystate_kb_seq[rows, r, k] = nxt.to(self.citystate_kb_seq.dtype)
         self.citystate_kb_next[rows, r] = nxt + 1
 
-    def _kb_own_loss(self, s: int, rows: torch.Tensor, g: torch.Tensor) -> None:
-        """`recordOwnLoss` — minor `s`'s units `g` [N] (global slots) lost at
-        its turn's start in the games `rows` [N] stand in its knowledge base
-        as seen this turn, on their plots: the record of each refreshed, else
-        one added"""
-        if not rows.numel():
-            return
-        slot = self.citystate_kb_slot[:, s]
-        own = self.citystate_kb_owner[:, s]
-        typ = self.citystate_kb_type[:, s]
-        turn = int(self.turn)
-        hp_max = int(self.rules.combat["unitHp"])
-        for bi, gi in zip(rows.tolist(), g.tolist()):
-            hit = ((slot[bi] == gi) & (own[bi] == 100 + s) & (typ[bi] == int(self.unit_type[bi, gi]))).nonzero(as_tuple=True)[0]
-            if hit.numel():
-                k = int(hit[0])
-                self.citystate_kb_seen[bi, s, k] = turn
-                self.citystate_kb_plot[bi, s, k] = int(self.unit_tile[bi, gi])
-                self.citystate_kb_damage[bi, s, k] = hp_max - int(self.unit_hp[bi, gi])
-                continue
-            b1 = torch.tensor([bi], device=self.device)
-            self._kb_birth(s, 100 + s, b1, torch.tensor([gi], device=self.device))
-            k = int(((slot[bi] == gi) & (own[bi] == 100 + s)).nonzero(as_tuple=True)[0][-1])
-            self.citystate_kb_seen[bi, s, k] = turn
-            self.citystate_kb_damage[bi, s, k] = hp_max - int(self.unit_hp[bi, gi])
-
     def _kb_unit_anew(self, rows: torch.Tensor, g: torch.Tensor) -> None:
         """`unitMadeAnew` — global units `g` [N] of the games `rows` [N]
         made anew under another owner (a levy, its return home): every
@@ -421,7 +395,8 @@ class SimMinors:
         district or wonder stands, nor (for a minor's unit) another player's
         ground, nor another player's unit; else it goes to the first plot of
         the rings round it (`barb_ring_table`, the game's ring order) passing
-        the same, revealed to `seat` and free for it (`_spot_free`)."""
+        the same, revealed to `seat` and free for it (`_spot_free`); one no
+        plot takes is destroyed."""
         if not bool(m.count_nonzero()):
             return
         ring = getattr(self, "_jump_ring", None)
@@ -452,17 +427,24 @@ class SimMinors:
             ok = (cand >= 0) & ~(foreign & built) & rev.gather(1, cc)
             if minor:
                 ok = ok & ~foreign
-            # where it stands: no other player's unit, itself aside
+            # where it stands, the location test (0x586360): a hostile
+            # defender alone refuses it, never another's civilian nor its own
             stay = (cand[:, 0] >= 0) & ~(foreign[:, 0] & built[:, 0]) & ~(foreign[:, 0] & minor)
-            for plane in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
-                occ = plane.gather(1, here.unsqueeze(1)).squeeze(1)
-                who = torch.where(occ >= 0, self.unit_seat.gather(1, occ.clamp(min=0).unsqueeze(1)).squeeze(1),
-                                  torch.full_like(occ, -1))
-                stay = stay & ~((occ >= 0) & (occ != g) & (who != seat))
+            for plane in (self.military_at, self.embarked_at):
+                occ = plane.gather(1, here.unsqueeze(1))
+                who = torch.where(occ >= 0, self.unit_seat.gather(1, occ.clamp(min=0)), torch.full_like(occ, -1))
+                stay = stay & ~((occ >= 0) & (occ != g) & self._seats_hostile(seat, who)).squeeze(1)
             ok = ok & free
             ok[:, 0] = stay
             first = torch.where(ok, torch.arange(K, device=dev), K).min(dim=1).values
             spot = cand.gather(1, first.clamp(max=K - 1).unsqueeze(1)).squeeze(1)
+            # no plot passes: the unit is not placed, destroyed (the transfer
+            # 0x93fa10, the destroy 0x941130)
+            gone = (on & (first >= K)).nonzero(as_tuple=True)[0]
+            if gone.numel():
+                self._occ_clear(gone, here[gone], torch.full_like(gone, g))
+                self.major_unit_alive[gone, u] = False
+                self._gen_ver += 1
             go = on & (first > 0) & (first < K)
             rows = go.nonzero(as_tuple=True)[0]
             if not rows.numel():

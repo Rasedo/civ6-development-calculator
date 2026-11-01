@@ -1865,11 +1865,20 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
       const now = copy.turn;
       copy.turn = turn;
       // ...seeing no unit the next turn's start made, nor one upgraded in the
-      // pair (runs/h1_duely1121 t116: city-state 4's Man-at-Arms on 33:20 at
-      // age 1 the next turn, no record of the Musketman it became)
+      // pair whose new unit the log takes off before the look (runs/h1_duely1121
+      // t116: city-state 4's Man-at-Arms on 33:20 at age 1 the next turn, no
+      // record of the Musketman 1507335 it became, merged into a Corps in its
+      // turn); one upgraded at an earlier start stands in its new chassis
+      // (runs/h1_duely1128 t89: city-state 2's Swordsman 1179650 upgraded at
+      // its start to the Man-at-Arms 1507331 on 8:6, at age 0 in its own end
+      // look and city-state 3's)
       const unborn = unbornUnits(ctx, b);
       const all = copy.units;
-      copy.units = all.filter((x) => !unborn.has(twin.get(x)!) && !upgraded.has(x));
+      const goneBefore = (x: Unit) => {
+        const off = removedAt.get(keyOf.get(twin.get(x)!) ?? '');
+        return end === undefined || (off !== undefined && off < end);
+      };
+      copy.units = all.filter((x) => !unborn.has(twin.get(x)!) && !(upgraded.has(x) && goneBefore(x)));
       minorKnowledge(copy, c, false);
       copy.units = all.filter((x) => !revived.includes(x) && !seized.some(([y]) => y === x && !kept.has(y)));
       for (const [x, f] of seized) Object.assign(x, f);
