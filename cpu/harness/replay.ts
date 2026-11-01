@@ -1294,6 +1294,14 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   // a city-state's research in its actions is its start's, which record
   // t+1 holds (its embarking), and the majors' as their actions left it
   // (the open-borders civic that closes their ground)
+  // — a technology record t+1 holds that a city-state's start left it short
+  // of is one the game completed at that start: its "Upgrade Units" trees'
+  // trigger (runs/h1_duely1128 Bologna t154-155: a tree each turn holds its
+  // units, no tactical row)
+  for (const c of copy.cityStates) {
+    const r = seatOf(ctx.next.state, c.seat)?.research;
+    if (r?.techs.some((x) => !c.research.techs.includes(x))) c.upgradeTrigger = true;
+  }
   for (const s of [...copy.cityStates, ...copy.seats]) {
     const r = seatOf(ctx.next.state, s.seat)?.research;
     if (r) s.research = { ...s.research, techs: [...r.techs], civics: [...r.civics] };

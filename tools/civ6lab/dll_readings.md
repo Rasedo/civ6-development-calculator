@@ -12827,3 +12827,10 @@ City_BuildQueue.csv).
   pick's best over its pillaged Holy Site, NO BUILDS AT ALL, the Horseman
   picked above it at t32 (33.7) and t36 (47.1). Both twins: `minorQueueOk`
   / `_minor_queue_ok`.
+
+## C-99: the Upgrade Units trigger counts the technologies completed — both twins and the replay's copy
+
+`minorResearchBank` returns its technology and civic completions apart, `minorEconomy` the technologies, `minorTurn`'s `upgradeTrigger` (cpu/core/minorBuild.ts); `_minor_research_bank` / `_minor_economy` / `mops_upg_trig` (gpu/core/sim_minors.py). The replay's copy (`minorAi`, cpu/harness/replay.ts) also raises the trigger for a technology record t+1 holds that the start left the city-state short of: there the start's completion is the record's, not the bank's.
+- Confirmed: runs/h1_duely1128 Bologna t154-155, the game's new trees hold its four units (no tactical row; 2228224 444 -> 357, 1179650 on 399); the copy's plots now 3 of 4 the record's, where its units wandered.
+- Open: the game's AI memory names no tree member at the log site those turns, so the score reads the rows "(no row)" against ours "Upgrade Units".
+- Open: City Defense's recruits, runs/h1_duely1121 t31 city-state 2. The recruit rule matches; the operation's enemy strength does not (the game's "Enemy Str: 30 / 25.0", ours 55: the knowledge base's Quadrireme within 3 of 11:5 a turn early, C-129), so ours recruits a fourth Warrior, 589826.

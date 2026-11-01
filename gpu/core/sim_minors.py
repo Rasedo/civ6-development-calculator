@@ -38,8 +38,7 @@ class SimMinors:
             # its units' fuel, out of the same bank, before its grid
             self._seat_charge_upkeep(self._CITY_MINOR0 + s)
             self._minor_power(s)
-            techs_was = self.citystate_techs[:, s].sum(dim=1)
-            self._minor_economy(s)
+            techs = self._minor_economy(s)
             self._store_unit_strength(s, alive)
             self._minor_build(s, self._minor_production(s))
             # its city AI's update reads, between the production and the
@@ -65,7 +64,7 @@ class SimMinors:
             self._cv_counted[s] = self._cv_known(s, before)
             # its "Upgrade Units" trees' trigger: a technology gained
             # (`minorTurn`: a civic gained alone starts none)
-            self.mops_upg_trig[:, s] |= alive & (self.citystate_techs[:, s].sum(dim=1) > techs_was)
+            self.mops_upg_trig[:, s] |= alive & (techs > 0)
             # its city AI ran before this turn (the City Analysis job's list
             # takes none the turn the city is founded)
             ran = self.citystate_ai_on[:, s].clone()
@@ -1115,13 +1114,14 @@ class SimMinors:
         it, Gold banks into `citystate_treasury` and pays the minor's units'
         upkeep — each unit's own Maintenance, a minor carrying no card that
         cuts it — and meets the `_bankruptcy` every seat meets, and Faith
-        banks into `citystate_faith`. Returns [B] long, the upgrade trigger's
-        count."""
+        banks into `citystate_faith`. Returns [B] long, the technologies completed (the upgrade trigger's
+        count)."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
         keep = alive.double()
         tot = self._seat_city_stats(row, record=False)[0][:, 0]  # [B, 6], zero where the city is dead
-        gained = self._minor_research_bank(s, tot[:, 3] * keep, tot[:, 4] * keep)
+        techs, civics = self._minor_research_bank(s, tot[:, 3] * keep, tot[:, 4] * keep)
+        gained = techs + civics
         if bool((gained > 0).count_nonzero()):
             fresh = self._seat_city_stats(row, record=False)[0][:, 0]
             tot = torch.where((gained > 0).unsqueeze(1), fresh, tot)
@@ -1133,7 +1133,7 @@ class SimMinors:
         maint = self._unit_maintenance(self.unit_type, self.unit_formation, self.unit_levied).double()
         self.citystate_treasury[:, s] = self._bankruptcy(row, paid, alive, maint)
         self.citystate_faith[:, s] += tot[:, 5] * keep
-        return gained
+        return techs
 
     def _minor_production(self, s: int) -> torch.Tensor:
         """[B] — the Production minor `s`'s city makes as it stands now, for
@@ -1247,9 +1247,9 @@ class SimMinors:
         game every turn) — the bank (`_minor_research_bank`) and the AIs' turns
         (`_minor_research_turn`) at once. Returns [B] long, how many trees
         completed a row."""
-        gained = self._minor_research_bank(s, sci, cul)
+        techs, civics = self._minor_research_bank(s, sci, cul)
         self._minor_research_turn(s, sci, cul)
-        return gained
+        return techs + civics
 
     def _minor_research_turn(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> None:
         """`minorResearchTurn` for research row `s`: the research AI analyses
@@ -1268,7 +1268,7 @@ class SimMinors:
         tot = self._seat_city_stats(self._CITY_MINOR0 + s, record=False)[0][:, 0]
         self._minor_research_turn(s, tot[:, 3] * keep, tot[:, 4] * keep)
 
-    def _minor_research_bank(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> torch.Tensor:
+    def _minor_research_bank(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`minorResearchBank` for research row `s` — a city-state's, or the
         Free Cities' — the TECHNOLOGIES first: the CATCH-UP (`minorCatchUp`,
         read inline), the turn's Science (`sci` [B]) and the overflow bank, a
@@ -1280,12 +1280,13 @@ class SimMinors:
         (`_cai_completion`). CIV6 (Urban Defenses): the tech "builds modern
         fortifications around the City Centers of all current and future
         cities and their Encampment districts", so the holder's perimeters
-        arrive at the urban tier's full pool. Returns [B] long, how many trees
-        completed a row — the upgrade trigger's count."""
+        arrive at the urban tier's full pool. Returns two [B] long, the technologies and
+        the civics completed."""
         free = s == self.FR
         alive = (torch.ones(self.B, dtype=torch.bool, device=self.device) if free
                  else self.citystate_alive[:, s])
-        gained = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        techs = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        civics = torch.zeros_like(techs)
         live = self._barb_majors_alive()
         need = ((int(self.rules.citystate["catchUpPct"]) * live.sum(dim=1) + 50) // 100).clamp(min=1)
 
@@ -1319,7 +1320,7 @@ class SimMinors:
         c = self.citystate_cur_tech[:, s].clone()
         cval = rc.gather(1, c.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
         fire = alive & (c >= 0) & (prog[:, s] >= cval)
-        gained = gained + fire.long()
+        techs = techs + fire.long()
         if bool(fire.count_nonzero()):
             self.citystate_techs[fire, s, c[fire]] = True
             prog[:, s] = torch.where(fire, prog[:, s] - cval, prog[:, s])
@@ -1352,7 +1353,7 @@ class SimMinors:
         c = cur[:, s].clone()
         cval = rc.gather(1, c.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
         fire = alive & (c >= 0) & (prog[:, s] >= cval)
-        gained = gained + fire.long()
+        civics = civics + fire.long()
         if bool(fire.count_nonzero()):
             have[fire, s, c[fire]] = True
             prog[:, s] = torch.where(fire, prog[:, s] - cval, prog[:, s])
@@ -1360,7 +1361,7 @@ class SimMinors:
             cur[:, s] = torch.where(fire, torch.full_like(c, -1), c)
             self._eff_version += 1
             self._cai_completion(s, fire, torch.where(fire, c, torch.full_like(c, -1)), cul)
-        return gained
+        return techs, civics
 
     def _minor_urban_fit(self, s: int, hit: torch.Tensor) -> None:
         """`minorResearch`'s Urban Defenses fit: the centre's perimeter and its

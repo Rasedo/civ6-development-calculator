@@ -110,8 +110,7 @@ export function minorPhase(state: GameState): void {
     // order: `chargeUnitUpkeep`)
     chargeUnitUpkeep(state, cityState.seat);
     minorPower(state, cityState);
-    const techsWas = cityState.research.techs.length;
-    minorEconomy(state, cityState);
+    const techs = minorEconomy(state, cityState);
     storeUnitStrength(state, cityState.seat);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
     // its city AI's forecast, between the production and the growth: of the
@@ -148,7 +147,7 @@ export function minorPhase(state: GameState): void {
     // over the five duely duels a tech gain is followed by a new tree on
     // 1042 of 1061 minor-turns, a civic gain with no tech on 68 of 446
     // (runs/h1_duely1124 t84 city-state 4, runs/h1_duely1128 t139 Bologna)
-    if (cityState.research.techs.length > techsWas) cityState.upgradeTrigger = true;
+    if (techs > 0) cityState.upgradeTrigger = true;
     minorAiTurn(state, cityState, fresh, units);
     delete cityState.armyCounted;
     minorTrade(state, cityState, !ordersHeld);
@@ -290,21 +289,21 @@ export function minorResearchAi(state: GameState, cityState: CityState): void {
  * (`minorResearchBank`); then, off the city as that research left it, its Gold
  * banks and pays its units' upkeep — each unit's own Maintenance, a minor
  * carrying no government or policy that cuts it — and meets the
- * `bankruptcy` every seat meets, and its Faith banks. Returns how many trees
- * completed a row, the upgrade trigger's count.
+ * `bankruptcy` every seat meets, and its Faith banks. Returns how many
+ * technologies it completed, the upgrade trigger's count.
  */
 export function minorEconomy(state: GameState, cityState: CityState): number {
   let y = computeCityStats(state, minorCity(cityState)).total;
   const gained = minorResearchBank(state, cityState.research, cityState.seat, y.science, y.culture,
     () => minorCityTerms(state, cityState), () => minorUrbanFit(state, cityState), minorTechContracts(cityState));
-  if (gained > 0) y = computeCityStats(state, minorCity(cityState)).total;
+  if (gained.techs + gained.civics > 0) y = computeCityStats(state, minorCity(cityState)).total;
   let upkeep = 0;
   for (const u of state.units) if (u.seat === cityState.seat) upkeep += unitMaintenance(u);
   cityState.treasury += y.gold;
   cityState.treasury -= upkeep;
   bankruptcy(state, cityState, (u) => unitMaintenance(u));
   cityState.faith += y.faith;
-  return gained;
+  return gained.techs;
 }
 
 /**
@@ -356,7 +355,7 @@ export function minorResearch(state: GameState, r: ResearchState, seat: number, 
   contracts: readonly TechContract[], stood = true): number {
   const gained = minorResearchBank(state, r, seat, science, culture, terms, urban, contracts);
   minorResearchTurn(state, r, seat, science, culture, terms, contracts, stood);
-  return gained;
+  return gained.techs + gained.civics;
 }
 
 /**
@@ -369,19 +368,19 @@ export function minorResearch(state: GameState, r: ResearchState, seat: number, 
  * and their Encampment districts" — `urban` fits the holder's cities on its
  * completion. `terms` gives the analyses their city terms
  * (`minorResearchTerms`), `contracts` the seat's Tech Contracts. Returns how
- * many trees completed a row.
+ * many technologies and civics it completed.
  */
 export function minorResearchBank(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
   terms: () => ReturnType<typeof minorResearchTerms> | undefined, urban: () => void,
-  contracts: readonly TechContract[]): number {
-  let gained = 0;
+  contracts: readonly TechContract[]): { techs: number; civics: number } {
+  const gained = { techs: 0, civics: 0 };
   minorCatchUp(state, r, false, seat);
   r.techProgress += science + (r.techOverflow ?? 0);
   r.techOverflow = 0;
   const cur = r.tech;
   const cost = cur ? researchCost(state, cur, false, seat) : Infinity;
   if (cur && r.techProgress >= cost) {
-    gained += 1;
+    gained.techs += 1;
     r.techProgress -= cost;
     if (!r.techs.includes(cur)) r.techs.push(cur);
     delete r.techRetained[cur];
@@ -397,7 +396,7 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
   const civ = r.civic;
   const civCost = civ ? researchCost(state, civ, true, seat) : Infinity;
   if (civ && r.civicProgress >= civCost) {
-    gained += 1;
+    gained.civics += 1;
     r.civicProgress -= civCost;
     if (!r.civics.includes(civ)) r.civics.push(civ);
     delete r.civicRetained[civ];
