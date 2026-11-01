@@ -12377,3 +12377,31 @@ Heal in `_minor_pass` / `_free_tactics` (gpu/core/sim_tactics.py);
   0x9766c0, a plot command of kind 5): no plot-yield change among them, so
   what moves runs/h1_duely1128 t5 Hong Kong's citizen off its drought plot
   316 (to 362) before its analysis stays unread.
+
+## C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins
+
+`upgradeArrived` in `upgradeTreesTick` (cpu/core/minorOps.ts); Move Unit's
+update in `_mops_upgrade_trees` (gpu/core/sim_minorops.py).
+
+- MOVE UNIT'S UPDATE (0x7f0020; no Location from 0x7f067c, READ): no unit
+  in the tree, SUCCESS (1). Else over the tree's units (0x6092c0), each with
+  a target (+0x830 / +0x834 valid): with a planning (+0x1fc0) reaching the
+  target this turn (0x791300: 1 turn, no Movement asked) and Allow Danger
+  false, a target on the danger map (0x716a60) passes; else its planning
+  reaching the target this turn with Movement left (r9b 1) passes; no
+  planning, or neither, RUNNING (2). Every unit passing, SUCCESS: the tree
+  ends and frees its units. A unit with no target passes.
+- The engines check it after Upgrade Units' execution and the deletion,
+  before Move Unit's execution: on SUCCESS the trees end and their units'
+  turns are done. Confirmed: runs/h1_duely1128 Bologna (city-state 3) at 0
+  Gold, its Upgrade Units tree 5963782 holds four units at t151-153 (aimem
+  `assigned`), which walk to its centre; the tree is gone at t154 and the
+  units wander from t156 (AI_Tactical.csv), where the engines held them to
+  t171 (77 carried cityState.move.family rows Upgrade Units / Wander).
+- LAB: Operation Defend Units' ship release (0x73d1f0). runs/h1_duely1127
+  t113-114: Naval Superiority's Galley 393216 leaves its team (empty from
+  t114). But t66-75 the same Galley (damage 34 then 60, 30:19) stays in the
+  team. Taking every hurt ship off friendly ground out of its team after
+  the run lowered ops.members on 1127 (1202 -> 1137 carried), so what tells
+  the two turns apart (its Movement, the ground, the endangered move of
+  t112 before it) is unread.

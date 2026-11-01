@@ -3347,6 +3347,7 @@
     - cpu/core/aiCityTrees.ts:CityTreeWorld
     - gpu/core/sim_minorai.py:danger
     - cpu/core/minorOps.ts:upgradeMove
+    - cpu/core/minorOps.ts:upgradeArrived
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -3355,6 +3356,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+    - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the..."
   context:

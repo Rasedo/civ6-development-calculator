@@ -308,6 +308,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t is suzerain of, an ally's; 2 no one's; 3 another's) is released from the operation (0x73d1f0: its operation field +0x778 to -1, out of every team); one fortified afloat to its safe..."

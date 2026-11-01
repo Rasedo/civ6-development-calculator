@@ -234,6 +234,8 @@ const UPGRADE_TREE_PRIORITY = AI_TRIGGERED_TREES.find((t) => t.tree === 'Upgrade
  *    trees (runs/h1_duelw1121 city-state 3's Galley, taken from Naval
  *    Superiority at t89 as Cartography lands, the operation completing
  *    empty, home by t91, a Caravel from t92);
+ *  - MOVE UNIT'S UPDATE (`upgradeArrived`): every unit reaching its target
+ *    this turn, the trees end SUCCESS, their units' turns done;
  *  - FIND UNIT TARGETS (0x7ed200, Nearest Owned City; its job 0x7eba40) and
  *    MOVE UNIT'S EXECUTION (0x7eeba0, no Location, `upgradeMove`): each unit
  *    left goes for the minor's city centre, a ship for a coastal centre or
@@ -313,9 +315,32 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
     }
     if (unupgradedDeleted(state, cs, u)) drop(u);
   }
+  // Move Unit's update: SUCCESS ends the trees, their units' turns done
+  if (upgradeArrived(state, pass, order(held), targets)) {
+    for (const u of order(held)) passFinish(pass, u, UPGRADE_MOVE, u.tileIndex);
+    delete cs.upgrading;
+    return;
+  }
   for (const u of order(held)) upgradeMove(state, pass, u, targets.get(u.id) ?? -1);
   for (const u of order(held)) passFinish(pass, u, UPGRADE_MOVE, u.tileIndex);
   cs.upgrading = order(held).map((u) => u.id);
+}
+
+/** MOVE UNIT'S UPDATE with no Location (0x7f0020 at 0x7f067c): SUCCESS where
+ *  every unit with a target (+0x830) passes — its planning in the pass
+ *  (+0x1fc0, `passReachAt`) reaching the target this turn, the target on the
+ *  danger map (0x716a60, Allow Danger false), or reaching it this turn with
+ *  Movement left; one with no planning, or reaching it neither way, keeps
+ *  the tree RUNNING. The trees end on its SUCCESS (runs/h1_duely1128
+ *  Bologna t151-153: its four units held at 0 Gold walk to its centre 4:9,
+ *  the tree gone at t154, the units wandering from t156) */
+function upgradeArrived(state: GameState, pass: Pass, units: readonly Unit[], targets: ReadonlyMap<number, number>): boolean {
+  return units.every((u) => {
+    const p = targets.get(u.id) ?? -1;
+    if (p < 0) return true;
+    if (pass.danger[p] > 0 && passReachAt(state, pass, u, p, 1, false, 0) >= 0) return true;
+    return passReachAt(state, pass, u, p, 1, true, 0) >= 0;
+  });
 }
 
 /** MOVE UNIT'S EXECUTION with no Location (0x7eeba0 from 0x7eee6a) for a

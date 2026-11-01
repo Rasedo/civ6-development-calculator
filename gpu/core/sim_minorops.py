@@ -1406,6 +1406,19 @@ class SimMinorOps:
             self._occ_clear(rows, self.major_unit_tile[rows, slots], slots + self.POOL_LO["major"])
             self.major_unit_alive[rows, slots] = False
             held &= ~drop
+        # MOVE UNIT'S UPDATE (`upgradeArrived`): every held unit with a target
+        # whose planning in the pass reaches it this turn — on the danger map,
+        # or with Movement left — the trees end SUCCESS, their units' turns done
+        row = op["rowof"][:, :P]
+        rc, tc = row.clamp(min=0), target.clamp(min=0)
+        rt = op["res"]["turns"][rc, tc]
+        rm = op["res"]["moves"][rc, tc]
+        hot = op["danger"].gather(1, tc) > 0
+        passes = (target < 0) | ((row >= 0) & (rt == 1) & (hot | (rm > 0)))
+        ended = live & (~held | passes).all(dim=1)
+        done |= held & ended.unsqueeze(1)
+        held &= ~ended.unsqueeze(1)
+        live = live & ~ended
         order, _n = self._mops_in_order(held, u["key"])
         for j in range(order.shape[1]):
             us = order[:, j]

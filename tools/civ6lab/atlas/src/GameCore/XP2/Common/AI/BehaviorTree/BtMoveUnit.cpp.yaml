@@ -102,11 +102,18 @@
 - addr: 0x7f0020
   final: 0x5580a0
   kind: function
+  name: moveUnitUpdate
+  semantics: Move Unit's update; with no Location (0x7f067c) SUCCESS where every tree unit with a target (+0x830) has a planning (+0x1fc0) reaching it this turn on the danger map (Allow Danger false) or with Movement left, else RUNNING; no units SUCCESS
   status: PARTLY
+  cases:
+    - recording: h1_duely1128
+      turn: 151-156
+      value: Bologna's Upgrade Units tree 5963782 holds four units at 0 Gold t151-153, gone at t154 once they reach the centre; the units wander from t156
   impl:
     - cpu/core/aiCityTrees.ts:moveUnit
     - gpu/core/sim_citytrees.py:_u_move
     - cpu/core/barbarianOps.ts:SCOUT_NODES
+    - cpu/core/minorOps.ts:upgradeArrived
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -114,6 +121,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
