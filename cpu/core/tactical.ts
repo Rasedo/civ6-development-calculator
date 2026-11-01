@@ -69,6 +69,10 @@ interface PNode {
   closed: boolean;
   /** a plot the unit attacks into: the path ends there */
   attack?: boolean;
+  /** the node's water as the search takes it (+0x50 bit 0x20, 0x271be0): a
+   *  plot the player revealed, or one stepped onto from a revealed plot, its
+   *  own; one stepped onto from an unrevealed plot its parent's */
+  wet: boolean;
   parent: PNode | null;
   /** the nodes it linked (the node's children, CvAStar +0x38), each with
    *  its step's DirectionTypes index */
@@ -138,6 +142,11 @@ function dropHeldCosts(): void {
  *  none, on a plot the player sees now */
 interface Ground {
   enter: (t: Tile) => boolean;
+  /** a closed plot the reach lists may hold: a revealed one (the search
+   *  entered it by `enter`), else one passing the location test alone (the
+   *  list's 0x586900 -> 0x586360: `enterable` with no unit counted), since
+   *  the search enters a plot the player never revealed whatever it is */
+  fits: (i: number) => boolean;
   zoc: (t: Tile) => boolean;
   attack: (t: Tile) => boolean;
   /** a unit at war that fights stands on the plot, on a plot the player
@@ -170,6 +179,8 @@ interface Ground {
   /** another player's ground closed to a city-state's unit (`closedToMinor`) */
   closed: (i: number) => boolean;
 }
+
+const NO_FOES: ReadonlySet<number> = new Set();
 
 function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, anyGround = true,
   mates: readonly Unit[] = []): Ground {
@@ -283,6 +294,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       seenZocs.set(i, v);
       return v;
     },
+    fits: (i) => revealed(i) || enterable(state, unit, state.map.tiles[i], NO_FOES, embarks),
     enter: (t) => {
       let v = enters.get(t.index);
       if (v === undefined) {
@@ -401,7 +413,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   // other search on its Movement left
   const startMoves = fromFull ? unitFullMoves(state, unit) : unit.movesLeft;
   const start: PNode = { tile: unit.tileIndex, g: 0, tie: 0, moves: Math.floor(startMoves * FIX / MP_SCALE),
-    turns: 1, closed: false, parent: null };
+    turns: 1, closed: false, parent: null, wet: isWater(map.tiles[unit.tileIndex]) };
   nodes.set(start.tile, start);
   // the start is priced too, linked from itself
   onLink?.(start.tile, start.tile, start.turns, start.moves, false);
@@ -451,8 +463,14 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     for (let di = 0; di < DIRECTION_TYPES.length; di++) {
       const d = DIRECTION_TYPES[di];
       const to = neighborTile(map, from, d);
-      if (!to || cliffBlocksStep(state, from, to, unit)) continue;
-      const attack = !ground.enter(to);
+      if (!to) continue;
+      // a plot the player never revealed is entered whatever it holds: the
+      // step's validity (0x2720a0 at 0x272372..0x27242e) tests the location
+      // (+0x50 bit 0x40, the domain, the embarking) on a revealed plot alone;
+      // between two such plots no movement rule runs (0x26e920)
+      const blind = blindStep(best, to);
+      if (!blind && cliffBlocksStep(state, from, to, unit)) continue;
+      const attack = ground.revealed(to.index) && !ground.enter(to);
       if (attack && !ground.attack(to)) continue;
       if (zoned && !attack) continue;
       // the step's validity (0x2720a0 at 0x272372..0x27242e): onto a revealed
@@ -479,7 +497,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // 0x2724c8) no child on the ground of a player at war with the unit's
       if (danger && best.turns <= 1 && danger.plane[to.index] > 0 && (danger.any || (danger.water && isWater(to)))) continue;
       if (danger?.war && tileSeat(to) !== NO_SEAT && tileSeat(to) !== unit.seat && unitsHostile(state, unit, { seat: tileSeat(to) })) continue;
-      const s = price(best, to, di, attack);
+      const s = price(best, to, di, attack, blind);
       if (s.turns > maxTurns) continue;
       // a path's turn may not end on a plot its own stacking unit holds, nor
       // one another player's unit at peace holds in its sight (the path
@@ -492,7 +510,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       onLink?.(to.index, best.tile, s.turns, s.moves, attack);
       const c = nodes.get(to.index);
       if (!c) {
-        const n: PNode = { tile: to.index, g: s.g, tie: 0, moves: s.moves, turns: s.turns, carry: s.carry, closed: false, parent: best, attack };
+        const n: PNode = { tile: to.index, g: s.g, tie: 0, moves: s.moves, turns: s.turns, carry: s.carry, closed: false, parent: best, attack, wet: s.wet };
         if (lo && hi && s.g >= lo.g && s.g <= hi.g) n.tie = Math.abs(s.g - lo.g) <= Math.abs(s.g - hi.g) ? -++seq : ++seq;
         nodes.set(n.tile, n);
         (best.kids ??= []).push({ node: n, di });
@@ -515,7 +533,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
         for (const k of p.kids ?? []) {
           if (p.parent === k.node) continue;
           const kt = map.tiles[k.node.tile];
-          const ks = price(p, kt, k.di, !!k.node.attack);
+          const ks = price(p, kt, k.di, !!k.node.attack, blindStep(p, kt));
           onLink?.(kt.index, p.tile, ks.turns, ks.moves, !!k.node.attack);
           if (ks.g >= k.node.g) continue;
           reparent(k.node, p, ks);
@@ -525,26 +543,34 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     }
   }
 
+  /** a step between two plots the player never revealed (node +0x51 bit 0
+   *  clear on both; the unit's own plot counts as revealed) */
+  function blindStep(p: PNode, to: Tile): boolean {
+    return p !== start && !ground.revealed(p.tile) && !ground.revealed(to.index);
+  }
+
   /** a step's turns, Movement and cost from the node `p` onto `to` (the cost
    *  callback 0x26e920 and 0x270dd0) */
-  function price(p: PNode, to: Tile, di: number, attack: boolean): { g: number; moves: number; turns: number; carry: number } {
+  function price(p: PNode, to: Tile, di: number, attack: boolean, blind: boolean): { g: number; moves: number; turns: number; carry: number; wet: boolean } {
     const from = map.tiles[p.tile];
     let pm = p.moves;
     let turns = p.turns;
     if (pm <= 0) {
       turns += 1;
-      pm = !naval && isWater(from) ? fullSea : fullLand;
+      pm = !naval && p.wet ? fullSea : fullLand;
     }
     // the step's rules, then the parent's carry on top (0x26e920: the
-    // parent's +0x20 added to the step's cost)
-    let cost = Math.floor(stepCostHeld(state, unit, from, to, di, held) * FIX / MP_SCALE) + (p.carry ?? 0);
+    // parent's +0x20 added to the step's cost); between two plots the
+    // player never revealed no rule runs: the parent's carry, else 1
+    let cost = blind ? (p.carry || FIX) : Math.floor(stepCostHeld(state, unit, from, to, di, held) * FIX / MP_SCALE) + (p.carry ?? 0);
+    const wet = blind ? p.wet : isWater(to);
     // a shore crossing carries the Movement held past the new domain's full
     // Movement to the next step (0x530420 / 0x530240: Movement left above
     // the domain's, a FreeEmbark district's crossing too; runs/h1_duely1128
     // t88: Nazca's Horseman 31:6 (1/4) embarks onto 31:5 (1/1) carrying 2,
     // 32:4 beyond it (2/0), AI_Planning.csv)
-    const cross = shoreCrossing(unit.type, from, to);
-    const maxTo = isWater(to) ? fullSea : fullLand;
+    const cross = !blind && shoreCrossing(unit.type, from, to);
+    const maxTo = wet ? fullSea : fullLand;
     let carry = cross && pm > maxTo ? pm - maxTo : 0;
     let moves = pm - cost;
     if (moves < 0) {
@@ -562,7 +588,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // Movement it leaves (0x26e570: the cost adds it)
       cost += moves;
       moves = 0;
-    } else if (moves > 0 && zoc && ground.zoc(to)) {
+    } else if (moves > 0 && zoc && !blind && ground.zoc(to)) {
       // a zone of control's step costs at least the Movement it starts with
       // (0x26f980's minimum), the parent's carry on top: with one, the step
       // is left short (0x26ed00). The danger map's search pays none: 0x26df90
@@ -586,17 +612,18 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // 12:8 and 12:9 and its water to the north after the land, AI_Planning.csv)
     const seen = ground.known(to.index);
     const ends = moves <= 0 ? 4 + (seen && tileSeat(to) !== unit.seat ? 3 : 0) : 0;
-    const wet = seen && !naval && isWater(to) ? 1000 : 0;
-    return { g: p.g + cost * 1000 + (ends + (seen ? 2 : 3) + wet) * FIX, moves, turns, carry };
+    const sea = seen && !naval && isWater(to) ? 1000 : 0;
+    return { g: p.g + cost * 1000 + (ends + (seen ? 2 : 3) + sea) * FIX, moves, turns, carry, wet };
   }
 
   /** a node made cheaper from `p`: an open one re-keyed after its new
    *  equals (0x79560) */
-  function reparent(c: PNode, p: PNode, s: { g: number; moves: number; turns: number; carry: number }): void {
+  function reparent(c: PNode, p: PNode, s: { g: number; moves: number; turns: number; carry: number; wet: boolean }): void {
     c.g = s.g;
     c.moves = s.moves;
     c.turns = s.turns;
     c.carry = s.carry;
+    c.wet = s.wet;
     c.parent = p;
     if (c.closed) return;
     c.tie = ++seq;
@@ -616,7 +643,7 @@ export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reac
   search(state, unit, maxTurns, false, (n, ground) => {
     // a plot the unit may not stand on it only passes (`stand`), its own
     // plot listed whatever holds it, none of ground closed to a city-state
-    if (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || ground.stand(n.tile)))) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    if (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || (ground.stand(n.tile) && ground.fits(n.tile))))) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   });
   return out;
@@ -1210,7 +1237,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     // (0x26d890's 0x586900 under 9 -> 0x586360's territory test; runs/
     // h1_duely1127 t70-74: city-state 4's Catapult on 10:10 lists none of
     // 11:10, the barbarian Swordsman's on player 1's ground, AI_Planning.csv)
-    if (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || ground.stand(n.tile)))) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    if (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || (ground.stand(n.tile) && ground.fits(n.tile))))) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   }, entries.length ? onLink : undefined, false, false, true);
   let wins = false;
@@ -1316,7 +1343,8 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     // a ship's strike onto land is no plot of its reach: the land a ship
     // threatens is the range of its water plots
     const naval = !!UNITS[u.type]?.naval;
-    search(state, full, 1, false, (n) => {
+    search(state, full, 1, false, (n, ground) => {
+      if (!ground.fits(n.tile)) return false;
       if (!naval || isWater(map.tiles[n.tile])) reach.push(n.tile);
       return false;
     }, undefined, true);

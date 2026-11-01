@@ -260,6 +260,7 @@
     - "C-99: the planning list's map layer and closed ground, a siege unit in Attack Units — READ (0x2665b0 -> 0x585eb0, 0x26d890's 0x586900 under 9 -> 0x586360 at 0x586624, 0x80ceb0 at 0x80d015 / 0x80d1cf), both twins"
     - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
+    - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
@@ -299,6 +300,7 @@
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-99: the planning list's map layer and closed ground, a siege unit in Attack Units — READ (0x2665b0 -> 0x585eb0, 0x26d890's 0x586900 under 9 -> 0x586360 at 0x586624, 0x80ceb0 at 0x80d015 / 0x80d1cf), both twins"
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
+    - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:

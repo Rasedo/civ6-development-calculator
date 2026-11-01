@@ -1104,6 +1104,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-99: the planning list's map layer and closed ground, a siege unit in Attack Units — READ (0x2665b0 -> 0x585eb0, 0x26d890's 0x586900 under 9 -> 0x586360 at 0x586624, 0x80ceb0 at 0x80d015 / 0x80d1cf), both twins"
+    - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...the player's type flags (+0xb0) take it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes..."
   context:
@@ -1115,7 +1116,9 @@
   kind: function
   semantics: "the reach search's list callback (0x26df90 +0x78): on NotifyList 5, or 3 with no parent (GetBest 0x781e0's close), a plot it lists (0x791270, once): one the player sees now (+0x50 & 2) only with +0x50 & 0x40 and neither 0xc, its own stacking count (+0x54) on a plot of the formation's owner; then 0x586900 under the search's flags (4 -> 8, 0x10 -> 1, 0x20 -> 2, 0x2000 -> 0x80)."
   status: PARTLY
-  readings: ["C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"]
+  readings:
+    - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
+    - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE CANDIDATE LIST (0x26df90's list callback 0x26dab0): a plot is appended on GetBest's NotifyList 3 (0x781e0, parent argument 0), once (0x79..."
@@ -2197,6 +2200,7 @@
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
+    - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
   context:
     - "...v — the row equal once priced so). The embark and disembark tests beside it (0x52fe90 / 0x52fb90, +1e6 where refused) and the mountain and canyon +1e6 the engines leave to the links..."
   review: reviewed
@@ -2213,6 +2217,7 @@
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
+    - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
   context:
     - "...Planning.csv — the row equal once priced so). The embark and disembark tests beside it (0x52fe90 / 0x52fb90, +1e6 where refused) and the mountain and canyon +1e6 the engines leave to t..."
   review: reviewed

@@ -6932,3 +6932,45 @@ tactical.ts). GPU `crowd_n` in `_tac_search`, the Wander candidates over
   Farms, Pastures, an Alcazar; 0x530240's plot test at 0x530297 on the
   FROM plot only, unexplained); 1121 4:1048577 t82-98 the sail east past
   the north landings (our path lands at 39:16).
+
+## C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins
+
+`search`'s step (`blindStep`, `price`'s `wet`), `Ground.fits` in `reachPlots`,
+`planUnit` and `dangerPlane` (cpu/core/tactical.ts); `_tac_search`'s
+`unrev6` / `blind6` / `wt` / `fits`, `_tac_enter(foes=False)`
+(gpu/core/sim_tactics.py).
+
+- THE STEP'S VALIDITY (0x2720a0 at 0x272372..0x27242e): a land formation
+  (+0x1f2) runs the embarking tests (0x52fe90 / 0x52fb90) and the location
+  test (+0x50 bit 0x40, 0x586900 under flag 1) on a child the player revealed
+  (+0x51 bit 0) alone, a naval one (+0x1f1) the location test the same: a
+  child it never revealed is valid whatever its terrain, domain or units —
+  never an attack. The turn-end tests (mountain, city, stacking) read a seen
+  node only.
+- THE NODE'S WATER (0x271be0 at 0x27203b / 0x27205b): +0x50 bit 0x20 is the
+  plot's own water (bit 0x10) where it or its parent is revealed, else the
+  parent's bit 0x20; the cost (0x26e920 at 0x26e9f2..0x26ea17) takes it for
+  the step between two unrevealed plots.
+- THE COST BETWEEN TWO UNREVEALED PLOTS (0x26e920 at 0x26eab2..0x26ead2):
+  the parent's carry (+0x20), else 0x100 (one Movement); no movement rule,
+  no cliff, no shore crossing, no zone of control. A later turn starts on
+  the pool of the parent's water as the search takes it.
+- THE LISTS (0x26d890 / 0x26dab0 -> 0x586900 -> 0x586360): a closed plot
+  never revealed is listed (the reach, the planning's reach, the danger
+  map's reach) only where the location test lets the unit stand there.
+- Confirmed (one-seed aimem traces): runs/h1_duely1117 t24-33 the
+  Galley 720906 on 31:2 "HL: Explore cur area" for the unrevealed coast 33:3
+  behind the ice, its path round the map, walking to 29:0 / 26:1 as logged
+  (the engines' "fallback" without the rule); h1_duely1121 t12 the Scout
+  131073 on 12:20 "cur region" 9:18 past the unrevealed 10:16 / 9:17, t24-26
+  "tertiary regions" 20:7 / 19:6, t29-62 Galleys 524295 / 1572882 "cur area"
+  41:19 / 43:23 / 40:18; h1_duely1124 t15-21 Scouts 524295 / 131073
+  "tertiary regions" 33:8 / 36:10 / 35:9, Galley 262147 t20-21 "cur area"
+  1:10 / 32:18; h1_duely1128 t7 Galley 524295 "cur area" 42:4.
+- Open: a move order's walk on such a path once a plot ahead is revealed
+  impassable (the game re-plans: 1117 t26 the Galley 720906 from 26:1 walks
+  25:1 / 25:2 / 25:3, the engines' path without flag 0x1000 refused by the
+  turn ends on its own units 28:18 / 30:11 on a twenty-turn route);
+  h1_duely1121 t41-77 the Scout 131073's "tertiary regions" 10:9 inside
+  China's cities, no path in the engines (the zone of control of units the
+  barbarians do not see, unread).
