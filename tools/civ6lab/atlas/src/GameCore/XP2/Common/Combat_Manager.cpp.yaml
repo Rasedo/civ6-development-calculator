@@ -232,6 +232,9 @@
     - recording: 1124
       turn: 157
       value: a military unit its city's production completes garrisons from that city's turn (1124 t157 Taiyuan grows Content).
+    - recording: h1_duely1121
+      turn: 86
+      value: "runs/h1_duely1121 t86: city-state 3's embarked Man-At-Arms on 40:20 plans 40:20 and 39:21 alone, the embarked units of player 0 on 40:19 and of city-state 4 on 41:20 closing the water beyond (AI_Planning.csv); t94 city-state 4's on 28:23 plans past player 0's Quadriremes."
   impl:
     - cpu/core/combat.ts:garrisonCS
     - cpu/core/tactical.ts:tacticalTargets
@@ -239,6 +242,9 @@
     - cpu/harness/checks.ts:fresh
     - cpu/core/tactical.ts:ARMY_RECORD_AGE
     - cpu/core/combat.ts:districtGarrisonedStrength
+    - cpu/core/tactical.ts:boarded
+    - gpu/core/sim_tactics.py:_tac_boarded
+    - cpu/core/tactical.ts:Ground
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: the garrison requirement — READ"
@@ -248,11 +254,12 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
+    - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
   context:
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units in its own order the comparator 0x523d60 keeps the..."
     - "...s with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a Mili..."
     - "...live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's unit list stands before the in-turn player's start while the plot reads t..."
-  review: imported
+  review: reviewed
 - addr: 0x209550
   final: 0x159b60
   kind: function
@@ -285,6 +292,7 @@
     - cpu/core/tactical.ts:minor
     - gpu/core/sim_tactics.py:_tac_attack_planes
     - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/tactical.ts:v
   readings:
     - "H-1: the garrison requirement — READ"
     - "H-1: a civilian stepped on — READ"
@@ -306,6 +314,23 @@
       value: Builder Capture 983046 steps from 9:12 to 8:13, no defender there
   readings:
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+  review: reviewed
+- addr: 0x20a2a0
+  final: 0x15a780
+  kind: function
+  name: a unit counts for a player's look at a plot
+  semantics: "(player, unit, flags): a unit on the map; without flag 0x100 the player's visibility count of its plot (+0x290) above 0 and, another player's unit, its stealth (+0x15f0 / +0x1650, 0x5032d0) passed; a TeamVisibility type (+0x1ba bit 8) only the player's own"
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 86
+      value: "Under 0x108 (0x586360's best defender 0x208b80) the visibility is skipped: runs/h1_duely1121 t86 city-state 3's embarked Man-At-Arms on 40:20 plans 39:21 alone, the embarked units on 40:19 and 41:20 refusing it (AI_Planning.csv)."
+  impl: [cpu/core/tactical.ts:boarded, gpu/core/sim_tactics.py:_tac_boarded]
+  readings:
+    - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
+  context:
+    - ...-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins
+    - ...nder 0x108 any other player's unit, at war or not, combat or not (flag 8), seen or not (0x20a2a0 with 0x100 skips the visibility count +0x290; a TeamVisibility type, +0x1ba bit 8, of...
   review: reviewed
 - addr: 0x20a3c0
   final: 0x15a8a0

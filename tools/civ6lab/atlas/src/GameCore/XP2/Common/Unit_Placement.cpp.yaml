@@ -46,12 +46,14 @@
     - cpu/core/tactical.ts:stackedAt
     - gpu/core/sim_tactics.py:_tac_move_to
     - cpu/core/tactical.ts:moveBarred
+    - cpu/core/tactical.ts:v
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-127: a Trader keeps none of its player's units out — ported (0x585eb0 -> 0x585d90), both twins"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
+    - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
   context:
     - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
   review: reviewed
@@ -187,6 +189,9 @@
     - recording: 1127
       turn: 69
       value: "With no flag a unit a city makes is refused by a hostile defender alone: Mexico City's Heavy Chariot 720899 made onto its centre 8:10 under city-state 3's Trader 458755 (runs/h1_duely1127)."
+    - recording: h1_duely1121
+      turn: 86
+      value: "runs/h1_duely1121 t86: city-state 3's embarked Man-At-Arms on 40:20 plans 40:20 and 39:21 alone, the embarked units of player 0 on 40:19 and of city-state 4 on 41:20 closing the water beyond (AI_Planning.csv); t94 city-state 4's on 28:23 plans past player 0's Quadriremes."
   impl:
     - cpu/core/units.ts:tileFreeForUnit
     - gpu/core/sim_masks.py:_spot_free
@@ -198,6 +203,9 @@
     - cpu/core/units.ts:spawnUnit
     - cpu/core/units.ts:domain
     - cpu/core/tactical.ts:heal
+    - cpu/core/tactical.ts:boarded
+    - gpu/core/sim_tactics.py:_tac_boarded
+    - cpu/core/tactical.ts:Ground
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -210,6 +218,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
+    - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
@@ -229,6 +238,9 @@
       value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
     - recording: 1117
       value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+    - recording: h1_duely1121
+      turn: 86
+      value: "runs/h1_duely1121 t86: city-state 3's embarked Man-At-Arms on 40:20 plans 40:20 and 39:21 alone, the embarked units of player 0 on 40:19 and of city-state 4 on 41:20 closing the water beyond (AI_Planning.csv); t94 city-state 4's on 28:23 plans past player 0's Quadriremes."
   impl:
     - cpu/core/tactical.ts:Ground
     - cpu/core/tactical.ts:reachPlots
@@ -236,10 +248,13 @@
     - cpu/core/tactical.ts:planUnit
     - gpu/core/sim_tactics.py:update_parents
     - cpu/core/tactical.ts:minor
+    - cpu/core/tactical.ts:boarded
+    - cpu/core/tactical.ts:v
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+    - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
   context:

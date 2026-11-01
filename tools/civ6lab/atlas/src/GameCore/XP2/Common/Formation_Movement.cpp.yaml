@@ -66,6 +66,7 @@
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:planningSearch
     - cpu/core/tactical.ts:turnsToPlot
+    - cpu/core/tactical.ts:v
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -367,9 +368,14 @@
     - recording: 1124
       turn: 1
       value: "The   planning's search (0x115 | 0x800 | 0x100) carries +4: none of them runs   there (the planning classifier, 1124 t1-60: applying the stacking test   takes 822 equal rows to 472)."
+    - recording: h1_duely1121
+      turn: 86
+      value: "runs/h1_duely1121 t86: city-state 3's embarked Man-At-Arms on 40:20 plans 40:20 and 39:21 alone, the embarked units of player 0 on 40:19 and of city-state 4 on 41:20 closing the water beyond (AI_Planning.csv); t94 city-state 4's on 28:23 plans past player 0's Quadriremes."
+  impl: [cpu/core/tactical.ts:boarded, gpu/core/sim_tactics.py:_tac_search]
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
     - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."
@@ -395,6 +401,9 @@
     - recording: h1_duely1121
       turn: 74
       value: "flags 2 / 8 (Move Unit's 0x100a): city-state 2's Horseman 786438 on 8:6 under Upgrade Units, every plot beside it on the danger map, holds t74-112 where its centre 11:5 stands free"
+    - recording: h1_duely1121
+      turn: 86
+      value: "runs/h1_duely1121 t86: city-state 3's embarked Man-At-Arms on 40:20 plans 40:20 and 39:21 alone, the embarked units of player 0 on 40:19 and of city-state 4 on 41:20 closing the water beyond (AI_Planning.csv); t94 city-state 4's on 28:23 plans past player 0's Quadriremes."
   impl:
     - cpu/core/tactical.ts:enterable
     - cpu/core/tactical.ts:planningSearch
@@ -404,6 +413,8 @@
     - gpu/core/sim_tactics.py:update_parents
     - cpu/core/tactical.ts:moveUnitDanger
     - gpu/core/sim_tactics.py:_move_unit_danger
+    - cpu/core/tactical.ts:boarded
+    - gpu/core/sim_tactics.py:_tac_boarded
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -414,6 +425,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-99: Move Unit's path flags 0x2 / 0x8 — READ (0x2720a0, 0x716080), both twins"
+    - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."

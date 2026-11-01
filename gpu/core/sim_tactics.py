@@ -244,6 +244,19 @@ class SimTactics:
             out |= (s != seat) & ~self._seats_hostile(seat, s) & ~trader
         return out
 
+    def _tac_boarded(self, seat: int) -> torch.Tensor:
+        """[B, T] bool — `groundOf`'s boarded for an embarked mover of
+        `seat`: another player's passenger holds the plot and no other
+        player's unit stands there unembarked (0x586360 under flag 1, the
+        best defender 0x208b80 under 0x108)."""
+        ep = self.embarked_at
+        es = torch.where(ep >= 0, self.unit_seat.gather(1, ep.clamp(min=0)), torch.full_like(ep, seat))
+        out = (ep >= 0) & (es != seat)
+        for pl in (self.military_at, self.civilian_at, self.support_at):
+            s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, seat))
+            out &= s == seat
+        return out
+
     def _tac_hostile(self, seat: int) -> torch.Tensor:
         """[B, T] bool — a unit of a player at war with `seat` holds the plot
         (an aircraft or a spy holds none)."""
@@ -556,6 +569,15 @@ class SimTactics:
         # a move order's path under flag 1 (no `explore`): the plots it revealed
         rev = self._tac_known(seat) if not explore else None
         rev_n = rev[rows] if rev is not None else None
+        # an embarked unit's: the revealed water another player's passenger
+        # holds (`groundOf`'s boarded), neither passed nor ended on
+        emb_u = getattr(self, f"{pre}_unit_emb")[rows, slots]
+        boarded_n = None
+        board_step = None
+        if bool(emb_u.count_nonzero()):
+            boarded_n = self._tac_boarded(seat)[rows] & emb_u.unsqueeze(1)
+            rev_b = self._tac_known(seat)
+            board_step = boarded_n & rev_b[rows] if rev_b is not None else boarded_n
         embarks = self._tac_embarks(rows, utype, seat)
         ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & embarks.unsqueeze(1)))  # [N, T]
         water_n = self.water[rows]
@@ -827,6 +849,12 @@ class SimTactics:
                 ok = ok & ~stacked
             if zs is not None:
                 ok = ok & ~(zs.gather(1, b1) & (best != start).unsqueeze(1) & ~a6)
+            if board_step is not None:
+                # the step's validity (0x2720a0 at 0x272372..0x27242e): onto
+                # a revealed plot of the domain it leaves, one the unit may
+                # stand on under flag 1 (`search`)
+                same = water_n.gather(1, b1) == water_n.gather(1, nbc)
+                ok = ok & ~(board_step.gather(1, nbc) & same)
             if stand:
                 # the danger map's search: an attack is struck from a plot
                 # the unit may stand on, its own or one none of its own
@@ -967,14 +995,17 @@ class SimTactics:
         # the list keeps the plots the unit may end on, where it attacks, and
         # its own: a path's none another player's unit holds; the planning's
         # (0x26d890) none it sees now where a unit of another player not at
-        # war with it but a Trader stands (0x585d90, node +0x54)
+        # war with it but a Trader stands (0x585d90, node +0x54), and none an
+        # embarked unit's boarded holds (+0x50 bit 0x40)
         own = torch.zeros(N, T, dtype=torch.bool, device=dev)
         own[ar, start] = True
         if zoc:
-            kept_out = self._tac_foreign(seat)
+            kept_out = self._tac_foreign(seat)[rows]
         else:
-            kept_out = self._tac_peaceful(seat) & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
-        stand = ~kept_out[rows] | atk_n | own
+            kept_out = (self._tac_peaceful(seat) & self._barb_seen("barbarians" if seat == BARB_SEAT else seat))[rows]
+            if boarded_n is not None:
+                kept_out = kept_out | boarded_n
+        stand = ~kept_out | atk_n | own
         closed = rturn
         rank = torch.where(stand, rank, torch.full_like(rank, -1))
         rturn = torch.where(stand, rturn, torch.full_like(rturn, -1))

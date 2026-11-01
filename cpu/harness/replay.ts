@@ -266,9 +266,9 @@ interface Ctx {
   upgradeInto: Set<string>;
   /** this pair's upgrade orders, the new unit's record key to the old's */
   upgradedFrom: Map<string, string>;
-  /** each plot's road tier at the pair's first record, -1 no road: the one
-   *  its minors move on */
-  roadTiersWas?: number[];
+  /** each plot's ground at the pair's first record — its road tier (-1 no
+   *  road), feature, improvement and pillage: the one its minors plan on */
+  groundWas?: GroundWas[];
   /** the barbarian units' plots of this pair the record's steps entered,
    *  in their order, for their scouts' looks at the end of the barbarians'
    *  turn (`barbarianTurn`) */
@@ -1323,15 +1323,22 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     c.movesFull = unitFullMoves(copy, c);
     c.movesLeft = upgraded.has(c) || boughtNow.has(`${c.seat}:${c.id}`) ? 0 : c.movesFull;
   }
-  // ...and the ground as record t+1 holds it: its owners, features,
-  // improvements, districts and roads, which the planning's steps read
+  // ...and the ground the planning's steps read: its owners and districts as
+  // record t+1 holds them; its features, improvements, pillage and roads as
+  // the pair's first record does — the turn's units change them after the
+  // minors' planning (runs/h1_duely1121 t21: city-state 2's Builder clears
+  // the Woods of 11:4 in its turn, its Warrior at 10:3 planning 11:4 (1/0)
+  // and 11:5 a turn on; t45: city-state 4's Trader lays the road of 34:16 as
+  // it steps on after the Warrior there planned 34:18 two turns away,
+  // AI_Planning.csv)
   copy.map.tiles.forEach((t, i) => {
     const r = ctx.next.state.map.tiles[i];
+    const was = ctx.groundWas![i];
     t.ownerSeat = r.ownerSeat;
     t.ownerCity = r.ownerCity;
-    t.feature = r.feature;
-    t.improvement = r.improvement;
-    t.pillaged = r.pillaged;
+    t.feature = was.feature;
+    t.improvement = was.improvement;
+    t.pillaged = was.pillaged;
     t.district = r.district;
     t.districtComplete = r.districtComplete;
     t.districtPillaged = r.districtPillaged;
@@ -1339,11 +1346,9 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // at the turn's end (runs/h1_duely1128 t145: China's Industrial era, the
     // minors' planning on Medieval roads, Industrial ones from record 146),
     // a city-state's at its research step (the engine's turn re-laid them:
-    // `minorPhase`); a road new since, record t+1's
-    const was = ctx.roadTiersWas?.[i] ?? -1;
-    const relaid = was >= 0 && t.road && isCityStateSeat(t.ownerSeat) ? Math.max(was, t.roadTier ?? 0) : was;
-    t.road = r.road;
-    const tier = was >= 0 ? relaid : (r.roadTier ?? 0);
+    // `minorPhase`)
+    const tier = was.roadTier >= 0 && t.road && isCityStateSeat(t.ownerSeat) ? Math.max(was.roadTier, t.roadTier ?? 0) : was.roadTier;
+    t.road = was.roadTier >= 0;
     if (tier > 0) t.roadTier = tier;
     else delete t.roadTier;
   });
@@ -1621,6 +1626,11 @@ interface CopyBuy { cs: CityState; u: Unit; price: number; savings?: number[]; t
 /** a plot's ground as the copy of the units' turn sets it from record t+1 */
 type GroundOf = Pick<Tile, 'ownerSeat' | 'ownerCity' | 'feature' | 'resource' | 'improvement' | 'pillaged' | 'district' | 'districtComplete'
   | 'districtPillaged' | 'road'>;
+/** a plot's ground as the pair opens that its own turn's units change: its
+ *  road tier (-1 no road), feature, improvement and pillage */
+type GroundWas = Pick<Tile, 'feature' | 'improvement' | 'pillaged'> & { roadTier: number };
+const groundWasOf = (t: Tile): GroundWas => ({ feature: t.feature, improvement: t.improvement, pillaged: t.pillaged,
+  roadTier: t.road ? (t.roadTier ?? 0) : -1 });
 const groundOf = (t: Tile): GroundOf => ({ ownerSeat: t.ownerSeat, ownerCity: t.ownerCity, feature: t.feature, resource: t.resource,
   improvement: t.improvement, pillaged: t.pillaged, district: t.district, districtComplete: t.districtComplete,
   districtPillaged: t.districtPillaged, road: t.road });
@@ -4783,7 +4793,6 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   takeGameMemory(ctx, world, imp, a.turn - 1, fromLog, fromAimem);
   for (const key of Object.keys(state)) if (!(key in world)) delete (state as unknown as Record<string, unknown>)[key];
   Object.assign(state, world);
-  ctx.roadTiersWas = state.map.tiles.map((t) => (t.road ? (t.roadTier ?? 0) : -1));
   importedWorld(state, imp, a, history);
   ctx.retained = new Map();
 }
@@ -5025,6 +5034,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       break;
     }
     ctx.turn = a.turn;
+    ctx.groundWas = state.map.tiles.map(groundWasOf);
     // the city-states' revealed plots as the turn opens, which their units'
     // planning reads (runs/h1_duely1117 t2: Valletta's Warrior on 13:8
     // closes 11:10, which the other Warrior's step to 12:9 reveals later in

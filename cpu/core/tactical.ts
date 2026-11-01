@@ -155,6 +155,13 @@ interface Ground {
    *  hostile city or Encampment, on a plot the player sees now, none across a
    *  river (the planning validity's 0x26f980 -> Rules_Movement 0x530f50) */
   seenZoc: (i: number) => boolean;
+  /** the unit embarked, and the best of the other players' units on the
+   *  plot embarked too (0x586360 under flag 1 at 0x586542..0x5865a1: the
+   *  best defender 0x208b80 under 0x108 — any other player's unit, seen or
+   *  not —, read as a passenger where no other player's hull stands beside
+   *  it): the unit may neither end there nor pass (the node's +0x50 bit 0x40
+   *  clear) */
+  boarded: (i: number) => boolean;
 }
 
 function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, anyGround = true): Ground {
@@ -191,12 +198,23 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // and a city-state's do from their Shipbuilding, AI_Planning.csv)
   const embarks = canEmbark(state, unit) && !isBarbSeat(unit.seat);
   const minor = isCityStateSeat(unit.seat);
+  const boards = new Map<number, boolean>();
+  const boarded = (i: number): boolean => {
+    if (!unit.embarked || !held.has(i)) return false;
+    let v = boards.get(i);
+    if (v === undefined) {
+      const others = state.units.filter((x) => x.tileIndex === i && x.seat !== unit.seat && onMap(x));
+      boards.set(i, (v = others.some((x) => !!x.embarked) && others.every((x) => !!x.embarked)));
+    }
+    return v;
+  };
   return {
     known,
     revealed,
+    boarded,
     stand: (i) => {
       if (!held.has(i)) return true;
-      if (!planning) return false;
+      if (!planning || boarded(i)) return false;
       // the planning's list (0x26d890): on a plot the player sees now (node
       // +0x50 & 2, the visibility count +0x290) a unit of another player
       // not at war with it but a Trader (0x585d90 counts none with
@@ -408,6 +426,15 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       const attack = !ground.enter(to);
       if (attack && !ground.attack(to)) continue;
       if (zoned && !attack) continue;
+      // the step's validity (0x2720a0 at 0x272372..0x27242e): onto a revealed
+      // plot of the domain it leaves (an embarking or a landing step tested
+      // apart, 0x52fe90 / 0x52fb90), one the unit may stand on under flag 1
+      // (+0x50 bit 0x40): an embarked unit passes no water another player's
+      // embarked unit holds (runs/h1_duely1121 t86: city-state 3's embarked
+      // Man-At-Arms at 40:20 plans 39:21 alone, player 0's embarked Warrior
+      // on 40:19 and city-state 4's Man-At-Arms on 41:20; t94: city-state
+      // 4's at 28:23 plans 29:21 past player 0's Quadriremes, AI_Planning.csv)
+      if (isWater(from) === isWater(to) && ground.revealed(to.index) && ground.boarded(to.index)) continue;
       // the danger map's search (0x26df90, flags 0x311): an attack is struck
       // from a plot the unit may stand on, its own or one none of its own
       // stacking units holds
@@ -2757,8 +2784,7 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
   for (const u of units) {
     const p = planUnit(state, u, targets);
     plan.set(u.id, p);
-    reach.set(u.id, p.reach);
-  }
+    reach.set(u.id, p.reach);  }
   return { seat, strike: false, units, reach, done: new Set(), ended: new Set(), ai, targets, plan, danger: dangerPlane(state, seat), regions: seenRegions(state, seat) };
 }
 

@@ -5716,3 +5716,46 @@ nodes.ts), `_op_move_exec`'s `stacks` and `_tac_own_class`
   (p3 t42 -39986.70); the rest of the Temple's residual (1.0 .. 2.4, T past
   the horizon at t46 / t51) untraced. So the Shrine's dependent term never
   lands in ours.
+
+## C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins
+
+- THE STEP'S STAND TEST (0x2720a0 at 0x272372..0x27242e): a land formation
+  (+0x1f2) stepping onto a revealed plot (+0x51 bit 0) of the domain it
+  leaves needs the child's +0x50 bit 0x40, the plot it may stand on under
+  flag 1 (0x271be0 at 0x271d9e: 0x586900(formation, plot, 1) == 1); an
+  embarking step (land -> water) takes 0x52fe90 and a landing one 0x52fb90
+  instead. A sea formation (+0x1f1) needs bit 0x40 on any revealed child.
+  The planning's list (0x26d890) needs the same bit.
+- 0x586360 UNDER FLAG 1 (0x586542..0x5865a1): the plot's best defender
+  0x208b80(plot, -1, owner, unit, 0x108) — under 0x108 any other player's
+  unit, at war or not, combat or not (flag 8), seen or not (0x20a2a0 with
+  0x100 skips the visibility count +0x290; a TeamVisibility type, +0x1ba bit
+  8, of another player none), the first of strictly the greatest strength
+  (0x523d60) — refuses the plot without flag 1, and with it where the mover
+  is embarked and that unit embarked too (IsEmbarked 0x8be30 on both). So
+  an embarked unit neither passes nor ends on water another player's
+  passenger holds; a hull, a land unit ashore or any unit of its own
+  passes. Engines: `groundOf`'s `boarded`, `search`'s step test and the
+  planning's `stand` (`_tac_boarded`, `_tac_search`).
+- Confirmed (AI_Planning.csv): runs/h1_duely1121 t86 city-state 3's
+  embarked Man-At-Arms on 40:20 plans 40:20 and 39:21 alone — player 0's
+  embarked Warrior on 40:19 and city-state 4's embarked Man-At-Arms on 41:20
+  close the water to its Harbor 41:19 and beyond; t94 city-state 4's
+  embarked Man-At-Arms on 28:23 plans 29:21 and 30:22 past player 0's
+  Quadriremes on 29:20 / 29:22. A one-seed aimem trace of 1121 t1-100: the
+  city-states' planning rows whose first-turn plots the engine reproduces
+  1,207 -> 1,226 of 1,228 (with the ground below), its Wander draws off the
+  game's range 23 -> 9.
+- THE MINORS' PLANNING GROUND (the replay's copy, not the DLL): the plots'
+  features, improvements, pillage and roads as the pair's first record holds
+  them — the turn's own units change them after the planning: runs/h1_duely1121
+  t21 city-state 2's Builder clears the Woods of 11:4 (record 22), its
+  Warrior at 10:3 planning 11:4 (1/0) and 11:5 a turn on; t45 city-state 4's
+  Trader lays the road of 34:16 stepping there (record 46) after the Warrior
+  on 34:16 planned 34:18 two turns away. Owners and districts stay record
+  t+1's (taking those of record t loses rows).
+- OPEN: the best defender read as the passenger only where no other
+  player's unit stands there unembarked (0x523d60's strengths of a hull
+  beside a passenger not compared); runs/h1_duely1127 t80-91 city-state 3's
+  Swordsman plans 4:10, player 1's Missionary there in the record (0x585d90
+  counts it for a Swordsman: +0x1ce0 of the pair 0x518f40 unread).
