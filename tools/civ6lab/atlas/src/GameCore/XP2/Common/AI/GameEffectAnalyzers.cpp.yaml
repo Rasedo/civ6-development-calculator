@@ -1432,7 +1432,7 @@
   final: 0x476060
   kind: function
   name: EFFECT_ADJUST_FLAT_BONUS
-  semantics: "EFFECT_ADJUST_FLAT_BONUS (@f03ea0, vtable 0xd626c8; parser 0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's hash +0xc): a switch on the bonus type, the branches' sum whole at the end. WONDER_CONSTRUCTION (0x5953bf98): the most Production of the player's cities (at least 0) x PSEUDOYIELD_WONDER of the Amount, weighted, between. COMBAT_EXPERIENCE (0xc819e0a3): the player's units (+0x12e8 +0xc0) x PSEUDOYIELD_UNIT_COMBAT of the Amount, weighted, / 10.0, between — running on into GREAT_PEOPLE's (0xf8705d00): per GreatPersonClasses row the player's points a turn of the class (+0x1360 +0x168) x the Amount as the class's pseudo-yield, weighted, between. ENVOYS (0xe96ca959): the Amount x the player's Influence Points a turn (0x44c6a0), as PSEUDOYIELD_INFLUENCE weighted, between. FAITH_PURCHASES (0xc25143f9): with the player's religion entry (0x4979f0), 0.1 x min(its Faith +0x100, 150) as Gold weighted, discounted from the start, plus 0.2 x min(its Faith yield, 100) as Gold weighted, between; the Amount unused. DISTRICT_PROJECTS (0xbcfe99b8: per city its best project 0x5d1f10) unread. OVERALL_PRODUCTION (0xc1a005d2): the cities' Production x the Amount, weighted, between. UNIT_PRODUCTION (0x3d5ff1a2): the Production of the cities with a unit at their queue's head (0x179860) x the Amount x min(PSEUDOYIELD_UNIT_COMBAT of 1.0, 2.0), at most 75.0, weighted, between. GOLD_PURCHASES (0x7530bd65): 0.5 x the treasury (+0x13a0 +0xf8) x the Amount as Gold weighted, discounted from the start, plus 0.5 x the Gold yield (0x4e0bf0) x the Amount, between. DISTRICT_PRODUCTION (0x0112d393, Merchant Republic's): no branch, none."
+  semantics: "a switch on the government bonus type's hash: ENVOYS the Amount x the Influence Points a turn as PSEUDOYIELD_INFLUENCE; WONDER_CONSTRUCTION (0x6c5b9d) the best city Production (City::GetYield) x PSEUDOYIELD_WONDER of the Amount, its sum (ebx at 0x6c5c87) running on into COMBAT_EXPERIENCE's label 0x6c5c8d; COMBAT_EXPERIENCE the units (Player_Units +0xc0) x PSEUDOYIELD_UNIT_COMBAT of the Amount / 10 (0x6c5df7 adds it), running on into GREAT_PEOPLE's per-class points (0x6c5e45); FAITH_PURCHASES and GOLD_PURCHASES the treasury and the yield; between, whole at the end (0x6c65eb)"
   status: PARTLY
   cases:
     - recording: h1_duely1121
@@ -1441,11 +1441,15 @@
     - recording: h1_duely1121
       turn: 51
       value: "every city-state's Divine Right 5.0 above ours: Monarchy's ENVOYS 50% of Chiefdom's one point"
+    - recording: h1_duely1121
+      turn: 13
+      value: "Hunza's Autocracy flat bonus 12 / 12 / 16 / 15 / 15 / 15 / 16 at t11-17 and 18 / 20 / 20 / 20 / 21 / 21 / 21 / 22 at t19-26 as runs/lb1_gov1121 logged: the wonder's term with its units' COMBAT_EXPERIENCE term, one whole (Political Philosophy t14-30 as logged but t19)"
   impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_analyze]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-130: the government values' parts at Hunza (live) — READ"
+    - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (@f03ea0, vtable 0xd626c8; its parser 0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's..."

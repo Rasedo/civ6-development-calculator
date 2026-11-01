@@ -331,6 +331,16 @@
   context:
     - "...loader 0xa98af0): for each, amount = min(the Production passed in, the item's full cost (0x179510)) x (PercentOfProductionRate << 8) / 100 — fixed point, so the rate is the percent trunca..."
   review: imported
+- addr: 0x1795d0
+  final: 0xfd0e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- City::GetYield passes only the head's KIND (0x1795d0: building 0xd8a30267, unit 0x15d11e18, district 0x80d3734) into the yield build 0x1c535..."
+  review: imported
 - addr: 0x179650
   final: 0xfd160
   kind: function

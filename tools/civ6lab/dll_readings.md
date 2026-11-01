@@ -5649,3 +5649,26 @@ nodes.ts), `_op_move_exec`'s `stacks` and `_tac_own_class`
   runs/h1_duely1128 t171 / t173 the capture team steps 9:3 -> 10:3 and
   9:5 -> 10:5 for 14:16 where the game's takes 9:4 / 9:6: the formation's
   path (0x2726b0 -> 0x272aa0) against a single member's, unread.
+
+## C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins
+
+- EFFECT_ADJUST_FLAT_BONUS 0x6c5700's GOVERNMENTBONUS_WONDER_CONSTRUCTION case
+  (0x6c5b9d: the most City::GetYield 0x1cb8b0 Production over the player's
+  cities x PSEUDOYIELD_WONDER of the Amount, 0x7a2140 from the start to the
+  horizon, into +0x7c0) has no break: its sum (ebx at 0x6c5c87) falls into
+  COMBAT_EXPERIENCE's label 0x6c5c8d (Player_Units +0xc0 units x
+  PSEUDOYIELD_UNIT_COMBAT of the Amount / 10.0, added at 0x6c5df7) and on into
+  GREAT_PEOPLE's class loop (0x6c5e45); the whole is taken once, of the
+  three terms' sum (0x6c65eb) (`EFFECT_ADJUST_FLAT_BONUS` in ANALYZERS;
+  `_pol_analyze`).
+- Confirmed: runs/h1_duely1121 Hunza (player 2), Autocracy's term against
+  runs/lb1_gov1121's govlog: 12 / 12 / 16 / 15 / 15 / 15 / 16 at t11-17 and
+  18 / 20 / 20 / 20 / 21 / 21 / 21 / 22 at t19-26, Political Philosophy
+  t14-30 as logged but t19.
+- City::GetYield passes only the head's KIND (0x1795d0: building 0xd8a30267,
+  unit 0x15d11e18, district 0x80d3734) into the yield build 0x1c5350, whose
+  0x1c4460 adds the city's per-kind flat (+0xa40 / +0xaa0 / +0xb00) and
+  percent (+0x248c / +0x2484 / +0x2490); a Builder and a Warrior read alike.
+- Open (C-112): t18's term is the game's after Hunza's citizens moved
+  187 / 188 -> 230 / 232 before its civics AI (Animal Husbandry completing
+  that turn, Horses on 230 / 232); ours keeps the record's placement to t19.

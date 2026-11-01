@@ -807,7 +807,9 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // horizon (runs/h1_duely1121 every city-state's Divine Right 5.0 above
   // ours: Monarchy's 50% of Chiefdom's one point). WONDER_CONSTRUCTION
   // (0x5953bf98): the most Production of its cities x PSEUDOYIELD_WONDER of
-  // the Amount, likewise. COMBAT_EXPERIENCE (0xc819e0a3): its units x
+  // the Amount, likewise, then runs on into COMBAT_EXPERIENCE's term and
+  // GREAT_PEOPLE's (runs/h1_duely1121 Hunza's Autocracy, its Warriors' term
+  // whole with the wonder's). COMBAT_EXPERIENCE (0xc819e0a3): its units x
   // PSEUDOYIELD_UNIT_COMBAT of the Amount / 10.0, likewise, then GREAT_PEOPLE's
   // term (0xf8705d00, which the branch runs on into): per class its points a
   // turn x the Amount as the class's pseudo-yield, likewise — a city-state's
@@ -831,11 +833,27 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
         sum = valueBetween(v, t.start, t.horizon, t.rate);
         break;
       }
-      case 'GOVERNMENTBONUS_WONDER_CONSTRUCTION': {
-        let best = 0;
-        for (const c of t.view.cities(t.seat)) best = Math.max(best, fxOf(t.view.cityYield(t.seat, c.id, 'YIELD_PRODUCTION')));
-        const pv = pseudoYieldValue(t.view, t.seat, a, 'PSEUDOYIELD_WONDER');
-        sum = valueBetween(fmul(best, pv), t.start, t.horizon, t.rate);
+      case 'GOVERNMENTBONUS_WONDER_CONSTRUCTION':
+      case 'GOVERNMENTBONUS_COMBAT_EXPERIENCE':
+      case 'GOVERNMENTBONUS_GREAT_PEOPLE': {
+        if (args.BonusType === 'GOVERNMENTBONUS_WONDER_CONSTRUCTION') {
+          let best = 0;
+          for (const c of t.view.cities(t.seat)) best = Math.max(best, fxOf(t.view.cityYield(t.seat, c.id, 'YIELD_PRODUCTION')));
+          const pv = pseudoYieldValue(t.view, t.seat, a, 'PSEUDOYIELD_WONDER');
+          sum = valueBetween(fmul(best, pv), t.start, t.horizon, t.rate);
+        }
+        if (args.BonusType !== 'GOVERNMENTBONUS_GREAT_PEOPLE') {
+          const pv = pseudoYieldValue(t.view, t.seat, a, 'PSEUDOYIELD_UNIT_COMBAT');
+          const x = t.view.playerUnits(t.seat).length * pv;
+          sum += valueBetween(fdiv(x, 10 * FX), t.start, t.horizon, t.rate);
+        }
+        if (t.seat === FREE_SEAT) break;
+        for (const cls of AI_GREAT_PERSON_CLASSES) {
+          const pseudo = AI_GP_CLASS_PSEUDOYIELD[cls];
+          if (!pseudo) continue;
+          const v = pseudoYieldValue(t.view, t.seat, fmul(a, fxOf(t.view.greatPersonPointsPerTurn(t.seat, cls))), pseudo);
+          sum += valueBetween(v, t.start, t.horizon, t.rate);
+        }
         break;
       }
       case 'GOVERNMENTBONUS_OVERALL_PRODUCTION':
@@ -860,22 +878,6 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
         const banked = yieldValue(t.view, t.seat, fmul(fmul(fxOf(t.view.treasury(t.seat)), half), a), 'YIELD_GOLD');
         const income = yieldValue(t.view, t.seat, fmul(fmul(fxOf(t.view.grossGoldYield(t.seat)), half), a), 'YIELD_GOLD');
         sum = discounted(banked, t.rate, t.start) + valueBetween(income, t.start, t.horizon, t.rate);
-        break;
-      }
-      case 'GOVERNMENTBONUS_COMBAT_EXPERIENCE':
-      case 'GOVERNMENTBONUS_GREAT_PEOPLE': {
-        if (args.BonusType === 'GOVERNMENTBONUS_COMBAT_EXPERIENCE') {
-          const pv = pseudoYieldValue(t.view, t.seat, a, 'PSEUDOYIELD_UNIT_COMBAT');
-          const x = t.view.playerUnits(t.seat).length * pv;
-          sum = valueBetween(fdiv(x, 10 * FX), t.start, t.horizon, t.rate);
-        }
-        if (t.seat === FREE_SEAT) break;
-        for (const cls of AI_GREAT_PERSON_CLASSES) {
-          const pseudo = AI_GP_CLASS_PSEUDOYIELD[cls];
-          if (!pseudo) continue;
-          const v = pseudoYieldValue(t.view, t.seat, fmul(a, fxOf(t.view.greatPersonPointsPerTurn(t.seat, cls))), pseudo);
-          sum += valueBetween(v, t.start, t.horizon, t.rate);
-        }
         break;
       }
       default:

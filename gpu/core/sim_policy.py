@@ -547,9 +547,9 @@ class SimPolicy:
             # none) as PSEUDOYIELD_INFLUENCE from the start to the horizon;
             # the other types none here (`EFFECT_ADJUST_FLAT_BONUS`)
             # the best city Production x PSEUDOYIELD_WONDER of the Amount
-            # (WONDER_CONSTRUCTION); the units x PSEUDOYIELD_UNIT_COMBAT of
-            # the Amount / 10 (COMBAT_EXPERIENCE, then the GREAT_PEOPLE term:
-            # a minor's Great Person points none)
+            # (WONDER_CONSTRUCTION), running on into the units x
+            # PSEUDOYIELD_UNIT_COMBAT of the Amount / 10 (COMBAT_EXPERIENCE),
+            # then the GREAT_PEOPLE term (a minor's Great Person points none)
             bonus = a.get("BonusType")
             pct = _fx_const(_f32(amount * _f32(0.01)))
             if bonus == "GOVERNMENTBONUS_ENVOYS":
@@ -558,14 +558,24 @@ class SimPolicy:
                 pts = int(self.rules.civic_ai["cityStateInfluencePoints"]) * _FX
                 p = "PSEUDOYIELD_INFLUENCE"
                 return between(self._cv_pseudo(full((pct * pts) // _FX), p, f0.pseudo_w(p))) >> 8
-            if bonus == "GOVERNMENTBONUS_WONDER_CONSTRUCTION":
-                best = zero
-                for f, alive, _cap in ctx["cities"]:
-                    prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64, device=dev) * _FX + 0.5).long()
-                    best = torch.maximum(best, torch.where(alive, prod.expand(B), zero))
-                p = "PSEUDOYIELD_WONDER"
+            if bonus in ("GOVERNMENTBONUS_WONDER_CONSTRUCTION", "GOVERNMENTBONUS_COMBAT_EXPERIENCE"):
+                acc = zero
+                if bonus == "GOVERNMENTBONUS_WONDER_CONSTRUCTION":
+                    best = zero
+                    for f, alive, _cap in ctx["cities"]:
+                        prod = torch.floor(torch.as_tensor(f.city_yield("YIELD_PRODUCTION"), dtype=torch.float64, device=dev) * _FX + 0.5).long()
+                        best = torch.maximum(best, torch.where(alive, prod.expand(B), zero))
+                    p = "PSEUDOYIELD_WONDER"
+                    pv = self._cv_pseudo(full(pct), p, f0.pseudo_w(p))
+                    acc = between(_fmul(best, pv))
+                # the wonder's term runs on into COMBAT_EXPERIENCE's, summed
+                # before the whole
+                pre = "barb" if ctx["s"] == self.FR else "major"
+                n = (getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == ctx["seat"])).long().sum(dim=1)
+                p = "PSEUDOYIELD_UNIT_COMBAT"
                 pv = self._cv_pseudo(full(pct), p, f0.pseudo_w(p))
-                return between(_fmul(best, pv)) >> 8
+                x = torch.div(n * _FX * pv, _FX, rounding_mode="floor")
+                return (acc + between(_fdiv(x, torch.full_like(x, 10 * _FX)))) >> 8
             if bonus in ("GOVERNMENTBONUS_OVERALL_PRODUCTION", "GOVERNMENTBONUS_UNIT_PRODUCTION", "GOVERNMENTBONUS_GOLD_PURCHASES"):
                 # the Free Cities' not read
                 if ctx["s"] == self.FR:
@@ -600,13 +610,6 @@ class SimPolicy:
                     pv = self._cv_pseudo(full(_FX), p, f0.pseudo_w(p)).clamp(max=2 * _FX)
                     x = _fmul(x, pv).clamp(max=75 * _FX)
                 return between(self._cv_yield(x, "YIELD_PRODUCTION", f0.yield_w("YIELD_PRODUCTION"))) >> 8
-            if bonus == "GOVERNMENTBONUS_COMBAT_EXPERIENCE":
-                pre = "barb" if ctx["s"] == self.FR else "major"
-                n = (getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == ctx["seat"])).long().sum(dim=1)
-                p = "PSEUDOYIELD_UNIT_COMBAT"
-                pv = self._cv_pseudo(full(pct), p, f0.pseudo_w(p))
-                x = torch.div(n * _FX * pv, _FX, rounding_mode="floor")
-                return between(_fdiv(x, torch.full_like(x, 10 * _FX))) >> 8
             return zero
         if eff == "EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT":
             # 0x6bf850: per unit of the minor whose upgrade its research

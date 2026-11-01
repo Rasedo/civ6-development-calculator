@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x1c4460
+  final: 0x12f6d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0xd8a30267, unit 0x15d11e18, district 0x80d3734) into the yield build 0x1c5350, whose 0x1c4460 adds the city's per-kind flat (+0xa40 / +0xaa0 / +0xb00) and percent (+0x248c / +0x2484...
+  review: imported
 - addr: 0x1c5350
   final: 0x12ff20
   kind: function
@@ -25,6 +35,7 @@
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
+    - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
   context:
     - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0x1108 of the city's yield component) a...
     - "...'s step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Production toward the item), B with none (the city's plain P..."
@@ -150,6 +161,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
     - "C-126 / C-130: who may plunder a route (0x9555a0) and the treasury turn's city term (0x4dd3b0) — READ, the plunder ported in both twins"
+    - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...x(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption 0x5276c0 of the new population. One entry per free slot of e..."
