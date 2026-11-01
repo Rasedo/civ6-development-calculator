@@ -7078,3 +7078,43 @@ entries' plots) read by `_tac_spot_link` (gpu/core/sim_tactics.py).
 - OPEN: runs/h1_duely1124 t119 the barbarian Man-At-Arms 4521989 on 39:20
   moves for 37:17 ((2/0) in its planning) against player 1's Missionary
   3080203; the target entry's plot at the barbarians' turn is unread.
+
+## C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported
+
+The engines recompute every move order's path (`moveTo` -> `pathTo`,
+cpu/core/tactical.ts; `_tac_move_to`, gpu/core/sim_tactics.py); nothing below
+is ported.
+
+- THE KEPT PATH (0x2726b0 -> 0x272aa0): a formation keeps the nodes of the
+  last path it found (+0x638, goal first, its start last; +0x5d8 set; +0x6a8
+  / +0x6ac the goal). With two nodes or more kept: where the goal node is
+  flagged (+8 bit 1) and its plot is visible now, a path to that goal is
+  searched (0x26ef40); else, where the node after the start is not flagged,
+  the kept path is taken unsearched; else the node ending the path's first
+  turn (0x782d0(nodes, 1): the last node of turn 1, walking from the start) is
+  searched for, and on failure the requested plot. With fewer than two the
+  requested plot is searched unless it is the kept goal.
+- THE FLAGS (0x26e3a0, on each path found): walking from the start, the
+  first node whose plot the player does not see now takes bit 1 and the node
+  before it bit 2; a goal not seen now takes bit 1.
+- THE WRITER OF +0x5d8 outside the formation's constructor (0x263240 at
+  0x2646ad) is not found by a direct store (its sub-object at +0x580): when
+  a kept path is dropped (a new goal, the operation's end) is unread.
+- A PATH'S OTHER PLAYERS' UNITS: the step's location test (0x271be0 ->
+  0x586900 under flag 1 -> 0x586360) refuses no plot for another player's
+  unit, seen or not, but where both the mover and that unit are embarked
+  (0x586542..0x5865a1: 0x208b80 under 0x108, the refusal only without flag
+  1); a hostile unit makes an attack node only on a plot the player sees now
+  (+0x51 bits 5 / 6, 0x5861f0, set under +0x50 bit 1). The zone of control
+  (0x530f50) skips only a hidden unit the player cannot see (0x5033a0, the
+  stealth test), not a unit out of sight.
+- Trials (one-seed aimem traces, the five duels): keeping the path as read,
+  with the goal taken as the kept path's key, matches runs/h1_duely1117 t26
+  / t32 / t52 (Galley 720906 walking 25:1 / 25:2 / 25:3 on the t25 path) and
+  breaks as many moves of other families (1117 t14 the rampaging Scout
+  131073, t35 Operation, t59 Attack Units); a path passing other players'
+  units out of sight matches runs/h1_duely1121 t58-77 the Scout 131073's
+  "tertiary regions" 10:9 and 1127 t46 / t51 the Galley 262147, and breaks
+  1117 t80-103 / 1127 t27-126 Attack Civilian and Rampage moves the game
+  makes none of (1117 t80 Warrior 3670030 holding on 32:16 for 31:13). Open:
+  the kept path's drop, and what keeps those moves unmade in the game.

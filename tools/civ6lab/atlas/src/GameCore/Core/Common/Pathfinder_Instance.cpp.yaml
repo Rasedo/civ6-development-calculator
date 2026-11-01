@@ -46,6 +46,18 @@
     - "...0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the..."
     - "...n walks toward the head past strictly greater keys (0x79560). The step pops the head (0x781e0: NotifyList 2 then 3, closed) and links its neighbours in DirectionTypes order (0xeff73..."
   review: reviewed
+- addr: 0x782d0
+  final: 0x58530
+  kind: function
+  semantics: "the path node ending turn T (edx): walking from the start, the last node of turn T before a node of a later turn"
+  status: PARTLY
+  readings:
+    - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+    - "...agged, the kept path is taken unsearched; else the node ending the path's first turn (0x782d0(nodes, 1): the last node of turn 1, walking from the start) is searched for, and on fai..."
+  review: imported
 - addr: 0x78750
   final: 0x588e0
   kind: function

@@ -54,6 +54,18 @@
     - ...; bombard less GlobalParameters +0x188) to every plot of its one-turn reach (the search 0x26df90, flags 0x311) and to each plot within its range of those; an aircraft a disk of its r...
     - ...e larger of combat and ranged) onto the plots of its 1-turn planning reach (0x7921e0 -> 0x26df90) and every plot within its range (0x56e3d0) of them; a unit with the flag +0x18bd also...
   review: reviewed
+- addr: 0x26e3a0
+  final: 0x1a6cd0
+  kind: function
+  semantics: "flags a path found: walking from its start, the first node not seen now bit 1, the node before it bit 2; a goal not seen now bit 1"
+  status: PARTLY
+  readings:
+    - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "## C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+    - "- THE FLAGS (0x26e3a0, on each path found): walking from the start, the first node whose plot the player does..."
+  review: imported
 - addr: 0x26e570
   final: 0x1a6e00
   kind: function
@@ -185,6 +197,7 @@
   readings:
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+    - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
   review: reviewed
 - addr: 0x26f1d0
   final: 0x1a76a0
@@ -440,6 +453,7 @@
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
+    - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
     - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."
@@ -535,6 +549,7 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
+    - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
   context:
     - "...cost (plot vt +0x18) << 8 needs 0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4). Start (0x972a50): the unit's formation to the target (flags | 4), then the p..."
   review: imported
