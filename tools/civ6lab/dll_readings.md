@@ -6302,3 +6302,28 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   replacement) is released by the engines, where 0x5f4cd0 would print its
   line; the status the release writes on a COMPLETED or FAILED contract
   (kept).
+
+## H-1: a city-state's boost completion and the research AI — READ
+
+`minorCompleteNow`, `minorPhase`, `_minor_complete_now`, `_city_state_phase`;
+the replay's `foldResearchParked` (`History.researchParked`).
+
+- THE COMPLETION: 0x762d60 (bound by 0x761d30 at 0x761ffe on the player's
+  signals +0x13b8) tests no research in hand: any row the player completes,
+  a boost's included, runs the propagation again and the keyed choice
+  0x763020, which replaces the research in hand. runs/h1_duely1128 t117
+  city-state 2: Banking boosted complete, Education 231.3 taken over the
+  Gunpowder in hand (82.8), as logged; 1127 t124 city-state 2's Cartography.
+- THE TIMING: a boost lands at its event. A building the city's step
+  completes lands before the research AI's turn (list B): runs/h1_duely1121
+  t58 city-state 3, Walls complete in the step (City_BuildQueue 40.5 / 40),
+  Engineering logged owned at t58 and Irrigation in hand; a Builder's,
+  a chop's or a trade route's after it (1121 t50 city-state 2's Water Mill
+  on a chop, Construction 1 turn at t50's analysis; 1117 t80 Apprenticeship).
+  The engines detect the boosts after the city's step and growth, before the
+  research AI, and again at the turn's end.
+- THE RECORD'S PARKED RESEARCH: a record shows the progress of the item in
+  hand alone; an item left unfinished keeps the record's progress plus the
+  record's yield (the bank before the AI's turn). runs/h1_duely1117
+  city-state 3's Sanitation, in hand t149-t154: 50 turns at t156, 49 at t160
+  as logged, beside Economics' 58 at the same cost.

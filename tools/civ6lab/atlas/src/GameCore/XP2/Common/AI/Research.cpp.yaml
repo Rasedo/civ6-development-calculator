@@ -167,12 +167,14 @@
 - addr: 0x761d30
   final: 0x4f9b50
   kind: function
+  semantics: "the research AI's setup: binds its listeners — the completion delegate 0x762d60 (0x761ffe) on the player's signals (+0x13b8, slot +0x18), the turn job 0x760980 (0x7620db), the unit listener 0x75d3d0."
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "H-1: a city-state's boost completion and the research AI — READ"
   context:
     - "...0 / 0x39d490; the one listener the research AI's 0x75d3d0, functor vt 0xd6f258 bound in 0x761d30: its m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0 — the vector 0x..."
   review: imported
@@ -191,9 +193,15 @@
 - addr: 0x762d60
   final: 0x4fa7e0
   kind: function
-  semantics: "a research completion (the row): the in-hand turns +0x528 zeroed (0x731d10 on +0x4d0), the propagation again, the contract list walked again (IN PROGRESS / ACCEPTED add their value and are called at +0x10, any other released), per row 0x68d090, then the choice with the row as the key."
-  status: PARTLY
+  semantics: "a research completion (the row): the in-hand turns +0x528 zeroed (0x731d10 on +0x4d0), the propagation again, the contract list walked again (IN PROGRESS / ACCEPTED add their value and are called at +0x10, any other released), per row 0x68d090, then the choice with the row as the key. No test of the research in hand: any completed row of the player (the delegate bound by 0x761d30 at 0x761ffe on the player's signals +0x13b8), a boosted row not in hand included, makes the choice, which replaces the research in hand."
+  status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 117
+      value: "city-state 2: Banking boosted complete (Game_Boosts.csv), Education 231.3 taken over the Gunpowder in hand"
+    - recording: h1_duely1121
+      turn: 58
+      value: "city-state 3: Engineering complete by its Walls' boost before the turn's analysis, Irrigation 221.2 taken over Mathematics in hand"
     - recording: h1_duelw1117
       turn: 14
       value: "Caguana: Celestial Navigation 477.1 + contract 36's 40.0 over Iron Working's 480.7"
@@ -207,7 +215,10 @@
     - cpu/core/minorBuild.ts:minorCompleteNow
     - cpu/core/minorBuild.ts:minorResearchBank
     - gpu/core/sim_research.py:_rai_contracts
-  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+    - gpu/core/sim_minors.py:_minor_complete_now
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1: a city-state's boost completion and the research AI — READ"
   context:
     - "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on the entries as they stand, then the c..."
   review: reviewed

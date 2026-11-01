@@ -19,9 +19,9 @@ class SimMinors:
         # strategic resources' income (`_seat_accrue_stockpile`, a major's body
         # over its own bank) and its units' fuel after its city's turn; then growth and borders on the city as
         # it stands after that (its city presses a religion it follows on the
-        # founder's turn); its research and civics AIs' turns, its military
-        # AI's Combat Desire between their policy jobs and government values;
-        # its savings and
+        # founder's turn); the boosts its city's turn earned, then its research
+        # and civics AIs' turns, its military AI's Combat Desire between their
+        # policy jobs and government values; its savings and
         # military AI's turn (`_minor_military_turn`); its knowledge
         # base's look; its contract purchases; then its actions — the
         # upgrades a completion triggers, its city AI's turn (`_minor_ai_turn`:
@@ -55,9 +55,11 @@ class SimMinors:
             now = torch.where((seen[:, 5] > 0).unsqueeze(-1), seen[:, :5], now)
             self.citystate_ai_growth[:, s] = torch.where(alive.unsqueeze(-1), now, self.citystate_ai_growth[:, s])
             self._minor_growth(s)
-            # its research and civics AIs' turns, its military AI's strengths
-            # (the Combat Desire, the favoured technology) between the policy
-            # jobs and the government values
+            # the boosts its city's turn earned land before its research AI's
+            # turn; its research and civics AIs' turns, its military AI's
+            # strengths (the Combat Desire, the favoured technology) between
+            # the policy jobs and the government values
+            self._detect_minor_boosts(s, alive)
             def military(s=s, alive=alive) -> None:
                 self._minor_combat_desire(s)
                 self._military_fav_tech(s, alive)
@@ -148,9 +150,10 @@ class SimMinors:
     def _minor_complete_now(self, s: int, full: torch.Tensor, is_civic: bool) -> None:
         """`minorCompleteNow`: the items of `full` [B, N] COMPLETED outside
         city-state `s`'s research step — held, the progress kept on them
-        spent, Urban Defenses' walls fitted; the item in hand makes the
+        spent, Urban Defenses' walls fitted; each technology makes the
         completion's choice over the analysis its last turn left (none where
-        it has none), the completed row the key"""
+        it has none), the completed row the key, whatever is in hand; a civic
+        in hand makes the civics AI's"""
         held = self.citystate_civics if is_civic else self.citystate_techs
         retain = self.citystate_civic_retain if is_civic else self.citystate_tech_retain
         prog = self.citystate_civic_prog if is_civic else self.citystate_tech_prog
@@ -163,20 +166,28 @@ class SimMinors:
                 self._minor_urban_fit(s, hit)
         cur = curp[:, s]
         on_cur = (cur >= 0) & full.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1)
-        if not bool(on_cur.count_nonzero()):
-            return
-        done = torch.where(on_cur, cur, torch.full_like(cur, -1))
         curp[:, s] = torch.where(on_cur, torch.full_like(cur, -1), cur)
         prog[:, s] = torch.where(on_cur, torch.zeros_like(prog[:, s]), prog[:, s])
         if is_civic:
+            done = torch.where(on_cur, cur, torch.full_like(cur, -1))
             fire = on_cur & self.citystate_cai_valid[:, s]
             if bool(fire.count_nonzero()):
                 ent = (self.citystate_cai_turns[:, s], self.citystate_cai_next[:, s], self.citystate_cai_base[:, s],
                        self.citystate_cai_score[:, s], self.citystate_cai_owned[:, s])
                 self._cai_take(s, self._cai_choice(s, fire, ent, done))
             return
-        fire = on_cur & self.citystate_ai_valid[:, s]
-        if bool(fire.count_nonzero()):
+        # every completed technology makes the completion's choice, in the
+        # order the boosts landed (the Boosts rows' order, `detectBoosts`)
+        valid = self.citystate_ai_valid[:, s]
+        if not bool((full.any(dim=1) & valid).count_nonzero()):
+            return
+        for _i, idx in self._boost_tables()["to_tech"]:
+            if idx >= full.shape[1]:
+                continue
+            fire = full[:, idx] & valid
+            if not bool(fire.count_nonzero()):
+                continue
+            done = torch.full_like(cur, idx)
             turns, base = self.citystate_ai_turns[:, s], self.citystate_ai_base[:, s]
             score = self.citystate_ai_score[:, s] + self._rai_upstream(self.citystate_techs[:, s], base, turns)
             score = score + self._rai_contracts(s, score, self.citystate_ai_owned[:, s], live=True)

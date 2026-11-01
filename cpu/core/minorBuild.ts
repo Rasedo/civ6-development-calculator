@@ -90,7 +90,11 @@ import { militaryFavTech } from './operations/unitRows';
  *  (`upgradeRoads`), then its city — the Production its city
  *  makes now, its strategic resources' income and its units' fuel, then growth and borders on the city as it stands after that
  *  (`minorGrowth`) — its city presses a religion it follows on that
- *  religion's founder's turn (`spreadReligiousPressure`) — then its research
+ *  religion's founder's turn (`spreadReligiousPressure`) — the boosts its
+ *  city's turn earned (`detectBoosts`: a boost lands at its event, a building
+ *  its step completed before its research AI's turn — runs/h1_duely1121
+ *  city-state 3's Walls at t58, Engineering complete and Irrigation taken
+ *  before the turn's analysis) — then its research
  *  and civics AIs' turns on the city so grown (`minorResearchAi`), its
  *  military AI's Combat Desire (`minorCombatDesire`) taken between their
  *  policy jobs and their government values, its savings and military AI's
@@ -131,9 +135,11 @@ export function minorPhase(state: GameState): void {
     // own the first turn
     cityState.aiGrowth = cityState.aiGrowthSeen ?? minorCityGrowth(state, cityState);
     minorGrowth(state, cityState);
+    // the boosts its city's turn earned land before its research AI's turn;
     // its research and civics AIs' turns, its military AI's strengths — the
     // Combat Desire and the favoured technology on the records as its last
     // update aged them — between the policy jobs and the government values
+    detectBoosts(state, cityState.seat);
     minorResearchAi(state, cityState, () => {
       cityState.combatDesire = minorCombatDesire(state, cityState, state.turn - 1).desire;
       const wars = seatOf(state, cityState.seat)?.wars ?? [];
@@ -574,9 +580,12 @@ function takeChoice(r: ResearchState, c: ResearchChoice | null): void {
 
 /** A city-state's or the Free Cities' item COMPLETED outside its research
  *  step (a boost that filled it, `markBoost`): held, the progress kept on it
- *  spent, Urban Defenses' walls fitted; the item in hand makes the
- *  completion's choice over the analysis its last turn left, the completed
- *  row the key (0x762d60, 0x6293e0) */
+ *  spent, Urban Defenses' walls fitted. A technology makes the completion's
+ *  choice over the analysis its last turn left, the completed row the key,
+ *  whatever is in hand (0x762d60 reads no research in hand: runs/h1_duely1128
+ *  city-state 2's Banking boosted complete at t117, Education 231.3 taken
+ *  over the Gunpowder in hand); a civic in hand makes the civics AI's
+ *  (0x6293e0) */
 export function minorCompleteNow(state: GameState, seat: number, id: string): void {
   const r = seatOf(state, seat)?.research;
   if (!r) return;
@@ -598,9 +607,10 @@ export function minorCompleteNow(state: GameState, seat: number, id: string): vo
     if (cs) minorUrbanFit(state, cs);
     else urbanDefensesFit(state, seat);
   }
-  if (r.tech !== id) return;
-  r.tech = null;
-  r.techProgress = 0;
+  if (r.tech === id) {
+    r.tech = null;
+    r.techProgress = 0;
+  }
   if (r.aiEntries) takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries.map((e) => ({ ...e })), id, researchDraw(state),
     cs ? minorTechContracts(cs) : []));
 }

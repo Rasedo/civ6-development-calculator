@@ -622,6 +622,13 @@ export interface History {
    *  `seat:item`: the boost's share of the item's price at the first record
    *  that showed it boosted (the price of that record's game era) */
   boostParked: Map<string, number>;
+  /** the research each player parked on an item it left unfinished, by
+   *  `player:t<index>` (a technology) or `player:c<index>` (a civic): the
+   *  record's progress on the item in hand plus the yield its turn banked
+   *  into it, where the next record shows another item in hand and the
+   *  item unheld (`foldResearchParked`); `boosted` where its boost was in
+   *  that progress */
+  researchParked: Map<string, { amount: number; boosted: boolean }>;
   /** each major's tourism banked toward each major it has met, by `p:o`
    *  (`Seat.tourismTo`): the record's tourism through the pair's route and
    *  government terms of `tourismIntlPct` */
@@ -853,7 +860,7 @@ export function newHistory(): History {
   return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
-    competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), boostParked: new Map(), tourismTo: new Map(),
+    competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), boostParked: new Map(), researchParked: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), startPicks: new Map(), seaLevel: 0, people: null, stockpile: new Map(), reservations: new Map() };
 }
 
@@ -1879,6 +1886,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   for (const k of [...h.routeCourse.keys()]) if (!live.has(k)) h.routeCourse.delete(k);
   if (h.last) foldCultureTourism(h, h.last, rec, cat);
   if (h.last) foldGrowthDrift(h, h.last, rec, cat);
+  if (h.last) foldResearchParked(h, h.last, rec);
   foldDominance(h, rec);
   foldBeside(h.alpine, h.last, rec, cat, ALPINE_FEATURE);
   foldBeside(h.fionn, h.last, rec, cat, FIONN_FEATURE);
@@ -2768,8 +2776,22 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   // 34 / 30 / 44; runs/h1_duely1128 Bologna's Stirrups, boosted the turn
   // the Medieval era began at t91, at the Classical price)
   const boostEra = history && history.eraStartTurn === rec.turn ? Math.max(0, history.gameEra - 1) : state.gameEra;
+  // The research each player parked on an item it left (`foldResearchParked`)
+  // stands on it, its boost beside it where the boost landed after
   for (const s of [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
     const r = s.research;
+    const pid = playerOfSeat.get(s.seat);
+    const researched = new Map<string, { amount: number; boosted: boolean }>();
+    for (const [key, v] of pid === undefined ? [] : history?.researchParked ?? []) {
+      const [owner, item] = key.split(':');
+      if (Number(owner) !== pid) continue;
+      const civic = item[0] === 'c';
+      const name = (civic ? cat.civics : cat.techs)[Number(item.slice(1))];
+      const id = civic ? engineId('civic', name, 'CIVIC_', CIVICS) : engineId('tech', name, 'TECH_', TECHS);
+      if (!id || r.techs.includes(id) || r.civics.includes(id) || r.tech === id || r.civic === id) continue;
+      researched.set(id, v);
+      (civic ? r.civicRetained : r.techRetained)[id] = v.amount;
+    }
     for (const id of r.boosted) {
       if (r.techs.includes(id) || r.civics.includes(id) || r.tech === id || r.civic === id || !BOOSTS[id]) continue;
       const civic = !TECHS[id];
@@ -2780,7 +2802,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         parked = Math.min(cost, boostAmount(cost, BOOSTS[id].pct, boostPoints(state, s.seat, civic)));
         if (history && history.last === rec) history.boostParked.set(key, parked);
       }
-      (civic ? r.civicRetained : r.techRetained)[id] = parked;
+      const before = researched.get(id);
+      if (before?.boosted) continue;
+      (civic ? r.civicRetained : r.techRetained)[id] = before ? Math.min(researchCost(state, id, civic, s.seat), parked + before.amount) : parked;
     }
   }
   // the rivers named so far: the history's, then this record's look — the
@@ -4177,6 +4201,37 @@ function spentPersonGaps(ctx: Ctx, rec: TurnRecord, cityByKey: Map<string, City>
     }
   }
   ctx.scopeCity = undefined;
+}
+
+/**
+ * THE RESEARCH A PLAYER PARKED (`History.researchParked`): a record shows the
+ * progress of the item in hand alone. Where the next record holds another
+ * item in hand and the first unheld, the player's step of the turn between
+ * banked the turn's yield into it before its choice moved on (the minors'
+ * bank before their research AI's turn, `minorResearchBank`), so the item
+ * keeps the record's progress plus the record's yield (`selectResearch`
+ * parks it): runs/h1_duely1117 city-state 3's Sanitation, in hand t149-t154,
+ * 50 turns at t156 beside Economics' 58 at the same cost. An item back in
+ * hand shows its progress again, and one held is spent.
+ */
+function foldResearchParked(h: History, prev: TurnRecord, rec: TurnRecord): void {
+  const was = new Map(prev.players.map((p) => [p.id, p]));
+  for (const p of rec.players) {
+    const q = was.get(p.id);
+    if (!q) continue;
+    for (const civic of [false, true]) {
+      const before = num(civic ? q.civic : q.researching);
+      const now = num(civic ? p.civic : p.researching);
+      const held = (civic ? p.civics : p.techs) ?? '';
+      const key = (i: number) => `${p.id}:${civic ? 'c' : 't'}${i}`;
+      for (let i = 0; i < held.length; i++) if (held[i] === '1') h.researchParked.delete(key(i));
+      if (before >= 0 && before !== now && held[before] !== '1') {
+        const amount = num(civic ? q.civicProgress : q.researchProgress) + num(civic ? q.cultureYield : q.scienceYield);
+        h.researchParked.set(key(before), { amount, boosted: ((civic ? q.civicBoosts : q.techBoosts) ?? '')[before] === '1' });
+      }
+      if (now >= 0) h.researchParked.delete(key(now));
+    }
+  }
 }
 
 /**

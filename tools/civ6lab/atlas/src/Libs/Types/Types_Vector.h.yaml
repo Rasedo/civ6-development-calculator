@@ -704,6 +704,7 @@
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1: a city-state's boost completion and the research AI — READ"
   context:
     - "...es: a city-state whose research or civic completed picks the next (\"BT Research Choice\" 0x763020: the AI plan's tech, no draw, else ONE uniform draw over every researchable tech; \"Rand..."
     - "...t (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research in hand; the analysis reads the value b..."
