@@ -1017,7 +1017,7 @@ class SimBarbOps:
         col = 0 if raiding else 1
         forces = bb["forces"]  # [kind][raid 0 / assault 1] = [rate, [[tag, n] ...]]
         unit_for = self._barb_unit_for()  # [B, n_tags]
-        free = (self.barb_unit_alive & (self.barb_unit_tribe == k) & ~self.barb_unit_scout & ~self.barb_unit_fresh
+        free = (self.barb_unit_alive & (self.barb_unit_tribe == k) & ~self.barb_unit_fresh
                 & ~self.barb_unit_op & ~self._bcap_members() & act.unsqueeze(1))
         bidx = self._bidx
         dmg = int(self.rules.combat["unitHp"]) - self.barb_unit_hp.long()

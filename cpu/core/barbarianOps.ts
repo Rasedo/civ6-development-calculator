@@ -116,12 +116,14 @@ function hooksOf(state: GameState): BarbarianHooks {
       const force = barbForce(tr.kind, raiding, handicapOf(state, tr.op.target.seat));
       const fresh = new Set(tr.fresh ?? []);
       // the unit evaluator's walk (0x60a8c0): the player's units unassigned
-      // (+0x7d0 -1), alive, in the pool's slot order; the tribe's request
+      // (+0x7d0 -1), alive, in the pool's slot order, the tribe's scouts
+      // among them (runs/h1_duely1128 t224: tribe 6's Ranger 6946838 joins
+      // its CavalryRaid as the CLASS_MOBILE_RANGED one); the tribe's request
       // (0x7c62f0) fills each class's count in that order, and a later unit
       // of the class with less damage (+0xcf0) takes the place of the first
       // held one with more
       const inOps = new Set(opsOf(opsOfBarbs(state)).flatMap((o) => opUnits(o)));
-      const free = tr.units.filter((id) => unitOf(state, id) && !fresh.has(id) && !inOps.has(id))
+      const free = [...tr.units, ...tr.scouts].filter((id) => unitOf(state, id) && !fresh.has(id) && !inOps.has(id))
         .sort((a, b) => (unitOf(state, a)!.slot ?? 0) - (unitOf(state, b)!.slot ?? 0));
       const damage = (id: number) => UNIT_HP - unitOf(state, id)!.hp;
       const taken: number[] = [];

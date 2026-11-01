@@ -1937,7 +1937,9 @@ and the operation's units it took are then listed (0x6092c0) and join in
 that order (0x737e80): the pool's slot order (runs/h1_duelw1127 t35: Warrior
 2162693, slot 5, taken before 1835024, slot 16, the older). The tribe's
 request (0x7c62f0, its vtable @d72bb8) walks that list: a unit of the tribe
-(+0x11d0) of each class (0x8c2880 on the force's class lists, never
+(+0x11d0), its scouts among them (runs/h1_duely1128 t224: tribe 6's Ranger
+6946838, its scout, joins its CavalryRaid as the CLASS_MOBILE_RANGED one,
+AI_Operation t225 "Ready, UNIT_CAVALRY; UNIT_RANGER; UNIT_CAVALRY"), of each class (0x8c2880 on the force's class lists, never
 CLASS_ZOMBIE) fills the class's count in order; the class full, it takes the
 place of the first held one with more damage (+0xcf0, strictly) — 1121 t11:
 Horseman 851980 (whole) displaces 655369 (20 damage) beside 720906.

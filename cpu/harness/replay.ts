@@ -240,6 +240,9 @@ interface Ctx {
   barbBattles: (() => void)[];
   /** the units of this pair's recorded battles a barbarian attacked in */
   barbFought: Set<string>;
+  /** the health a recorded promotion healed a unit to this pair (its pick
+   *  heals: a spent unit's clamp keeps it) */
+  promoteHp: Map<Unit, number>;
   /** the city-states' units as each one's own engine turn left them, before
    *  the record's sync (`minorTurns`): their copy's turn opens so (a unit its
    *  city trained where it was made), a Builder record t+1 lost to its own
@@ -3341,12 +3344,13 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           const ours = aiPromotionPick(u);
           count(ctx, 'minorAi:promote', ours === k ? 'applied' : 'fallback', d.player, `the AI's ${unitPromoRows(u)[ours]?.id ?? 'none'}, the game's ${name}`);
         }
-        if (k >= 0 && takePromotion(u, k)) { count(ctx, 'promote', 'applied', d.player); break; }
+        if (k >= 0 && takePromotion(u, k)) { ctx.promoteHp.set(u, u.hp); count(ctx, 'promote', 'applied', d.player); break; }
         if (k >= 0) {
           // the experience is kept through the promotion, as the engine's
           u.promos = (u.promos ?? 0) | (1 << k);
           u.level = (u.level ?? 1) + 1;
           u.hp = Math.min(UNIT_HP, u.hp + PROMOTE_HEAL);
+          ctx.promoteHp.set(u, u.hp);
         }
         count(ctx, 'promote', 'fallback', d.player, k < 0 ? `no ${name} in the unit's class` : 'the engine offered no such pick');
         break;
@@ -4837,7 +4841,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -4935,6 +4939,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.imposed = new Map();
     ctx.battled = new Set();
     ctx.barbFought = new Set();
+    ctx.promoteHp = new Map();
     ctx.barbBattles = [];
     ctx.fortified = fortifiedIn(b);
     ctx.paths = new Map();
@@ -5345,8 +5350,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // unit's (runs/h1_duelw1128 t17: Rome's Warrior, two turns dug in,
     // attacked, stepped onto 41:16 and took a barbarian Warrior's blow there
     // unfortified)
+    // a recorded promotion's heal stands (runs/h1_duely1124 t34: China's Scout
+    // 524294 promoted at 77 HP, UnitDamageChanged 23 -> 0, takes the
+    // barbarian Slinger's 30 whole)
     for (const [u, was] of spent) {
-      if (u.hp > was.hp) u.hp = was.hp;
+      const cap = Math.max(was.hp, ctx.promoteHp.get(u) ?? 0);
+      if (u.hp > cap) u.hp = cap;
       if ((u.fortifyTurns ?? 0) > was.fortify) u.fortifyTurns = was.fortify;
     }
     // a rested unit struck in a later player's turn heals at its own next
@@ -5355,7 +5364,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // health and read +10 after them; runs/h1_duelw1124 t9: Rome's Warrior,
     // whole when a barbarian Warrior struck it for 24, read 86): its rest
     // heal is taken at the health the blows left
-    for (const [u, hp] of struckHp) u.hp = Math.min(u.hp, hp);
+    for (const [u, hp] of struckHp) u.hp = Math.min(u.hp, Math.max(hp, ctx.promoteHp.get(u) ?? 0));
     const healedOn = new Map(state.units.map((u) => [u, healPlot(state, u)]));
     state.units.push(...barbs);
     verifyPolicies(ctx, staged);
