@@ -374,10 +374,21 @@ export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld
     idOf.set(Number(id), t.id);
     trees.push(t);
   }
-  // every contract of a tree taken: the city trees' and the operations'
-  const contracts = read.contracts.filter((c) => idOf.has(c.owner)).map((c) => {
+  // every contract of a tree taken — the city trees' and the operations':
+  // its owner's, else the taken tree whose list holds it — and every one
+  // the culture AI holds (a civic goal's contract is owned by none:
+  // runs/h1_duely1117 Antananarivo, civic contract 65 owner -1, in Build City
+  // District's list at the t23 end look, the culture AI's alone at t35)
+  const holder = new Map<number, number>();
+  for (const [id, g] of Object.entries(read.trees)) {
+    const t = idOf.get(Number(id));
+    if (t !== undefined) for (const c of g.contracts ?? []) if (!holder.has(c)) holder.set(c, t);
+  }
+  for (const c of read.holders?.culture ?? []) if (!holder.has(c)) holder.set(c, -1);
+  const contracts = read.contracts.filter((c) => idOf.has(c.owner) || holder.has(c.id)).map((c) => {
     const x = contractOf(w, c, read.trees!);
-    x.tree = idOf.get(c.owner)!;
+    x.tree = idOf.get(c.owner) ?? holder.get(c.id)!;
+    if (!idOf.has(c.owner)) x.treeName = trees.find((t) => t.id === x.tree)?.name ?? '-';
     return x;
   });
   ai.trees = trees;
@@ -412,7 +423,7 @@ export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld
   ai.techContracts = {};
   ai.plotContracts = {};
   for (const c of read.contracts) {
-    if (!idOf.has(c.owner)) continue;
+    if (!idOf.has(c.owner) && !holder.has(c.id)) continue;
     if (c.kind === 'tech' && (c.goal ?? -1) >= 0) ai.techContracts[c.id] = w.names.techs[c.goal!];
     else if (c.kind === 'civic' && (c.goal ?? -1) >= 0) ai.techContracts[c.id] = w.names.civics[c.goal!];
     else if (c.kind === 'plot' && c.plot && c.plot[0] >= 0) ai.plotContracts[c.id] = c.plot[1] * w.W + c.plot[0];

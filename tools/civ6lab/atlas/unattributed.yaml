@@ -194,6 +194,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
     - "...a city-state; COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD 0x6afa10 (a plot not impassable: ha..."
   review: imported
@@ -3053,6 +3054,24 @@
   context:
     - ...filter (+0x64, -1 or the Amount's yield +8), a walk over the city's trade set (+0x1ee0, 0x6c8660 -> 0x1fa000) with a functor (vtable 0xd64048) whose body is unread.
   review: imported
+- addr: 0x6c89b0
+  final: 0x4887e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...of the city's vertex, 0x542bd0) with a functor (vtable 0xd64048, its call 0x6c8fa0 -> 0x6c89b0, READ): per route its destination city (+0x18 player, +0x1a city, 0x57960), the count o..."
+  review: imported
+- addr: 0x6c8fa0
+  final: 0x488ca0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...'s routes out of the city's vertex, 0x542bd0) with a functor (vtable 0xd64048, its call 0x6c8fa0 -> 0x6c89b0, READ): per route its destination city (+0x18 player, +0x1a city, 0x57960..."
+  review: imported
 - addr: 0x6c8fb0
   final: 0x488cb0
   kind: function
@@ -5232,6 +5251,15 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...rn or the last (city +0x2600 + 1 >= the game turn; +0x2600 is m_iTurnFounded, the field 0x8ea750's CitiesFounded / TurnFounded reads: runs/h1_duelw1117 Caguana t34 keeps the Warrior..."
+  review: imported
+- addr: 0x8f3700
+  final: 0x62e800
+  kind: function
+  status: UNREAD
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - ...open borders (0x3dab70) +0x6dc + the governments' tier difference x +0x6cc + 0x8f1530 / 0x8f3700 / 0x8f2910 (unread) - the target's +0xf90, at least -100) / 100. Its inputs for a cit...
   review: imported
 - addr: 0x9034b0
   final: 0x72a920

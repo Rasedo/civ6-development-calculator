@@ -32,3 +32,11 @@
     - "...0x54bdb0 (a route's yield of one type): the route's path from the trade manager's cache (0x541ae0; else a fresh path, 0x5526a0), n its plots (4-byte entries, both ends included); the post..."
     - ...no Trading Post there (the route's own yield counts none until t223). The path cache (0x541ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x552...
   review: imported
+- addr: 0x542bd0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...et (+0x1ee0, 0x6c8660 -> 0x1fa000: the trade manager's routes out of the city's vertex, 0x542bd0) with a functor (vtable 0xd64048, its call 0x6c8fa0 -> 0x6c89b0, READ): per route its d..."
+  review: imported

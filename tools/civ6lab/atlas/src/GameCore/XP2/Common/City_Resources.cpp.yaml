@@ -13,5 +13,7 @@
     - cpu/core/trade.ts:routeDestStrategicPlots
     - gpu/core/sim_seats.py:_city_lux_plots
     - gpu/core/sim_seats.py:_city_strat_plots
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported

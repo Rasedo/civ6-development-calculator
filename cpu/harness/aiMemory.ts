@@ -204,7 +204,7 @@ export interface GameMemoryRead {
   ops?: GameOperation[];
   /** the economic, research, culture and diplomatic AIs' and each city's
    *  contract holders */
-  holders?: { cities: { city: number; hand: number; list: number[] }[]; economic: number[] };
+  holders?: { cities: { city: number; hand: number; list: number[] }[]; economic: number[]; research?: number[]; culture?: number[] };
   /** per unit id the control it is assigned to */
   assigned?: Record<string, number>;
 }
@@ -288,6 +288,15 @@ function contractTree(end: { trees?: Record<string, GameTree> }, c: GameContract
   return Object.values(end.trees ?? {}).find((t) => t.contracts?.includes(c.id))?.name ?? '-';
 }
 
+/** the tree holding one of our contracts: its tree's name while that tree
+ *  runs, else none (a Civic Contract the culture AI holds past its tree, as
+ *  the game reads it) */
+function ourTree(c: AiContract, ai: CityAi): string {
+  const goal = ai.techContracts[c.id];
+  const civic = goal !== undefined && (goal.startsWith('CIVIC_') || goal in CIVICS);
+  return !civic || ai.trees.some((t) => t.id === c.tree) ? c.treeName : '-';
+}
+
 function ourItem(c: AiContract, ai: CityAi, W: number): string {
   if (c.unit) return typed('unit', c.unit, 'UNIT_');
   if (c.building) return typed('building', c.building, 'BUILDING_');
@@ -332,7 +341,7 @@ export function syncContracts(game: GameMemory, names: MemoryNames, seat: Seat, 
   let cancelled = 0;
   for (const c of ai.contracts) {
     if (!OPEN.has(c.progress)) continue;
-    const key = `${ourItem(c, ai, W)}|${c.treeName}`;
+    const key = `${ourItem(c, ai, W)}|${ourTree(c, ai)}`;
     const k = pool.findIndex((g) => `${gameItem(g, names)}|${tree(g)}` === key);
     if (k < 0) {
       c.progress = CP_CANCELLED;
@@ -374,8 +383,8 @@ export function readGameMemory(game: GameMemory, names: MemoryNames, seat: Seat,
     const ours = ai ? ai.contracts.filter((c) => OPEN.has(c.progress)) : [];
     const theirs = end.contracts.filter((c) => OPEN.has(c.status));
     const tree = (c: GameContract) => contractTree(end, c);
-    add('contracts', ours.map((c) => `${ourItem(c, ai!, W)}|${c.treeName}`), theirs.map((c) => `${gameItem(c, names)}|${tree(c)}`));
-    add('contracts.progress', ours.map((c) => `${ourItem(c, ai!, W)}|${c.treeName}|${CP_NAMES[c.progress]}`),
+    add('contracts', ours.map((c) => `${ourItem(c, ai!, W)}|${ourTree(c, ai!)}`), theirs.map((c) => `${gameItem(c, names)}|${tree(c)}`));
+    add('contracts.progress', ours.map((c) => `${ourItem(c, ai!, W)}|${ourTree(c, ai!)}|${CP_NAMES[c.progress]}`),
       theirs.map((c) => `${gameItem(c, names)}|${tree(c)}|${CP_NAMES[c.status] ?? c.status}`));
   }
   if (end?.ops) {

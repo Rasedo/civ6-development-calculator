@@ -6488,7 +6488,11 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   the score — past the propagation, which sums the own values (+0x10)
   alone, so no other row carries it. The contracts are the city AI's Add
   Goal Tech contracts on a civic ("Desired Civics"), every one listed
-  (status 3 and 5 alike). runs/h1_duely1117 Antananarivo (aimem): civic
+  (status 3 and 5 alike). The culture AI holds each (the end look's holders
+  culture list) past the tree that made it, accepted or in progress, until
+  its civic completes it (7): Antananarivo's contract 65 held t23-t44, its
+  Build City District tree gone by t35, released at t45 with Drama and
+  Poetry; a civic contract's owner reads -1. runs/h1_duely1117 Antananarivo (aimem): civic
   contract 65 on Drama and Poetry, 32.0, from t24, a second (93) of 84.0
   from t36 — Drama and Poetry 32.0 then 116.0 above the propagation's sum,
   Theology and Recorded History equal. Port: `civicAnalysis` (`CivicContract`,
@@ -6499,14 +6503,33 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   count from either side above 0), the player's tourism toward it
   (Player_Culture 0x394830) x Amount x 0.01, as PSEUDOYIELD_TOURISM,
   discounted to the start (0x7a1240), whole, summed. Not ported: 0x394830
-  (the tourism toward a player) unread for a city-state.
+  (the tourism toward a player), PARTLY READ: per city of the player (+0x12f0
+  +0xd8) its tourism (city +0x1ac8: 0x1ab5f0, then 0x1ab2a0 added), the
+  first part cut by the target's culture defence percent (+0x1310 +0xf30,
+  unless the player's +0xff0) and by GlobalParameters +0x6d4 percent where
+  the two players' majority religions differ, raised by the city's
+  +0x1b1c percent where its era bonus (+0x1b18) applies at the target's
+  era or later; the sum then x (100 + the player's +0x1248 + a trade route
+  either way (0x552fb0) GlobalParameters +0x6e4 + open borders (0x3dab70)
+  +0x6dc + the governments' tier difference x +0x6cc + 0x8f1530 / 0x8f3700
+  / 0x8f2910 (unread) - the target's +0xf90, at least -100) / 100. Its
+  inputs for a city-state (great works, the era bonus) are not ported.
 - PARTLY READ, Market Economy's per-destination analyzers
   EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL
   0x6b2aa0 (@f03d60, vtable 0xd63130) and its STRATEGIC twin 0x6b44d0
   (@f03d68, vtable 0xd631f0): on the context's city (+0x70), the yield
   filter (+0x64, -1 or the Amount's yield +8), a walk over the city's trade
-  set (+0x1ee0, 0x6c8660 -> 0x1fa000) with a functor (vtable 0xd64048)
-  whose body is unread.
+  set (+0x1ee0, 0x6c8660 -> 0x1fa000: the trade manager's routes out of the
+  city's vertex, 0x542bd0) with a functor (vtable 0xd64048, its call 0x6c8fa0
+  -> 0x6c89b0, READ): per route its destination city (+0x18 player, +0x1a
+  city, 0x57960), the count of the resources of the class on it (0x1f71b0:
+  the plots of its first 0x5cbc0(2) + 18 that the city owns, the resource
+  known to the city's owner, 0x4ab4b0, of the class — RESOURCECLASS_LUXURY
+  0xa9f06a65, STRATEGIC 0xc163880a, BONUS 0xa3fcd07b, ARTIFACT
+  0x438194d8) x Amount, as the Amount's yield at the player's weight
+  (0x7a6690), between the start and the horizon (0x7a2140), whole, added
+  per route; no international test in the functor. Not ported: our
+  routes' destinations and their plots are not in the policy context.
 - UNREAD, the analyzers 0 in the port that the governments' values name:
   EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER 0x6b2060 (@f04260, vtable
   0xd630e8; Oligarchy's and Theocracy's abilities through EFFECT_GRANT_ABILITY

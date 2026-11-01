@@ -524,9 +524,12 @@ def _tree_take_unit(ai: CityAi, s: int, k: torch.Tensor, uid: torch.Tensor, mask
 def reap_contracts(ai: CityAi, s: int, w) -> None:
     """`reapContracts`: a contract lives while its tree — a city tree's, an
     operation's (`w.operation_live`) — runs and holds it, or the city has it
-    in hand"""
+    in hand, or it is a Civic Contract accepted or in progress, which the
+    culture AI holds past its tree (`minorCultureContracts`)"""
     in_tree = ai.c_in_tree[:, s] & (tree_live(ai, s, ai.c_tree[:, s]) | _b(w.operation_live(ai.c_tree[:, s]), ai.c_in_tree[:, s]))
-    keep = in_tree | (ai.c_id[:, s] == ai.in_hand[:, s].unsqueeze(1))
+    prog = ai.c_progress[:, s]
+    culture = (ai.c_goal_kind[:, s] == GOAL_CIVIC) & (ai.c_goal[:, s] >= 0) & ((prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS))
+    keep = in_tree | culture | (ai.c_id[:, s] == ai.in_hand[:, s].unsqueeze(1))
     gone = (ai.c_id[:, s] >= 0) & ~keep
     ai.c_id[:, s] = torch.where(gone, torch.full_like(ai.c_id[:, s], -1), ai.c_id[:, s])
     ai.c_listed[:, s] &= ~gone
