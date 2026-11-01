@@ -3,6 +3,19 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x91e540
+  kind: function
+  semantics: "the game state's lock: +0x458 counted up; at the first count game signal +0x18f0 fires with 1 (the cities' yield caches cleared, 0x370080)."
+  status: PARTLY
+  cases:
+    - recording: h1_duely1128
+      turn: 17
+      value: city-state 3's government values on the Production its Food focus left (Political Philosophy 392.1 / 396.1 a turn apart as logged)
+  readings:
+    - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
+  context:
+    - ...locked (game instance +0x458 at 1 or more), else computes afresh (0x1c5350). The lock 0x91e540 (from the AI turn start 0x608870 at 0x60889e) on its first count fires game signal +0x1...
+  review: reviewed
 - addr: 0x91e590
   final: 0x63d1f0
   kind: function

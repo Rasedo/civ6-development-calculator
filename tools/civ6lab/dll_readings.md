@@ -6400,3 +6400,41 @@ cpu/core/combat.ts; `siegeMayShoot` its unmoved case on top);
   formation's Movement +0x218 the search starts on, 0x271909, against the
   unit's +0xdb0 after the move: unread). t66 / t68 / t72 / t74 / t76: the
   hurt Galley's Move to Safety (C-99's "t66-75 the same hurt Galley stays").
+
+## C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins
+
+`minorResearchTurn`'s returned government step, run in `minorPhase` after
+`minorAiTurn`, the Free Cities' after `freeDesire` (cpu/core/minorBuild.ts,
+cpu/core/phase.ts); `detectBoosts` after `minorBuild`. GPU: `_cai_turn`'s
+returned `government` (gpu/core/sim_civics.py), run in the minors' phase
+after `_minor_ai_turn` and in `_free_cities_phase` after `_free_combat_desire`;
+`_detect_minor_boosts` after `_minor_build` (gpu/core/sim_minors.py).
+
+- CITY::GETYIELD (0x1cb8b0) reads a per-yield cache (city +0x31d8, 8-byte
+  entries: the value, +4 the cached flag) while the game state is locked
+  (game instance +0x458 at 1 or more), else computes afresh (0x1c5350). The
+  lock 0x91e540 (from the AI turn start 0x608870 at 0x60889e) on its first
+  count fires game signal +0x18f0 with 1; Player_Cities' handler 0x370080
+  (bound by 0x36fe20) clears every city's cached flags (0x1cd040). So the
+  flat bonus's wonder term (0x6c5bcf) reads the city as it stands when the
+  AI turn reads it.
+- THE GOVERNMENT VALUES (0x7b0330) read the city as its CityBuildAI update
+  left it: the update's Food focus (0x5cdae0) re-places the citizens before
+  them. runs/h1_duely1128 city-state 3 t16-t30: the focus toggling a turn
+  apart, the Production 4 / 3 between the plots 399 and 445; Autocracy's
+  wonder term on it and Political Philosophy 392.1 / 396.1 a turn apart as
+  logged (ours a turn out of phase on the city before the focus). The
+  research AI's analysis, the policy jobs and the City Analysis tables read
+  the city before the focus (the research rows and Ilkum's policy job of
+  1128 p3 t16-t22 as logged only so).
+- A BOOST the city's turn earns lands at once, before the AI turn reads the
+  civics: runs/h1_duely1128 Nazca's Holy Site completed t15 (AI_CityBuild.csv
+  CONTRACT 28 COMPLETED), Game_Boosts.csv State Workforce t15, its t15
+  analysis at 6 turns (State Workforce 144.9, Military Training 657.3 at 48
+  turns as logged), Military Training inside the horizon and Equestrian
+  Orders scored 5 that turn.
+- Open: runs/h1_duely1124 city-state 3's Foreign Trade value +89 a turn
+  early (t12 170.23 for the logged t13 170.2): its route value K over
+  player 1's cities nonzero from its t11 turn (met t10, initiated by the
+  city-state), the game's from t12 — player 1's trade list at its t11 turn
+  or the knowledge base's met record a turn later, unread.

@@ -75,3 +75,31 @@
   context:
     - "...f0): the major owning its plot (0x469db0), else the major whose city stands nearest it (0x36f6c0 per player, the first at the least distance); none, no draw. China's pool falls 40, 39,..."
   review: reviewed
+- addr: 0x36fe20
+  final: 0x265b40
+  kind: function
+  semantics: "Player_Cities' signal bindings: 0x370080 on game signal +0x18f0 (the game state's lock)."
+  status: PARTLY
+  cases:
+    - recording: h1_duely1128
+      turn: 17
+      value: city-state 3's government values on the Production its Food focus left (Political Philosophy 392.1 / 396.1 a turn apart as logged)
+  readings:
+    - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
+  context:
+    - ...rst count fires game signal +0x18f0 with 1; Player_Cities' handler 0x370080 (bound by 0x36fe20) clears every city's cached flags (0x1cd040). So the flat bonus's wonder term (0x6c5bcf...
+  review: reviewed
+- addr: 0x370080
+  final: 0x265d40
+  kind: function
+  semantics: "the lock signal's handler: over the player's cities (+0xd8 list) each city's yield cache cleared (0x1cd040)."
+  status: PARTLY
+  cases:
+    - recording: h1_duely1128
+      turn: 17
+      value: city-state 3's government values on the Production its Food focus left (Political Philosophy 392.1 / 396.1 a turn apart as logged)
+  readings:
+    - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
+  context:
+    - ...t 0x60889e) on its first count fires game signal +0x18f0 with 1; Player_Cities' handler 0x370080 (bound by 0x36fe20) clears every city's cached flags (0x1cd040). So the flat bonus's...
+  review: reviewed

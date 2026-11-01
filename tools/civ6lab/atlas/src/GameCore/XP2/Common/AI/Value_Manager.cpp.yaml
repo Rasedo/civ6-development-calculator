@@ -760,6 +760,7 @@
     - "C-130: the government values' parts at Hunza (live) — READ"
     - "C-130: Antioch's government values read the Combat Desire of their own turn (live) — READ"
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
+    - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
   context:
     - "...its (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to valueHorizons[0]; the first strictly highest; a different one is commanded (civics..."
     - "- The government's value (0x7b0330): FX_MIN when start >= horizon, or for one held before (PlayerCulture +0x350 [governmen..."

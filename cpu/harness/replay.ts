@@ -2534,14 +2534,14 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     state.turn -= 1;
     placed.foundedTurn = state.turn;
     try {
-      minorResearch(state, placed.research, placed.seat, 0, 0, () => undefined, () => undefined, [], () => {
-        placed.combatDesire = minorCombatDesire(state, placed, state.turn - 1).desire;
-      }, false);
+      const { government } = minorResearch(state, placed.research, placed.seat, 0, 0, () => undefined, () => undefined, [], false);
+      placed.combatDesire = minorCombatDesire(state, placed, state.turn - 1).desire;
       const fresh = !placed.cityAi;
       minorMilitaryTurn(state, placed);
       minorKnowledge(state, placed, false);
       minorContractPurchases(state, placed);
       minorAiTurn(state, placed, fresh);
+      government();
       minorSecondHook(state, placed, fresh);
       detectBoosts(state, placed.seat);
     } finally {

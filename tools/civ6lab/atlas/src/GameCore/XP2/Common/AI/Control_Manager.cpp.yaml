@@ -57,6 +57,7 @@
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
+    - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...its watched setter 0x731d10 on +0x220) and acts only in its own pass: the turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs..."

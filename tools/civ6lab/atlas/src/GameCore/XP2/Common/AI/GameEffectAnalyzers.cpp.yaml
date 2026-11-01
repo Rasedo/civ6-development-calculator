@@ -1490,6 +1490,7 @@
     - "C-130: the government values' parts at Hunza (live) — READ"
     - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
     - "C-130: Antioch's government values read the Combat Desire of their own turn (live) — READ"
+    - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (@f03ea0, vtable 0xd626c8; its parser 0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's..."

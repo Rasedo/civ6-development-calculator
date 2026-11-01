@@ -37,6 +37,7 @@
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
+    - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
   context:
     - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0x1108 of the city's yield component) a...
     - "...'s step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Production toward the item), B with none (the city's plain P..."
@@ -160,7 +161,7 @@
 - addr: 0x1cb8b0
   kind: function
   name: City::GetYield
-  semantics: City::GetYield.
+  semantics: "City::GetYield: while the game state is locked (game instance +0x458 at 1 or more) the city's cached yield (+0x31d8, the entry's flag +4), computed (0x1c5350) and kept on a miss; unlocked, computed afresh. The lock's first count clears the caches (0x91e540 -> 0x370080 -> 0x1cd040)."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
@@ -169,6 +170,7 @@
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
     - "C-126 / C-130: who may plunder a route (0x9555a0) and the treasury turn's city term (0x4dd3b0) — READ, the plunder ported in both twins"
     - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
+    - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...x(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption 0x5276c0 of the new population. One entry per free slot of e..."
@@ -212,4 +214,18 @@
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
   context:
     - "- A citizen's yield share (0x1cbd10): population << 8 times SCIENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed..."
+  review: reviewed
+- addr: 0x1cd040
+  final: 0x1346f0
+  kind: function
+  semantics: "a city's yield cache cleared on the lock signal (dl set): each 8-byte entry of +0x31d8 (count +0x31e8) has its cached flag +4 zeroed."
+  status: PARTLY
+  cases:
+    - recording: h1_duely1128
+      turn: 17
+      value: city-state 3's government values on the Production its Food focus left (Political Philosophy 392.1 / 396.1 a turn apart as logged)
+  readings:
+    - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
+  context:
+    - ...; Player_Cities' handler 0x370080 (bound by 0x36fe20) clears every city's cached flags (0x1cd040). So the flat bonus's wonder term (0x6c5bcf) reads the city as it stands when the AI...
   review: reviewed

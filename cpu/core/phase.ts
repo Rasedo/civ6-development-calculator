@@ -1057,7 +1057,9 @@ export function freeCitiesPhase(state: GameState): void {
   const urban = () => urbanDefensesFit(state, FREE_SEAT);
   storeUnitStrength(state, FREE_SEAT);
   if (free.cities.length === 0) {
-    minorResearch(state, free.research, FREE_SEAT, 0, 0, () => undefined, urban, [], () => freeDesire(state));
+    const { government } = minorResearch(state, free.research, FREE_SEAT, 0, 0, () => undefined, urban, []);
+    freeDesire(state);
+    government();
     freeMilitaryTurn(state);
     freeKnowledge(state, false);
     return;
@@ -1076,7 +1078,10 @@ export function freeCitiesPhase(state: GameState): void {
     science += s.total.science;
     culture += s.total.culture;
   }
-  if (minorResearch(state, free.research, FREE_SEAT, science, culture, () => undefined, urban, [], () => freeDesire(state)) > 0) {
+  const research = minorResearch(state, free.research, FREE_SEAT, science, culture, () => undefined, urban, []);
+  freeDesire(state);
+  research.government();
+  if (research.gained > 0) {
     luxMap = luxuryAmenities(state, FREE_SEAT);
     mods = getModifiers(state, FREE_SEAT);
     free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, luxMap, mods); });

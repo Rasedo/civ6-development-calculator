@@ -367,6 +367,7 @@
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
     - "C-112: the citizen manager has no turn of its own"
+    - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
   context:
     - "...ned with no wait, \"H-1: why a seed does not replay\"). Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150 (tree \"Build City..."
   review: reviewed
