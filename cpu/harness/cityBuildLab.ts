@@ -88,8 +88,9 @@ function inHandAtAnalysis(state: GameState, cs: CityState, player: number, name:
     : 'unit' in ha ? b.units.some((u) => u.owner === player && !before.has(u.id) && engineRowOf(cat, 'unit', u.type) === ha.unit)
       : progress >= minorItemCost(state, cs, ha as Exclude<MinorItem, { none: true }>);
   if (done) {
-    // a completion leaves the store what the step paid past the cost
-    stored.set(key, Math.max(0, (progress - minorItemCost(state, cs, ha as Exclude<MinorItem, { none: true }>)) / (1 + minorItemPct(state, cs, ha) / 100)));
+    // a completion leaves the store the turn's Production less what the
+    // item lacked (0x16f3bf), none below 0
+    stored.set(key, Math.max(0, production - (minorItemCost(state, cs, ha as Exclude<MinorItem, { none: true }>) - from)));
     cs.prodOverflow = stored.get(key);
     tracked.delete(key);
     delete cs.prodItem;
@@ -268,7 +269,12 @@ for (let i = 0; i + 1 < recs.length; i++) {
     const logged = tables.get(`${turn}:${player}:${imp.dumpOfMinor.get(cs)?.name}`);
     if (!logged) continue;
     const stats = computeCityStats(state, minorCity(cs));
-    inHandAtAnalysis(state, cs, player, imp.dumpOfMinor.get(cs)!.name, recs[i], b, stats.total.production);
+    // the turn's production step pays the Production its record stood at
+    // (runs/h1_duelv1128 Nazca t39: the Walls 26.4 off 4.4 a turn, the next
+    // record's 5.5 not yet)
+    const was = prevImp!.minorOfPlayer.get(player);
+    const turnProduction = was && was.centerIndex >= 0 ? computeCityStats(prevImp!.state, minorCity(was)).total.production : stats.total.production;
+    inHandAtAnalysis(state, cs, player, imp.dumpOfMinor.get(cs)!.name, recs[i], b, turnProduction);
     cs.research.aiEntries = researchAnalysis(state, cs.seat, stats.total.science);
     // the completion overflow the turn's Culture left (no record holds it):
     // the civic the record before held in hand, now held, at its progress

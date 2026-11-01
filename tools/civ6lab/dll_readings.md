@@ -6120,3 +6120,36 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   Political Philosophy's +1 / -1 at the t11 / t12 computes. The CPU twin
   (`minorBuild.ts`) sets `CityState.combatDesire` after `minorResearchAi`
   in a city-state's turn, so its government values read the previous turn's.
+
+## C-127: an idle city's store through the queue step (0x16f050), the build lab on it — READ (the engines unchanged)
+
+- THE STORE (0x16f050, `minorBuild`, `_minor_build` in gpu/core/sim_minors.py,
+  as the engines already hold it): an idle step adds the plain Production B
+  to BuildQueue.m_xProductionOverflow +0x1f4 (0x16f62d -> 0x0ac650); with a
+  head the step pays (A + the store) through the item's add (0x1853d0: the
+  SUM times the item's percent multiplier) and clears the store (0x16f31b);
+  a completion stores min(A, B) less what the item lacked before the step
+  (0x16f3bf..0x16f474, none below 0). The excess past the cost is lost.
+  The other writer: a building made by another path with its flag set
+  (0x175da0 at 0x175eec) adds the progress kept on that building
+  (+0x218[building]) into the store.
+- The build lab now keeps that store (`cityBuildLab.ts` `inHandAtAnalysis`:
+  a completion stores the turn's Production less what the item lacked, where
+  before it stored the excess over the multiplier), and pays the turn's
+  production step at the Production the turn's record stood at, not the
+  next record's.
+- Confirmed (runs/h1_duelv1128, City_BuildQueue.csv): Nazca t33 the Horseman
+  117.6 of 40 leaves no store, the Shrine's T 8 / 7 / 6 / 5 at t33-36 and
+  8 / 7 at t37-38 as logged (the excess carried gave 5 / 4 / 3 / 2); t39 the
+  Walls 26.4 = (4.4 + 4.4) x 3 off the turn's 4.4; t40 the Shrine T 7. The
+  lab's tables, all rows exact: Nazca 933 -> 984 of 1330, Hong Kong
+  505 -> 777 of 1627, Bologna 740 -> 1157 of 2633 (onlyOurs 17 / 88 / 43 ->
+  1 / 24 / 10). Hong Kong t56's Temple a bare FX(-9999) in both now (T past
+  the horizon on the store as the game keeps it).
+- Open: runs/h1_duelv1128 Nazca t27-32: the game's store reads 9 or so above
+  the idle Production from t27's analysis on (the Shrine T 6 / 5 / 4 / 3 / 2,
+  ours 8 / 7 / 6 / 5 / 4; t33's Horseman 117.6 = (34.8 + 4.4) x 3 against
+  25.8 of idle Production t27-32), entering after the t26 analysis (T 7 as
+  logged there): no queue row, map change, combat or building explains it.
+  The Builder's lump (Nazca t22: the Granary's second row 9.0, overflow 8.5)
+  is not in the lab, which reads no feature removal (t22-23 a turn off).

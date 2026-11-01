@@ -138,10 +138,12 @@
     - cpu/core/phase.ts:milAllyWarPct
     - gpu/core/sim_phase.py:_seat_city_produce
     - gpu/core/sim_minors.py:_minor_build
+    - cpu/harness/cityBuildLab.ts:done
   readings:
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
     - "H-1: a completion's overflow and the item multiplier — READ"
+    - "C-127: an idle city's store through the queue step (0x16f050), the build lab on it — READ (the engines unchanged)"
   context:
     - ...e city's yield component) and its project id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Pro...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
@@ -308,6 +310,18 @@
   context:
     - ...+0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where the value passes CityBuildAI +0xa48 and the production was set this turn or the...
   review: reviewed
+- addr: 0x175da0
+  final: 0xfba40
+  kind: function
+  semantics: "a building made in the city by a path other than the queue step (16 callers): with its flag (r14b) and the percent at 100 or more (r12d), the progress kept on the building (+0x218[building]) is added to the store BuildQueue +0x1f4 (0x175eec), then the building is placed (0x17f870); the callers' paths unread."
+  status: PARTLY
+  readings:
+    - "C-127: an idle city's store through the queue step (0x16f050), the build lab on it — READ (the engines unchanged)"
+  notes:
+    - "no recording case read: no city-state building bought or granted with progress kept on it in runs/h1_duelv1128"
+  context:
+    - "...he cost is lost. The other writer: a building made by another path with its flag set (0x175da0 at 0x175eec) adds the progress kept on that building (+0x218[building]) into the store."
+  review: imported
 - addr: 0x177d10
   kind: function
   name: City_BuildQueue
@@ -952,6 +966,7 @@
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: a completion's overflow and the item multiplier — READ"
     - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
+    - "C-127: an idle city's store through the queue step (0x16f050), the build lab on it — READ (the engines unchanged)"
   context:
     - "...lers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0 from the city, distric..."
     - ...nt less its reservations covers it (0x4aa790), else leaves the front; the completion (0x1856b3 / 0x185a2a) releases the reservation and charges the stockpile together.
