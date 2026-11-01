@@ -480,13 +480,18 @@ class SimBarbOps:
         formed = self.bcap_form[:, c]
         zero[bidx[formed & civ_ok], csc[formed & civ_ok]] = True
         zero[bidx[formed & esc_ok], esc_[formed & esc_ok]] = True
+        # each formed member's formation mate (the formation's Movement)
+        mate = torch.full_like(self.barb_unit_tile, -1)
+        both = formed & civ_ok & esc_ok
+        mate[bidx[both], csc[both]] = esc_[both]
+        mate[bidx[both], esc_[both]] = csc[both]
         ex6 = mv_on & ~no_goal & ((c6 == 1) | (c6 == 2))
         # the move orders' danger flags read the operation's strength below
         # its target's, and its formation (`passMoveExec`)
         below = self.bcap_str[:, c] < self.bcap_estr[:, c]
         if bool(ex6.any()):
             self._op_move_exec(ex6, mem, self._bcap_rank(c), goal, sp6, ar6, self.bcap_ready[:, c], done, rowof, res, zero=zero,
-                               danger=ctx["danger"], weak=below, formed=zero)
+                               danger=ctx["danger"], weak=below, formed=zero, mate=mate)
         self.bcap_form[:, c] &= ~seq7
         ex8 = on8 & ~no_goal & ((c8 == 1) | (c8 == 2))
         if bool(ex8.any()):

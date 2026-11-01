@@ -164,17 +164,21 @@ interface Ground {
   boarded: (i: number) => boolean;
 }
 
-function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, anyGround = true): Ground {
+function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, anyGround = true,
+  mates: readonly Unit[] = []): Ground {
   const held = new Set<number>();
   const foes = new Set<number>();
   const own = new Set<number>();
   const dom = unitDomain(unit.type);
+  // a formation's stacking: any member's class (0x585eb0 over its members)
+  const doms = new Set([dom, ...mates.map((m) => unitDomain(m.type))]);
+  const formation = new Set([unit, ...mates]);
   let seenNow: Uint8Array | undefined;
   // the plots a unit at war with it that fights holds, whatever its domain
   // (the planning's attack test; a move order's path strikes its own domain)
   const fighters = new Set<number>();
   for (const u of state.units) {
-    if (u !== unit && u.seat === unit.seat && unitDomain(u.type) === dom) own.add(u.tileIndex);
+    if (!formation.has(u) && u.seat === unit.seat && doms.has(unitDomain(u.type))) own.add(u.tileIndex);
     if (u.seat === unit.seat || !onMap(u)) continue;
     held.add(u.tileIndex);
     if (!unitsHostile(state, unit, u)) continue;
@@ -356,9 +360,9 @@ export const moveUnitDanger = (plane: ArrayLike<number>): PathDanger => ({ plane
 
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false,
-  laterTurns = false, fromFull = false, explore = true, danger?: PathDanger): void {
+  laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = []): void {
   const { map } = state;
-  const ground = groundOf(state, unit, !zoc, !zoc, standToAttack);
+  const ground = groundOf(state, unit, !zoc, !zoc, standToAttack, mates);
   const held = heldCostsOf(state, unit);
   const nodes = new Map<number, PNode>();
   // a later turn starts on the pathfinder's pool of the domain its plot holds
@@ -603,16 +607,16 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number): number 
 /** the plots from the unit's to `dest`, the unit's own left out, by the
  *  pathfinder's path (its parents once `dest` closes); empty where none */
 export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false, explore = true,
-  danger?: PathDanger): number[] {
+  danger?: PathDanger, mates: readonly Unit[] = []): number[] {
   let found = null as PNode | null;
   search(state, unit, Infinity, true, (n) => {
     if (n.tile !== dest) return false;
     found = n;
     return true;
-  }, undefined, false, laterTurns, false, explore, danger);
+  }, undefined, false, laterTurns, false, explore, danger, mates);
   // under flag 0x1000 the path's first turn may not end on the destination
   // its own stacking unit holds
-  if (laterTurns && found && (found as PNode).turns <= 1 && stackedAt(state, unit, dest)) return [];
+  if (laterTurns && found && (found as PNode).turns <= 1 && stackedWith(state, unit, mates, dest)) return [];
   const out: number[] = [];
   for (let n: PNode | null = found; n && n.parent; n = n.parent) out.push(n.tile);
   return out.reverse();
@@ -630,14 +634,14 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
  *  8 / 0x8000) its first turn steps onto no plot of danger, (its flag 2)
  *  no step onto the ground of a player at war with it. */
 export function moveTo(state: GameState, unit: Unit, dest: number, strike = true,
-  laterTurns = false, explore = true, danger?: PathDanger): void {
-  let path = pathTo(state, unit, dest, laterTurns, explore, danger);
+  laterTurns = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = []): void {
+  let path = pathTo(state, unit, dest, laterTurns, explore, danger, mates);
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
   const last = path.length ? path[path.length - 1] : -1;
   const into = last >= 0 && attackPlot(state, unit, last);
   if (into) path = path.slice(0, -1);
-  walk(state, unit, path);
+  walk(state, unit, path, mates);
   if (into && strike && unit.movesLeft > 0 && attacksLeftOf(unit) > 0 && state.units.includes(unit)
     && plotDistance(state, unit.tileIndex, last) === 1) {
     meleeAttack(state, unit.id, last, unit.seat);
@@ -655,7 +659,7 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
 }
 
 /** the walk of a path as far as the unit's Movement carries it this turn */
-function walk(state: GameState, unit: Unit, path: number[]): void {
+function walk(state: GameState, unit: Unit, path: number[], mates: readonly Unit[] = []): void {
   const { tiles } = state.map;
   // how far its Movement carries it along the path this turn
   const full = unit.movesFull ?? unitFullMoves(state, unit);
@@ -677,7 +681,7 @@ function walk(state: GameState, unit: Unit, path: number[]): void {
     from = p;
     if (mp <= 0 || inEnemyZoc(state, p, unit)) break;
   }
-  while (stop > 0 && (stackedAt(state, unit, path[stop - 1]) || foreignAt(state, unit, path[stop - 1]))) stop -= 1;
+  while (stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || foreignAt(state, unit, path[stop - 1]))) stop -= 1;
   for (let i = 0; i < stop; i++) {
     if (stepUnit(state, unit, tiles[path[i]]) !== 'moved') return;
   }
@@ -718,6 +722,19 @@ export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number
   other.tileIndex = from;
   moveTo(state, unit, tile, false);
   if (unit.tileIndex !== tile) other.tileIndex = tile;
+}
+
+/** a unit of the unit's player on the plot that stacks with it or with a
+ *  member of its formation (`mates`), the formation's own units not counted
+ *  (0x585eb0: the most 0x585d90 counts over the members) */
+function stackedWith(state: GameState, unit: Unit, mates: readonly Unit[], tile: number): boolean {
+  if (!mates.length) return stackedAt(state, unit, tile);
+  const formation = new Set([unit, ...mates]);
+  return [unit, ...mates].some((m) => {
+    const dom = unitDomain(m.type);
+    return state.units.some((u) => !formation.has(u) && u.tileIndex === tile && u.seat === m.seat && unitDomain(u.type) === dom
+      && !UNITS[u.type]?.trader && dom !== 'spy');
+  });
 }
 
 /** a unit of the unit's player on the plot that stacks with it, the unit
@@ -2981,6 +2998,9 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     .filter((u): u is Unit => !!u && moves(u))
     .map((u) => ({ u, d: plotDistance(state, u.tileIndex, goal) }))
     .sort(nearestFirst).map((x) => x.u!);
+  // each member's Movement as the order opens: a formation's is the least
+  // of its members' (the formation moves once, its members together)
+  const opened = new Map(state.units.filter((x) => x.seat === pass.seat).map((x) => [x, pass.ended.has(x.id) ? 0 : x.movesLeft] as const));
   for (const u of movers) {
     if (!moves(u)) continue;
     const z = zero(u);
@@ -3022,7 +3042,14 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     const paired = mine.length > 0;
     const danger: PathDanger = { plane: pass.danger, any: weak ? !combat || paired : !combat && !paired,
       water: !UNITS[u.type]?.naval && unitDomain(u.type) !== 'air', war: false };
-    moveTo(state, u, dest, strike, true, false, danger);
+    // a formation moves on its Movement (+0x218): the least its members hold
+    // (0x267650 at 0x2679f9, refreshed as a member's order ends its moves,
+    // 0x56d6f0 -> 0x267b00), each member set to it
+    const live = mine.filter((m) => state.units.includes(m));
+    const held = Math.min(u.movesLeft, ...live.map((m) => opened.get(m) ?? 0));
+    if (held <= 0) continue;
+    u.movesLeft = held;
+    moveTo(state, u, dest, strike, true, false, danger, live);
   }
   return out;
 }

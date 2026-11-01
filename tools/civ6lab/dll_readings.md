@@ -5868,3 +5868,40 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   the six-unit cut on
   p2 / p3 (t75 / t78 / t98 the log's 4 x FX(-9999), ours valued: the unit
   count the cut reads).
+
+## C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins
+
+`passMoveExec`'s `opened` / `held` and `moveTo` / `pathTo` / `search` /
+`groundOf` / `walk` with `mates`, `stackedWith` (cpu/core/tactical.ts);
+`_op_move_exec`'s `mp_open` / `mate`, `_tac_move_to` / `_tac_search`'s
+`mate` (gpu/core/sim_tactics.py), the capture's `mate` (gpu/core/sim_barbops.py).
+
+- THE FORMATION'S MOVEMENT (formation +0x218, fixed point << 8): set as the
+  player's units' turn opens (0x2673f0, from DoTurn 0x4e4560) to 0x262cd0
+  over the members (+0x708) with GetMaxMoves: the least, raised to the most
+  of members with +0x1938 set (no recorded member holds it); refreshed by
+  0x267650 (its loop 0x2679e0..0x267a27) to the least of the members'
+  GetMovementMovesRemaining (0x56e2b0) whenever a member's order ends its
+  moves (0x56d6f0 -> 0x267b00), each member told the new value (event
+  0xc50d66d6). The formation's move 0x26fe20 sets out on +0x218 (0x270215).
+  So the formation moves once, on the least Movement its members held as
+  the order opened; a member whose moves an order ended holds the others.
+- THE PATH'S STACKING (0x2720a0's +0x54 = 0x585eb0 over the formation): a
+  turn may not end where an own unit stacks with any member — a civilian
+  and its escort are kept off both an own civilian's and an own fighter's
+  plot — the formation's own members not counted; the walk's stop and flag
+  0x1000's first turn read the same.
+- CONFIRMED: runs/h1_duely1121 t168 the 6:10 team's Settler 4587543 holds
+  while its escort's Protect Units plunder ends the Line Infantry's moves;
+  t97 / t98 Settler 3211277 and t102 / t113 / t114 Settler 3407879 end where
+  logged (their turns' ends off their tribe's units' plots); t149 / t150
+  Builder 4259860 as logged.
+- OPEN: runs/h1_duely1121 t157 the 16:17 team: the game's 16:17 -> 16:19 for
+  4:18 past its Crossbowmen on 16:18 / 15:19, ours a northern route (the
+  validity refusing the turn-ending node itself, so a later parent may reach
+  it, against the engines' refusing its children, unread); t159 the 7:19
+  team on 6:19 for 4:19 (the game's 6:18) and runs/h1_duely1128 t171 / t173
+  9:3 -> 10:3 / 9:5 -> 10:5 for 14:16 (the game's 9:4 / 9:6), every step a
+  full turn: the zone of control's sight on a move order's path (0x5033a0)
+  or the barbarians' revealed plots, no record holding either; the 5:17
+  team's t169 / t172 steps over our danger map.

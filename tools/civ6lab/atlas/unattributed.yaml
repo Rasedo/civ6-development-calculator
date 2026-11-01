@@ -988,6 +988,17 @@
   context:
     - ...CIES, hash 0x370521e0, gates it) to the game signal at GameSignals +0xc48; the subscriber 0x261ce0 calls 0x2597d0(player, a, b, c). The install's SEND_AID_EMERGENCY_TARGET_REQUIREMENTS / _...
   review: reviewed
+- addr: 0x267b00
+  final: 0x1a5000
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:live]
+  readings:
+    - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...MovementMovesRemaining (0x56e2b0) whenever a member's order ends its moves (0x56d6f0 -> 0x267b00), each member told the new value (event 0xc50d66d6). The formation's move 0x26fe20 sets...
+  review: imported
 - addr: 0x26d6f0
   final: 0x1a6250
   kind: function
@@ -1776,6 +1787,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ....cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x7164..."
   context:

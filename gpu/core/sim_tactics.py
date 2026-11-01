@@ -509,7 +509,8 @@ class SimTactics:
     def _tac_search(self, rows: torch.Tensor, slots: torch.Tensor, seat: int, max_turns: int, zoc: bool,
                     dest: torch.Tensor | None = None, pre: str = "barb", plan: dict | None = None,
                     full: bool = False, stand: bool = False, later_turns: bool = False,
-                    from_full: bool = False, explore: bool = True, danger: tuple | None = None) -> dict:
+                    from_full: bool = False, explore: bool = True, danger: tuple | None = None,
+                    mate: torch.Tensor | None = None) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
         the open nodes by (cost, tie) — a node inserted where its cost lies
@@ -652,6 +653,19 @@ class SimTactics:
             sup_u = self._type_support.take(utype).unsqueeze(1)
             full_n = torch.where(civ_u, own_at(self.civilian_at),
                                  torch.where(sup_u, own_at(self.support_at), own_at(self.military_at) | own_at(self.embarked_at)))
+            if mate is not None:
+                # a formation (`mate` [N] its other member's local slot, -1
+                # none: Make Formation's pair, a civilian and a fighter)
+                # stacks by either member's class, its own members not counted
+                # (0x585eb0 over the members)
+                mg = torch.where(mate >= 0, mate + self.POOL_LO[pre], torch.full_like(mate, -2)).unsqueeze(1)
+
+                def own_f(pl: torch.Tensor) -> torch.Tensor:
+                    pr = pl[rows]
+                    return own_at(pl) & (pr != mg)
+
+                form = own_f(self.civilian_at) | own_f(self.military_at) | own_f(self.embarked_at)
+                full_n = torch.where((mate >= 0).unsqueeze(1), form, full_n)
         tseat = self.tile_seat
         g = torch.full((N, T), NONE, dtype=torch.long, device=dev)
         tie = torch.zeros(N, T, dtype=torch.long, device=dev)
@@ -1129,7 +1143,8 @@ class SimTactics:
 
     def _tac_move_to(self, mask: torch.Tensor, us: torch.Tensor, dest: torch.Tensor, pre: str = "barb",
                      seat: int = BARB_SEAT, strike: bool = True,
-                     later_turns: bool = False, explore: bool = True, danger: tuple | None = None) -> None:
+                     later_turns: bool = False, explore: bool = True, danger: tuple | None = None,
+                     mate: torch.Tensor | None = None) -> None:
         """`moveTo` for the unit at local slot `us` [B] of pool `pre` (its
         player `seat`) in the games of `mask`: the pathfinder's path to `dest`
         with zones of control, walked as far as its Movement carries it this
@@ -1152,8 +1167,9 @@ class SimTactics:
         sr = us[rows]
         dr = dest[rows].clamp(min=0)
         dg = None if danger is None else tuple(x[rows] for x in danger)
+        mr = None if mate is None else mate[rows]
         res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre, later_turns=later_turns, explore=explore,
-                               danger=dg)
+                               danger=dg, mate=mr)
         par = res["parent"]
         start = res["start"]
         R = rows.shape[0]
@@ -1207,6 +1223,13 @@ class SimTactics:
         civ_trader = (civ_pl >= 0) & (self.unit_type[rows].gather(1, civ_pl.clamp(min=0)) == self._trader_idx)
         own_same = torch.where(civ_u, own_at(civ_pl) & ~civ_trader,
                                torch.where(sup_u, own_at(self.support_at[rows]), own_mil))
+        if mr is not None:
+            # a formation: either member's class, its other member not counted
+            mg = torch.where(mr >= 0, mr + self.POOL_LO[pre], torch.full_like(mr, -2)).unsqueeze(1)
+            not_m = lambda pl: pl != mg  # noqa: E731
+            form = ((own_at(civ_pl) & ~civ_trader & not_m(civ_pl)) | (own_at(self.military_at[rows]) & not_m(self.military_at[rows]))
+                    | (own_at(self.embarked_at[rows]) & not_m(self.embarked_at[rows])))
+            own_same = torch.where((mr >= 0).unsqueeze(1), form, own_same)
         no_end = own_same | self._tac_foreign(seat)[rows]
         # how far its Movement carries it
         mp = mp_p[rows, sr].clone()
@@ -2725,7 +2748,7 @@ class SimTactics:
                       arrived: torch.Tensor, ready: torch.Tensor, done: torch.Tensor, rowof: torch.Tensor, res: dict, pre: str = "barb",
                       seat: int = BARB_SEAT, zero: torch.Tensor | None = None,
                       leader: bool = False, danger: torch.Tensor | None = None, weak: torch.Tensor | None = None,
-                      formed: torch.Tensor | None = None) -> list:
+                      formed: torch.Tensor | None = None, mate: torch.Tensor | None = None) -> list:
         """`passMoveExec` for an operation's team in the games `on`: nothing
         where the operation is `ready` [B], the team arrived and the node names
         no Leader Tag (`leader`); else each living member `mem` [B, P] with
@@ -2757,6 +2780,8 @@ class SimTactics:
         tile_p = getattr(self, f"{pre}_unit_tile")
         type_p = getattr(self, f"{pre}_unit_type")
         can = mem & alive_p & (mp_p > 0) & go.unsqueeze(1)
+        # each member's Movement as the order opens (a formation's: the least)
+        mp_open = mp_p.clone() if mate is not None else None
         order = torch.where(can, key, torch.full_like(key, big)).argsort(dim=1, stable=True)
         nm = can.sum(dim=1)
         region = self.tile_region.gather(1, goal.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -2852,8 +2877,23 @@ class SimTactics:
                 f80 = torch.zeros(B, dtype=torch.bool, device=dev)
                 f80[rows] = ~naval & (self._type_air.take(ut) == 0)
                 dg = (danger, f8, f80, torch.zeros_like(f8))
-            self._tac_move_to(ms & ~hit, us, full, pre, seat, strike=False, later_turns=True, explore=False, danger=dg)
-            self._tac_move_to(ms & hit, us, full, pre, seat, strike=True, later_turns=True, explore=False, danger=dg)
+            # a formation moves on its Movement, the least its members hold,
+            # each member set to it (0x267650)
+            go_m = ms.clone()
+            if mate is not None:
+                mt = mate[rows, ur]
+                mtc = mt.clamp(min=0)
+                live_m = (mt >= 0) & alive_p[rows, mtc]
+                own_mp = mp_p[rows, ur]
+                held = torch.where(live_m, torch.minimum(own_mp, mp_open[rows, mtc]), own_mp)
+                mp_p[rows, ur] = held
+                go_m[rows] = held > 0
+            mate_b = None
+            if mate is not None:
+                mate_b = torch.full_like(us, -1)
+                mate_b[rows] = torch.where(live_m, mt, torch.full_like(mt, -1))
+            self._tac_move_to(go_m & ~hit, us, full, pre, seat, strike=False, later_turns=True, explore=False, danger=dg, mate=mate_b)
+            self._tac_move_to(go_m & hit, us, full, pre, seat, strike=True, later_turns=True, explore=False, danger=dg, mate=mate_b)
             moves.append((torch.where(ms, us, torch.full_like(us, -1)), before, torch.where(ms, full, torch.full_like(us, -1))))
         return moves
 

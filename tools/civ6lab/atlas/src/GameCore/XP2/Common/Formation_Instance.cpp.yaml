@@ -3,6 +3,19 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x262cd0
+  kind: function
+  name: the formation's least Movement
+  semantics: over a member list (+0x20, count +0x30) the least of fn(unit), raised to the most of the members with +0x1938 set
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 168
+      value: the 6:10 team's formation Movement the least of its members'
+  impl: [cpu/core/tactical.ts:passMoveExec, gpu/core/sim_tactics.py:_op_move_exec]
+  readings:
+    - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
+  review: reviewed
 - addr: 0x265ac0
   final: 0x1a3460
   kind: function
@@ -168,10 +181,34 @@
 - addr: 0x2673f0
   final: 0x1a4940
   kind: function
-  status: PARTLY
+  name: the formation's turn start
+  semantics: the formation's Movement +0x218 set to 0x262cd0 over the members with GetMaxMoves (<< 8); m_bHasMovedIntoZOC +0x518 cleared
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 168
+      value: the 6:10 team's Settler 4587543 holds on the formation's Movement once its escort's plunder ended the Line Infantry's
+  impl: [cpu/core/tactical.ts:passMoveExec, gpu/core/sim_tactics.py:_op_move_exec]
   readings:
+    - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...20 from 0x26f980 on its new plot, cleared each turn by Player_Units' DoTurn 0x4e4560 -> 0x2673f0) waits (+0x11), else it moves (0x26fe20). Ended (+0x10), a unit whose plot is not val...
   review: imported
+- addr: 0x267650
+  kind: function
+  name: the formation's refresh
+  semantics: the formation's class flags re-read over its members; its Movement +0x218 to the least of the members' GetMovementMovesRemaining (0x56e2b0; +0x1938 members the most), each member told (event 0xc50d66d6); reached from a member's 0x56d6f0 through 0x267b00
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 168
+      value: "the Settler 4587543 holds once the escort Line Infantry 4456462's plunder ended its moves (AI_Operation: Operation Move 6:10, 4:18, 6:10)"
+  impl:
+    - cpu/core/tactical.ts:passMoveExec
+    - gpu/core/sim_tactics.py:_op_move_exec
+    - cpu/core/tactical.ts:live
+  readings:
+    - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
+  review: reviewed

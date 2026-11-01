@@ -80,6 +80,7 @@
     - gpu/core/sim_minorops.py:_x_garrison
     - gpu/core/sim_minorops.py:end_moves
     - cpu/core/operations/assault.ts:stronger
+    - cpu/core/tactical.ts:live
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -90,6 +91,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
+    - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.c..."
   context:
@@ -263,6 +265,17 @@
   context:
     - "...daa0) strength within its range (0x56e3d0), any other nearer than twice its Movement (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The type ids (0x5bcb80, each g..."
   review: reviewed
+- addr: 0x56e2b0
+  final: 0x3a3b80
+  kind: function
+  name: GetMovementMovesRemaining
+  status: PARTLY
+  readings:
+    - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0 (its loop 0x2679e0..0x267a27) to the least of the members' GetMovementMovesRemaining (0x56e2b0) whenever a member's order ends its moves (0x56d6f0 -> 0x267b00), each member told the...
+  review: imported
 - addr: 0x56e3d0
   final: 0x3a3c70
   kind: function
