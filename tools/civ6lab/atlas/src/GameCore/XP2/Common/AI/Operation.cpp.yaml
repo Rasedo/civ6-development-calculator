@@ -89,6 +89,9 @@
     - recording: h1_duelv1117
       turn: 20
       value: Battle line 31:15, 0 endangered
+    - recording: h1_duely1128
+      turn: 85
+      value: "a civilian is listed only alone in its formation (0x739659): Builder Capture's Settler 4718622 in its Swordsman's formation on 12:13 is not moved off; no barbarian civilian logs Operation Protect Units in the five duely duels"
   impl:
     - cpu/core/operations/assault.ts:WEIGHED
     - cpu/core/operations/assault.ts:marchPoint

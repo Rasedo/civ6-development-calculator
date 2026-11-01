@@ -6687,7 +6687,12 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   or more. How the cost's "spend everything" leaves the Movement is
   unread (the walk's deduction 0x265d80 of [rsp+0x60]). The engines: a
   walk halts on a plot of an enemy's zone with its Movement kept
-  (`stepUnit`, `walk`; `_tac_zoc`'s halt, `_step_verb` no longer zeroes).
+  (`stepUnit`, `walk`; `_tac_zoc`'s halt, `_step_verb` no longer zeroes);
+  the exerter of the mover's domain alone (`inEnemyZoc`; `_tac_zoc`'s
+  `naval` in the path and the walk): runs/h1_duely1128 t107, the barbarian
+  Galley 2:1 -> 0:3 through 1:3 beside city-state 3's Man-At-Arms on 2:4
+  (HL: Explore, "Move To: 0 3", record t108 on 0:3; t117-120 likewise). The
+  sight test (0x5033a0) is the planning's alone in the engines.
 - THE PLANNING'S ZONE OF CONTROL (0x26e570 at 0x26e83e..0x26e8ae, READ;
   its exerters PARTLY READ): with the search's flag 0x200 clear (the
   planning's 0x115 | 0x800 | 0x100; the danger map's 0x311 sets it), a step
@@ -7410,6 +7415,33 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   city's centre.
   The unit's turn ends (0x570b40) and its MoveTo (0x962030) runs at once
   ("Operation Move, %s, at, goal, after").
+  THE ORDER'S FLAGS (READ, 0x8176d7..0x8178b1): 0x1000, and 1 unless the
+  node's Can Explore (DefnId 6, node +0x60 / +0x6c) is set and the player
+  is no barbarian (0x469ce0) — only Civ Royale's trees set it, so every
+  Operation Move of the duels' players carries 0x1001: the path's turns
+  after its first may end where its own stacking unit stands (0x1000), and
+  no step leaves a plot the player never revealed but the unit's own (1,
+  the path validity 0x2720a0); 0x80 where the game's +0x590 is above 0, 8
+  for a unit with no combat or 0x266950(2) on its formation, 0x8000 for a
+  formation domain 2 without 0x266950(3), 0x10 the goal barred (the attack
+  flag). The homeland's and tactical moves (Wander, Explore, Move To
+  Safety, Attack Units' 0x771f80, Random Direction) pass 0 or 0x1000: they
+  explore. A solo unit (formation +0x738 == 1) with +0x1939 set whose
+  planning reaches no plot at the radius within two turns takes an
+  alternate order through the vtable +0x48 / +0x60 at 0x817bea..0x817d9e
+  in place of the MoveTo (unread, no recorded case named).
+  runs/h1_duely1128 t26-63: Builder Capture's Settler 2228251 and Slinger
+  1441812 on 13:14 for 30:6 ("Operation Move, UNIT_SETTLER, 13:14, 29:6,
+  13:14" each turn): the only path runs west over the wrap through plots
+  the barbarians never revealed (24 turns), and the team stays; under
+  flag 1 the engines' path is none. Against it (LAB): runs/h1_duely1128
+  t21, the raid on 42:20 — Slinger 1376265 40:16 -> 40:17 and Warrior
+  1048591 39:15 -> 40:16 toward 41:20 in the game; under flag 1 the
+  engines' path through the barbarians' revealed plots is none and both
+  stay (the revealed set the engines hold for the barbarians, C-124). The engines: `passMoveExec`'s moveTo
+  (`laterTurns`, no `explore`; `search`'s explore) / `_op_move_exec`'s
+  `_tac_move_to` (`later_turns`, `explore=False`; `_tac_search`'s
+  explore).
 - BARBARIAN RAID CHECK (0x7c7330): SUCCESS where the tribe's score
   (0x152c00: +0x78 + +0x7c) reaches Score, else FAILURE; Signal At Start
   links a game signal for the target. The score: the game signal +0x8d0 —
@@ -7496,8 +7528,15 @@ GPU twin gpu/core/sim_barbops.py (`_barb_start_op`, `_barb_ops_refresh`,
   district's city (kind 3, 0x408770) that strikes, the member within its
   strike range of the centre, its strike (0x519370); after each entry a
   member not yet listed joins where the sum is above 0 and it does not
-  fight (a lone unit on land), else where its damage plus the sum passes
-  its hit points.
+  fight (a lone unit on land: 0x739659, its formation +0x1fb8 holding one
+  unit, +0x738 == 1, and the plot's +0x4c == 1), else where its damage
+  plus the sum passes its hit points. So a captive in its escort's
+  formation is never listed: no recorded barbarian civilian takes
+  "Operation Protect Units" (0 of the five duely duels' 29 capture lines,
+  all the escorts'; runs/h1_duely1128 t85 Builder Capture's Settler
+  4718622 on 12:13 stays, the engines' moved it off). The engines:
+  `endangered`'s `formed` (the operation's formations) / `_bop_endangered`'s
+  `formed` (`bcap_form`).
 - THE RECRUIT'S OFFER (0x60a8c0): the player's units with no operation
   (+0x7d0 == -1), their turn not done (+0x530 clear) and alive (+0x770
   clear), then the evaluator's test (Recruit Units' 0x816380 -> 0x738050).

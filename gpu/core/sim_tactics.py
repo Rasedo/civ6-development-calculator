@@ -354,10 +354,11 @@ class SimTactics:
         """[B, T] bool — `inEnemyZoc` for a military mover of `seat` at every
         plot: a military unit hostile to it beside the plot that exerts a zone
         (no Ranged or Siege class without SUPPRESSION, none embarked, none of a
-        chassis that exerts none), none across a river. With `seen` [B, T]
-        and `naval` (`groundOf`'s seenZoc) only an exerter on a plot it sees
-        and of the mover's domain, and for a land mover a hostile city or
-        Encampment too. The mover's own ignoring is the caller's."""
+        chassis that exerts none), of the mover's domain (`naval`: a ship's
+        or a land unit's), none across a river. With `seen` [B, T]
+        (`groundOf`'s seenZoc) only an exerter on a plot it sees, and for a
+        land mover a hostile city or Encampment too. The mover's own ignoring
+        is the caller's."""
         mil = self.military_at
         here = mil >= 0
         ms = mil.clamp(min=0)
@@ -369,8 +370,10 @@ class SimTactics:
             no_ex = no_ex & ~self._promo_flag(mtype, self.unit_promos.gather(1, ms), "ZOC_EXERT")
         ex = here & ~self.unit_emb.gather(1, ms) & ~self._type_zoc_none.take(mtype) & ~no_ex
         ex = ex & self._seats_hostile(seat, mseat)
+        if naval is not None:
+            ex = ex & (self.unit_naval.take(mtype) == naval)
         if seen is not None:
-            ex = ex & seen & (self.unit_naval.take(mtype) == naval)
+            ex = ex & seen
             if not naval:
                 # a hostile city or Encampment exerts one on the land beside it
                 town = self._centre_plane() & self._seats_hostile(seat, self.tile_seat)
@@ -480,7 +483,7 @@ class SimTactics:
     def _tac_search(self, rows: torch.Tensor, slots: torch.Tensor, seat: int, max_turns: int, zoc: bool,
                     dest: torch.Tensor | None = None, pre: str = "barb", plan: dict | None = None,
                     full: bool = False, stand: bool = False, later_turns: bool = False,
-                    from_full: bool = False) -> dict:
+                    from_full: bool = False, explore: bool = True) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
         the open nodes by (cost, tie) — a node inserted where its cost lies
@@ -504,7 +507,9 @@ class SimTactics:
         holds. With `later_turns` (the path's flag 0x1000) a path's turn may
         end on a plot its own stacking unit holds after its first. With
         `from_full` (the planning's, `search`'s fromFull) each unit sets out on
-        its full Movement, unmoved by its Movement left."""
+        its full Movement, unmoved by its Movement left. With no `explore`
+        (a move order's path flag 1) no step leaves a plot the player never
+        revealed but the unit's own."""
         dev = self.device
         N, T = rows.shape[0], self.T
         NONE = _KEY_NONE
@@ -529,6 +534,9 @@ class SimTactics:
         # step leaves it but the unit's own
         known = self._tac_known(seat) if not zoc else None
         kn_n = known[rows] if known is not None else torch.ones(N, T, dtype=torch.bool, device=dev)
+        # a move order's path under flag 1 (no `explore`): the plots it revealed
+        rev = self._tac_known(seat) if not explore else None
+        rev_n = rev[rows] if rev is not None else None
         embarks = self._tac_embarks(rows, utype, seat)
         ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & embarks.unsqueeze(1)))  # [N, T]
         water_n = self.water[rows]
@@ -559,7 +567,8 @@ class SimTactics:
             ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, slots]
             cliffs_b = self._tac_cliffs(seat)
             waive_cliff = self._promo_flag(utype, getattr(self, f"{pre}_unit_promos")[rows, slots], "CLIFFS")
-        zp = (self._tac_zoc(seat)[rows] & ~self._tac_zoc_ignored(utype).unsqueeze(1)) if zoc else None
+        zp = (torch.where(naval.unsqueeze(1), self._tac_zoc(seat, naval=True)[rows], self._tac_zoc(seat, naval=False)[rows])
+              & ~self._tac_zoc_ignored(utype).unsqueeze(1)) if zoc else None
         # the planning's search (no flag 0x200: 0x26e570 at 0x26e83e) moves on
         # from no plot of a zone of control the player sees but the unit's
         # own; an attack it strikes from there all the same (`groundOf`'s
@@ -780,6 +789,8 @@ class SimTactics:
             if fought_n is not None:
                 stop = stop & fought_n.gather(1, b1).squeeze(1)
             act = act & ~stop & (kn_n.gather(1, b1).squeeze(1) | (best == start))
+            if rev_n is not None:
+                act = act & (rev_n.gather(1, b1).squeeze(1) | (best == start))
             if not bool(act.count_nonzero()):
                 continue
             nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6 = price6(best)
@@ -1043,7 +1054,7 @@ class SimTactics:
 
     def _tac_move_to(self, mask: torch.Tensor, us: torch.Tensor, dest: torch.Tensor, pre: str = "barb",
                      seat: int = BARB_SEAT, strike: bool = True, avoid: torch.Tensor | None = None,
-                     later_turns: bool = False) -> None:
+                     later_turns: bool = False, explore: bool = True) -> None:
         """`moveTo` for the unit at local slot `us` [B] of pool `pre` (its
         player `seat`) in the games of `mask`: the pathfinder's path to `dest`
         with zones of control, walked as far as its Movement carries it this
@@ -1053,7 +1064,8 @@ class SimTactics:
         its side, and with `strike` (the barbarians') it strikes there; a walk
         whose end `avoid` [B, T] names stays put. With `later_turns` (the
         order's path flag 0x1000) the path's turns after its first may end on
-        a plot its own stacking unit holds, its first not."""
+        a plot its own stacking unit holds, its first not; with no `explore`
+        (its flag 1) the path leaves no plot the player never revealed."""
         if not bool(mask.count_nonzero()):
             return
         dev = self.device
@@ -1061,7 +1073,7 @@ class SimTactics:
         rows = mask.nonzero(as_tuple=True)[0]
         sr = us[rows]
         dr = dest[rows].clamp(min=0)
-        res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre, later_turns=later_turns)
+        res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre, later_turns=later_turns, explore=explore)
         par = res["parent"]
         start = res["start"]
         R = rows.shape[0]
@@ -1094,7 +1106,8 @@ class SimTactics:
         ut = ut_pool[rows, sr].clamp(min=0, max=self.NU - 1)
         naval = self.unit_naval.take(ut)
         ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, sr]
-        halts = self._tac_zoc(seat)[rows] & ~self._tac_zoc_ignored(ut).unsqueeze(1)
+        halts = (torch.where(naval.unsqueeze(1), self._tac_zoc(seat, naval=True)[rows], self._tac_zoc(seat, naval=False)[rows])
+                 & ~self._tac_zoc_ignored(ut).unsqueeze(1))
         # its terrain waivers (`terrainMp`: hills, Woods)
         waive = self._tac_waive_code(ut, getattr(self, f"{pre}_unit_promos")[rows, sr],
                                      getattr(self, f"{pre}_unit_alpine")[rows, sr])
@@ -2732,8 +2745,8 @@ class SimTactics:
             ms = torch.zeros(B, dtype=torch.bool, device=dev)
             ms[rows] = True
             before = torch.where(ms, tile_p[bidx, us], torch.full_like(us, -1))
-            self._tac_move_to(ms & ~hit, us, full, pre, seat, strike=False)
-            self._tac_move_to(ms & hit, us, full, pre, seat, strike=True)
+            self._tac_move_to(ms & ~hit, us, full, pre, seat, strike=False, later_turns=True, explore=False)
+            self._tac_move_to(ms & hit, us, full, pre, seat, strike=True, later_turns=True, explore=False)
             moves.append((torch.where(ms, us, torch.full_like(us, -1)), before, torch.where(ms, full, torch.full_like(us, -1))))
         return moves
 

@@ -105,10 +105,11 @@ const afloatInDanger = (state: GameState, pass: Pass, u: Unit): boolean =>
  * the target is HIGH, within the target's Movement or its range, adds the
  * blow it would strike the member (0x51a240 on their strengths); a city
  * that strikes, within its range, its strike (0x519370) — and the member
- * the sum would leave with no hit points (a unit that does not fight, any
- * blow at all) is endangered.
+ * the sum would leave with no hit points is endangered; one that does not
+ * fight, any blow at all where it stands alone (its formation of one unit,
+ * 0x739659: no civilian of `formed`) on land.
  */
-function endangered(state: GameState, pass: Pass, members: readonly Unit[]): Unit[] {
+function endangered(state: GameState, pass: Pass, members: readonly Unit[], formed: readonly number[]): Unit[] {
   const out: Unit[] = [];
   for (const u of members) {
     const near = 2 * (UNITS[u.type]?.moves ?? 0);
@@ -137,7 +138,7 @@ function endangered(state: GameState, pass: Pass, members: readonly Unit[]): Uni
       }
       if (out.includes(u)) continue;
       if (sum > 0 && !fights) {
-        if (!isWater(state.map.tiles[u.tileIndex])) out.push(u);
+        if (!formed.includes(u.id) && !isWater(state.map.tiles[u.tileIndex])) out.push(u);
       } else if (damageOf(u) + sum > COMBAT_MAX_HIT_POINTS) out.push(u);
     }
   }
@@ -155,16 +156,16 @@ function passDefend(state: GameState, seat: number, pass: Pass, changed: () => v
   // Movement left (+0xdb0), none once an order ended its moves
   const moves = (u: Unit) => (pass.ended.has(u.id) ? 0 : u.movesLeft);
   return {
-    flagged: (members, pct) => {
+    flagged: (members, pct, formed) => {
       const us = unitsOf(members);
-      if (endangered(state, pass, us).length) return true;
+      if (endangered(state, pass, us, formed).length) return true;
       return us.some((u) => hurt(u, pct) || afloatInDanger(state, pass, u));
     },
-    execute: (members, target, pct, range) => {
+    execute: (members, target, pct, range, formed) => {
       const lines: { type: string; what: string }[] = [];
       const us = unitsOf(members);
       // the endangered to their safe plots (0x716b90)
-      for (const u of endangered(state, pass, us)) {
+      for (const u of endangered(state, pass, us, formed)) {
         if (!off(u, target, range) || aiStrengths(state, u).bombard > 0 || moves(u) <= 0 || inCity(u)) continue;
         const to = passSafePlot(state, pass, u);
         passFinish(pass, u, 'Operation', u.tileIndex);

@@ -144,6 +144,8 @@ interface Ground {
    *  sees now (the node's +0x51 bit 0x40, 0x5861f0 -> 0x523520) */
   foughtOn: (i: number) => boolean;
   known: (i: number) => boolean;
+  /** the player revealed the plot (node +0x51 bit 0), whatever the search */
+  revealed: (i: number) => boolean;
   stand: (i: number) => boolean;
   /** a unit of its own that stacks with it holds the plot (0x585eb0, the
    *  unit itself not counted: the path node's +0x54) */
@@ -191,6 +193,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const minor = isCityStateSeat(unit.seat);
   return {
     known,
+    revealed,
     stand: (i) => {
       if (!held.has(i)) return true;
       if (!planning) return false;
@@ -304,7 +307,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
  */
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false,
-  laterTurns = false, fromFull = false): void {
+  laterTurns = false, fromFull = false, explore = true): void {
   const { map } = state;
   const ground = groundOf(state, unit, !zoc, !zoc, standToAttack);
   const held = heldCostsOf(state, unit);
@@ -359,6 +362,9 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // unit's own (0x2720a0 under the search's flag 1: the parent unrevealed)
     const planningSearch = !zoc && !standToAttack;
     if ((best.attack && (!planningSearch || ground.foughtOn(best.tile))) || (best !== start && !ground.known(best.tile))) continue;
+    // a move order's path under flag 1 (no `explore`) leaves no plot the
+    // player never revealed but the unit's own
+    if (!explore && best !== start && !ground.revealed(best.tile)) continue;
     // the planning's search (no flag 0x200: 0x26e570 at 0x26e83e) moves on
     // from no plot of a zone of control the player sees but the unit's own;
     // an attack it strikes from there all the same
@@ -527,13 +533,13 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number): number 
 
 /** the plots from the unit's to `dest`, the unit's own left out, by the
  *  pathfinder's path (its parents once `dest` closes); empty where none */
-export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false): number[] {
+export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false, explore = true): number[] {
   let found = null as PNode | null;
   search(state, unit, Infinity, true, (n) => {
     if (n.tile !== dest) return false;
     found = n;
     return true;
-  }, undefined, false, laterTurns);
+  }, undefined, false, laterTurns, false, explore);
   // under flag 0x1000 the path's first turn may not end on the destination
   // its own stacking unit holds
   if (laterTurns && found && (found as PNode).turns <= 1 && stackedAt(state, unit, dest)) return [];
@@ -549,10 +555,12 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
  *  ending on a plot it attacks into stops at its side, and with `strike`
  *  the unit strikes it there; a walk whose end `avoid` names stays put. With
  *  `laterTurns` (the order's path flag 0x1000) the path's turns after its
- *  first may end on a plot its own stacking unit holds, its first not. */
+ *  first may end on a plot its own stacking unit holds, its first not; with
+ *  no `explore` (its flag 1) the path leaves no plot the player never
+ *  revealed. */
 export function moveTo(state: GameState, unit: Unit, dest: number, strike = true, avoid?: (tile: number) => boolean,
-  laterTurns = false): void {
-  let path = pathTo(state, unit, dest, laterTurns);
+  laterTurns = false, explore = true): void {
+  let path = pathTo(state, unit, dest, laterTurns, explore);
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
   const last = path.length ? path[path.length - 1] : -1;
@@ -2908,7 +2916,7 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     }
     finish(pass, u, 'Operation', dest);
     out.push({ unit: u, from: u.tileIndex, dest });
-    moveTo(state, u, dest, strike);
+    moveTo(state, u, dest, strike, undefined, true, false);
   }
   return out;
 }

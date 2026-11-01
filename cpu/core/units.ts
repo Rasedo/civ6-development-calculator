@@ -558,6 +558,10 @@ export function inEnemyZoc(
   // units" — so a religious mover walks through a military zone, and a
   // military one walks through a religious zone. Only a matching pair halts.
   const relMover = mover.type !== undefined && unitReligious(mover.type);
+  // an exerter of the mover's domain alone (Rules_Movement 0x530f50: the
+  // exerter's +0x650 against the mover's formation domain): a land unit
+  // zones no ship, a ship no land unit, embarked or not
+  const navalMover = mover.type !== undefined && !!UNITS[mover.type]?.naval;
   for (const n of neighbors(state.map, tile)) {
     // CIV6 (Zone of Control): rivers block ZOC — an exerter across a river
     // from the entered tile halts nothing.
@@ -565,6 +569,7 @@ export function inEnemyZoc(
     for (const u of unitsAt(state, n.index)) {
       const relU = unitReligious(u.type);
       if (relU !== relMover) continue;
+      if (mover.type !== undefined && !!UNITS[u.type]?.naval !== navalMover) continue;
       const exerts = relU ? !u.embarked : unitExertsZoc(u);
       if (exerts && unitsHostile(state, u, mover)) return true;
     }

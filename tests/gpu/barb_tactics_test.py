@@ -38,9 +38,9 @@ def scalar_search(sim, b, slot, max_turns, zoc, dest=-1, link=None):
     sees each priced link (plot, from, turns, moves), the start first"""
     land, wat = sim._tac_enter(BARB_SEAT, not zoc)
     cost = sim._tac_step_cost()[b].tolist()
-    zp = sim._tac_zoc(BARB_SEAT)[b].tolist() if zoc else None
     ut = int(sim.barb_unit_type[b, slot])
     naval = bool(sim.unit_naval[ut])
+    zp = sim._tac_zoc(BARB_SEAT, naval=naval)[b].tolist() if zoc else None
     ent = (wat if naval else land)[b].tolist()
     a_land, a_nav = sim._tac_attack_planes(BARB_SEAT, not zoc)
     fights = int(sim._type_combat[ut]) > 0

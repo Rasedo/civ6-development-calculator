@@ -40,7 +40,8 @@ export interface DiplomacyRequest {
 }
 
 /** OPERATION DEFEND UNITS' orders (0x80ee70 / 0x80d790) for a team's
- *  members in the seat's units' turn: `flagged` the update's test — a
+ *  members in the seat's units' turn (`formed` the members in a formation
+ *  of the operation's): `flagged` the update's test — a
  *  member endangered (the team update's list, 0x738f20), hurt to the
  *  percentage or a land unit afloat in danger; `execute` the execution's —
  *  the endangered to their safe plots; the hurt promoted where a promotion
@@ -49,8 +50,8 @@ export interface DiplomacyRequest {
  *  stays the operation's), pillaging where the plot pays a plunder, moved
  *  off a plot of danger (a barbarian not), fortified — its lines */
 export interface DefendOrders {
-  flagged(members: readonly number[], pct: number): boolean;
-  execute(members: readonly number[], target: number, pct: number, range: number):
+  flagged(members: readonly number[], pct: number, formed: readonly number[]): boolean;
+  execute(members: readonly number[], target: number, pct: number, range: number, formed: readonly number[]):
     readonly { type: string; what: string }[];
 }
 
@@ -784,7 +785,8 @@ const operationDefendUnits: BtHandler<OpsContext> = {
   update(node, run, ctx) {
     const pct = dataInt(node, 'AutoProtect Percentage') ?? 33;
     const d = ctx.defend;
-    run.mem[node.index].marked = !!d && ctx.op.teams.some((t) => d.flagged(t.members, pct));
+    const formed = ctx.op.formations.flat();
+    run.mem[node.index].marked = !!d && ctx.op.teams.some((t) => d.flagged(t.members, pct, formed));
     return BT_SUCCESS;
   },
   execute(node, run, ctx) {
@@ -792,8 +794,9 @@ const operationDefendUnits: BtHandler<OpsContext> = {
     if (!d || !run.mem[node.index].marked) return;
     const pct = dataInt(node, 'AutoProtect Percentage') ?? 33;
     const range = dataInt(node, 'Protect Outside Range') ?? -1;
+    const formed = ctx.op.formations.flat();
     for (const t of ctx.op.teams) {
-      for (const x of d.execute(t.members, ctx.op.target, pct, range)) ctx.log(`${ctx.op.def}, Operation Protect Units, ${x.type}, ${x.what}`);
+      for (const x of d.execute(t.members, ctx.op.target, pct, range, formed)) ctx.log(`${ctx.op.def}, Operation Protect Units, ${x.type}, ${x.what}`);
     }
   },
 };
