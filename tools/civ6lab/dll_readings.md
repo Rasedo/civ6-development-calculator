@@ -7843,3 +7843,33 @@ cpu/core/units.ts, cpu/core/tactical.ts); `_bop_capture_tick`, `_tac_mate`,
   (the flag answers it), and an embarked captive's danger from a land unit
   beside it (1127 t166 player 0's Warrior on 15:12 beside 16:12, 1128 t137;
   the game's Move To Safety, the engines' danger 0) (C-123).
+
+## C-127: a unit bought this turn holds no planning, so the tree that bought it ends — READ (records, aimem), both twins
+
+`minorTreeWorld`'s `planned` (cpu/core/minorCityAi.ts), `cityStateMilitary`
+(cpu/core/minorOps.ts). GPU `_MinorWorld._planned` / `_reach_turns`
+(gpu/core/sim_minorai.py), `_minor_pass`'s `op["planned"]`
+(gpu/core/sim_tactics.py).
+
+- THE RULE: a city-state's units' planning holds the units with Movement
+  as its units' turn opens. A unit with none, such as one its contract
+  purchase bought that turn, has no planning (+0x1fc0). Move Unit's update
+  (0x7f0020) reads the planning (0x791300) and the path (0x272a60 on the
+  path finder +0x1fb8), so for such a unit it finds no plot reached and no
+  path. Build City Improvement's Move Unit FAILS and the tree ends with the
+  Builder unmoved. The improvement event starts a new tree on a later turn.
+- CONFIRMED: every Builder a city-state bought for Build City Improvement in
+  the five duely duels, 34 of 34: the tree holding the contract is gone by
+  the purchase turn's end look (aimem), and m_eventTrees slot 3 holds its
+  stale id until the next update. Builders made by production, with
+  Movement at the turn's opening, keep their trees on most turns (1117 t19
+  Antananarivo contract 44, t74 contract 181). runs/h1_duely1127 Mexico City
+  t87: the Builder 917510 is bought for the Farm tree on 491 and has no
+  AI_Planning.csv row that turn (one at t88). The tree is gone by the end
+  look, and no tree runs t88 (the Farm on 491 valued 0 that turn, the best
+  plot 492). The t89 tree lays the Farm on 491. The engines' carried tree
+  had kept the Builder on a two-turn path and laid the Farm at t88.
+- OPEN: when a slot 3 holding an ended tree's id empties. At 1117 t45 it
+  empties by the next update, which starts a tree. At 1127 t88 it still
+  holds the id at the log site and is empty (-1) by the end look; no tree
+  starts there whichever way it empties.

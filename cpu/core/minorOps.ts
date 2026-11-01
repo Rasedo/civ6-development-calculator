@@ -466,6 +466,9 @@ export function holdSecondHook(fn: typeof hookHeld): void {
  * (`minorSecondHook`) in its pass among the trees.
  */
 export function cityStateMilitary(state: GameState, cs: CityState): void {
+  // its units' planning: those with Movement as its units' turn opens (a
+  // unit with none, one bought this turn, holds none; its trees read it)
+  const planned = new Set(state.units.filter((u) => u.seat === cs.seat && u.movesLeft > 0).map((u) => u.id));
   cityStateTactics(state, cs, (pass) => {
     const ops = opsOfMinor(cs);
     const env = minorEnv(state, cs, pass);
@@ -476,7 +479,7 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
       // Superiority recruiting none; runs/h1_duely1127 t39 the same)
       cityHook: () => {
         const before = new Set(state.units.filter((u) => u.seat === cs.seat).map((u) => u.id));
-        (hookHeld ?? ((_st, _cs, run) => run()))(state, cs, () => minorSecondHook(state, cs));
+        (hookHeld ?? ((_st, _cs, run) => run()))(state, cs, () => minorSecondHook(state, cs, false, planned));
         for (const u of state.units) if (u.seat === cs.seat && !before.has(u.id)) passEnd(pass, u);
       },
       // out of the operations' offers (0x60a8c0: unassigned, turn not done

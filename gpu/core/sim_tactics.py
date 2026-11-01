@@ -4486,7 +4486,11 @@ class SimTactics:
         # the whole target list where an operation of its runs: its nodes
         # take a city, a district or an improvement as a target
         ops_on = bool((act & (self.mops_def[:, s] >= 0).any(dim=1)).any())
+        # its units' planning: those with Movement as its units' turn opens
+        # (`cityStateMilitary`'s `planned`; its trees read it)
+        planned = act.unsqueeze(1) & self.major_unit_alive & (self.major_unit_seat == seat) & (self.major_unit_mp > 0)
         op = self._seat_pass_open(pre, seat, act, full=ops_on)
+        op["planned"] = planned
         units, order, npass = op["units"], op["order"], op["npass"]
         tg = op["tg"]
         # a unit with no Movement left as the pass opens is none of its

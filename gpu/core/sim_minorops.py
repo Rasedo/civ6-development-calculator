@@ -1323,7 +1323,7 @@ class SimMinorOps:
             if hook[0] and prio <= _CITY_AI_PASS:
                 hook[0] = False
                 before = self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
-                self._minor_second_hook(s, act)
+                self._minor_second_hook(s, act, op.get("planned"))
                 # a unit the hook buys has its turn done at its creation
                 # (0x60a440): the trees after the hook offer it not
                 after = self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))

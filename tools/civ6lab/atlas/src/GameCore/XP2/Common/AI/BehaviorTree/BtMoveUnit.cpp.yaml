@@ -165,6 +165,7 @@
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees"
+    - "C-127: a unit bought this turn holds no planning, so the tree that bought it ends — READ (records, aimem), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.

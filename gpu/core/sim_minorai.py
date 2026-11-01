@@ -284,13 +284,14 @@ class SimMinorAi:
             ft = self._cv_minor_tables(s, ff)
             self._minor_empty_pick(s, first, ff, _MinorWorld(self, s, ff, ft, evals, threat), ft)
 
-    def _minor_second_hook(self, s: int, act: torch.Tensor) -> None:
+    def _minor_second_hook(self, s: int, act: torch.Tensor, planned=None) -> None:
         """`minorSecondHook` — THE CITY'S SECOND HOOK (0x5c2610 -> 0x5ce5b0)
         of minor `s` where `act`, in the Control Manager's pass 2 (`_mops_run`):
         the Default Specialization on an empty queue, then a threatened city's
         purchases; then the city trees' tick; its tables the city's update's
         (`citystate_unit_values`, `citystate_building_values`,
-        `citystate_project_values`), its plot analysis read again"""
+        `citystate_project_values`), its plot analysis read again; the tick on
+        the units its turn's planning holds (`planned`, None every unit)"""
         ai = self.cityai
         alive = (act & self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0) & self.citystate_ai_on[:, s]
                  & self.citystate_unit_on[:, s])
@@ -311,7 +312,7 @@ class SimMinorAi:
             self._minor_purchases(s, f, threat, buy)
         # the city trees' tick, on the city as the hook left it
         evals = self._minor_plot_evals(s, f, self._cv_city_buildings_pass(f)[1])
-        tick_city_trees(ai, s, _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), evals, threat), int(self.turn), alive)
+        tick_city_trees(ai, s, _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), evals, threat, planned), int(self.turn), alive)
 
     def _minor_empty_pick(self, s: int, idle: torch.Tensor, f, w, tables) -> None:
         """`emptyQueuePick` — THE DEFAULT SPECIALIZATION (0x5d4d70) of minor
@@ -2085,10 +2086,12 @@ class _PlotFacts:
 class _MinorWorld:
     """The minor's world as its contracts, events and trees read it and act
     on it (`TreeWorld`, `minorTreeCity` and `minorTreeWorld`): a unit's id is
-    its slot in the majors' pool"""
+    its slot in the majors' pool; `planned` ([B, slots] of the majors' pool,
+    None: every unit) the units its turn's planning holds"""
 
-    def __init__(self, sim, s: int, f: _MinorFacts, tables, evals: dict, threat: torch.Tensor):
+    def __init__(self, sim, s: int, f: _MinorFacts, tables, evals: dict, threat: torch.Tensor, planned=None):
         self.sim, self.s, self.f = sim, s, f
+        self._planned = planned
         self.seat = 100 + s
         self.row = sim._CITY_MINOR0 + s
         b, u, _p = tables
@@ -2475,6 +2478,10 @@ class _MinorWorld:
         u = self.units()
         out = torch.zeros_like(u["id"])
         lo = sim.POOL_LO["major"]
+        # a unit out of the turn's planning neither reaches a plot nor has a
+        # path (`minorTreeWorld`'s `planned`)
+        if self._planned is not None:
+            among = among & self._planned.gather(1, (u["id"] - lo).clamp(min=0)) & u["valid"]
         for j in range(u["id"].shape[1]):
             m = u["valid"][:, j] & (plot >= 0) & among[:, j]
             if not bool(m.count_nonzero()):

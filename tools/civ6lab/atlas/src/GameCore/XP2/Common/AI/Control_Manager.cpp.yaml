@@ -173,6 +173,7 @@
     - cpu/core/minorOps.ts:cities
     - cpu/core/minorOps.ts:cityStateMilitary
     - gpu/core/sim_minorops.py:city_hook
+    - cpu/core/minorOps.ts:planned
   readings:
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

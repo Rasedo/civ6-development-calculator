@@ -86,6 +86,7 @@
     - cpu/core/aiCityTrees.ts:CityTreeWorld
     - cpu/core/tactical.ts:supportFormation
     - cpu/core/minorOps.ts:upgradeMove
+    - cpu/core/minorCityAi.ts:minorTreeWorld
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -104,6 +105,7 @@
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
+    - "C-127: a unit bought this turn holds no planning, so the tree that bought it ends — READ (records, aimem), both twins"
   context:
     - ...Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the city assault nodes (Can Alpha City, Is At War, Operation Diplomacy, Operation Pil...
   review: reviewed

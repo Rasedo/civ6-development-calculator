@@ -1194,12 +1194,14 @@
     - gpu/core/sim_tactics.py:nearest
     - cpu/core/tactical.ts:to
     - gpu/core/sim_tactics.py:first_in_reach
+    - cpu/core/minorCityAi.ts:minorTreeWorld
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
+    - "C-127: a unit bought this turn holds no planning, so the tree that bought it ends — READ (records, aimem), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with a path to it (0x272a60), not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area..."

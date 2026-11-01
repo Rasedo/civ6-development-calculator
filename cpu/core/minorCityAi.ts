@@ -531,8 +531,15 @@ export function holdMinorClears(held: typeof clearHeld): void {
 }
 
 /** the minor's world as its trees read it and act on it; `spent` the units
- *  whose last charge an order took */
-function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityTreeCity): CityTreeWorld {
+ *  whose last charge an order took. `planned`: the units its turn's planning
+ *  holds (those with Movement as its units' turn opens); a unit out of it
+ *  neither reaches a plot this turn nor has a path (the planning +0x1fc0
+ *  0x791300 and the path finder +0x1fb8 0x272a60 read; runs/h1_duely1127
+ *  Mexico City t87: the Builder 917510 bought for its Farm tree on 491, no
+ *  AI_Planning.csv row that turn, the tree gone by the end look, the Builder
+ *  unmoved; every Builder a city-state bought for Build City Improvement over
+ *  the five duely duels, 34 of 34, its tree gone the turn it is bought) */
+function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityTreeCity, planned?: ReadonlySet<number>): CityTreeWorld {
   const r = cs.research;
   const spent = new Set<number>();
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id && u.seat === cs.seat);
@@ -564,11 +571,12 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     plotCity: (plot) => (owned(plot) ? city.id : -2),
     reachThisTurn: (u, plot, moves) => {
       const unit = unitOf(u.id);
-      return !!unit && reachPlots(state, unit, 1).some((e) => e.tile === plot && (!moves || e.moves > 0));
+      if (!unit || (planned && !planned.has(unit.id))) return false;
+      return reachPlots(state, unit, 1).some((e) => e.tile === plot && (!moves || e.moves > 0));
     },
     turnsTo: (u, plot) => {
       const unit = unitOf(u.id);
-      return unit ? turnsToPlot(state, unit, plot) : 0;
+      return unit && (!planned || planned.has(unit.id)) ? turnsToPlot(state, unit, plot) : 0;
     },
     canPlaceDistrict: (plot, d) => {
       const id = engineId('district', d, 'DISTRICT_', DISTRICTS) as DistrictId | null;
@@ -1064,7 +1072,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
  * the Harbor contract the tick submits; Caguana t15: the Warrior contract
  * queued before its tree's tick ends it).
  */
-export function minorSecondHook(state: GameState, cs: CityState, fresh = false): void {
+export function minorSecondHook(state: GameState, cs: CityState, fresh = false, planned?: ReadonlySet<number>): void {
   const ai = cs.cityAi;
   if (cs.centerIndex < 0 || !ai) return;
   const threat = cs.threat ?? -1;
@@ -1083,7 +1091,7 @@ export function minorSecondHook(state: GameState, cs: CityState, fresh = false):
   }
   // the city trees' tick, on the city as the hook left it
   const trees = minorTreeCity(state, cs, facts, tables, pf, minorPlotEvals(state, cs, facts, cityBuildingsPass(facts).districts), threat);
-  tickCityTrees(ai, minorTreeWorld(state, cs, ai, trees));
+  tickCityTrees(ai, minorTreeWorld(state, cs, ai, trees, planned));
 }
 
 /** THE DEFAULT SPECIALIZATION on an empty queue (0x5d4d70) over `tables`:
