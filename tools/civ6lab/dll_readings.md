@@ -1691,7 +1691,7 @@ clans' 0x8e1bf0 (no clans in these games).
   +0xb4 (0x144ed0) likewise; else, the count +0x34 under NumMilitary +0x30,
   the ranged roll. So a pending class count raises past the cap of 5 and
   still counts; its writer is unread (no add / inc / mov of +0xa8..+0xb4
-  in 0x140000..0x160000 or 0x7c0000..0x7d0000 but the copies 0x14c930 /
+  in the tribe code (the 0x14xxxx-0x15xxxx and 0x7cxxxx pages) but the copies 0x14c930 /
   0x142650 / 0x142e90 / 0x7ca670 and the decrements). runs/h1_duely1128
   tribe 2 raises each clock t89-166 at a battle-lowered count of 11-18:
   the pending counts are the read that fits it, unported.
