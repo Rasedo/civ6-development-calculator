@@ -12564,3 +12564,36 @@ the pass's `swap` (cpu/core/opsOrders.ts, `swapUnits`); `_x_garrison` and
   other). Standing on the city, its moves end (0x56d6f0). Then the
   candidate takes AI type DEFENDER and the garrison its type's own
   (0x1e60f0 on +0x168; unported).
+
+## C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins
+
+Unit_Operations_MakeTradeRoute.cpp 0x960f40 (FinalRelease 0x66bf70), the
+operation's per-turn check, and Trade_Manager 0x552bc0 (FinalRelease
+0x38f720), the term. Check: runs/h1_duely1127 Hattusa (the records' route
+rows and Trader plots t70-152).
+
+- 0x960f40: the route's origin and destination cities (0x57580 on the
+  operation's plots); with the route still held (0x553210) and the Trader
+  standing on the origin plot (unit +0x220 / +0x224 against the origin),
+  the game turn (the game object +0x110) at or past 0x552bc0(the
+  operation's start turn +0x20) removes the route (0x5521f0). Nothing else
+  ends a route at its term: away from home it runs on.
+- 0x552bc0(start): start + 0x5254d0(TRADE_ROUTE_TURN_DURATION_BASE, the
+  global parameters +0x714) + 0x5254d0(the Eras_XP2 row's
+  TradeRouteMinimumEndTurnChange, row +0x30, where the row is present +0x2c)
+  of the GAME era (the era manager 0x2c3660's m_eCurrentGameEra +0x108)
+  read at the check, not at the route's start; an end at or before the
+  start is start + 1 (the assert "endTurn > startTurn"). 0x5254d0 is the
+  speed's CostMultiplier / 100 truncated: online 10, and 0 / 0 / 5 / 5 /
+  10 / 10 / 10 / 15 / 15 by era (Ancient .. Future).
+- CONFIRMED (runs/h1_duely1127 Hattusa, the game era Medieval from t61,
+  Renaissance t91, Industrial t121): its routes to city-state 4 (a 12-turn
+  round trip) begin t77, t101, t125 and end t100, t124, t148, home at
+  t88 / t112 / t136 short of the term (15, 15, 20); to China (a 10-turn
+  trip) begin t95 and t115 and end t114 (Renaissance, 15) and t144 — home
+  at t134, 19 turns on, short of the Industrial era's 20 the check reads
+  though the route began in the Renaissance. Each Trader goes again the
+  turn after. Both twins: `tradeRouteMinDuration` / `_trade_min_duration`
+  read the game era where the expiry finds the Trader home
+  (`tradeRouteExpiry` / `_expire_seat_routes`); the route keeps its start
+  turn only.

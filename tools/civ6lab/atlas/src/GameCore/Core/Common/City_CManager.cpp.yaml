@@ -3,6 +3,15 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x57580
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- 0x960f40: the route's origin and destination cities (0x57580 on the operation's plots); with the route still held (0x553210) and the Trader standi..."
+  review: imported
 - addr: 0x57960
   final: 0x132c90
   kind: function

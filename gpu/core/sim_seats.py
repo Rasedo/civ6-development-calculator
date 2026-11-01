@@ -575,7 +575,7 @@ class SimSeats:
             m = kill[:, k] & (oc[:, k] >= 0)
             if bool(m.count_nonzero()):
                 self._spawn_unit(row, m, oc[:, k].clamp(min=0), self._trader_idx)
-        for plane in (self.seat_route_dseat, self.seat_route_dcity, self.seat_route_exp,
+        for plane in (self.seat_route_dseat, self.seat_route_dcity,
                       self.seat_route_born, self.seat_route_walk, self.seat_route_leg):
             plane[:, row][kill] = -1
         self.seat_routes[:, row][kill] = -1
@@ -11633,7 +11633,6 @@ class SimSeats:
         self.seat_routes[b, src_row][kill] = -1
         self.seat_route_dseat[b, src_row][kill] = -1
         self.seat_route_dcity[b, src_row][kill] = -1
-        self.seat_route_exp[b, src_row][kill] = -1
         self.seat_route_born[b, src_row][kill] = -1
         self.seat_route_walk[b, src_row][kill] = -1
         self.seat_route_leg[b, src_row][kill] = -1
@@ -16222,14 +16221,10 @@ class SimSeats:
         return oc, dc
 
     def _trade_min_duration(self) -> torch.Tensor:
-        """tradeRouteMinDuration: the base term plus the WORLD-era bump
-        (+10 per threshold era passed), [B] long."""
-        B, dev = self.B, self.device
-        we = self._world_era()
-        bump = torch.zeros(B, dtype=torch.long, device=dev)
-        for be in self._trade_dur_bumps:
-            bump = bump + (we >= be).long() * 10
-        return self._trade_duration + bump
+        """tradeRouteMinDuration: the base term plus the GAME era's term,
+        [B] long."""
+        era = self.game_era.clamp(min=0, max=self._trade_era_term.shape[0] - 1)
+        return self._trade_duration + self._trade_era_term[era]
 
     def _route_dest_yields(self, row: int, hb: torch.Tensor, hk: torch.Tensor) -> torch.Tensor:
         """[n, 6] f64 — what row `row`'s routes (hb, hk) pay their DESTINATION
@@ -16454,7 +16449,6 @@ class SimSeats:
         self.seat_routes[hb, row, hk] = -1
         self.seat_route_dseat[hb, row, hk] = -1
         self.seat_route_dcity[hb, row, hk] = -1
-        self.seat_route_exp[hb, row, hk] = -1
         self.seat_route_born[hb, row, hk] = -1
         self.seat_route_walk[hb, row, hk] = -1
         self.seat_route_leg[hb, row, hk] = -1
@@ -16478,7 +16472,7 @@ class SimSeats:
         # a STABLE partition — the live slots first in their own order, the
         # dead behind them. Idempotent where a row already has no holes.
         idx = torch.argsort((~live).long(), dim=1, stable=True)
-        for _p in (self.seat_route_dseat, self.seat_route_dcity, self.seat_route_exp,
+        for _p in (self.seat_route_dseat, self.seat_route_dcity,
                    self.seat_route_born, self.seat_route_walk, self.seat_route_leg):
             _p[:, row] = _p[:, row].gather(1, idx)
         for _w in (self.seat_routes, self.seat_route_course):
@@ -16580,8 +16574,6 @@ class SimSeats:
         self._quest_route(row, take, to_code)
         self.seat_route_dseat[rows, row, slot] = dseat[rows]
         self.seat_route_dcity[rows, row, slot] = dcity[rows]
-        md = self._trade_min_duration()
-        self.seat_route_exp[rows, row, slot] = int(self.turn) + md[rows]
         self.seat_route_born[rows, row, slot] = int(self.turn)
         self.seat_route_walk[rows, row, slot] = o_ct[rows]
         self.seat_route_leg[rows, row, slot] = 0
@@ -16620,7 +16612,6 @@ class SimSeats:
             self.seat_routes[:, a][kill] = -1
             self.seat_route_dseat[:, a][kill] = -1
             self.seat_route_dcity[:, a][kill] = -1
-            self.seat_route_exp[:, a][kill] = -1
             self.seat_route_born[:, a][kill] = -1
             self.seat_route_walk[:, a][kill] = -1
             self.seat_route_leg[:, a][kill] = -1
@@ -16641,7 +16632,6 @@ class SimSeats:
         self.seat_routes[:, row][kill] = -1
         self.seat_route_dseat[:, row][kill] = -1
         self.seat_route_dcity[:, row][kill] = -1
-        self.seat_route_exp[:, row][kill] = -1
         self.seat_route_born[:, row][kill] = -1
         self.seat_route_walk[:, row][kill] = -1
         self.seat_route_leg[:, row][kill] = -1
@@ -16862,20 +16852,21 @@ class SimSeats:
         return frm_c, dest_c
 
     def _expire_seat_routes(self, row: int) -> None:
-        """End seat row `row`'s routes. COMPLETION is the minimum term (exp)
-        having arrived WITH the Trader home — the round-trip rule; one that
+        """End seat row `row`'s routes. COMPLETION is the Trader home with the
+        turn at its start (born) plus the minimum term the game era gives now — the round-trip rule; one that
         cannot come home ends at the walk rail. A completed or destination-dead route hands its Trader back at
         the origin (only plunder destroys the unit); only COMPLETION scores
         Coinage. An international destination dies when its (seat, city id)
         stops naming a living city — a capture mints the flipped city a fresh
         id under the CAPTOR's seat, so both halves stop matching."""
         act = self.seat_routes[:, row, :, 0] >= 0
-        exp = self.seat_route_exp[:, row]
+        born = self.seat_route_born[:, row]
         wt = self.seat_route_walk[:, row]
         oc, dc = self._route_centres(row)
-        term = act & (exp >= 0) & (exp <= int(self.turn))
+        exp = born + self._trade_min_duration().unsqueeze(1)
+        term = act & (born >= 0) & (exp <= int(self.turn))
         home = (oc >= 0) & (wt == oc)
-        rail = (exp >= 0) & (exp + self._trade_walk_rail <= int(self.turn))
+        rail = (born >= 0) & (exp + self._trade_walk_rail <= int(self.turn))
         completed = term & (home | rail)
         # CIV6 (Reform the Coinage, dark face): "+1 Era Score each time you
         # successfully complete a Trade Route" — the term running out with the
@@ -16909,7 +16900,6 @@ class SimSeats:
             self.seat_routes[:, row][drop] = -1
             self.seat_route_dseat[:, row][drop] = -1
             self.seat_route_dcity[:, row][drop] = -1
-            self.seat_route_exp[:, row][drop] = -1
             self.seat_route_born[:, row][drop] = -1
             self.seat_route_walk[:, row][drop] = -1
             self.seat_route_leg[:, row][drop] = -1

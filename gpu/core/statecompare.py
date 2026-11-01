@@ -707,7 +707,7 @@ def _centre_of(sim, b: int, row: int, city_id: int) -> int:
 
 def _routes_of(sim, b: int, seat: int) -> list[int]:
     """Every live route of `seat`, as flattened [fromTile, destTile, kind,
-    exp, born, walkTile, leg, course x courseMax] rows sorted ascending — the `routes`
+    born, walkTile, leg, course x courseMax] rows sorted ascending — the `routes`
     extractor's twin. Kind: 0 domestic, 1 city-state, 2 international.
     `seat_routes[..., 1]` carries the domestic destination city id, or
     -(2 + city-state index), or -1 for international (whose destination is
@@ -717,7 +717,6 @@ def _routes_of(sim, b: int, seat: int) -> list[int]:
     rr = sim.seat_routes[b, row].tolist()
     ds = sim.seat_route_dseat[b, row].tolist()
     dc = sim.seat_route_dcity[b, row].tolist()
-    ex = sim.seat_route_exp[b, row].tolist()
     bo = sim.seat_route_born[b, row].tolist()
     wk = sim.seat_route_walk[b, row].tolist()
     lg = sim.seat_route_leg[b, row].tolist()
@@ -741,7 +740,7 @@ def _routes_of(sim, b: int, seat: int) -> list[int]:
         # a city-state's routes leave its one city, origin code 0
         org = (int(sim.citystate_center[b, row - sim._CITY_MINOR0])
                if sim._CITY_MINOR0 <= row < sim.FREE_ROW else _centre_of(sim, b, row, frm))
-        out.append([org, dest, kind, int(ex[k]), int(bo[k]),
+        out.append([org, dest, kind, int(bo[k]),
                     int(wk[k]), int(lg[k])] + [int(x) for x in ch[k]])
     out.sort()
     return [x for t in out for x in t]

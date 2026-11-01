@@ -393,7 +393,7 @@ function routeRowsOf(state: GameState, s: Seat): number[] {
         : kind === 2
           ? centreOf(r.toSeat!, r.toSeatCity ?? -1)
           : centreOf(s.seat, r.to ?? -1);
-    return [routeOriginCenter(state, s, r), dest, kind, r.expiresTurn ?? -1,
+    return [routeOriginCenter(state, s, r), dest, kind,
       r.createdTurn ?? -1, r.walkTile ?? -1, r.walkLeg ?? -1,
       ...Array.from({ length: TRADE_COURSE_MAX }, (_, i) => (r.course ?? [])[i] ?? -1)];
   });

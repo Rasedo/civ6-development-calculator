@@ -1374,7 +1374,6 @@ class SimInit:
         # one, so the pair is what makes a captured destination stop resolving.
         self.seat_route_dseat = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         self.seat_route_dcity = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
-        self.seat_route_exp = torch.full((B, self.NS, k_routes), -1, dtype=torch.long, device=device)
         # the WALK: the servicing Trader's turn of birth, current tile, and
         # leg (0 walking out along the course, 1 walking home) — what
         # plunder targets and the round-trip expiry reads.
@@ -3303,7 +3302,7 @@ class SimInit:
         # route, domestic and international (engine yield order)
         self._route_centre_dom = torch.tensor([float(x) for x in _tr["centreRouteDom"]], dtype=torch.float64, device=device)  # [6]
         self._route_centre_intl = torch.tensor([float(x) for x in _tr["centreRouteIntl"]], dtype=torch.float64, device=device)  # [6]
-        self._trade_duration = int(_tr["duration"])  # route lifetime
+        self._trade_duration = int(_tr["duration"])  # a route's minimum term before its era's
         self._trade_plunder_gold = int(_tr["plunderGold"])
         self._trade_plunder_turns = int(_tr["plunderTurns"])  # V × this (`routePlunderGold`)
         self._gold_equiv_other = int(_tr["goldEquivalentOther"])  # a non-Gold yield's Gold weight in V
@@ -3318,7 +3317,7 @@ class SimInit:
         self._path_portal = int(_tr["pathPortal"])
         self._path_denom = int(_tr["pathDenom"])
         self._path_cap = int(round(float(_tr["pathMaxRatio"]) * self._path_denom))
-        self._trade_dur_bumps = [int(x) for x in _tr["durEraBumps"]]  # eras adding +10/+20/+30
+        self._trade_era_term = torch.tensor([int(x) for x in _tr["eraTerm"]], dtype=torch.long, device=device)  # by game era
         self._trader_progress = tuple(int(x) for x in _tr["traderProgress"])  # (install Cost, climb)
         # RIVER FLOOD, the Flood (Civ6) tables by severity.
         _ds = rules.disasters

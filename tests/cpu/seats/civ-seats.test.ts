@@ -565,7 +565,7 @@ describe('civ CS trade routes', () => {
     expect([course[0], course[course.length - 1]]).toEqual([civCity.centerIndex, cityState.centerIndex]);
     expect(civ.tradeRoutes![0]).toEqual({
       from: civCity.id, to: -1, toCs: cityState.id,
-      expiresTurn: state.turn + 20, createdTurn: state.turn, // route duration, era 0
+      createdTurn: state.turn,
       walkTile: civCity.centerIndex, walkLeg: 0, course,
     });
     const y1 = computeCityStats(state, civCity).total;

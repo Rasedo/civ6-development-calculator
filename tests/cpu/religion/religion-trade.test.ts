@@ -378,7 +378,7 @@ describe('religious pressure spread', () => {
       grantFoundingPressure(state, seat);
       city.followedReligion = seat;
     }
-    seatOf(state, 0)!.tradeRoutes = [{ from: a.id, toSeat: 1, toSeatCity: b.id, expiresTurn: state.turn + 100 }];
+    seatOf(state, 0)!.tradeRoutes = [{ from: a.id, toSeat: 1, toSeatCity: b.id }];
     const delta = (city: City, g: number, run: () => void) => {
       const before = city.religionPressure?.[g] ?? 0;
       run();

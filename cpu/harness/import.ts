@@ -31,7 +31,7 @@ import { NO_SEAT } from '../core/types';
 import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
 import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, majorsAlive, setMetTurnWith } from '../core/seats';
-import { routeOriginCenter, stampTradingPost, tradeRouteMinDuration } from '../core/trade';
+import { routeOriginCenter, stampTradingPost } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
 import { civEraIndex, cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
 import { tileYields } from '../core/yields';
@@ -3328,10 +3328,7 @@ function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<str
     const trail = history?.trail.get(routeKey(r));
     if (trail) route.course = trailCourse(state, owner.seat, route.course ?? [], trail);
     const seen = history?.routeSeen.get(routeKey(r));
-    if (seen !== undefined) {
-      route.createdTurn = seen;
-      route.expiresTurn = seen + tradeRouteMinDuration(state);
-    }
+    if (seen !== undefined) route.createdTurn = seen;
     (owner.tradeRoutes ??= []).push(route);
     out.push({ owner: owner.seat, route, game: r });
   }

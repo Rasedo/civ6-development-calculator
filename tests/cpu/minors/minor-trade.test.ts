@@ -76,7 +76,7 @@ describe("a city-state's route", () => {
     const r = cs.tradeRoutes![0];
     expect(r.from).toBe(-1);
     expect(routeOriginCenter(state, cs, r)).toBe(cs.centerIndex);
-    expect(r.expiresTurn).toBe(state.turn + tradeRouteMinDuration(state));
+    expect(r.createdTurn).toBe(state.turn);
     // the stored course runs from its city to the destination
     expect(r.course![0]).toBe(cs.centerIndex);
     expect(r.course![r.course!.length - 1]).toBe(routeDestCenter(state, cs, r));
@@ -100,7 +100,7 @@ describe("a city-state's route", () => {
     spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat);
     minorTrade(state, cs, true);
     const r = cs.tradeRoutes![0];
-    const exp = r.expiresTurn!;
+    const exp = r.createdTurn! + tradeRouteMinDuration(state);
     const firstGold = cityTradeYields(state, minorCity(cs)).gold;
     let moved = false;
     for (let turn = state.turn + 1; turn < exp + 40 && (cs.tradeRoutes ?? []).length > 0; turn++) {

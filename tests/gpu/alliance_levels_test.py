@@ -71,7 +71,6 @@ def craft_intl_route(sim, a: int, b: int, k: int = 0) -> None:
     sim.seat_routes[B0, a, k, 1] = -1_000_000  # never an own-city id: the leg is not domestic
     sim.seat_route_dseat[B0, a, k] = b
     sim.seat_route_dcity[B0, a, k] = did
-    sim.seat_route_exp[B0, a, k] = int(sim.turn) + 50
     sim.seat_route_born[B0, a, k] = int(sim.turn)
     sim._seat_route_cache = None
 
@@ -224,7 +223,6 @@ def test_democracy_destination_half(rules, path) -> None:
     sim3.seat_routes[B0, 0, 0, 1] = -(2 + s_cs)
     sim3.seat_route_dseat[B0, 0, 0] = -1
     sim3.seat_route_dcity[B0, 0, 0] = -1
-    sim3.seat_route_exp[B0, 0, 0] = int(sim3.turn) + 50
     sim3.seat_route_born[B0, 0, 0] = int(sim3.turn)
     mrow = sim3._CITY_MINOR0 + s_cs
     sim3.seat_citystate_envoys[B0, :, s_cs] = 0

@@ -20,7 +20,6 @@ import { revealAround, unitSeesThrough, unitSight } from './fog';
 import { minorRouteCandidate } from './aiTrade';
 import { routeInRange, tradeCourse, tradeReach } from './tradePath';
 import { TRADE_COURSE_MAX, scaleByGameSpeed } from '../data/constants';
-import { civEraIndex } from './city';
 import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, minorCity, suzerainEffect, suzerainEffectCount } from './cityStates';
@@ -272,23 +271,32 @@ function wonderRouteSenderYields(state: GameState, dest: City): { science: numbe
   return { science, gold };
 }
 
-export const TRADE_ROUTE_DURATION = 20;
+/** TRADE_ROUTE_TURN_DURATION_BASE through the game speed (0x5254d0): a
+ *  route's minimum term before its era's (`tradeRouteMinDuration`) */
+export const TRADE_ROUTE_DURATION = srcConst('trade.routeDuration', scaleByGameSpeed(20), {
+  derived: 'TRADE_ROUTE_TURN_DURATION_BASE through the speed\'s CostMultiplier (Trade_Manager 0x552bc0 via 0x5254d0)',
+  inputs: [xml('GlobalParameters', 'Name=TRADE_ROUTE_TURN_DURATION_BASE', 'Value', { expect: 20 })],
+});
+
+/** each game era's Eras_XP2 TradeRouteMinimumEndTurnChange through the game
+ *  speed (0x5254d0), by ERAS index */
+export const TRADE_ROUTE_ERA_TERM: readonly number[] = ([
+  ['ERA_ANCIENT', 0], ['ERA_CLASSICAL', 0], ['ERA_MEDIEVAL', 10], ['ERA_RENAISSANCE', 10], ['ERA_INDUSTRIAL', 20],
+  ['ERA_MODERN', 20], ['ERA_ATOMIC', 20], ['ERA_INFORMATION', 30], ['ERA_FUTURE', 30],
+] as const).map(([era, turns]) => srcConst(`trade.routeEraTerm.${era}`, scaleByGameSpeed(turns), {
+  derived: 'the era\'s TradeRouteMinimumEndTurnChange through the speed\'s CostMultiplier (Trade_Manager 0x552bc0 via 0x5254d0)',
+  inputs: [xml('Eras_XP2', `EraType=${era}`, 'TradeRouteMinimumEndTurnChange', { expect: turns })],
+}));
 
 /**
- * CIV6 (GS): a route runs a MINIMUM of the base 20 turns
- * (TRADE_ROUTE_TURN_DURATION_BASE) plus the WORLD-era bump
- * (TradeRouteMinimumEndTurnChange: +10 from Medieval, +20 from Industrial,
- * +30 from Information) — and ends only when its Trader completes a round
- * trip after that minimum.
+ * A ROUTE'S MINIMUM TERM (Trade_Manager 0x552bc0): TRADE_ROUTE_DURATION plus
+ * the GAME era's term (`TRADE_ROUTE_ERA_TERM`), read where the MakeTradeRoute
+ * operation finds its Trader at the origin (0x960f40) — the era the game
+ * stands in then, not the one the route began in. The route ends there once
+ * the turn reaches its start plus this term.
  */
 export function tradeRouteMinDuration(state: GameState): number {
-  let era = 0;
-  for (const s of state.seats) {
-    const e = civEraIndex(s.research.techs, s.research.civics);
-    if (e > era) era = e;
-  }
-  const bump = era >= 7 ? 30 : era >= 4 ? 20 : era >= 2 ? 10 : 0;
-  return TRADE_ROUTE_DURATION + bump;
+  return TRADE_ROUTE_DURATION + TRADE_ROUTE_ERA_TERM[Math.min(state.gameEra ?? 0, TRADE_ROUTE_ERA_TERM.length - 1)];
 }
 
 /** THE PLUNDER PAYOUT (Trade_Manager plunder, GameCore_XP2 0x5545e0;
@@ -1130,7 +1138,6 @@ function commitRoute(state: GameState, seat: number, originCenter: number, destC
     const t = freeTrader(state, seat);
     if (t) disbandUnit(state, t.id);
   }
-  route.expiresTurn = state.turn + tradeRouteMinDuration(state);
   route.createdTurn = state.turn;
   // the COURSE, computed once here and walked for the route's life (the
   // trade manager's path cache); every caller has checked the range, so the
@@ -1268,9 +1275,10 @@ export function tradeRouteWalk(state: GameState, actor: Seat): void {
 }
 
 /**
- * THE ROUND-TRIP EXPIRY of one holder's routes. Completion is the minimum
- * term running out WITH the Trader home (one that cannot come home ends at
- * the rail); a route whose destination city is gone ends too. A route that ENDS hands its Trader back at the origin; only plunder
+ * THE ROUND-TRIP EXPIRY of one holder's routes. Completion is the Trader
+ * home with the turn at its start plus the minimum term the game era gives
+ * now (`tradeRouteMinDuration`; one that cannot come home ends at the rail);
+ * a route whose destination city is gone ends too. A route that ENDS hands its Trader back at the origin; only plunder
  * destroys the unit.
  *
  * CIV6 (Reform the Coinage, dark face): "+1 Era Score each time you
@@ -1283,9 +1291,10 @@ export function tradeRouteWalk(state: GameState, actor: Seat): void {
  */
 export function tradeRouteExpiry(state: GameState, actor: Seat): void {
   const cur = actor.tradeRoutes ?? [];
+  const term = tradeRouteMinDuration(state);
   const isDone = (x: TradeRoute): boolean => {
-    if (x.expiresTurn === undefined || state.turn < x.expiresTurn) return false;
-    if (state.turn >= x.expiresTurn + TRADE_WALK_EXPIRY_RAIL) return true;
+    if (x.createdTurn === undefined || state.turn < x.createdTurn + term) return false;
+    if (state.turn >= x.createdTurn + term + TRADE_WALK_EXPIRY_RAIL) return true;
     return x.walkTile === routeOriginCenter(state, actor, x);
   };
   const destGone = (x: TradeRoute): boolean =>

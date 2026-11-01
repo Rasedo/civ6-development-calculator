@@ -47,6 +47,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...d (pseudo index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) [the record +0x6c of the 0x2c3660 manager's per-player vector] valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0, and...

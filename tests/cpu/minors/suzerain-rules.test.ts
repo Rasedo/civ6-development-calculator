@@ -124,7 +124,7 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
     const kumasi = addNamedCs(state, 'Kumasi', 'cultural', 15, 9, { 0: 3 });
     completeDistrict(state, city, 'CAMPUS', 10, 9);
     completeDistrict(state, city, 'HOLY_SITE', 8, 9);
-    seatOf(state, 0)!.tradeRoutes = [{ from: city.id, to: -1, toCs: kumasi.id, expiresTurn: state.turn + 100 }];
+    seatOf(state, 0)!.tradeRoutes = [{ from: city.id, to: -1, toCs: kumasi.id }];
     const withSuz = cityTradeYields(state, city);
     kumasi.envoys = {};
     const without = cityTradeYields(state, city);

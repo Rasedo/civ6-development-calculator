@@ -64,7 +64,7 @@ describe("Mediterranean's Bride", () => {
       const state = threeSeats(civs);
       const c0 = settleAt(state, tileAtCoords(state.map, 3, 3).index, 0);
       const c1 = settleAt(state, tileAtCoords(state.map, 9, 9).index, 1);
-      state.seats[1].tradeRoutes = [{ from: c1.id, toSeat: 0, toSeatCity: c0.id, expiresTurn: 999 } as TradeRoute];
+      state.seats[1].tradeRoutes = [{ from: c1.id, toSeat: 0, toSeatCity: c0.id, createdTurn: state.turn } as TradeRoute];
       setAllyTurnsWith(state, 0, 1, 10);
       const before = alliancePtsWith(state, 0, 1);
       seatPhase(state);

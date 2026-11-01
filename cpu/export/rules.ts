@@ -42,7 +42,7 @@ import { CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivic
 import { techUnlocks } from '../core/aiResearch';
 import { civicUnlocks } from '../core/aiCivics';
 import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, RELIC_COUNT, GWO_COUNT, GWO_NAMES, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
-import { TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS, TRADER_GUARD_RADIUS, TRADE_WALK_EXPIRY_RAIL, ROUTE_PATH_WATER, ROUTE_PATH_RAIL, ROUTE_PATH_MULTI_DOMAIN, ROUTE_PATH_PORTAL, ROUTE_PATH_MAX_RATIO, ROUTE_PATH_DENOM } from '../core/trade';
+import { TRADE_ROUTE_DURATION, TRADE_ROUTE_ERA_TERM, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS, TRADER_GUARD_RADIUS, TRADE_WALK_EXPIRY_RAIL, ROUTE_PATH_WATER, ROUTE_PATH_RAIL, ROUTE_PATH_MULTI_DOMAIN, ROUTE_PATH_PORTAL, ROUTE_PATH_MAX_RATIO, ROUTE_PATH_DENOM } from '../core/trade';
 import { TRADE_BASE_RANGE, TRADE_LAND_REFUEL, TRADE_WATER_REFUEL, TRADE_DEST_REFUEL, TRADE_COST_STEP, TRADE_COST_RAIL, TRADE_COST_ROUTE, TRADE_COST_WATER, TRADE_COST_LAND, TRADE_COST_SWITCH, TRADE_EMBARK_DISTRICTS, TRADE_DANGER_FEATURES } from '../core/tradePath';
 import { CITY_STATE_GOVERNMENT, SUZERAIN_ENVOYS, VATICAN_GP_PRESSURE } from '../data/cityStates';
 import { CITIZEN_NAME_ROWS, CITIZEN_NAME_ROWS_FRANCE } from '../data/seats';
@@ -823,9 +823,8 @@ export function buildRules() {
       pathPortal: ROUTE_PATH_PORTAL,
       pathMaxRatio: ROUTE_PATH_MAX_RATIO,
       pathDenom: ROUTE_PATH_DENOM,
-      // the era-scaled minimum-duration bumps (tradeRouteMinDuration):
-      // +10 from era 2, +20 from era 4, +30 from era 7
-      durEraBumps: [2, 4, 7],
+      // each game era's minimum-term addition (tradeRouteMinDuration)
+      eraTerm: [...TRADE_ROUTE_ERA_TERM],
       // the Trader's install Cost and climb (`traderCost`, `progressCost`)
       traderProgress: [UNITS.TRADER.progressBase ?? 0, gameProgressK(UNITS.TRADER.costProgressGame ?? 100)],
     },

@@ -926,7 +926,6 @@ class SimMinors:
                     self.seat_routes[rows, row, slot, 1] = code[rows]
                     self.seat_route_dseat[rows, row, slot] = dseat[rows]
                     self.seat_route_dcity[rows, row, slot] = dcity[rows]
-                    self.seat_route_exp[rows, row, slot] = int(self.turn) + self._trade_min_duration()[rows]
                     self.seat_route_born[rows, row, slot] = int(self.turn)
                     self.seat_route_walk[rows, row, slot] = o_ct[rows]
                     self.seat_route_leg[rows, row, slot] = 0

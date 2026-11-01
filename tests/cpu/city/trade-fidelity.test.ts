@@ -3,7 +3,7 @@ import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfC
 import { settleAt, makeMap, makeState, meetAll, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, routeYields, specialtyDistricts, routeChainGold, routeCoursePosts, routePathGold, stampTradingPost, routePostGold, wonderRouteOriginGold, TRADE_ROUTE_DURATION } from '../../../cpu/core/trade';
+import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, routeYields, specialtyDistricts, routeChainGold, routeCoursePosts, routePathGold, stampTradingPost, routePostGold, wonderRouteOriginGold, TRADE_ROUTE_DURATION, tradeRouteMinDuration } from '../../../cpu/core/trade';
 import { routeInRange, tradeCourse, tradeReach, TRADE_BASE_RANGE, TRADE_COST_RAIL, TRADE_COST_ROUTE, TRADE_COST_STEP, TRADE_COST_LAND, TRADE_COST_SWITCH, type TradeReach } from '../../../cpu/core/tradePath';
 import { TRADE_COURSE_MAX } from '../../../cpu/data/constants';
 import { computeCityStats } from '../../../cpu/core/city';
@@ -175,11 +175,11 @@ describe('international route yields', () => {
 });
 
 describe('route duration', () => {
-  it('addTradeRoute / addCsTradeRoute stamp expiresTurn = turn + TRADE_ROUTE_DURATION', () => {
+  it('addTradeRoute / addCsTradeRoute stamp createdTurn = turn', () => {
     const { state, origin, dest } = twoCitySandbox();
     state.turn = 7;
     expect(addTradeRoute(state, origin.id, dest.id, 0).ok).toBe(true);
-    expect(state.seats[0].tradeRoutes![0].expiresTurn).toBe(7 + TRADE_ROUTE_DURATION);
+    expect(state.seats[0].tradeRoutes![0].createdTurn).toBe(7);
   });
 
   it('the walker follows the stored course out and home, one plot a turn', () => {
@@ -245,7 +245,7 @@ describe('civ international pick + income', () => {
     const intl = routes.find((r) => r.toSeatCity !== undefined);
     expect(intl).toBeDefined();
     expect(intl!.toSeatCity).toBe(pcity.id);
-    expect(intl!.expiresTurn).toBe(state.turn + TRADE_ROUTE_DURATION);
+    expect(intl!.createdTurn).toBe(state.turn);
   });
 });
 
@@ -277,7 +277,7 @@ describe('the Trader unit', () => {
     const r = state.seats[0].tradeRoutes![0];
     r.walkTile = r.course![1];
     r.walkLeg = 1;
-    state.turn = (r.expiresTurn ?? 0);
+    state.turn = (r.createdTurn ?? 0) + tradeRouteMinDuration(state);
     seatPhase(state);
     expect(state.seats[0].tradeRoutes!.length).toBe(0);
     const back = freeTrader(state, 0);

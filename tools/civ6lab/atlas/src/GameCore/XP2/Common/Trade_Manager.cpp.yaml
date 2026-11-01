@@ -204,6 +204,15 @@
   context:
     - "...known city of the knowledge base +0xe0 entries, the routes' yields 0x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the unit table: that is 0x7989e0 (the section \"C-96..."
   review: imported
+- addr: 0x5521f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...object +0x110) at or past 0x552bc0(the operation's start turn +0x20) removes the route (0x5521f0). Nothing else ends a route at its term: away from home it runs on."
+  review: imported
 - addr: 0x5526a0
   final: 0x38f2c0
   kind: function
@@ -220,6 +229,23 @@
   context:
     - "...one type): the route's path from the trade manager's cache (0x541ae0; else a fresh path, 0x5526a0), n its plots (4-byte entries, both ends included); the posts counted on it (0x5500b0) ti..."
     - ...41ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x5526a0); whether an edge holds the reverse route's path is unread.
+  review: imported
+- addr: 0x552bc0
+  final: 0x38f720
+  kind: function
+  name: Trade_Manager
+  status: PARTLY
+  impl:
+    - cpu/core/trade.ts:TRADE_ROUTE_DURATION
+    - cpu/core/trade.ts:TRADE_ROUTE_ERA_TERM
+    - cpu/core/trade.ts:tradeRouteMinDuration
+  readings:
+    - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e.cpp 0x960f40 (FinalRelease 0x66bf70), the operation's per-turn check, and Trade_Manager 0x552bc0 (FinalRelease 0x38f720), the term. Check: runs/h1_duely1127 Hattusa (the records' route r..."
+    - ...+0x220 / +0x224 against the origin), the game turn (the game object +0x110) at or past 0x552bc0(the operation's start turn +0x20) removes the route (0x5521f0). Nothing else ends a r...
+    - "- 0x552bc0(start): start + 0x5254d0(TRADE_ROUTE_TURN_DURATION_BASE, the global parameters +0x714)..."
   review: imported
 - addr: 0x552d40
   final: 0x392150
@@ -251,6 +277,16 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   notes: [no port, no confirming case]
   review: reviewed
+- addr: 0x553210
+  final: 0x38fbb0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...n and destination cities (0x57580 on the operation's plots); with the route still held (0x553210) and the Trader standing on the origin plot (unit +0x220 / +0x224 against the origin),...
+  review: imported
 - addr: 0x553680
   kind: function
   status: READ

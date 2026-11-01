@@ -1147,8 +1147,7 @@ export interface TradeRoute {
   toCs?: number;
   toSeat?: number;
   toSeatCity?: number;
-  /** the round-trip MINIMUM end turn (createdTurn + tradeRouteMinDuration) */
-  expiresTurn?: number;
+  /** the turn the route began: its minimum term counts from it (`tradeRouteMinDuration`) */
   createdTurn?: number;
   /** the servicing Trader's CURRENT tile (walks 1 tile/turn) */
   walkTile?: number;

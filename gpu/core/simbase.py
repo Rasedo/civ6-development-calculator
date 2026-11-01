@@ -1233,7 +1233,7 @@ _MUTABLE = [
     "deal_offer_left", "deal_offer_give", "deal_offer_ask", "deal_term_left", "deal_term_item", "seat_spy_held", "seat_promise", "seat_promise_broken",
     "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "moment_seen", "moment_world", "dark_bar", "golden_bar", "game_era", "era_start", "era_countdown", "road_tier", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_gov_chosen", "civ_civic_turn", "civ_gov_anarchy_end", "civ_policies", "civ_policy_lapsed", "civ_policy_slot", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
-    "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
+    "seat_routes",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
     "seat_route_born", "seat_route_walk", "seat_route_leg",  # the Trader's walk (birth turn, tile, leg)
     "seat_route_course",  # the stored course (the path's plots, origin to destination, -1-padded)

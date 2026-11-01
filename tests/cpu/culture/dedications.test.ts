@@ -7,7 +7,7 @@ import { archaeologistExcavate, spawnUnit, unitIsMilitary } from '../../../cpu/c
 import { meleeAttack } from '../../../cpu/core/combat';
 import { revealAround } from '../../../cpu/core/fog';
 import { completeQueueItem } from '../../../cpu/core/production';
-import { routePlunderer, cityTradeYields } from '../../../cpu/core/trade';
+import { routePlunderer, cityTradeYields, tradeRouteMinDuration } from '../../../cpu/core/trade';
 import { computeCityStats, seatTourism } from '../../../cpu/core/city';
 import { effectiveAdjacency } from '../../../cpu/core/yields';
 import { enterEra, goldenMoveBonus } from '../../../cpu/core/eras';
@@ -113,7 +113,7 @@ describe('the four new dedications', () => {
     commit(state, 0, DED_COINAGE);
     seatOf(state, 0)!.tradeRoutes = [
       // the term is up this very turn, the Trader home
-      { from: city.id, to: city.id, expiresTurn: state.turn, walkTile: city.centerIndex, walkLeg: 0 },
+      { from: city.id, to: city.id, createdTurn: state.turn - tradeRouteMinDuration(state), walkTile: city.centerIndex, walkLeg: 0 },
     ];
     endTurn(state);
     const gained = seatOf(state, 0)!.eraScore ?? 0;
@@ -139,7 +139,7 @@ describe('the four new dedications', () => {
     expect(routePlunderer(state, bt, 0)).toBe(null);
     state.units = state.units.filter((u) => u.seat !== BARB_SEAT); // the raider leaves before the yield reads
     seatOf(state, 0)!.tradeRoutes = [
-      { from: city.id, to: -1, toSeat: 1, toSeatCity: dest.id, expiresTurn: state.turn + 100 },
+      { from: city.id, to: -1, toSeat: 1, toSeatCity: dest.id },
     ];
     const withG = cityTradeYields(state, city).gold;
     commit(state, 0, DED_MONUMENTALITY, true); // golden, different pick

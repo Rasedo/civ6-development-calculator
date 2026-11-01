@@ -25,7 +25,7 @@ function scene(): { state: GameState; mine: number; theirs: number } {
   const mine = settleAt(state, tileAtCoords(state.map, 5, 5).index, 0).id;
   const theirs = settleAt(state, tileAtCoords(state.map, 14, 14).index, 1).id;
   const s = seatOf(state, 0)!;
-  s.tradeRoutes = [{ from: mine, to: -1, toSeat: 1, toSeatCity: theirs, createdTurn: 0, expiresTurn: 50 }];
+  s.tradeRoutes = [{ from: mine, to: -1, toSeat: 1, toSeatCity: theirs, createdTurn: 0 }];
   return { state, mine, theirs };
 }
 
@@ -89,7 +89,7 @@ describe("Democracy's ally and suzerain routes", () => {
     adoptDemocracy(state);
     const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', tileAtCoords(state.map, 5, 14).index);
     setMet(cs, 0);
-    seatOf(state, 0)!.tradeRoutes = [{ from: mine, to: -1, toCs: cs.id, createdTurn: 0, expiresTurn: 50 }];
+    seatOf(state, 0)!.tradeRoutes = [{ from: mine, to: -1, toCs: cs.id, createdTurn: 0 }];
     const city = minorCity(cs);
     // met, routed, not suzerain: nothing
     expect(incomingAllyRouteYields(state, city).food).toBe(0);

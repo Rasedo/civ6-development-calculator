@@ -31,7 +31,7 @@ function scene(hostLeader?: string): { state: GameState; host: ReturnType<typeof
 function routeIn(state: GameState, from: number, to: number, fromCity: number, toCity: number): void {
   const s = seatOf(state, from)!;
   s.tradeRoutes = [...(s.tradeRoutes ?? []),
-    { from: fromCity, to: -1, toSeat: to, toSeatCity: toCity, createdTurn: state.turn, expiresTurn: state.turn + 50 }];
+    { from: fromCity, to: -1, toSeat: to, toSeatCity: toCity, createdTurn: state.turn }];
 }
 
 describe('a route coming in is paid with no route going out', () => {

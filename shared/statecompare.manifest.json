@@ -1596,7 +1596,6 @@
             "TradeRoute.toCs",
             "TradeRoute.toSeat",
             "TradeRoute.toSeatCity",
-            "TradeRoute.expiresTurn",
             "TradeRoute.createdTurn",
             "TradeRoute.walkTile",
             "TradeRoute.walkLeg",
@@ -1606,13 +1605,12 @@
             "seat_routes",
             "seat_route_dseat",
             "seat_route_dcity",
-            "seat_route_exp",
             "seat_route_born",
             "seat_route_walk",
             "seat_route_leg",
             "seat_route_course"
           ],
-          "note": "per-route [fromTile, destTile, kind, expiresTurn, createdTurn, walkTile, walkLeg, course x courseMax], sorted; destinations in CENTRE-TILE space because city ids are not compared. The walk triple IS the Trader while it services the route."
+          "note": "per-route [fromTile, destTile, kind, createdTurn, walkTile, walkLeg, course x courseMax], sorted; destinations in CENTRE-TILE space because city ids are not compared. The walk triple IS the Trader while it services the route."
         },
         {
           "name": "tradingPosts",
@@ -2712,7 +2710,6 @@
             "seat_routes",
             "seat_route_dseat",
             "seat_route_dcity",
-            "seat_route_exp",
             "seat_route_born",
             "seat_route_walk",
             "seat_route_leg",
