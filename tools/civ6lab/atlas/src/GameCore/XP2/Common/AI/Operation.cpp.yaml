@@ -382,6 +382,9 @@
     - recording: h1_duelw1127
       turn: 36
       value: "Barbarian Attack Not Ready t36-t43: the members' 65 against 83 to 121 (a garrisoned city within 3)"
+    - recording: h1_duely1121
+      turn: 31
+      value: "city-state 2's City Defense on 11:5, Enemy Str 30: the barbarian Galley 1572882 on 13:5 its tactical look added (age 0), the Galley 1114128 on 9:2 at age 4 not read, the Quadrireme 786443 on 8:4 (four away) before its blow from 8:5 in the barbarians' turn"
   impl:
     - cpu/core/operations/nodes.ts:refreshStrengths
     - cpu/core/operations/nodes.ts:enemyStrengthAbout
@@ -393,6 +396,7 @@
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-129: an operation's enemy strength reads the knowledge base after the tactical look, before a later player's blows — the aimem sites read, the replay's copy"
   context:
     - "...; a type of none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120,..."
   review: reviewed

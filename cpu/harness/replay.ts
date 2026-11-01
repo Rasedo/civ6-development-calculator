@@ -3500,11 +3500,25 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         ctx.stream.placed(true);
         if (isBarbSeat(atk.seat)) for (const k of [d.attacker, d.defender]) ctx.barbFought.add(k);
         barbBattlesFromRecord(true);
+        // a later player's blow on a city-state's or the Free Cities' unit
+        // comes after the defender's turn: its record of the attacker waits
+        // for the late blows (`lateBlows`), after the defender's turn on the
+        // copy (`minorAi`) has read its knowledge base (runs/h1_duely1121
+        // t31: the barbarians' Quadrireme strikes Hunza's Warrior from 8:5
+        // in their turn; Hunza's City Defense of t31 reads it on 8:4, four
+        // from 11:5, its enemy strength the Galley's 30)
+        const late = minorAiSeat(def.seat) && ctx.playerOfSeat.get(atk.seat)! > ctx.playerOfSeat.get(def.seat)!;
+        const holder = late ? seatOf(state, def.seat) : undefined;
+        const known = holder?.armyKnown?.map((x) => ({ ...x }));
         let r: ReturnType<typeof rangedAttack>;
         try {
           r = d.ranged ? rangedAttack(state, atk.id, d.at) : meleeAttack(state, atk.id, d.at, atk.seat);
         } finally {
           barbBattlesFromRecord(false);
+          if (holder) {
+            if (known) holder.armyKnown = known;
+            else delete holder.armyKnown;
+          }
         }
         ctx.stream.placed(false);
         const stood = state.units.includes(atk) ? { ...atk } : undefined;
@@ -3514,9 +3528,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         ctx.battled.add(d.attacker);
         ctx.battled.add(d.defender);
         for (const k of [d.attacker, d.defender]) if (!state.units.includes(ctx.units.get(k)!)) ctx.engineKilled.add(k);
-        if (stood && minorAiSeat(def.seat) && ctx.playerOfSeat.get(atk.seat)! > ctx.playerOfSeat.get(def.seat)!) {
-          ctx.lateBlows.push({ seat: def.seat, attacker: stood });
-        }
+        if (stood && late) ctx.lateBlows.push({ seat: def.seat, attacker: stood });
         count(ctx, 'battle', 'applied');
         break;
       }

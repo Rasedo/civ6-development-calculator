@@ -12889,3 +12889,30 @@ City_BuildQueue.csv).
   `_city_state_phase`. runs/h1_duelw1121 Hunza's Equestrian Orders still
   every turn as logged (t1-60); 1128 Nazca's Walls (t39-40) and its
   Horsemen (t33, t37) as the record.
+
+## C-129: an operation's enemy strength reads the knowledge base after the tactical look, before a later player's blows — the aimem sites read, the replay's copy
+
+- An operation's enemy strength (0x73eb60 -> 0x5eadb0, records of age at
+  most 2 within 3 of the target) reads the records the tactical turn's look
+  left: runs/h1_duely1121 t31, city-state 2's City Defense on 11:5 logs
+  "Enemy Str: 30 / 25.0" — the barbarian Galley 1572882 on 13:5, absent at
+  the aimem tactical site and at age 0 at the log site (the look added it);
+  the Galley 1114128 on 9:2 at age 4 not read; the Quadrireme 786443 at
+  age 0 on 8:4, four from 11:5. So the operations read later than the city
+  AI's unit production table, which counts no record the look adds (the
+  section "C-96 / C-129" above).
+- A defender's record of its attacker (0x787fb0 -> 0x5f0440, `recordAttacker`)
+  lands in the attacker's turn: the Quadrireme strikes city-state 2's
+  Warrior from 8:5 in the barbarians' turn of t31, and the t32 tactical
+  site holds it on 8:5 at age 0. The engines' order is the game's
+  (the barbarians' turn closes the turn the minors acted in). The
+  replay's pair applies the record's battles before the minors' turns on
+  the copy (`minorAi`): a blow by a later player on a city-state's or the
+  Free Cities' unit leaves the defender's knowledge base as it stood, and
+  its record of the attacker waits for `lateBlows`, after the copy
+  (cpu/harness/replay.ts, the battle case). Both modes on runs/h1_duely1121
+  t31: City Defense 30, three recruits, Warrior 589826 wanders as logged.
+- runs/h1_duely1121 Hunza t9 (its Quadrireme absent at the tactical site,
+  at the log site from the look): the unit production table's
+  `armyCounted` already matches, its Warrior contract the game's in both
+  modes.

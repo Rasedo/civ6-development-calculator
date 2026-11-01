@@ -94,6 +94,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
+    - "C-129: an operation's enemy strength reads the knowledge base after the tactical look, before a later player's blows — the aimem sites read, the replay's copy"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb5/NOTES.md: ...urn's KB update -> t-1); +0.5*count term absent at minors. NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..),..."
@@ -452,6 +453,7 @@
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-129: an operation's enemy strength reads the knowledge base after the tactical look, before a later player's blows — the aimem sites read, the replay's copy"
   context:
     - "...plot (x, y), +0x18 / +0x1c the plot's two map ids (the second its area). 0x5e9530 (from 0x5f0440) finds the unit's id in its type's list: found, age 0 and the plot rewritten; else a..."
     - ..., one hidden (+0x15f0, not +0x1650) only where 0x5033a0 lets the player see it, through 0x5f0440 into its owner's list; a barbarian camp improvement (plot +0x44 the barbarians') -> 0x5...

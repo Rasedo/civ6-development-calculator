@@ -3784,6 +3784,7 @@
   impl: [cpu/core/units.ts:recordAttacker]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-129: an operation's enemy strength reads the knowledge base after the tactical look, before a later player's blows — the aimem sites read, the replay's copy"
   context:
     - ...s, not a unit; the lambda 0x783570 (one unit, through 0x5f0440) is referenced only from 0x787fb0, its caller unread.
   review: imported
