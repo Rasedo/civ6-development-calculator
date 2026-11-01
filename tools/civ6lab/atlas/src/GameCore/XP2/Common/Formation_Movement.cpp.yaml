@@ -113,6 +113,7 @@
     - cpu/core/tactical.ts:ground
     - cpu/core/tactical.ts:price
     - cpu/core/tactical.ts:crowded
+    - cpu/core/tactical.ts:addOpen
   readings:
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
@@ -256,6 +257,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   context:
     - "...er_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair is null), so a node's key is its cost. The op..."
     - "...r a unit +0x738 above 1 holding 0x2669d0 2 or 4; then the A* 0x7a630 over the callbacks 0x26f330 sets: the validity 0x2720a0, the cost 0x26e920), its turns the answer. The planning's..."
@@ -408,6 +410,16 @@
   context:
     - "...river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the unit is not..."
   review: reviewed
+- addr: 0x270d70
+  final: 0x1a9000
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...+0x30/+0x38, the cost 0x270dd0 at +0x40/+0x48, the validity 0x2720a0 at +0x50/+0x58, 0x270d70 at +0x60/+0x68 and the open notification 0x271920 at +0x70/+0x78; the search is 0x7a630...
+  review: imported
 - addr: 0x270dd0
   final: 0x1a9060
   kind: function
@@ -430,6 +442,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   context:
     - "- The cost (0x270dd0): 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no..."
     - ...tep), its step costing +3 where a revealed plot's costs +2 and no +3 off the territory (0x270dd0); a path (the move order's pathfinder) reads every plot as revealed. A plot only reve...
@@ -438,9 +451,19 @@
 - addr: 0x271490
   final: 0x30c70
   kind: function
-  semantics: a path search's destination test. The trade path's A* heuristic (0x557fd0's search).
-  status: PARTLY
+  semantics: "a path search's plot test against the instance's destination (+0xd8 / +0xdc, the fifth argument the instance): 1 on it. The move order's pool (0x26f330) lays it at +0x10 / +0x18, where the open notification 0x271920 opens no turn-end node on the destination; the trade path's search (0x557fd0) its heuristic slot."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 32
+      value: the barbarian Slinger 1769487 on 30:17 for 30:15 ends its turn on 29:16, its path waiting on 29:15's turn-end node
+  impl:
+    - cpu/core/tactical.ts:search
+    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:c
+    - gpu/core/sim_tactics.py:place
   readings:
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-20: the Trader's path and range"
     - "H-1: the trade path's search, its score and the Canal — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
@@ -465,6 +488,7 @@
   readings:
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   review: reviewed
 - addr: 0x2715a0
   final: 0x1a94b0
@@ -490,6 +514,22 @@
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
   context:
     - ...is of the land domain (finder +0x1f2 = 0x2669d0( formation, 2), set by the pool's init 0x2715a0 at +0x180 +0x72) and the plot is water, +1000 (0x3e800) where its player is not human (...
+  review: reviewed
+- addr: 0x271920
+  kind: function
+  name: the turn-end node
+  semantics: "the move order's pool's open notification (the instance's +0x70 / +0x78, AddToOpen 0x775a0's call after each insertion, r9 0 or 1): a node with Movement (+0x28 above 0) off the destination (0x271490 at +0x10 / +0x18) opens the second layer's node of its plot (0x7a880): Movement 0, its turn +0x2c, +0x24, key +0x18, carry +0x20, flags +0x50 / +0x54 and parent +0 the node's, its cost +0x1c the node's plus 1000 x the Movement (0x16e7d0 with 0x3e800), then AddToOpen. Under search flag 4 (the planning) only on a mountain (terrain bits 0x4924) or a canyon (0xb3c380)."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 32
+      value: the barbarian Slinger 1769487 on 30:17 for 30:15 ends its turn on 29:16 (30:15 through 29:15's turn-end node, 1541632 for 1543424)
+    - recording: h1_duely1127
+      turn: 36
+      value: "the barbarian Warrior 2031626 (Operation, 12:14 for 12:7) steps 12:13: 12:7 through 13:8's turn-end node (3340544 for 3342848)"
+  impl: [cpu/core/tactical.ts:search, gpu/core/sim_tactics.py:_tac_search, cpu/core/tactical.ts:c]
+  readings:
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   review: reviewed
 - addr: 0x271b50
   final: 0x1a99b0
@@ -537,6 +577,7 @@
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
     - "C-125: the danger map's search pays the attack's spend on a district alone — READ (0x26e570 at 0x26e6d3, 0x26e5cd), both twins; a new unit stands whole on the replay's copy"
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
     - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."
@@ -596,6 +637,7 @@
     - cpu/core/tactical.ts:crowded
     - cpu/core/tactical.ts:blind
     - cpu/core/tactical.ts:before
+    - cpu/core/tactical.ts:addOpen
   readings:
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -615,6 +657,7 @@
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."

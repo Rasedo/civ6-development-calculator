@@ -77,6 +77,9 @@ interface PNode {
   /** the nodes it linked (the node's children, CvAStar +0x38), each with
    *  its step's DirectionTypes index */
   kids?: { node: PNode; di: number }[];
+  /** the open list's key (+0x18) where it is not the cost: a turn-end
+   *  node's, its plot's node's cost (`search`) */
+  f?: number;
 }
 
 /** may the unit enter this plot at all (Pathfinder valid 0x2720a0, the
@@ -400,7 +403,8 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
 /**
  * THE PATHFINDER (Pathfinder_Instance 0x77d10, its step 0x793f0): Dijkstra
  * from the unit's plot — no heuristic (the pool's default, 0x26f330) — over
- * the open nodes by (cost, tie): a node inserted where its cost lies nearer
+ * the open nodes by (key, cost, tie) — a move order's path opens a turn-end
+ * node beside each node with Movement left — : a node inserted where its key lies nearer
  * the cheapest open node goes before its equals, else after them (0x775a0),
  * a node made cheaper goes after its new equals (0x79560), a closed one made
  * cheaper re-prices its children from it (UpdateParents 0x79660); each closed
@@ -481,7 +485,20 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   let lo: PNode | null = null;
   let hi: PNode | null = null;
   let seq = 0;
-  const before = (a: PNode, b: PNode) => a.g < b.g || (a.g === b.g && a.tie < b.tie);
+  // the open list's order: its key (+0x18), then its cost (+0x1c), then its
+  // place among equals
+  const kf = (a: PNode) => a.f ?? a.g;
+  const below = (a: PNode, b: PNode) => kf(a) < kf(b) || (kf(a) === kf(b) && a.g < b.g);
+  const before = (a: PNode, b: PNode) => below(a, b) || (kf(a) === kf(b) && a.g === b.g && a.tie < b.tie);
+  // AddToOpen (0x775a0): below the cheapest first, above the dearest last;
+  // else by its key's distance to theirs, nearer the cheapest (or as near)
+  // before its equals, nearer the dearest after them
+  const addOpen = (n: PNode) => {
+    if (lo && hi && !below(n, lo) && !below(hi, n)) n.tie = Math.abs(kf(n) - kf(lo)) <= Math.abs(kf(n) - kf(hi)) ? -++seq : ++seq;
+    open.push(n);
+    if (!lo || before(n, lo)) lo = n;
+    if (!hi || before(hi, n)) hi = n;
+  };
   for (;;) {
     if (!open.length) break;
     // the cheapest node, and the cheapest once it is out
@@ -567,12 +584,24 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       const c = nodes.get(to.index);
       if (!c) {
         const n: PNode = { tile: to.index, g: s.g, tie: 0, moves: s.moves, turns: s.turns, carry: s.carry, closed: false, parent: best, attack, wet: s.wet };
-        if (lo && hi && s.g >= lo.g && s.g <= hi.g) n.tie = Math.abs(s.g - lo.g) <= Math.abs(s.g - hi.g) ? -++seq : ++seq;
         nodes.set(n.tile, n);
         (best.kids ??= []).push({ node: n, di });
-        open.push(n);
-        if (!lo || before(n, lo)) lo = n;
-        if (!hi || before(hi, n)) hi = n;
+        addOpen(n);
+        // the turn-end node (the two-layer pathfinder's second layer: the
+        // open notification 0x271920 -> 0x7a880): a path's node with
+        // Movement left but on its destination (0x271490) opens a second
+        // node on its plot that ends the turn there — its Movement 0, its
+        // cost the node's plus 1000 x the Movement left (0x16e7d0 with
+        // 0x3e800), its key the node's, its parent the node's — so a later
+        // turn may set out from that plot at full Movement (runs/h1_duely1117
+        // t32: the barbarian Slinger 1769487 on 30:17 for 30:15 ends its turn
+        // on 29:16, its second waiting on 29:15; runs/h1_duely1127 t36: the Warrior
+        // 2031626 for 12:7 waits on 13:8); the planning's search (flag 4)
+        // opens one on a mountain or a canyon alone, none the unit enters, and
+        // the danger map's one-turn search reaches no plot more by one
+        if (zoc && n.moves > 0 && n.tile !== dest) {
+          addOpen({ tile: n.tile, g: n.g + n.moves * 1000, f: n.g, tie: 0, moves: 0, turns: n.turns, carry: n.carry, closed: false, parent: best, wet: n.wet });
+        }
         continue;
       }
       (best.kids ??= []).push({ node: c, di });

@@ -18,7 +18,7 @@
   kind: function
   semantics: "fixed-point multiply: (a b) >> 8 (24.8)."
   status: PARTLY
-  impl: [cpu/core/operations/evaluate.ts:mul]
+  impl: [cpu/core/operations/evaluate.ts:mul, cpu/core/tactical.ts:c]
   readings:
     - "H-1: a boost lands as progress — READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
@@ -29,6 +29,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb/notes.txt: ...*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8..."

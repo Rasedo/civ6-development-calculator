@@ -7873,3 +7873,63 @@ cpu/core/units.ts, cpu/core/tactical.ts); `_bop_capture_tick`, `_tac_mate`,
   empties by the next update, which starts a tree. At 1127 t88 it still
   holds the id at the log site and is empty (-1) by the end look; no tree
   starts there whichever way it empties.
+
+## C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins
+
+`search`'s turn-end node, `addOpen`, `PNode.f` (cpu/core/tactical.ts); GPU
+`_tac_search`'s second node layer (T + plot), `place`, the keys
+`_KEY_SHIFT` / `_SUB_SHIFT` / `_TIE_OFF` (gpu/core/sim_tactics.py).
+
+- THE TWO-LAYER PATHFINDER: the move order's pool (0x26f330's callback
+  block at rsp+0x30 -> the instance's +0x10..+0x78) lays the destination
+  test 0x271490 at +0x10/+0x18, 0x2714b0 at +0x20/+0x28, no heuristic at
+  +0x30/+0x38, the cost 0x270dd0 at +0x40/+0x48, the validity 0x2720a0 at
+  +0x50/+0x58, 0x270d70 at +0x60/+0x68 and the open notification 0x271920
+  at +0x70/+0x78; the search is 0x7a630 (Pathfinder_TwoLayer.cpp).
+- THE OPEN NOTIFICATION 0x271920 (AddToOpen 0x775a0 calls +0x78 after each
+  insertion, its r9 0 or 1): a node with Movement (+0x28 above 0) not on the
+  path's destination (0x271490: the node's x / y against the instance's
+  +0xd8 / +0xdc) opens a second node on its plot (0x7a880: the instance's
+  +0x380 grid, stride 0x58): Movement 0, its turn (+0x2c), +0x24, its key
+  (+0x18), carry (+0x20), flags (+0x50, +0x54) and parent (+0) the node's,
+  its cost (+0x1c) the node's + 1000 x the Movement (0x16e7d0 with
+  0x3e800), AddToOpen'd at once. A later turn sets out from it at full
+  Movement. Under search flag 4 (the planning's 0x115) only a mountain
+  (terrain bits 0x4924) or a canyon (0xb3c380) opens one.
+- THE OPEN LIST (0x775a0): sorted by (key +0x18, cost +0x1c); a key below
+  the head's first, above the tail's last; else by the key's distance to the
+  head's and the tail's (24.8 to float): as near the head or nearer, the walk
+  from the head before its first equal, nearer the tail the walk from the
+  tail after its last. A turn-end node sits after its plot's node and the
+  other nodes of its key, and the head it leaves after them weighs every
+  later insertion's side.
+- CONFIRMED (one-seed aimem traces to t80, the head with against without
+  it, no other kind moved): runs/h1_duely1117 t32 the barbarian Slinger
+  1769487 on 30:17 for 30:15 ends its turn on 29:16 (its path waits on 29:15,
+  30:15 at 1541632 for 1543424); h1_duely1127 t36 the Warrior 2031626
+  (Operation, 12:14 for 12:7) steps 12:13 (12:7 through 13:8's turn-end node,
+  3340544 for 3342848); h1_duely1121 the Galleys 524295 (t28 / t30 / t43 /
+  t53) and 1572882 (t43 / t58 / t64) "HL: Explore", city-state 2's Warrior
+  1048579 t61 and Swordsman 1310720 t74; h1_duely1127 t38 / t50 the Galley
+  262147, t39 the Archer 2293771's family; h1_duely1124 t32 the Scout
+  1507333; h1_duely1128 t78 the Archer 2883598 and Swordsman 3670032.
+- THE PLANNING'S TIE: runs/h1_duely1128 t41 city-state 4's Horseman 589827
+  on 30:7: 31:9 links 32:9 then 32:10 (769536 each); ours, with 30:6 at
+  (1/3) (256512), holds no node dearer than 769536 then, so 32:10 lands last
+  and 32:9 after it from the tail; the game lists 30:6 at (1/0), a node near
+  1027000 at the tail, from which both land from the head and 32:9 closes
+  first, as logged: the order follows from 30:6's step cost.
+- OPEN: runs/h1_duely1127 t17 the barbarian Slinger 1114127 (Attack Units,
+  14:2 for 14:5, flags 0 from 0x771f80 at 0x772131) walks 14:3 / 15:4 in the
+  game; with the turn-end nodes of 13:3 / 13:2 / 14:3 at the head when 14:3
+  links 15:4 (514816; the tail 12:2 at 770816) it lands from the tail after
+  14:4 and the path takes 13:3 / 14:4. THE STACKING COUNT 0x585d90 (READ):
+  every unit of the plot's list not at war with the mover; one of the
+  mover's player counted where the unit manager (0x9406e0) vt +0xb8 on the
+  two units' +0x160 says so, no Movement or order test, its third argument
+  unread; another player's but MakeTradeRoute / Spy and a pair 0x518f40
+  passes; 0x271be0 stores it less one on the unit's own plot (+0x54).
+  runs/h1_duely1117 t26 the Galley 720906 (26:1 for 33:3) still finds no
+  path: the path's turn 7 ends on 28:18 on the Galley 1835026 the barbarians
+  moved there earlier in the pass (record order 4709..4712 before 4720), the
+  only channel; what vt +0xb8 compares is unread.

@@ -16,9 +16,11 @@ _AI_DEFENDER = 4
 _WANDER_CAMP_RANGE = 5
 _DEFEND_CAMP_TURNS = 3
 _PLAN_TURNS = 2
-# an open node's key: its cost, then its order among equal costs
-_KEY_SHIFT = 1 << 22
-_TIE_OFF = 1 << 21
+# an open node's key: its key cost (+0x18), then its cost past it (a turn-end
+# node's Movement left, `_tac_search`), then its order among equals
+_KEY_SHIFT = 1 << 30
+_SUB_SHIFT = 1 << 18
+_TIE_OFF = 1 << 17
 _KEY_NONE = 1 << 62
 # BARBARIAN_DEFENSE_ALL_UNITS / BARBARIAN_DEFENSE_RANGED_UNITS (GlobalParameters)
 _BARB_DEFENSE_ALL = 4
@@ -587,7 +589,9 @@ class SimTactics:
                     mate: torch.Tensor | None = None, listed: bool = False) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
-        the open nodes by (cost, tie) — a node inserted where its cost lies
+        the open nodes by (key, cost, tie) — a move order's path opens a
+        turn-end node beside each new node with Movement left (`search`); a
+        node inserted where its key lies
         nearer the cheapest open node goes before its equals, else after them;
         a node made cheaper goes after its new equals, a closed one re-prices
         its children from it (UpdateParents, `update_parents`); each closed node links
@@ -596,7 +600,8 @@ class SimTactics:
         domain its plot holds it in. Returns the closing rank and turns of each
         plot it may end on ([N, T], -1 never closed or only passed: another
         player's unit holds it — in the planning's, one not at war with it,
-        no Trader, on a plot it sees now) and each node's parent; with `dest` [N] each
+        no Trader, on a plot it sees now) and each node's parent (a move order's path [N, 2T]: its turn-end
+        nodes at T + plot); with `dest` [N] each
         row stops once its plot closes. With `plan` (`_tac_plan`'s targets)
         each link the search prices — the start first, linked from itself —
         lays the targets' spots (`planUnit`'s `onLink`): "spot" [N, E, 6]
@@ -783,28 +788,32 @@ class SimTactics:
         # a zone of control's step on the path's destination (`groundOf`'s zoc)
         zp = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(utype), dest, crowd_n) if zoc else None
         tseat = self.tile_seat
-        g = torch.full((N, T), NONE, dtype=torch.long, device=dev)
-        tie = torch.zeros(N, T, dtype=torch.long, device=dev)
-        mv = torch.zeros(N, T, dtype=torch.long, device=dev)
-        tn = torch.zeros(N, T, dtype=torch.long, device=dev)
+        # the nodes: one per plot, and in a move order's path (`zoc`) a
+        # second layer of turn-end nodes at T + plot (`search`'s turn-end
+        # node: the two-layer pathfinder's 0x271920 -> 0x7a880)
+        TN = 2 * T if zoc else T
+        g = torch.full((N, TN), NONE, dtype=torch.long, device=dev)
+        tie = torch.zeros(N, TN, dtype=torch.long, device=dev)
+        mv = torch.zeros(N, TN, dtype=torch.long, device=dev)
+        tn = torch.zeros(N, TN, dtype=torch.long, device=dev)
         # each node's carry (`PNode.carry`, the node's +0x20): the Movement a
         # shore crossing onto it held past the new domain's full Movement,
         # which the next step from it pays on top
-        cr = torch.zeros(N, T, dtype=torch.long, device=dev)
+        cr = torch.zeros(N, TN, dtype=torch.long, device=dev)
         # each node's water as the search takes it (`PNode.wet`, +0x50 bit
         # 0x20): its own, but a plot stepped onto from an unrevealed one with
         # neither revealed its parent's
-        wt = water_n.clone()
+        wt = torch.cat((water_n, water_n), dim=1) if zoc else water_n.clone()
         ww_n = self.unit_water_walk.take(utype)
-        st = torch.zeros(N, T, dtype=torch.long, device=dev)
-        par = torch.full((N, T), -1, dtype=torch.long, device=dev)
+        st = torch.zeros(N, TN, dtype=torch.long, device=dev)
+        par = torch.full((N, TN), -1, dtype=torch.long, device=dev)
         rank = torch.full((N, T), -1, dtype=torch.long, device=dev)
         rturn = torch.full((N, T), -1, dtype=torch.long, device=dev)
-        # each open node's key (cost, then its order among equal costs), NONE
-        # off the open list
-        key = torch.full((N, T), NONE, dtype=torch.long, device=dev)
+        # each open node's key (key cost, cost past it, then its order among
+        # equals), NONE off the open list
+        key = torch.full((N, TN), NONE, dtype=torch.long, device=dev)
         # each node's links (its children, CvAStar +0x38) by direction
-        linked6 = torch.zeros(N, T, 6, dtype=torch.bool, device=dev)
+        linked6 = torch.zeros(N, TN, 6, dtype=torch.bool, device=dev)
         # the planning's valid wrapper (0x26e570, the start linked from itself
         # too): a plot holding a district whose type has HitPoints (the city
         # centre, the Encampment) of a player at war with the unit's, pillaged
@@ -846,8 +855,11 @@ class SimTactics:
             the neighbours, their attack flags, turns, Movement, cost, cliffs,
             then each step's carry, the child's water as the search takes it,
             and the children the player never revealed"""
+            b1n = best.unsqueeze(1)
+            bg, bm, bt = g.gather(1, b1n), mv.gather(1, b1n), tn.gather(1, b1n)  # [N, 1]
+            # the node's plot (a turn-end node's its plot's)
+            best = best % T
             b1 = best.unsqueeze(1)
-            bg, bm, bt = g.gather(1, b1), mv.gather(1, b1), tn.gather(1, b1)  # [N, 1]
             nb = neigh[best]  # [N, 6]
             nbc = nb.clamp(min=0)
             if rv_n is not None:
@@ -882,7 +894,7 @@ class SimTactics:
             cst = torch.where(naval.unsqueeze(1), torch.where(ashore, cost_b[rows, best][:, cols], self._mp_scale), cst)
             cst = torch.div(cst * _FIX, self._mp_scale, rounding_mode="floor")
             fresh = bm <= 0
-            pw = wt.gather(1, b1)  # [N, 1]
+            pw = wt.gather(1, b1n)  # [N, 1]
             full_here = torch.where(pw.squeeze(1) & ~naval, full_s, full_l)
             pm = torch.where(fresh, full_here.unsqueeze(1), bm).expand(-1, 6)
             turns = (bt + fresh.long()).expand(-1, 6)
@@ -890,7 +902,7 @@ class SimTactics:
             # the Movement left above the new domain's full Movement
             # (0x530420 / 0x530240); between two unrevealed plots no rule
             # runs: the parent's carry, else one Movement
-            crp = cr.gather(1, b1)
+            crp = cr.gather(1, b1n)
             cst = cst + crp
             cst = torch.where(blind6, torch.where(crp > 0, crp, _FIX).expand(-1, 6), cst)
             tw6 = water_n.gather(1, nbc)
@@ -914,9 +926,9 @@ class SimTactics:
                 # the parent's carry on top of the zone's minimum leaves the
                 # step short (0x26ed00): a wait where the turn goes on
                 carry6 = torch.where(inz, torch.zeros_like(carry6), carry6)
-                waits = inz & (cr.gather(1, b1) > 0) & ~at_start & same_turn
+                waits = inz & (cr.gather(1, b1n) > 0) & ~at_start & same_turn
                 turns = torch.where(waits, turns + 1, turns)
-                cst = torch.where(waits, pm + cr.gather(1, b1), cst)
+                cst = torch.where(waits, pm + cr.gather(1, b1n), cst)
             # the attack's step priced as any step, then spending the
             # Movement it leaves (`search`), as a planning step onto a
             # district at war with HitPoints does; the danger map's search
@@ -986,15 +998,20 @@ class SimTactics:
             if not bool(act.count_nonzero()):
                 break
             lo = vals[:, 1] if two == 2 else torch.full_like(kmin, NONE)
+            bn = best
+            b1n = bn.unsqueeze(1)
+            st.scatter_(1, b1n, torch.where(act, 2, st.gather(1, b1n).squeeze(1)).unsqueeze(1))
+            key.scatter_(1, b1n, torch.where(act, NONE, kmin).unsqueeze(1))
+            # the node's plot; a turn-end node closes its plot's again
+            best = bn % T
             b1 = best.unsqueeze(1)
-            st.scatter_(1, b1, torch.where(act, 2, st.gather(1, b1).squeeze(1)).unsqueeze(1))
-            key.scatter_(1, b1, torch.where(act, NONE, kmin).unsqueeze(1))
-            rank.scatter_(1, b1, torch.where(act, cnt, rank.gather(1, b1).squeeze(1)).unsqueeze(1))
-            rturn.scatter_(1, b1, torch.where(act, tn.gather(1, b1).squeeze(1), rturn.gather(1, b1).squeeze(1)).unsqueeze(1))
-            cnt += act.long()
+            first = act & (bn < T)
+            rank.scatter_(1, b1, torch.where(first, cnt, rank.gather(1, b1).squeeze(1)).unsqueeze(1))
+            rturn.scatter_(1, b1, torch.where(first, tn.gather(1, b1n).squeeze(1), rturn.gather(1, b1).squeeze(1)).unsqueeze(1))
+            cnt += first.long()
             hi = torch.where(act & (lo >= NONE), -1, hi)
             if dest is not None:
-                hit = act & (best == dest)
+                hit = act & (bn == dest)
                 found |= hit
                 act &= ~hit
             run &= act
@@ -1008,7 +1025,7 @@ class SimTactics:
                 act = act & (rev_n.gather(1, b1).squeeze(1) | (best == start))
             if not bool(act.count_nonzero()):
                 continue
-            nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6, wet6, unrev6 = price6(best)
+            nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6, wet6, unrev6 = price6(bn)
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6 | unrev6) & (turns <= max_turns)
             if zoc:
                 stacked = crowd_n.gather(1, b1) & (turns > bt)
@@ -1045,7 +1062,7 @@ class SimTactics:
                     ok = ok & ~(war_t.gather(1, nbc) & d_war.unsqueeze(1))
             if link is not None:
                 link(nbc, best, turns, moves, ok)
-            linked6[ar, best] = torch.where(act.unsqueeze(1), ok, linked6[ar, best])
+            linked6[ar, bn] = torch.where(act.unsqueeze(1), ok, linked6[ar, bn])
             s0 = st.gather(1, nbc)
             g0 = g.gather(1, nbc)
             t0 = tie.gather(1, nbc)
@@ -1057,37 +1074,75 @@ class SimTactics:
                 continue
             ins6 = new6 | upo6
             cl6 = upd6 & (s0 == 2)
-            if bool(cl6.count_nonzero()):
+            if zoc or bool(cl6.count_nonzero()):
                 # a closed child made cheaper takes its children along at once
-                # (UpdateParents 0x79660, `search`): the links land one by one,
-                # each closed one re-parented then walked
+                # (UpdateParents 0x79660, `search`), and a move order's path
+                # opens a turn-end node beside each new node with Movement
+                # left: the links land one by one, each closed one re-parented
+                # then walked
+                sub = _KEY_SHIFT // _SUB_SHIFT
+
+                def place(fm: torch.Tensor, f: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
+                    """AddToOpen's place (0x775a0) for a key (key cost `f`,
+                    `fm` with the cost past it) where `m`: its tie, 0 below
+                    the cheapest or above the dearest, else before its
+                    equals nearer the cheapest's key cost (or as near),
+                    after them nearer the dearest's"""
+                    nonlocal seq
+                    lo_f = torch.div(lo, _KEY_SHIFT, rounding_mode="floor")
+                    hi_f = torch.div(hi, _KEY_SHIFT, rounding_mode="floor")
+                    inr = m & (lo < NONE) & (fm >= torch.div(lo, _SUB_SHIFT, rounding_mode="floor")) \
+                        & (fm <= torch.div(hi, _SUB_SHIFT, rounding_mode="floor"))
+                    head = (f - lo_f).abs() <= (f - hi_f).abs()
+                    seq = seq + inr.long()
+                    return torch.where(inr, torch.where(head, -seq, seq), 0)
+
                 for j in range(6):
                     new = new6[:, j]
                     upo = upo6[:, j]
                     cl = cl6[:, j]
                     k = nbc[:, j]
                     gj = gn[:, j]
-                    lo_g = torch.div(lo, _KEY_SHIFT, rounding_mode="floor")
-                    hi_g = torch.div(hi, _KEY_SHIFT, rounding_mode="floor")
-                    inr = new & (lo < NONE) & (gj >= lo_g) & (gj <= hi_g)
-                    head = (gj - lo_g).abs() <= (gj - hi_g).abs()
-                    seq += inr.long()
-                    tnew = torch.where(inr, torch.where(head, -seq, seq), 0)
+                    tnew = place(gj * sub, gj, new)
                     seq += upo.long()
                     tj = torch.where(new, tnew, torch.where(upo, seq, t0[:, j]))
                     nk = gj * _KEY_SHIFT + tj + _TIE_OFF
                     ins = new | upo
                     lo = torch.where(ins, torch.minimum(lo, nk), lo)
+                    hi = torch.where(new, torch.maximum(hi, nk), hi)
                     m = new | upd6[:, j]
                     g[ar, k] = torch.where(m, gj, g[ar, k])
                     mv[ar, k] = torch.where(m, moves[:, j], mv[ar, k])
                     tn[ar, k] = torch.where(m, turns[:, j], tn[ar, k])
                     cr[ar, k] = torch.where(m, carry6[:, j], cr[ar, k])
                     wt[ar, k] = torch.where(m, wet6[:, j], wt[ar, k])
-                    par[ar, k] = torch.where(m, best, par[ar, k])
+                    par[ar, k] = torch.where(m, bn, par[ar, k])
                     tie[ar, k] = torch.where(ins, tj, tie[ar, k])
                     st[ar, k] = torch.where(new, 1, st[ar, k])
                     key[ar, k] = torch.where(ins, nk, key[ar, k])
+                    if zoc:
+                        # the turn-end node (`search`): Movement 0, the cost
+                        # plus 1000 x the Movement left, the node's key cost
+                        # and parent; none on the destination (0x271490)
+                        mj = moves[:, j]
+                        tw = new & (mj > 0)
+                        if dest is not None:
+                            tw = tw & (k != dest)
+                        if bool(tw.count_nonzero()):
+                            kt = k + T
+                            tt = place(gj * sub + mj, gj, tw)
+                            nkt = gj * _KEY_SHIFT + mj * _SUB_SHIFT + tt + _TIE_OFF
+                            lo = torch.where(tw, torch.minimum(lo, nkt), lo)
+                            hi = torch.where(tw, torch.maximum(hi, nkt), hi)
+                            g[ar, kt] = torch.where(tw, gj + mj * 1000, g[ar, kt])
+                            mv[ar, kt] = torch.where(tw, 0, mv[ar, kt])
+                            tn[ar, kt] = torch.where(tw, turns[:, j], tn[ar, kt])
+                            cr[ar, kt] = torch.where(tw, carry6[:, j], cr[ar, kt])
+                            wt[ar, kt] = torch.where(tw, wet6[:, j], wt[ar, kt])
+                            par[ar, kt] = torch.where(tw, bn, par[ar, kt])
+                            tie[ar, kt] = torch.where(tw, tt, tie[ar, kt])
+                            st[ar, kt] = torch.where(tw, 1, st[ar, kt])
+                            key[ar, kt] = torch.where(tw, nkt, key[ar, kt])
                     hi = torch.where(act, torch.where(key < NONE, key, -1).max(dim=1).values, hi)
                     if bool(cl.count_nonzero()):
                         seq, lo = update_parents(cl, k, seq, lo)
@@ -1151,14 +1206,14 @@ class SimTactics:
                 hi = torch.maximum(hi, torch.where(new6, nk6, neg6).max(dim=1).values)
 
             def put(t: torch.Tensor, vals: torch.Tensor, m: torch.Tensor = chg) -> None:
-                t.scatter_(1, torch.where(m, nbc, b1), torch.where(m, vals, t.gather(1, b1).expand(-1, 6)))
+                t.scatter_(1, torch.where(m, nbc, b1n), torch.where(m, vals, t.gather(1, b1n).expand(-1, 6)))
 
             put(g, gn)
             put(mv, moves)
             put(tn, turns)
             put(cr, carry6)
             put(wt, wet6)
-            put(par, best.unsqueeze(1).expand(-1, 6))
+            put(par, bn.unsqueeze(1).expand(-1, 6))
             put(tie, tie6)
             put(st, torch.ones_like(s0), new6)
             put(key, nk6, ins6)
@@ -1194,7 +1249,7 @@ class SimTactics:
         rank = torch.where(stand, rank, torch.full_like(rank, -1))
         rturn = torch.where(stand, rturn, torch.full_like(rturn, -1))
         out = {"rank": rank, "turns": rturn, "parent": par, "found": found, "start": start, "attack": atk_n,
-               "moves": mv, "closed": closed, "fits": fits}
+               "moves": mv[:, :T], "closed": closed, "fits": fits}
         if plan is not None:
             out.update(plan["spots"])
         return out
@@ -1438,14 +1493,15 @@ class SimTactics:
         start = res["start"]
         R = rows.shape[0]
         ar = torch.arange(R, device=dev)
-        # the path, dest first, back to the unit's plot
+        # the path, dest first, back to the unit's plot: each node's plot (a
+        # turn-end node at T + its plot)
         back = []
         cur = torch.where(res["found"], dr, start)
         while True:
             more = cur != start
             if not bool(more.count_nonzero()):
                 break
-            back.append(torch.where(more, cur, torch.full_like(cur, -1)))
+            back.append(torch.where(more, cur % self.T, torch.full_like(cur, -1)))
             cur = torch.where(more, par[ar, cur], cur)
         if not back:
             return

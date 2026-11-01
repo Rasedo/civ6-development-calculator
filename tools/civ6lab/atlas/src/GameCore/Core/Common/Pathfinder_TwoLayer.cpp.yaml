@@ -14,6 +14,20 @@
   readings:
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   context:
     - "...+0x4b8 is clear, 0x2000 for a unit +0x738 above 1 holding 0x2669d0 2 or 4; then the A* 0x7a630 over the callbacks 0x26f330 sets: the validity 0x2720a0, the cost 0x26e920), its turns..."
+  review: reviewed
+- addr: 0x7a880
+  kind: function
+  name: the second layer's node
+  semantics: "the two-layer pathfinder's second-layer node of a plot: [instance +0x380][x] + y x 0x58."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 32
+      value: "the turn-end node 0x271920 opens: the Slinger 1769487's path waits on 29:15"
+  impl: [cpu/core/tactical.ts:search, gpu/core/sim_tactics.py:_tac_search, cpu/core/tactical.ts:c]
+  readings:
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   review: reviewed

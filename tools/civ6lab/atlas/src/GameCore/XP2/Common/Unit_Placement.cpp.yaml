@@ -31,7 +31,7 @@
 - addr: 0x585d90
   final: 0x3b0370
   kind: function
-  semantics: "the count of a plot's units (its list of the mover's map layer) that keep the mover out: none at war with it (IsAtWarWith 0x3dcec0); one of its player where its type stacks with the mover's (vtable +0xb8); one of another player but a unit whose info holds MakeTradeRoute (+0x1b9 bit 0x40) or Spy (+0x1ba bit 2), and but a pair 0x518f40 lets share a plot."
+  semantics: "the count of a plot's units (its list of the mover's map layer: +0x50, count +0x60) that keep the mover out: none at war with it (IsAtWarWith 0x3dcec0); one of its player where the unit manager (0x9406e0) vtable +0xb8 on the two units' +0x160 says so, with no Movement or order test (its third argument unread); one of another player but a unit whose info holds MakeTradeRoute (+0x1b9 bit 0x40) or Spy (+0x1ba bit 2), and but a pair 0x518f40 lets share a plot. The path node's +0x54 (0x271be0) is it less one on the unit's own plot."
   status: READ
   cases:
     - recording: 1124
@@ -57,6 +57,7 @@
     - cpu/core/tactical.ts:peaceHeld
     - gpu/core/sim_tactics.py:_tac_peaceful
   readings:
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-127: a Trader keeps none of its player's units out — ported (0x585eb0 -> 0x585d90), both twins"

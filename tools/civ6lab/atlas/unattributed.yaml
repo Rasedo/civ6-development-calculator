@@ -460,10 +460,20 @@
   final: 0x57960
   kind: function
   name: AddToOpen
-  semantics: "AddToOpen: below the head first, above the tail last; else |f - tail| against |f - head| (24.8 to float, 0x774c0): strictly nearer the tail the walk from the tail puts it after its equals, else the walk from the head before them. The open list (+0xf0 head, +0xf8 tail, doubly linked) is sorted by (f, g); from the head a key goes BEFORE its first equal, from the tail AFTER its last equal."
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
+  semantics: "AddToOpen: below the head first, above the tail last; else |f - tail| against |f - head| (24.8 to float, 0x774c0): strictly nearer the tail the walk from the tail puts it after its equals, else the walk from the head before them. The open list (+0xf0 head, +0xf8 tail, doubly linked: +8 next, +0x10 previous) is sorted by (f +0x18, g +0x1c); from the head a key goes BEFORE its first equal, from the tail AFTER its last equal; the distance reads f alone. Then the notification +0x78 (0x271920 in a move order's path: the turn-end node, f its plot's node's, g above it)."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 41
+      value: "city-state 4's Horseman 589827 on 30:7: 31:9 links 32:9 then 32:10 (769536 each); with 30:6 at (1/0) near 1027000 at the tail both land from the head and 32:9 closes first, as AI_Planning.csv lists"
+  impl:
+    - cpu/core/tactical.ts:search
+    - cpu/core/tactical.ts:PathDanger
+    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:before
+    - gpu/core/sim_tactics.py:place
   readings:
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -2051,6 +2061,7 @@
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
     - "C-125: the safe plot's stacking test holds other players' units — READ (0x716b90 at 0x716d77 -> 0x585eb0 / 0x585d90), both twins"
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   context:
     - "...that keep it out (0x585d90: its own of its class, vtable +0xb8; another player's where 0x518f40 refuses the pair), none with MakeTradeRoute (+0x1b9 bit 64) or Spy (+0x1ba bit 2). Th..."
   review: reviewed
@@ -7399,6 +7410,7 @@
       value: "runs/h1_duelv1121 t7: city-state 2's Attack Barb Camp logs its \"No   recruits\" pair twice — the Builder made at t6 held by a city tree;"
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-124: a move order's path opens a turn-end node beside each node with Movement left — READ (0x271920, 0x7a880, 0x271490, 0x775a0, 0x26f330), both twins"
   context:
     - "...read. THE SECOND OFFER (0x60a8c0): the evaluator's satisfied test (vtable @0xd760f8 +8, 0xb3c380) answers false always, so after the first offer (the units in no job, not done, alive)..."
   review: reviewed

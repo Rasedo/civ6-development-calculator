@@ -393,7 +393,9 @@ def main() -> None:
     assert units, "no barbarian unit stands at the warm-up's end"
     rows = torch.zeros(len(units), dtype=torch.long)
     slots = torch.tensor(units)
-    for zoc, turns in ((False, 2), (True, 1 << 30)):
+    # the planning's search alone: the scalar search opens no turn-end node
+    # (a move order's path does, `search`)
+    for zoc, turns in ((False, 2),):
         res = sim._tac_search(rows, slots, BARB_SEAT, turns, zoc)
         for i, s in enumerate(units):
             want, parent = scalar_search(sim, 0, s, turns, zoc)
