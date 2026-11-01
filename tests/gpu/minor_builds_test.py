@@ -302,7 +302,7 @@ def test_the_minor_encampment_fights_as_its_centre(rules, path) -> None:
     tier = int(sim._minor_walls_tier_at(csx)[B0])
     want = (int(sim.citystate_best_melee[B0, s]) - int(sim._city_base_melee_cut) + int((sim.city_bldg[B0, row, 0].long() * sim._b_walls_cs).sum())
             + int(sim._palace_city_cs) + int(sim._d_city_str[dv])
-            + int(sim._minor_envoys_received()[B0, s]) * int(sim._envoy_city_cs))
+            + int(sim._minor_most_envoys()[B0, s]) * int(sim._envoy_city_cs))
     assert tier >= 1, "the walls did not reach the tier read"
     assert int(d[B0]) == want, f"the minor's Encampment defends at {int(d[B0])}, its centre says {want}"
     assert bool(held[B0]) and int(wtier[B0]) == tier and int(hcol[B0]) < 0

@@ -1214,18 +1214,15 @@ class SimMinors:
         CIV6 (`CivilizationLevels.CanAnnexTilesWithReceivedInfluence`): TRUE
         for CITY_STATE and FALSE for a full civ, the Free Cities player and a
         tribe — the one column of that table only a minor owns, and the reason
-        its culture box banks and claims nothing. Measured on one minor over
-        fifteen readings on a SINGLE turn, so nothing but the envoys moved:
-        exactly +1 owned plot per envoy received, `plots = envoys + 6`, no cap
-        through sixteen, and the suzerain contest does not change the slope. A
-        minor is founded on seven plots, so its first envoy takes none
+        its culture box banks and claims nothing. The count is the MOST envoys
+        one major holds there (GetMostTokensReceived 0x44c4b0,
+        `_minor_most_envoys`), not their sum: `plots = most + 6`. A minor is
+        founded on seven plots, so a major's first envoy takes none
         (`envoyTiles`).
 
         The LEDGER is `city_acquired` itself — the `tilesAcquired` twin — so
         the rule needs no counter of its own: a minor's box buys nothing, so
-        every tile that counter holds was bought by an envoy past the first. The count it
-        claims up to is the RAW store, `seat_citystate_envoys` and never
-        `_envoys_here`, because a governor POSTING is not an envoy RECEIVED.
+        every tile that counter holds was bought by an envoy.
         Claiming up to the count rather than on each delta is what makes the
         measured equation an invariant, and it settles the one case the lab
         did not reach: an envoy REMOVED (a spy's Fabricate Scandal) takes no
@@ -1240,7 +1237,7 @@ class SimMinors:
             return
         bidx = self._bidx
         col = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        env = self._minor_envoys_received()
+        env = self._minor_most_envoys()
         for s in range(self.S):
             row = self._CITY_MINOR0 + s
             if not bool(self._row_annex_influence[row]):
@@ -1441,12 +1438,6 @@ class SimMinors:
             urban = self.citystate_techs[b, s0, self._urban_def_tech]
             tier = torch.where(urban, torch.full_like(tier, self._walls_tier_urban), tier)
         return tier
-
-    def _minor_envoys_received(self) -> torch.Tensor:
-        """[B, S] long — `envoysReceived`: every envoy each minor holds, the
-        raw store summed over the majors that sent them, an established
-        Amani's included."""
-        return self.seat_citystate_envoys[:, : self.n_majors, : self.S].sum(dim=1).long()
 
     def _minor_most_envoys(self) -> torch.Tensor:
         """[B, S] long — `mostEnvoysReceived`: the most envoys any one major

@@ -7,10 +7,9 @@ The TS twin is tests/cpu/minors/envoy-tiles.test.ts.
 
 CIV6 (`CivilizationLevels.CanAnnexTilesWithReceivedInfluence`, TRUE for
 CITY_STATE and FALSE for every other class of player): a minor takes ground
-from the influence SPENT ON IT. Measured on one minor over fifteen readings
-on a single turn, so nothing but the envoys moved — exactly +1 owned plot per
-envoy received, `plots = envoys + 6`, no cap through sixteen, and the suzerain
-contest does not change the slope.
+from the influence SPENT ON IT: one plot per envoy of the MOST one major
+holds there (GetMostTokensReceived), `plots = most + 6`, no cap through
+sixteen, and the suzerain contest does not change the slope.
 
 No gate lane drives this (a minor takes no decision of its own and the envoy
 verb is a major's), so these scenes are the whole GPU-side evidence:
@@ -138,8 +137,8 @@ def test_slope(rules) -> None:
     assert plots(sim, s) == base_p + 16, f"sixteen envoys took {plots(sim, s) - base_p} plots"
     assert int(sim.citystate_suzerain[B0, s]) == 0, "sixteen envoys from one seat hold no suzerainty"
 
-    # ...and a TIE, which leaves nobody suzerain, pays the same one plot per
-    # envoy past the first
+    # ...and a record split between two majors pays the MOST one of them holds
+    # (GetMostTokensReceived), not the sum
     sim2 = build(rules)
     s2 = a_minor(sim2)
     row2 = sim2._CITY_MINOR0 + s2
@@ -150,7 +149,8 @@ def test_slope(rules) -> None:
     sim2.seat_citystate_envoys[B0, min(1, sim2.n_majors - 1), s2] = (b_a + 6) - half
     sim2._cs_resolve_suzerain()
     sim2._minor_envoy_tiles(every(sim2))
-    assert plots(sim2, s2) == b_p + 5, "a split record pays a different slope"
+    most = half if sim2.n_majors == 1 else max(half, (b_a + 6) - half)
+    assert plots(sim2, s2) == b_p + max(0, most - 1 - b_a), "a split record paid other than its most"
     if sim2.n_majors > 1 and half * 2 == b_a + 6 and half >= suz_min:
         assert int(sim2.citystate_suzerain[B0, s2]) == -1, "a tie left a suzerain"
     print(f"  2 slope OK — +1 plot per envoy to sixteen (base {base_p} plots)")

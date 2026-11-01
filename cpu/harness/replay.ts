@@ -2036,7 +2036,9 @@ function unstack(ctx: Ctx, b: TurnRecord, u: Unit): void {
 
 /**
  * THE PLAYERS' ENVOYS of the pair (the ones not sent in a start,
- * `stageEnvoys`), once its moves have landed: a major meets a city-state in
+ * `stageEnvoys`), once the moves of the players who sent them have landed
+ * (the other majors' before the city-states' turns, the active player's at
+ * the pair's close): a major meets a city-state in
  * the move that reveals it, the first major to meet one sending it its free
  * envoy (`meetCityState`). Each minor's count from the player is brought to
  * record t+1's — through the engine's own verb, its purse's tokens, where
@@ -2044,7 +2046,9 @@ function unstack(ctx: Ctx, b: TurnRecord, u: Unit): void {
  */
 function settleEnvoys(ctx: Ctx, b: TurnRecord): void {
   const { state } = ctx;
-  for (const d of ctx.lateEnvoys) {
+  const due = ctx.lateEnvoys;
+  ctx.lateEnvoys = [];
+  for (const d of due) {
     const seat = seatOfP(ctx, d.player);
     const s = seatOf(state, seat) as Seat | undefined;
     const ms = seatOfP(ctx, d.minor);
@@ -5455,6 +5459,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // ...taking into the turn's heal the moves their actions spent
       for (const [u, kept] of movesKept) if (others.includes(u.seat)) u.movesLeft = kept ? grantedMoves(state, u) : 0;
       for (const seat of others) detectBoosts(state, seat);
+      // the envoys the majors' actions sent land before the city-states'
+      // turns, which bank on the ground they annex (runs/h1_duely1127 t60:
+      // China's envoy to Hattusa in its actions annexes 573, Hattusa's
+      // Builder on it the next turn)
+      settleEnvoys(ctx, b);
     };
     // each unit's health before the engine's turn heals it, beside the plot
     // the heal reads (`healedOn`)
@@ -5909,6 +5918,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     state.units = all.filter((u) => !unborn.has(u));
     knowledgeLook(state, state.barbSeat, BARB_SEAT, plotsSeenNow(state, new Set([BARB_SEAT])), false);
     state.units = all;
+    // ...and the active player's, sent in its start of the next turn
     settleEnvoys(ctx, b);
     // the barbarians' units sat the engine's turn out, so their rest — the
     // fortification a unit holding the Fortify order digs in (`fortifyOrders`)

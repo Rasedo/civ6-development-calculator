@@ -142,13 +142,6 @@ export function envoysOf(cityState: CityState, seat: number): number {
   return cityState.envoys[seat] ?? 0;
 }
 
-/** Every envoy this minor holds, the store summed over every seat that sent
- *  one, an established Amani's included. The GPU twin is
- *  `_minor_envoys_received`. */
-export function envoysReceived(cityState: CityState): number {
-  return Object.values(cityState.envoys).reduce((n, e) => n + e, 0);
-}
-
 /**
  * The envoys `seat` effectively holds here — the store, doubled where its
  * governor established at this minor holds Puppeteer ("While established in
@@ -278,18 +271,18 @@ export function addEnvoys(state: GameState, cityState: CityState, seat: number, 
  * CIV6 (`CivilizationLevels.CanAnnexTilesWithReceivedInfluence`): TRUE for
  * CITY_STATE and FALSE for a full civ, the Free Cities player and a tribe —
  * the one column of that table only a minor owns, and the reason a minor's
- * culture box banks and claims nothing. Measured on one minor over fifteen
- * readings on a single turn, so nothing but the envoys moved: EXACTLY +1
- * owned plot per envoy received, `plots = envoys + 6`, no cap through
- * sixteen, and the suzerain contest does not change the slope. A minor is
- * founded on seven plots (`placeCityStateAt`), so its first envoy takes none
- * (runs/h1_duelw1103–1118: a minor with one envoy holds seven plots in all
- * sixteen, and plots − envoys reads 6 on 7,232 of the 11,787 city-state
- * rows, the mode in every duel).
+ * culture box banks and claims nothing. The count is the MOST envoys one
+ * player holds here (0x1abf40 reads GetMostTokensReceived 0x44c4b0,
+ * `mostEnvoysReceived`), not their sum: `plots = most + 6`. A minor is
+ * founded on seven plots (`placeCityStateAt`), so a player's first envoy
+ * takes none (runs/h1_duely1127 t81: China's first envoy to Muscat beside
+ * Rome's one annexes nothing, Muscat on seven plots; its second at t96
+ * annexes 0:15; over the five duely duels plots − 7 = most − 1 on 99 of 103
+ * changes, the sum's E − 1 on 69).
  *
  * The LEDGER is `tilesAcquired` itself, so the rule needs no counter of its
  * own: a minor's box buys nothing, so every tile that record counts was
- * bought by an envoy past the first. Claiming UP TO the count rather than on each delta is
+ * bought by an envoy. Claiming UP TO the count rather than on each delta is
  * what makes the measured equation an invariant, and it settles the one case
  * the lab did not reach — an envoy REMOVED (a spy's Fabricate Scandal) takes
  * no ground back, and buys nothing new until the count passes its own mark.
@@ -302,7 +295,7 @@ export function addEnvoys(state: GameState, cityState: CityState, seat: number, 
 export function envoyTiles(state: GameState, cityState: CityState): void {
   if (!CIV_LEVELS.CITY_STATE.canAnnexTilesWithReceivedInfluence) return;
   const city = minorCity(cityState);
-  let want = envoysReceived(cityState) - 1 - city.tilesAcquired;
+  let want = mostEnvoysReceived(state, cityState) - 1 - city.tilesAcquired;
   let took = false;
   while (want > 0) {
     const next = drawBorderPlot(state, city);

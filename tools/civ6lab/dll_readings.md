@@ -7416,3 +7416,41 @@ ranged exclusion gone (gpu/core/sim_tactics.py); `minorAi`'s copy health
   t41 city-state 4's Warrior 30 on 34:7 takes 35:7 (danger 45 in our map)
   over 33:7 (Woods, 0) and 34:8 (20). Every open case avoids a Woods plot
   our map holds safe.
+
+## H-1: the envoy annex counts the most envoys one player holds — READ (0x1abf40 -> 0x44c4b0), both twins
+
+- THE COUNT: 0x1abf40 (City_Culture, a city-state reacting to influence
+  received) calls GetMostTokensReceived 0x44c4b0 at 0x1ac06a — the most
+  envoys one player holds there, a posted governor's share (0x44caa0)
+  included — not the envoys summed over the givers. With A the annexed
+  count past the starting tiles (+0xc less 0x1ab460), E > A annexes E − A
+  plots (AnnexPlots 0x1a8a30): `plots = most + 6`, each player's first envoy
+  taking none. `envoyTiles` (cpu/core/cityStates.ts) reads
+  `mostEnvoysReceived`, `_minor_envoy_tiles` (gpu/core/sim_minors.py)
+  `_minor_most_envoys`; the importer's ledger floor reads the same count
+  (`importTurn`, cpu/harness/import.ts).
+- WHEN: every non-founding claim of a city-state over the five duely duels
+  (99: 97 beside the row, two the second plot of a double annex) is
+  published beside an InfluenceGiven row inside a major's start or actions,
+  before the minor's own turn: a minor's border grows only through the envoy
+  annex (CanAnnexTilesWithCulture false), and the plot it annexes, its
+  citizens re-placed (0x1a8b70 -> 0x196320), is worked when its own turn
+  banks. The replay imports each major's Influence banked
+  (`GetPointsEarned`, the record's `influencePoints`), so the start that
+  fills it sends its envoy there (`stageEnvoys`), and lands the envoys sent
+  in the other majors' actions before the city-states' turns (`settleEnvoys`
+  at the end of their actions; the active player's at the pair's close).
+- CONFIRMED: runs/h1_duely1124 t44: China's 49 + 3 Influence fill its token,
+  its envoy to Cardiff in its start annexes 13:14 (a luxury, 3 Gold), and
+  Cardiff banks Gold 8 against 6 maintenance (Player_Stats.csv; 122 at t45),
+  where the record-less purse left the envoy after Cardiff's turn and Cardiff
+  banked 5; its Warrior 196610's upgrade at t47 is no longer bought.
+  runs/h1_duely1127 t81: China's first envoy to Muscat beside Rome's one
+  annexes nothing (seven plots); plots − 7 = most − 1 on 99 of 103 envoy or
+  plot changes of the five duels (the sum's E − 1 on 69; the four others a
+  posted Amani's share, 1121 t181 / t233, 1127 t132 / t148).
+- OPEN: runs/h1_duely1117 t44 Antananarivo, its annex of 210 landing before
+  its turn as the event log places it: the engine's city AI opens an
+  Improvement tree for a Mine on 210 at once, the game's none (its log's
+  trees t44-t46 hold no Build City Improvement), its Builder's Farm on 295
+  at t46 then missed.

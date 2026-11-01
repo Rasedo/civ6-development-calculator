@@ -85,6 +85,8 @@ export interface DumpPlayer {
   favorPerTurn?: Read<number>;
   tourism: Read<number>;
   tokens: Read<number>;
+  /** the Influence banked toward the next envoy (`GetPointsEarned`) */
+  influencePoints?: Read<number>;
   suzerain: Read<number>;
   policies: Read<number>[];
   wars: number[];

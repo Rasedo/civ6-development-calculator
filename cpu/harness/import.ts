@@ -45,7 +45,7 @@ import { isWater } from '../../world/query';
 import { FEATURE_ID, TERRAIN_BASE } from '../data/aliases';
 import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
-import { envoysReceived, envoysWith, minorCity } from '../core/cityStates';
+import { envoysWith, minorCity, mostEnvoysReceived } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOVERNOR_PROMOTIONS, promotionBit, promotionBitValue } from '../data/governors';
 import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { BOOSTS } from '../data/boosts';
@@ -2638,7 +2638,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     // claim, so only an envoy written after the record annexes (runs/h1_duelw1124
     // Granada t59: three envoys, nine plots, Amani establishing at another
     // minor annexes nothing there)
-    cs.tilesAcquired = Math.max(cs.tilesAcquired ?? 0, envoysReceived(cs) - 1);
+    cs.tilesAcquired = Math.max(cs.tilesAcquired ?? 0, mostEnvoysReceived(state, cs) - 1);
   }
 
   // a resource the engine lacks on an owned plot is its owner's gap too: a
@@ -3593,6 +3593,11 @@ function importPlayer(ctx: Ctx, p: DumpPlayer, s: GameState['seats'][number]): v
   s.faith = num(p.faith);
   s.diplomaticFavor = num(p.favor) || 0;
   s.envoysAvailable = num(p.tokens) || 0;
+  // the Influence banked toward the next envoy (GetInfluence():GetPointsEarned):
+  // a start that fills it sends its envoy there, and the minor annexes before
+  // its own turn banks (runs/h1_duely1124 t44: China's 49 + 3 fill its token,
+  // Cardiff annexes 13:14 in China's start and banks its 3 Gold that turn)
+  s.influencePoints = num(p.influencePoints) || 0;
   const pan = num(p.pantheon);
   if (pan >= 0) {
     const id = engineId('belief', cat.beliefs[pan], 'BELIEF_', PANTHEONS);

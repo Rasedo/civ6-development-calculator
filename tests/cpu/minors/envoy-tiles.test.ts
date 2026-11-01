@@ -3,10 +3,10 @@
  *
  * CIV6 (`CivilizationLevels.CanAnnexTilesWithReceivedInfluence`, TRUE for
  * CITY_STATE alone): a minor takes ground from the influence SPENT ON IT.
- * Measured on one minor over fifteen readings on a single turn, so nothing
- * but the envoys moved — exactly +1 owned plot per envoy received,
- * `plots = envoys + 6`, no cap through sixteen, and the suzerain contest does
- * not change the slope. The GPU half is tests/gpu/envoy_tiles_test.py.
+ * One plot per envoy of the MOST one player holds there (0x1abf40 reads
+ * GetMostTokensReceived), `plots = most + 6`, no cap through sixteen, and the
+ * suzerain contest does not change the slope. The GPU half is
+ * tests/gpu/envoy_tiles_test.py.
  *
  * WHICH plot is the city rule's own next-tile pick and its own refusals; the
  * game's choice rule is unmeasured.
@@ -89,12 +89,14 @@ describe('one plot per envoy RECEIVED', () => {
     expect(plots(state, cs)).toBe(before);
   });
 
-  it('counts envoys from ANY seat and the suzerain contest changes no slope', () => {
+  it('counts the MOST one seat holds, and the suzerain contest changes no slope', () => {
     const split = scene();
     addEnvoys(split.state, split.cs, 0, 2);
     addEnvoys(split.state, split.cs, 1, 2);
     expect(suzerainOf(split.cs)).toBe(-1); // a TIE leaves nobody
-    expect(plots(split.state, split.cs)).toBe(10);
+    expect(plots(split.state, split.cs)).toBe(8); // the most, two, not the sum
+    addEnvoys(split.state, split.cs, 1, 1);
+    expect(plots(split.state, split.cs)).toBe(9);
 
     const sole = scene();
     addEnvoys(sole.state, sole.cs, 0, 4);
