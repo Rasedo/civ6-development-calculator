@@ -7692,3 +7692,30 @@ update (gpu/core/sim_tactics.py).
   destination, `_tac_zoc_path(..., None, ...)` on the plot the unit stands on
   after the walk; the walk's own halt (the path cost 0x26e920 through
   0x26f980 with the path's destination) keeps the destination waiver.
+
+## H-1: a plot annexed before a city-state's turn reveals the plots beside it to that turn's planning — READ (records, aimem), the replay's copy
+
+`minorAi` (cpu/harness/replay.ts), `cityStateSight` with `units` false
+(cpu/core/fog.ts).
+
+- THE RULE: the plots a city-state's units and trees plan on are those it
+  had revealed as the turn opened and those its ground sees as its turn
+  comes (its plots, the plots beside them, the plots within two of its
+  centre): a plot a major's start annexes for it reveals its neighbours
+  before the minor's trees tick. An unrevealed plot stays passable to the
+  pathfinder, so without the reveal a Builder plans across a coast it
+  cannot embark on.
+- CONFIRMED: runs/h1_duely1117 t44 Antananarivo. 210 (34:4, Tundra Hills
+  between mountains and coast), annexed in China's t44 start, takes the
+  improvement event's Build City Improvement (m_eventTrees slot 3 1638405
+  at the end look; m_reservations element 10, plot 210, held by its
+  control 1769479 at 71.0); the tree is gone by the end look and the
+  Builder 262144 ends its turn on 296 unmoved (AI_Tactical.csv "HL: End
+  Turn"): Move Unit finds no path to 210, the coast 211 beside it revealed
+  and no Sailing. t45 the same (slot 3 1769474, control 1900548 on element
+  10); t46 the Farm tree on 295 lays at once (record t47 the Farm, the
+  Builder spent). The engines' t44 tree stepped the Builder to 297 on a
+  six-turn path through the unrevealed 211.
+- The improvement event's value is no gate here: the game's trees start at
+  t44 and t45 on 210 as the engines' do (the Mine 71.45, the reservation's
+  whole 71).

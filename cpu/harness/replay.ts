@@ -72,7 +72,7 @@ import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeD
 import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
-import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
+import { cityStateSight, initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
 import { holdFavor, seatFavor } from '../core/seatTurn';
 import { displaceAirFrom } from '../core/air';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setDelegationWith, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
@@ -1242,9 +1242,16 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   revealedWas: ReadonlyMap<number, number[] | undefined>): void {
   const { state } = ctx;
   const copy = deserialize(serialize(state));
+  // the revealed plots as the turn opened and those its ground sees as its
+  // turn comes, a plot annexed in a major's start revealing the plots beside
+  // it (runs/h1_duely1117 t44: Antananarivo's 210 annexed in China's start,
+  // the coast 211 beside it revealed, its Builder on 296 finds no path to
+  // the Mine there and Build City Improvement ends, the Builder unmoved)
   for (const cs of copy.cityStates) {
     const r = revealedWas.get(cs.seat);
-    if (r) cs.revealed = [...r];
+    if (!r) continue;
+    const ground = cityStateSight(state, cs.seat, false);
+    cs.revealed = r.map((v, p) => (ground[p] ? 1 : v));
   }
   const twin = new Map<Unit, Unit>();
   state.units.forEach((u, i) => twin.set(copy.units[i], u));

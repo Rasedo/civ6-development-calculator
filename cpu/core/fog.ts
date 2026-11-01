@@ -306,8 +306,8 @@ export function seatSeesPlot(state: GameState, seat: number, t: Tile, mover?: Lo
  *  plots the knowledge base's update walks, 0x7877e0 over player +0x290):
  *  `seatSeesPlot`'s eyes for the minor alone — its plots and those beside
  *  them, the plots within two of its centre, and each of its units' look
- *  (`unitSight`, cut by `losDisk`). */
-export function cityStateSight(state: GameState, seat: number): Uint8Array {
+ *  (`unitSight`, cut by `losDisk`; `units` false: its ground's eyes alone). */
+export function cityStateSight(state: GameState, seat: number, units = true): Uint8Array {
   const { map } = state;
   const out = new Uint8Array(map.tiles.length);
   for (const t of map.tiles) {
@@ -320,6 +320,7 @@ export function cityStateSight(state: GameState, seat: number): Uint8Array {
     const c = map.tiles[cs.centerIndex];
     for (const n of tilesWithin(map, c.col, c.row, 2)) out[n.index] = 1;
   }
+  if (!units) return out;
   for (const u of state.units) {
     if (u.seat !== seat) continue;
     const from = map.tiles[u.tileIndex];
