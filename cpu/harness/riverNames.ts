@@ -69,11 +69,14 @@ export function startRiverNames(state: GameState): boolean[] | undefined {
 }
 
 /** names the rivers the record's events name over `look` (the record
- *  before's sight; `named` written in place); `unitByKey` the record's own
- *  units, for one its turn made */
+ *  before's sight, read and left as it stands: a record imported again
+ *  replays its events on the same look; `named` written in place);
+ *  `unitByKey` the record's own units, for one its turn made */
 export function recordRiverNames(look: RiverLook, actions: readonly unknown[][], named: boolean[],
   seatOfPlayer: ReadonlyMap<number, number>, unitByKey: ReadonlyMap<string, Unit>): void {
-  const { state, counts, units } = look;
+  const { state } = look;
+  const counts = new Map([...look.counts].map(([m, c]) => [m, c.slice()] as const));
+  const units = new Map(look.units);
   const at = floodRiversAt(state.map);
   const W = state.map.width;
   const add = (key: string, owner: number, tile: number) => {
