@@ -657,7 +657,11 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
   v = fmul(v, f.promotionWeight(u.promotionClass));
   if (u.resource && !f.resourceAccess(u.resource)) return 0;
   v = pseudoYieldValue(f.view, f.seat, v, pseudo);
-  if (f.handicap < 3) v -= yieldValue(null, null, Math.max(0, u.maintenance) * FX, 'YIELD_GOLD');
+  // its Maintenance as Gold at the player's weight (0x7b72d1 passes the
+  // player: runs/h1_duely1121 Antioch t151, the Field Cannon's 2.785 less
+  // 5 Maintenance at its Economic AI's boosted Gold, below the game's Scout
+  // at 0.0)
+  if (f.handicap < 3) v -= yieldValue(f.view, f.seat, Math.max(0, u.maintenance) * FX, 'YIELD_GOLD');
   return presentValue(v, AI_RATE, h) - presentValue(v, AI_RATE, t);
 }
 

@@ -468,6 +468,7 @@
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-96: the unit value's Maintenance at the player's Gold weight — READ (0x7b62c0 at 0x7b729e..0x7b72de), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - "label: yieldValue(out,&amt,yield,playerAI): amt*Yields.col1c*(1+min(w[yield],9))"
@@ -850,6 +851,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
+    - "C-96: the unit value's Maintenance at the player's Gold weight — READ (0x7b62c0 at 0x7b729e..0x7b72de), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...req buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) ->..."
     - ".claude/scratchpad/cb/notes.txt: ...turns). regional (+0x2c) via 0x79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x..."

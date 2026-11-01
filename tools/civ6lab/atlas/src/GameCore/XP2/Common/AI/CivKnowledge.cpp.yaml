@@ -186,6 +186,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
+    - "C-96: the unit value's Maintenance at the player's Gold weight — READ (0x7b62c0 at 0x7b729e..0x7b72de), both twins"
   context:
     - "..., over the player list (0x483b50 +0x4a0) the knowledge base's count of it (CivKnowledge 0x5eb650: the player's army records, AI_Knowledge.csv's ARMY lines \"UNIT_X count age\"), N thei..."
   review: imported

@@ -862,7 +862,8 @@ class SimCityValue:
             noaccess = ~_t(f.resource_access(u["resource"]), like).bool()
         v = self._cv_pseudo(v, pseudo, f.pseudo_w(pseudo))
         if f.handicap() < 3:
-            v = v - self._cv_yield(torch.full_like(like, max(0, u["maintenance"]) * _FX), "YIELD_GOLD")
+            # its Maintenance as Gold at the player's weight (0x7b72d1)
+            v = v - self._cv_yield(torch.full_like(like, max(0, u["maintenance"]) * _FX), "YIELD_GOLD", f.yield_w("YIELD_GOLD"))
         value = _present_value(v, r, h) - _present_value(v, r, t)
         value = torch.where(noaccess, torch.zeros_like(value), value)
         trains = _t(f.trains_domain(u["domain"]), like).bool()

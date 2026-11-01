@@ -12845,3 +12845,20 @@ City_BuildQueue.csv).
   Trader, laid t95 and t113 as recorded (both missed before).
 - Open: the stacking classes themselves (vtable +0xb8) unread; the engines
   keep the domain (military / civilian / support).
+
+## C-96: the unit value's Maintenance at the player's Gold weight — READ (0x7b62c0 at 0x7b729e..0x7b72de), both twins
+
+- Below handicap 3 the unit value takes max(Maintenance (+0x5c) - the
+  treasury's +0x338, 0) as Gold through yieldValue 0x7a6690 with the player
+  (r9 = the player, 0x7b72ae): the player's Gold weight, the Economic AI's
+  gold boost in it — not the unweighted DefaultValue (0.5 a Maintenance only
+  while the boost is 0). Ported (`unitValue`, `_cv_unit`: `yieldValue(f.view,
+  f.seat, ...)` / `f.yield_w("YIELD_GOLD")`).
+- CONFIRMED: runs/h1_duely1121 Antioch (aimem, one-seed trace t146-t172):
+  the Field Cannon's table 2.785 on the game's records less 5 Maintenance
+  at 5.80 / 8.28 goes negative, the game's Scout at 0.0 picked t151, t152,
+  t156, t162, t167, t169, t170 as recorded (the opposition sum 0x5eb650 on
+  the counted records equals the game's: the records match its tactical
+  site). Open: the treasury's +0x338 (held 0); the cityBuildLab runs no
+  Economic AI, so its tables keep the unboosted weight.
+
