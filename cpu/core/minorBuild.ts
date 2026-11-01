@@ -771,8 +771,12 @@ function minorWorship(state: GameState, cityState: CityState): string | undefine
 function minorProjectOk(state: GameState, cityState: CityState, id: string): boolean {
   const def = PROJECTS[id];
   if (!def) return false;
-  const home = (cityState.districts ?? []).map((d) => state.map.tiles[d.tileIndex])
-    .find((t) => t.district === def.district && t.districtComplete);
+  // a City Center project runs in the centre, which the minor's district
+  // list leaves out (runs/h1_duely1124 Bologna t214: its Manhattan Project
+  // at 1558.6 as logged, its progress 24 -> 496 by t242)
+  const home = def.district === 'CITY_CENTER' ? state.map.tiles[cityState.centerIndex]
+    : (cityState.districts ?? []).map((d) => state.map.tiles[d.tileIndex])
+      .find((t) => t.district === def.district && t.districtComplete);
   return !!home && !irradiated(home);
 }
 

@@ -75,7 +75,7 @@ import { borderCandidates, computeCityStats } from './city';
 import { goldAffordable, tilePurchaseCost } from './game';
 import { computeUnlocksIn, makeYieldCtx } from './effects';
 import { eruptionHazardTurns, floodHazardTurns } from './disasters';
-import { baseAdjacency, improvementAdjacency } from './yields';
+import { baseAdjacency, buildingPillaged, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
 import { builderHarvest, builderRemoveFeature, purchaseSpotBlocked } from './units';
 import { aiStrengths, dangerPlane, moveTo, reachPlots, turnsToPlot } from './tactical';
@@ -472,11 +472,13 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
     current: currentItem(cs),
     foundedTurn: cs.foundedTurn ?? -99,
     currentValue: cs.prodSetValue ?? FX_MIN,
-    // CanConstruct refuses for good a building the city holds, a district it
-    // holds complete and unpillaged (a pillaged one's repair it takes)
+    // CanConstruct refuses for good a building the city holds unpillaged
+    // (0x18e9f0 / 0x18fe60 at 0x1707f1), a district it holds complete and
+    // unpillaged (a pillaged one's repair it takes: runs/h1_duely1121
+    // Ayutthaya's pillaged Shipyard, contract 649 queued t215)
     buildingBlocked: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
-      return !id || (cs.buildings ?? []).includes(id);
+      return !id || ((cs.buildings ?? []).includes(id) && !buildingPillaged(cs, id));
     },
     districtBlocked: (d) => !engineId('district', d, 'DISTRICT_', DISTRICTS) || districtWhole(d),
     canTrain: (u) => pf.canTrain(u),
@@ -499,10 +501,13 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
     eventBuilding: eventBuilding(tables, pf), eventUnit: eventUnit(tables),
     // Build Unit's test reads the city's buildings (0x18e9f0 -> 0x18fe60), not
     // its queue (runs/h1_duelw1121 Antioch t45: its Walls queued by the
-    // Default Specialization, the walls tree's contract submitted that turn)
+    // Default Specialization, the walls tree's contract submitted that turn);
+    // a pillaged one is not held (0x7f5101), its contract the repair
+    // (runs/h1_duely1121 Ayutthaya's pillaged Shipyard, contract 649 queued
+    // t215-t222)
     buildingHeld: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
-      return !!id && (cs.buildings ?? []).includes(id);
+      return !!id && (cs.buildings ?? []).includes(id) && !buildingPillaged(cs, id);
     },
     // Build Unit takes a pillaged district for one not held: its tree
     // submits the district's contract, the repair (runs/h1_duely1128 Nazca's

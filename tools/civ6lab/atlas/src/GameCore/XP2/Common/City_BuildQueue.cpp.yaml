@@ -153,8 +153,15 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/core/aiCityBuild.ts:PickFacts, cpu/core/aiContracts.ts:ContractCity]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  impl:
+    - cpu/core/aiCityBuild.ts:PickFacts
+    - cpu/core/aiContracts.ts:ContractCity
+    - cpu/core/minorBuild.ts:minorPickFacts
+    - gpu/core/sim_cityvalue.py:can_construct
+    - cpu/core/minorCityAi.ts:districtWhole
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
   notes: ["label: CanConstruct(city.buildQueue,...)"]
   context:
     - "...lain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not MustPurchase (Buildings +0x159 bi..."

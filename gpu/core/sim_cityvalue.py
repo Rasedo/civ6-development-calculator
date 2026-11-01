@@ -2326,6 +2326,10 @@ class _MinorFacts:
         dv = int(sim._proj_rows[pi]["d"])
         if dv < 0:
             return self._bools(False)
+        if dv == sim._center_didx:
+            # a City Center project runs in the minor's centre
+            c = sim.citystate_center[:, self.s]
+            return (c >= 0) & ~sim._fallout().gather(1, c.clamp(min=0).unsqueeze(1)).squeeze(1)
         t = sim.city_dist_tile[:, self.row, 0, dv]
         t0 = t.clamp(min=0).unsqueeze(1)
         return (t >= 0) & sim.district_complete.gather(1, t0).squeeze(1) & ~sim._fallout().gather(1, t0).squeeze(1)

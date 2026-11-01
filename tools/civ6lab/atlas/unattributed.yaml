@@ -1137,6 +1137,7 @@
       value: "Recorded: runs/h1_duelw1103 Hattusa t46 and   runs/h1_duelw1105 Bandar Brunei t16 \"Canceling current build\" with their   centres whole (CombatLog.csv: no blow on either city since t23 / ever)   and no"
   readings:
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
   context:
     - "...NEMY AT THE GATES (READ): the value of a watched bool at CityBuildAI +0x1c0 (its setter 0x29fdf0 writes +0x1c0 + 0x58). Its one writer is the threat 0x5cbd10 itself: cleared as the wal..."
   review: imported

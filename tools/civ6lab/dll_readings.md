@@ -12479,3 +12479,48 @@ update in `_mops_upgrade_trees` (gpu/core/sim_minorops.py).
   2720, 3150 / 3152). Unexplained: the two
   re-places with neither row (runs/h1_duely1128 Hong Kong t5's drought
   plot 316 -> 362 among them).
+
+## C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins
+
+- A CITY CENTER PROJECT runs in the minor's centre (the project's district
+  CITY_CENTER, which the minor's district list leaves out): the minor's
+  project test (`minorProjectOk`, `_MinorFacts.can_produce`,
+  `_minor_queue_ok`) takes the centre for it. runs/h1_duely1124 Bologna's
+  Manhattan Project: Default Specialization t214 at 1558.6, its progress
+  24 -> 496 by t242 (City_BuildQueue); the engines refused every City
+  Center project before.
+- THE PICK'S CanConstruct 0x170450 (the one 0x5d0860 calls), 0x17071d:
+  the building's PrereqDistrict (+0x160) or its replacement (0x408860)
+  looked up in the city's districts (+0x1a48, 0x1ae530); held, +0xb08 set
+  and 0x406c00 true, the reason +0x1c cleared, then 0x1ad720 (a district of
+  the type in the city stands pillaged) sets +0x2a and fails, 0x1aeff0
+  (fallout) +0x2b, 0x1af120 +0x29; a held building pillaged (0x18e9f0, then
+  0x18fe60 true at 0x17082b) reads its district again through +0x218 and
+  0x1af250 (IsPillaged). What 0x406c00 and +0xb08 gate is unread, and the
+  pick does take a pillaged district's building where it was measured
+  (runs/h1_duelv1128 Nazca t26-t31, "C-96 / C-97: the city build AI"), so
+  nothing is ported: refusing a building of a pillaged district at the pick
+  (the held pillaged one aside) moves runs/h1_duely1128 Nazca's Harbor
+  project rows t60-t229 to the game's and the Lighthouse t49, the Shipyard
+  t133, and loses its Holy Site project t27-t47 where the game has NO
+  BUILDS AT ALL (cityState.build 708 -> 707 on 1128, the other seats
+  unchanged). Nazca t59's Harbor project at 34.0 over the Shrine (its Holy
+  Site pillaged) stays a value question.
+- THE WAR FOOTING +0x4b8 (the player AI's [+0x12a0], an autovariable at
+  +0x460, setter 0x29fdf0, value at +0x58) is written by the military AI's
+  turn 0x71fb80 only: cleared at 0x721158 each turn, set to 1 at 0x72142b
+  on the branch behind 0x72118a's IsMajor (0x469db0) — a city-state skips
+  to 0x721302. So for a city-state it is always clear, and 0x5cdc50's
+  threat test there is the threat with the centre's damage or +0x218:
+  runs/h1_duely1128 Nazca's t32 Horseman is not the war footing.
+- BUILD UNIT'S BUILDING TEST (0x7f4e00, 0x7f50e9..0x7f5103): the city
+  holds the building (0x18e9f0) and it is not pillaged (0x18fe60, the
+  building's pillaged byte) -> held (0x7f513c); a pillaged one is not
+  held, the contract stands and the queue takes it as the repair. The
+  contract eligibility's CanConstruct alike (0x170450 at 0x1707f1..0x170832:
+  a held building refused unless pillaged). Ported (the minor tree city's
+  `buildingHeld` / `buildingBlocked`, `_MinorWorld.building_held` /
+  `building_blocked`):
+  runs/h1_duely1121 Ayutthaya's pillaged Shipyard, contract 649 submitted
+  t209, queued t215 (value 1311.8) over the Builder's 668, cancelled t222;
+  the engines took the Builder at t215.

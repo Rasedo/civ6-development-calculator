@@ -1770,6 +1770,11 @@ class SimMinors:
                 d = int(P["d"][pi])
                 if d < 0:
                     continue
+                if d == self._center_didx:
+                    # a City Center project runs in the minor's centre
+                    c = self.citystate_center[:, s]
+                    ok = ok | (m & (c >= 0) & ~self._fallout().gather(1, c.clamp(min=0).unsqueeze(1)).squeeze(1))
+                    continue
                 t = self.city_dist_tile[:, row, 0, d]
                 t0 = t.clamp(min=0).unsqueeze(1)
                 ok = ok | (m & (t >= 0) & self.district_complete.gather(1, t0).squeeze(1) & ~self._fallout().gather(1, t0).squeeze(1))

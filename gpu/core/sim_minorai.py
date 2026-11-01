@@ -2161,7 +2161,8 @@ class _MinorWorld:
             bi = int(self.E["building"][r])
             if bi < 0:
                 return torch.ones(sim.B, dtype=torch.bool, device=sim.device)
-            return sim.city_bldg[:, self.row, 0, bi]
+            # a pillaged one's repair it takes
+            return sim.city_bldg[:, self.row, 0, bi] & ~sim.city_bldg_pillaged[:, self.row, 0, bi]
         return self._rows_apply(row, one) | (row < 0)
 
     def district_blocked(self, row, plot):
@@ -2212,8 +2213,10 @@ class _MinorWorld:
 
     def building_held(self, row):
         names = self._b_names
-        # Build Unit's test reads the city's buildings, not its queue
-        return self._rows_apply(row, lambda r: _t(self.f.has_building(names[r]), self.f.like()).bool())
+        # Build Unit's test reads the city's buildings, not its queue; a
+        # pillaged one is not held, its contract the repair
+        return self._rows_apply(row, lambda r: _t(self.f.has_building(names[r]), self.f.like()).bool()
+                                & ~_t(self.f.building_pillaged(names[r]), self.f.like()).bool())
 
     def district_held(self, row):
         """the City Center, or a district held complete and unpillaged: Build

@@ -14,6 +14,7 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Zone District Type (0x84e120 / 0x84e030): the actor's own district (0x406c00) with RequiresPopulation (+0xe1 bit 6), its era known and at most the actor's (0x93e5..."
@@ -30,6 +31,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...its blow on the member (0x51a240 on GetCombat's strengths); a district's city (kind 3, 0x408770) that strikes, the member within its strike range of the centre, its strike (0x519370);...
+  review: imported
+- addr: 0x408860
+  final: 0x2c43b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e 0x5d0860 calls), 0x17071d: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held and complete (+0xb08), t..."
   review: imported
 - addr: 0x4088a0
   kind: function

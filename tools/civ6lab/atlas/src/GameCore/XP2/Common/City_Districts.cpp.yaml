@@ -10,9 +10,14 @@
     - recording: h1_duely1124
       turn: 160
       value: "true where a district of the type at the city's own plot IsPillaged (0x24c3a0); Build Unit then submits the district's contract: Granada's pillaged Encampment, contract 674 SUBMITTED t160, queued as DISTRICT_ENCAMPMENT 104 / 107 t165"
-  impl: [cpu/core/minorCityAi.ts:minorTreeCity, gpu/core/sim_minorai.py:district_held]
+  impl:
+    - cpu/core/minorCityAi.ts:minorTreeCity
+    - gpu/core/sim_minorai.py:district_held
+    - cpu/core/minorBuild.ts:minorPickFacts
+    - gpu/core/sim_cityvalue.py:can_construct
   readings:
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
   review: reviewed
 - addr: 0x1ae510
   kind: function
@@ -38,6 +43,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...nt stored as fx(Amount x 0.01f)): a city subject with the district (context +0x78, else 0x1ae530 by DistrictType); per building of the district type (Districts +0x130 list, the first r..."
@@ -112,4 +118,34 @@
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
   context:
     - "...the player's cities (+0x12f0 -> +0xd8, list order); a city holding the class's district (0x1aec20 on city +0x1a48 with (district, true, 0) — completed) and of greater population (+0x588,..."
+  review: imported
+- addr: 0x1aeff0
+  final: 0x11f230
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...hen 0x1ad720 (a district of the type in the city stands pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29. A held pillaged building's path (0x1707ec -> 0x17084...
+  review: imported
+- addr: 0x1af120
+  final: 0x11f370
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the type in the city stands pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29. A held pillaged building's path (0x1707ec -> 0x170840) reads its district again...
+  review: imported
+- addr: 0x1af250
+  final: 0x11f460
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...aged building's path (0x1707ec -> 0x170840) reads its district again through +0x218 and 0x1af250 (IsPillaged) alike. Ported for the minor's pick on a building it does not hold pillag...
   review: imported
