@@ -341,7 +341,7 @@ class SimCivics:
         sc = self._pol_scores(s, ctx)
         slots = self._pol_tables()["slots"]
         was = {st: self.citystate_slot_best[:, s, k] for k, st in enumerate(slots)}
-        gov = self._pol_gov_values(s, ctx, was)
+        gov = self._pol_gov_values(s, self._pol_ctx(s, forecast_now=True), was)
         now = self._pol_slot_best(sc)
         cards = self._pol_civic_best(sc, self.citystate_civic_pol_best.shape[2])
         self.citystate_gov_values[:, s] = torch.where(m, gov, self.citystate_gov_values[:, s])

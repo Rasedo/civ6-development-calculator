@@ -6501,6 +6501,16 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   from t36 — Drama and Poetry 32.0 then 116.0 above the propagation's sum,
   Theology and Recorded History equal. Port: `civicAnalysis` (`CivicContract`,
   `minorResearchTerms`' civicContracts), `sim_civics.py` (`_cai_contracts`).
+- THE GOVERNMENT VALUES' HOUSING (READ on the logs): a government's
+  EFFECT_ADJUST_POLICY_HOUSING (Monarchy's walls / castle / star fort
+  housing, Classical Republic's) reads the growth forecast of the city as it
+  stands after the turn's growth, while the policy jobs' (Civil Prestige's)
+  read the forecast the city AI's last update made (runs/h1_duely1121 Hunza
+  t55-57, both modes: grown to 7 at t55, Monarchy's walls housing 12 in the
+  game's t56 Divine Right where ours had the forecast of 6 and none, exact
+  on it; t58 still 16.3 low, its housing 10 -> 11 that turn). Port:
+  `aiView`'s forecastNow (`governmentValues` in `minorResearchTurn`),
+  `_pol_ctx`'s forecast_now (`_cai_turn`).
 - PARTLY READ, Online Communities' EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER
   0x6a1380 (@f04068, vtable 0xd62818): per player of the game's list that a
   trade route joins to the player either way (0x552fb0: 0x54ff90's route

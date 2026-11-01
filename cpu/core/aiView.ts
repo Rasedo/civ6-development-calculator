@@ -94,7 +94,10 @@ export function cityGrowth(state: GameState, city: City): CityGrowth {
   };
 }
 
-export function aiView(state: GameState): AiView {
+/** `forecastNow`: a city-state's housing value on the forecast of its city's
+ *  growth as it stands (the civics AI's government values) instead of the
+ *  one its city AI's last update read (`CityState.aiGrowth`) */
+export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): AiView {
   const seat = (i: number) => {
     const s = seatOf(state, i);
     if (!s) throw new Error(`aiView: no seat ${i}`);
@@ -511,7 +514,7 @@ export function aiView(state: GameState): AiView {
       if (!city) return 0;
       const g = cityGrowth(state, city);
       const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
-      return housingValue(g, growthForecast(cs?.aiGrowth ?? g), housing, t, h);
+      return housingValue(g, growthForecast(opts.forecastNow ? g : cs?.aiGrowth ?? g), housing, t, h);
     },
     greatPersonPointsPerTurn: (i, cls) => greatPersonPointsPerTurn(state, i)[cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass] ?? 0,
     diplomaticPoints: (i) => seat(i).diplomaticPoints ?? 0,

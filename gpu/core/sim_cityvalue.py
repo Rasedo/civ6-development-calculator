@@ -1598,8 +1598,9 @@ class _MinorFacts:
     """A minor's city as the city build AI reads it, its facts [B] tensors
     off the sim (`minorBuildFacts`, `minorProjectFacts`, `minorPickFacts`)."""
 
-    def __init__(self, sim, s: int):
+    def __init__(self, sim, s: int, forecast_now: bool = False):
         self.sim, self.s = sim, s
+        self.forecast_now = forecast_now
         self.row = sim._CITY_MINOR0 + s
         # its city's column in the city planes (a minor holds one city)
         self._slot = 0
@@ -1909,8 +1910,10 @@ class _MinorFacts:
 
     def forecast_growth(self):
         """the growth its city's update read between the turn's production
-        and its growth (`CityState.aiGrowth`, `citystate_ai_growth`): the
-        growth forecast's inputs"""
+        and its growth (`CityState.aiGrowth`, `citystate_ai_growth`), or with
+        `forecast_now` its growth as it stands: the growth forecast's inputs"""
+        if self.forecast_now:
+            return self.growth()
         g = self.sim.citystate_ai_growth[:, self.s]
         return {k: g[:, i] for i, k in enumerate(_AI_GROWTH_KEYS)}
 

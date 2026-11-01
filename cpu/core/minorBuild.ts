@@ -444,7 +444,13 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   const view = aiView(state);
   const scores: ReadonlyMap<string, number> = stood ? policyScores(view, seat) : new Map();
   policyTracer?.(seat, scores);
-  r.civicGovValues = governmentValues(view, seat, r.civicSlotBest ? new Map(Object.entries(r.civicSlotBest)) : slotTypeBest(new Map()));
+  // the government values' housing on the forecast of the city's growth as
+  // it stands, the policy jobs' on its city AI's last (runs/h1_duely1121
+  // Hunza t55: Monarchy's walls housing 12 in the game's Divine Right, the
+  // forecast of the city grown to 7 that turn, ours a turn later on the
+  // forecast of 6)
+  r.civicGovValues = governmentValues(aiView(state, { forecastNow: true }), seat,
+    r.civicSlotBest ? new Map(Object.entries(r.civicSlotBest)) : slotTypeBest(new Map()));
   r.civicSlotBest = Object.fromEntries(slotTypeBest(scores));
   r.civicPolicyBest = civicPolicyBest(scores);
   if (!r.civic) takeCivic(r, civicChoice(state, seat, r.civicAiEntries, null, civicDraw(state)));
