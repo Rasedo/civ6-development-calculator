@@ -22,7 +22,7 @@ import { DISTRICTS } from '../data/districts';
 import { pillagePlunder } from './economy';
 import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { governorSum, governorTileSum, cityGovernorEffects } from './governors';
-import { CITY_STATE_MAX_HP, KABUL_XP_MULT } from '../data/cityStates';
+import { KABUL_XP_MULT } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
@@ -1216,10 +1216,9 @@ export function cityStrikeStrength(state: GameState, city: City): number {
   // the Free Cities train toward no ranged base of their own
   const best = Math.max(isFreeSeat(city.seat) ? 0 : seatOf(state, city.seat)?.bestRangedCS ?? 0, CITY_MIN_STRIKE_CS);
   const walls = wallsMax(state, city);
-  const maxHp = isCityStateSeat(city.seat) ? CITY_STATE_MAX_HP : CITY_MAX_HP;
   const pct = walls > 0
     ? Math.trunc(((walls - outerPool(state, city)) * 100) / walls)
-    : Math.trunc(((maxHp - Math.min(maxHp, city.hp)) * 100) / maxHp);
+    : Math.trunc(((CITY_MAX_HP - Math.min(CITY_MAX_HP, city.hp)) * 100) / CITY_MAX_HP);
   const cs = best - woundedLoss256(Math.max(0, pct)) / 256;
   return isCiv(city.seat) ? cs + getModifiers(state, city.seat).cityRanged : cs;
 }
@@ -1574,7 +1573,7 @@ export function predictCityBlow(state: GameState, attacker: Unit, targetIndex: n
   const max = wallsMax(state, shape);
   const share = outer > 0 && max > 0 && (assist & ASSIST_TOWER) === 0 ? Math.floor((outer * 256) / max) : 0;
   const raw = damageRaw(COMBAT_MAX_EXTRA_DAMAGE >> 1, damageExponent(atkCS - defCS));
-  return Math.min(held ? CITY_MAX_HP : CITY_STATE_MAX_HP, Math.max(COMBAT_MINIMUM_DAMAGE, raw - Math.floor((raw * share) / 256)));
+  return Math.min(CITY_MAX_HP, Math.max(COMBAT_MINIMUM_DAMAGE, raw - Math.floor((raw * share) / 256)));
 }
 
 /**
@@ -2492,9 +2491,9 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     const csOuter = outerPool(state, csShape);
     const defCS = centreStrength(state, minorCity(cityState));
     const csDiff = (rangedCityAtkCS(state, attacker, csOuter, cityState.seat, relCity) - defCS);
-    const csSplit = districtHit(state, csDiff, csOuter, wallsMax(state, csShape), CITY_STATE_MAX_HP, cityHitClass(attacker.type, true), 0, 'rngcs', targetIndex);
+    const csSplit = districtHit(state, csDiff, csOuter, wallsMax(state, csShape), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'rngcs', targetIndex);
     if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
-    cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - csSplit.centre);
+    cityState.hp = Math.max(1, (cityState.hp ?? CITY_MAX_HP) - csSplit.centre);
     cityState.lastHitTurn = state.turn;
     warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true });
     spendAttack(attacker, true);
@@ -2599,9 +2598,9 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     const csOuter = outerPool(state, csShape);
     const defCS = centreStrength(state, minorCity(csHere));
     const diff = (rangedCityAtkCS(state, attacker, csOuter, csHere.seat, religionAttackCS(state, attacker, targetIndex)) - defCS);
-    const split = districtHit(state, diff, csOuter, wallsMax(state, csShape), CITY_STATE_MAX_HP, cityHitClass(attacker.type, true), 0, 'vrngcs', targetIndex);
+    const split = districtHit(state, diff, csOuter, wallsMax(state, csShape), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'vrngcs', targetIndex);
     if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
-    csHere.hp = Math.max(1, (csHere.hp ?? CITY_STATE_MAX_HP) - split.centre);
+    csHere.hp = Math.max(1, (csHere.hp ?? CITY_MAX_HP) - split.centre);
     csHere.lastHitTurn = state.turn;
     warWearinessBattle(state, attacker.seat, seatOfCityState(csHere.id), targetIndex, { city: true });
     spendAttack(attacker, true);
@@ -2863,7 +2862,7 @@ export function detonate(state: GameState, seat: number, k: number, targetIndex:
   }
   for (const minor of state.cityStates ?? []) {
     if (!hit.has(minor.centerIndex)) continue;
-    minor.hp = Math.min(minor.hp ?? CITY_STATE_MAX_HP, 1);
+    minor.hp = Math.min(minor.hp ?? CITY_MAX_HP, 1);
   }
   for (const v of victims) warWearinessLaunch(state, seat, v);
   // CIV6 (Nuclear Emergency): "The Target has used a nuclear device; capture
@@ -2939,10 +2938,10 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState)
   const defCS = centreStrength(state, minorCity(cityState));
   const csOuter = outerPool(state, csShape);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, 'cstyc', cityState.centerIndex);
-  const csSplit = districtHit(state, atkCS - defCS, csOuter, wallsMax(state, csShape), CITY_STATE_MAX_HP,
+  const csSplit = districtHit(state, atkCS - defCS, csOuter, wallsMax(state, csShape), CITY_MAX_HP,
     cityHitClass(attacker.type, false), siegeAssist(state, attacker, cityState.centerIndex, csTier), 'csty', cityState.centerIndex);
   if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
-  cityState.hp = (cityState.hp ?? CITY_STATE_MAX_HP) - csSplit.centre;
+  cityState.hp = (cityState.hp ?? CITY_MAX_HP) - csSplit.centre;
   cityState.lastHitTurn = state.turn;
   // CIV6: barbarians never capture a city — their assault leaves the minor
   // standing at 1 HP, `hostileRangedStrike`'s own city floor.

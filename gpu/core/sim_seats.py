@@ -3145,6 +3145,8 @@ class SimSeats:
                     self.major_unit_pslot[m] = -1
                     self.major_unit_mp[m] = 0
                     self._gen_ver += 1
+                    # where the suzerain may stand (`jumpMadeAnew`)
+                    self._jump_made_anew(row, m)
                     self.civ_treasury[:, row] = torch.where(do_l, self.civ_treasury[:, row] - levy_cost, self.civ_treasury[:, row])
                     rows_l = do_l.nonzero(as_tuple=True)[0]
                     self.citystate_levy_seat[rows_l, sl[rows_l]] = row
@@ -14635,7 +14637,7 @@ class SimSeats:
             tier = torch.where(major, tier_m, tier_c)
             outer = torch.where(major, outer_m, outer_c)
             wmax = self._walls_tier_hp.take(tier)
-            hp_max = torch.where(major, torch.full_like(tgt, self._city_max_hp), torch.full_like(tgt, self._cs_max_hp))
+            hp_max = torch.full_like(tgt, self._city_max_hp)
             atk = torch.where(ranged, self._city_ranged_atk_cs(pre, u, tgt, outer, ctr).to(torch.float64),
                               self._city_assault_atk_cs(pre, u, tgt).to(torch.float64))
             assist = torch.where(ranged, torch.zeros_like(tier), self._siege_assist(a_seat, ut0, tgt, tier))
@@ -14666,7 +14668,7 @@ class SimSeats:
             csx = self.citystate_at.gather(1, tk)
             minor = ~city & (ctr >= 100) & (csx >= 0)
             hp = torch.where(minor, self.citystate_hp.gather(1, csx.clamp(min=0)).to(torch.long), hp)
-            mx = torch.where(minor, torch.full_like(tk, self._cs_max_hp), mx)
+            mx = torch.where(minor, torch.full_like(tk, self._city_max_hp), mx)
         return mx, hp, torch.where(mx > 0, ctr, torch.full_like(ctr, -1))
 
     def _assault_city(self, att: torch.Tensor, tgt: torch.Tensor,
@@ -14897,7 +14899,7 @@ class SimSeats:
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
         cs_assist = self._siege_assist(a_seat[:, u], at0, tgt, cs_tier)
         cs_wall, cs_centre = self._district_hit(
-            att, atk_e - def_cs, cs_outer, self._walls_tier_hp[cs_tier], self._cs_max_hp,
+            att, atk_e - def_cs, cs_outer, self._walls_tier_hp[cs_tier], self._city_max_hp,
             self._hit_class(at0, False), cs_assist, "csty", tgt)
         self._spend_one_attack(atk_kind, u, att)
         rows = att.nonzero(as_tuple=True)[0]
@@ -15259,7 +15261,7 @@ class SimSeats:
             def_cs = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
             atk_cs = self._city_ranged_atk_cs(atk_kind, u, tgt, cs_outer, ctr)
             cs_wall, cs_centre = self._district_hit(cs_att, atk_cs - def_cs, cs_outer, self._walls_tier_hp[cs_tier],
-                                                    self._cs_max_hp, _klass, None, "vrngcs", tgt)
+                                                    self._city_max_hp, _klass, None, "vrngcs", tgt)
             self._ww_battle(cs_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(100 + csx), tgt, city=True)
             rr = cs_att.nonzero(as_tuple=True)[0]
@@ -15443,7 +15445,7 @@ class SimSeats:
                                                                       getattr(self, f"{atk_kind}_unit_formation")[:, u],
                                                                       getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_base.dtype)
                                                     - def_cs,
-                                                    cs_outer, self._walls_tier_hp[cs_tier], self._cs_max_hp, _klass, None, "rngcs", tgt)
+                                                    cs_outer, self._walls_tier_hp[cs_tier], self._city_max_hp, _klass, None, "rngcs", tgt)
             self._ww_battle(cs_att, self._row_of(aseat), self._row_of(100 + csx), tgt, city=True)
             rr = cs_att.nonzero(as_tuple=True)[0]
             self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall[rr]

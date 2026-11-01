@@ -741,6 +741,9 @@
   name: valueProject
   status: PARTLY
   cases:
+    - recording: h1_duely1124
+      turn: 89
+      value: "Cardiff's Repair Outer Defenses 3255.0 as logged: 42 outer hit points down x population 8 x 1 district x 10, discounted a turn; Granada t127 21971.3"
     - recording: h1_duelv1124
       turn: 32
       value: "player 4's Campus Research Grants 29 / 30 / 31 at T 3 / 2 / 1 (t32 .. t34), 16 points at 9%"
@@ -749,6 +752,7 @@
     - cpu/core/aiProjectValue.ts:projectValue
     - gpu/core/sim_cityvalue.py:_cv_project
   readings:
+    - "C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew — the repair READ (0x17a680, 0x7b28c0's count), the jump a fit, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"

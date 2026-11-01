@@ -496,6 +496,10 @@ export interface History {
   /** the residue each city's growth accumulator keeps, in 256ths, by the
    *  city's `owner:id` (`City.growthDrift`, `foldGrowthDrift`) */
   growthDrift: Map<string, number>;
+  /** the turn each city's centre was last struck, by its `owner:id`: the
+   *  turn before a record whose centre or outer defences hold more damage
+   *  than the record before (`City.lastHitTurn`) */
+  lastHit: Map<string, number>;
   /** each player's best strengths trained as the last record whose mem read
    *  its PlayerStats held them, [melee, ranged] (`TurnRecord.mem`): a record
    *  whose read of them failed carries the last */
@@ -840,7 +844,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), alpine: new Set(), govSeated: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), alpine: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
@@ -1867,6 +1871,19 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   foldDominance(h, rec);
   foldAlpine(h, rec, cat);
   h.beforeThat = h.before;
+  // a centre struck: its damage or its outer defences' grown since the
+  // record before, in the turn that record closed
+  if (h.last) {
+    const centre = (c: TurnRecord['cities'][number]) => c.districts.find((x) => x[1] === c.x && x[2] === c.y);
+    const was = new Map(h.last.cities.map((c) => [`${c.owner}:${c.id}`, centre(c)] as const));
+    for (const c of rec.cities) {
+      const now = centre(c);
+      const old = was.get(`${c.owner}:${c.id}`);
+      if (now && old && (num(now[6] as number) > num(old[6] as number) || num(now[8] as number) > num(old[8] as number))) {
+        h.lastHit.set(`${c.owner}:${c.id}`, rec.turn - 1);
+      }
+    }
+  }
   h.before = h.last;
   h.last = rec;
 }
@@ -2395,6 +2412,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       minor.tilesAcquired = c.plots.filter((q) => hexDistance(shape, c.x, c.y, q % rec.head.W, Math.floor(q / rec.head.W)) > 1).length;
       minor.hp = hp;
       minor.outerHp = outerHp;
+      const struck = history?.lastHit.get(`${c.owner}:${c.id}`);
+      if (struck !== undefined) minor.lastHitTurn = struck;
       minor.buildings = buildings.filter((b) => b !== 'PALACE');
       minor.pillagedBuildings = pillaged.length ? pillaged : undefined;
       minor.districts = districts.filter((d) => d.type !== 'CITY_CENTER')
@@ -2473,6 +2492,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       specialistPref: pins,
       ...(pillaged.length ? { pillagedBuildings: pillaged } : {}),
       ...(outerHp !== undefined ? { outerHp } : {}),
+      ...(history?.lastHit.has(`${c.owner}:${c.id}`) ? { lastHitTurn: history.lastHit.get(`${c.owner}:${c.id}`) } : {}),
     };
     holder.cities.push(city);
     cityByKey.set(`${c.owner}:${c.id}`, city);

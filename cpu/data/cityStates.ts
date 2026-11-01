@@ -559,7 +559,6 @@ export const CITY_STATE_ENVOY_ROWS: readonly EnvoyRow[] = [
       ['OIL_POWER_PLANT', 'FOSSIL_FUEL_POWER_PLANT', 'REQUIRES_CITY_HAS_FOSSIL_FUEL_POWER_PLANT_ETHIOPIA']]),
 ];
 export const SUZERAIN_ENVOYS = 3;
-export const CITY_STATE_MAX_HP = 150;
 /** CIV6 (Eras.xml `BonusMinorStartingUnits`, "Additional Starting Units for
  *  Minor Civilizations in addition to their Settler"): an Ancient-era start
  *  gives every minor two Warriors — the Quantity 2 row; the third Warrior is

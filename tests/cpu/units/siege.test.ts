@@ -13,7 +13,8 @@ import {
 import { availableProjects, projectCost, queueProject } from '../../../cpu/core/game';
 import { completeProject } from '../../../cpu/core/production';
 import { buySeatBuilding, healCities, seatPhase } from '../../../cpu/core/phase';
-import { UNITS, WALLS_TIER_HP, REPAIR_QUIET_TURNS } from '../../../cpu/data/units';
+import { UNITS, WALLS_TIER_HP, REPAIR_QUIET_TURNS, REPAIR_HP_PER_COST } from '../../../cpu/data/units';
+import { scaleByGameSpeed } from '../../../cpu/data/constants';
 import { wallsStrength } from '../../../cpu/core/combat';
 import { damageRaw } from '../../../cpu/data/constants';
 import { randRange } from '../../../cpu/core/rand';
@@ -285,25 +286,25 @@ describe('Repair Outer Defenses', () => {
     expect(p?.district).toBe('CITY_CENTER');
   });
 
-  it('CIV6: it needs Walls, damage, and three turns without an attack', () => {
+  it('CIV6: it needs Walls, damage, and three turns without an attack after the strike\'s own', () => {
     const { state, city } = damaged();
     const offered = () => availableProjects(state, city).some((p) => p.id === 'REPAIR_DEFENSES');
     state.turn = 10;
     city.lastHitTurn = 10;
     expect(offered()).toBe(false);
-    for (let d = 1; d < REPAIR_QUIET_TURNS; d++) {
+    for (let d = 1; d <= REPAIR_QUIET_TURNS; d++) {
       city.lastHitTurn = 10 - d;
       expect(offered()).toBe(false);
     }
-    city.lastHitTurn = 10 - REPAIR_QUIET_TURNS;
+    city.lastHitTurn = 10 - REPAIR_QUIET_TURNS - 1;
     expect(offered()).toBe(true);
     city.outerHp = WALLS_TIER_HP[1]; // undamaged
     expect(offered()).toBe(false);
   });
 
-  it('CIV6: "Walls gain HP equal to the Production invested", so the price IS the missing HP', () => {
+  it('the price is the hit points down over COMBAT_HEAL_CITY_OUTER_DEFENSES, at the speed', () => {
     const { state, city } = damaged();
-    expect(projectCost(state, 0, 'REPAIR_DEFENSES', city)).toBe(WALLS_TIER_HP[1] - 40);
+    expect(projectCost(state, 0, 'REPAIR_DEFENSES', city)).toBe(scaleByGameSpeed(Math.trunc((WALLS_TIER_HP[1] - 40) / REPAIR_HP_PER_COST)));
   });
 
   it('CIV6: completing it "fully restores the HP of the city\'s Outer Defenses"', () => {
@@ -315,16 +316,18 @@ describe('Repair Outer Defenses', () => {
   it('a queued repair locks its price and the queue accepts it', () => {
     const { state, city } = damaged();
     state.turn = 10;
-    city.lastHitTurn = 10 - REPAIR_QUIET_TURNS;
+    city.lastHitTurn = 10 - REPAIR_QUIET_TURNS - 1;
     expect(queueProject(state, city.id, 'REPAIR_DEFENSES', 0).ok).toBe(true);
-    expect(city.queue[0]).toMatchObject({ kind: 'project', project: 'REPAIR_DEFENSES', cost: 60 });
+    expect(city.queue[0]).toMatchObject({ kind: 'project', project: 'REPAIR_DEFENSES', cost: projectCost(state, 0, 'REPAIR_DEFENSES', city) });
   });
 
   function running() {
     const { state, city } = damaged();
     state.turn = 10;
-    city.lastHitTurn = 10 - REPAIR_QUIET_TURNS;
+    city.lastHitTurn = 10 - REPAIR_QUIET_TURNS - 1;
     queueProject(state, city.id, 'REPAIR_DEFENSES', 0);
+    // a price the drips below never reach
+    (city.queue[0] as { cost: number }).cost = 1000;
     return { state, city };
   }
 

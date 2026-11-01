@@ -3950,8 +3950,16 @@ export const URBAN_DEFENSES_TECH = 'STEEL';
 export const WALLS_TIER_URBAN = 4;
 /** CIV6 (Repair Outer Defenses): a city may run the project only if it "and/or
  * its Encampment district have damaged Walls and have not been attacked in the
- * last three turns". */
+ * last three turns": the three turns after the strike's own, so a city struck
+ * in turn t may repair from t + 4 (`repairAvailable`: runs/h1_duely1124
+ * Cardiff struck t85 and t103, Repair Outer Defenses t89 and t107; Granada
+ * t123 -> t127, t159 -> t163, t166 -> t170; 1127 Muscat t109 -> t113; 1128
+ * Hong Kong t137 -> t141, Bologna t163 -> t167). */
 export const REPAIR_QUIET_TURNS = 3;
+/** GlobalParameters COMBAT_HEAL_CITY_OUTER_DEFENSES (10, +0x1bc): the outer
+ *  defences' hit points a point of the repair's price stands for (0x17a680:
+ *  the city's count +0x1880 over it, at the game's speed). */
+export const REPAIR_HP_PER_COST = 10;
 /** the ANCIENT tier's pool, which is what a fresh set of Walls is worth. */
 export const WALLS_HP = WALLS_TIER_HP[1];
 /** CIV6: "Ranged attacks receive a -17 penalty when attacking city and

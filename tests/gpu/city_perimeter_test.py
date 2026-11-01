@@ -348,18 +348,19 @@ def test_repair_project(rules, path) -> None:
     sim.city_outer_hp[0, 0, 0] = 40
     sim.city_last_hit[0, 0, 0] = sim.turn
     assert not bool(sim._repair_available(0, 0)[0]), "hit THIS turn — the three quiet turns have not passed"
-    for d in range(1, sim._repair_quiet):
+    for d in range(1, sim._repair_quiet + 1):
         sim.city_last_hit[0, 0, 0] = sim.turn - d
         assert not bool(sim._repair_available(0, 0)[0]), f"only {d} quiet turns"
-    sim.city_last_hit[0, 0, 0] = sim.turn - sim._repair_quiet
-    assert bool(sim._repair_available(0, 0)[0]), "three quiet turns and a breach: the project must offer"
-    assert int(sim._repair_cost(0, 0)[0]) == sim._walls_hp - 40, int(sim._repair_cost(0, 0)[0])
+    sim.city_last_hit[0, 0, 0] = sim.turn - sim._repair_quiet - 1
+    assert bool(sim._repair_available(0, 0)[0]), "three quiet turns past the strike's and a breach: the project must offer"
+    want = max(1, int(((sim._walls_hp - 40) // sim._repair_hp_per_cost) * sim.rules.game_speed))
+    assert int(sim._repair_cost(0, 0)[0]) == want, int(sim._repair_cost(0, 0)[0])
     # the MASK offers it, and only in the column that qualifies
     m = sim._seat_production_mask(0)
     base = sim.PROJECT_BASE   # NOT derived from the mask WIDTH: the promote block sits past the projects
     if bool(sim.city_alive[0, 0, 0]) and int(sim.city_current[0, 0, 0, 0]) == -1:
         assert bool(m[0, 0, base + rep]), "the repair column is closed on a city that qualifies"
-    print(f"  repair OK: gated on Walls + damage + {sim._repair_quiet} quiet turns, price {int(sim._repair_cost(0, 0)[0])} = the HP it restores")
+    print(f"  repair OK: gated on Walls + damage + {sim._repair_quiet} quiet turns, price {int(sim._repair_cost(0, 0)[0])}")
 
 
 def test_encirclement(rules, path) -> None:

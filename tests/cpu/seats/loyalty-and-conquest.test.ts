@@ -10,7 +10,7 @@ import { seatPhase, levyGoldCost, levyUnits, loyaltyDelta, applyLoyalty, flipCit
 import { meleeAttack, attackTargets } from '../../../cpu/core/combat';
 import { barbarianPhase } from '../../../cpu/core/tactical';
 import { spawnUnit } from '../../../cpu/core/units';
-import { CITY_STATE_MAX_HP } from '../../../cpu/data/cityStates';
+import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { declareWarOnCityState } from '../../../cpu/core/cityStates';
 import type { CityState, CityStateType, GameState, City, Seat } from '../../../cpu/core/types';
 
@@ -226,7 +226,7 @@ describe('city-state conquest and levies', () => {
     cityState.hp = 50;
     endTurn(state);
     expect(cityState.hp).toBeGreaterThan(50);
-    expect(cityState.hp).toBeLessThanOrEqual(CITY_STATE_MAX_HP);
+    expect(cityState.hp).toBeLessThanOrEqual(CITY_MAX_HP);
   });
 });
 

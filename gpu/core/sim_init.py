@@ -476,7 +476,7 @@ class SimInit:
         self._alloc_war(B, self.n_majors, s_pad, device)
         # Siege hit points (attackCityState) — the TS `cs.hp` twin.
         self.citystate_hp = self.city_hp[:, _m0:_m0 + s_pad, 0]
-        self.citystate_hp.fill_(int(rules.citystate["maxHp"]))
+        self.citystate_hp.fill_(int(rules.combat["cityMaxHp"]))
         self.register_alias("citystate_hp", lambda sim: sim.city_hp[:, sim._CITY_MINOR0:sim._CITY_MINOR0 + max(sim.S, 1), 0])
         # `war_turns[b, i, j]` is how long i and j have been at war — one cell
         # per WAR, symmetric like the matrix it counts, because that is what
@@ -3537,6 +3537,7 @@ class SimInit:
         self._walls_tier_urban = int(rules.combat["wallsTierUrban"])
         self._urban_def_tech = int(rules.combat["urbanDefensesTech"])
         self._repair_quiet = int(rules.combat["repairQuietTurns"])
+        self._repair_hp_per_cost = int(rules.combat["repairHpPerCost"])
         self._b_walls = rules.b_walls.to(device)  # [NB] walls tier per building row
         self._b_no_purchase = rules.b_no_purchase.to(device)  # [NB] bool
         self._b_faith_units = rules.b_faith_units.to(device)  # [NB] bool
@@ -3553,7 +3554,6 @@ class SimInit:
         self._def_pct_ranged = int(rules.combat["defensePctRanged"])
         self._def_pct_bombard = int(rules.combat["defensePctBombard"])
         self._city_max_hp = int(rules.combat["cityMaxHp"])
-        self._cs_max_hp = int(rules.citystate["maxHp"])
         self._ranged_city_pen = float(rules.combat["rangedCityPenalty"])
         self._bombard_vs_unit = int(rules.combat["bombardVsUnit"])
         self._city_min_strike = int(rules.combat["cityMinStrike"])

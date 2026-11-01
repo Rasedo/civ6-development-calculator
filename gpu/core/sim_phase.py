@@ -2110,9 +2110,8 @@ class SimPhase:
         # the whole map; this asks about ONE tile per game.
         free = act & ~besieged
         ok = free & ~(self.tile_fallout[bidx, ctr] > 0)
-        # a city-state's centre stands at its own pool (`CITY_STATE_MAX_HP`)
         minor = self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S
-        cmax = int(self.rules.citystate["maxHp"] if minor else self.rules.combat["cityMaxHp"])
+        cmax = int(self.rules.combat["cityMaxHp"])
         hp = self.city_hp[bidx, row, col]
         self.city_hp[bidx, row, col] = torch.where(ok, (hp + heal).clamp(max=cmax), hp)
         return free

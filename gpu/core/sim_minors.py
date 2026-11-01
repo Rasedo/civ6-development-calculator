@@ -3,6 +3,9 @@ from __future__ import annotations
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from . import simbase
 
+# the furthest ring a unit made anew is looked for a plot in (`JUMP_RADIUS`)
+_JUMP_RADIUS = 12
+
 
 class SimMinors:
     def _city_state_phase(self) -> None:
@@ -376,6 +379,64 @@ class SimMinors:
             self.citystate_kb_seq[nb, nr, nk] = nxt.to(self.citystate_kb_seq.dtype)
             self.citystate_kb_next[nb, nr] = nxt + 1
 
+    def _jump_made_anew(self, seat: int, m: torch.Tensor) -> None:
+        """`jumpMadeAnew` for the major-pool units `m` [B, U] made anew under
+        `seat`, in unit order: each keeps its plot where no other player's
+        district or wonder stands, nor (for a minor's unit) another player's
+        ground, nor another player's unit; else it goes to the first plot of
+        the rings round it (`barb_ring_table`, the game's ring order) passing
+        the same, revealed to `seat` and free for it (`_spot_free`)."""
+        if not bool(m.count_nonzero()):
+            return
+        ring = getattr(self, "_jump_ring", None)
+        if ring is None:
+            ring = self._jump_ring = torch.tensor(simbase.barb_ring_table(self.W, self.H, self.wrap_x, _JUMP_RADIUS),
+                                                  dtype=torch.long, device=self.device)
+        B, dev = self.B, self.device
+        minor = seat >= 100
+        rev = self.mops_revealed[:, seat - 100] if minor else self.seat_explored[:, seat]
+        lo = self.POOL_LO["major"]
+        K = ring.shape[1]
+        for u in m.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            on = m[:, u] & self.major_unit_alive[:, u] & (self.major_unit_tile[:, u] >= 0)
+            if not bool(on.count_nonzero()):
+                continue
+            g = u + lo
+            here = self.major_unit_tile[:, u].clamp(min=0)
+            cand = torch.where(on.unsqueeze(1), ring[here], torch.full((B, K), -1, dtype=torch.long, device=dev))
+            cc = cand.clamp(min=0)
+            ty = self.major_unit_type[:, u].clamp(min=0, max=self.NU - 1)
+            sup = self._type_support.take(ty)
+            civ = self._type_civilian.take(ty)
+            naval = self.unit_naval.take(ty)
+            free = self._spot_free(cand, seat, civ_mask=civ, naval_mask=naval, sup_mask=sup, utype=ty)
+            owner = self.tile_seat.gather(1, cc)
+            foreign = (owner >= 0) & (owner != seat)
+            built = (self.district.gather(1, cc) >= 0) | (self.built_wonder.gather(1, cc) >= 0)
+            ok = (cand >= 0) & ~(foreign & built) & rev.gather(1, cc)
+            if minor:
+                ok = ok & ~foreign
+            # where it stands: no other player's unit, itself aside
+            stay = (cand[:, 0] >= 0) & ~(foreign[:, 0] & built[:, 0]) & ~(foreign[:, 0] & minor)
+            for plane in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+                occ = plane.gather(1, here.unsqueeze(1)).squeeze(1)
+                who = torch.where(occ >= 0, self.unit_seat.gather(1, occ.clamp(min=0).unsqueeze(1)).squeeze(1),
+                                  torch.full_like(occ, -1))
+                stay = stay & ~((occ >= 0) & (occ != g) & (who != seat))
+            ok = ok & free
+            ok[:, 0] = stay
+            first = torch.where(ok, torch.arange(K, device=dev), K).min(dim=1).values
+            spot = cand.gather(1, first.clamp(max=K - 1).unsqueeze(1)).squeeze(1)
+            go = on & (first > 0) & (first < K)
+            rows = go.nonzero(as_tuple=True)[0]
+            if not rows.numel():
+                continue
+            gs = torch.full_like(rows, g)
+            self._occ_clear(rows, here[rows], gs)
+            self.major_unit_tile[rows, u] = spot[rows]
+            self._occ_set(rows, spot[rows], gs)
+            self._gen_ver += 1
+
     def _minor_levy_return(self, s: int) -> None:
         """`minorLevyReturn` — CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS):
         the levied army "will return to the city-state after {2_TurnLimit}
@@ -394,6 +455,8 @@ class SimMinors:
             self.major_unit_levied[m] = False
             self.major_unit_levy_src[m] = -1
             self._gen_ver += 1
+            # where the minor may stand (`jumpMadeAnew`)
+            self._jump_made_anew(100 + s, m)
             # each unit made anew under the minor (`sendLevyHome`): the
             # record it held of the unit before the levy a gone unit's, and
             # a record of the unit it made
@@ -986,8 +1049,8 @@ class SimMinors:
     def _minor_repair(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B] bool, [B] f64) — `repairAvailable` and `projectCost` for minor
         `s`'s city: walls standing and breached (the centre's pool or its
-        Encampment's), the centre clean, three quiet turns since its last hit;
-        the price the HP it puts back, at least 1."""
+        Encampment's), the centre clean, more than three turns since its last hit;
+        the price `_repair_price`."""
         row = self._CITY_MINOR0 + s
         mx = self._walls_tier_hp.take(self._minor_walls_tier(s)).long()
         outer = torch.minimum(self.city_outer_hp[:, row, 0], mx)
@@ -1002,8 +1065,8 @@ class SimMinors:
         ctr = self.citystate_center[:, s]
         clean = (ctr >= 0) & ~self._fallout().gather(1, ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
         ok = ((mx > 0) & breached & clean
-              & ((int(self.turn) - self.city_last_hit[:, row, 0]) >= self._repair_quiet))
-        cost = ((mx - outer) + enc_missing).clamp(min=1).double()
+              & ((int(self.turn) - self.city_last_hit[:, row, 0]) > self._repair_quiet))
+        cost = self._repair_price((mx - outer) + enc_missing)
         return ok, cost
 
     def _minor_worship(self, s: int) -> torch.Tensor:
@@ -2215,8 +2278,8 @@ class SimMinors:
     def _free_repair(self, j: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B] bool, [B] f64) — `repairAvailable` and `projectCost` for the
         Free City in column `j`: walls standing and breached (the centre's
-        pool or its Encampment's), the centre clean, three quiet turns; the
-        price the HP it puts back, at least 1."""
+        pool or its Encampment's), the centre clean, more than three turns since its last hit; the
+        price `_repair_price`."""
         row = self.FREE_ROW
         mx = self._free_walls_max(j)
         outer = torch.minimum(self.city_outer_hp[:, row, j], mx)
@@ -2230,8 +2293,8 @@ class SimMinors:
         breached = (outer < mx) | (enc_missing > 0)
         ctr = self.city_center[:, row, j]
         clean = (ctr >= 0) & ~self._fallout().gather(1, ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
-        ok = (mx > 0) & breached & clean & ((int(self.turn) - self.city_last_hit[:, row, j]) >= self._repair_quiet)
-        cost = ((mx - outer) + enc_missing).clamp(min=1).double()
+        ok = (mx > 0) & breached & clean & ((int(self.turn) - self.city_last_hit[:, row, j]) > self._repair_quiet)
+        cost = self._repair_price((mx - outer) + enc_missing)
         return ok, cost
 
     def _free_nearest_col(self) -> torch.Tensor:

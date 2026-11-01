@@ -12140,3 +12140,57 @@ engines' roster carries no Persia, so the term is 0 for every player.
   pillaged that the engine held whole sets `repairWait` (runs/h1_duely1127
   Muscat t154: its Market pillaged, the Star Fort completing t155 before
   the Market's repair).
+
+## C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew — the repair READ (0x17a680, 0x7b28c0's count), the jump a fit, both twins
+
+- A CITY-STATE'S CENTRE holds the City Center district's HitPoints (200,
+  Districts.xml) as a major's does: the records' centre rows read 200 for
+  every city-state (runs/h1_duely1124 Cardiff t86-t89 damage 46 -> 26 -> 6
+  -> 0 at 20 a turn). `CITY_STATE_MAX_HP` (150) deleted for `CITY_MAX_HP`;
+  GPU `_cs_max_hp`, the exported `citystate.maxHp` deleted.
+- THE REPAIR'S PRICE (0x17a680, Projects +0xe8 bit 0 OuterDefenseRepair):
+  the city's count +0x1880 (0x197ff0: the outer defences' hit points down)
+  over GlobalParameters +0x1bc COMBAT_HEAL_CITY_OUTER_DEFENSES (10) where
+  above 0, through the speed (0x5254d0). CONFIRMED: City_BuildQueue.csv's
+  Production Needed 2 for runs/h1_duely1124 Granada t83 (40 down) and
+  Cardiff t90 (42 down). `projectCost` (REPAIR_HP_PER_COST), GPU
+  `_repair_price`.
+- THE REPAIR'S VALUE (0x7b28c0's OuterDefenseRepair term): the count +0x1880
+  is the outer defences' hit points down (the centre's own damage aside),
+  x population x districts (the centre counted) x 10.0, discounted to T.
+  CONFIRMED (AI_CityBuild.csv, the logged values to the decimal):
+  runs/h1_duely1124 Cardiff t89 42 x 8 x 1 = 3255.0, t107 54 x 9 x 1 =
+  4708.1; Granada t82 3875.0, t127 108 x 7 x 3 = 21971.3, t163 97 x 8 x 3
+  = 22552.5 (its centre's 18 damage not counted), t170 46 x 8 x 3 = 10695.0.
+  `minorProjectFacts` (defenceRepairs), GPU `_MinorFacts.defence_repairs`
+  (the Free Cities' none).
+- THE QUIET TURNS: a city struck in turn t may run the repair from t + 4
+  (the three turns after the strike's own): every first repair pick of the
+  five duely duels' city-states is the record after the strike + 3
+  (runs/h1_duely1124 Cardiff 86 -> 89, 104 -> 107; Granada 124 -> 127, 160
+  -> 163, 167 -> 170; 1127 Muscat 110 -> 113; 1128 Hong Kong 138 -> 141,
+  Bologna 164 -> 167). `repairAvailable`, GPU `_repair_available`,
+  `_minor_repair`; the replay's import dates a strike from the records
+  (`History.lastHit`: the turn before a record whose centre or outer
+  defences hold more damage than the one before).
+- A UNIT MADE ANEW (a levy, its return; no DLL reading, the records'
+  plots): it keeps its plot where no other player's district or wonder
+  stands, nor (a minor's unit) another player's ground, nor another
+  player's unit; else the first plot of the rings round it in the game's
+  ring order (0x69010) passing the same, revealed to its new owner, and free
+  for it. runs/h1_duely1117: the five levies' 11 units as logged (t74's
+  Heavy Chariot off city-state 3's centre 614 onto 613, its ring's second
+  plot, the first water); returns t42 561 (China's centre) -> 648, t76 516
+  (China's wonder site) -> 471 past 428's foreign Builder; runs/h1_duely1121
+  t56 Hunza 405 -> 361, 404 -> 360, 493 -> 494, 534 -> 359 and 577 -> 316
+  past the plots Hunza never revealed. The five duely duels (--aiscore,
+  aimem): 30 of 31 levied units and 15 of 22 returned ones as logged. `jumpMadeAnew` (phase.ts), GPU `_jump_made_anew`. LAB:
+  1117 t42 608 (China's ground in the engine's state at the return,
+  unowned in the game's), 1117 t42 / t88 648 and 690 past plots the
+  engine's revealed planes lack, 1121 t56 362 against the game's 361, 1121
+  a levy 186 against 187, 1124 438 against 439, 1127 two returns onto 530
+  against 707 and 533.
+- THE REPLAY'S PROGRESS: the records floor an item's progress
+  (queueProgress); the copy keeps the engine's own fraction where it floors
+  to the record's on the same item (runs/h1_duely1127 Hattusa's Trader at
+  2.4 a turn completing at t40 as logged).

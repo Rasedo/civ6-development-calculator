@@ -2329,6 +2329,9 @@ class _FreeFacts(_MinorFacts):
         # the Free Cities' trade AI's route value K (`_free_trade_value`)
         return self.sim.free_trade_value
 
+    def defence_repairs(self):
+        return 0
+
     def __init__(self, sim, j: int):
         super().__init__(sim, sim.FR)
         self.row = sim.FREE_ROW

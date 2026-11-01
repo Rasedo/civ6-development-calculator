@@ -14,7 +14,7 @@ import type { FeatureId } from '../../world/types';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { atRngPoint, randRange } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatTallies, seatGrowth, commitProduction } from './seatTurn';
-import { cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
+import { cityAtIndex, spawnUnit, unitStackSlot, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
@@ -30,7 +30,7 @@ import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, suzerainGpCultureMult, meetCityState } from './cityStates';
-import { LEVY_TURNS, govInfluence, CITY_STATE_MAX_HP } from '../data/cityStates';
+import { LEVY_TURNS, govInfluence } from '../data/cityStates';
 import { freeCityBuild, freeCombatDesire, freeKnowledge, minorBestOfClass, minorCompleteNow, minorOrdersHeld, minorResearch, trainableIn } from './minorBuild';
 import { storeUnitStrength } from './aiView';
 import { militaryFavTech } from './operations/unitRows';
@@ -38,7 +38,7 @@ import { freeTradeValue, majorTradeLists } from './aiTrade';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { plotDistance, tacticalTargets } from './tactical';
 import { freeCitiesMilitary, freeRaidCheck, freeRaidSignal } from './freeOps';
-import { plotsSeenNow } from './barbarians';
+import { plotsSeenNow, ringPlots } from './barbarians';
 import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
 import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, governmentSlots, governmentChanges, policyLayoutChanges, policyLayoutOf, policyUnlockCost } from './effects';
 import type { RuleResult } from './rules';
@@ -397,6 +397,54 @@ export function levyGoldCost(state: GameState, seat: number, cityState: CityStat
   return cost;
 }
 
+/** the furthest ring a unit made anew is looked for a plot in */
+const JUMP_RADIUS = 12;
+
+/**
+ * A UNIT MADE ANEW (a levy, its return) stands where its new owner may: its
+ * own plot where no other player's district or wonder stands, nor (for a
+ * minor's unit) another player's ground, nor another player's unit or one of
+ * its stacking class; else the first plot of the rings round it in the
+ * game's ring order (`ringPlots`) passing the same and revealed to its owner,
+ * that it may enter (`tileFreeForUnit`: a major's where the borders stand
+ * open). runs/h1_duely1117 t42 China's Warrior on its centre 561 home to
+ * city-state 3 on 648, the first ground of no owner two rings out (608 and
+ * 692, unowned, kept); t74 city-state 3's Heavy Chariot levied off its
+ * centre 614 onto 613, the ring's second plot (its first water); t76 the
+ * Archer off China's wonder site 516 -> 471 past 428's foreign Builder;
+ * runs/h1_duely1121 t56 Hunza's Warriors off China's ground 405 -> 361,
+ * 404 -> 360 (361 taken), 493 -> 494, and two past the plots Hunza never
+ * revealed (534 -> 359, 577 -> 316).
+ */
+export function jumpMadeAnew(state: GameState, u: Unit): void {
+  const revealed = isCityStateSeat(u.seat)
+    ? state.cityStates.find((c) => c.seat === u.seat)?.revealed
+    : seatOf(state, u.seat)?.explored;
+  const here = u.tileIndex;
+  const ok = (p: number): boolean => {
+    const t = state.map.tiles[p];
+    const owner = tileSeat(t);
+    const foreign = owner !== NO_SEAT && owner !== u.seat;
+    // another player's district or wonder bars it, its city centre among them
+    // (runs/h1_duely1117 t74's Heavy Chariot off city-state 3's centre, t76
+    // the Archer off China's wonder site 516)
+    if (foreign && (t.district || t.builtWonder)) return false;
+    // a minor's unit on no other player's ground, a major's where its
+    // borders stand open (`tileFreeForUnit`)
+    if (foreign && !isCiv(u.seat)) return false;
+    // a plot it goes to revealed to its owner
+    if (p !== here && revealed && !revealed[p]) return false;
+    // where it stands, no other player's unit nor one of its stacking class
+    if (p === here) return unitsAt(state, p).every((x) => x === u || (x.seat === u.seat && unitStackSlot(x) !== unitStackSlot(u)));
+    return tileFreeForUnit(state, p, u.seat, u);
+  };
+  for (const p of ringPlots(state, here, JUMP_RADIUS)) {
+    if (!ok(p)) continue;
+    u.tileIndex = p;
+    return;
+  }
+}
+
 /**
  * LEVY MILITARY. CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS): "The Suzerain
  * of this city-state can pay {1_GoldCost} Gold to take temporary control of
@@ -419,9 +467,11 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
     seatOf(state, seat)!.treasury -= cost;
   }
   for (const u of army) {
-    // the game removes it and adds it anew under the suzerain
+    // the game removes it and adds it anew under the suzerain, where the
+    // suzerain may stand
     unitMadeAnew(state, u);
     u.seat = seat;
+    jumpMadeAnew(state, u);
     // the mark the Raven King's clauses read (its +2 Movement, +5 Combat and
     // 75% upgrade discount) and what brings the unit home
     u.leviedFrom = cityState.seat;
@@ -2610,10 +2660,10 @@ export function healCities(state: GameState): void {
     }
   }
   for (const cityState of state.cityStates) {
-    if (cityState.hp === undefined || cityState.hp >= CITY_STATE_MAX_HP) continue;
+    if (cityState.hp === undefined || cityState.hp >= CITY_MAX_HP) continue;
     const centre = state.map.tiles[cityState.centerIndex];
     if (encircled(state, centre, cityState.seat) || irradiated(centre)) continue;
-    cityState.hp = Math.min(CITY_STATE_MAX_HP, cityState.hp + CITY_HEAL_PER_TURN);
+    cityState.hp = Math.min(CITY_MAX_HP, cityState.hp + CITY_HEAL_PER_TURN);
   }
   for (const city of state.freeSeat?.cities ?? []) {
     const centre = state.map.tiles[city.centerIndex];

@@ -502,7 +502,7 @@ class SimMinorAi:
         -1 with its centre's hit points damaged or the enemy at its gates
         (CityBuildAI +0x218, `citystate_threat_near`; the war footing a
         city-state's held clear)"""
-        return (threat > -1) & ((self.citystate_hp[:, s] < self._cs_max_hp) | self.citystate_threat_near[:, s])
+        return (threat > -1) & ((self.citystate_hp[:, s] < self._city_max_hp) | self.citystate_threat_near[:, s])
 
     def _minor_threat(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
         """[B] long, [B] bool — `minorThreat` (0x5cbd10) on minor `s`'s knowledge base's

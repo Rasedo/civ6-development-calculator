@@ -31,7 +31,7 @@ import { gpPermOf } from '../data/greatPeople';
 import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, COMPETITIONS } from '../data/seats';
 import { recordMoments } from './moments';
 import { foundingMoments, religionMoment, gameEraTurn, upgradeAllRoads, buildingDedications, dedicationEvent, goldenDedication, monumentalityBuyMult } from './eras';
-import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
+import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, REPAIR_HP_PER_COST, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
 import { competitionOf } from './competition';
@@ -443,13 +443,17 @@ export function dominationWinner(state: GameState): number {
 /** A project's price: its own `Projects.Cost` row (already speed-scaled in
  *  the table), or, where the row carries COST_PROGRESSION_GAME_PROGRESS — the
  *  district projects, the Cothon's capital move — `progressCost` over its
- *  install Cost and Param1. The repair alone is priced by the HP it
- *  restores. */
+ *  install Cost and Param1. The repair (OuterDefenseRepair, 0x17a680) is
+ *  priced by the outer defences' hit points down (the city's +0x1880, its
+ *  Encampment's beside its centre's) over COMBAT_HEAL_CITY_OUTER_DEFENSES,
+ *  at the game's speed: runs/h1_duely1124 Granada t83 40 down, Cardiff t90
+ *  42, City_BuildQueue.csv's Production Needed 2 each. */
 export function projectCost(state: GameState, seat: number, projectId: string, city?: City): number {
   const def = PROJECTS[projectId];
-  // CIV6: "Walls gain HP equal to the Production invested into the project" —
-  // so the whole repair costs exactly the perimeter HP it puts back.
-  if (def?.repair && city) return Math.max(1, wallsMax(state, city) - outerPool(state, city) + encampOuterMissing(state, city));
+  if (def?.repair && city) {
+    const down = wallsMax(state, city) - outerPool(state, city) + encampOuterMissing(state, city);
+    return Math.max(1, scaleByGameSpeed(Math.trunc(down / REPAIR_HP_PER_COST)));
+  }
   if (def?.costProgressGame !== undefined && def.progressBase !== undefined) {
     const r = seatOf(state, seat)?.research;
     return progressCost(def.progressBase, gameProgressK(def.costProgressGame), r ? researchProgressPct(r) : 0);
@@ -467,7 +471,7 @@ export function repairAvailable(state: GameState, city: City): boolean {
   // CIV6 (a City Center or Encampment caught in a blast): "Healing is
   // impossible and Repair Outer Defenses is unusable while the fallout lasts."
   if (irradiated(state.map.tiles[city.centerIndex])) return false;
-  return state.turn - (city.lastHitTurn ?? 0) >= REPAIR_QUIET_TURNS;
+  return state.turn - (city.lastHitTurn ?? 0) > REPAIR_QUIET_TURNS;
 }
 
 /** May this seat run a project at all? A civilization-UNIQUE row (`civ` /

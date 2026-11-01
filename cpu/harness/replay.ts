@@ -41,7 +41,7 @@ import { advanceTurn, minorTurns, turnChange, turnClose, foundCity, foundCityAt,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
   serialize, deserialize, itemCost } from '../core/game';
 import { completeQueueItem } from '../core/production';
-import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
+import { applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, jumpMadeAnew, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes, envoysAtStart, applySeatEnvoys,
   seatPhase, worldCongress } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, minorReplaceCitizens, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
@@ -66,7 +66,7 @@ import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
 import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
 import { barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, holdBarbBattles, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
-import { CITY_STATE_MAX_HP, MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
+import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
 import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
@@ -85,7 +85,7 @@ import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES } from '../data/policies';
 import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_IDS, RELIGION_TYPES, gainPopulationPressure } from '../data/religion';
 import { missionOf, missionPayable } from '../core/deals';
 import { DEAL_MISSION } from '../data/seats';
-import { UNITS, UNIT_HP } from '../data/units';
+import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
@@ -2782,15 +2782,15 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
             unitMadeAnew(state, u);
             u.seat = seat;
             u.leviedFrom = cs.seat;
+            jumpMadeAnew(state, u);
           }
           // a unit made anew where its major may not stand is added where
-          // the game jumps it, which the engine does not lay
-          // (runs/h1_duelw1117 t74: city-state 3's Heavy Chariot from its
-          // centre to (41,13))
+          // the game jumps it (`jumpMadeAnew`; runs/h1_duely1117 t74: city-state
+          // 3's Heavy Chariot from its centre 614 to 613), the game's plot held
           if (u.tileIndex !== plot) {
+            count(ctx, 'levy:jump', 'fallback', d.player, `the engine's jump ${u.tileIndex}, the game's ${plot}`);
             u.tileIndex = plot;
-            count(ctx, 'levy:jump', 'fallback', d.player, 'the engine jumps no re-made unit');
-          }
+          } else count(ctx, 'levy:jump', 'applied', d.player);
         }
         if (!res.ok) {
           // the record's levy, on the verb's own term (`levyUnits`)
@@ -4611,7 +4611,16 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   const seatPair = (from: Seat, to: Seat, minor: boolean) => {
     carryFields(from, to, [...SEAT_MEMORY, ...SEAT_STORES]);
     carryFields(from.research, to.research, [...RESEARCH_MEMORY, ...RESEARCH_STORES]);
-    if (minor) carryFields(from, to, [...MINOR_MEMORY, ...MINOR_STORES]);
+    if (minor) {
+      carryFields(from, to, [...MINOR_MEMORY, ...MINOR_STORES]);
+      // the record floors the item's progress (queueProgress): the engine's
+      // own fraction stands where it floors to the record's on the same item
+      // (runs/h1_duely1127 Hattusa's Trader at 2.4 a turn, 23.6 + 2.4
+      // completing at t40, 23 + 2.4 short of 26)
+      const f = from as CityState;
+      const t = to as CityState;
+      if (f.prodItem !== undefined && f.prodItem === t.prodItem && Math.floor(f.prodProgress ?? 0) === (t.prodProgress ?? 0)) t.prodProgress = f.prodProgress;
+    }
     for (const c of to.cities ?? []) {
       const o = from.cities?.find((x) => x.centerIndex === c.centerIndex);
       if (o) carryFields(o, c, CITY_MEMORY);
@@ -4626,11 +4635,12 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
     // Bank pillaged under its Sewer, the Sewer finished first)
     if (cs.pillagedBuildings?.length && cs.prodItem && !cs.prodItem.startsWith('repair:')) cs.repairWait = true;
     // a city the record shows hit since the engine's last turn (its hit
-    // points or its walls lower) was hit at this record's turn: the walls'
-    // repair waits three quiet turns from it (runs/h1_duely1124 Cardiff, hit
-    // at record 86 and 104, the repair queued by the turns 89 and 107)
-    if (o && ((cs.hp ?? CITY_STATE_MAX_HP) < (o.hp ?? CITY_STATE_MAX_HP)
-      || (cs.outerHp ?? Infinity) < (o.outerHp ?? Infinity))) cs.lastHitTurn = a.turn;
+    // points or its walls lower) was struck in the turn before this record,
+    // as the import's `lastHit` dates it: the walls' repair waits past three
+    // quiet turns (runs/h1_duely1124 Cardiff, its damage in records 86 and
+    // 104, the repair queued by the turns 89 and 107)
+    if (o && ((cs.hp ?? CITY_MAX_HP) < (o.hp ?? CITY_MAX_HP)
+      || (cs.outerHp ?? Infinity) < (o.outerHp ?? Infinity))) cs.lastHitTurn = a.turn - 1;
     bindQueuedContracts(ctx, cs, imp, a.turn - 1);
   }
   seatPair(state.barbSeat, world.barbSeat, true);
@@ -5063,16 +5073,24 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       stream.actions(a.turn);
       otherMajorsTurn();
       // a levied unit the game makes anew on a plot its minor may not stand
-      // on is added where the game jumps it, which the engine does not lay
-      // (runs/h1_duelw1117 t42: China's levied Warrior on China's (33,12)
-      // added to city-state 3 on (32,14), out of sight of China's Builder)
+      // on is added where the game jumps it (`jumpMadeAnew`), its return
+      // landing after the players before the minor moved it (runs/h1_duely1117
+      // t42: China's levied Warrior on China's 561 added to city-state 3 on
+      // 648): the engine's jump from where the unit stands, against the
+      // game's plot, which it then holds
       for (const d of ds) {
         if (d.kind !== 'levyEnd') continue;
         for (const [from, , plot] of d.units) {
           const u = unitOf(ctx, from);
-          if (!u || u.tileIndex === plot) continue;
+          if (!u) continue;
+          const seat = u.seat;
+          u.seat = seatOfP(ctx, d.player);
+          jumpMadeAnew(state, u);
+          const ours = u.tileIndex;
+          u.seat = seat;
           u.tileIndex = plot;
-          count(ctx, 'levyEnd:jump', 'fallback', d.player, 'the engine jumps no re-made unit');
+          if (ours === plot) count(ctx, 'levyEnd:jump', 'applied', d.player);
+          else count(ctx, 'levyEnd:jump', 'fallback', d.player, `the engine's jump ${ours}, the game's ${plot}`);
         }
       }
       // each city-state's turn opens with the city-states before it standing

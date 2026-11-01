@@ -78,13 +78,13 @@ import { IMPROVEMENT_IDS } from './unitActions';
 import { TECHS } from '../data/techs';
 import { PROJECTS } from '../data/projects';
 import { CIVICS } from '../data/civics';
-import { UNITS, UNIT_INDEX } from '../data/units';
+import { CITY_MAX_HP, UNITS, UNIT_INDEX } from '../data/units';
 import { SPY_IDLE } from '../data/espionage';
 import { buildingCostIn, outerPool } from './rules';
 import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
-import { CITY_STATE_TYPES, CITY_STATE_MAX_HP } from '../data/cityStates';
+import { CITY_STATE_TYPES } from '../data/cityStates';
 import { MINOR_OP_DEFS } from './minorOps';
 import { BARB_TREE_FIRST_GEN, BARB_TREE_HELD, barbHomingRecord, barbOpRecord } from './barbarianOps';
 import { opsOf, type OpsAi } from './operations/manager';
@@ -945,7 +945,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   type: overCityStates((cityState) => CITY_STATE_TYPES.indexOf(cityState.type)),
   centerIndex: overCityStates((cityState) => cityState.centerIndex),
   population: overCityStates((cityState) => cityState.population),
-  hp: overCityStates((cityState) => cityState.hp ?? CITY_STATE_MAX_HP),
+  hp: overCityStates((cityState) => cityState.hp ?? CITY_MAX_HP),
   envoys: overCityStates((cityState, st) => perCiv(st, (seat) => envoysOf(cityState, seat))),
   governorAtMinor: overCityStates((cityState, st) => perCiv(st, (seat) => {
     const roster = seatOf(st, seat)?.governors ?? [];

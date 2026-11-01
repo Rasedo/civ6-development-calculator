@@ -254,13 +254,13 @@ describe("the minor's Urban Defenses", () => {
 
 // ---------------------------------------------------------------------------
 describe('the items the step completes', () => {
-  it('the repair restores the breached walls at the HP it puts back', () => {
+  it('the repair restores the breached walls at its price', () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12, { buildings: ['ANCIENT_WALLS'], outerHp: 20 });
     state.turn = 20;
     cs.lastHitTurn = 9;
     const cost = projectCost(state, cs.seat, 'REPAIR_DEFENSES', minorCity(cs));
-    expect(cost).toBe(WALLS_TIER_HP[1] - 20);
+    expect(cost).toBe(Math.floor(Math.trunc((WALLS_TIER_HP[1] - 20) / 10) * 0.5));
     inHand(cs, 'project:REPAIR_DEFENSES', cost);
     step(state, cs);
     expect(cs.outerHp).toBe(WALLS_TIER_HP[1]);

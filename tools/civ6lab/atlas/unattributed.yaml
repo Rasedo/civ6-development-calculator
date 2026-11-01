@@ -254,6 +254,7 @@
   readings:
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew — the repair READ (0x17a680, 0x7b28c0's count), the jump a fit, both twins"
   context:
     - ...Combat in the tag that the barbarians' techs and civics allow; placement walks rings 0x69010 (the centre, then each ring from axial corner (0,1),(-1,0),(1,-1),(0,-1),(1,0),(-1,1) a...
     - "...e the node names a Leader Tag and Range above 0. With a radius the ring walk 0x6aef0 (0x69010's order) around the goal with the test 0x815d50: a plot in the goal's region (plot +0x1..."

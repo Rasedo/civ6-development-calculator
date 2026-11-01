@@ -362,7 +362,7 @@ def test_cs_siege(rules, path):
     # and "one hit must not kill a full-hp CS" failed on a CS that was not
     # full. The capture half below already clears the barbarians for its own
     # reasons — the first hit needs the same ground.
-    sim.citystate_hp[0, s] = int(rules.citystate["maxHp"])
+    sim.citystate_hp[0, s] = int(rules.combat["cityMaxHp"])
     near0 = sim.pair_dist[ctr] <= 2
     for u in (sim.barb_unit_alive[0] & near0[sim.barb_unit_tile[0].clamp(min=0)]).nonzero(as_tuple=True)[0].tolist():
         t_ = int(sim.barb_unit_tile[0, u])
@@ -370,7 +370,7 @@ def test_cs_siege(rules, path):
         if int(sim.barb_at[0, t_]) == u:
             sim.military_at[0, t_] = -1
     hp0, tile0 = int(sim.citystate_hp[0, s]), int(sim.major_unit_tile[0, p_])
-    assert hp0 == int(rules.citystate["maxHp"]), f"the premise did not build: hp0={hp0}"
+    assert hp0 == int(rules.combat["cityMaxHp"]), f"the premise did not build: hp0={hp0}"
     sim._apply_seat_unit_actions(0, ua)
     sim.step()
     assert int(sim.citystate_hp[0, s]) < hp0, "CS took no siege damage"

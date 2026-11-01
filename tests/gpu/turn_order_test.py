@@ -42,7 +42,7 @@ def test_city_state_heal(rules, path) -> None:
     if not sim.S or not bool(sim.citystate_alive[B0, 0]):
         print("  2 city-state heal SKIPPED — no minor on this fixture")
         return
-    cmax = int(rules.citystate["maxHp"])
+    cmax = int(rules.combat["cityMaxHp"])
     sim.citystate_hp[B0, 0] = 100
     sim._heal_cities()
     assert int(sim.citystate_hp[B0, 0]) == 120, f"a city-state healed {int(sim.citystate_hp[B0, 0]) - 100}"

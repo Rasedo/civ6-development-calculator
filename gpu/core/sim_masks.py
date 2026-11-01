@@ -585,7 +585,7 @@ class SimMasks:
         rt = torch.full_like(c0, row)
         walls = self._walls_max_at(rt, c0).long()
         pool = torch.minimum(self.city_outer_hp[bidx, row, c0].long(), walls)
-        cmax = int(self.rules.citystate["maxHp"] if minor else self.rules.combat["cityMaxHp"])
+        cmax = int(self.rules.combat["cityMaxHp"])
         hp = self.city_hp[bidx, row, c0].long().clamp(max=cmax)
         pct = torch.where(walls > 0, torch.div((walls - pool) * 100, walls.clamp(min=1), rounding_mode="trunc"),
                           torch.div((cmax - hp) * 100, cmax, rounding_mode="trunc")).clamp(min=0, max=100)
@@ -701,15 +701,19 @@ class SimMasks:
         _ctr = self.city_center[:, row, j]
         clean = (_ctr >= 0) & ~self._fallout().gather(1, _ctr.clamp(min=0).unsqueeze(1)).squeeze(1)
         return ((mx > 0) & breached & clean
-                & ((self.turn - self.city_last_hit[:, row, j]) >= self._repair_quiet))
+                & ((self.turn - self.city_last_hit[:, row, j]) > self._repair_quiet))
+
+    def _repair_price(self, down: torch.Tensor) -> torch.Tensor:
+        """`projectCost`'s repair: the outer defences' hit points down over
+        COMBAT_HEAL_CITY_OUTER_DEFENSES at the game's speed, at least 1"""
+        whole = torch.div(down.long(), self._repair_hp_per_cost, rounding_mode="trunc")
+        return self.rules.scale_by_game_speed(whole.double()).clamp(min=1)
 
     def _repair_cost(self, row: int, j: int) -> torch.Tensor:
-        """The perimeter HP missing right now — CIV6: "Walls gain HP equal to
-        the Production invested into the project", so the whole repair costs
-        exactly what it puts back."""
+        """`projectCost`'s repair for column `j` of `row` (`_repair_price`)"""
         mx = self._walls_max_all(row)[:, j]
-        return ((mx - self.city_outer_hp[:, row, j])
-                + self._enc_outer_missing(row)[:, j]).clamp(min=1).to(self.dtype)
+        return self._repair_price((mx - self.city_outer_hp[:, row, j])
+                                  + self._enc_outer_missing(row)[:, j]).to(self.dtype)
 
     def _repair_drip(self, row: int, before: torch.Tensor) -> None:
         """`repairDrip` — CIV6 (Repair Outer Defenses): "Walls gain HP equal to

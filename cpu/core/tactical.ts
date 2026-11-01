@@ -12,7 +12,6 @@ import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, neighbors, o
 import { hullPassage, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { COMBAT_BOMBARD_VS_UNIT, MP_SCALE } from '../data/constants';
 import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
-import { CITY_STATE_MAX_HP } from '../data/cityStates';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
@@ -1409,7 +1408,7 @@ export function districtHealth(state: GameState, tile: number): { max: number; h
   const held = cityAtIndex(state, tile);
   if (held) return { max: CITY_MAX_HP, hp: held.city.hp };
   const cs = cityStateAt(state, tile);
-  return cs && cs.centerIndex === tile ? { max: CITY_STATE_MAX_HP, hp: cs.hp ?? CITY_STATE_MAX_HP } : null;
+  return cs && cs.centerIndex === tile ? { max: CITY_MAX_HP, hp: cs.hp ?? CITY_MAX_HP } : null;
 }
 
 /** a unit of a player at war with the unit holds the plot to fight it (0x208b80) */

@@ -23,7 +23,7 @@ import { CIVICS } from '../data/civics';
 import {
   CITY_STATE_TYPE_DISTRICT, MINOR_BUILDER_PROD_PCT, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_HARBOR_PROD_PCT,
   MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD,
-  MINOR_WALLS_PROD_PCT, MINOR_REPAIR_RESUME_PCT, MINOR_CATCHUP_PCT, CITY_STATE_MAX_HP,
+  MINOR_WALLS_PROD_PCT, MINOR_REPAIR_RESUME_PCT, MINOR_CATCHUP_PCT,
 } from '../data/cityStates';
 import { CITY_MAX_HP, ENCAMPMENT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
@@ -36,7 +36,7 @@ import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefens
 import { lumpFood, seatGrowth } from './seatTurn';
 import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
 import { freeCityThreat, minorAiTurn, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
-import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
+import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
 import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats, withPercent256 } from './city';
@@ -206,6 +206,8 @@ function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
   u.seat = cityState.seat;
   delete u.leviedFrom;
   unitMadeAnew(state, u);
+  // where the minor may stand (`jumpMadeAnew`)
+  jumpMadeAnew(state, u);
   (cityState.armyKnown ??= []).push({ id: u.id, owner: cityState.seat, type: u.type, seen: cityState.armyAged ?? state.turn,
     plot: u.tileIndex, damage: 0 });
 }
@@ -1701,7 +1703,7 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
  * kept and complete at t45).
  */
 export function minorUnderThreat(cityState: CityState, threat: number): boolean {
-  return threat > -1 && ((cityState.hp ?? CITY_STATE_MAX_HP) < CITY_STATE_MAX_HP || !!cityState.threatNear);
+  return threat > -1 && ((cityState.hp ?? CITY_MAX_HP) < CITY_MAX_HP || !!cityState.threatNear);
 }
 
 /** The percent a minor's step pays toward the item on top of its Production:

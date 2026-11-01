@@ -377,13 +377,23 @@
 - addr: 0x17a680
   final: 0xfdca0
   kind: function
+  name: projectCost
+  semantics: "a project's price: OuterDefenseRepair (+0xe8 bit 0) the city's +0x1880 count (0x197ff0) over GlobalParameters +0x1bc COMBAT_HEAL_CITY_OUTER_DEFENSES, through the speed 0x5254d0; else the cost progression model"
   status: PARTLY
   cases:
+    - recording: h1_duely1124
+      turn: 83
+      value: Granada's Repair Outer Defenses at Production Needed 2 (City_BuildQueue.csv) with 40 down; Cardiff t90 2 with 42 down
     - recording: h1_duelw1117
       turn: 28
       value: "Every space project counts whether the   city may build it: China's Space Initiative 66 at t28 of   runs/h1_duelw1117 on the replayed state, the log's 111 under its   science-victory weight)."
+  impl:
+    - cpu/core/game.ts:projectCost
+    - gpu/core/sim_masks.py:_repair_price
+    - cpu/data/units.ts:REPAIR_HP_PER_COST
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew — the repair READ (0x17a680, 0x7b28c0's count), the jump a fit, both twins"
   context:
     - "...8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x17a680 (OuterDefenseRepair's own; else the cost progression model: game progress 1, 8; 0x5254d..."
   review: imported

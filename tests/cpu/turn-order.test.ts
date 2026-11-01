@@ -12,7 +12,7 @@ import { computeCityStats } from '../../cpu/core/city';
 import { spawnUnit } from '../../cpu/core/units';
 import { placeCityStateAt } from '../../cpu/core/cityStates';
 import { amenityTierIndex } from '../../cpu/data/constants';
-import { CITY_STATE_MAX_HP } from '../../cpu/data/cityStates';
+import { CITY_MAX_HP } from '../../cpu/data/units';
 import { neighbors } from '../../world/hex';
 
 describe("the seat's economy runs before its cities", () => {
@@ -60,9 +60,9 @@ describe('every city heals once, at the turn\'s end', () => {
     cs.hp = 100;
     healCities(state);
     expect(cs.hp).toBe(120);
-    cs.hp = CITY_STATE_MAX_HP - 5;
+    cs.hp = CITY_MAX_HP - 5;
     healCities(state);
-    expect(cs.hp).toBe(CITY_STATE_MAX_HP);
+    expect(cs.hp).toBe(CITY_MAX_HP);
     // every passable neighbour held by a hostile unit exerting its zone of
     // control: no heal
     cs.hp = 100;
