@@ -2288,6 +2288,9 @@ class SimMinors:
                 self.citystate_stockpile[rr, s] = bank
         self.major_unit_type[rr, u] = nxt[rr, u]
         self.major_unit_mp[rr, u] = 0
+        # the upgrade a new unit: of its type's own AI type, homed nowhere
+        self.major_unit_defender[rr, u] = False
+        self.major_unit_homed[rr, u] = False
         self._gen_ver += 1
         # the upgraded chassis raises the minor's base (`raiseBestTrained`)
         self._raise_best_trained(self._CITY_MINOR0 + s, go, self.major_unit_type.gather(1, fc.unsqueeze(1)).squeeze(1),

@@ -26,7 +26,7 @@ import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiView } from './aiView';
 import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passReachAt, plotDistance, stackedAt, swapUnits, type Pass } from './tactical';
-import { ownAiType, passOrders, passView } from './opsOrders';
+import { defenderAiType, ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
 import { NO_PLOT, opDef, opJobUnits } from './operations/operation';
@@ -159,6 +159,7 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
     },
     ...(pass ? passOrders(state, cs.seat, pass, changed) : outsidePass),
     ownAiType: ownAiType(state, cs.seat, pass),
+    defenderAiType: defenderAiType(state, cs.seat, pass),
     log: (l) => tracer?.(cs.seat, l, false),
     logEval: (l) => tracer?.(cs.seat, l, true),
   };

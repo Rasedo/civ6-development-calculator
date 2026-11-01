@@ -222,6 +222,9 @@ function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
     ownAiType: () => {
       throw new Error('the barbarians\' operations recruit through Barbarian Recruit alone');
     },
+    defenderAiType: () => {
+      throw new Error('the barbarians\' operations garrison no city');
+    },
     log: (l) => tracer?.(l),
     logEval: () => undefined,
   };

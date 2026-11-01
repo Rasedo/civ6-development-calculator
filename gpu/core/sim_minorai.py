@@ -894,13 +894,14 @@ class SimMinorAi:
         whole part of PSEUDOYIELD_STANDING_ARMY_NUMBER (1.0 at a minor's
         weight) times the square root of its population (float32, as the
         game's fixed point); its list the units of AI type DEFENDER
-        (`unit_defender`) in pool order, then each COMBAT unit (not
-        civilian, not recon, a fighter) outside every running operation, of
-        the land or — the city coastal — the sea, in pool order, joining
-        while the list is below the quota, else replacing the list's weakest
-        (the first of the lowest Combat, `_ai_combat`) where its Combat is
-        higher; the
-        count it lacks, the quota less the list (CityBuildAI +0x2d8)"""
+        (`unit_defender`) homed on the city (`unit_homed`) in pool order, in
+        an operation or not, then each COMBAT unit (not civilian, not recon,
+        a fighter) outside every running operation, of the land or — the
+        city coastal — the sea, in pool order, joining homed while the list
+        is below the quota, else replacing the list's weakest (the first of
+        the lowest Combat, `_ai_combat`), turned COMBAT and homed nowhere,
+        where its Combat is higher; a DEFENDER homed nowhere in neither part;
+        the count it lacks, the quota less the list (CityBuildAI +0x2d8)"""
         B, dev = self.B, self.device
         T = self._cv_tables()
         rows = T["unit_rows"]
@@ -922,9 +923,12 @@ class SimMinorAi:
         ar = er.take(ut)
         ar = torch.where(ar >= 0, ar, torch.full_like(ar, len(rows)))
         act = act & (centre >= 0)
+        # in pool order, the pool brought up to date (`seatPoolSlots`)
+        self._seat_pool_slots(s, "major", 100 + s, act)
         own = self.major_unit_alive & (self.major_unit_seat == 100 + s) & act.unsqueeze(1)
-        flag = self.major_unit_defender & own
-        ok = own & ~flag & ~self._mops_busy(s) & fights.take(ar) & (land.take(ar) | (sea.take(ar) & coastal.unsqueeze(1)))
+        dfd = self.major_unit_defender & own
+        flag = dfd & self.major_unit_homed
+        ok = own & ~dfd & ~self._mops_busy(s) & fights.take(ar) & (land.take(ar) | (sea.take(ar) & coastal.unsqueeze(1)))
         P = own.shape[1]
         BIG = 1 << 40
         pslot = self.major_unit_pslot
@@ -936,6 +940,7 @@ class SimMinorAi:
         # joiner after them all
         place = torch.where(flag, order.argsort(dim=1), torch.full_like(pslot, BIG))
         n = flag.sum(dim=1)
+        ever = flag.clone()
         bidx = torch.arange(B, device=dev)
         for j in range(int(n_own.max()) if B else 0):
             u_b = order[:, j]
@@ -955,9 +960,15 @@ class SimMinorAi:
                 r = add.nonzero(as_tuple=True)[0]
                 flag[r, u_b[r]] = True
                 place[r, u_b[r]] = P + 1 + j
+                ever[r, u_b[r]] = True
             n = n + join.long()
-        mine = own
-        self.major_unit_defender[mine] = flag[mine]
+        # a joiner a DEFENDER homed on the city, a replaced one COMBAT homed
+        # nowhere; a DEFENDER homed nowhere as it was
+        start = dfd & self.major_unit_homed
+        dropped = ever & ~flag
+        added = flag & ~start
+        self.major_unit_defender[own] = ((dfd & ~dropped) | added)[own]
+        self.major_unit_homed[own] = ((self.major_unit_homed & ~dropped) | added)[own]
         return torch.where(act, quota - n, torch.zeros_like(n))
 
     def _minor_eruption_turns(self) -> torch.Tensor:

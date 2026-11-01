@@ -2916,6 +2916,7 @@ class SimMasks:
         self.barb_unit_formation[rows, slot] = 0
         self.barb_unit_escorted[rows, slot] = False
         self.barb_unit_defender[rows, slot] = False
+        self.barb_unit_homed[rows, slot] = False
         self.barb_unit_band_level[rows, slot] = 0
         self.barb_unit_band_album[rows, slot] = 0
         self.barb_unit_spy_mission[rows, slot] = self._spy_idle
@@ -3713,6 +3714,7 @@ class SimMasks:
             formation[rows] if formation is not None else 0)
         getattr(self, f"{pre}_unit_escorted")[rows, slot] = False
         getattr(self, f"{pre}_unit_defender")[rows, slot] = False
+        getattr(self, f"{pre}_unit_homed")[rows, slot] = False
         getattr(self, f"{pre}_unit_band_level")[rows, slot] = 0
         getattr(self, f"{pre}_unit_band_album")[rows, slot] = 0
         getattr(self, f"{pre}_unit_spy_mission")[rows, slot] = self._spy_idle

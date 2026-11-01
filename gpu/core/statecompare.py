@@ -1414,6 +1414,7 @@ UNIT = {
     "formation": _unit("unit_formation"),
         "escorted": _unit("unit_escorted"),
         "aiDefender": _unit("unit_defender"),
+        "aiHomed": _unit("unit_homed"),
     "patrol": _unit("unit_patrol"),
     "freeCity": _unit("unit_free_city"),
     "noResourceUpkeep": _unit("unit_no_res_upkeep"),

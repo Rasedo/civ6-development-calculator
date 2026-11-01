@@ -256,6 +256,17 @@ export function ownAiType(state: GameState, seat: number, pass: Pass | null): Op
   };
 }
 
+/** `seat`'s unit of the id takes AI type DEFENDER (unit +0x168 to 4), its
+ *  home kept, the pass (where one is open) reading the type it now holds */
+export function defenderAiType(state: GameState, seat: number, pass: Pass | null): OpsEnv['defenderAiType'] {
+  return (id) => {
+    const u = state.units.find((x) => x.id === id && x.seat === seat);
+    if (!u || unitDomain(u.type) !== 'military') return;
+    u.aiDefender = true;
+    if (pass?.ai.has(id)) pass.ai.set(id, militaryAiTypeOf(u));
+  };
+}
+
 /** the orders of `seat`'s operations in `pass`; `changed` after each */
 export function passOrders(state: GameState, seat: number, pass: Pass, changed: () => void):
   Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend' | 'endTurn' | 'endMoves' | 'swap' | 'patrol' | 'pillage'> {

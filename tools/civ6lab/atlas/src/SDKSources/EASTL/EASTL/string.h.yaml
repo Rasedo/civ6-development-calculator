@@ -109,6 +109,15 @@
   context:
     - "- The research and civic overflows (`m_xResearchOverflow`, serializer 0x4c6dc2; `m_xCulturalOverflow`, 0x38a93a): only the members are read; the records fit the produ..."
   review: imported
+- addr: 0x563cd0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/minorBuild.ts:minorUpgradeUnit]
+  readings: ["C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...s +0xf8) and where it drops one (-1). The other writers of the home: the unit's init (0x5657b2, -1) and a city's capture (0x5c9d40 from 0x1fdea0: the capturing unit's assignment -1,..."
+  review: imported
 - addr: 0x5c4f40
   final: 0x3db2f0
   kind: function

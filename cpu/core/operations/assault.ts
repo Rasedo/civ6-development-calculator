@@ -235,7 +235,12 @@ const garrisonCity: BtHandler<OpsContext> = {
  *  32:5 -> 32:6 before the city's purchase; city-state 3's Crossbowman
  *  42:13 -> 41:13 t112-t121), a melee one stays (runs/h1_dueldA1117
  *  Antananarivo t24's Warrior on 32:5, no Operation Move row). The
- *  fortify commands are none in the action rows. */
+ *  fortify commands are none in the action rows. The garrison it keeps
+ *  takes AI type DEFENDER, a candidate swapped in takes it and the garrison
+ *  its type's own (0x1e60f0 on unit +0x168), a candidate moved in with no
+ *  garrison neither: Recruit Units having turned the operation's units
+ *  their own type first, the garrison is the one member a standing army
+ *  homed on the city counts (runs/h1_duely1127 Mexico City t71-78). */
 function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], _run: unknown, ctx: OpsContext): void {
   const view = ctx.view();
   const { op } = ctx;
@@ -298,9 +303,15 @@ function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], 
     if (spot >= 0 && spot !== pick.plot) moveTo(ctx, pick, spot);
     ctx.swap?.(pick.id, city);
     if (unitsById(ctx.view(), ctx.seat).get(pick.id)?.plot === city) ctx.endMoves?.(pick.id);
+    // the candidate takes AI type DEFENDER, the garrison its type's own
+    // (0x81132d / 0x81135e)
+    ctx.defenderAiType(pick.id);
+    ctx.ownAiType([garrison.id]);
     return;
   }
   if (garrison.range === 0) ctx.endMoves?.(garrison.id);
+  // the garrison takes AI type DEFENDER (0x8111c2 -> 0x81135e)
+  ctx.defenderAiType(garrison.id);
 }
 
 // OPERATION DIPLOMACY (0x819db0 update, 0x8163f0 execution)

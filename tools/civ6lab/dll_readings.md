@@ -6839,3 +6839,48 @@ takes the entry's +8. GPU `citystate_kb_form` (gpu/core/sim_minors.py
 - OPEN: the Corps / Army terms of 0x4f2b50 held 0; the city threat
   (`knownThreat` -> 0x5cbd10) and the minors' standing army by record read
   no formation.
+
+## C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins
+
+`minorStandingArmy` (cpu/core/minorCityAi.ts: `Unit.aiDefender`,
+`Unit.aiHomed`), `garrisonExecute` (cpu/core/operations/assault.ts) through
+`defenderAiType` / `ownAiType` (cpu/core/opsOrders.ts), `minorUpgradeUnit`
+(cpu/core/minorBuild.ts). GPU `_minor_standing_army`
+(gpu/core/sim_minorai.py: `unit_defender`, `unit_homed`), `_x_garrison`
+(gpu/core/sim_minorops.py), `_minor_upgrade_unit` (gpu/core/sim_minors.py).
+
+- THE HOME: a unit's AI type (the watched +0x168, value +0x1c0) and its home
+  (the watched +0x1178, value +0x11d0) are two fields. The standing army
+  (0x5ca7e0) counts a DEFENDER only where it is homed on the city, in an
+  operation or not; it writes the home where it takes a unit (the city's
+  +0xf8) and where it drops one (-1). The other writers of the home: the
+  unit's init (0x5657b2, -1) and a city's capture (0x5c9d40 from 0x1fdea0:
+  the capturing unit's assignment -1, DEFENDER, homed on the city). Recruit
+  Units' update turns every unit of the operation its type's own AI type
+  each tick (0x81cbb2, 0x79b9c0) and leaves the home.
+- GARRISON CITY (0x810d30) writes the AI type alone: a stronger candidate
+  swapped in takes DEFENDER and the garrison its type's own (0x81132d,
+  0x81135e); with no stronger candidate the garrison takes DEFENDER whether
+  it fortifies or not (0x8111c2 -> 0x811359); a candidate moved in with no
+  garrison takes none (0x811124). Recruit Units running first in Simple City
+  Defense, the garrison is the one member a standing army counts, and only
+  where the army homed it before its recruit.
+- AN UPGRADE is a new unit (a new id in the records): its type's own AI
+  type, homed nowhere.
+- THE POOL ORDER: the army walks the units in pool order with the pool
+  brought up to date first (`seatPoolSlots`), a unit made this turn in its
+  slot.
+- CONFIRMED (one-seed aimem traces, AI_Military.csv's Combat Desire):
+  runs/h1_duely1127 Mexico City t70-79: t70 its Heavy Chariot 655362 moved
+  onto 8:10 with no garrison (no DEFENDER), the garrison from t71 (homed by
+  the army at t69): 0.3 / 0.2 / 0.2 / 0.1 at t72 / t73 / t74 / t75 (an Archer
+  joining) and 0.0 at t79 as logged; runs/h1_duely1127 city-state 2 t37-44
+  -0.1 with its homed garrison over a quota of 2, 0.0 once the garrison's
+  upgrade is a new unit; runs/h1_duely1124 city-state 3 t27-45 (its Warrior
+  589824 made on slot 0 at t27 joins ahead of the older ones; 720900, made
+  on slot 4 at t29 with the quota of 1 full, recruited, City Defense's
+  garrison t30-39 never counted: 0.1 / 0.2 as logged).
+- OPEN: the EXPLORE clause and the +0xf30 release of 0x5ca7e0; whether an
+  upgraded member leaves its operation (runs/h1_duely1117 city-state 4
+  t93-94: 0.2 / 0.1 against the logged 0.0); the Free Cities' garrison in
+  the GPU twin (`_x_garrison` reads the minors' pool).

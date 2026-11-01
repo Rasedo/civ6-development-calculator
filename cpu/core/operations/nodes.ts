@@ -115,6 +115,9 @@ export interface OpsContext {
   /** the units take their type's own AI type (0x79b9c0: COMBAT for a
    *  fighting unit), a standing army's DEFENDER among them leaving it */
   ownAiType(ids: readonly number[]): void;
+  /** the unit takes AI type DEFENDER (0x1e60f0 on unit +0x168), its home
+   *  kept: Garrison City's garrison or swapped-in candidate */
+  defenderAiType(id: number): void;
   op: Operation;
   /** the units in any operation (none recruitable elsewhere) */
   assigned(): ReadonlySet<number>;

@@ -80,7 +80,7 @@ import { eruptionHazardTurns, floodHazardTurns } from './disasters';
 import { baseAdjacency, buildingPillaged, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
 import { builderHarvest, builderRemoveFeature, purchaseSpotBlocked } from './units';
-import { aiStrengths, dangerPlane, moveTo, moveUnitDanger, reachPlots, turnsToPlot } from './tactical';
+import { aiStrengths, dangerPlane, moveTo, moveUnitDanger, reachPlots, seatPoolSlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import {
   installType, minorBuildFacts, minorBuilderLays, minorBuildingPrice, minorBuyBuilding, minorBuyUnit, minorItemFor, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
@@ -722,14 +722,17 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
  * THE STANDING ARMY (0x5ca7e0, the city's full update): its quota, the whole
  * part of PSEUDOYIELD_STANDING_ARMY_NUMBER (1.0 at a minor's weight) times
  * the square root of its population (float32, as the game's fixed point).
- * Its list: the minor's units of AI type DEFENDER (`aiDefender`), in its
- * units' order (taken as pool order); then each unit of AI type COMBAT (a
- * fighting unit, not civilian, not recon) outside every running operation,
- * of the land or — where the city is coastal — the sea, in that order, joins
- * as a DEFENDER while the list is below the quota, else takes the place of
- * the list's weakest (the first of the lowest Combat, 0x5c4910) where its
- * Combat is higher (`aiStrengths`, 0x56dc90 with 0), the weakest turned
- * COMBAT. The count it lacks, the quota
+ * Its list: the minor's units of AI type DEFENDER (`aiDefender`) homed on
+ * its city (`aiHomed`, +0x11d0), in pool order (`seatPoolSlots`), in an
+ * operation or not; then each unit of AI type COMBAT (a fighting
+ * unit, not civilian, not recon) outside every running operation, of the
+ * land or — where the city is coastal — the sea, in that order, joins as a
+ * DEFENDER homed on the city while the list is below the quota, else takes
+ * the place of the list's weakest (the first of the lowest Combat,
+ * 0x5c4910) where its Combat is higher (`aiStrengths`, 0x56dc90 with 0), the
+ * weakest turned COMBAT and homed nowhere. A DEFENDER homed nowhere (City
+ * Defense's garrison never in the army) is in neither part. The count it
+ * lacks, the quota
  * less the list (CityBuildAI +0x2d8, below 0 where the list outgrows a quota
  * that fell), which the military AI adds to its Combat Desire as
  * PSEUDOYIELD_STANDING_ARMY_VALUE each. The release of a DEFENDER with
@@ -743,8 +746,12 @@ export function minorStandingArmy(state: GameState, cs: CityState): number {
     fl * FX + Math.trunc(Math.fround(Math.fround(root - fl) * 256))) >> 8;
   const busy = new Set(minorJobUnits(cs));
   const coastal = isCoastalLand(state.map, state.map.tiles[cs.centerIndex]);
-  const own = state.units.filter((u) => u.seat === cs.seat).sort((a, b) => (a.slot ?? Infinity) - (b.slot ?? Infinity));
-  const list = own.filter((u) => u.aiDefender);
+  // in pool order, the pool brought up to date: a unit made this turn walks
+  // in its slot (runs/h1_duely1124 city-state 3 t27: its new Warrior 589824
+  // on slot 0 joins ahead of the older ones)
+  seatPoolSlots(state, cs);
+  const own = state.units.filter((u) => u.seat === cs.seat).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+  const list = own.filter((u) => u.aiDefender && u.aiHomed);
   const combat = (u: Unit) => aiStrengths(state, u).melee;
   const weakest = (): Unit | null => list.reduce<Unit | null>((w, u) => (w === null || combat(u) < combat(w) ? u : w), null);
   for (const u of own) {
@@ -754,14 +761,17 @@ export function minorStandingArmy(state: GameState, cs: CityState): number {
     if (row.domain !== 'DOMAIN_LAND' && !(row.domain === 'DOMAIN_SEA' && coastal)) continue;
     if (list.length < quota) {
       u.aiDefender = true;
+      u.aiHomed = true;
       list.push(u);
       continue;
     }
     const w = weakest();
     if (!w || combat(w) >= combat(u)) continue;
     delete w.aiDefender;
+    delete w.aiHomed;
     list.splice(list.indexOf(w), 1);
     u.aiDefender = true;
+    u.aiHomed = true;
     list.push(u);
   }
   return quota - list.length;

@@ -30,7 +30,7 @@
  */
 import type { City, GameState, Unit } from './types';
 import { aiView } from './aiView';
-import { passOrders, passView, ownAiType } from './opsOrders';
+import { defenderAiType, passOrders, passView, ownAiType } from './opsOrders';
 import { recentOf } from './minorOps';
 import { newOpsAi, operationsRun, opsOf, startOperationAt, type OpsAi, type OpsEnv } from './operations/manager';
 import { NO_PLOT, opUnits } from './operations/operation';
@@ -138,6 +138,7 @@ function freeEnv(state: GameState, pass: Pass | null): OpsEnv {
     },
     ...(pass ? passOrders(state, FREE_SEAT, pass, changed) : outsidePass),
     ownAiType: ownAiType(state, FREE_SEAT, pass),
+    defenderAiType: defenderAiType(state, FREE_SEAT, pass),
     log: (l) => tracer?.(l),
     logEval: () => undefined,
   };

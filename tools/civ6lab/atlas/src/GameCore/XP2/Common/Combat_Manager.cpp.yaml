@@ -47,6 +47,15 @@
   context:
     - "...(the Unit constructor FinalRelease 0x39b140), its object +0x970 (the Release's +0x1bc0; 0x1fc100 (FinalRelease 0x14fa10) asks 0x116f80 (FinalRelease 0x2af30) of unit +0x970): +8 the..."
   review: reviewed
+- addr: 0x1fdea0
+  final: 0x151910
+  kind: function
+  status: PARTLY
+  readings: ["C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...writers of the home: the unit's init (0x5657b2, -1) and a city's capture (0x5c9d40 from 0x1fdea0: the capturing unit's assignment -1, DEFENDER, homed on the city). Recruit Units' upd..."
+  review: imported
 - addr: 0x200e10
   kind: function
   semantics: raises an AI event on the player's signals (+0x2b8).

@@ -660,6 +660,12 @@ export function minorUpgradeUnit(state: GameState, cityState: CityState, u: Unit
   }
   u.type = next;
   u.movesLeft = 0;
+  // the upgrade a new unit (a new id in the records): of its type's own AI
+  // type and homed nowhere (the unit's init 0x563cd0), out of the standing
+  // army (runs/h1_duely1127 city-state 2 t43: its garrison Warrior 44's
+  // Swordsman, the Combat Desire -0.1 -> 0.0)
+  delete u.aiDefender;
+  delete u.aiHomed;
   raiseBestTrained(state, cityState.seat, u.type, u.formation ?? 0);
   return true;
 }

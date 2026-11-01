@@ -1770,11 +1770,13 @@ function minorOpsAfter(ctx: Ctx, b: TurnRecord, turn: number, copy: GameState, t
     if (x[2] === 'UnitAddedToMap' && !addedAt.has(`${x[3]}:${x[4]}`)) addedAt.set(`${x[3]}:${x[4]}`, x[0] as number);
   }
   const plotAt = logPlots(ctx, acts);
-  // their units' AI type as their operations' recruits left it
+  // their units' AI type and home as their operations left them
   for (const [x, u] of twin) {
     if (!minorAiSeat(x.seat) || !copy.units.includes(x) || !state.units.includes(u)) continue;
     if (x.aiDefender) u.aiDefender = true;
     else delete u.aiDefender;
+    if (x.aiHomed) u.aiHomed = true;
+    else delete u.aiHomed;
   }
   for (const c of copy.cityStates) {
     const cs = state.cityStates.find((x) => x.id === c.id);
@@ -4636,7 +4638,7 @@ const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues'
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgrading', 'upgradeTrigger'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
-const UNIT_MEMORY = ['slot', 'aiDefender'] as const;
+const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed'] as const;
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;
 /** THE RULES' STORES NO RECORD SHOWS, carried the same way: the research
  *  and culture overflow a completion left for the next turn's yield
@@ -4920,6 +4922,10 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
     pool.size = Math.max(pool.size, ...[...held].map((x) => x + 1));
     pool.free = pool.free.filter((x) => !held.has(x));
     pool.dying = pool.dying.filter((x) => !held.has(x));
+    // a slot the record's last turn emptied waits for the player's next
+    // turn to go free (`poolDying`; runs/h1_duely1124 city-state 3 t27: its
+    // Warrior 589824 made on slot 0, its Builder lost at t25)
+    for (let k = 0; k < pool.size; k++) if (!held.has(k) && !pool.free.includes(k) && !pool.dying.includes(k)) pool.dying.push(k);
   }
   ctx.retained = new Map();
 }

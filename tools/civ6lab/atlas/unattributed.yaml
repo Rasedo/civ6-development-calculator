@@ -888,6 +888,10 @@
     - recording: AI_Military.csv
       turn: 10
       value: "UNIT_WARRIOR\" takes its   standing DEFENDER, the Combat Desire 0.0 at t10 (the city's update before   the recruit), 0.1 from t11 (AI_Military.csv), the shortfall 1."
+  impl:
+    - cpu/core/operations/assault.ts:garrisonExecute
+    - cpu/core/operations/nodes.ts:OpsContext
+    - gpu/core/sim_minorops.py:_x_garrison
   readings:
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
@@ -2662,6 +2666,17 @@
   context:
     - ...D_FOOD] / adv[YIELD_PRODUCTION] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analy...
   review: reviewed
+- addr: 0x5c9d40
+  final: 0x3def80
+  kind: function
+  name: a city's capturer homed as its DEFENDER
+  semantics: "called from a city's capture (0x1fdea0 at 0x1fe491, rdx the capturing unit, rcx the city's AI): the unit's assignment (the watched +0x778, value +0x7d0) -1, its AI type (+0x168, value +0x1c0) DEFENDER 4, its home (+0x1178, value +0x11d0) the city's +0x98 -> +0xf8 (0x1e60f0 each). Unported: no recording holds a city-state's or Free City's capture of a city."
+  status: PARTLY
+  readings: ["C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...1). The other writers of the home: the unit's init (0x5657b2, -1) and a city's capture (0x5c9d40 from 0x1fdea0: the capturing unit's assignment -1, DEFENDER, homed on the city). Recrui..."
+  review: imported
 - addr: 0x5d7e00
   final: 0x3ea990
   kind: function
@@ -5966,6 +5981,7 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-96: the standing army and the Combat Desire's city terms"
+    - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
   context:
     - "...up, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority..."
   review: reviewed

@@ -122,6 +122,8 @@ export interface OpsEnv {
   pillage?: OpsContext['pillage'];
   /** the units' AI type their type's own (`OpsContext`) */
   ownAiType: OpsContext['ownAiType'];
+  /** a unit's AI type DEFENDER (`OpsContext`) */
+  defenderAiType: OpsContext['defenderAiType'];
   /** the operation lines (AI_Operation.csv without its turn and player) and
    *  the candidate lines (AI_Operation_Eval.csv) */
   log(line: string): void;
@@ -432,6 +434,7 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     patrol: env.patrol,
     pillage: env.pillage,
     ownAiType: env.ownAiType,
+    defenderAiType: env.defenderAiType,
     op,
     assigned: () => {
       const out = assigned(ai);

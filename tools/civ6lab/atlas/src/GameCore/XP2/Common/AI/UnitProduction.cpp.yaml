@@ -113,6 +113,7 @@
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-96: the standing army and the Combat Desire's city terms"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
+    - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ng army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"

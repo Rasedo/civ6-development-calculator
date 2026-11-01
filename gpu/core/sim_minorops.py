@@ -2754,6 +2754,17 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     # else a garrison of no Range fortifies, its moves ended
     gt = sim.major_unit_type[b, gar.clamp(min=0)].clamp(min=0, max=sim.NU - 1)
     end_moves(gar, with_g & ~m & (sim._type_ranged_range.take(gt) == 0))
+    # the candidate swapped in takes AI type DEFENDER, the garrison its
+    # type's own; with no stronger candidate the garrison takes DEFENDER
+    # (0x1e60f0 on unit +0x168; `garrisonExecute`), its home kept
+    dfd = sim.major_unit_defender
+    r = m.nonzero(as_tuple=True)[0]
+    if r.numel():
+        dfd[r, pick[r]] = True
+        dfd[r, gar[r]] = False
+    r = (with_g & ~m).nonzero(as_tuple=True)[0]
+    if r.numel():
+        dfd[r, gar[r]] = True
 
 
 def _x_attack_city(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:

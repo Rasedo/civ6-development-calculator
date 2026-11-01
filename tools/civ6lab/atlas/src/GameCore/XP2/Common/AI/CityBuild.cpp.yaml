@@ -70,7 +70,7 @@
 - addr: 0x5ca7e0
   kind: function
   name: the standing army
-  semantics: "the standing army, a step of the city's full update (after the threat 0x5cbd10). The quota, CityBuildAI +0x220's watched value (+0x278, the setter 0x731d10), is pseudoYieldValue(PSEUDOYIELD_STANDING_ARMY_NUMBER, 1.0, the owner) x fx(sqrtf(the population +0x588)) (sqrtf the IAT slot @0xcf47b0), whole (sar 8). The list: the player's units (+0x12e8 +0xd8) of AI type DEFENDER (+0x1c0 == 4) homed on the city (+0x11d0 == city +0xf8) — one with +0xf30 above 0 that player +0x1278 holds (0x623910 >= 0) released (COMBAT 3, home -1); the weakest found (0x5c4910); then per unit of AI type COMBAT (3) — or EXPLORE (2) whose type's highest AI flag up to 3 is COMBAT (0x79b9c0) while the player's units exceed twice its cities — in no operation (+0x7d0 == -1), of the land (+0x650 == 2) or the sea (0) beside a coastal city (0x82a10), not so held: below the quota it joins (DEFENDER, homed); else where its Combat (0x56dc90) tops the weakest's it takes the weakest's place (the weakest COMBAT, home -1), the weakest found again after each change. The shortfall, CityBuildAI +0x280's watched value (+0x2d8), is the quota less the list (below 0 where the list outgrew a fallen quota). Ported: minorStandingArmy / minorStandingArmyShort (cpu/core/minorCityAi.ts), _minor_standing_army / _minor_standing_short (gpu/core/sim_minorai.py); the EXPLORE clause and the +0xf30 release not ported."
+  semantics: "the standing army, a step of the city's full update (after the threat 0x5cbd10). The quota, CityBuildAI +0x220's watched value (+0x278, the setter 0x731d10), is pseudoYieldValue(PSEUDOYIELD_STANDING_ARMY_NUMBER, 1.0, the owner) x fx(sqrtf(the population +0x588)) (sqrtf the IAT slot @0xcf47b0), whole (sar 8). The list: the player's units (+0x12e8 +0xd8) of AI type DEFENDER (+0x1c0 == 4) homed on the city (+0x11d0 == city +0xf8) — one with +0xf30 above 0 that player +0x1278 holds (0x623910 >= 0) released (COMBAT 3, home -1); the weakest found (0x5c4910); then per unit of AI type COMBAT (3) — or EXPLORE (2) whose type's highest AI flag up to 3 is COMBAT (0x79b9c0) while the player's units exceed twice its cities — in no operation (+0x7d0 == -1), of the land (+0x650 == 2) or the sea (0) beside a coastal city (0x82a10), not so held: below the quota it joins (DEFENDER, homed); else where its Combat (0x56dc90) tops the weakest's it takes the weakest's place (the weakest COMBAT, home -1), the weakest found again after each change. The shortfall, CityBuildAI +0x280's watched value (+0x2d8), is the quota less the list (below 0 where the list outgrew a fallen quota). The home (+0x1178, value +0x11d0) is written here (join: the city's +0xf8; drop: -1), by the capture 0x5c9d40 and the unit's init (-1, 0x5657b2), never by a recruit (0x81cbb2 writes the AI type alone) or Garrison City: a DEFENDER Garrison City makes counts only where the army homed it before. Ported: minorStandingArmy / minorStandingArmyShort (cpu/core/minorCityAi.ts: aiDefender, aiHomed), _minor_standing_army / _minor_standing_short (gpu/core/sim_minorai.py: unit_defender, unit_homed); the EXPLORE clause and the +0xf30 release not ported."
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -78,17 +78,17 @@
       value: "Hunza's standing DEFENDER recruited by Attack Barb Camp at t9: the Combat Desire 0.0 at t10, 0.1 from t11, the shortfall 1"
     - recording: h1_duelv1117
       value: the Combat Desire as logged 264 -> 602 of 747 minor-turns with the shortfall at PSEUDOYIELD_STANDING_ARMY_VALUE each
-  impl:
-    - cpu/core/minorCityAi.ts:minorStandingArmy
-    - gpu/core/sim_minorai.py:_minor_standing_army
-    - cpu/core/minorCityAi.ts:minorStandingArmy
-    - gpu/core/sim_minorai.py:_minor_standing_army
+    - recording: h1_duely1127
+      turn: 43
+      value: "city-state 2: its garrison Warrior 44, homed, counted with the two DEFENDERs above the quota (-0.1 t37-43); its upgrade a new unit homed nowhere (0.0 from t44)"
+  impl: [cpu/core/minorCityAi.ts:minorStandingArmy, gpu/core/sim_minorai.py:_minor_standing_army]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the standing army and the Combat Desire's city terms"
+    - "C-128: the standing army's home and Garrison City's DEFENDER — READ, both twins"
   context:
     - "...] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0x5ce3f0: the job o..."
   review: reviewed
