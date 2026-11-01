@@ -33,7 +33,9 @@
   final: 0x2e9200
   kind: function
   status: PARTLY
-  readings: ["H-1: the city-states' quests — READ"]
+  readings:
+    - "H-1: the city-states' quests — READ"
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ient != actor, both alive (+0x728), the client a minor and the actor a major (Influence 0x449cc0 / 0x449940), the client has met the actor (0x3daaf0) and is not at war with it (0x3dc...
@@ -70,19 +72,28 @@
   review: reviewed
 - addr: 0x44c4b0
   kind: function
+  semantics: "GetMostTokensReceived: over the player list (+0x4a0), the greatest of the store +0x5d0[p] plus 0x44caa0(p) (a posted governor's share), 0 with none — the city centre's envoy term (0x24a180)."
   status: READ
   cases:
+    - recording: 1128
+      turn: 148
+      value: "runs/h1_duely1128 Bologna (one envoy from player 0, six from player 1): the centre 50 = 35 + Palace 3 + walls 6 + the most envoys 6, its City Defense started at t148 as logged"
     - recording: h1_duelw1117
       turn: 28
       value: "The AI sends its envoys in its start, before its cities: the \"one or two border picks more with no plot changing hands\" of the major's start (LAB) are the city-state's annex — runs/h1_duelw1117 t28 (C"
     - recording: h1_duelw1118
       turn: 33
       value: runs/h1_duelw1118 t33 (Armagh's two), t66, t113, t148 (Kumasi's two before China's seven cities).
-  impl: [cpu/core/aiViewTypes.ts:AiView]
-  readings: ["H-1: the envoy annex — READ (settles the extra border picks)"]
+  impl:
+    - cpu/core/aiViewTypes.ts:AiView
+    - cpu/core/cityStates.ts:mostEnvoysReceived
+    - gpu/core/sim_minors.py:_minor_most_envoys
+  readings:
+    - "H-1: the envoy annex — READ (settles the extra border picks)"
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
   context:
     - ...ation level CanAnnexTilesWithReceivedInfluence (+0x28 bit 4), with E the envoys it holds (0x44c4b0, every giver) and A its annexed count past its starting tiles (+0xc less 0x1ab460, Starti...
-  review: imported
+  review: reviewed
 - addr: 0x44c6a0
   final: 0x2ea600
   kind: function
@@ -151,6 +162,7 @@
   impl: [cpu/core/aiView.ts:centres]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
   context:
     - ...city-state received from the player (0x44c860, the store +0x5d0 and a posted governor's 0x44caa0) plus the context's n reach MinimumTokens (parser 0x6d4490, stoi); REQUIREMENT_PLAYER_I...
   review: imported

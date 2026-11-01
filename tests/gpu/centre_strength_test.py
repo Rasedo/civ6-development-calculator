@@ -6,7 +6,7 @@ One rule for every holder, the combat preview's DEFENSES lines: the holder's
 base (max(the start era's melee, its strongest melee trained or bought) - 10: an Ancient
 major's 20, a minor's 25), `Districts.CityStrengthModifier`
 over the complete, unpillaged districts, the walls tier, the Palace's +3, the
-garrison term, and a city-state's +1 per envoy. Each scene asserts the number
+garrison term, and a city-state's +1 per envoy of the major holding the most. Each scene asserts the number
 the TS twin (tests/cpu/units/city-combat.test.ts, "a city centre's standing
 strength") asserts for the same scene.
 """
@@ -164,7 +164,7 @@ def test_minor(sim) -> None:
     sim.seat_citystate_envoys[B0, :, s] = 0
     sim.seat_citystate_envoys[B0, 0, s] = 2
     sim.seat_citystate_envoys[B0, 1, s] = 1
-    assert strength(sim, row, 0) == 15 + 3 + 3, strength(sim, row, 0)
+    assert strength(sim, row, 0) == 15 + 3 + 2, strength(sim, row, 0)
     # a Warrior merely created moves nothing; one trained stays under the
     # minor's own start value 25; the strongest melee it trains, not its
     # population or its type, raises the base
@@ -180,10 +180,10 @@ def test_minor(sim) -> None:
     sim._minor_spawn(s, one, torch.full((sim.B,), sim._warrior_idx, dtype=torch.long))
     assert int(sim.citystate_best_melee[B0, s]) == start, "a trained Warrior moved the minor's base past its start"
     clear(sim, ctr)   # the trained Warrior lands on the centre: no garrison here
-    assert strength(sim, row, 0) == 15 + 3 + 3, strength(sim, row, 0)
+    assert strength(sim, row, 0) == 15 + 3 + 2, strength(sim, row, 0)
     sim.citystate_best_melee[B0, s] = 35
-    assert strength(sim, row, 0) == 25 + 3 + 3, strength(sim, row, 0)
-    print("  4 the city-state OK — its best melee (from its start 25) - 10, the Palace, +1 per envoy")
+    assert strength(sim, row, 0) == 25 + 3 + 2, strength(sim, row, 0)
+    print("  4 the city-state OK — its best melee (from its start 25) - 10, the Palace, +1 per envoy of the major holding the most")
 
 
 def test_trained_or_bought() -> None:

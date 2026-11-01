@@ -13327,8 +13327,8 @@ class SimSeats:
         stands, the Palace's +3 where
         the city holds it (`_palace_at`: a capital, a minor's city), the
         garrison term (`_garrison_cs`) — left out where `garrisoned` is False
-        (the Encampment) — and a city-state's +1 per envoy it holds
-        (`_minor_envoys_received`). The garrison term is fractional, so the
+        (the Encampment) — and a city-state's +1 per envoy of the major that
+        holds the most there (`_minor_most_envoys`). The garrison term is fractional, so the
         strength is float64, summed in TS's order: the integer terms first,
         then the garrison, then the envoys."""
         bidx = self._bidx
@@ -13350,7 +13350,7 @@ class SimSeats:
             cs = cs + self._garrison_cs(hrow, hcol, seat, base)
         if self.S > 0:
             s0 = (hrow - self._CITY_MINOR0).clamp(min=0, max=self.S - 1)
-            env = self._minor_envoys_received()[bidx, s0]
+            env = self._minor_most_envoys()[bidx, s0]
             cs = cs + torch.where(minor, env * self._envoy_city_cs, torch.zeros_like(env))
         return cs
 

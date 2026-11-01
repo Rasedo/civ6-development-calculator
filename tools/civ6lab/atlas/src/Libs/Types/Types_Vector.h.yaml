@@ -681,6 +681,21 @@
   context:
     - ...y itself passes; a city no longer standing (0x57960 null) leaves the list (0x78d6d0 / 0x78f5d0); the destination's plot asked of the player (0x2d2220); with the list holding a city a...
   review: imported
+- addr: 0x7963a0
+  final: 0x51ff60
+  kind: function
+  semantics: "the std::sort insertion sort (MSVC _Insertion_sort_unchecked) over the 0x168-byte unit production entries: an element before the first moves to the front, else it sinks past every element it precedes. Stable."
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 212
+      value: "runs/h1_duely1121 city-state 3's Naval Superiority: of 66 entries, Pike and Shot (55) walks before the Caravel (55), every sum 0; Contract for: UNIT_PIKE_AND_SHOT t212-t221 as logged"
+  impl: [cpu/core/stdSort.ts:stdSort, gpu/core/std_sort.py:std_sort]
+  readings:
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
+  context:
+    - "...h no divisions left the heap pair 0x796970 / 0x797420; 32 or fewer the insertion sort 0x7963a0. Unstable: equal entries (0x79d3e0 equal on buildable, the sums and the strength) land..."
+  review: reviewed
 - addr: 0x7e7d20
   kind: function
   semantics: "Add Goal Tech's update: its kept contracts first (+0x94 tech, +0x9c civic: SUBMITTED / FAILED / COMPLETED / 0 released, IN PROGRESS RUNNING); no list in its data ERROR. The lists: Desired Techs and Civics the player lacks, each desired unit's, building's and improvement's PrereqTech / PrereqCivic it lacks; per improvement, on the Goal Plot, the resource the player sees there (0x4ab4b0): one it works keeps the feature where MustRemoveFeature is false, one it does not adds its Resource_Harvests' PrereqTech; then a feature it neither keeps nor lists: not Removable FAILURE, else its RemoveTech. \"Add Techs For All\" clear: an item lacking its own SUCCEEDS at once. Then the Goal Plot alone: each improvement working the seen resource adds its PrereqTech, and a removable feature's RemoveTech. The tech list sorted (0x7e7080), the first the goal; none SUCCESS, else RUNNING."

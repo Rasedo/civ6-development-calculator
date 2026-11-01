@@ -7,23 +7,27 @@
  */
 import { AI_UNIT_AI_PRIORITY } from '../../data/aiOperations';
 import type { UnitProductionRow } from '../aiUnitProduction';
+import { stdSort } from '../stdSort';
 import { hasAiType } from './operation';
 
-/** 0x79d3e0, the order the choice walks (a std::sort, descending): a
- *  buildable entry (+0x0e) first; against a player, its per-player sum
- *  (+0x38) greater first; then the at-war sum (+0x2c), the sum over every
- *  player (+0x30), the strength (+0x18). Equals keep the table's order. */
+/** The order the choice walks: the table sorted by the game's std::sort
+ *  (0x7976f0, `stdSort`) under the comparator 0x79d3e0 — a buildable entry
+ *  (+0x0e) first; against a player, its per-player sum (+0x38) greater
+ *  first; then the at-war sum (+0x2c), the sum over every player (+0x30),
+ *  the strength (+0x18). Equals land where the unstable sort puts them
+ *  (runs/h1_duely1121 t212 city-state 3's Naval Superiority: of the
+ *  table's 66 entries, Pike and Shot before the Caravel, both 55). */
 export function choiceOrder(rows: readonly UnitProductionRow[], player: number): UnitProductionRow[] {
-  return [...rows].sort((a, b) => {
-    if (a.buildable !== b.buildable) return a.buildable ? -1 : 1;
+  return stdSort([...rows], (a, b) => {
+    if (a.buildable !== b.buildable) return a.buildable;
     if (player >= 0) {
       const pa = a.perPlayer.get(player) ?? 0;
       const pb = b.perPlayer.get(player) ?? 0;
-      if (pa !== pb) return pb - pa;
+      if (pa !== pb) return pa > pb;
     }
-    if (a.atWar !== b.atWar) return b.atWar - a.atWar;
-    if (a.all !== b.all) return b.all - a.all;
-    return b.strength - a.strength;
+    if (a.atWar !== b.atWar) return a.atWar > b.atWar;
+    if (a.all !== b.all) return a.all > b.all;
+    return a.strength > b.strength;
   });
 }
 

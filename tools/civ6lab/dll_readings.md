@@ -5759,3 +5759,48 @@ nodes.ts), `_op_move_exec`'s `stacks` and `_tac_own_class`
   beside a passenger not compared); runs/h1_duely1127 t80-91 city-state 3's
   Swordsman plans 4:10, player 1's Missionary there in the record (0x585d90
   counts it for a Swordsman: +0x1ce0 of the pair 0x518f40 unread).
+
+## C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins
+
+`mostEnvoysReceived` (cpu/core/cityStates.ts) in `centreStrength`;
+`_minor_most_envoys` in `_centre_strength`. `stdSort` (cpu/core/stdSort.ts)
+in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
+
+- THE ENVOY TERM (0x24a180, LOC_COMBAT_PREVIEW_ENVOY_STRENGTH_BONUS): where
+  the district's owner can receive influence (0x449cc0), GetMostTokensReceived
+  (0x44c4b0: over the player list, the store +0x5d0[p] plus 0x44caa0's
+  governor share, the greatest) times the float global +0x22c (fixed-point
+  whole and fraction; COMBAT_STRENGTH_FROM_ENVOYS 1). Not the sum over the
+  givers. The other centre terms read as the engines take them: the base
+  0x24a000 (the strongest melee trained, +0x1330 +0xf0, less global +0x1b4),
+  the garrison, the walls' OuterDefenseStrength sum plus city +0x1888, the
+  districts' strength, the Palace's city +0x188c.
+- CONFIRMED: runs/h1_duely1128 t148 Bologna (player 3: one envoy from player
+  0, six from player 1) holds 35 + 3 + 6 + 6 = 50, inside the bound the
+  City Defense start gives (above 45: the Trebuchet 65 short of D + 20 at
+  t147; below 51: the new Courser 46 counts at t148); the engines' sum gave
+  51. Its City Defense now starts at t148 with the Trebuchet and two
+  Warriors, as logged (aimem trace t140-151: no op.start / ops.members miss
+  for player 3 at t148-149).
+- THE SORT (0x7976f0 over 0x168-byte entries): the MSVC STL's
+  _Sort_unchecked — above 32 elements and with divisions left, the
+  partition by median guess 0x796f60 (the median guess 0x795f80: Tukey's
+  ninther above 40 elements through the median-of-three 0x796bf0, else one
+  median of three; the pivot range of equals grown both ways, swaps
+  0x797bf0), the smaller side recursed, ideal = ideal/2 + ideal/4; with no
+  divisions left the heap pair 0x796970 / 0x797420; 32 or fewer the
+  insertion sort 0x7963a0. Unstable: equal entries (0x79d3e0 equal on
+  buildable, the sums and the strength) land where the partition leaves
+  them, not in the table's order.
+- CONFIRMED: runs/h1_duely1121 city-state 3's Naval Superiority (aimem trace
+  from t212): of its 66-entry table Pike and Shot (55) before the Caravel
+  (55), every sum 0: "Contract for: UNIT_PIKE_AND_SHOT" t212-t221 as logged
+  (the engines' stable order named the Caravel). The TS and Python sorts
+  agree on 400 random key vectors (1-150 elements).
+- OPEN: where the sums are not equal the game still names a land unit over
+  the Caravel: 1121 city-state 2 (Hunza) t218 Pike and Shot (engines: the
+  Caravel's every-player sum 2738 over Pike and Shot's 2639, at-war sums
+  equal 1585); city-state 3 t90 the Warrior Monk and t92-t174 the Trebuchet
+  over the Caravel (engines' every-player sum 60432 / 31327). The sums'
+  terms against a sea entry (the efficiency orientation or the opposition's
+  domain) unread.

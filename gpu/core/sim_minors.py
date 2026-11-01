@@ -1420,6 +1420,12 @@ class SimMinors:
         Amani's included."""
         return self.seat_citystate_envoys[:, : self.n_majors, : self.S].sum(dim=1).long()
 
+    def _minor_most_envoys(self) -> torch.Tensor:
+        """[B, S] long — `mostEnvoysReceived`: the most envoys any one major
+        effectively holds at each minor (`_envoys_here_all`), 0 with none —
+        GetMostTokensReceived, the city centre's envoy term."""
+        return self._envoys_here_all()[:, :, : self.S].amax(dim=1).clamp(min=0)
+
     def _init_minor_build(self, rules) -> None:
         """THE MINOR'S STEP'S TABLES (`minorBuild`): the percents its step pays
         toward an item (a Builder, a military unit while the minor holds few,

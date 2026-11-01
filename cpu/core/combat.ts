@@ -14,7 +14,7 @@ import { addWmd, nukeBlast, nukeCarrier, nukeInterceptStrength, nukeOffers, nuke
 import { declareWar } from './phase';
 import { declareWarOnCityState } from './cityStates';
 import { warBuffCS } from './casusBelli';
-import { envoysOf, envoysReceived, hasMet, minorCity } from './cityStates';
+import { envoysOf, hasMet, minorCity, mostEnvoysReceived } from './cityStates';
 import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS } from '../data/units';
 import { UNIT_TYPE_IDX } from '../data/units';
 import { IMPROVEMENTS, improvementDefenseCS, improvementIsCover } from '../data/improvements';
@@ -1162,7 +1162,8 @@ export function wallsStrength(city: { buildings: string[] }): number {
  * - the garrison term (`garrisonCS`). The Encampment asks without it
  *   (`garrisoned` false) — CIV6: it fights "similar to the parent City
  *   Center, excluding any bonus obtained for a Garrisoned unit";
- * - a city-state's +1 per envoy it holds (`envoysReceived`).
+ * - a city-state's +1 per envoy of the seat that holds the most there
+ *   (`mostEnvoysReceived`, GetMostTokensReceived in 0x24a180).
  * The garrison term is fractional, so the strength is; the damage law takes
  * it as it stands. The governor and policy terms ride on top in
  * `cityDefenseStrength` and `cityStrikeStrength`. The GPU twin is
@@ -1179,7 +1180,7 @@ export function centreStrength(state: GameState, city: City, garrisoned = true):
   if (garrisoned) n += garrisonCS(state, city, base);
   if (isCityStateSeat(city.seat)) {
     const minor = seatOf(state, city.seat) as CityState | undefined;
-    if (minor) n += envoysReceived(minor) * ENVOY_CITY_CS;
+    if (minor) n += mostEnvoysReceived(state, minor) * ENVOY_CITY_CS;
   }
   return n;
 }

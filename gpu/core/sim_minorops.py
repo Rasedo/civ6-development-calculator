@@ -43,6 +43,7 @@ from .sim_citytrees import (
 )
 from .sim_research import _FX
 from .sim_tactics import _AI_COMBAT, _AI_DEFENDER
+from .std_sort import std_sort
 
 # the pool's slots, the teams of an operation, a team's members, the camps
 # the knowledge base holds, the Operation Move nodes of a tree
@@ -592,18 +593,43 @@ class SimMinorOps:
         ok = rows["entry"] & rows["buildable"] & ~rows["obsolete"] & matched & ~fullh & rows["maintained"]
         return ok, prio & ok
 
+    def _mops_choice_order(self, rows: dict) -> torch.Tensor:
+        """`choiceOrder` against no player: [B, NU] the AI unit rows in the
+        order the choice walks — the entries, in the table's order, sorted
+        by the game's std::sort (`std_sort`) under 0x79d3e0 (buildable
+        first, then the at-war sum, the every-player sum, the strength, each
+        greater first), the rows not in the table after them. The sort is
+        unstable, so each batch row's order is the host sort over its keys'
+        dense ranks, one sort per distinct rank pattern (memoised)."""
+        B, dev = self.B, self.device
+        entry = rows["entry"]
+        nu = entry.shape[1]
+        keys = torch.stack([rows["buildable"].to(torch.float64), rows["war"].to(torch.float64),
+                            rows["all"].to(torch.float64), rows["strength"].to(torch.float64)], dim=2)
+        _u, rank = torch.unique(keys.reshape(B * nu, 4), dim=0, return_inverse=True)
+        rank = torch.where(entry, rank.reshape(B, nu), torch.full((B, nu), -1, dtype=torch.long, device=dev))
+        pats, inv = torch.unique(rank, dim=0, return_inverse=True)
+        memo = getattr(self, "_mops_order_memo", None)
+        if memo is None or len(memo) > 4096:
+            memo = self._mops_order_memo = {}
+        out = []
+        for p in pats.tolist():
+            key = tuple(p)
+            got = memo.get(key)
+            if got is None:
+                idx = [k for k in range(nu) if p[k] >= 0]
+                std_sort(idx, lambda a, b: p[a] > p[b])
+                got = memo[key] = idx + [k for k in range(nu) if p[k] < 0]
+            out.append(got)
+        return torch.tensor(out, dtype=torch.long, device=dev).index_select(0, inv)
+
     def _mops_choose(self, rows: dict, need: torch.Tensor, full: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         """`chooseUnit` (0x79bd30) against no player: [B] the AI unit row the
         team asks to be built, -1 none"""
         B, dev = self.B, self.device
         ok, prio = self._mops_fits(rows, need, full)
         ok &= mask.unsqueeze(1)
-        nu = ok.shape[1]
-        order = torch.arange(nu, device=dev).unsqueeze(0).expand(B, -1)
-        for keyv in (rows["strength"], rows["all"], rows["war"], rows["buildable"].long(), rows["entry"].long()):
-            kk = keyv.gather(1, order)
-            idx = torch.sort(kk, dim=1, descending=True, stable=True).indices
-            order = order.gather(1, idx)
+        order = self._mops_choice_order(rows)
         chosen = torch.full((B,), -1, dtype=torch.long, device=dev)
         cprio = torch.zeros(B, dtype=torch.bool, device=dev)
         call = torch.zeros(B, dtype=torch.long, device=dev)

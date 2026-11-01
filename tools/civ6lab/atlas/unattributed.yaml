@@ -4106,18 +4106,114 @@
   context:
     - "...ee-over-ranged test (0x772437), Attack Strikers (0x7753fa), the planning's fights flag (0x793453), the team updates (0x738f20 — the endangered — and 0x73fba0, the members' strength), O..."
   review: imported
+- addr: 0x795f80
+  final: 0x51fb40
+  kind: function
+  semantics: "the std::sort median guess (MSVC _Guess_median_unchecked): over [first, last] inclusive, above 40 elements Tukey's ninther (step (count + 1) >> 3, four medians of three 0x796bf0), else one median of three."
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 212
+      value: "runs/h1_duely1121 city-state 3's Naval Superiority: of 66 entries, Pike and Shot (55) walks before the Caravel (55), every sum 0; Contract for: UNIT_PIKE_AND_SHOT t212-t221 as logged"
+  impl: [cpu/core/stdSort.ts:stdSort, gpu/core/std_sort.py:std_sort]
+  readings:
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
+  context:
+    - "...ments and with divisions left, the partition by median guess 0x796f60 (the median guess 0x795f80: Tukey's ninther above 40 elements through the median-of-three 0x796bf0, else one med..."
+  review: reviewed
+- addr: 0x796970
+  final: 0x5203f0
+  kind: function
+  semantics: the std::sort heap build (MSVC _Make_heap_unchecked) over the unit production entries, the fallback once the divisions run out.
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 212
+      value: "runs/h1_duely1121 city-state 3's Naval Superiority: of 66 entries, Pike and Shot (55) walks before the Caravel (55), every sum 0; Contract for: UNIT_PIKE_AND_SHOT t212-t221 as logged"
+  impl: [cpu/core/stdSort.ts:stdSort, gpu/core/std_sort.py:std_sort]
+  readings:
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
+  context:
+    - "...smaller side recursed, ideal = ideal/2 + ideal/4; with no divisions left the heap pair 0x796970 / 0x797420; 32 or fewer the insertion sort 0x7963a0. Unstable: equal entries (0x79d3e0..."
+  review: reviewed
+- addr: 0x796bf0
+  kind: function
+  semantics: the std::sort median of three (MSVC _Med3_unchecked) over three unit production entries.
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 212
+      value: "runs/h1_duely1121 city-state 3's Naval Superiority: of 66 entries, Pike and Shot (55) walks before the Caravel (55), every sum 0; Contract for: UNIT_PIKE_AND_SHOT t212-t221 as logged"
+  impl: [cpu/core/stdSort.ts:stdSort, gpu/core/std_sort.py:std_sort]
+  readings:
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
+  context:
+    - "...he median guess 0x795f80: Tukey's ninther above 40 elements through the median-of-three 0x796bf0, else one median of three; the pivot range of equals grown both ways, swaps 0x797bf0)..."
+  review: reviewed
+- addr: 0x796f60
+  kind: function
+  semantics: "the std::sort partition (MSVC _Partition_by_median_guess_unchecked): the median guess 0x795f80 to the middle, the pivot range of equals grown both ways, the elements before it less-free and after it greater-free (swaps 0x797bf0); returns the equals' range."
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 212
+      value: "runs/h1_duely1121 city-state 3's Naval Superiority: of 66 entries, Pike and Shot (55) walks before the Caravel (55), every sum 0; Contract for: UNIT_PIKE_AND_SHOT t212-t221 as logged"
+  impl: [cpu/core/stdSort.ts:stdSort, gpu/core/std_sort.py:std_sort]
+  readings:
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
+  context:
+    - "...rt_unchecked — above 32 elements and with divisions left, the partition by median guess 0x796f60 (the median guess 0x795f80: Tukey's ninther above 40 elements through the median-of-thr..."
+  review: reviewed
+- addr: 0x797420
+  final: 0x521250
+  kind: function
+  semantics: the std::sort heap sort (MSVC _Sort_heap_unchecked) over the unit production entries, after 0x796970.
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 212
+      value: "runs/h1_duely1121 city-state 3's Naval Superiority: of 66 entries, Pike and Shot (55) walks before the Caravel (55), every sum 0; Contract for: UNIT_PIKE_AND_SHOT t212-t221 as logged"
+  impl: [cpu/core/stdSort.ts:stdSort, gpu/core/std_sort.py:std_sort]
+  readings:
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
+  context:
+    - "...de recursed, ideal = ideal/2 + ideal/4; with no divisions left the heap pair 0x796970 / 0x797420; 32 or fewer the insertion sort 0x7963a0. Unstable: equal entries (0x79d3e0 equal on..."
+  review: reviewed
 - addr: 0x7976f0
   final: 0x521430
   kind: function
-  semantics: sorts the unit production table (comparator 0x79d3e0).
+  semantics: "sorts the unit production table (comparator 0x79d3e0) by the MSVC STL's std::sort (_Sort_unchecked): above 32 elements with divisions left the partition 0x796f60, the smaller side recursed, ideal = ideal/2 + ideal/4; out of divisions the heap pair 0x796970 / 0x797420; 32 or fewer the insertion sort 0x7963a0. Unstable."
   status: READ
   cases:
+    - recording: 1121
+      turn: 212
+      value: "runs/h1_duely1121 city-state 3's Naval Superiority: of 66 entries, Pike and Shot (55) walks before the Caravel (55), every sum 0; Contract for: UNIT_PIKE_AND_SHOT t212-t221 as logged"
     - recording: 1128
       value: "The sums   the choice reads run the efficiency table the other way from the value's   (the entry's row against the opposing unit's column): AI_Operation.csv's   \"Contract for\" names the Warrior Monk w"
+  impl:
+    - cpu/core/operations/unitChoice.ts:choiceOrder
+    - cpu/core/stdSort.ts:stdSort
+    - gpu/core/std_sort.py:std_sort
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
   context:
     - "...urce, +0x2c the at-war players' sum, +0x30 every player's, +0x38 per player), sorted (0x7976f0, comparator 0x79d3e0): buildable first, then against the player its per-player sum, the..."
+  review: reviewed
+- addr: 0x797bf0
+  final: 0x521930
+  kind: function
+  semantics: the std::sort swap of two 0x168-byte unit production entries.
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 212
+      value: "runs/h1_duely1121 city-state 3's Naval Superiority: of 66 entries, Pike and Shot (55) walks before the Caravel (55), every sum 0; Contract for: UNIT_PIKE_AND_SHOT t212-t221 as logged"
+  impl: [cpu/core/stdSort.ts:stdSort, gpu/core/std_sort.py:std_sort]
+  readings:
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
+  context:
+    - ...0x796bf0, else one median of three; the pivot range of equals grown both ways, swaps 0x797bf0), the smaller side recursed, ideal = ideal/2 + ideal/4; with no divisions left the heap...
   review: reviewed
 - addr: 0x79d2d0
   final: 0x525590
@@ -4182,9 +4278,10 @@
   cases:
     - recording: 1128
       value: "The sums   the choice reads run the efficiency table the other way from the value's   (the entry's row against the opposing unit's column): AI_Operation.csv's   \"Contract for\" names the Warrior Monk w"
-  impl: [cpu/core/operations/unitChoice.ts:choiceOrder]
+  impl: [cpu/core/operations/unitChoice.ts:choiceOrder, gpu/core/sim_minorops.py:_mops_choice_order]
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
   context:
     - "...war players' sum, +0x30 every player's, +0x38 per player), sorted (0x7976f0, comparator 0x79d3e0): buildable first, then against the player its per-player sum, the at-war sum, the all-..."
   review: reviewed

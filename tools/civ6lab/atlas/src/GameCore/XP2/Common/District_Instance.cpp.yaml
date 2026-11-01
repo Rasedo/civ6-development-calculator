@@ -113,15 +113,19 @@
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
   context:
     - "- A district's GetDefenseStrength (Lua 0x98ca00 -> 0x24ae80) is computed live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's un..."
   review: reviewed
 - addr: 0x24a180
   final: 0x190d90
   kind: function
-  semantics: "a district's defence terms past the base: its garrison first (the best defender on the district's plot, 0x208b80 flags 0x10: its Combat << 8 less the wounded loss 0x522630, less the base, where positive), then the walls and the rest the centre reads."
+  semantics: "a district's defence terms past the base: its garrison first (the best defender on the district's plot, 0x208b80 flags 0x10: its Combat << 8 less the wounded loss 0x522630, less the base, where positive), then the walls (the buildings' OuterDefenseStrength plus city +0x1888), the districts' strength, the envoy term where the owner can receive influence (GetMostTokensReceived 0x44c4b0 times global +0x22c: the most one player holds, not the sum), the Palace (city +0x188c)."
   status: READ
   cases:
+    - recording: 1128
+      turn: 148
+      value: "runs/h1_duely1128 Bologna (one envoy from player 0, six from player 1): the centre 50 = 35 + Palace 3 + walls 6 + the most envoys 6, its City Defense started at t148 as logged"
     - recording: 1108
       value: formation,   0x56dc90) less the wounded loss, less the base, where positive (H-1 1108   Jiaodong 30.8359375 = 29 + 36 - 26 - 2090/256).
     - recording: 1121
@@ -144,12 +148,15 @@
     - cpu/core/combat.ts:garrisonTerm
     - cpu/core/operations/cityThreat.ts:MARGIN_HOSTILE
     - gpu/core/sim_minorai.py:_known_threat
+    - cpu/core/combat.ts:centreStrength
+    - gpu/core/sim_seats.py:_centre_strength
   readings:
     - "C-94: the wounded law and the garrison — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
   context:
     - "- The centre's garrison term (0x24a180): FP(Combat incl. formation, 0x56dc90) less the wounded loss, less the base, where posi..."
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units i..."

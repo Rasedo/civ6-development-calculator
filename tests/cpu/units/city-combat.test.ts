@@ -322,7 +322,7 @@ describe("a city centre's standing strength", () => {
     expect(centreStrength(state, city)).toBe(10);
   });
 
-  it("a city-state's centre: its best melee (from its start melee) - 10, the Palace, +1 per envoy", () => {
+  it("a city-state's centre: its best melee (from its start melee) - 10, the Palace, +1 per envoy of the seat holding the most", () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
     state.seats.push(emptySeat(1));
@@ -336,14 +336,14 @@ describe("a city centre's standing strength", () => {
     state.cityStates.push(cs);
     state.cityStateMax = 1;
     expect(CITY_START_MELEE_MINOR).toBe(25);
-    expect(centreStrength(state, minorCity(cs))).toBe(15 + PALACE_CITY_CS + 3 * ENVOY_CITY_CS);
+    expect(centreStrength(state, minorCity(cs))).toBe(15 + PALACE_CITY_CS + 2 * ENVOY_CITY_CS);
     // a trained Warrior stays under the minor's own start value
     raiseBestTrained(state, cs.seat, 'WARRIOR');
     expect(cs.bestMeleeCS).toBe(CITY_START_MELEE_MINOR);
-    expect(centreStrength(state, minorCity(cs))).toBe(15 + 3 + 3);
+    expect(centreStrength(state, minorCity(cs))).toBe(15 + 3 + 2);
     // the strongest melee it has trained, not its population or its type
     raiseBestTrained(state, cs.seat, 'SWORDSMAN');
-    expect(centreStrength(state, minorCity(cs))).toBe(25 + 3 + 3);
+    expect(centreStrength(state, minorCity(cs))).toBe(25 + 3 + 2);
   });
 });
 

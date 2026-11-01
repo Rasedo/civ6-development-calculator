@@ -173,6 +173,15 @@ export function envoysHere(state: GameState, cityState: CityState, seat: number)
   return envoysWith(state, cityState, seat, envoysOf(cityState, seat));
 }
 
+/** The most envoys any one seat effectively holds here (`envoysHere`, every
+ *  contender), 0 with none — GetMostTokensReceived (0x44c4b0), the city
+ *  centre's envoy term. The GPU twin is `_minor_most_envoys`. */
+export function mostEnvoysReceived(state: GameState, cityState: CityState): number {
+  let n = 0;
+  for (const c of contenders(state, cityState)) n = Math.max(n, envoysHere(state, cityState, c));
+  return n;
+}
+
 /** Everyone the contest has to weigh: every seat in the world, plus every
  *  ledger entry, the store the contest is over. */
 function contenders(state: GameState, cityState: CityState): number[] {
