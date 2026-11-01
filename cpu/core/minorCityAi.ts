@@ -241,7 +241,8 @@ export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1
  * and its improvements' and districts' values in database order. An
  * improvement the ground does not take, a district the plot cannot hold or
  * the city has, one the minor's type disfavours (`minorDistrictVerdict`):
- * FX(-9999); one only a drought on the plot bars, 0. The centre and a district's plot stand
+ * FX(-9999); one only a drought on the plot bars, 0. The centre, another
+ * player's plot (never beside the seat's) and a district's plot stand
  * unanalysed (0), but the plot of the city's own pillaged district, which
  * values that district alone, its repair (`districtValue`: x2;
  * runs/h1_duelw1127 Muscat t160: the Commercial Hub pillaged, "Build City
@@ -272,10 +273,15 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
   for (const plot of cityPlots(state, cs.centerIndex)) {
     const tile = map.tiles[plot];
     const owned = tileSeat(tile) === cs.seat;
-    const nearOwned = !owned && neighbors(map, tile).some((n) => tileSeat(n) === cs.seat);
+    // another player's plot stands unanalysed, beside the minor's or not
+    // (0x5ceba7: an owner other than none or the city's own clears +0x55 /
+    // +0x57; runs/h1_duely1124 Cardiff t188, 10:12 another player's from t187, the
+    // district tree at 13:13)
+    const foreign = !owned && tileSeat(tile) >= 0;
+    const nearOwned = !owned && !foreign && neighbors(map, tile).some((n) => tileSeat(n) === cs.seat);
     // the plot of the city's own pillaged district: its repair is valued
     const repair = minorRepairsDistrictAt(state, cs, plot);
-    if (plot === cs.centerIndex || (tile.district && !repair)) {
+    if (plot === cs.centerIndex || foreign || (tile.district && !repair)) {
       out.push({ plot, owned, improvable: false, districtOk: false, nearOwned,
         improvements: AI_IMPROVEMENTS.map(() => 0), districts: AI_DISTRICTS.map(() => 0) });
       continue;
@@ -382,6 +388,10 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
         return best;
       },
     };
+    // 0x5ce970's +0x55: a district passes the plot's gates (its own pillaged
+    // district's repair among them), whatever its value (runs/h1_duely1128
+    // Nazca t49: the Holy Site's repair at 0.0, its contract VALUE 0.0)
+    let passed = false;
     const districts = AI_DISTRICTS.map((row, i) => {
       if (row.trait !== null || row.type === 'DISTRICT_CITY_CENTER' || row.type === 'DISTRICT_WONDER') return FX_MIN;
       const id = DISTRICT_ENGINE.get(row.type) ?? null;
@@ -390,6 +400,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
         if (!id || id !== tile.district) return FX_MIN;
       } else if (!id || (cs.districts ?? []).some((c) => c.type === id) || !placeable(id)) return FX_MIN;
       if (minorDistrictVerdict(cs.type, row.type) < 0) return FX_MIN;
+      passed = true;
       return districtValue(df, row.type, distT[i], AI_VALUE_HORIZON);
     });
     out.push({
@@ -399,7 +410,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       // its improved Farms' 0.00 the researched pick over plot 321's Mine
       // without Mining, no tree until Mining at t15)
       improvable: owned && dry.size > 0,
-      districtOk: districts.some((v) => v > FX_MIN && v !== 0),
+      districtOk: passed,
       improvements, districts,
     });
   }
@@ -449,6 +460,12 @@ function currentItem(cs: CityState): ContractItem | null {
 function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, tables: CityBuildTables, pf: PickFacts,
   evals: PlotEval[], threat: number): CityTreeCity {
   const city = minorCity(cs);
+  // the city holds the district complete and unpillaged
+  const districtWhole = (d: string): boolean => {
+    const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
+    return !!id && (cs.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete
+      && !state.map.tiles[x.tileIndex].districtPillaged);
+  };
   return {
     id: city.id, name: cs.name, underThreat: minorUnderThreat(cs, threat),
     current: currentItem(cs),
@@ -460,11 +477,7 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !id || (cs.buildings ?? []).includes(id);
     },
-    districtBlocked: (d) => {
-      const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
-      return !id || (cs.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete
-        && !state.map.tiles[x.tileIndex].districtPillaged);
-    },
+    districtBlocked: (d) => !engineId('district', d, 'DISTRICT_', DISTRICTS) || districtWhole(d),
     canTrain: (u) => pf.canTrain(u),
     trainsSea: facts.trainsDomain('DOMAIN_SEA'),
     buildTurns: (c) => facts.buildTurns(c.unit ?? c.building ?? c.district ?? ''),
@@ -490,7 +503,12 @@ function minorTreeCity(state: GameState, cs: CityState, facts: CityBuildFacts, t
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !!id && (cs.buildings ?? []).includes(id);
     },
-    districtHeld: (d) => facts.hasDistrict(d),
+    // Build Unit takes a pillaged district for one not held: its tree
+    // submits the district's contract, the repair (runs/h1_duely1128 Nazca's
+    // Holy Site pillaged from t24, DISTRICT_HOLY_SITE contracts t49-t149;
+    // runs/h1_duely1124 Granada's Encampment, contracts 424 / 674 / 721 at
+    // t121 / t160 / t167 queued as its repair)
+    districtHeld: (d) => d === 'DISTRICT_CITY_CENTER' || districtWhole(d),
     threat,
     plot: cs.centerIndex,
   };

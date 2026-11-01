@@ -12005,3 +12005,66 @@ engines' roster carries no Persia, so the term is 0 for every player.
   t24 Antananarivo's garrisoned Warrior (fortified, Movement 0) no row.
   `garrisonExecute` (operations/assault.ts, `endTurn` / `endMoves`),
   `passMoveExec` (tactical.ts); `_x_garrison`, `_op_move_exec`.
+
+## C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins
+
+- THE PLOT ANALYSIS'S OWNER TEST (0x5ce970, 0x5ceac1..0x5cecc0): +0x5a
+  the plot's owner (plot vt +0x30, byte +0x1c) the player's; +0x57 (an
+  unowned plot beside one of the player's) the walk of the six adjacent
+  plots 0x5ceb67 where +0x5a is clear. Then (0x5ceba7) an owner other
+  than none (0xff) — another player's, or the player's in another city
+  (the plot's city id +0xc against the city's +0xf8) — clears +0x57 and
+  +0x55 (a district may stand), fills the district, improvement and
+  building rows with FX(-9999), clears +0x54 / +0x56 and leaves the plot
+  (0x5d023b): no district is chosen on another player's plot, beside the
+  player's or not. Ported (`minorPlotEvals` / `_minor_plot_evals`: such a
+  plot stands unanalysed). CONFIRMED: runs/h1_duely1124 Cardiff, its
+  Purchase Plot contract on 10:12 ends t187 (the plot another player's from t187 in the engines), the
+  t188 district tree on 13:13; the engines chose 10:12 again each turn,
+  its Purchase Plot FAILING (1124 p2 t188-t246, 50 carried contract
+  turns).
+- BUILD UNIT'S DISTRICT TEST (0x7f4e00, 0x7f510d..0x7f513c): the desired
+  district held (0x1aec20 on the city's districts +0x1a48, its third
+  argument 1: complete) and 0x1ad720 false — 0x1ad720 walks the city's
+  districts (+0x1308) of the type at the city's own plot (+0xf8 / +0x218)
+  and returns true where one IsPillaged (0x24c3a0) — SUCCEEDS; a pillaged
+  district is not held, the tree submits its contract, which the city's
+  queue takes as the district's repair. Ported (the minors' `districtHeld`
+  / `district_held`). CONFIRMED: runs/h1_duely1128 Nazca's Holy Site
+  pillaged at t24, DISTRICT_HOLY_SITE contracts t49-t149 (the engines
+  none: 1128 p4, 120 carried contract turns); runs/h1_duely1124 Granada's
+  Encampment, contracts 424 / 674 / 721 SUBMITTED t121 / t160 / t167,
+  queued as DISTRICT_ENCAMPMENT on 104 of 107 (City_BuildQueue t129,
+  t165, t172).
+- A UNIQUE'S INSTALL TYPE: the engine's RENAISSANCE_WALLS is read from
+  BUILDING_STAR_FORT and, through its civVariants, BUILDING_TSIKHE; the
+  catalog's reverse alias (`gameTypeOf`) names the type the id's own row
+  reads most (BUILDING_STAR_FORT; DISTRICT_THEATER over DISTRICT_ACROPOLIS,
+  DISTRICT_WATER_ENTERTAINMENT_COMPLEX over DISTRICT_WATER_STREET_CARNIVAL),
+  so a minor's queued Star Fort is the item its IN PROGRESS contract asks
+  for (runs/h1_duely1121 Hunza: the game's contract 423 queued t148,
+  COMPLETED t152). The GPU reads the non-trait row (`_engine_rows`).
+- THE MEMORY READER: the game's civic goal contract is read with owner -1
+  (runs/h1_duely1117 p4 t25: contract 65, kind civic, owner -1, in tree
+  1048581's list), so its tree is the one whose list holds it; our goal
+  contract's item is its install type (CIVIC_DRAMA_POETRY).
+- THE PLOT ANALYSIS'S +0x55 (0x5cede6..0x5cee82): per district row, the
+  row past its gates — +0xe1 bit 4 clear, the type's verdict 0x5d2ae0 not
+  -1, 0x406c00 on the player's districts (+0x1308), then the plot's own
+  district of the row (0x5cee3f: its repair) or the placement test
+  0x35f2d0 — sets +0x55 before the row is valued; a district valued 0.0
+  stands chosen like any other (0x5d0c20 takes a value above the plot's
+  reservation, FX(-9999) unreserved). Ported (`minorPlotEvals`'s
+  `districtOk` / `_minor_plot_evals`'s `district_ok`: a row past its gates,
+  not a nonzero value). CONFIRMED: runs/h1_duely1128 Nazca's pillaged Holy
+  Site, "Build City District" contracts 125 (t49) and 157 (t66) at VALUE
+  0.0, the repair's value 0.0 in the engines.
+- THE PER-TURN WORLD (`--aiscore`): a minor's item switched from keeps its
+  progress in the game (runs/h1_duely1117 Caguana: its Art Museum 46.3 of
+  145 at t116, the queue on the Trebuchet t117, the Museum's "Build City
+  Building" contract 381 at VALUE 110.0 at t132); the record shows only the
+  item in hand, so the replay carries `prodRetained` from the engine's own
+  turn with the other minor stores, and a building the record holds
+  pillaged that the engine held whole sets `repairWait` (runs/h1_duely1127
+  Muscat t154: its Market pillaged, the Star Fort completing t155 before
+  the Market's repair).

@@ -648,8 +648,17 @@
   final: 0x55c550
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiContracts.ts:buildUnitNode, gpu/core/sim_citytrees.py:_u_build_unit]
+  cases:
+    - recording: h1_duely1128
+      turn: 49
+      value: "0x7f510d..0x7f513c: a pillaged district is not held; Nazca's Holy Site (pillaged t24) DISTRICT_HOLY_SITE contracts t49-t149"
+  impl:
+    - cpu/core/aiContracts.ts:buildUnitNode
+    - gpu/core/sim_citytrees.py:_u_build_unit
+    - cpu/core/minorCityAi.ts:minorTreeCity
+    - gpu/core/sim_minorai.py:district_held
   readings:
+    - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"

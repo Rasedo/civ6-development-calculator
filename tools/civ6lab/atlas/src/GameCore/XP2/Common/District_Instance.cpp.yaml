@@ -385,6 +385,7 @@
     - "H-1: a plot's resource for its owner (strategic access) — READ"
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
   context:
     - "...ct), is complete (District +0xb08, Lua IsComplete 0x9c83d0) and not pillaged (+0xc88, 0x24c3a0); AdjacentTerrain: the plot's terrain (+0x2c) alone; AdjacentFeature (+0x3c); AdjacentI..."
     - "...s id) is complete (district +0xb08, Lua `District:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers the plot's resource (+0x40, c..."

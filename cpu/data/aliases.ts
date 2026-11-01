@@ -57,7 +57,9 @@ function aliasesOf(rows: Rows[], table: string, key: string): Map<string, string
       }
     }
   }
-  return new Map([...best].map(([type, v]) => [type, v.id]));
+  // the most-voted type first: an id's own row reads its type the most, a
+  // civilization's unique replacing it (civVariants) the fewest
+  return new Map([...best].sort((x, y) => y[1].votes - x[1].votes).map(([type, v]) => [type, v.id]));
 }
 
 const byId = (rows: readonly { id: string; src?: Readonly<Record<string, Src>> }[]): Rows =>
@@ -110,10 +112,17 @@ export function engineId(kind: string, gameType: string, prefix: string, known: 
 
 const reverse: Record<string, Map<string, string>> = {};
 
-/** The game type an engine id of one kind stands for: the type whose catalog
- *  tag names the id, else the id with the game's prefix. */
+/** The game type an engine id of one kind stands for: the most-voted type
+ *  whose catalog tag names the id (its own row, not a civilization's unique
+ *  replacing it: RENAISSANCE_WALLS is BUILDING_STAR_FORT, not
+ *  BUILDING_TSIKHE), else the id with the game's prefix. */
 export function gameTypeOf(kind: string, id: string, prefix: string): string {
-  const rev = (reverse[kind] ??= new Map([...(aliases()[kind] ?? new Map())].map(([type, eid]) => [eid, type] as const)));
+  let rev = reverse[kind];
+  if (!rev) {
+    rev = new Map();
+    for (const [type, eid] of aliases()[kind] ?? new Map<string, string>()) if (!rev.has(eid)) rev.set(eid, type);
+    reverse[kind] = rev;
+  }
   return rev.get(id) ?? prefix + id;
 }
 

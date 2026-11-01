@@ -1014,7 +1014,8 @@ class SimMinorAi:
         districts' values in database order. An improvement the ground does
         not take, a district the plot cannot hold or the city has, one the
         minor's type disfavours (`minorDistrictVerdict`): FX(-9999).
-        The centre and a district's plot stand unanalysed (0). T: an
+        The centre, a district's plot and another player's plot stand
+        unanalysed (0), the last never beside the minor's. T: an
         improvement's the research and civics AIs' turns to its technology
         and civic (the larger), a district's its build turns plus those. The
         hazards' turns (flood `_minor_flood_turns`, eruption
@@ -1037,10 +1038,12 @@ class SimMinorAi:
         P = plots.shape[1]
         own_t = self.tile_seat == seat
         owned = own_t.gather(1, p0) & valid
+        # another player's plot stands unanalysed, beside the minor's or not
+        foreign = (self.tile_seat.gather(1, p0) >= 0) & ~owned
         nb = self.neigh[p0]                                                    # [B, P, 6]
         nown = own_t.gather(1, nb.clamp(min=0).reshape(B, -1)).reshape(B, P, -1) & (nb >= 0)
-        near = valid & ~owned & nown.any(-1)
-        skip = (self.district.gather(1, p0) >= 0) | self._centre_plane().gather(1, p0)
+        near = valid & ~owned & ~foreign & nown.any(-1)
+        skip = (self.district.gather(1, p0) >= 0) | self._centre_plane().gather(1, p0) | foreign
         ev = valid & ~skip
         imps = torch.where(ev.unsqueeze(-1), torch.full((B, P, NI), _FX_MIN, dtype=torch.long, device=dev),
                            torch.zeros(B, P, NI, dtype=torch.long, device=dev))
@@ -1081,6 +1084,9 @@ class SimMinorAi:
         if not bool(ev.count_nonzero()) and not repairs:
             out["district_ok"] = torch.zeros_like(valid)
             return out
+        # 0x5ce970's +0x55: a district passes the plot's gates (its own
+        # pillaged district's repair among them), whatever its value (0.0 too)
+        passed = torch.zeros_like(valid)
         hz = int(T["horizon"])
         impT = [torch.maximum(_t(f.tech_turns(r["tech"]), f.like()), _t(f.civic_turns(r["civic"]), f.like())) for r in imp_rows]
         distT = [_t(f.build_turns(r["type"]), f.like()) + torch.maximum(_t(f.tech_turns(r["tech"]), f.like()),
@@ -1139,6 +1145,7 @@ class SimMinorAi:
                 imps[bb, pp, i] = torch.where(gi, v, barred)
             for (i, name, _dv, pl, ok_t) in cand_rows:
                 ci = pl[bb, pp] & ok_t[bb]
+                passed[bb, pp] = passed[bb, pp] | ci
                 ti = distT[i][bb]
                 # landing past the horizon: FX(-9999)
                 if not bool(ci.any()) or bool((ti > hz).all()):
@@ -1160,12 +1167,13 @@ class SimMinorAi:
                                 PN["feature"][fi] if fi >= 0 else None,
                                 [(name, torch.zeros_like(bb, dtype=torch.bool)) for (_i, name, _dv, _pl, _ok) in cand_rows])
                 pf.repair_of = dname
+                passed[bb, pp] = passed[bb, pp] | ok_t[bb]
                 ti = distT[i][bb]
                 if bool((ti > hz).all()):
                     continue
                 v = self._cv_district(pf, dname, ti, torch.full_like(bb, hz))
                 dists[bb, pp, i] = torch.where(ok_t[bb], v, torch.full_like(v, _FX_MIN))
-        out["district_ok"] = (ev | rep_any) & ((dists > _FX_MIN) & (dists != 0)).any(-1)
+        out["district_ok"] = (ev | rep_any) & passed
         return out
 
     # -- the resource value --------------------------------------------------
@@ -2208,8 +2216,21 @@ class _MinorWorld:
         return self._rows_apply(row, lambda r: _t(self.f.has_building(names[r]), self.f.like()).bool())
 
     def district_held(self, row):
+        """the City Center, or a district held complete and unpillaged: Build
+        Unit takes a pillaged district for one not held, its tree submitting
+        the district's contract, the repair"""
+        sim = self.sim
         names = self._d_names
-        return self._rows_apply(row, lambda r: _t(self.f.has_district(names[r]), self.f.like()).bool())
+
+        def one(r):
+            if names[r] == "DISTRICT_CITY_CENTER":
+                return torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+            dv = int(self.E["district"][r])
+            if dv < 0:
+                return torch.zeros(sim.B, dtype=torch.bool, device=sim.device)
+            return ((sim.district == dv) & sim.district_complete & ~sim.district_pillaged
+                    & (sim.tile_seat == self.seat)).any(dim=1)
+        return self._rows_apply(row, one)
 
     def threat(self):
         return self._threat

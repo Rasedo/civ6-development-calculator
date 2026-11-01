@@ -4439,8 +4439,10 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  and culture overflow a completion left for the next turn's yield
  *  (runs/h1_duelw1121 Hunza t7: Pottery's 1.5 over, Astrology 7 turns as
  *  logged), the barbarian kills a boost counts, the wars' clocks; a
- *  city-state's production overflow, its powered project and repair waits,
- *  the turn its city was last hit (the walls' repair waits three quiet
+ *  city-state's production overflow, the progress its items switched from
+ *  keep (runs/h1_duely1117 Caguana t117: its Art Museum's 46.3 of 145, valued
+ *  110.7 as its tree's contract 381 at 110.0), its powered project and repair
+ *  waits, the turn its city was last hit (the walls' repair waits three quiet
  *  turns: runs/h1_duely1124 Cardiff t86-88 NO BUILDS AT ALL, the repair
  *  from t89),
  *  its fuel shortfall, its strategic stockpile and the queue front's
@@ -4449,7 +4451,7 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
 const GAME_STORES = ['warTurns'] as const;
 const SEAT_STORES = ['barbKills'] as const;
 const RESEARCH_STORES = ['techOverflow', 'civicOverflow'] as const;
-const MINOR_STORES = ['prodOverflow', 'fullyPowered', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved'] as const;
+const MINOR_STORES = ['prodOverflow', 'prodRetained', 'fullyPowered', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved'] as const;
 
 /** the named fields of `from` onto `to`, a field `from` lacks dropped */
 function carryFields(from: object, to: object, keys: readonly string[]): void {

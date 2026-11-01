@@ -280,12 +280,21 @@ function gameItem(c: GameContract, n: MemoryNames): string {
  *  types (the AI tables' rows), the goals the engine's tech and civic ids */
 const typed = (kind: string, id: string, prefix: string) => (id.startsWith(prefix) ? id : gameTypeOf(kind, id, prefix));
 
+/** the tree holding a game contract: its owner's, else (a civic goal's
+ *  contract is read with owner -1) the tree whose list holds it */
+function contractTree(end: { trees?: Record<string, GameTree> }, c: GameContract): string {
+  const own = end.trees?.[String(c.owner)];
+  if (own) return own.name ?? '-';
+  return Object.values(end.trees ?? {}).find((t) => t.contracts?.includes(c.id))?.name ?? '-';
+}
+
 function ourItem(c: AiContract, ai: CityAi, W: number): string {
   if (c.unit) return typed('unit', c.unit, 'UNIT_');
   if (c.building) return typed('building', c.building, 'BUILDING_');
   if (c.district) return typed('district', c.district, 'DISTRICT_');
+  // a goal holds the install's type (TECH_ / CIVIC_)
   const goal = ai.techContracts[c.id];
-  if (goal !== undefined) return goal in CIVICS ? typed('civic', goal, 'CIVIC_') : typed('tech', goal, 'TECH_');
+  if (goal !== undefined) return goal.startsWith('CIVIC_') || goal in CIVICS ? typed('civic', goal, 'CIVIC_') : typed('tech', goal, 'TECH_');
   const plot = ai.plotContracts[c.id];
   if (plot !== undefined) return xy(plot, W);
   return 'none';
@@ -317,7 +326,7 @@ export function syncContracts(game: GameMemory, names: MemoryNames, seat: Seat, 
   const end = game.at('endlook', turn, player);
   const ai = seat.cityAi;
   if (!end?.contracts || !ai) return [0, 0, 0];
-  const tree = (c: GameContract) => end.trees?.[String(c.owner)]?.name ?? '-';
+  const tree = (c: GameContract) => contractTree(end, c);
   const pool = end.contracts.filter((c) => OPEN.has(c.status));
   let matched = 0;
   let cancelled = 0;
@@ -364,7 +373,7 @@ export function readGameMemory(game: GameMemory, names: MemoryNames, seat: Seat,
     const ai = seat.cityAi;
     const ours = ai ? ai.contracts.filter((c) => OPEN.has(c.progress)) : [];
     const theirs = end.contracts.filter((c) => OPEN.has(c.status));
-    const tree = (c: GameContract) => end.trees?.[String(c.owner)]?.name ?? '-';
+    const tree = (c: GameContract) => contractTree(end, c);
     add('contracts', ours.map((c) => `${ourItem(c, ai!, W)}|${c.treeName}`), theirs.map((c) => `${gameItem(c, names)}|${tree(c)}`));
     add('contracts.progress', ours.map((c) => `${ourItem(c, ai!, W)}|${c.treeName}|${CP_NAMES[c.progress]}`),
       theirs.map((c) => `${gameItem(c, names)}|${tree(c)}|${CP_NAMES[c.status] ?? c.status}`));

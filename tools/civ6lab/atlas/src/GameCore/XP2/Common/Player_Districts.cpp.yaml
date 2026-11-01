@@ -13,6 +13,7 @@
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Zone District Type (0x84e120 / 0x84e030): the actor's own district (0x406c00) with RequiresPopulation (+0xe1 bit 6), its era known and at most the actor's (0x93e5..."
