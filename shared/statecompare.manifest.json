@@ -482,7 +482,7 @@
         {
           "name": "barbArmyKnown",
           "compare": "exact",
-          "note": "the barbarians' knowledge base's records (`knowledgeLook` on `barbSeat.armyKnown`; the row `BK`) as a sorted multiset of (owner, unit type, turn seen, plot, damage), as minorArmyKnown.",
+          "note": "the barbarians' knowledge base's records (`knowledgeLook` on `barbSeat.armyKnown`; the row `BK`) as a sorted multiset of (owner, unit type, turn seen, plot, damage, formation), as minorArmyKnown.",
           "covers": [
             "Seat.armyKnown"
           ],
@@ -492,7 +492,8 @@
             "citystate_kb_type",
             "citystate_kb_seen",
             "citystate_kb_plot",
-            "citystate_kb_damage"
+            "citystate_kb_damage",
+            "citystate_kb_form"
           ]
         },
         {
@@ -531,7 +532,7 @@
         {
           "name": "freeArmyKnown",
           "compare": "exact",
-          "note": "the Free Cities' knowledge base's records (`freeKnowledge` on `freeSeat.armyKnown`; the row `FK`) as a sorted multiset of (owner, unit type, turn seen, plot, damage), as barbArmyKnown.",
+          "note": "the Free Cities' knowledge base's records (`freeKnowledge` on `freeSeat.armyKnown`; the row `FK`) as a sorted multiset of (owner, unit type, turn seen, plot, damage, formation), as barbArmyKnown.",
           "covers": [
             "Seat.armyKnown"
           ],
@@ -541,7 +542,8 @@
             "citystate_kb_type",
             "citystate_kb_seen",
             "citystate_kb_plot",
-            "citystate_kb_damage"
+            "citystate_kb_damage",
+            "citystate_kb_form"
           ]
         },
         {
@@ -2408,7 +2410,7 @@
         {
           "name": "minorArmyKnown",
           "compare": "exact",
-          "note": "the records as a sorted multiset of (owner, unit type, turn seen, plot, damage): the unit's identity (TS id, GPU pool slot) is not compared",
+          "note": "the records as a sorted multiset of (owner, unit type, turn seen, plot, damage, formation): the unit's identity (TS id, GPU pool slot) is not compared",
           "covers": [
             "Seat.armyKnown"
           ],
@@ -2418,7 +2420,8 @@
             "citystate_kb_type",
             "citystate_kb_seen",
             "citystate_kb_plot",
-            "citystate_kb_damage"
+            "citystate_kb_damage",
+            "citystate_kb_form"
           ]
         },
         {

@@ -82,13 +82,18 @@
   review: reviewed
 - addr: 0x5eadb0
   kind: function
-  semantics: "an enemy's known units within a distance of a plot at least a threshold strong (the knowledge base's army records). Per unit type max(Combat, RangedCombat) x the known units in range, each less its damage x COMBAT_WOUNDED_DAMAGE_MULTIPLIER x -0.01f cut toward 0; the entries' kinds 1 / 2 add gp +0x198 / +0x17c and 0x4f2b50 terms. It counts per unit type the records of 0x5ef760, which skips a record whose age (+0xc, the ageing's count since last seen) passes its seventh argument; every caller passes 2 — the city threat (0x5cbfc1, 0x5cc394), the target walk (0x747433, 0x7477ca, 0x747a0e), the enemy strength (0x73ecda / 0x73ecf4), the target check (0x73abf0), the evaluation's own strength (0x746d07), the city value (0x7a0142), 0x654c9a, 0x7aed3b. Ported: recentOf / _mops_records' recent, minorThreat, recentArmy (the age the last ageing's turn less the turn last seen). Its out list holds per unit type [type, count] (0x5eafd2)."
+  semantics: "an enemy's known units within a distance of a plot at least a threshold strong (the knowledge base's army records). Per unit type max(Combat, RangedCombat) x the known units in range, each less its damage x COMBAT_WOUNDED_DAMAGE_MULTIPLIER x -0.01f cut toward 0; each out entry (0x20 bytes: +4 the damage, +8 the record's formation) then adds, kind 1 (a Corps) gp +0x198 COMBAT_CORPS_STRENGTH_MODIFIER and the player's 0x4f2b50 Corps term, kind 2 (an Army) gp +0x17c and its Army term (0x5eaf79; -1, a unit that forms none, and 0 nothing). Its eighth argument (+0xf8) adds the known cities' entries within the distance (their +0x1c >> 8); the enemy strength passes 0. It counts per unit type the records of 0x5ef760, which skips a record whose age (+0xc, the ageing's count since last seen) passes its seventh argument; every caller passes 2 — the city threat (0x5cbfc1, 0x5cc394), the target walk (0x747433, 0x7477ca, 0x747a0e), the enemy strength (0x73ecda / 0x73ecf4), the target check (0x73abf0), the evaluation's own strength (0x746d07), the city value (0x7a0142), 0x654c9a, 0x7aed3b. Ported: recentOf / _mops_records' recent, minorThreat, recentArmy (the age the last ageing's turn less the turn last seen). Its out list holds per unit type [type, count] (0x5eafd2)."
   status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 149
+      value: "city-state 3's Cuirassier 1835008: every holder's record +8 reads 0 to t148 and 1 from its UnitFormCorps at t149"
     - recording: h1_duelv1117
       turn: 50
       value: "Caguana: three Warrior records on 611 seen t33, t35, t50 — the last alone counts, 20 against 23 + 23, no threat, no City Defense"
   impl:
+    - cpu/core/units.ts:setRecordFormation
+    - gpu/core/sim_minors.py:_knowledge_look
     - cpu/core/operations/evaluate.ts:armyStrength
     - gpu/core/sim_minorops.py:_mops_army_term
     - cpu/core/operations/nodes.ts:refreshStrengths
@@ -100,6 +105,7 @@
     - gpu/core/sim_minorai.py:_known_threat
     - cpu/core/operations/knowledge.ts:KnownUnit
   readings:
+    - "C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -400,6 +406,7 @@
   readings:
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-95: an operation's enemy strength"
+    - "C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x5ef870

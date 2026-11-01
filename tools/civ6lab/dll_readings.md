@@ -6807,3 +6807,35 @@ read by `canUpgradeUnit` / `upgradeUnit`, `minorUpgradeVisible` /
   gone first), Granada's floodplain Farm on 524 at t72 as logged.
 - Open: a plot's owner change inside a turn (0x84760's count) is not replayed by
   the importer; an ally's shared sight (Poundmaker) is not a receiver.
+
+## C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins
+
+`ArmyRecord.formation` (cpu/core/types.ts) set by the looks and the attacker's
+record (`setRecordFormation`, cpu/core/units.ts; `knowledgeLook`,
+`recordAttacker`), carried by `knownOf` (cpu/core/minorOps.ts) into
+`armyStrength` (cpu/core/operations/evaluate.ts); `barbarianTactics`
+(cpu/core/tactical.ts). The import of the game's records (cpu/harness/replay.ts)
+takes the entry's +8. GPU `citystate_kb_form` (gpu/core/sim_minors.py
+`_knowledge_look`, `_kb_birth`, `_kb_attacked`), `_mops_records`' form and
+`_mops_army_term` (gpu/core/sim_minorops.py), `_barbarian_tactics`' close
+(gpu/core/sim_tactics.py).
+
+- THE RECORD'S FORMATION (0x5eadb0 over 0x5ef760's out list, 0x20-byte
+  entries: +4 the damage, +8 the formation): per entry the damage term, then
+  kind 1 adds COMBAT_CORPS_STRENGTH_MODIFIER (gp +0x198) and the player's
+  0x4f2b50 Corps term (r13), kind 2 COMBAT_ARMY_STRENGTH_MODIFIER (gp +0x17c)
+  and its Army term (r12); -1 (a unit that forms none) and 0 add nothing.
+  The aimem records' third field is that +8: runs/h1_duely1124 city-state
+  3's Cuirassier 1835008 reads 0 to t148 and 1 from t149 (UnitFormCorps) in
+  every holder's records. The known cities' term behind the flag (+0xf8)
+  is off at the enemy strength's calls (0x73ecda / 0x73ecf4 pass 0).
+- THE CAPTURE'S START: the barbarians' captures start their operations
+  (AI_EVENT_UNIT_CAPTURED, 0x7265b0 -> 0x73a120) on the knowledge base their
+  pass left, before the turn's end look: runs/h1_duely1117 t33 Barbarian
+  Builder Capture on 31:14 at Target Str 23 (the known city's term alone),
+  the Scout 851971 on 33:12 (10) in the end look's records only;
+  runs/h1_duely1124 t111 the capture's start at 97 (167 on the end look's
+  records).
+- OPEN: the Corps / Army terms of 0x4f2b50 held 0; the city threat
+  (`knownThreat` -> 0x5cbd10) and the minors' standing army by record read
+  no formation.

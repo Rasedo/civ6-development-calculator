@@ -1224,6 +1224,9 @@ export interface ArmyRecord {
   plot: number;
   /** its damage when last seen */
   damage: number;
+  /** its formation when last seen (the entry's +8: 1 a Corps, 2 an Army);
+   *  undefined none */
+  formation?: number;
 }
 
 export interface CityState extends Seat {

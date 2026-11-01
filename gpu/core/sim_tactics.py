@@ -1745,12 +1745,13 @@ class SimTactics:
             self._tac_in_pass = False
             self._tac_cost_held = None
             self._tac_full_held = None
+        # the turn's captures start their operations on the knowledge base
+        # the pass left, then it looks again
+        self._barb_captures()
         ones = torch.ones(self.B, dtype=torch.bool, device=self.device)
         seen = self._barb_seen("barbarians")
         self._knowledge_look(self.BK, BARB_SEAT, seen, ones, False)
         self._barb_kb_camps(seen)
-        # the turn's captures start their operations
-        self._barb_captures()
 
     def _tac_range(self, b: torch.Tensor, s: torch.Tensor, pre: str = "barb") -> torch.Tensor:
         """`rangeOf` for the units at local slots `s` of pool `pre` in the

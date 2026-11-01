@@ -20,7 +20,7 @@ import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious, waterWalks,
   setBarbStepLook, unitsHostile, unitVisibleTo,
-  waterEnterable, formationCS,
+  waterEnterable, formationCS, setRecordFormation,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -854,8 +854,9 @@ export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord
       r.seen = state.turn;
       r.plot = u.tileIndex;
       r.damage = UNIT_HP - u.hp;
+      setRecordFormation(r, u);
     }
-    else kept.push({ id: u.id, owner: u.seat, type: u.type, seen: state.turn, plot: u.tileIndex, damage: UNIT_HP - u.hp });
+    else kept.push(setRecordFormation({ id: u.id, owner: u.seat, type: u.type, seen: state.turn, plot: u.tileIndex, damage: UNIT_HP - u.hp }, u));
   }
   if (kept.length) holder.armyKnown = kept;
   else delete holder.armyKnown;
@@ -3148,12 +3149,14 @@ export function barbarianTactics(state: GameState, acting: ReadonlySet<number>):
   } finally {
     costsHeld = null;
   }
-  // the turn's end: the knowledge base looks again (player signal +0x228);
-  // the turn's captures start their operations
+  // the turn's end: the turn's captures start their operations on the
+  // knowledge base the pass left, then it looks again (player signal +0x228)
+  // (runs/h1_duely1117 t33: Builder Capture's start at Target Str 23, the
+  // Scout 851971 on 33:12 in the end look's records only)
+  barbarianCaptures(state);
   const seen = plotsSeenNow(state, new Set([BARB_SEAT]));
   knowledgeLook(state, state.barbSeat, BARB_SEAT, seen, false);
   barbCampsLook(state, seen);
-  barbarianCaptures(state);
 }
 
 function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {

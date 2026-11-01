@@ -1332,6 +1332,7 @@ _MUTABLE = [
     "cai_c_in_tree", "cai_c_listed", "cai_c_purchase", "cai_c_shown", "cai_c_goal_held", "cai_c_released", "cai_in_hand", "cai_r_plot", "cai_r_tree", "cai_r_value", "cai_c_serial", "cai_t_serial",
     "citystate_kb_slot", "citystate_kb_owner", "citystate_kb_type", "citystate_kb_seen", "citystate_kb_plot",  # its knowledge base's army records
     "citystate_kb_damage",  # the damage each record's unit had when last seen
+    "citystate_kb_form",  # the formation each record's unit had when last seen
     # its operations (`OpsAi`, sim_minorops.py): the pool, the trees, the teams, the stores, the pick, the camps known, the plots revealed
     "mops_def", "mops_id", "mops_target", "mops_rally", "mops_bk_target", "mops_bk_rally", "mops_started", "mops_estr",
     "mops_str", "mops_st", "mops_ma", "mops_mb", "mops_bb", "mops_tm", "mops_mem", "mops_cnt", "mops_goal", "mops_eng",

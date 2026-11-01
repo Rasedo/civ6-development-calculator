@@ -286,6 +286,7 @@ class SimMinors:
         rec = rec[:, :U]
         hit = vis & (rec >= 0)
         dmg = self.citystate_kb_damage[:, r]
+        form = self.citystate_kb_form[:, r]
         hp_max = int(self.rules.combat["unitHp"])
         if bool(hit.count_nonzero()):
             b, u = hit.nonzero(as_tuple=True)
@@ -293,6 +294,7 @@ class SimMinors:
             seen_t[b, k] = turn
             plot[b, k] = self.unit_tile[b, u].to(plot.dtype)
             dmg[b, k] = (hp_max - self.unit_hp[b, u]).to(dmg.dtype)
+            form[b, k] = self.unit_formation[b, u].clamp(min=0).to(form.dtype)
         new = vis & (rec < 0)
         if bool(new.count_nonzero()):
             free = slot == -2
@@ -308,6 +310,7 @@ class SimMinors:
             seen_t[b, k] = turn
             plot[b, k] = self.unit_tile[b, u].to(plot.dtype)
             dmg[b, k] = (hp_max - self.unit_hp[b, u]).to(dmg.dtype)
+            form[b, k] = self.unit_formation[b, u].clamp(min=0).to(form.dtype)
             nxt = self.citystate_kb_next[:, r]
             seq[b, k] = (nxt[b] + rank[b, u]).to(seq.dtype)
             self.citystate_kb_next[:, r] = nxt + new.sum(dim=1)
@@ -333,6 +336,7 @@ class SimMinors:
             self.citystate_kb_seen.dtype)
         self.citystate_kb_plot[rows, r, k] = self.unit_tile[rows, g].to(self.citystate_kb_plot.dtype)
         self.citystate_kb_damage[rows, r, k] = 0
+        self.citystate_kb_form[rows, r, k] = 0
         nxt = self.citystate_kb_next[rows, r]
         self.citystate_kb_seq[rows, r, k] = nxt.to(self.citystate_kb_seq.dtype)
         self.citystate_kb_next[rows, r] = nxt + 1
@@ -383,6 +387,7 @@ class SimMinors:
             self.citystate_kb_seen.dtype)
         self.citystate_kb_plot[b, r, k] = a_tile[b].to(self.citystate_kb_plot.dtype)
         self.citystate_kb_damage[b, r, k] = (hp_max - a_hp[b].long()).to(self.citystate_kb_damage.dtype)
+        self.citystate_kb_form[b, r, k] = self.unit_formation[b, gb].clamp(min=0).to(self.citystate_kb_form.dtype)
         nb, nr, nk = b[~has], r[~has], k[~has]
         if nb.numel():
             nxt = self.citystate_kb_next[nb, nr]

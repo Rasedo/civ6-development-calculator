@@ -4747,7 +4747,8 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
         if (!type) continue;
         for (const r of rows) {
           const u = ctx.units.get(`${owner}:${r[0]}`);
-          recs.push({ id: u ? u.id : fresh--, owner: seat, type, seen: at - r[3], plot: r[5] * ctx.W + r[4], damage: r[1] });
+          // the entry's +8 its formation (-1 a unit that forms none)
+          recs.push({ id: u ? u.id : fresh--, owner: seat, type, seen: at - r[3], plot: r[5] * ctx.W + r[4], damage: r[1], ...(r[2] > 0 ? { formation: r[2] } : {}) });
         }
       }
     }

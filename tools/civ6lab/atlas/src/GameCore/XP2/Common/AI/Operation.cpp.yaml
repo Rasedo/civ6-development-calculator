@@ -183,6 +183,7 @@
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+    - "C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...(0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
@@ -487,6 +488,7 @@
     - "C-129: an operation's enemy strength reads the knowledge base after the tactical look, before a later player's blows — the aimem sites read, the replay's copy"
     - "C-95: an operation's enemy strength"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
+    - "C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins"
   context:
     - "...; a type of none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120,..."
   review: reviewed

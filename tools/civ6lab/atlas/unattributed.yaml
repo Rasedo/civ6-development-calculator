@@ -4095,6 +4095,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
     - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
+    - "C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's flag any, el..."

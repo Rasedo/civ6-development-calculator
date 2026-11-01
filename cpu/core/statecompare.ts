@@ -639,18 +639,18 @@ const GAME: Record<string, Extractor> = {
   // makes the seat
   freeResearch: (s) => [researchRecord(s.freeSeat?.research)],
   // the barbarians' knowledge base's army records (`knowledgeLook`), as a
-  // city-state's: owner, unit type, turn and plot last seen, damage, sorted
+  // city-state's: owner, unit type, turn and plot last seen, damage, formation, sorted
   barbArmyKnown: (s) => [(s.barbSeat.armyKnown ?? [])
-    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage])
-    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()],
+    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage, r.formation ?? 0])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4] || a[5] - b[5]).flat()],
   barbArmyAged: (s) => [s.barbSeat.armyAged ?? -1],
   barbCampsKnown: (s) => [[...(s.barbSeat.campsKnown ?? [])]],
   freeUnitStrength: (s) => [s.freeSeat?.unitStrength ?? 0],
   // the Free Cities' knowledge base's army records (`freeKnowledge`), as the
   // barbarians'; their last ageing; their military AI's Combat Desire
   freeArmyKnown: (s) => [(s.freeSeat?.armyKnown ?? [])
-    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage])
-    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()],
+    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage, r.formation ?? 0])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4] || a[5] - b[5]).flat()],
   freeArmyAged: (s) => [s.freeSeat?.armyAged ?? -1],
   freeCombatDesire: (s) => [s.freeSeat?.combatDesire ?? 0],
   freeTradeValue: (s) => [s.freeSeat?.tradeValue ?? 0],
@@ -1019,8 +1019,8 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorProdKept: overCityStates((cityState) => Object.entries(cityState.prodRetained ?? {})
     .map(([k, v]) => [minorItemIdx(k), v] as const).sort((a, b) => a[0] - b[0]).flat()),
   minorArmyKnown: overCityStates((cityState) => (cityState.armyKnown ?? [])
-    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage])
-    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]).flat()),
+    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot, r.damage, r.formation ?? 0])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4] || a[5] - b[5]).flat()),
   minorOps: overCityStates((cityState, state) => minorOpsRecord(cityState, state)),
   // its "Upgrade Units" trees: running, the trigger, their units' pool slots
   minorUpgrading: overCityStates((cityState, state) => [cityState.upgrading ? 1 : 0, cityState.upgradeTrigger ? 1 : 0,

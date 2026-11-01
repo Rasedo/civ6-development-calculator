@@ -5,7 +5,7 @@
  */
 
 import { ENHANCER_BELIEFS, gainPopulationPressure, unconvertedOf } from '../data/religion';
-import type { GameMap, GameState, City, Seat, Tile, Unit } from './types';
+import type { ArmyRecord, GameMap, GameState, City, Seat, Tile, Unit } from './types';
 import { seatWonderSum } from './wonders';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { FORMATION_CS, FORMATION_MAX, FORMATION_CIVIC, BUILDER_COST_STEP, CITIZEN_NAMED_UNITS } from '../data/units';
@@ -15,6 +15,14 @@ import { FORMATION_CS, FORMATION_MAX, FORMATION_CIVIC, BUILDER_COST_STEP, CITIZE
  *  default and none of them can drift apart. */
 export function formationCS(unit: Unit): number {
   return FORMATION_CS[unit.formation ?? 0] ?? 0;
+}
+
+/** a knowledge base's record takes the unit's formation as it sees it (the
+ *  army entry's +8, which 0x5eadb0 reads: 1 a Corps, 2 an Army) */
+export function setRecordFormation(r: ArmyRecord, unit: Unit): ArmyRecord {
+  if (unit.formation) r.formation = unit.formation;
+  else delete r.formation;
+  return r;
 }
 
 /** CIV6: fortification tops out at two turns dug in. */
@@ -1780,7 +1788,8 @@ export function recordAttacker(state: GameState, attacker: Unit, seat: number): 
     r.seen = seen;
     r.plot = attacker.tileIndex;
     r.damage = damage;
-  } else recs.push({ id: attacker.id, owner: attacker.seat, type: attacker.type, seen, plot: attacker.tileIndex, damage });
+    setRecordFormation(r, attacker);
+  } else recs.push(setRecordFormation({ id: attacker.id, owner: attacker.seat, type: attacker.type, seen, plot: attacker.tileIndex, damage }, attacker));
 }
 
 /** A UNIT MADE ANEW under another owner (a levy, its return home: the game

@@ -458,18 +458,18 @@ GAME = {
     "freeShortfall": lambda sim, b, rows: [int(sim.seat_shortfall[b, sim.FREE_ROW])],
     "freeResearch": lambda sim, b, rows: [_research_record(sim, b, sim.FR)],
     "barbArmyKnown": lambda sim, b, rows: [[x for r in sorted(
-        (int(o), int(t), int(n), int(p), int(d)) for k, o, t, n, p, d in zip(
+        (int(o), int(t), int(n), int(p), int(d), int(f)) for k, o, t, n, p, d, f in zip(
             sim.citystate_kb_slot[b, sim.BK].tolist(), sim.citystate_kb_owner[b, sim.BK].tolist(),
             sim.citystate_kb_type[b, sim.BK].tolist(), sim.citystate_kb_seen[b, sim.BK].tolist(),
-            sim.citystate_kb_plot[b, sim.BK].tolist(), sim.citystate_kb_damage[b, sim.BK].tolist()) if k != -2) for x in r]],
+            sim.citystate_kb_plot[b, sim.BK].tolist(), sim.citystate_kb_damage[b, sim.BK].tolist(), sim.citystate_kb_form[b, sim.BK].tolist()) if k != -2) for x in r]],
     "barbArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.BK])],
     "barbCampsKnown": lambda sim, b, rows: [[int(x) for x in sim.barb_camps_known[b].tolist() if x >= 0]],
     "freeUnitStrength": lambda sim, b, rows: [int(sim.citystate_unit_strength[b, sim.FR])],
     "freeArmyKnown": lambda sim, b, rows: [[x for r in sorted(
-        (int(o), int(t), int(n), int(p), int(d)) for k, o, t, n, p, d in zip(
+        (int(o), int(t), int(n), int(p), int(d), int(f)) for k, o, t, n, p, d, f in zip(
             sim.citystate_kb_slot[b, sim.FK].tolist(), sim.citystate_kb_owner[b, sim.FK].tolist(),
             sim.citystate_kb_type[b, sim.FK].tolist(), sim.citystate_kb_seen[b, sim.FK].tolist(),
-            sim.citystate_kb_plot[b, sim.FK].tolist(), sim.citystate_kb_damage[b, sim.FK].tolist()) if k != -2) for x in r]],
+            sim.citystate_kb_plot[b, sim.FK].tolist(), sim.citystate_kb_damage[b, sim.FK].tolist(), sim.citystate_kb_form[b, sim.FK].tolist()) if k != -2) for x in r]],
     "freeArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, sim.FK])],
     "freeCombatDesire": lambda sim, b, rows: [int(sim.citystate_combat_desire[b, sim.FR])],
     "freeTradeValue": lambda sim, b, rows: [int(sim.free_trade_value[b])],
@@ -998,10 +998,10 @@ CITY_STATE = {
         [x for i, v in enumerate(sim.citystate_kept[b, s].tolist()) if v != 0 for x in (i, v)] for s in rows],
     "minorArmyKnown": lambda sim, b, rows: [
         [x for r in sorted(
-            (int(o), int(t), int(n), int(p), int(d)) for k, o, t, n, p, d in zip(
+            (int(o), int(t), int(n), int(p), int(d), int(f)) for k, o, t, n, p, d, f in zip(
                 sim.citystate_kb_slot[b, s].tolist(), sim.citystate_kb_owner[b, s].tolist(),
                 sim.citystate_kb_type[b, s].tolist(), sim.citystate_kb_seen[b, s].tolist(),
-                sim.citystate_kb_plot[b, s].tolist(), sim.citystate_kb_damage[b, s].tolist()) if k != -2) for x in r] for s in rows],
+                sim.citystate_kb_plot[b, s].tolist(), sim.citystate_kb_damage[b, s].tolist(), sim.citystate_kb_form[b, s].tolist()) if k != -2) for x in r] for s in rows],
     "minorOps": lambda sim, b, rows: [_minor_ops(sim, b, s) for s in rows],
     "minorUpgrading": lambda sim, b, rows: [_minor_upgrading(sim, b, s) for s in rows],
     "minorCampsKnown": lambda sim, b, rows: [[int(x) for x in sim.mops_camps[b, s].tolist() if x >= 0] for s in rows],

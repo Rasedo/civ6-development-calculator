@@ -20,6 +20,7 @@ import type { AiOpDef, OpsSettle } from './types';
 import { cityValue } from './cityValue';
 import type { KnownUnit } from './knowledge';
 import type { AiKnownCityView, AiView } from '../aiViewTypes';
+import { FORMATION_CS } from '../../data/units';
 
 /** one candidate (the 0x70-byte entries at manager +0x328) */
 export interface Candidate {
@@ -46,18 +47,20 @@ export function fixed(f: number): number {
 }
 
 /** a unit as the army strength reads it */
-export type ArmyUnit = Pick<KnownUnit, 'plot' | 'combat' | 'ranged' | 'damage'>;
+export type ArmyUnit = Pick<KnownUnit, 'plot' | 'combat' | 'ranged' | 'damage' | 'formation'>;
 
 /** the strength of a player's units the seat knows within `radius` of a plot
  *  (0x5eadb0 over the knowledge base's army lists 0x5ef760): each unit its
  *  larger of combat and ranged strength, less its damage x
- *  COMBAT_WOUNDED_DAMAGE_MULTIPLIER (10) x -0.01 cut toward 0; a unit whose
- *  larger strength is below `minStrength` left out */
+ *  COMBAT_WOUNDED_DAMAGE_MULTIPLIER (10) x -0.01 cut toward 0, plus its
+ *  record's formation's (the entry's +8: 1 COMBAT_CORPS_STRENGTH_MODIFIER,
+ *  2 COMBAT_ARMY_STRENGTH_MODIFIER, 0x5eaf79); a unit whose larger strength
+ *  is below `minStrength` left out */
 export function armyStrength(view: AiView, units: readonly ArmyUnit[], plot: number, radius: number, minStrength = -Infinity): number {
   let s = 0;
   for (const u of units) {
     if (view.plotDistance(u.plot, plot) > radius || Math.max(u.combat, u.ranged) < minStrength) continue;
-    s += Math.max(u.combat, u.ranged) + Math.trunc(Math.fround(u.damage * 10 * Math.fround(-0.01)));
+    s += Math.max(u.combat, u.ranged) + Math.trunc(Math.fround(u.damage * 10 * Math.fround(-0.01))) + (FORMATION_CS[u.formation ?? 0] ?? 0);
   }
   return s;
 }

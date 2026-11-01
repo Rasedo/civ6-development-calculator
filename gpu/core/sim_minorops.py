@@ -362,14 +362,18 @@ class SimMinorOps:
         ranged strengths less a tenth of its damage"""
         return torch.maximum(u["combat"], u["ranged"]) - torch.div(u["dmg"], 10, rounding_mode="floor")
 
-    @staticmethod
-    def _mops_army_term(combat: torch.Tensor, ranged: torch.Tensor, dmg: torch.Tensor) -> torch.Tensor:
+    def _mops_army_term(self, combat: torch.Tensor, ranged: torch.Tensor, dmg: torch.Tensor,
+                        form: torch.Tensor | None = None) -> torch.Tensor:
         """a unit in the knowledge base's army strength (0x5eadb0): its larger
         of combat and ranged strength, less its damage x 10 x -0.01 (single
-        precision) cut toward 0"""
+        precision) cut toward 0, plus its record's formation's (`form`, the
+        entry's +8: a Corps' / an Army's; none for a unit as it stands)"""
         c = float(torch.tensor(-0.01, dtype=_F32))
         t = (dmg.to(torch.float64) * 10.0 * c).to(_F32).to(torch.float64).trunc().long()
-        return torch.maximum(combat, ranged) + t
+        out = torch.maximum(combat, ranged) + t
+        if form is not None:
+            out = out + self._formation_cs.take(form.clamp(min=0, max=self._form_max))
+        return out
 
     # -- the knowledge base --------------------------------------------------
 
@@ -422,7 +426,7 @@ class SimMinorOps:
         `BK`) ([B, K]): live, those the
         army strength reads (`recentOf`: aged at most ARMY_READ_AGE, all
         where the row never aged), owner, AI unit row, plot, combat and
-        ranged strengths, damage"""
+        ranged strengths, damage, formation"""
         T = self._cv_tables()
         dev = self.device
         slot = self.citystate_kb_slot[:, s]
@@ -436,7 +440,7 @@ class SimMinorOps:
                 "row": torch.where(typ >= 0, er.take(tc), torch.full_like(typ, -1)),
                 "plot": self.citystate_kb_plot[:, s].long(),
                 "combat": self._type_combat.take(tc), "ranged": self._type_ranged_strength.take(tc),
-                "dmg": self.citystate_kb_damage[:, s].long()}
+                "dmg": self.citystate_kb_damage[:, s].long(), "form": self.citystate_kb_form[:, s].long()}
 
     # -- the unit production entries ----------------------------------------
 
@@ -908,7 +912,7 @@ class SimMinorOps:
         rec = self._mops_records(r)
         rd = self.pair_dist[rec["plot"].clamp(min=0), tc.unsqueeze(1)].to(torch.long)
         near = rec["recent"] & (rec["plot"] >= 0) & (rd <= 3) & on.unsqueeze(1)
-        term = self._mops_army_term(rec["combat"], rec["ranged"], rec["dmg"])
+        term = self._mops_army_term(rec["combat"], rec["ranged"], rec["dmg"], rec["form"])
         counted = near & self._ops_counted(seat, rec["owner"], enemy)
         strength = torch.where(counted, term, torch.zeros_like(term)).sum(dim=1)
         theirs = near & (rec["owner"] == enemy.unsqueeze(1)) & (enemy >= 0).unsqueeze(1)
@@ -1159,7 +1163,7 @@ class SimMinorOps:
         r = self._mops_records(s)
         pz = plot.clamp(min=0).unsqueeze(1)
         rd = self.pair_dist[r["plot"].clamp(min=0), pz].to(torch.long)
-        rterm = self._mops_army_term(r["combat"], r["ranged"], r["dmg"])
+        rterm = self._mops_army_term(r["combat"], r["ranged"], r["dmg"], r["form"])
         if not own:
             m = r["recent"] & (r["owner"] == BARB_SEAT) & (rd <= radius)
             return torch.where(m, rterm, torch.zeros_like(rterm)).sum(dim=1)

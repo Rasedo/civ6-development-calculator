@@ -437,6 +437,8 @@ class SimInit:
         self.citystate_kb_seen = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_plot = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_damage = torch.zeros(_kb, dtype=torch.int16, device=device)
+        # the formation each record's unit had when last seen (1 a Corps, 2 an Army)
+        self.citystate_kb_form = torch.zeros(_kb, dtype=torch.int8, device=device)
         # per minor in its city AI's turn, its records by AI_UNITS row as its
         # military AI's turn counted them (`CityState.armyCounted`)
         self._cv_counted: dict[int, torch.Tensor] = {}

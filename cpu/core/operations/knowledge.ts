@@ -14,6 +14,8 @@ export interface KnownUnit {
   combat: number;
   ranged: number;
   damage: number;
+  /** its formation when last seen (1 a Corps, 2 an Army); undefined none */
+  formation?: number;
   /** the turn it was last seen */
   seen: number;
 }

@@ -79,7 +79,7 @@ function knownOf(records: readonly ArmyRecord[] | undefined, player: number): Kn
   return (records ?? []).filter((r) => r.owner === player).map((r) => {
     const d = UNITS[r.type];
     return { id: r.id, owner: r.owner, type: gameTypeOf('unit', r.type, 'UNIT_'), plot: r.plot, combat: d?.combat ?? 0,
-      ranged: d?.ranged?.strength ?? 0, damage: r.damage, seen: r.seen };
+      ranged: d?.ranged?.strength ?? 0, damage: r.damage, formation: r.formation, seen: r.seen };
   });
 }
 

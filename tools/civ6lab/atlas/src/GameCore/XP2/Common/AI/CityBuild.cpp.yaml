@@ -187,6 +187,7 @@
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
     - "C-96: the Free Cities' city build AI, threat and Combat Desire"
     - "C-96: the city under threat and a pillaged district's repair"
+    - "C-128: the army records' formation in the army strength; a capture's start before the end look — READ (0x5eadb0 at 0x5eaf79), both twins"
   context:
     - "...m the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights; logged by 0x5cdd70: Food Adv. / Prod. Adv. are adv..."
   review: reviewed
