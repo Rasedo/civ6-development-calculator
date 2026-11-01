@@ -1363,6 +1363,7 @@
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
   context:
     - "...(PSEUDOYIELD_UNIT_SPY of Amount, landing to the horizon); EFFECT_GRANT_COMBAT_ADJACENCY 0x6c4060 (Enable: the player's strength over every domain 0x4bd0d0(-1) = PlayerStats +0x210 -..."
   review: reviewed

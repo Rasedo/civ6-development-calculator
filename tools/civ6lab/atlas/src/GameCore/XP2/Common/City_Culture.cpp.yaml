@@ -103,6 +103,7 @@
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: the border bank in fixed point — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
   context:
     - "...is non-empty. BASE_MULTIPLIER and DISTANCE_DIVISOR are not read here. The turn's handler 0x1a9bc0 (City_Culture.cpp) banks culture × (100 + percent) / 100 when the civ level annexes with..."
     - "...stored next plot (+0x1c) to -1 and counts the plot (+0xc). Its callers: the culture turn (0x1a9bc0, which then draws and stores a fresh plot), AnnexPlots(n) (0x1a8a30: n picker draws, each..."

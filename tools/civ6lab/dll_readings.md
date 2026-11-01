@@ -5804,3 +5804,28 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   over the Caravel (engines' every-player sum 60432 / 31327). The sums'
   terms against a sea entry (the efficiency orientation or the opposition's
   domain) unread.
+
+## C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins
+
+- The strength over every domain the civics AI reads (Military Tradition's
+  EFFECT_GRANT_COMBAT_ADJACENCY 0x6c4060, 0x4bd0d0(-1)) is +0x210 less
+  +0x390, both written by 0x4bc720 at the player's turn start through the
+  synced setter 0x731d10: +0x1b8's value (+0x210) is 0x4bb1e0(-1), the units'
+  term plus the treasury's (PlayerTreasury +0xf8, a 24.8, x 256 / 6 / 512:
+  gold / 12 in 24.8), its whole part; +0x338's (+0x390) the whole part of the
+  treasury / 12.0 (0x16e940 at 0x4bc7fb). The treasury's fraction carries the
+  units' into one more (`storeUnitStrength`, `_store_unit_strength`).
+  Confirmed: runs/h1_duely1121 player 4 t14 / t16 / t19 / t21 / t23 / t27
+  (Warriors 23.4 with 70 gold -> 24; Military Tradition 459.9 / 854.9 /
+  808.9 / 839.9 / 816.1 / 1374.6 as logged), t15 / t17 / t18 / t20 / t22
+  held (26.4 with 75 gold -> 26).
+- Every city's turn (0x1fa1d0, from Player DoTurn 0x4e4560 at 0x4e4813, over
+  the player's cities) runs production 0x178310, growth 0x1b46e0, borders
+  0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50, 0x1783b0)
+  0x194f80, a thunk to the full reassign 0x196320: every citizen re-placed
+  every turn after the border step (`minorGrowth`'s last step; `_minor_growth`),
+  which subsumes the annex's. Confirmed: runs/h1_duely1121 Hunza t18 187 /
+  188 -> 230 / 232 (Animal Husbandry completed that turn, its Horses on 230 /
+  232), Political Philosophy t19 438.0 as logged.
+- Open: the majors' and the Free Cities' cities re-place the same way; neither
+  engine places their citizens at the city's turn (C-112).

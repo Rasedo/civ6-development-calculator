@@ -762,12 +762,16 @@ function militaryStrength(state: GameState, seat: number): number {
 }
 
 /** PlayerStats' strength over every domain (0x4bd0d0(-1): +0x210 less
- *  +0x390, m_iMilitaryStrength less m_iMilitaryStrengthFromGold, computed at
- *  0x4bb1e0 as the player's turn starts, before its production):
- *  `militaryStrength`'s unit term without its treasury's, stored on the seat
- *  — runs/h1_duelv1127: a city-state's Military Tradition worth PV(20) a
- *  Warrior; runs/h1_duelw1121 Antioch: the Warrior its t13 production trains
- *  counts in Military Tradition's value from t14 */
+ *  +0x390, stored by 0x4bc720 as the player's turn starts, before its
+ *  production): +0x210 the whole part of the units' term and the treasury's
+ *  (0x4bb1e0(-1): the treasury's 24.8 x 256 / 6 / 512, its gold / 12 in
+ *  24.8), +0x390 the whole part of the treasury / 12.0 (0x4bc7fb) —
+ *  so the treasury's fraction carries the units' into one more (runs/
+ *  h1_duely1121 player 4 t14: Warriors at 32 and 85 hit points 23.4 and
+ *  70 gold, 24 in Military Tradition's 459.9; t15 26.4 and 75 gold, 26);
+ *  stored on the seat — runs/h1_duelv1127: a city-state's Military
+ *  Tradition worth PV(20) a Warrior; runs/h1_duelw1121 Antioch: the Warrior
+ *  its t13 production trains counts in Military Tradition's value from t14 */
 export function storeUnitStrength(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
@@ -778,7 +782,9 @@ export function storeUnitStrength(state: GameState, seat: number): void {
     const str = Math.max(d.combat ?? 0, d.ranged?.strength ?? 0) << 8;
     sum += Math.trunc((Math.trunc((str * (Math.max(0, u.hp) << 8)) / 256) * 256) / (UNIT_HP << 8));
   }
-  s.unitStrength = sum >> 8;
+  const gold = Math.trunc((s.treasury ?? 0) * FX);
+  const fromGold = Math.trunc(Math.trunc((gold * 256) / 6) / 512);
+  s.unitStrength = ((sum + fromGold) >> 8) - (Math.trunc(gold / 12) >> 8);
 }
 
 /** a unit as the AI reads it */

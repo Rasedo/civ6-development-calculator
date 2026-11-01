@@ -99,8 +99,8 @@ export function minorPlaceCitizens(state: GameState, cs: CityState, n: number): 
   cs.idleCitizens = city.idleCitizens;
 }
 
-/** every citizen of the minor's city re-placed (0x196320: an annex, a
- *  citizen lost, an improvement laid, a yield flag set) */
+/** every citizen of the minor's city re-placed (0x196320: the city's turn,
+ *  an annex, a citizen lost, an improvement laid, a yield flag set) */
 export function minorReplaceCitizens(state: GameState, cs: CityState): void {
   const city = minorCity(cs);
   replaceAllCitizens(state, city, minorFlags(cs));

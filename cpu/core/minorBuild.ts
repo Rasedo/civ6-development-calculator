@@ -111,8 +111,7 @@ export function minorPhase(state: GameState): void {
     // Kong t156: its Industrial era, its new Builder from the centre to 9:9
     // on Industrial roads at 0.75 with Movement left, the Farm laid there)
     upgradeRoads(state, cityState.seat, cityState.research);
-    storeUnitStrength(state, cityState.seat);
-    minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
+    storeUnitStrength(state, cityState.seat);    minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
     // its strategic resources after its city's turn, as the player's DoTurn
     // runs the resources' turn after the city turns (0x4e4560): every source
     // of its own pays into its stockpile, the resources its research
@@ -341,7 +340,6 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
   else if (city.population < popBefore) minorReplaceCitizens(state, cityState);
   city.specialistPref = cityState.specialistPref;
   city.idleCitizens = cityState.idleCitizens;
-  const acquired = city.tilesAcquired;
   cityBorderGrowth(state, city, cityState.seat, cultureAfterGrowth(state, city, popBefore, stats));
   cityState.population = city.population;
   cityState.unconvertedPressure = city.unconvertedPressure;
@@ -349,8 +347,13 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
   cityState.cultureBox = city.cultureBox;
   cityState.nextPlot = city.nextPlot;
   cityState.tilesAcquired = city.tilesAcquired;
-  // the border's annex re-places every citizen (AnnexPlot 0x1a8b70)
-  if (city.tilesAcquired !== acquired) minorReplaceCitizens(state, cityState);
+  // the city's turn ends re-placing every citizen (0x1fa1d0, after the
+  // production, growth, border and loyalty steps: 0x194f80 -> the full
+  // reassign 0x196320), the border's annex (AnnexPlot 0x1a8b70) with it
+  // (runs/h1_duely1121 Hunza t18: Animal Husbandry completed that turn shows
+  // the Horses on 230 / 232, its citizens 187 / 188 -> 230 / 232 before its
+  // civics AI)
+  minorReplaceCitizens(state, cityState);
 }
 
 /**

@@ -21,12 +21,16 @@
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
   context:
     - "...gth the rank conditions read (PlayerStats m_iMilitaryStrength, data +0x210, computed at 0x4bb1e0, stored as each player's turn starts, before its production): per unit max(Combat, Ra..."
   review: reviewed
 - addr: 0x4bc720
   kind: function
   status: PARTLY
+  impl: [cpu/core/aiView.ts:storeUnitStrength]
+  readings:
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x4bca20
@@ -100,6 +104,7 @@
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
   context:
     - "..._STRENGTH_LEAD (0xb548f0): the same lead test on the player stats' per-domain strength (0x4bd0d0: LAND +0x330, SEA +0x270, AIR +0x2d0), the ratio a float; the field's writer is unread..."
     - "...h, -10 where +0x6780 names p, + (20 - T in mode 1) where the owner's military strength (0x4bd0d0(-1): PlayerStats +0x210) is above twice p's or its era (player +0x1358 +0xf8, the Eras..."

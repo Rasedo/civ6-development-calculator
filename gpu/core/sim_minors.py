@@ -1172,11 +1172,12 @@ class SimMinors:
         pop1 = self.city_pop[:, row, 0].clone()
         self._minor_place_citizens(s, act & (pop1 > pop0), pop1 - pop0)
         self._minor_replace_citizens(s, act & (pop1 < pop0))
-        acq0 = self.city_acquired[:, row, 0].clone()
         self._seat_border_growth(row, col, act,
                                  self._culture_after_growth(row, 0, pop0, total[:, 0, 4], lux) * act.double())
-        # the border's annex re-places every citizen (AnnexPlot 0x1a8b70)
-        self._minor_replace_citizens(s, act & (self.city_acquired[:, row, 0] != acq0))
+        # the city's turn ends re-placing every citizen (0x1fa1d0 -> 0x194f80
+        # -> the full reassign 0x196320), the border's annex (AnnexPlot
+        # 0x1a8b70) with it
+        self._minor_replace_citizens(s, act)
 
     def _minor_envoy_tiles(self, games: torch.Tensor) -> None:
         """A MINOR TAKES GROUND FROM THE INFLUENCE SPENT ON IT — `envoyTiles`,

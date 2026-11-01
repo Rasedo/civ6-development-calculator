@@ -11,6 +11,17 @@
   context:
     - ...ier entry keeps a tie. The N = unassigned count of the last row's backtrack are assigned (0x194d90).
   review: imported
+- addr: 0x194f80
+  final: 0x10fa20
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/minorBuild.ts:minorGrowth, gpu/core/sim_minors.py:_minor_growth]
+  readings:
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...46e0, borders 0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50, 0x1783b0) 0x194f80, a thunk to the full reassign 0x196320: every citizen re-placed every turn after the bo..."
+  review: imported
 - addr: 0x194fb0
   final: 0x10fa50
   kind: function
@@ -100,11 +111,14 @@
     - gpu/core/sim_minorai.py:order
     - gpu/core/sim_minors.py:_minor_envoy_tiles
     - gpu/core/sim_minors.py:_minor_replace_citizens
+    - cpu/core/minorBuild.ts:minorGrowth
+    - gpu/core/sim_minors.py:_minor_growth
   readings:
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
   context:
     - "...1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced cou..."
     - "...nd writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the event (hash 0xe808a01e) — the city command 0x975920..."

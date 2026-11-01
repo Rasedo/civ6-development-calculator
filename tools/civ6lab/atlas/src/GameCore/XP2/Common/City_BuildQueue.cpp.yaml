@@ -54,6 +54,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...28, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8f100).  LOG: AI_CityBuild.csv lines: D..."
   context:
@@ -304,6 +305,24 @@
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
   context:
     - "...s strategic queue (City_BuildQueue 0x17f3a0, the front check 0x17f070 the queue process 0x178250 runs where the queue changed, +0x3ac): the front unit not CanTrain leaves the front; a..."
+  review: imported
+- addr: 0x178310
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...1d0, from Player DoTurn 0x4e4560 at 0x4e4813, over the player's cities) runs production 0x178310, growth 0x1b46e0, borders 0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50,...
+  review: imported
+- addr: 0x1783b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...growth 0x1b46e0, borders 0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50, 0x1783b0) 0x194f80, a thunk to the full reassign 0x196320: every citizen re-placed every turn..."
   review: imported
 - addr: 0x178c50
   kind: function

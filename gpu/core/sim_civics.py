@@ -232,7 +232,8 @@ class SimCivics:
         Cities' at `FR`) strength over every domain as its turn starts,
         before its production — per unit the greater of its combat and
         ranged strengths x its hit points left over its most, 24.8
-        truncated, the sum's whole part"""
+        truncated; with the treasury's gold / 12 in 24.8 the sum's whole
+        part, less the whole part of the gold / 12 (+0x210 less +0x390)"""
         seat = FREE_SEAT if s == self.FR else 100 + s
         mine = self.major_unit_alive & (self.major_unit_seat == seat)
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
@@ -240,7 +241,10 @@ class SimCivics:
         left = self.major_unit_hp.clamp(min=0) << 8
         hp = int(self.rules.combat["unitHp"]) << 8
         per = torch.div(torch.div(st * left, 256, rounding_mode="trunc") * 256, hp, rounding_mode="trunc")
-        now = (per * mine.long()).sum(dim=1) >> 8
+        tre = self.free_treasury if s == self.FR else self.citystate_treasury[:, s]
+        gold = torch.trunc(tre.double() * 256).long()
+        from_gold = torch.div(torch.div(gold * 256, 6, rounding_mode="trunc"), 512, rounding_mode="trunc")
+        now = (((per * mine.long()).sum(dim=1) + from_gold) >> 8) - (torch.div(gold, 12, rounding_mode="trunc") >> 8)
         self.citystate_unit_strength[:, s] = torch.where(live, now, self.citystate_unit_strength[:, s])
 
     def _cai_best(self, ent, key: torch.Tensor) -> torch.Tensor:

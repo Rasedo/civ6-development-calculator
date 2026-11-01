@@ -104,6 +104,16 @@
   context:
     - "..., 0 with none); the danger (the influence map below, 0x716a90); the Loyalty pressure (0x19d470 >> 8); and per ring plot revealed: one owned by another player is skipped (a city there..."
   review: reviewed
+- addr: 0x19f8d0
+  final: 0x115be0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...e player's cities) runs production 0x178310, growth 0x1b46e0, borders 0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50, 0x1783b0) 0x194f80, a thunk to the full reassign 0x1...
+  review: imported
 - addr: 0x1a0140
   final: 0x1163b0
   kind: function

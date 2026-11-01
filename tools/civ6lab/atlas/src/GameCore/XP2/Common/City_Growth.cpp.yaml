@@ -28,6 +28,16 @@
     - ...READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domai...
     - ...he globals' +0x13c) plus the first AppealHousingChanges band the plot's Appeal reaches (0x1b4450) at the housing value 0x7a3d70; where the civics' list holds the district (0x39dd20)...
   review: reviewed
+- addr: 0x1b46e0
+  final: 0x123460
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...DoTurn 0x4e4560 at 0x4e4813, over the player's cities) runs production 0x178310, growth 0x1b46e0, borders 0x1a9bc0, loyalty 0x19f8d0, then the citizens' (city +0x1b50, 0x1783b0) 0x19...
+  review: imported
 - addr: 0x1b4af0
   final: 0x123860
   kind: function
