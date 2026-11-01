@@ -252,7 +252,7 @@ class SimSeats:
             _m = torch.ones(self.B, self.NU, dtype=torch.bool, device=self.device)
             if self._res_slot_units:
                 _su, _ss, _sc = self._res_slot_vecs
-                _m[:, _su] = self.civ_stockpile[:, row][:, _ss] >= _sc * self._form_res_mult[_fk]
+                _m[:, _su] = self.civ_stockpile[:, row][:, _ss] >= self._formation_res_cost(self._type_res_base[_su], _fk)
             res_f.append(_m)
         w_okc: list[torch.Tensor | None] = []
         if nW_m:
@@ -3389,9 +3389,8 @@ class SimSeats:
                                      * self._form_cost_mult.gather(0, ftier.clamp(max=self._form_cost_mult.shape[0] - 1))
                                      * self._form_train_disc + 0.5)
                 self._q_push(row, j, is_f, a, cost_f)
-                _fmult = torch.tensor(self._form_res_mult, device=self.device, dtype=torch.long)[ftier.clamp(max=len(self._form_res_mult) - 1)]
                 for _ui, _sl, _c in self._res_slot_units:
-                    self._charge_unit_resource(row, is_f & (fui == _ui), _ui, at=j, mult=_fmult)
+                    self._charge_unit_resource(row, is_f & (fui == _ui), _ui, at=j, mult_tier=ftier)
 
     def _select_research(self, row: int, want: torch.Tensor, ok: torch.Tensor, is_civic: bool = False) -> None:
         """The `selectResearch` twin: switch item, keeping the old one's science.
@@ -4257,23 +4256,34 @@ class SimSeats:
             for _k in range(stock.shape[1]):
                 self._log_stock(range(self.B), row, _k, "up")
 
+    def _formation_res_cost(self, base: torch.Tensor, tier, off: torch.Tensor | None = None) -> torch.Tensor:
+        """`formationResourceCost`: the base times the formation's multiple, a
+        Corps or Army less the trained-formation discount (truncated), less
+        the city's percent off rounded half up, at least 1 (long)"""
+        mult_t = torch.tensor(self._form_res_mult, dtype=torch.long, device=self.device)
+        tier_t = tier if isinstance(tier, torch.Tensor) else torch.full_like(base, int(tier))
+        c = base * mult_t[tier_t.clamp(min=0, max=len(self._form_res_mult) - 1)]
+        c = torch.where(tier_t > 0, c - torch.floor(c.double() * (1.0 - self._form_train_disc)).long(), c)
+        if off is not None:
+            c = c - torch.floor(c.double() * off.double() / 100.0 + 0.5).long()
+        return c.clamp(min=1)
+
     def _charge_unit_resource(self, row: int, hit: torch.Tensor, u_idx: int,
                               at: int | None = None,
-                              mult: torch.Tensor | None = None) -> None:
+                              mult_tier: torch.Tensor | None = None) -> None:
         """`chargeUnitResource` — the unit's stockpile cost, taken from the rows
         that actually started it. CIV6 (Black Marketeer): "Strategic resources
         for units are discounted 80%" — the discount belongs to the TRAINING
         city, so a purchase made outside a production queue pays full price.
-        `mult` is the FORMATION tier's multiple of the charge, per row."""
-        slot, cost = int(self._type_res_slot[u_idx]), int(self._type_res_cost[u_idx])
-        if slot < 0 or cost <= 0 or not bool(hit.count_nonzero()):
+        `mult_tier` is the FORMATION tier per row (`formationResourceCost`)."""
+        slot = int(self._type_res_slot[u_idx])
+        if slot < 0 or not bool(hit.count_nonzero()):
             return
-        pay = torch.full((self.B,), float(cost), dtype=torch.float64, device=self.device)
-        if mult is not None:
-            pay = pay * mult.double()
-        if at is not None and self.n_governors:
-            off = self._governor_sum(row, "resourceDiscountPct")[:, at].clamp(max=100.0)
-            pay = js_round(pay * (100.0 - off) / 100.0)
+        base = torch.full((self.B,), int(self._type_res_base[u_idx]), dtype=torch.long, device=self.device)
+        tier = mult_tier if mult_tier is not None else torch.zeros_like(base)
+        off = (self._governor_sum(row, "resourceDiscountPct")[:, at].clamp(max=100.0)
+               if at is not None and self.n_governors else torch.zeros(self.B, dtype=torch.float64, device=self.device))
+        pay = self._formation_res_cost(base, tier, off).double()
         col = self.civ_stockpile[:, row, slot]
         col.copy_(torch.where(hit, (col - pay.to(col.dtype)).clamp(min=0), col))
         self._log_stock(hit.nonzero(as_tuple=True)[0], row, slot, "uc")
@@ -10392,11 +10402,10 @@ class SimSeats:
 
     def _res_extracting(self) -> torch.Tensor:
         """[B, T] — does the plot hand its resource to its owner
-        (`extractsResource`)? CIV6 (Player_Resources 0x4aa8e0 / 0x4aaa70): a
-        complete, unpillaged district on it — a major's city centre included —
-        or else the resource's own unpillaged improvement."""
-        district = (self.centre_slot_at >= 0) | (
-            (self.district >= 0) & self.district_complete & ~self.district_pillaged)
+        (`extractsResource`)? An unpillaged district on it, placed or
+        complete — a city centre included — or else the resource's own
+        unpillaged improvement."""
+        district = (self.centre_slot_at >= 0) | ((self.district >= 0) & ~self.district_pillaged)
         return (self.res_id >= 0) & (district | ((self.improvement == self.res_imp) & ~self.pillaged))
 
     def _seat_accrue_stockpile(self, row: int) -> None:

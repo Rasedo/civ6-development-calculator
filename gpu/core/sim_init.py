@@ -4443,10 +4443,14 @@ class SimInit:
         self._res_pair_vecs = (
             torch.tensor([u for u, _ in self._res_unit_pairs], dtype=torch.long, device=device),
             torch.tensor([r for _, r in self._res_unit_pairs], dtype=torch.long, device=device))
-        # GS: the STOCKPILE slot a unit charges, and what it charges.
+        # GS: the STOCKPILE slot a unit charges, its base before formation
+        # and city (`unitBaseResourceCost`, 0 for a fuel unit), and what a
+        # single one charges (at least 1)
         self._type_res_slot = torch.tensor([int(u["resSlot"]) for u in ru], dtype=torch.long, device=device)
-        self._type_res_cost = torch.tensor([int(u["resCost"]) for u in ru], dtype=torch.long, device=device)
-        self._res_slot_units = [(i, int(u["resSlot"]), int(u["resCost"]))
+        self._type_res_base = torch.tensor([int(u["resCost"]) for u in ru], dtype=torch.long, device=device)
+        self._type_res_cost = torch.where(self._type_res_slot >= 0, self._type_res_base.clamp(min=1),
+                                          torch.zeros_like(self._type_res_base))
+        self._res_slot_units = [(i, int(u["resSlot"]), max(1, int(u["resCost"])))
                                 for i, u in enumerate(ru) if int(u["resSlot"]) >= 0]
         # ...as (unit, slot, charge) vectors — each unit charges one slot, so
         # one gather tests them all

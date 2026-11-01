@@ -138,14 +138,15 @@ describe('build/purchase gating', () => {
 });
 
 describe('a formation pays a multiple of the chassis charge', () => {
-  it('doubles for a Corps and triples for an Army, up front', () => {
-    // CIV6 (Formations, two agreeing secondary sources): a Corps costs DOUBLE
-    // the unit's strategic resource and an Army TRIPLE, maintenance unchanged.
+  it('doubles for a Corps and triples for an Army, less the trained formation\'s 25%', () => {
+    // CIV6 (Formations): a Corps costs DOUBLE the unit's strategic resource
+    // and an Army TRIPLE, less the training building's corps / army
+    // discount (City_BuildQueue 0x17c2e0)
     const gated = Object.values(UNITS).find((u) => u.requiresResource)!;
     const one = unitResourceCost(gated.id)!;
     expect(one.n).toBeGreaterThan(0);
-    expect(unitResourceCost(gated.id, 1)!.n).toBe(one.n * FORMATION_RESOURCE_MULT[1]);
-    expect(unitResourceCost(gated.id, 2)!.n).toBe(one.n * FORMATION_RESOURCE_MULT[2]);
+    expect(unitResourceCost(gated.id, 1)!.n).toBe(one.n * 2 - Math.floor(one.n * 2 / 4));
+    expect(unitResourceCost(gated.id, 2)!.n).toBe(one.n * 3 - Math.floor(one.n * 3 / 4));
     expect(FORMATION_RESOURCE_MULT[1]).toBe(2);
     expect(FORMATION_RESOURCE_MULT[2]).toBe(3);
     // the resource is the same one either way — only the amount moves
@@ -157,18 +158,18 @@ describe('a formation pays a multiple of the chassis charge', () => {
     const city = settleAt(state, tileAtCoords(state.map, 6, 6).index, 0);
     const gated = Object.values(UNITS).find((u) => u.requiresResource)!;
     const res = gated.requiresResource!;
-    const one = unitResourceCost(gated.id)!.n;
     const seat = seatOf(state, 0)!;
 
-    seat.stockpile![strategicSlot(res)] = one * 2;
+    const corps = unitResourceCost(gated.id, 1)!.n;
+    seat.stockpile![strategicSlot(res)] = corps;
     expect(canTrainWithStockpile(state, 0, gated.id, 0)).toBe(true);
     expect(canTrainWithStockpile(state, 0, gated.id, 1)).toBe(true);
-    // an ARMY asks three times the charge, which this bank cannot meet
+    // an ARMY asks more than this bank holds
     expect(canTrainWithStockpile(state, 0, gated.id, 2)).toBe(false);
 
     const before = stockOf(state, 0, res);
     commitProduction(state, 0, city, { kind: 'unit', unit: gated.id, formation: 1, progress: 0 });
-    expect(before - stockOf(state, 0, res)).toBe(one * 2);
+    expect(before - stockOf(state, 0, res)).toBe(corps);
     expect(seat).toBeTruthy();
   });
 });

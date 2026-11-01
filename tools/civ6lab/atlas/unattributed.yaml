@@ -468,6 +468,7 @@
     - "H-1: the district adjacency — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...e Cothon,   the Royal Navy Dockyard) stands at the FROM plot, or at the TO plot — the   completion (0x811b0) read off the FROM plot's district in both cases (t72:   2's Swordsman embarking from (15,6) onto i..."
   context:

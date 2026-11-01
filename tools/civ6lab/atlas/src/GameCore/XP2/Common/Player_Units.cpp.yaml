@@ -171,8 +171,10 @@
   final: 0x34f6e0
   kind: function
   status: PARTLY
+  impl: [cpu/core/stockpile.ts:formationResourceCost]
   readings:
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
+    - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...me speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"

@@ -284,8 +284,10 @@
   final: 0xfc5d0
   kind: function
   status: PARTLY
+  impl: [cpu/core/minorBuild.ts:minorSetItem]
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
   context:
     - "...s strategic queue (City_BuildQueue 0x17f3a0, the front check 0x17f070 the queue process 0x178250 runs where the queue changed, +0x3ac): the front unit not CanTrain leaves the front; a..."
   review: imported
@@ -546,10 +548,11 @@
   final: 0xfec80
   kind: function
   status: PARTLY
-  impl: [cpu/core/stockpile.ts:unitBaseResourceCost]
+  impl: [cpu/core/stockpile.ts:unitBaseResourceCost, cpu/core/stockpile.ts:formationResourceCost]
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
+    - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
   context:
     - ...8 / +0x1a0), no progress (0x17d1a0) and a StrategicResource (+0x2c8) reserves its cost (0x17c2e0, its formation's) where the stock less the reservations (0x4aa790) covers it (0x4a7400)...
   review: imported
@@ -660,7 +663,10 @@
   final: 0x100e80
   kind: function
   status: PARTLY
-  impl: [cpu/core/minorBuild.ts:minorBuild, gpu/core/sim_minors.py:_minor_build]
+  impl:
+    - cpu/core/minorBuild.ts:minorBuild
+    - gpu/core/sim_minors.py:_minor_build
+    - cpu/core/minorBuild.ts:minorSetItem
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
@@ -679,6 +685,7 @@
     - cpu/core/minorBuild.ts:minorBuild
     - cpu/core/types.ts:CityState
     - gpu/core/sim_minors.py:_minor_build
+    - cpu/core/minorBuild.ts:minorSetItem
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"

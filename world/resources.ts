@@ -135,16 +135,20 @@ export function resourceImprovement(tile: Tile): ImprovementId | null {
 }
 
 /**
- * Does this plot hand its resource to its owner? CIV6 (GameCore_XP2
- * Player_Resources 0x4aa8e0 / 0x4aaa70): a complete, unpillaged district on
- * the plot — any district, the city centre (never pillaged) included — or
- * else an unpillaged improvement whose valid resources hold it; and 0x4aafd0
- * pays an accumulating resource its ImprovedExtractionRate through either.
+ * Does this plot hand its resource to its owner? An unpillaged district on
+ * the plot — any district, placed or complete, the city centre (never
+ * pillaged) included — or else an unpillaged improvement whose valid
+ * resources hold it (Player_Resources 0x4aa8e0 / 0x4aaa70); 0x4aafd0 pays
+ * an accumulating resource its ImprovedExtractionRate through either. A
+ * district still building pays (a fit: runs/h1_duely1128 Nazca's Holy Site
+ * on its Horses, placed t14, complete t16 — its Horses 4 at t15, 6 at t16
+ * by AI_GovtPolicies.csv's Equestrian Orders 5.0 / 7.0, every turn to t31 as
+ * logged; the DLL's 0x811b0 reads +0xb08 there, its meaning open).
  */
 export function extractsResource(tile: Tile): boolean {
   if (!tile.resource) return false;
   if (tile.district === 'CITY_CENTER') return true;
-  if (tile.district && tile.districtComplete && !tile.districtPillaged) return true;
+  if (tile.district && !tile.districtPillaged) return true;
   return !tile.pillaged && tile.improvement === resourceImprovement(tile);
 }
 

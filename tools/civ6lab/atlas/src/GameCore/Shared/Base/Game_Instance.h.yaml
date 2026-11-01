@@ -25,6 +25,7 @@
     - cpu/core/governors.ts:governorClocks
     - cpu/harness/checks.ts:standing
     - cpu/harness/import.ts:luxuryCards
+    - cpu/core/minorBuild.ts:minorPhase
   readings:
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
@@ -34,6 +35,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
   context:
     - "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0: production, growth, the border turn 0x1a9bc0, loyalty): a WONDER..."
     - "- Player DoTurn 0x4e4560, in order: the culture (+0x1310, 0x396860: the civic progress), the resources (+0x1320,..."

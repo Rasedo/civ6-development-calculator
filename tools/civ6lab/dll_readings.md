@@ -12862,3 +12862,30 @@ City_BuildQueue.csv).
   site). Open: the treasury's +0x338 (held 0); the cityBuildLab runs no
   Economic AI, so its tables keep the unboosted weight.
 
+## C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins
+
+- THE CHARGE (City_BuildQueue 0x17c2e0): base (Player_Units +0x430, the
+  scaled ResourceCost) x the formation's multiple (0x4f2cc0); a Corps or
+  Army less trunc(cost x m_xCorpsArmyDiscount) (+0x390, by unit; MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT's
+  25 — Military Academy, Seaport, Ikanda); less round(cost x
+  m_xStrategicResourceRequirementModifier) (+0x3b0;
+  MODIFIER_CITY_ADJUST_STRATEGIC_RESOURCE_REQUIREMENT_MODIFIER, Black
+  Marketeer's 80); at least 1, last. The names are 0x186460's dump. Both
+  twins: `formationResourceCost` / `_formation_res_cost`
+  (`unitBaseResourceCost`, `resCost` the base, 0 for a fuel unit). No
+  recording trains a formation or holds Black Marketeer.
+- THE QUEUE PROCESS where the queue changed (0x178250, +0x3ac) runs the
+  front check as an item is taken: a fresh unit short of its cost leaves at
+  once (runs/h1_duely1128 Nazca t41: its Horseman picked at 51.7 on no
+  Horses, the record's queue empty at t42). Both twins: `minorSetItem` /
+  `_minor_set_item`.
+- A DISTRICT PLACED on a resource extracts it, complete or not, unpillaged
+  (a fit; 0x811b0 reads +0xb08 for 0x4aa8e0, its meaning open):
+  runs/h1_duely1128 Nazca's Holy Site on Horses, placed t14, complete t16 —
+  Equestrian Orders 7.0 ... 25.0 t16-t31 to the turn (ours two accruals
+  short before). `extractsResource` / `_res_extracting`, every player's.
+- A MINOR'S RESOURCE TURN after its city's turn (DoTurn 0x4e4560 runs the
+  cities before the resources), its units' fuel after: `minorPhase` /
+  `_city_state_phase`. runs/h1_duelw1121 Hunza's Equestrian Orders still
+  every turn as logged (t1-60); 1128 Nazca's Walls (t39-40) and its
+  Horsemen (t33, t37) as the record.

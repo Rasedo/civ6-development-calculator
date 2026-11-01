@@ -14,10 +14,10 @@ class SimMinors:
         # each minor in turn — the `minorPhase` order, one minor at a time
         # because a district one minor lands may lend a neighbour's district
         # adjacency across the border: its levied army home when due, its
-        # strategic resources' income (`_seat_accrue_stockpile`, a major's
-        # body over its own bank), its grid; its economy and the research it
-        # completes; its city — the
-        # step works the item in hand, then growth and borders on the city as
+        # grid; its economy and the research it completes; its city — the
+        # step works the item in hand; its strategic resources' income
+        # (`_seat_accrue_stockpile`, a major's body over its own bank) and its
+        # units' fuel after its city's turn; then growth and borders on the city as
         # it stands after that (its city presses a religion it follows on the
         # founder's turn); its military AI's Combat Desire; its savings and
         # military AI's turn (`_minor_military_turn`); its knowledge
@@ -34,13 +34,14 @@ class SimMinors:
             if not bool(alive.count_nonzero()):
                 continue
             self._minor_levy_return(s)
-            self._seat_accrue_stockpile(self._CITY_MINOR0 + s)
-            # its units' fuel, out of the same bank, before its grid
-            self._seat_charge_upkeep(self._CITY_MINOR0 + s)
             self._minor_power(s)
             techs = self._minor_economy(s)
             self._store_unit_strength(s, alive)
             self._minor_build(s, self._minor_production(s))
+            # its strategic resources after its city's turn (`minorPhase`), then
+            # its units' fuel out of the same bank
+            self._seat_accrue_stockpile(self._CITY_MINOR0 + s)
+            self._seat_charge_upkeep(self._CITY_MINOR0 + s)
             # its city AI's update reads, between the production and the
             # growth, the growth its last turn read (its own the first turn)
             g = self._cv_minor_facts(s).growth()
@@ -1584,6 +1585,23 @@ class SimMinors:
             self.citystate_kept[rr[has], s, k[has]] = 0
         self.citystate_prod[rr, s] = resume
         self.citystate_item[rr, s] = k
+        # the queue process runs where the queue changed (`minorSetItem`): a
+        # fresh unit's strategic cost reserved where the stock less the
+        # reservations covers it, else the unit leaves the queue
+        if self._n_strategic:
+            item = self.citystate_item[:, s]
+            ui = item.clamp(min=0, max=self.NU - 1)
+            slot = self._type_res_slot.take(ui)
+            need = self._type_res_cost.take(ui)
+            fresh = (ch & (item >= 0) & (item < self._mk_b0) & (slot >= 0)
+                     & (self.citystate_prod[:, s] <= 0) & (self.citystate_prod_reserved[:, s] < 0))
+            if bool(fresh.count_nonzero()):
+                free = (self.citystate_stockpile[:, s] - self._stock_reserved(self._CITY_MINOR0 + s)).gather(
+                    1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
+                drop = fresh & (free < need)
+                self.citystate_prod_reserved[:, s] = torch.where(fresh & ~drop, need, self.citystate_prod_reserved[:, s])
+                if bool(drop.count_nonzero()):
+                    self._minor_set_item(s, drop, -1)
 
     def _minor_place_district(self, s: int, mask: torch.Tensor, key: torch.Tensor, site: torch.Tensor) -> None:
         """`minorPlaceDistrict` where `mask` (`key` the item, `site` its plot):

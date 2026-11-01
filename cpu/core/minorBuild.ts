@@ -84,7 +84,7 @@ import { militaryFavTech } from './operations/unitRows';
  *  before its yields read it. Then, as every player's turn runs
  *  (tools/civ6lab/turn_order_civ6.md): its economy (`minorEconomy`) and the
  *  research that completes on it, then its city — the Production its city
- *  makes now, then growth and borders on the city as it stands after that
+ *  makes now, its strategic resources' income and its units' fuel, then growth and borders on the city as it stands after that
  *  (`minorGrowth`) — its city presses a religion it follows on that
  *  religion's founder's turn (`spreadReligiousPressure`) — then its research
  *  and civics AIs' turns on the city so grown (`minorResearchAi`), its military
@@ -101,18 +101,18 @@ export function minorPhase(state: GameState): void {
     atRngPoint(state, { kind: 'seat', seat: cityState.seat, turn: state.turn });
     minorStart?.(state, cityState);
     minorLevyReturn(state, cityState);
-    // its strategic resources, before anything reads them: every improved
-    // source of its own pays into its stockpile, as a major's does
-    // (Player_Resources is every player's; runs/h1_duelw1121 Hunza's one
-    // Horses Pasture from t20)
-    accrueStockpiles(state, cityState.seat);
-    // its units' fuel, out of the same bank, before its grid (a major's
-    // order: `chargeUnitUpkeep`)
-    chargeUnitUpkeep(state, cityState.seat);
     minorPower(state, cityState);
     const techs = minorEconomy(state, cityState);
     storeUnitStrength(state, cityState.seat);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
+    // its strategic resources after its city's turn, as the player's DoTurn
+    // runs the resources' turn after the city turns (0x4e4560): every source
+    // of its own pays into its stockpile, the resources its research
+    // revealed this turn included (runs/h1_duely1128 Nazca's Horses t15-t31
+    // as logged; runs/h1_duelw1121 Hunza's one Horses Pasture from t20)
+    accrueStockpiles(state, cityState.seat);
+    // its units' fuel, out of the same bank (a major's order: `chargeUnitUpkeep`)
+    chargeUnitUpkeep(state, cityState.seat);
     // its city AI's forecast, between the production and the growth: of the
     // growth its last turn read, before that turn's Builders acted (the
     // citizens and the store before each turn's growth: runs/h1_duelv1121
@@ -993,6 +993,16 @@ export function minorSetItem(state: GameState, cityState: CityState, item: Exclu
   else delete cityState.prodRetained;
   if (key) cityState.prodItem = key;
   else delete cityState.prodItem;
+  // the queue process runs where the queue changed (0x178250, +0x3ac): the
+  // front check (0x17f070 -> 0x17f3a0) reserves a fresh unit's strategic
+  // cost where the stock less the reservations covers it, else the unit
+  // leaves the queue as it is taken (runs/h1_duely1128 Nazca t41: its
+  // Horseman picked at 51.7 on no Horses, the record's queue empty at t42)
+  if (item && 'unit' in item && !(cityState.prodProgress ?? 0)) {
+    const res = unitResourceCost(item.unit);
+    if (res && stockFree(state, cityState.seat, res.id) < res.n) minorSetItem(state, cityState, null);
+    else if (res) cityState.prodReserved = res.n;
+  }
 }
 
 /** A DISTRICT STANDS ON ITS PLOT FROM ITS PRODUCTION'S START: the plot takes

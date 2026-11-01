@@ -2264,6 +2264,7 @@ export function buildRules() {
       requiresResource: u.requiresResource ? RESOURCE_IDS.indexOf(u.requiresResource) : -1,
       // the STOCKPILE slot the unit charges, and what it charges
       resSlot: u.requiresResource ? STRATEGIC_IDS.indexOf(u.requiresResource) : -1,
+      // its base before formation and city (`unitBaseResourceCost`; 0 for a fuel unit)
       resCost: u.requiresResource ? unitBaseResourceCost(u) : 0,
       // GS: a FUEL unit bills this out of the bank every turn it lives
       resUpkeep: u.resourceUpkeep ?? 0,

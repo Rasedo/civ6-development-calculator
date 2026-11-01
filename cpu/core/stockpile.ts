@@ -9,7 +9,7 @@
 import { logStockWrite } from './difflog';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, RAILROAD_COST, emptyStockpile,
   PURCHASE_DIVISOR, UPGRADE_BASE_COST, UPGRADE_MINIMUM_COST, UPGRADE_MINIMUM_COST_LEVY, UPGRADE_NET_PRODUCTION_PERCENT_COST, scaleByGameSpeed } from '../data/constants';
-import { UNITS, civUpgradeTarget, FORMATION_RESOURCE_MULT } from '../data/units';
+import { UNITS, civUpgradeTarget, FORMATION_RESOURCE_MULT, FORMATION_TRAIN_DISCOUNT } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
 import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor } from '../data/buildings';
@@ -290,12 +290,25 @@ export function canPayStockpile(state: GameState, seat: number, resourceId: stri
   return k < 0 || stockOf(state, seat, resourceId) >= n;
 }
 
-/** A unit's strategic cost before its formation: its Units_XP2
- *  ResourceCost through the game speed (Player_Units 0x4f2df0 / 0x4f31f0
- *  fill +0x430 with 0x5254d0 of the row's ResourceCost; online 20 -> 10),
- *  at least 1 (City_BuildQueue 0x17c2e0's floor) */
+/** A unit's strategic cost before its formation and its city: its
+ *  Units_XP2 ResourceCost through the game speed (Player_Units 0x4f2df0 /
+ *  0x4f31f0 fill +0x430 with 0x5254d0 of the row's ResourceCost; online
+ *  20 -> 10, a fuel unit's 1 -> 0) */
 export function unitBaseResourceCost(def: { resourceCost?: number }): number {
-  return Math.max(1, scaleByGameSpeed(def.resourceCost ?? UNIT_RESOURCE_COST));
+  return scaleByGameSpeed(def.resourceCost ?? UNIT_RESOURCE_COST);
+}
+
+/** THE CHARGE (City_BuildQueue 0x17c2e0): the base times the formation's
+ *  multiple (0x4f2cc0), a Corps or Army less its training city's
+ *  m_xCorpsArmyDiscount (+0x390, MODIFIER_CITY_CORPS_ARMY_ADJUST_DISCOUNT's
+ *  25 — the building a directly trained formation needs), truncated, then
+ *  less the city's m_xStrategicResourceRequirementModifier (+0x3b0, Black
+ *  Marketeer's 80) rounded half up, at least 1 */
+export function formationResourceCost(base: number, formation: number, offPct = 0): number {
+  let c = base * (FORMATION_RESOURCE_MULT[formation] ?? 1);
+  if (formation > 0) c -= Math.floor(c * (1 - FORMATION_TRAIN_DISCOUNT));
+  if (offPct > 0) c -= Math.round((c * Math.min(100, offPct)) / 100);
+  return Math.max(1, c);
 }
 
 /**
@@ -309,7 +322,7 @@ export function unitResourceCost(unitType: string, formation = 0): { id: string;
   return def?.requiresResource
     ? {
       id: def.requiresResource,
-      n: unitBaseResourceCost(def) * (FORMATION_RESOURCE_MULT[formation] ?? 1),
+      n: formationResourceCost(unitBaseResourceCost(def), formation),
     }
     : undefined;
 }
@@ -432,11 +445,11 @@ export function canTrainWithStockpile(state: GameState, seat: number, unitType: 
 }
 
 export function chargeUnitResource(state: GameState, seat: number, unitType: string, city?: City, formation = 0): void {
-  const c = unitResourceCost(unitType, formation);
-  if (!c) return;
+  const def = UNITS[unitType];
+  if (!def?.requiresResource) return;
   // CIV6 (Black Marketeer): "Strategic resources for units are discounted 80%."
   const off = city ? governorSum(state, city, (e) => e.resourceDiscountPct) : 0;
-  spendStockpile(state, seat, c.id, Math.round(c.n * (100 - Math.min(100, off)) / 100), 'uc');
+  spendStockpile(state, seat, def.requiresResource, formationResourceCost(unitBaseResourceCost(def), formation, off), 'uc');
 }
 
 /** The same charge for a PROJECT — the Lagrange station's one-time Aluminum. */
