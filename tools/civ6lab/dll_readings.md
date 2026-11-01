@@ -6217,3 +6217,39 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
 - Open: the other multipliers of the minor's queue (the Global Energy
   Treaty's plant, Public Works' projects, the roster's prodMults) not on a
   minor's step or turns; 0x178610 and +0x308 / +0x30c unread.
+
+## C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins
+
+- Operation Move's execution (0x816cb0) walks the ring of its radius around
+  the goal (0x6aef0) with the test 0x815d50: the goal's region before
+  another, then strictly nearer the mover; off the mover's own plot (0x90290)
+  each unit of the mover's player on the plot goes to 0x265ac0, whose test
+  (0x265af0: a unit off the leader's plot) refuses it, so any unit of its own
+  refuses the plot; then the location test 0x586360 (flags 0 / 0, the ground,
+  the domain, closed borders, a hostile defender) on any plot. No path test:
+  a ring plot the mover has no path to is taken, and the move order walks
+  toward it. Ported as `passMoveExec`'s ring walk (the stacking test kept,
+  `groundOf(...).enter` for 0x586360) and `_op_move_exec`'s
+  (`_tac_enter`, `_tac_embarks`).
+- runs/h1_duely1121 t59-t65 and t79-t91: the raid's Archer 2031620 and
+  Warriors 589832 / 1310730 / 1769487 log 6:13 / 7:12 beside their target
+  6:12 and step on while their own Scout 131073 stands on the land bridge
+  11:18 / 9:19, the only way from the eastern peninsula; with a path test
+  every ring plot failed, the goal 6:12 (the city) taken with the attack
+  flag and no path, the units standing still (23 rows to t150, none lost on
+  the five duels to t150).
+- runs/h1_duely1124 t100: city-state 4's City Defense Trebuchet on 31:8
+  keeps its plot, the goal 32:8 holding its own Trader and Builder: a unit
+  of the player of any class refuses a ring plot (the stacking class test
+  of the path finder does not apply here).
+- The move order's destination (the path validity 0x2720a0's stacking test
+  at the path's end): a destination its own stacking unit holds, reached in
+  the first turn, is no path under flag 0x1000 or not; one reached in a later
+  turn is kept (refusing it at any turn loses 14 rows on the five duels to
+  t200). `pathTo`, `_tac_move_to`. runs/h1_duely1124 t182-t196: the
+  barbarian Ironclad 5701639 on 19:3 holds for China's Water Park 19:8
+  (Pillage Improvement, no flag) while the rampaging Galley 720906 stands on
+  it, ours had walked to 19:7 (27 rows to t200, none lost).
+- Open: 1121 t56-t58 the same raid's units, Not Ready, end one or two plots
+  away from the goal (14:13 -> 15:13, 15:14 -> 16:16, 16:15 -> 17:16) where
+  our move order walks the path west; MoveTo 0x962380 below the order unread.

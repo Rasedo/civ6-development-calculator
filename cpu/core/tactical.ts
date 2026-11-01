@@ -624,9 +624,11 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
     found = n;
     return true;
   }, undefined, false, laterTurns, false, explore, danger, mates);
-  // under flag 0x1000 the path's first turn may not end on the destination
-  // its own stacking unit holds
-  if (laterTurns && found && (found as PNode).turns <= 1 && stackedWith(state, unit, mates, dest)) return [];
+  // the path's first turn may not end on the destination its own stacking
+  // unit holds, under flag 0x1000 or not (runs/h1_duely1124 t182-t196: the
+  // barbarian Ironclad 5701639 on 19:3 holds for China's Water Park 19:8
+  // while the rampaging Galley 720906 stands on it)
+  if (found && (found as PNode).turns <= 1 && stackedWith(state, unit, mates, dest)) return [];
   const out: number[] = [];
   for (let n: PNode | null = found; n && n.parent; n = n.parent) out.push(n.tile);
   return out.reverse();
@@ -637,9 +639,10 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
  *  ends it), the engine's step paying each; it walks through its own units
  *  but stops short of a plot of its own unit that stacks with it. A path
  *  ending on a plot it attacks into stops at its side, and with `strike`
- *  the unit strikes it there. With `laterTurns` (the order's path flag
- *  0x1000) the path's turns after its first may end on a plot its own
- *  stacking unit holds, its first not; with no `explore` (its flag 1) the
+ *  the unit strikes it there. A destination its own stacking unit holds,
+ *  reached in the first turn, is no path. With `laterTurns` (the order's
+ *  path flag 0x1000) the path's turns after its first may end on a plot its
+ *  own stacking unit holds, its first not; with no `explore` (its flag 1) the
  *  path leaves no plot the player never revealed; with `danger` (its flags
  *  8 / 0x8000) its first turn steps onto no plot of danger, (its flag 2)
  *  no step onto the ground of a player at war with it. */
@@ -2997,8 +3000,11 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * (0x791300) where it lies in the goal's region, else of the plots within
  * the radius of the goal (the ring walk 0x6aef0, the test 0x815d50) one in
  * the goal's region before one outside, then the nearest it, its own plot or
- * one with none of its own and a path to it; none, the goal with the attack
- * flag. The order's danger flags (0x816e70..0x816e85, 0x817839..0x8178b1):
+ * one with none of its own that the unit may stand on, whatever its path
+ * (runs/h1_duely1121 t59-t65 / t79-t91: the raid's Archer and Warriors go
+ * for 6:13 / 7:12 beside the target 6:12 while their own Scout holds the
+ * land bridge 9:19 / 11:18, the only way there); none, the goal with the
+ * attack flag. The order's danger flags (0x816e70..0x816e85, 0x817839..0x8178b1):
  * where the operation is weaker than its target (op +0x4b0 below +0x510,
  * `weak`) flag 8 for a unit with no combat (0x56dc90) or one in a formation
  * holding a civilian (0x266950(2): Make Formation's pair, `mates`), else
@@ -3035,6 +3041,7 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     const p = reachAt(state, pass, u, goal, PLAN_TURNS, false, r);
     if (p >= 0 && region >= 0 && (state.map.tiles[p].region ?? -1) === region) dest = p;
     else if (r > 0) {
+      const ground = groundOf(state, u, false, false, true, mine);
       let best = -1;
       let bestD = -1;
       let bestIn = false;
@@ -3045,11 +3052,12 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
           if (inRegion === bestIn && d >= bestD) continue;
           if (inRegion !== bestIn && !inRegion) continue;
         }
+        // off its own plot no unit of its own there (0x265ac0 refuses each:
+        // none stands on the leader's plot), then the location test
+        // (0x586360 with no flag: the ground, its domain, closed borders, a
+        // hostile unit, city centre or Encampment there); no path test
         if (q !== u.tileIndex && state.units.some((x) => x !== u && x.tileIndex === q && x.seat === u.seat)) continue;
-        if (q !== u.tileIndex && !paths.has(q)) continue;
-        // one it may move into (0x815d50 -> 0x586360): no plot it would
-        // attack into, the goal's own city centre among them
-        if (attackPlot(state, u, q)) continue;
+        if (!ground.enter(state.map.tiles[q])) continue;
         best = q;
         bestD = d;
         bestIn = inRegion;

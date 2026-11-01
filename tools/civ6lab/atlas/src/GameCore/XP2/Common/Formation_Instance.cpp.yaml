@@ -28,8 +28,10 @@
     - recording: h1_duelv1124
       turn: 35
       value: runs/h1_duelv1124 t35   (a Warrior's goal one plot short of its target) agrees.
+  impl: [cpu/core/tactical.ts:bestIn, gpu/core/sim_tactics.py:_op_move_exec]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
   context:
     - ".... The ring test 0x815d50 takes a plot holding a unit of the mover's player only where 0x265ac0 -> 0x265af0 passes it on the mover's path finder (+0x738 0: any; else formation classes..."
   review: reviewed
@@ -46,6 +48,7 @@
       value: runs/h1_duelv1124 t35   (a Warrior's goal one plot short of its target) agrees.
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
   context:
     - "...est 0x815d50 takes a plot holding a unit of the mover's player only where 0x265ac0 -> 0x265af0 passes it on the mover's path finder (+0x738 0: any; else formation classes, damage, th..."
   review: imported

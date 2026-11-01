@@ -1175,7 +1175,9 @@ class SimTactics:
         turn (a zone of control ends it); it walks through its own units and
         other players' but never ends on another player's unit or its own
         that stacks with it. A path ending on a plot it attacks into stops at
-        its side, and with `strike` (the barbarians') it strikes there. With
+        its side, and with `strike` (the barbarians') it strikes there. A
+        destination its own stacking unit holds, reached in the first turn,
+        is no path. With
         `later_turns` (the order's path flag 0x1000) the path's turns after
         its first may end on a plot its own stacking unit holds, its first
         not; with no `explore` (its flag 1) the path leaves no plot the player
@@ -1289,11 +1291,10 @@ class SimTactics:
             if not bool(back_off.count_nonzero()):
                 break
             stop = stop - back_off.long()
-        if later_turns:
-            # its first turn may not end on the destination its own stacking
-            # unit holds: no path
-            first = res["found"] & (res["closed"][ar, dr] <= 1) & own_same[ar, dr]
-            stop = torch.where(first, torch.zeros_like(stop), stop)
+        # its first turn may not end on the destination its own stacking unit
+        # holds, under flag 0x1000 or not: no path
+        first = res["found"] & (res["closed"][ar, dr] <= 1) & own_same[ar, dr]
+        stop = torch.where(first, torch.zeros_like(stop), stop)
         gslot = torch.zeros(B, dtype=torch.long, device=dev)
         gslot[rows] = sr + self.POOL_LO[pre]
         going = stop > 0
@@ -2812,11 +2813,11 @@ class SimTactics:
         hostile = self._tac_hostile(seat)
         foreign = self._tac_foreign(seat)
         # the plots it would attack into (`attackPlot`): a unit at war, a
-        # hostile city centre, an Encampment that bars it — no ring plot
-        # (0x815d50 -> 0x586360)
+        # hostile city centre, an Encampment that bars it
         atk = hostile | (self._centre_plane() & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat))
         if self._encamp_didx >= 0:
             atk = atk | self._encamp_block_plane(seat)
+        ent_l, ent_w = self._tac_enter(seat, False)
         ring = self._barb_ring[goal.clamp(min=0)]                                   # [B, 37]
         for j in range(int(nm.max()) if B else 0):
             us = order[:, j]
@@ -2862,6 +2863,13 @@ class SimTactics:
                 seat_of = lambda pl: torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, -1))  # noqa: E731
                 mine = ((seat_of(self.military_at[rows]) == seat) | (seat_of(self.civilian_at[rows]) == seat)
                         | (seat_of(self.support_at[rows]) == seat)) & anyown
+                # the ring test (0x815d50): off its own plot no unit of its
+                # own there (0x265ac0 refuses each: none on the leader's
+                # plot), then the location test (0x586360 with no flag: the
+                # ground, its domain, closed borders, a hostile unit, city
+                # centre or Encampment there); no path test
+                ent = torch.where(naval.unsqueeze(1), ent_w[rows],
+                                  ent_l[rows] | (ent_w[rows] & self._tac_embarks(rows, ut, seat).unsqueeze(1)))
                 best = torch.full_like(gr, -1)
                 best_d = torch.full_like(gr, -1)
                 best_in = torch.zeros_like(walk)
@@ -2876,7 +2884,7 @@ class SimTactics:
                     first = best_d < 0
                     beat = first | (((inr == best_in) & (dq < best_d)) | ((inr != best_in) & inr))
                     away = qc != here
-                    free = (~away | (~mine[ar, qc] & path[ar, qc])) & ~atk[rows, qc]
+                    free = (~away | ~mine[ar, qc]) & ent[ar, qc]
                     take = ok & beat & free
                     best = torch.where(take, qc, best)
                     best_d = torch.where(take, dq, best_d)

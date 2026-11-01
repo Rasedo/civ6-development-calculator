@@ -74,6 +74,7 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers"
+    - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
   context:
     - ...e Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (...
     - "- Operation Move's destination (0x816cb0): radius = min(Range to goal, the unit's attack Range +0x19f8), 0 for a unit in a forma..."

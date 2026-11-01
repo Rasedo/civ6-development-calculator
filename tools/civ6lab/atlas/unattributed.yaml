@@ -344,6 +344,7 @@
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
   context:
     - ...ns a city's own and foreign citizen pressure (24.8 fixed point, gathered by the plot walk 0x6aef0 over CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF, gp +0xf0 = 10, with the per-plot functor 0x...
     - "...barian Camp (0x849a70): a camp within 5 of the minor's capital (the plots in range 5, 0x6aef0); no target; done when the actor clears a camp within 5 (0x849c00: distance <= 5); a..."
@@ -619,6 +620,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-130: Discipline's knowledge records and a levied unit's return"
+    - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
   context:
     - "...ION_PLAYER_UNITS (the context's unit +0x90), with the player (+0x80): a unit on a plot (0x90290) that fights (0x209dd0: GetCombat, GetRangedCombat or GetBombardCombat above 0); its kn..."
   review: imported
@@ -5767,9 +5769,15 @@
   final: 0x575a40
   kind: function
   name: opMoveRingTest
-  semantics: "the ring walk's test: in the goal's region first, then strictly nearer, its own plot or one with none of its own and a path"
+  semantics: "the ring walk's test: in the goal's region first, then strictly nearer (0x815d71..0x815dd4); off the mover's own plot (0x90290) each unit there of the mover's player put to 0x265ac0, which refuses it (0x815e40..0x815e60); then the location test 0x586360 (plot, flags 0 / 0, 0x7fffffff: the ground, the domain, closed borders, a hostile defender) on any plot, its own included. No path test: a plot the mover has no path to is taken."
   status: READ
   cases:
+    - recording: h1_duely1121
+      turn: 59
+      value: "t59-t65, t79-t91: the raid's Archer 2031620 and Warriors 589832 / 1310730 / 1769487 go for 6:13 / 7:12 beside the target 6:12 and step on while their own Scout 131073 holds the land bridge 11:18 / 9:19, every path to the ring through it (AI_Operation.csv Operation Move rows)"
+    - recording: h1_duely1124
+      turn: 100
+      value: city-state 4's City Defense Trebuchet on 31:8 keeps 31:8, its goal 32:8 holding its own Trader and Builder (a unit of the player of any class refuses the plot)
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
@@ -5786,6 +5794,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
   context:
     - "...0. With a radius the ring walk 0x6aef0 (0x69010's order) around the goal with the test 0x815d50: a plot in the goal's region (plot +0x18) before one outside, then the nearest the unit..."
   review: reviewed

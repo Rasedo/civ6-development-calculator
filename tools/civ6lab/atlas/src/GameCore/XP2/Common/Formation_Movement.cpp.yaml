@@ -442,7 +442,12 @@
     - recording: h1_duely1121
       turn: 86
       value: "runs/h1_duely1121 t86: city-state 3's embarked Man-At-Arms on 40:20 plans 40:20 and 39:21 alone, the embarked units of player 0 on 40:19 and of city-state 4 on 41:20 closing the water beyond (AI_Planning.csv); t94 city-state 4's on 28:23 plans past player 0's Quadriremes."
+    - recording: h1_duely1124
+      turn: 182
+      value: "a move order with no flag 0x1000 whose destination its own stacking unit holds within the first turn finds no path: the barbarian Ironclad 5701639 on 19:3 holds t182-t196 for China's Water Park 19:8 (Pillage Improvement), the rampaging Galley 720906 on it; a destination so held in a later turn is not refused (the five duels to t200)"
   impl:
+    - cpu/core/tactical.ts:pathTo
+    - gpu/core/sim_tactics.py:_tac_move_to
     - cpu/core/tactical.ts:enterable
     - cpu/core/tactical.ts:planningSearch
     - cpu/core/tactical.ts:from
@@ -466,6 +471,7 @@
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
+    - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."
