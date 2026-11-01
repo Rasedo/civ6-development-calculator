@@ -44,10 +44,19 @@
 - addr: 0x791270
   final: 0x51c2b0
   kind: function
-  semantics: "appends a plot to a reach list once (the list's +0x18 set: only with Movement left)."
-  status: PARTLY
-  readings: ["C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  semantics: "appends a plot to a reach list once: its 5th argument (a pointer to the node's Movement left, node +0x28) read only where the list's +0x18 (the ranged flag 0x7921e0 sets) is set, the plot then skipped with Movement 0 there; its 6th (a byte) set skips the append."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 28
+      value: "the barbarian Scout 1441809 on 7:17 flees (HL: Move To Safety) to 7:15 as logged: player 1's Slinger 327682 on 6:14 lists no plot it reaches with no Movement left, so 7:15 holds none of its danger"
+  impl:
+    - cpu/core/tactical.ts:dangerPlane
+    - gpu/core/sim_tactics.py:_danger_plane
+    - cpu/core/tactical.ts:naval
+  readings:
+    - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
+    - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
   context:
     - "...dab0): a plot is appended on GetBest's NotifyList 3 (0x781e0, parent argument 0), once (0x791270) — the BFS's closing order; NotifyList 1 / 2 (AddToOpen, GetBest) append nothing. A p..."
   review: reviewed
@@ -174,10 +183,18 @@
 - addr: 0x7921e0
   final: 0x51cec0
   kind: function
-  semantics: the one-turn reach search of a unit (-> 0x26df90) the danger map runs.
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:dangerPlane]
+  semantics: "the danger map's reach list's set-up (0x716717, before the search 0x26df90): the list's +0x18 the ranged flag (its third argument, GetRange 0x56e3d0 above 0 at 0x71647b), its capacity reserved from GetRange and GetMaxMoves 0x56e130 times its fourth argument (the turns)."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 28
+      value: the barbarian Scout 1441809 on 7:17 flees to 7:15 as logged, player 1's Slinger 327682 on 6:14 striking only from the plots it reaches with Movement left
+  impl:
+    - cpu/core/tactical.ts:dangerPlane
+    - gpu/core/sim_tactics.py:_danger_plane
+    - cpu/core/tactical.ts:naval
   readings:
+    - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"

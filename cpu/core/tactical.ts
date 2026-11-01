@@ -1370,7 +1370,8 @@ export const aiRanged = (u: Unit): number => aiFormed(u, UNITS[u.type]?.ranged?.
  * it stands on its full Movement (0x7921e0 -> 0x26df90, no zone of control, its melee attacks
  * included but a ship's onto land: runs/h1_duelv1128 t45 / t80 / t109, a
  * city-state's land unit beside a barbarian Galley and Quadriremes logs the
- * Quadriremes' ranged danger alone), and to a second list, each plot once: every other plot within
+ * Quadriremes' ranged danger alone; a unit with a range only the plots it
+ * reaches with Movement left), and to a second list, each plot once: every other plot within
  * its range (0x56e3d0) of those and — a unit that may coastal raid (+0x18bd,
  * CanRaid) — the land plots beside them (one it reaches too takes the
  * danger twice); an aircraft to the plots within its range. Each district of
@@ -1407,6 +1408,9 @@ export function dangerPlane(state: GameState, seat: number): Int16Array {
     const naval = !!UNITS[u.type]?.naval;
     search(state, full, 1, false, (n, ground) => {
       if (!ground.fits(n.tile)) return false;
+      // a unit with a range lists a plot only with Movement left there to
+      // strike from (the list's ranged flag, 0x7921e0 -> 0x791270)
+      if (R > 0 && n.moves <= 0) return false;
       if (!naval || isWater(map.tiles[n.tile])) reach.push(n.tile);
       return false;
     }, undefined, true);

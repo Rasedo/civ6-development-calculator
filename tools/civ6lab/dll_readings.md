@@ -7244,3 +7244,30 @@ and the cap in `_step_verb` (gpu/core/sim_seats.py).
   4259860), not ported; the second walk's path of 1121 t69 (Warrior 262146
   back from 35:19 to 35:18, ours staying) unmatched; plot vt +0x40 (read
   first by 0x530240 and 0x66680) unread.
+
+## C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins
+
+`dangerPlane`'s list callback (cpu/core/tactical.ts); `_danger_plane`'s
+`reach` (gpu/core/sim_tactics.py).
+
+- THE LIST'S RANGED FLAG: the danger map's per-unit lambda (0x716400) sets
+  the reach list up with 0x7921e0(list, unit, GetRange 0x56e3d0 > 0, 1)
+  before the search 0x26df90 (flags 0x311); 0x7921e0 stores the ranged flag
+  at the list's +0x18.
+- THE APPEND (0x26dab0 -> 0x791270): the list callback passes a pointer to
+  the closed node's Movement left (node +0x28); with the list's +0x18 set a
+  node of Movement 0 is not appended. A unit with a range so lists only the
+  plots it can still strike from; its range list (0x7167b0) walks those
+  alone. A melee unit lists every plot it may stand on as before.
+- CONFIRMED (one-seed aimem traces to t100, the five duels):
+  runs/h1_duely1121 t28-29 the barbarian Scout 1441809 on 7:17 flees to
+  7:15 as logged, player 1's Slinger 327682 on 6:14 no longer covering it;
+  t56-57 city-state 2's Warrior 1245191 Heals as logged; barb.move.plot
+  +48, cityState.move.plot +5, no other kind moved.
+- OPEN: runs/h1_duely1127 t8 city-state 4's hurt Warrior 131073 on 5:9
+  (Attack Barb Camp's Protect Units) takes 4:10, ours 6:10 — our danger map
+  holds 6:10 at 0 (the camp's Spearman on 6:8 and the Slinger on 5:8 reach
+  no plot beside it); runs/h1_duely1121 t11 city-state 4's Warrior 131073 on
+  32:23 takes 31:23, ours its own 32:22 at danger 0 (the barbarian Warrior on
+  33:23 reaches no plot beside it). The safe plot's order (0x716b90) is as
+  ported; the game holds danger on those plots the map as ported does not.

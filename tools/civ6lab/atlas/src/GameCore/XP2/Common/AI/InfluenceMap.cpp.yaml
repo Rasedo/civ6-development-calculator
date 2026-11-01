@@ -70,6 +70,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SAFE PLOT (0x716b90): over the planning reach's plots of this turn (+0x8 <= 1), none taken already, none (0..."

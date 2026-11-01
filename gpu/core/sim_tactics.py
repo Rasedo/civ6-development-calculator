@@ -3778,7 +3778,8 @@ class SimTactics:
         with it that it sees, with a combat, ranged or bombard strength, adds
         its danger (`unitDanger`) over the plots its one-turn search closes
         from where it stands on its full Movement (a ship's strike onto land
-        none), those within its range of
+        none; a unit with a range only those it reaches with Movement left),
+        those within its range of
         them and, a raider's, the land beside them — each set once; an
         aircraft over its range. Each district of such a player
         (`_danger_districts`) whose plot it sees adds its defence on its plot
@@ -3847,8 +3848,11 @@ class SimTactics:
                     # a ship's strike onto land is no plot of its reach
                     ship = self.unit_naval[ut[b_i[mm], u_i[mm]]]
                     reach &= ~(ship.unsqueeze(1) & ~self.water[b_i[mm]])
-                    second = torch.zeros_like(reach)
                     rr = R[b_i[mm], u_i[mm]]
+                    # a unit with a range lists a plot only with Movement
+                    # left there to strike from (0x7921e0 -> 0x791270)
+                    reach &= ~((rr > 0).unsqueeze(1) & (res["moves"] <= 0))
+                    second = torch.zeros_like(reach)
                     for r in torch.unique(rr).tolist():
                         if r <= 0:
                             continue

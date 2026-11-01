@@ -1426,11 +1426,25 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     ctx.minorDraws.paired += 1;
     rows.forEach((key, k) => { if (!drawOf.has(key)) drawOf.set(key, rd[k]); });
   }
+  // each minor's blows on the copy take the game's "Unit Combat Damage"
+  // draws of its turn in order (runs/h1_duely1127 t4: city-state 3's Warrior
+  // 196610 leaves the barbarian Scout on 5:12 at 10 health, city-state 4's
+  // Attack Barb Camp lists it after)
+  let passPlayer = -1;
+  const hits = new Map<number, { at: number[]; k: number }>();
   const held = rngHold();
   holdRng({
     point: (st, point) => (st === copy ? undefined : held?.point(st, point)),
     draw: (st, max, label) => {
       if (st !== copy) { held?.draw(st, max, label); return; }
+      if (label === 'Unit Combat Damage') {
+        if (!log || passPlayer < 0) return;
+        let h = hits.get(passPlayer);
+        if (!h) hits.set(passPlayer, (h = { at: turnDraws(log, [b, ctx.prev], turn, passPlayer, label), k: 0 }));
+        if (h.k < h.at.length) st.rngState = log.stateAt(h.at[h.k]);
+        h.k += 1;
+        return;
+      }
       const c = tacticsDrawing();
       const u = c ? twin.get(c) : undefined;
       const key = u ? keyOf.get(u) : undefined;
@@ -1497,10 +1511,12 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   try {
     for (const cs of [...copy.cityStates].sort((x, y) => playerOf(x.seat) - playerOf(y.seat))) {
       standGame(playerOf(cs.seat));
+      passPlayer = playerOf(cs.seat);
       // a city founded in the pair ran its second hook at its founding
       if (cs.centerIndex >= 0 && founded.has(playerOf(cs.seat))) cityStateMilitary(copy, cs);
     }
     standGame(playerOf(FREE_SEAT));
+    passPlayer = playerOf(FREE_SEAT);
     freeCitiesMilitary(copy);
   } finally {
     for (const [c, p] of ownEnd) c.tileIndex = p;
@@ -2291,6 +2307,29 @@ function battleDraw(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision)
     k += 1;
   }
   return undefined;
+}
+
+/** the log's draws labelled `label` in `player`'s turn `turn`: from the
+ *  state its start completed with (its `post` witness in `recs`) to the next
+ *  player's start; none where the witness is off the log */
+function turnDraws(log: RandLog, recs: readonly TurnRecord[], turn: number, player: number, label: string): number[] {
+  let post: number | undefined;
+  const stops = new Set<number>();
+  for (const r of recs) {
+    for (const w of r.witness ?? []) {
+      if (w.turn !== turn || typeof w.seed !== 'number') continue;
+      if (w.player === player && w.point === 'post') post = w.seed >>> 0;
+      else if (w.player !== player && w.point === 'pre') stops.add(w.seed >>> 0);
+    }
+  }
+  const from = post === undefined ? undefined : log.index(post);
+  if (from === undefined) return [];
+  const out: number[] = [];
+  for (let i = from; i < log.draws.length; i++) {
+    if (stops.has(log.stateAt(i))) break;
+    if (log.draws[i].label === label) out.push(i);
+  }
+  return out;
 }
 
 /** A CITY'S SHOT the log fired (`cityStrikeAt`): the city's centre, or its

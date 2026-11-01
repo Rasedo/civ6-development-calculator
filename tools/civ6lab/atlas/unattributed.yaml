@@ -1151,6 +1151,7 @@
   readings:
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
+    - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE CANDIDATE LIST (0x26df90's list callback 0x26dab0): a plot is appended on GetBest's NotifyList 3 (0x781e0, parent argument 0), once (0x79..."
