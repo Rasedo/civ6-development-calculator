@@ -246,3 +246,16 @@
     - "...pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - ...90 [unit] for formations 1 / 2, then the percent +0x3b0 [unit]), at least 1. 0x4f2df0 / 0x4f31f0 (from 0x4f2f40) fill the array per Units row with 0x5254d0(the Units_XP2 row +0x20):...
   review: imported
+- addr: 0x4f4a50
+  kind: function
+  name: the unit versions
+  semantics: "per Units row the player's version (player +0x12e8 +0x1c0): itself, -1 for a row not CanTrain (+0x1b8 bit 0x20), a FoundCity row (+0x1b9 bit 2) the player's level forbids, a TraitType row (+0x2d0) its traits do not name, the level-hashed rows (0x8e7bf0); a trait's unit replaces its base (\"Two or more traits trying to replace the unit %s\"); EnabledByReligion (+0x1b8 bit 0x40) is not read"
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 56
+      value: Nazca's Temple 43.25 as logged, its Warrior Monk (EnabledByReligion) valued through 0x7b62c0 where the version passes; the UNITS table's Warrior Monk FX(-9999) by CanTrain
+  impl: [cpu/core/minorBuild.ts:minorUnitVersion, gpu/core/sim_cityvalue.py:unit_version]
+  readings:
+    - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
+  review: reviewed

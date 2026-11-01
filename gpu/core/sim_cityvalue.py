@@ -905,6 +905,11 @@ class SimCityValue:
                 out.append((torch.full_like(like, _FX_MIN), torch.ones_like(like, dtype=torch.bool)))
                 continue
             t = self._cv_unit_turns(f, u["type"])
+            # CanTrain (0x172820, its prerequisites skipped) refuses an
+            # EnabledByReligion unit no belief of the city's majority
+            # religion enables
+            if u["religion"]:
+                t = torch.where(_t(f.belief_enables(u["type"]), like).bool(), t, torch.full_like(t, -1))
             if bool(((t >= hz) | (t < 0)).all()):
                 out.append((torch.full_like(t, _FX_MIN), torch.ones_like(t, dtype=torch.bool)))
                 continue
@@ -966,6 +971,15 @@ class SimCityValue:
             ok = ok & anyp
         return ok
 
+    def _cv_reasons_clear_now(self, f, b: dict) -> torch.Tensor:
+        """`reasonsClearNow`: CanConstruct's PrereqTech, PrereqCivic and
+        PrereqDistrict reasons clear (a complete district, pillaged or not)"""
+        like = f.like()
+        ok = (_t(f.tech_turns(b["tech"]), like) == 0) & (_t(f.civic_turns(b["civic"]), like) == 0)
+        if b["district"]:
+            ok = ok & _t(f.has_district(b["district"]), like).bool()
+        return ok
+
     def _cv_building_per_turn(self, f, b: dict) -> torch.Tensor:
         """`buildingPerTurn` (0x7a7590's v before its PV)"""
         T = self._cv_tables()
@@ -976,7 +990,7 @@ class SimCityValue:
             city = torch.tensor([_fx_float(_f32(int(p) * _f32(0.01) + 1)) for p in pct.reshape(-1).tolist()],
                                 dtype=torch.long, device=like.device).reshape(pct.shape)
             v = v + self._cv_yield(_fmul(torch.full_like(like, amt * _FX), city), y, f.yield_w(y))
-        v = v + torch.where(self._cv_constructible(f, b), _t(f.era(), like) * _FX, torch.zeros_like(v))
+        v = v + torch.where(self._cv_reasons_clear_now(f, b), _t(f.era(), like) * _FX, torch.zeros_like(v))
         for pseudo, pts in b["gpp"]:
             if pseudo:
                 v = v + self._cv_pseudo(torch.full_like(like, pts * _FX), pseudo, f.pseudo_w(pseudo))
@@ -1761,8 +1775,24 @@ class _MinorFacts:
 
     def unit_version(self, u):
         r = self.T["unit"].get(u)
-        ok = r is not None and not r["trait"] and not r["majorOnly"] and not r["foundCity"] and not r["religion"] and r["canTrain"]
+        ok = r is not None and not r["trait"] and not r["majorOnly"] and not r["foundCity"] and r["canTrain"]
         return u if ok else None
+
+    def _followed(self):
+        return self.sim._minor_followed()[:, self.s]
+
+    def belief_enables(self, u):
+        """`beliefEnables`: a belief of the city's majority religion enables
+        the unit (the Warrior Monks follower belief, the Warrior Monk)"""
+        sim = self.sim
+        if u != "UNIT_WARRIOR_MONK" or sim._monk_follower < 0:
+            return self._bools(False)
+        fol = self._followed()
+        n = sim.civ_follower.shape[1]
+        belief = torch.where((fol >= 0) & (fol < n),
+                             sim.civ_follower.gather(1, fol.clamp(min=0, max=n - 1).unsqueeze(1)).squeeze(1),
+                             torch.full_like(fol, -1))
+        return belief == sim._monk_follower
 
     def _building_index(self, b):
         r = self.T["bld"].get(b)
@@ -2550,6 +2580,9 @@ class _FreeFacts(_MinorFacts):
 
     def _district_at(self, dv: int):
         return self.sim.city_dist_tile[:, self.row, self.j, dv]
+
+    def _followed(self):
+        return self.sim.city_followed[:, self.row, self.j]
 
     def worship_is(self, b):
         return self.sim._worship_offered(self.row)[:, self.j] == self._building_index(b)

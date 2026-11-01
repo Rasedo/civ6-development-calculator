@@ -17,7 +17,7 @@ const facts: CityBuildFacts = {
   yieldPct: (y) => (y === 'YIELD_PRODUCTION' ? -50 : 0), version: (b) => b, hasBuilding: () => false,
   hasDistrict: () => true, districtPillaged: () => false, governmentTier: 0, worship: null, riverside: false, groundRefuses: () => false, buildingPillaged: () => false, coastalLowlands: () => ({ plots: 0, districts: 0 }), stocked: () => false,
   current: null, techTurns: () => 0, civicTurns: () => 0, buildTurns: () => 1,
-  amenity: { balance: 0, yields: {} }, regionalAmenities: () => [], unitVersion: (u) => u, fullCiv: false, tribe: false, unitCount: 1,
+  amenity: { balance: 0, yields: {} }, regionalAmenities: () => [], unitVersion: (u) => u, beliefEnables: () => false, fullCiv: false, tribe: false, unitCount: 1,
   growth: { surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 },
   forecast: growthForecast({ surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 }),
   unitProduction: new Map(), trainsDomain: () => true, cities: 0, extraCopies: () => 0, promotionWeight: () => 256,

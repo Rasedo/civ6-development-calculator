@@ -370,6 +370,9 @@ class City:
 
     unit_version = version
 
+    def belief_enables(self, u):
+        return 0
+
     def has_building(self, b):
         return 0
 

@@ -49,6 +49,16 @@
   context:
     - "- The spread (0x4967f0 PlayerReligion's turn: faith, the purchase notification, then 0x498570): a player whose..."
   review: reviewed
+- addr: 0x496970
+  final: 0x314df0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...igion unit (0x172cdf) needs a belief that enables it in the player's religion (+0x1340, 0x496970) or, without one, in the city's majority religion (city religion +0x1910, 0x340880):...
+  review: imported
 - addr: 0x496980
   final: 0x314e00
   kind: function

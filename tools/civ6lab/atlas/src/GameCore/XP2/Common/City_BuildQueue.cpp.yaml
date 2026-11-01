@@ -172,7 +172,9 @@
     - cpu/core/minorCityAi.ts:districtWhole
     - cpu/core/minorBuild.ts:pickDistrictPillaged
     - gpu/core/sim_cityvalue.py:_pick_district_pillaged
+    - cpu/core/aiCityBuild.ts:reasonsClearNow
   readings:
+    - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
@@ -222,11 +224,15 @@
       turn: 195
       value: "the sixth argument clear: an obsolete unit (0x538460) refused — Valletta's Warrior contract never bought or queued beside Gunpowder"
   impl:
+    - gpu/core/sim_cityvalue.py:_cv_unit_table
+    - cpu/core/aiCityBuild.ts:unitTable
     - cpu/core/aiCityBuild.ts:PickFacts
     - cpu/core/aiContracts.ts:ContractCity
     - cpu/core/minorBuild.ts:minorCanTrain
     - gpu/core/sim_minors.py:_minor_can_train
+    - cpu/core/aiCityBuild.ts:CityBuildFacts
   readings:
+    - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

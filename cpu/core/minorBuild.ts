@@ -1218,13 +1218,15 @@ export function analysedTurns(entries: readonly { id: string; next: string; turn
   return t < 500 && current !== e.next && current !== id ? t + currentLeft : t;
 }
 
-/** A minor's version of a unit (player +0x12e8 +0x1c0): none for a
- *  civilization's unique unit, a MajorCivOnly one, a unit that founds a
- *  city, one a belief enables (EnabledByReligion; a minor holds none), one
- *  the database bars from training */
+/** A minor's version of a unit (player +0x12e8 +0x1c0, written by
+ *  0x4f4a50): none for a civilization's unique unit (TraitType +0x2d0), a
+ *  MajorCivOnly one, a unit that founds a city, one the database bars from
+ *  training (CanTrain +0x1b8 bit 0x20); EnabledByReligion (bit 0x40) is not
+ *  asked (runs/h1_duelv1128 Nazca t44-57: the Temple's Warrior Monk valued
+ *  through 0x7b62c0, the Temple valid) */
 export function minorUnitVersion(u: string): string | null {
   const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
-  return row && !row.trait && !row.majorOnly && !row.foundCity && !row.religion && row.canTrain ? u : null;
+  return row && !row.trait && !row.majorOnly && !row.foundCity && row.canTrain ? u : null;
 }
 
 /** The promotion class weight (0x723bb0) of a player whose lists are
@@ -1635,6 +1637,10 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
     // a city-state holds one city
     regionalAmenities: () => [amenity],
     unitVersion: minorUnitVersion,
+    beliefEnables: (u) => {
+      const rel = majorityReligionOf(state, cityState.seat);
+      return u === 'UNIT_WARRIOR_MONK' && rel >= 0 && seatOf(state, rel)?.religion.follower === 'WARRIOR_MONKS';
+    },
     fullCiv: false,
     tribe: false,
     unitCount,

@@ -191,6 +191,9 @@ export interface CityBuildFacts {
   version(building: string): string | null;
   /** the player's version of a unit (player +0x12e8 +0x1c0), or null */
   unitVersion(unit: string): string | null;
+  /** a belief of the city's majority religion enables the unit
+   *  (CanTrain's EnabledByReligion test, 0x172cdf..0x172f33) */
+  beliefEnables(unit: string): boolean;
   hasBuilding(building: string): boolean;
   /** the city holds the building pillaged */
   buildingPillaged(building: string): boolean;
@@ -416,6 +419,17 @@ export function constructibleNow(f: CityBuildFacts, b: AiBuildingRow): boolean {
   return !b.prereqs.length || b.prereqs.some((p) => f.hasBuilding(p));
 }
 
+/** the three reasons the building value reads off CanConstruct
+ *  (0x7a7f35..0x7a7f49: result +0x24 the PrereqTech, +0x14 the PrereqCivic,
+ *  +0x18 the PrereqDistrict, cleared at 0x170951 by a complete one, pillaged
+ *  or not) all clear; its prerequisite buildings (+0x1f8) are not among
+ *  them (runs/h1_duelv1128 Nazca t65-99: its Temple takes the era with no
+ *  Shrine and its Holy Site pillaged) */
+export function reasonsClearNow(f: CityBuildFacts, b: AiBuildingRow): boolean {
+  if (f.techTurns(b.tech) !== 0 || f.civicTurns(b.civic) !== 0) return false;
+  return !b.district || f.hasDistrict(b.district);
+}
+
 /** 0x7a7590's per-turn v of a building, before its PV */
 export function buildingPerTurn(f: CityBuildFacts, b: AiBuildingRow): number {
   let v = 0;
@@ -425,7 +439,7 @@ export function buildingPerTurn(f: CityBuildFacts, b: AiBuildingRow): number {
     const city = fxConst(Math.fround(f.yieldPct(y) * Math.fround(0.01) + 1));
     v += yieldValue(f.view, f.seat, fmul(amt * FX, city), y);
   }
-  if (constructibleNow(f, b)) v += f.era * FX;
+  if (reasonsClearNow(f, b)) v += f.era * FX;
   for (const [pseudo, pts] of b.gpp) if (pseudo) v += pseudoYieldValue(f.view, f.seat, pts * FX, pseudo);
   if (b.outerDefenseHitPoints) {
     let d = 0;
@@ -671,6 +685,10 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
  *  Units row in database order; null where the value is not read */
 export function unitTable(f: CityBuildFacts): (number | null)[] {
   return AI_UNITS.map((u) => {
+    // CanTrain (0x172820, its prerequisites skipped) refuses an
+    // EnabledByReligion unit no belief of the city's majority religion
+    // enables (runs/h1_duelv1128: every minor's Warrior Monk FX(-9999))
+    if (u.religion && !f.beliefEnables(u.type)) return FX_MIN;
     const t = unitTurns(f, u);
     return t < 0 ? FX_MIN : unitValue(f, u, t);
   });

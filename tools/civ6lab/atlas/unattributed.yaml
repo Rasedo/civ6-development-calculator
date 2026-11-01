@@ -1438,6 +1438,16 @@
   context:
     - "...): entries not taken of class 1..4 whose class the religion has room for (0x3409a0 -> 0x340740: MaxInReligion); a higher score, or any while none stands, replaces the best; a Followe..."
   review: reviewed
+- addr: 0x340880
+  final: 0x243660
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0, 0x496970) or, without one, in the city's majority religion (city religion +0x1910, 0x340880): `beliefEnables` / `belief_enables` (the Warrior Monks follower belief, the only such..."
+  review: imported
 - addr: 0x3408d0
   final: 0x2436b0
   kind: function
@@ -5755,6 +5765,16 @@
   context:
     - "...7c62f0, its vtable @d72bb8) walks that list: a unit of the tribe (+0x11d0) of each class (0x8c2880 on the force's class lists, never CLASS_ZOMBIE) fills the class's count in order; the cla..."
   review: reviewed
+- addr: 0x8e7bf0
+  final: 0x625310
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...a TraitType row (+0x2d0) the player's traits do not name, and the level-hashed rows (0x8e7bf0); a trait's unit replaces its base. It never reads EnabledByReligion (+0x1b8 bit 0x40)....
+  review: imported
 - addr: 0x8ea750
   final: 0x627bb0
   kind: function

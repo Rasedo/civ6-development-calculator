@@ -5829,3 +5829,42 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   232), Political Philosophy t19 438.0 as logged.
 - Open: the majors' and the Free Cities' cities re-place the same way; neither
   engine places their citizens at the city's turn (C-112).
+
+## C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins
+
+- The player's unit versions (player +0x12e8 +0x1c0) are written by 0x4f4a50
+  per Units row: itself, then -1 for a row not CanTrain (Units +0x1b8 bit
+  0x20), a FoundCity row (+0x1b9 bit 2) where the player's level forbids it,
+  a TraitType row (+0x2d0) the player's traits do not name, and the
+  level-hashed rows (0x8e7bf0); a trait's unit replaces its base. It never
+  reads EnabledByReligion (+0x1b8 bit 0x40). `minorUnitVersion`
+  (cpu/core/minorBuild.ts) and `_MinorFacts.unit_version`
+  (gpu/core/sim_cityvalue.py) no longer drop an EnabledByReligion unit.
+- The building value's unit loop (0x7a93c4..0x7a94b2): each Buildings +0x298
+  row (the units the building enables), an Archaeologist skipped, through
+  0x7b62c0 and added. A minor's Temple counts its Warrior Monk at its value
+  (the version passes); with six units or more each of its four units exits
+  at FX(-9999) as before.
+- The UNITS table keeps the Warrior Monk at FX(-9999) by CanTrain (0x172820,
+  its prerequisites skipped): an EnabledByReligion unit (0x172cdf) needs a
+  belief that enables it in the player's religion (+0x1340, 0x496970) or,
+  without one, in the city's majority religion (city religion +0x1910,
+  0x340880): `beliefEnables` / `belief_enables` (the Warrior Monks follower
+  belief, the only such row) in `unitTable` / `_cv_unit_table`.
+- The building value's era term (0x7a7f30..0x7a7f5a): CanConstruct's result
+  +0x24 (PrereqTech, 0x1705f1), +0x14 (PrereqCivic, 0x170628) and +0x18
+  (PrereqDistrict, 0x17091e; cleared at 0x170951 by a complete district,
+  the pillaged flag +0x2a apart) all -1 add the era index. The prerequisite
+  buildings (+0x1f8) are not among them: `reasonsClearNow` /
+  `_cv_reasons_clear_now` replaces `constructibleNow` there.
+- Confirmed on runs/h1_duelv1128 (`cityBuildLab.ts --logtech`): Nazca's
+  Temple valid on 195 of the 198 logged rows (0 before), within 0.005 on 135
+  (t52 14.82, t56 43.25, t57 40.35, t62 86.00, t90-97 137.36 / 99.07); the Shrine within 0.005 on 187 of 274 (62). On duely1128 from t1
+  the game's Shrine contracts land: Nazca's contract misses t83-99 and
+  t236-242 all clear (contracts 1154 -> 1178 of 1210 to t243).
+- Open: the Temple's T past the horizon at t46 / t51 (ours 51 / 52) is the
+  civics AI's turns to Theology (ours 45 at t46 where the log's analysis
+  reads 29, the civic in hand's 16 turns added: the analysis's `next`);
+  the six-unit cut on
+  p2 / p3 (t75 / t78 / t98 the log's 4 x FX(-9999), ours valued: the unit
+  count the cut reads).

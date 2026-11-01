@@ -626,6 +626,8 @@
       turn: 51
       value: "Nazca's Shrine 27.18 t49-56 with the claimed plots (0x527fd0), modifiers (0x529ed0) and neighbours (0x4fa40) terms 0, the Temple 5.57 / 14.82 / 15.02 / 24.8 / 38.93 at t51-55 (bvlog.py): the log's Shrine + X is 0x5cadc0's dependents pass"
   impl:
+    - gpu/core/sim_cityvalue.py:_cv_reasons_clear_now
+    - cpu/core/aiCityBuild.ts:reasonsClearNow
     - cpu/core/aiCityBuild.ts:buildingPerTurn
     - cpu/core/aiCityBuild.ts:buildingValue
     - cpu/core/aiProjectValue.ts:ProjectValueFacts
@@ -636,6 +638,7 @@
     - cpu/core/aiCityBuild.ts:buildingTable
     - cpu/core/aiCityBuild.ts:analysisBuildings
   readings:
+    - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
@@ -949,7 +952,9 @@
     - cpu/core/aiCityBuild.ts:unitValue
     - cpu/core/aiModifiers.ts:ANALYZERS
     - gpu/core/sim_cityvalue.py:_cv_unit
+    - cpu/core/minorBuild.ts:minorUnitVersion
   readings:
+    - "C-127 / C-96: a minor's unit versions, the unit table's religion gate and the building value's era reasons — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
