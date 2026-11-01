@@ -42,6 +42,7 @@
   impl: [cpu/core/units.ts:TRADE_WATER_NONE]
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
   context:
     - "...the trade path's context (0x558ba0) sets +0x1a1 from 0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0): a game flag, the player's embark list, or a researched..."
   review: reviewed

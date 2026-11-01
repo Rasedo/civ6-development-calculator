@@ -62,7 +62,7 @@ import { applyGovernorActions, governorsOf } from '../core/governors';
 import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost, upgradeType } from '../core/stockpile';
-import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
+import { applyTrainingGrants, cityStrikeStrength, clearCampFor, combatBlow, type Blow, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
 import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
 import { barbBattleDeath, barbBattlesFromRecord, barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
@@ -243,6 +243,10 @@ interface Ctx {
   barbBattles: (() => void)[];
   /** the units of this pair's recorded battles a barbarian attacked in */
   barbFought: Set<string>;
+  /** this pair's recorded barbarian blows — the attacker, the plot struck
+   *  and the game's first damage draw's state —, each the barbarians' AI
+   *  takes once for its own blow of that attacker on that plot */
+  barbDraws: { attacker: string; at: number; s0: number }[];
   /** the health a recorded promotion healed a unit to this pair (its pick
    *  heals: a spent unit's clamp keeps it) */
   promoteHp: Map<Unit, number>;
@@ -1015,6 +1019,13 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     const at = from.get(u);
     if (at !== undefined) c.tileIndex = at;
   }
+  // a land unit those plots leave on water stands embarked (runs/h1_duely1127
+  // t148: player 0's Warrior 5439559 on the coast's 30:16, struck by the
+  // rampaging Galleys 589825 and 1048590 at its embarked 15 with no blow
+  // back, the second taking it and its plot)
+  for (const c of copy.units) {
+    if (!UNITS[c.type]?.naval && !waterWalks(c.type) && unitDomain(c.type) !== 'air' && unitDomain(c.type) !== 'spy') c.embarked = isWater(copy.map.tiles[c.tileIndex]) || undefined;
+  }
   refreshBarbarians(copy, opened);
   // the AI's "Random Direction" draws are the game's: the barbarians take the
   // turn's last ones, one a Wander row of the game's tactical log in its
@@ -1028,11 +1039,28 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   ids.slice(ids.length - theirs.length).forEach((id, k) => drawOf.set(id, theirs[k]));
   const idOf = new Map<Unit, number>();
   for (const [key, u] of ctx.units) if (isBarbSeat(u.seat)) idOf.set(u, Number(key.split(':')[1]));
+  // ...and a blow's "Unit Combat Damage" draws are the game's where the
+  // pair's record holds a blow of the same attacker on the same plot: the
+  // blow sets out on the state of that blow's first draw (runs/h1_duely1127
+  // t151: the rampaging Galley 1048590 strikes player 0's embarked Warrior on
+  // 29:15, which outlives it, and holds 30:16)
+  const blowDraws = ctx.barbDraws.splice(0);
+  let seeded: Blow | null = null;
   const held = rngHold();
   holdRng({
     point: (st, point) => (st === copy ? undefined : held?.point(st, point)),
     draw: (st, max, label) => {
       if (st !== copy) { held?.draw(st, max, label); return; }
+      if (label === 'Unit Combat Damage') {
+        const bl = combatBlow();
+        if (!bl || bl === seeded) return;
+        seeded = bl;
+        const c = copy.units.find((x) => x.id === bl.attacker);
+        const key = c ? keyOf.get(twin.get(c)!) : undefined;
+        const k = blowDraws.findIndex((x) => x.attacker === key && x.at === bl.at);
+        if (k >= 0) st.rngState = blowDraws.splice(k, 1)[0].s0;
+        return;
+      }
       const c = tacticsDrawing();
       const u = c ? twin.get(c) : undefined;
       const j = u ? drawOf.get(idOf.get(u) ?? -1) : undefined;
@@ -2457,6 +2485,7 @@ function assault(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision): v
   if (!UNITS[atk.type]?.naval && !waterWalks(atk.type)) atk.embarked = isWater(state.map.tiles[atk.tileIndex]) || undefined;
   atk.movesLeft = Math.max(atk.movesLeft, grantedMoves(state, atk));
   atk.attacksLeft = Math.max(1, atk.attacksLeft ?? 1);
+  if (isBarbSeat(atk.seat)) ctx.barbDraws.push({ attacker: d.attacker, at: d.at, s0 });
   state.rngState = s0;
   const hp0 = atk.hp;
   if (TRACE.has('battleHp')) (globalThis as { __cbLog?: string[] }).__cbLog = [];
@@ -3633,7 +3662,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (TRACE.has('battleHp')) (globalThis as { __cbLog?: string[] }).__cbLog = [battleTerms(state, atk, def)];
         // the battle draws where the log drew it, the hold standing aside
         ctx.stream.placed(true);
-        if (isBarbSeat(atk.seat)) for (const k of [d.attacker, d.defender]) ctx.barbFought.add(k);
+        if (isBarbSeat(atk.seat)) {
+          for (const k of [d.attacker, d.defender]) ctx.barbFought.add(k);
+          ctx.barbDraws.push({ attacker: d.attacker, at: d.at, s0 });
+        }
         barbBattlesFromRecord(true);
         // a later player's blow on a city-state's or the Free Cities' unit
         // comes after the defender's turn: its record of the attacker waits
@@ -5123,7 +5155,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -5225,6 +5257,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.imposed = new Map();
     ctx.battled = new Set();
     ctx.barbFought = new Set();
+    ctx.barbDraws = [];
     ctx.promoteHp = new Map();
     ctx.barbBattles = [];
     ctx.fortified = fortifiedIn(b);

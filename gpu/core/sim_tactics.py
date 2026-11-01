@@ -757,8 +757,22 @@ class SimTactics:
         key = torch.full((N, T), NONE, dtype=torch.long, device=dev)
         # each node's links (its children, CvAStar +0x38) by direction
         linked6 = torch.zeros(N, T, 6, dtype=torch.bool, device=dev)
+        # the planning's valid wrapper (0x26e570, the start linked from itself
+        # too): a plot holding a district whose type has HitPoints (the city
+        # centre, the Encampment) of a player at war with the unit's, pillaged
+        # or not, spends the Movement a step onto it leaves, and a unit
+        # standing on one sets out with none (`search`'s fortAtWar)
+        fort_n = None
+        if not zoc and not stand:
+            fort = self._centre_plane()
+            if self._encamp_didx >= 0:
+                fort = fort | (self.district == self._encamp_didx)
+            ts_f = self.tile_seat
+            fort_n = (fort & (ts_f >= 0) & (ts_f != seat) & self._seats_hostile(seat, ts_f))[rows]
         g[ar, start] = 0
         mv[ar, start] = torch.div(mp * _FIX, self._mp_scale, rounding_mode="floor")
+        if fort_n is not None:
+            mv[ar, start] = torch.where(fort_n[ar, start], 0, mv[ar, start])
         tn[ar, start] = 1
         st[ar, start] = 1
         key[ar, start] = _TIE_OFF
@@ -856,9 +870,11 @@ class SimTactics:
                 turns = torch.where(waits, turns + 1, turns)
                 cst = torch.where(waits, pm + cr.gather(1, b1), cst)
             # the attack's step priced as any step, then spending the
-            # Movement it leaves (`search`)
-            cst = torch.where(a6, cst + moves, cst)
-            moves = torch.where(a6, 0, moves)
+            # Movement it leaves (`search`), as a planning step onto a
+            # district at war with HitPoints does
+            spend6 = a6 | (fort_n.gather(1, nbc) & (nb >= 0)) if fort_n is not None else a6
+            cst = torch.where(spend6, cst + moves, cst)
+            moves = torch.where(spend6, 0, moves)
             # +4 where the step leaves no Movement, +3 more off the unit's
             # territory on a revealed plot; +2 a revealed plot, +3 an
             # unrevealed one; +1000 a land unit's revealed water (0x2712be)

@@ -495,6 +495,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
   context:
     - "...330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) is the player, its district (0x810d0) is not InternalOnly (Districts +0xe1 bit 4 — the Wonder district), is complete (Dist..."
     - "...rovement (+0x44, read as none while pillaged, +0x4d bit 0) and, when the plot's district (0x810d0, the district at the plot's id) is complete (district +0xb08, Lua `District:IsComplete` 0..."
@@ -6785,6 +6786,17 @@
   context:
     - "...urn +0xc0, the synchronous generator at +0xf0: its state +0xf8, its draw count +0xfc; 0x9ccff0 (FinalRelease 0x6d77f0), Lua's GetRandomSeed, reads game +0xf0 +8 through 0x9c98d0 (Fin..."
   review: reviewed
+- addr: 0x9f38d0
+  final: 0x6febc0
+  kind: function
+  name: GetOriginalOwner
+  status: PARTLY
+  readings:
+    - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...); else where its original owner (+0x340, m_eOriginalOwner: Lua Unit:GetOriginalOwner 0x9f38d0) is another player below 0x41 whose slot is live (+0x2b48), by that player's CanEmbark...."
+  review: imported
 - addr: 0xa2ed80
   final: 0x7316e0
   kind: function

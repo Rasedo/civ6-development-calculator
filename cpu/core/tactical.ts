@@ -451,7 +451,20 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   // with its third argument set: 0x26eea0 takes GetMaxMoves, 0x56e130), any
   // other search on its Movement left
   const startMoves = fromFull ? unitFullMoves(state, unit) : unit.movesLeft;
-  const start: PNode = { tile: unit.tileIndex, g: 0, tie: 0, moves: Math.floor(startMoves * FIX / MP_SCALE),
+  // the planning's valid wrapper (0x26e570 at 0x26e5e2..0x26e7f1, the start
+  // linked from itself too): a plot holding a district whose type has
+  // HitPoints (DistrictInfo +0x58 / +0x5c: the city centre, the Encampment)
+  // of a player at war with the unit's, pillaged or not, is the attack test's
+  // whatever the mover — the step onto it spends the Movement it leaves, and
+  // a unit standing on one sets out with none, its turn-1 reach its own plot
+  // alone (runs/h1_duely1128 t96-146: the captured Builder 5046293 on player
+  // 1's Encampment 13:13 plans "13:13(1/0)" and every other plot at turn 2,
+  // AI_Planning.csv, and fortifies in place, no safe plot this turn)
+  const planningSearch = !zoc && !standToAttack;
+  const fortAtWar = (t: Tile): boolean => planningSearch && garrisonDistrict(state, t) && tileSeat(t) !== NO_SEAT
+    && unitsHostile(state, unit, { seat: tileSeat(t) });
+  const start: PNode = { tile: unit.tileIndex, g: 0, tie: 0,
+    moves: fortAtWar(map.tiles[unit.tileIndex]) ? 0 : Math.floor(startMoves * FIX / MP_SCALE),
     turns: 1, closed: false, parent: null, wet: isWater(map.tiles[unit.tileIndex]) };
   nodes.set(start.tile, start);
   // the start is priced too, linked from itself
@@ -489,7 +502,6 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // at 0x26e5cd: the parent's +0x51 bit 0x40), so an attack on a city or
     // Encampment alone goes on; nor one the player never revealed but the
     // unit's own (0x2720a0 under the search's flag 1: the parent unrevealed)
-    const planningSearch = !zoc && !standToAttack;
     if ((best.attack && (!planningSearch || ground.foughtOn(best.tile))) || (best !== start && !ground.known(best.tile))) continue;
     // a move order's path under flag 1 (no `explore`) leaves no plot the
     // player never revealed but the unit's own
@@ -621,12 +633,13 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       else if (p.turns === turns) turns += 1;
       else cost = pm > 0 ? pm : FIX;
     }
-    if (attack) {
+    if (attack || fortAtWar(to)) {
       // the attack's step priced as any step — a river's 2 above the
       // Movement left waits for the next turn (runs/h1_duelv1121 t4: city-state
       // 4's Warrior at 32:22 lists 32:23 (1/1) and the barbarian Scout's
       // 33:23 across the river (2/0), AI_Planning.csv) — then spends the
-      // Movement it leaves (0x26e570: the cost adds it)
+      // Movement it leaves (0x26e570: the cost adds it), as a step onto a
+      // district at war with HitPoints does in the planning
       cost += moves;
       moves = 0;
     } else if (moves > 0 && zoc && !blind && ground.zoc(to)) {

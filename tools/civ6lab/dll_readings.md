@@ -7336,3 +7336,40 @@ mask and its walk's `foe_n` (gpu/core/sim_tactics.py).
   on 11:7, the game 12:13; h1_duely1117 t26 / t32 the Galley 720906's fresh
   search from 26:1 for 33:3 (no path in the engines; the game walks 25:1 /
   25:2 / 25:3).
+
+## C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins
+
+`search`'s `fortAtWar` (cpu/core/tactical.ts, through `garrisonDistrict`);
+`_tac_search`'s `fort_n` (gpu/core/sim_tactics.py).
+
+- THE DISTRICT TEST (0x26e570 at 0x26e5e2..0x26e6c4): on every link the
+  planning's search prices, the start linked from itself (its parent node
+  null skips the +0x51 & 0x40 refusal at 0x26e5c8): the plot's district type
+  (0x810d0) not -1, the plot's owner (+0x1c) at war with the mover's player
+  (0x3dcec0 on the player's +0x1300), the type's DistrictInfo +0x58 set and
+  +0x5c above 0 (the city centre, the Encampment and their replacements:
+  Districts.HitPoints) — no mover test, no pillage or health test — and the
+  link spends the Movement it leaves (0x26e77e..0x26e7f1: +0x1d0 += +0x1d4,
+  +0x1d4 = 0). So a unit standing on such a plot sets out with no Movement:
+  its turn-1 reach is its own plot alone, every other plot turn 2.
+- CONFIRMED (AI_Planning.csv, the aimem traces): runs/h1_duely1128 t96-146
+  the captured Builder 5046293 on player 1's pillaged Encampment 13:13
+  plans "13:13(1/0), 12:13(2/1), 14:12(2/1), ..." and logs "HL: Move To
+  Safety, Fortify in place" each turn (no safe plot of turn 1, its own plot
+  counting itself); runs/h1_duely1124 t219-249 Builder 5111833 on city-state
+  101's Encampment 40:10 ("40:10(1/0)", 14 spots) likewise. The engines'
+  Builder left for 11:13 / 15:14 / 14:13 each turn.
+- A LAND UNIT'S EMBARKING (0x56c480, the pathfinder pool's 0x56d9f0 at
+  0x56da1f): a unit of the land domain (+0x650 not 0) embarks where its
+  owner's CanEmbark (0x4ee3f0) passes its type (+0x160); else where its
+  original owner (+0x340, m_eOriginalOwner: Lua Unit:GetOriginalOwner
+  0x9f38d0) is another player below 0x41 whose slot is live (+0x2b48), by
+  that player's CanEmbark. The barbarians' own CanEmbark passes none of
+  their land types (no barbarian military unit stands embarked in the 90 recorded
+  games); a civilian they captured embarks by its first owner's (runs/
+  h1_duely1124 t134-137 Builder 5111833 on 37:10, h1_duely1128 t137-141
+  Settler 4718622 on 17:15 / 17:17, h1_duely1121 t134 Settler 4063247 on
+  13:12, h1_duely1127 t165 Settler 2097173 on 16:12).
+- OPEN: the original owner unported (the engines keep no unit's first owner;
+  `groundOf`'s `embarks` refuses every barbarian land unit): the captured
+  civilians' formations path over no water (C-95).

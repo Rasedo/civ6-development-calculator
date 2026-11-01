@@ -1856,7 +1856,7 @@ function disciplesSpread(
  *  ACTING SEAT, so a divergence (a barbarian on a foreign centre; the GPU
  *  sieging a peaceful city-state) reads as one diff line. */
 export function meleeAttack(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
-  const r = meleeAttackInner(state, attackerId, targetIndex, seat);
+  const r = striking(attackerId, targetIndex, () => meleeAttackInner(state, attackerId, targetIndex, seat));
   if (r.ok && r !== MOVED_ONTO) {
     const u = state.units.find((x) => x.id === attackerId);
     if (u) {
@@ -2427,7 +2427,7 @@ export function airStrike(
  *  ACTING SEAT, so a divergence (a barbarian on a foreign centre; the GPU
  *  sieging a peaceful city-state) reads as one diff line. */
 export function rangedAttack(state: GameState, attackerId: number, targetIndex: number): RuleResult {
-  const r = rangedAttackInner(state, attackerId, targetIndex);
+  const r = striking(attackerId, targetIndex, () => rangedAttackInner(state, attackerId, targetIndex));
   if (r.ok) {
     const u = state.units.find((x) => x.id === attackerId);
     if (u) {
@@ -2565,7 +2565,24 @@ function rangedCtx(state: GameState, attacker: Unit, defender: Unit, targetIndex
 }
 
 export function hostileRangedStrike(state: GameState, attacker: Unit, targetIndex: number): void {
-  if (hostileRangedStrikeInner(state, attacker, targetIndex)) markStealthAttack(state, attacker);
+  if (striking(attacker.id, targetIndex, () => hostileRangedStrikeInner(state, attacker, targetIndex))) markStealthAttack(state, attacker);
+}
+
+/** the blow being resolved — its attacker's id and the plot it strikes —,
+ *  for the replay's hold on the game's damage draws; null between blows */
+export interface Blow { attacker: number; at: number }
+let blow: Blow | null = null;
+export function combatBlow(): Blow | null {
+  return blow;
+}
+function striking<T>(attacker: number, at: number, run: () => T): T {
+  const was = blow;
+  blow = { attacker, at };
+  try {
+    return run();
+  } finally {
+    blow = was;
+  }
 }
 
 /** Did the strike actually resolve? Only a shot that lands reveals a raider. */

@@ -71,12 +71,15 @@
 - addr: 0x26e570
   final: 0x1a6e00
   kind: function
-  semantics: "the planning search's valid wrapper. Attack test: a district at war with hit points (DistrictInfo +0x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0), no domain test; the attack's cost adds the Movement left (0x1d0 += 0x1d4) and nothing is linked from it (0x26e5cd: a parent with node flag +0x51 & 0x40 refused). At 0x26e83e..0x26e8ae, flag 0x200 clear, a step whose parent is not the unit's own plot and lies in the unit's enemy zone of control (0x26f980 -> 0x530f50) is refused unless it is an attack."
+  semantics: "the planning search's valid wrapper, on every link it prices (the start linked from itself, its null parent skipping the +0x51 & 0x40 refusal). Attack test: the plot's district type (0x810d0) of an owner (+0x1c) at war with the mover's player whose DistrictInfo +0x58 is set and +0x5c above 0 (the city centre, the Encampment: Districts.HitPoints), whatever the mover and the district's pillage or health, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0), no domain test; the attack's cost adds the Movement left (0x1d0 += 0x1d4, 0x1d4 = 0): a unit standing on such a district sets out with none; nothing is linked from a fighter's attack node (0x26e5cd: a parent with node flag +0x51 & 0x40 refused). At 0x26e83e..0x26e8ae, flag 0x200 clear, a step whose parent is not the unit's own plot and lies in the unit's enemy zone of control (0x26f980 -> 0x530f50) is refused unless it is an attack."
   status: READ
   cases:
     - recording: h1_duely1121
       turn: 97-103
       value: "the raid's Man-At-Arms 2883594 on 6:14 lists China's Great Scientist's 5:12 at (2/1), a plain step from the city 6:12, none from 5:13 in the city's zone; its spot 6:12 as logged (civilian plots in the five duels' planning rows, t1-140: 475 equal / 51 differ as plain steps, 357 / 167 as attacks)"
+    - recording: h1_duely1128
+      turn: 96
+      value: the captured Builder 5046293 on player 1's Encampment 13:13 plans 13:13(1/0), every other plot at turn 2, and fortifies in place t96-146 (AI_Planning.csv)
     - recording: h1_duelv1121
       turn: 4
       value: city-state 4's Warrior at 32:22 lists the Scout's 33:23 across the river (2/0)
@@ -87,6 +90,9 @@
       turn: 1
       value: With them   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->   758 of 1,241, the game's plots within ours 862 -> 1,192.
   impl:
+    - cpu/core/tactical.ts:fortAtWar
+    - cpu/core/tactical.ts:garrisonDistrict
+    - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:minor
     - gpu/core/sim_tactics.py:_tac_attack_planes
     - cpu/core/tactical.ts:moves
@@ -99,8 +105,10 @@
     - gpu/core/sim_tactics.py:by_layer
     - cpu/core/tactical.ts:groundOf
     - cpu/core/tactical.ts:foesSeen
+    - cpu/core/tactical.ts:startMoves
   readings:
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
+    - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
@@ -544,6 +552,7 @@
     - gpu/core/sim_tactics.py:_tac_boarded
     - cpu/core/tactical.ts:crowded
     - cpu/core/tactical.ts:blind
+    - cpu/core/tactical.ts:before
   readings:
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
