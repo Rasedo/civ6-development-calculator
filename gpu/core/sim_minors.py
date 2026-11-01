@@ -395,7 +395,8 @@ class SimMinors:
         district or wonder stands, nor (for a minor's unit) another player's
         ground, nor another player's unit; else it goes to the first plot of
         the rings round it (`barb_ring_table`, the game's ring order) passing
-        the same, revealed to `seat` and free for it (`_spot_free`); one no
+        the same, revealed to `seat` (a major's explored plots under the fog,
+        every plot with the fog off) and free for it (`_spot_free`); one no
         plot takes is destroyed."""
         if not bool(m.count_nonzero()):
             return
@@ -405,7 +406,9 @@ class SimMinors:
                                                   dtype=torch.long, device=self.device)
         B, dev = self.B, self.device
         minor = seat >= 100
-        rev = self.mops_revealed[:, seat - 100] if minor else self.seat_explored[:, seat]
+        rev = (self.mops_revealed[:, seat - 100] if minor
+               else self.seat_explored[:, seat] if self.fog_of_war
+               else torch.ones(self.B, self.T, dtype=torch.bool, device=self.device))
         lo = self.POOL_LO["major"]
         K = ring.shape[1]
         for u in m.any(dim=0).nonzero(as_tuple=True)[0].tolist():

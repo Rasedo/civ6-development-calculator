@@ -414,7 +414,8 @@ const JUMP_RADIUS = 12;
  * Archer off China's wonder site 516 -> 471 past 428's foreign Builder;
  * runs/h1_duely1121 t56 Hunza's Warriors off China's ground 405 -> 361,
  * 404 -> 360 (361 taken), 493 -> 494, and two past the plots Hunza never
- * revealed (534 -> 359, 577 -> 316).
+ * revealed (534 -> 359, 577 -> 316). A major's revealed plots are its
+ * explored ones under the fog; with the fog off every plot is revealed.
  * Where no plot passes, the unit is not placed and is destroyed (the
  * transfer 0x93fa10: the placement 0x586d40 answering 0, the unit manager's
  * destroy 0x941130): false (runs/h1_duely1124 t82, China's levied Warrior
@@ -424,7 +425,7 @@ const JUMP_RADIUS = 12;
 export function jumpMadeAnew(state: GameState, u: Unit): boolean {
   const revealed = isCityStateSeat(u.seat)
     ? state.cityStates.find((c) => c.seat === u.seat)?.revealed
-    : seatOf(state, u.seat)?.explored;
+    : state.fogOfWar && seatOf(state, u.seat)?.explored.length ? seatOf(state, u.seat)!.explored : undefined;
   const here = u.tileIndex;
   const ok = (p: number): boolean => {
     const t = state.map.tiles[p];

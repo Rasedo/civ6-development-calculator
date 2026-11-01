@@ -201,6 +201,9 @@ interface Ctx {
    *  it, `barbStart`): the barbarians' AI takes its turn from there
    *  (`barbarianAi`) */
   barbBlows: Map<Unit, Unit>;
+  /** each major's best strengths trained as the next turn's start opens,
+   *  and the chassis of every unit then standing (`bestsBeforeStart`) */
+  startBests?: { best: Map<number, [number, number | undefined]>; types: Map<Unit, string> };
   /** the units the pair's record took off (`unitGone`), by key: the
    *  barbarians' turn may open before the game's loss (`barbarianAi`) */
   gone: Map<string, Unit>;
@@ -749,6 +752,29 @@ function unbornUnits(ctx: Ctx, b: TurnRecord): Set<Unit> {
   return out;
 }
 
+/** the majors' best strengths trained in a copy of the turn t's close (the
+ *  minors' and the barbarians' turns): as the next turn's start opened
+ *  (`Ctx.startBests`), raised by each unit of the copy made or upgraded since
+ *  (`raiseBestTrained`); the next turn's start's units, out of the copy
+ *  (`unbornUnits`), raise nothing (runs/h1_duely1124 t87: Rome's first
+ *  Archer 1900552 made at its start of t88, Rome striking at 3 in t87, the
+ *  barbarians' Man-at-Arms 4063235 and Swordsman 3932165 two plots off it
+ *  at Current Danger 3) */
+function bestsBeforeStart(ctx: Ctx, copy: GameState, twin: ReadonlyMap<Unit, Unit>, unborn: ReadonlySet<Unit>): void {
+  const at = ctx.startBests;
+  if (!at) return;
+  for (const s of copy.seats) {
+    const was = at.best.get(s.seat);
+    if (!was) continue;
+    [s.bestMeleeCS, s.bestRangedCS] = was;
+  }
+  for (const c of copy.units) {
+    const u = twin.get(c);
+    if (!u || unborn.has(u) || !isCiv(c.seat) || at.types.get(u) === c.type) continue;
+    raiseBestTrained(copy, c.seat, c.type, c.formation ?? 0);
+  }
+}
+
 /**
  * THE BARBARIANS CLOSE THE PAIR: after every player's actions of the turn
  * (the record's, landed), their unit pool takes the game's slots (each unit
@@ -886,6 +912,7 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // t8, out of the barbarians' t7 records)
   const unborn = unbornUnits(ctx, b);
   copy.units = copy.units.filter((c) => !unborn.has(twin.get(c)!));
+  bestsBeforeStart(ctx, copy, twin, unborn);
   // ...and every other player's unit, and each of theirs their camps raised,
   // where the log's last step before their turn opens put it, not a later
   // teleport's plot (runs/h1_duely1121 t85: China's Great Scientist walks to
@@ -1190,6 +1217,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   state.units.forEach((u, i) => twin.set(copy.units[i], u));
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
+  bestsBeforeStart(ctx, copy, twin, unbornUnits(ctx, b));
   const was = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
   const hpWas = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}` as string, UNIT_HP - num(r.damage)]));
   const fortWas = new Map(ctx.prev.units.flatMap((r) => (typeof r.fortify === 'number' ? [[`${r.owner}:${r.id}` as string, r.fortify] as const] : [])));
@@ -5146,6 +5174,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.walked = new Set();
     ctx.steps = loggedSteps(b, ctx.W);
     ctx.barbBlows = new Map();
+    delete ctx.startBests;
     ctx.gone = new Map();
     ctx.barbSeized = [];
     ctx.minorBlows = new Map();
@@ -5557,6 +5586,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // the other majors' per-turn Favor, at the turn's change after the
       // Congress (runs/h1_duelw1128 t101: China votes on 56, then banks +3)
       for (const seat of others) seatFavor(state, seat);
+      // the next turn's start opens: the best strengths trained before its
+      // units (`bestsBeforeStart`)
+      ctx.startBests = {
+        best: new Map(state.seats.map((s) => [s.seat, [s.bestMeleeCS, s.bestRangedCS]] as const)),
+        types: new Map(state.units.map((u) => [u, u.type] as const)),
+      };
       seatPhase(state, { seats: new Set([active.seat]), deals: false });
       advanceTurn(state);
     } catch (e) {
