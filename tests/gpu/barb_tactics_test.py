@@ -235,7 +235,8 @@ def scalar_danger(sim, viewer, b=0):
         pre = "major" if u < sim.POOL_HI["major"] else "barb"
         res = sim._tac_search(torch.tensor([b]), torch.tensor([u - sim.POOL_LO[pre]]), int(sim.unit_seat[b, u]), 1,
                               False, pre=pre, full=True)
-        reach = [p for p in range(T) if int(res["closed"][0, p]) >= 1]
+        # a unit with a range lists only the plots it reaches with Movement left
+        reach = [p for p in range(T) if int(res["closed"][0, p]) >= 1 and (R == 0 or int(res["moves"][0, p]) > 0)]
         rs = set(reach)
         second = set()
         if R > 0:

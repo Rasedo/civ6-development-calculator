@@ -289,7 +289,7 @@ describe("a city-state's tactical pass", () => {
 
 // tools/civ6lab/dll_readings.md "C-95: the danger map and Move to Safety"
 describe('the danger map and Move to Safety', () => {
-  it("lays a foe's strength over its one-turn reach on its full Movement, a ranged foe's over its range of it", () => {
+  it("lays a foe's strength over its one-turn reach on its full Movement, a ranged foe's over its range of the plots it reaches with Movement left", () => {
     const state = land();
     const eye = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 11).index, BARB_SEAT)!;
     const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 10, 10).index, 0)!;
@@ -316,8 +316,10 @@ describe('the danger map and Move to Safety', () => {
     const d2 = dangerPlane(state, BARB_SEAT);
     // the Archer's own plot: its reach, the Warrior's too (25 + 20)
     expect(d2[archer.tileIndex]).toBe(reach.has(archer.tileIndex) ? 45 : 25);
-    expect(d2[tileAtCoords(state.map, 10, 16).index]).toBe(25);
-    expect(d2[tileAtCoords(state.map, 10, 17).index]).toBe(0);
+    // the Archer's 2 Movement lists the plots one step off (one left there),
+    // not those two off (none left): its range 2 runs out three off
+    expect(d2[tileAtCoords(state.map, 10, 15).index]).toBe(25);
+    expect(d2[tileAtCoords(state.map, 10, 16).index]).toBe(0);
   });
 
   it('a hurt barbarian with half its health or less and no blow that kills goes to a plot of no danger', () => {
