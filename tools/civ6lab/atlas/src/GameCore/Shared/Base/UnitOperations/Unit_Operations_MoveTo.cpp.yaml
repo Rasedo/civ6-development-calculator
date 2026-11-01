@@ -18,6 +18,7 @@
     - cpu/core/tactical.ts:ended
     - cpu/core/minorOps.ts:upgradeMove
     - gpu/core/sim_minorops.py:_mops_upgrade_move
+    - cpu/core/tactical.ts:heal
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
@@ -30,6 +31,7 @@
     - "C-95: Attack Units — READ, ported"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...+0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the   move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none:   FindAlternateLocation (0x585940) rou..."
   context:

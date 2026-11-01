@@ -12194,3 +12194,66 @@ engines' roster carries no Persia, so the term is 0 for every player.
   (queueProgress); the copy keeps the engine's own fraction where it floors
   to the record's on the same item (runs/h1_duely1127 Hattusa's Trader at
   2.4 a turn completing at t40 as logged).
+
+## C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins
+
+`domainPool` / `search` / `walk`, `heal`, `ownMilitaryAi` / `militaryAiTypeOf`
+/ `tacticalUnit` / `cityStateTactics` / `freeCityTactics` (cpu/core/
+tactical.ts); `upgradeMove` (cpu/core/minorOps.ts). The GPU: `_tac_pool`
+(the search's and the walk's pools), `_minor_ai` / `_minor_tactical` and
+Heal in `_minor_pass` / `_free_tactics` (gpu/core/sim_tactics.py);
+`_mops_upgrade_move` (gpu/core/sim_minorops.py).
+
+- THE PATHFINDER'S POOL (0x2715a0 -> 0x56d9f0, READ): the pool's init
+  stores per domain (+0x180 + domain*4, 0..4) the largest of the
+  formation's units' 0x56d9f0(unit, domain) — the type's base Moves (unit
+  info +0x38) in its own domain (or -1); a land unit that may embark
+  (0x56c480) on water the embarked pool (game +0x510 + player +0x880)
+  unless +0x18c3 — and at +0x194 the largest GetMaxMoves (0x56e130). Only
+  the start node reads GetMaxMoves (the planning's 0x26eea0); a later
+  turn starts on the pool of its plot's domain, and the shore crossing's
+  carry reads the same pool. GetMaxMoves' own terms — the unit's Movement
+  modifiers (+0x1920), the player's (+0x1300, 0x3d8510), the start plot's
+  clear-terrain (+0x1924, its plot vt +0x18 at 1), own-ground (+0x1928) and
+  foreign-ground (+0x192c) Movement — are in none of it. Confirmed:
+  runs/h1_duely1124 t29-55 city-state 4's Heavy Chariot 83 (base 2, 3 on a
+  clear start plot) lists every second-turn plot one Movement under the
+  engines' (AI_Planning.csv); the planning lab (each minor's planning at its
+  pass against AI_Planning.csv, seed 1124 to t250): rows equal 1112 -> 1230
+  of 1829, plots differing 521 -> 382.
+- HEAL'S MOVES (0x7737c0, READ): a unit not of the sea domain (+0x650), or a
+  hull on its own territory (the plot's owner byte +0x1c), fortifies
+  (0x56ef30 -> 0x95eae0) or sleeps (0x9686d0); a hull off it takes its
+  player's nearest city (+0x12f0 +0xd8, GetPlotDistance strictly nearer)
+  and orders the move there (0x962030) only where 0x586360 (flag 0x10)
+  answers 0. 0x586360 answers 1 where the plot takes the unit (its plot
+  out-parameter the plot), 2 where, refused (flag 0x10) or always (flag
+  0x20), FindAlternateLocation finds a plot within 10 (out-parameter that
+  plot), 0 else — FindAlternateLocation reads it as nonzero = may enter
+  (0x585ba5). So the hull heads home only where neither its city's plot nor
+  any within 10 takes it: it holds. runs/h1_duely1124 t93-126 city-state
+  3's Quadrireme 1048577 heals on 38:17 off its territory every turn (record
+  t+1 38:17), t157-177 its Frigate, t211-221 its Battleship.
+- A UNIT'S OWN AI TYPE AND THE TACTICAL LIST (0x79b9c0, 0x7710f0, READ): a
+  unit's type's own AI type is the highest of its UnitAiInfos flags up to
+  COMBAT — EXPLORE for the military chassis with UNITAI_EXPLORE and no
+  UNITAI_COMBAT (Units.xml: the Scout, the Skirmisher, the Ranger, Spec
+  Ops, the Highlander, the Okihtcitaw, the Warak'aq). The selector keeps a
+  unit of AI type EXPLORE or above, in no AI system (+0x770), on the map,
+  +0xf90 not above 0; an explorer (PSEUDOYIELD_UNIT_EXPLORER, the Scout) at
+  EXPLORE only while the barbarian tribe its +0x11d0 names rampages
+  (0x152d60) — a city-state's or the Free Cities' never; a unit +0xf30 holds
+  only where the player's +0x1278 lists it; a Spy (+0x1ba bit 2) never; one
+  with +0x1c70 / +0x1c74 set and +0x770 clear whatever its type. The rest
+  are the homeland's: a city-state's Move to Safety and End Turn, the Free
+  Cities' End Turn. Every city-state Scout's AI_Tactical.csv row of the
+  five duely duels is HL: End Turn (165 of 165); its Skirmishers and
+  Rangers wander (180, 69 rows). Wander Near Camp (the Free Cities') takes
+  AI types above EXPLORE alone.
+- MOVE UNIT'S PLANNING (0x7eeba0 at 0x7eef84, READ): with Allow Danger false a
+  target on the danger map is gone for only where the unit's planning
+  (+0x1fc0, the pass's: 0x791300, 1 turn, Movement left) reaches it — not a
+  fresh search. runs/h1_duely1121 t80-112 city-state 2's Horseman 786438,
+  fortified on 8:6 under an Upgrade Units tree, its planning holding its
+  centre 11:5 at (1/0) (AI_Planning.csv), stays there t80-112 (the engines
+  still take it in: their danger or planning at 11:5, unread).

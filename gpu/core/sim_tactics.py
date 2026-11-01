@@ -426,6 +426,19 @@ class SimTactics:
             self._tac_full_held[pre] = f
         return f
 
+    def _tac_pool(self, pre: str = "barb") -> tuple[torch.Tensor, torch.Tensor]:
+        """[B, P] twice — `domainPool` of each unit of pool `pre` ashore and on
+        water, in `mp_scale` units: the type's base Moves; a land unit's on
+        water the embarked pool (EMBARK_MOVES, the embark techs, the roster's
+        rows); a hull its base Moves on either"""
+        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        seat = getattr(self, f"{pre}_unit_seat")
+        base = self._type_moves.take(typ)
+        naval = self.unit_naval.take(typ)
+        emb = (self._embark_moves + self._roster_embark_mp(seat, typ)
+               + self._sea_move_mp(seat, torch.ones_like(naval), torch.zeros_like(naval)))
+        return base * self._mp_scale, torch.where(naval, base, emb) * self._mp_scale
+
     def _tac_full_now(self, pre: str = "barb") -> torch.Tensor:
         """[B, P] — `unitFullMoves` of each unit of pool `pre` as it stands,
         embarked or ashore"""
@@ -519,7 +532,8 @@ class SimTactics:
         start = getattr(self, f"{pre}_unit_tile")[rows, slots].clamp(min=0)
         mp = (self._tac_full_now(pre) if full else getattr(self, f"{pre}_unit_mp"))[rows, slots]
         granted = getattr(self, f"{pre}_unit_mp_full")[rows, slots]
-        f_land, f_sea = self._tac_full(pre)
+        # a later turn starts on the pathfinder's pool of its domain (`domainPool`)
+        f_land, f_sea = self._tac_pool(pre)
         full_l = torch.div(f_land[rows, slots] * _FIX, self._mp_scale, rounding_mode="floor")
         full_s = torch.div(f_sea[rows, slots] * _FIX, self._mp_scale, rounding_mode="floor")
         unmoved = mp >= granted
@@ -1133,7 +1147,7 @@ class SimTactics:
         # a shore crossing's Movement past the new domain's full, paid by the
         # next step (`walk`'s carry)
         carry = torch.zeros_like(mp)
-        f_land_w, f_sea_w = self._tac_full(pre)
+        f_land_w, f_sea_w = self._tac_pool(pre)
         fl_w, fs_w = f_land_w[rows, sr], f_sea_w[rows, sr]
         ww = self.unit_water_walk.take(ut)
         for i in range(L):
@@ -3905,17 +3919,23 @@ class SimTactics:
         # its operations' run once the pass has its units' planning: their
         # units' turns are the operations'
         self._mops_run(s, act, op, done)
-        # the pass's own units (its job): no operation's
-        peers = self._tac_peers(units & ~self._mops_held(s), pre)
+        # DEFENDER where its city's standing army holds it, else the type's
+        # own (`militaryAiTypeOf`); the tactical list (`tacticalUnit`): an
+        # explorer at EXPLORE is the homeland's
+        ai = self._minor_ai(units, pre)
+        tac = self._minor_tactical(ai, pre)
+        # the pass's own units (its job): the tactical list's, no operation's
+        peers = self._tac_peers(units & tac & ~self._mops_held(s), pre)
+
+        def live_all() -> torch.Tensor:
+            return units & ~done & alive & (self.major_unit_seat == seat)
 
         def live() -> torch.Tensor:
-            return units & ~done & alive & (self.major_unit_seat == seat)
+            return live_all() & tac
 
         npos = int(npass.max()) if B else 0
         home = self.citystate_center[:, s].clamp(min=0)
         danger = op["danger"]
-        # DEFENDER where its city's standing army holds it (`militaryAiTypeOf`)
-        ai = torch.where(units, torch.where(self.major_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
         # SUPPORT FORMATION
         self._tac_support_formation(live, done, op, pre, seat)
         # ATTACK HIGH PRIORITY, MOVE TO SAFETY, ATTACK MEDIUM and LOW PRIORITY
@@ -3930,20 +3950,10 @@ class SimTactics:
         if tg is not None:
             self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], tg, 1, peers, pre, seat)
         # HEAL: a hurt unit not embarked on a plot of no danger holds its
-        # plot; a hull outside its own waters heads for its city
+        # plot, a hull outside its own waters too (`heal`)
         hp_max = int(self.rules.combat["unitHp"])
-        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        naval = self.unit_naval.take(ut)
-        hurt = (live() & (self.major_unit_hp < hp_max) & ~self.major_unit_emb
-                & (danger.gather(1, self.major_unit_tile.clamp(min=0)) <= 0))
-        away = hurt & naval & (self.tile_seat.gather(1, self.major_unit_tile.clamp(min=0)) != seat)
-        if bool(away.count_nonzero()):
-            for j in range(npos):
-                u_b = order[:, j]
-                go = (j < npass) & away[bidx, u_b] & live()[bidx, u_b]
-                if bool(go.count_nonzero()):
-                    self._tac_move_to(go, u_b, home, pre, seat, False)
-        done |= hurt
+        done |= (live() & (self.major_unit_hp < hp_max) & ~self.major_unit_emb
+                 & (danger.gather(1, self.major_unit_tile.clamp(min=0)) <= 0))
         # CHASE TARGET: a LOW target within 8 of a unit (the list taken as the
         # pass began: only where a foe stands near is there one to take)
         if tg is not None:
@@ -3974,8 +3984,24 @@ class SimTactics:
                 alt = self._tac_alternate(back, u_b, home, pre, seat, ent)
                 self._tac_move_to(back & (alt >= 0), u_b, alt, pre, seat, False)
             done[bidx[ok], u_b[ok]] = True
-        # THE HOMELAND: Move to Safety; the rest end their turn
-        self._tac_move_to_safety(live, done, order, npass, op["rowof"], op["res"], danger, pre, seat, True)
+        # THE HOMELAND: Move to Safety over every unit; the rest end their turn
+        self._tac_move_to_safety(live_all, done, order, npass, op["rowof"], op["res"], danger, pre, seat, True)
+
+    def _minor_ai(self, units: torch.Tensor, pre: str) -> torch.Tensor:
+        """[B, P] long — `militaryAiTypeOf` over pool `pre`'s `units`:
+        DEFENDER where its city's standing army holds it, else the type's
+        own (`ownMilitaryAi`: COMBAT with UNITAI_COMBAT, else EXPLORE); -1
+        off `units`"""
+        ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        own = torch.where(self._bop_combat_ai.take(ut), _AI_COMBAT, _AI_EXPLORE)
+        return torch.where(units, torch.where(getattr(self, f"{pre}_unit_defender"), _AI_DEFENDER, own), -1)
+
+    def _minor_tactical(self, ai: torch.Tensor, pre: str) -> torch.Tensor:
+        """[B, P] bool — `tacticalUnit` for a player with no tribe: AI type
+        EXPLORE or above, no explorer (PSEUDOYIELD_UNIT_EXPLORER) at
+        EXPLORE"""
+        ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        return (ai >= _AI_EXPLORE) & ~((ai == _AI_EXPLORE) & self._type_explorer.take(ut))
 
     def _free_tactics(self, act: torch.Tensor) -> None:
         """THE FREE CITIES' TACTICAL TURN (`freeCityTactics`) in the games of
@@ -4005,15 +4031,16 @@ class SimTactics:
             done = torch.zeros_like(units)
             self._mops_run(self.FR, act, op, done)
             homes = self._free_homes()
-            # the pass's own units (its job)
-            peers = self._tac_peers(units, pre)
+            # the tactical list (`tacticalUnit`); the pass's own units (its job)
+            ai = self._minor_ai(units, pre)
+            tac = self._minor_tactical(ai, pre)
+            peers = self._tac_peers(units & tac, pre)
 
             def live() -> torch.Tensor:
-                return units & ~done & self.barb_unit_alive & (self.barb_unit_seat == seat)
+                return units & ~done & self.barb_unit_alive & (self.barb_unit_seat == seat) & tac
 
             # ATTACK HIGH and MEDIUM PRIORITY, MOVE TO SAFETY, ATTACK LOW
             # PRIORITY (the attacks where a foe stands near)
-            ai = torch.where(units, torch.where(self.barb_unit_defender, _AI_DEFENDER, _AI_COMBAT), -1)
             if op["tg"] is not None:
                 for kind in (3, 2):
                     self._tac_attack_units(live, done, ai, order, op["rowof"], op["res"], op["tg"], kind, peers, pre, seat)
@@ -4023,7 +4050,8 @@ class SimTactics:
             for j in range(int(npass.max()) if B else 0):
                 u_b = order[:, j]
                 home = homes[bidx, u_b]
-                ok = (j < npass) & live()[bidx, u_b] & (home >= 0)
+                # Wander Near Camp: AI type above EXPLORE (`wanderNearCamp`)
+                ok = (j < npass) & live()[bidx, u_b] & (home >= 0) & (ai[bidx, u_b] > _AI_EXPLORE)
                 if not bool(ok.count_nonzero()):
                     continue
                 camp = home.clamp(min=0)

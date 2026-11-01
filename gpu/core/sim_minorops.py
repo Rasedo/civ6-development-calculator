@@ -1413,7 +1413,7 @@ class SimMinorOps:
             if not bool(m.any()):
                 continue
             dest = target.gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self._mops_upgrade_move(s, us, dest, m, op["danger"])
+            self._mops_upgrade_move(s, us, dest, m, op)
         done |= held
         self.mops_upg[:, s, :P] = torch.where(go.unsqueeze(1), held, self.mops_upg[:, s, :P])
         self.mops_upg_on[:, s] = torch.where(go, live, self.mops_upg_on[:, s])
@@ -1799,12 +1799,12 @@ class SimMinorOps:
         m &= (self._mops_u(s, "tile")[b, uc] != dest) & (self._mops_u(s, "mp")[b, uc] > 0) & (dest >= 0)
         self._tac_move_to(m, uc, dest, self._mops_pre(s), self._mops_seat(s), strike=False)
 
-    def _mops_upgrade_move(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor,
-                           danger: torch.Tensor) -> None:
+    def _mops_upgrade_move(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor, op: dict) -> None:
         """`upgradeMove` (MOVE UNIT's execution with no Location, 0x7eeba0):
         the tree unit at local slot `us` [B] with Movement off its target
-        `dest`: a target on the danger map [B, T] only where its planning
-        reaches it this turn with Movement left; then, its own unit there
+        `dest`: a target on the pass's danger map (`op["danger"]`) only where
+        its planning in the pass (`op`'s, `passReachAt`) reaches it this turn
+        with Movement left; then, its own unit there
         beside it, the swap onto it where that one has Movement left
         (0x972880), else the move there (0x962030) under the path flag
         0x1000, whose first turn may not end on the target its own unit
@@ -1816,13 +1816,13 @@ class SimMinorOps:
         tile = self._mops_u(s, "tile")
         here = tile[b, uc].clamp(min=0)
         m = mask & (us >= 0) & (dest >= 0) & (tile[b, uc] != dest) & (self._mops_u(s, "mp")[b, uc] > 0)
-        hot = m & (danger.gather(1, dc.unsqueeze(1)).squeeze(1) > 0)
+        hot = m & (op["danger"].gather(1, dc.unsqueeze(1)).squeeze(1) > 0)
         if bool(hot.any()):
-            rows = hot.nonzero(as_tuple=True)[0]
-            res = self._tac_search(rows, uc[rows], seat, 1, False, None, pre=pre)
-            ar = torch.arange(rows.shape[0], device=self.device)
-            ok = (res["turns"][ar, dc[rows]] > 0) & (res["moves"][ar, dc[rows]] > 0)
-            m[rows[~ok]] = False
+            # the unit's planning in the pass (+0x1fc0, `passReachAt`)
+            n = op["rowof"][b, uc]
+            nc = n.clamp(min=0)
+            ok = ((n >= 0) & (op["res"]["turns"][nc, dc] == 1) & (op["res"]["moves"][nc, dc] > 0))
+            m = m & (~hot | ok)
         if not bool(m.any()):
             return
         occ = self.military_at[b, dc]

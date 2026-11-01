@@ -67,14 +67,22 @@
 - addr: 0x7710f0
   kind: function
   name: tacticalUnit
-  semantics: "the tactical pass's unit selector: AI type EXPLORE or above, an explorer only while its tribe rampages"
+  semantics: "the tactical pass's unit selector: AI type EXPLORE or above, not in an AI system (+0x770), on the map, +0xf90 not above 0; an explorer (PSEUDOYIELD_UNIT_EXPLORER) at EXPLORE only while its tribe (+0x11d0) rampages; a unit +0xf30 holds kept where the player's +0x1278 lists it; a Spy (+0x1ba bit 2) out; one with +0x1c70 / +0x1c74 set kept whatever its type"
   status: READ
   cases:
+    - recording: h1_duely1117-1128
+      turn: all
+      value: "every city-state Scout's AI_Tactical.csv row is HL: End Turn (165 of 165): the explorer at EXPLORE, with no tribe, is the homeland's"
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
-  impl: [cpu/core/tactical.ts:tacticalUnit, gpu/core/sim_tactics.py:_tac_tactical]
-  readings: ["C-95: Attack Units — READ, ported"]
+  impl:
+    - cpu/core/tactical.ts:tacticalUnit
+    - gpu/core/sim_tactics.py:_tac_tactical
+    - gpu/core/sim_tactics.py:_minor_tactical
+  readings:
+    - "C-95: Attack Units — READ, ported"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE UNIT SELECTOR (0x7710f0): a unit of AI type EXPLORE or above; an explorer (PSEUDOYIELD_UNIT_EXPLORER: the Scout..."
@@ -216,15 +224,22 @@
 - addr: 0x7737c0
   final: 0x5057b0
   kind: function
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:heal]
+  name: Heal (moves)
+  semantics: "each queued unit: not of the sea domain, or a hull on its own territory, fortifies (0x56ef30 / 0x95eae0) or sleeps (0x9686d0); a hull off it takes its nearest city (first of equals) and moves there (0x962030) only where 0x586360 (flag 0x10) answers 0 — no place on the city's plot nor within 10 of it; the turn done (0x570b40)"
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 93-126
+      value: city-state 3's Quadrireme 1048577 heals on 38:17 off its territory every turn (record t+1 38:17); t157-177 its Frigate, t211-221 its Battleship hold too
+  impl: [cpu/core/tactical.ts:heal, gpu/core/sim_tactics.py:_minor_pass]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...area (plot +8) counted three times as far; strictly nearer   replaces. - HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has   taken damage (+0xcf0 > 0), in no formation (0x8be30), on a pl..."
   context:
     - "- HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has taken damage (+0xcf0 > 0), in no formation (0x8be30..."
-  review: imported
+  review: reviewed
 - addr: 0x773bd0
   final: 0x505bc0
   kind: function

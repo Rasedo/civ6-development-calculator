@@ -9,6 +9,7 @@
   status: PARTLY
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...r with it; +0x4c not above 0, taken as no unit on it; its own area unless it embarks (0x56c480), a hull on water; no city centre but its player's); its two counts over its sight (0x5...
@@ -92,12 +93,21 @@
   final: 0x3a33d0
   kind: function
   name: a unit's base moves (embarked pool)
-  status: PARTLY
-  impl: [cpu/core/aiViewTypes.ts:AiUnitView, cpu/core/aiView.ts:unitView]
+  semantics: "a unit's Movement in a domain: Units +0x38 in its own domain (or -1), on water for a land unit that may embark the embarked pool (game +0x510 + player +0x880) unless +0x18c3; none of GetMaxMoves' terms (+0x1920, the player's +0x1300, +0x1924..+0x192c)"
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 29-55
+      value: city-state 4's Heavy Chariot 83 (base 2, 3 on its clear start plot) plans its second turn's plots on 2 (AI_Planning.csv); the planning lab's rows equal 1112 -> 1230 of 1829
+  impl:
+    - cpu/core/aiViewTypes.ts:AiUnitView
+    - cpu/core/aiView.ts:unitView
+    - cpu/core/tactical.ts:domainPool
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...+0x370: the unit targets CIVILIAN..HIGH, the districts) within twice its base Movement (0x56d9f0 with -1: Units +0x38, embarked the embarked pool): the team's attack strength (+0x98) o..."
@@ -219,6 +229,7 @@
     - cpu/core/units.ts:startTileMoves
     - gpu/core/sim_economy.py:_start_tile_mp
     - cpu/core/tactical.ts:startMoves
+    - cpu/core/tactical.ts:domainPool
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -226,6 +237,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-95: the clear-terrain start Movement — PARTLY READ, ported"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...bard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The   type ids (0x5bcb80, each global the..."
   context:
@@ -318,6 +330,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...and, the   gossip strings GOSSIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify   (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside   its own territory heads for its player's nearest ci..."
   context:

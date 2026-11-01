@@ -10,14 +10,15 @@
 import type { ArmyRecord, City, CityState, GameState, Tile, Unit } from './types';
 import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, neighbors, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
 import { hullPassage, isCoastalLand, isImpassable, isWater } from '../../world/query';
-import { COMBAT_BOMBARD_VS_UNIT, MP_SCALE } from '../data/constants';
+import { COMBAT_BOMBARD_VS_UNIT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
 import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
+import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  canEmbark, cityAtIndex, crossesRiver, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious, waterWalks,
+  canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious, waterWalks,
   setBarbStepLook, unitsHostile, unitVisibleTo,
   waterEnterable,
 } from './units';
@@ -279,6 +280,22 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   };
 }
 
+/** THE PATHFINDER'S FULL MOVEMENT OF A DOMAIN (the pool's init 0x2715a0 ->
+ *  0x56d9f0, [pathfinder + 0x180 + domain*4]), whole: the type's base Moves
+ *  (unit info +0x38) in its own domain; a land unit's on water the embarked
+ *  pool (EMBARK_MOVES and the player's embark Movement, +0x880). GetMaxMoves'
+ *  terms (0x56e130: the unit's Movement modifiers +0x1920, the player's
+ *  +0x1300, the start plot's +0x1924..+0x192c) are none of it: a later turn
+ *  of a search starts on it (runs/h1_duely1124 t29-55, city-state 4's Heavy
+ *  Chariot 83: 3 Movement on its clear start plot, its second turn's plots
+ *  planned on 2, AI_Planning.csv). A hull reads its base Moves on either. */
+function domainPool(state: GameState, unit: Unit, sea: boolean): number {
+  const def = UNITS[unit.type];
+  const base = def?.moves ?? 2;
+  if (def?.naval || !sea) return base;
+  return EMBARK_MOVES + embarkTechMoves(state, unit.seat) + rosterEmbarkMoves(state, unit);
+}
+
 /**
  * THE PATHFINDER (Pathfinder_Instance 0x77d10, its step 0x793f0): Dijkstra
  * from the unit's plot — no heuristic (the pool's default, 0x26f330) — over
@@ -311,11 +328,11 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   const ground = groundOf(state, unit, !zoc, !zoc, standToAttack);
   const held = heldCostsOf(state, unit);
   const nodes = new Map<number, PNode>();
-  // a turn starts on the full Movement of the domain its plot holds the unit
-  // in: embarked on water, a land unit's own pool ashore
+  // a later turn starts on the pathfinder's pool of the domain its plot holds
+  // the unit in (`domainPool`): embarked on water, a land unit's own ashore
   const naval = !!UNITS[unit.type]?.naval;
-  const fullLand = Math.floor(unitFullMoves(state, naval ? unit : { ...unit, embarked: false }) * FIX / MP_SCALE);
-  const fullSea = Math.floor(unitFullMoves(state, naval ? unit : { ...unit, embarked: true }) * FIX / MP_SCALE);
+  const fullLand = domainPool(state, unit, false) * FIX;
+  const fullSea = domainPool(state, unit, true) * FIX;
   const unmoved = unit.movesLeft >= (unit.movesFull ?? unitFullMoves(state, unit));
   // the planning sets out on the unit's full Movement (0x791e00 -> 0x26dcd0
   // with its third argument set: 0x26eea0 takes GetMaxMoves, 0x56e130), any
@@ -598,7 +615,7 @@ function walk(state: GameState, unit: Unit, path: number[], avoid?: (tile: numbe
     const cost = stepCost(state, unit, tiles[from], tiles[p]) + carry;
     if (mp < cost && mp < full) break;
     const cross = !naval && !waterWalks(unit.type) && isWater(tiles[from]) !== isWater(tiles[p]);
-    const maxTo = unitFullMoves(state, { ...unit, embarked: isWater(tiles[p]) });
+    const maxTo = domainPool(state, unit, isWater(tiles[p])) * MP_SCALE;
     carry = cross && mp > maxTo ? mp - maxTo : 0;
     mp = Math.max(0, mp - cost);
     stop += 1;
@@ -1265,11 +1282,13 @@ function aiTypeOf(state: GameState, u: Unit): number {
 
 /** A UNIT THE TACTICAL PASS TAKES (the tactical unit selector 0x7710f0 over
  *  the units no AI system holds): one of AI type EXPLORE or above, an
- *  explorer (`explorer`, PSEUDOYIELD_UNIT_EXPLORER) only while its tribe
- *  rampages; the rest are the homeland's */
+ *  explorer (`explorer`, PSEUDOYIELD_UNIT_EXPLORER) at EXPLORE only while
+ *  its barbarian tribe rampages; the rest are the homeland's */
 function tacticalUnit(state: GameState, u: Unit, ai: number): boolean {
   if (ai < AI_EXPLORE) return false;
   if (ai !== AI_EXPLORE || !UNITS[u.type]?.explorer) return true;
+  // another player's explorer has no tribe (+0x11d0 its home city, -1)
+  if (!isBarbSeat(u.seat)) return false;
   const tr = tribeOf(state, u.id);
   return !!tr && !tr.alive && tr.rampage !== undefined;
 }
@@ -2087,24 +2106,19 @@ function promotion(state: GameState, pass: Pass): void {
 
 /**
  * HEAL (0x779a70, its moves 0x7737c0): each unit left, in pool order, that
- * has taken damage (+0xcf0) is healed: a land unit holds its plot (it
- * fortifies, 0x95eae0, or sleeps, 0x9686d0); a naval one outside its own
- * territory heads for its player's nearest city (the first of equals), on
- * its own ground it holds. Its turn is done. An embarked unit (0x8be30)
- * or on a plot of danger (`pass.danger` above 0, 0x716a90) is left.
+ * has taken damage (+0xcf0) is healed where it stands: a land unit
+ * fortifies (0x95eae0) or sleeps (0x9686d0); a naval one outside its own
+ * territory takes its player's nearest city (the first of equals) and
+ * moves there (0x962030) only where the location test (0x586360, flag
+ * 0x10) answers 0 — the city's plot refused and no plot within 10 of it
+ * found (FindAlternateLocation) — so it holds too (runs/h1_duely1124
+ * t93-126 city-state 3's Quadrireme on 38:17, t157-177 its Frigate, t211-221
+ * its Battleship). Its turn is done. An embarked unit (0x8be30) or one on a
+ * plot of danger (`pass.danger` above 0, 0x716a90) is left.
  */
 function heal(state: GameState, pass: Pass): void {
   for (const u of pass.units) {
     if (!live(state, pass, u) || u.hp >= UNIT_HP || !!u.embarked || pass.danger[u.tileIndex] > 0) continue;
-    if (UNITS[u.type]?.naval && tileSeat(state.map.tiles[u.tileIndex]) !== u.seat) {
-      let best = -1;
-      let bd = -1;
-      for (const c of cityCentresOf(state, u.seat)) {
-        const d = plotDistance(state, u.tileIndex, c);
-        if (bd < 0 || d < bd) { bd = d; best = c; }
-      }
-      if (best >= 0) moveTo(state, u, best, pass.strike);
-    }
     finish(pass, u, 'Heal');
   }
 }
@@ -2586,13 +2600,22 @@ function supportFormation(state: GameState, pass: Pass): void {
   }
 }
 
+/** a military unit type's own AI type (0x79b9c0: the highest of its
+ *  UnitAiInfos flags up to COMBAT): COMBAT where its rows hold
+ *  UNITAI_COMBAT, else EXPLORE (every military chassis without it carries
+ *  UNITAI_EXPLORE: the Scout, the Skirmisher, the Ranger, Spec Ops and
+ *  their replacements) */
+export function ownMilitaryAi(type: string): number {
+  return (AI_UNIT_AI[gameTypeOf('unit', type, 'UNIT_')] ?? []).includes('UNITAI_COMBAT') ? AI_COMBAT : AI_EXPLORE;
+}
+
 /** the units a pass walks of a player of no full AI (a city-state, the Free
  *  Cities) or of an operations probe: its military units, of AI type
  *  DEFENDER where its city's standing army holds it (`aiDefender`), else
- *  COMBAT (a civilian, a support unit none) */
+ *  their type's own (`ownMilitaryAi`; a civilian, a support unit none) */
 export function militaryAiTypeOf(u: Unit): number {
   if (unitDomain(u.type) !== 'military') return -1;
-  return u.aiDefender ? AI_DEFENDER : AI_COMBAT;
+  return u.aiDefender ? AI_DEFENDER : ownMilitaryAi(u.type);
 }
 
 /**
@@ -2600,13 +2623,15 @@ export function militaryAiTypeOf(u: Unit): number {
  * "Minor Civ Tactical" and "Minor Civ Homeland" lists): its unit pool
  * (`poolSlots`, slot 0 its founding Settler's), each unit's planning reach
  * taken before any moves, its tactical target list; its operations' run
- * (`operations`: their units the operations'); then the moves in the
+ * (`operations`: their units the operations'); then over the tactical
+ * list's units (`tacticalUnit`) the moves in the
  * list's order, each walking the units the moves before it left, in pool
  * order — Support Formation, Attack High Priority, Move to Safety, Attack
  * Medium Priority, Promotion, Attack Low Priority, Heal, Chase Target (no
  * strike), Wander Near City (Attack Civilians and Make Military Formation
- * not ported); the homeland's Move to Safety, then its End Turn
- * takes the rest (its Promotion finds no unit the tactical one left due).
+ * not ported); the homeland's Move to Safety over every unit, then its End
+ * Turn takes the rest (its Promotion finds no unit the tactical one left
+ * due).
  */
 export function cityStateTactics(state: GameState, cityState: CityState, operations: (pass: Pass) => void): void {
   const pool = (cityState.unitPool ??= { size: 1, free: [], dying: [] });
@@ -2621,6 +2646,11 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
     // logged)
     for (const u of pass.units) if (u.movesLeft <= 0) pass.done.add(u.id);
     operations(pass);
+    // the tactical list (`tacticalUnit`): an explorer of AI type EXPLORE is
+    // the homeland's (every city-state Scout's row of the five duely duels
+    // is HL: End Turn, 165 of 165)
+    const all = pass.units;
+    pass.units = all.filter((u) => tacticalUnit(state, u, pass.ai.get(u.id) ?? -1));
     supportFormation(state, pass);
     attackUnits(state, pass, 'HIGH');
     moveToSafety(state, pass);
@@ -2630,6 +2660,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
     heal(state, pass);
     chaseTarget(state, pass);
     wanderNearCity(state, pass, cityState.centerIndex);
+    pass.units = all;
     homelandSafety(state, pass);
     for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
   } finally {
@@ -2656,12 +2687,15 @@ export function freeCityTactics(state: GameState, operations: (pass: Pass) => vo
   try {
     const pass = openPass(state, FREE_SEAT, militaryAiTypeOf);
     operations(pass);
+    // the tactical list (`tacticalUnit`); the homeland's End Turn takes all
+    const all = pass.units;
+    pass.units = all.filter((u) => tacticalUnit(state, u, pass.ai.get(u.id) ?? -1));
     attackUnits(state, pass, 'HIGH');
     attackUnits(state, pass, 'MEDIUM');
     moveToSafety(state, pass);
     attackUnits(state, pass, 'LOW');
     wanderNearCamp(state, pass, (u) => freeHome(state, u));
-    for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
+    for (const u of all) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
   } finally {
     costsHeld = null;
   }

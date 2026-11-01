@@ -137,6 +137,22 @@
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
+- addr: 0x3d8510
+  final: 0x2a5420
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Planning.csv
+      turn: 29
+      value: "Confirmed:   runs/h1_duely1124 t29-55 city-state 4's Heavy Chariot 83 (base 2, 3 on a   clear start plot) lists every second-turn plot one Movement under the   engines' (AI_Planning.csv);"
+    - recording: 1124
+      turn: 250
+      value: "the planning lab (each minor's planning at its   pass against AI_Planning.csv, seed 1124 to t250): rows equal 1112 -> 1230   of 1829, plots differing 521 -> 382."
+  readings:
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+  context:
+    - "...etMaxMoves' own terms — the unit's Movement modifiers (+0x1920), the player's (+0x1300, 0x3d8510), the start plot's clear-terrain (+0x1924, its plot vt +0x18 at 1), own-ground (+0x1928..."
+  review: imported
 - addr: 0x3d8d20
   final: 0x2a5950
   kind: function

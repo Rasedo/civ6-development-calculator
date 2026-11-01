@@ -25,7 +25,7 @@ import type { ArmyRecord, CityState, GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiView } from './aiView';
-import { cityStateTactics, moveTo, passEnd, passFinish, plotDistance, reachPlots, stackedAt, swapUnits, type Pass } from './tactical';
+import { cityStateTactics, moveTo, passEnd, passFinish, passReachAt, plotDistance, stackedAt, swapUnits, type Pass } from './tactical';
 import { ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
@@ -321,7 +321,10 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
 /** MOVE UNIT'S EXECUTION with no Location (0x7eeba0 from 0x7eee6a) for a
  *  tree unit with a target (+0x830) off its plot: Allow Danger false, a
  *  target on the danger map (0x716a60) is gone for only where the unit's
- *  planning reaches it this turn with Movement left (0x791300); then the
+ *  planning in the pass (+0x1fc0, `passReachAt`) reaches it this turn with
+ *  Movement left (0x791300; runs/h1_duely1121 t80-112: city-state 2's
+ *  Horseman 786438 on 8:6, its planning holding its centre 11:5 at (1/0),
+ *  stays); then the
  *  swap onto it (0x972880: a unit of its own stacking with it on the target
  *  beside it changes places), then the move there (0x962030) under the
  *  path flag 0x1000 (the order's 0x100a), whose first turn may not end on
@@ -333,7 +336,7 @@ export function upgradeTreesTick(state: GameState, cs: CityState, pass: Pass): v
  *  it with the first) */
 function upgradeMove(state: GameState, pass: Pass, u: Unit, p: number): void {
   if (p < 0 || u.tileIndex === p || u.movesLeft <= 0) return;
-  if (pass.danger[p] > 0 && !reachPlots(state, u, 1).some((e) => e.tile === p && e.moves > 0)) return;
+  if (pass.danger[p] > 0 && passReachAt(state, pass, u, p, 1, true, 0) < 0) return;
   if (plotDistance(state, u.tileIndex, p) === 1 && stackedAt(state, u, p)) {
     swapUnits(state, pass, u, p);
     return;

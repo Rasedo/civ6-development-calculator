@@ -146,6 +146,17 @@
   context:
     - "- BARBARIAN RAID CHECK (0x7c7330): SUCCESS where the tribe's score (0x152c00: +0x78 + +0x7c) reaches Score, else FAILURE; Signal At Start links a game signal for th..."
   review: reviewed
+- addr: 0x152d60
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Tactical.csv
+      value: "Every city-state Scout's AI_Tactical.csv row of the   five duely duels is HL: End Turn (165 of 165);"
+  readings:
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+  context:
+    - "...RER, the Scout) at EXPLORE only while the barbarian tribe its +0x11d0 names rampages (0x152d60) — a city-state's or the Free Cities' never; a unit +0xf30 holds only where the player'..."
+  review: imported
 - addr: 0x152df0
   final: 0xe40d0
   kind: function

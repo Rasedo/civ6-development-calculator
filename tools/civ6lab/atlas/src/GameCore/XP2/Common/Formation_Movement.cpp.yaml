@@ -123,6 +123,7 @@
   impl: [cpu/core/tactical.ts:startMoves, gpu/core/sim_tactics.py:_tac_search]
   readings:
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...rch 0x26dcd0 with its third argument 1 (flags 0x115), which installs the start callback 0x26eea0 at +0xa8; GeneratePath calls it first, and it sets the start node's Movement (+0x1bc, r...
@@ -296,16 +297,23 @@
 - addr: 0x2715a0
   final: 0x1a94b0
   kind: function
-  status: PARTLY
+  name: pathfinder pool init
+  semantics: "the pool's per-domain full Movement (+0x180 + domain*4, 0..4): the largest of the formation's units' 0x56d9f0(unit, domain); +0x194 the largest GetMaxMoves"
+  status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 29-55
+      value: city-state 4's Heavy Chariot 83 plans its second turn on its base 2, not GetMaxMoves' 3 on a clear start plot (AI_Planning.csv)
     - recording: AI_Planning.csv
       turn: 69
       value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
+  impl: [cpu/core/tactical.ts:domainPool, gpu/core/sim_tactics.py:_tac_pool]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
   context:
     - ...is of the land domain (finder +0x1f2 = 0x2669d0( formation, 2), set by the pool's init 0x2715a0 at +0x180 +0x72) and the plot is water, +1000 (0x3e800) where its player is not human (...
-  review: imported
+  review: reviewed
 - addr: 0x271b50
   final: 0x1a99b0
   kind: function
