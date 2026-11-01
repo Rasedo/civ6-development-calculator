@@ -826,7 +826,20 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   // from 10:8 before the other Scout at 10:7 walks to 8:7, which sees it); a
   // scout reports the cities it comes to see (`barbScoutLook`), its tree
   // ticking from the next turn
-  const walks = ctx.barbSteps.splice(0).filter(({ u }) => state.units.includes(u));
+  // (the order of each unit's first logged step, UnitMoved / UnitTeleported:
+  // runs/h1_duely1128 t219 tribe 6's Ranger walks to 41:20 before its Cavalry
+  // leaves 41:17 for 42:19, so the Ranger alone sees the city at 42:20 and
+  // reports it)
+  const firstStep = new Map<string, number>();
+  for (const x of (b as { actions?: unknown[][] }).actions ?? []) {
+    if (x[1] !== closing || (x[2] !== 'UnitMoved' && x[2] !== 'UnitTeleported')) continue;
+    const key = `${x[3]}:${x[4]}`;
+    if (!firstStep.has(key)) firstStep.set(key, x[0] as number);
+  }
+  const keyOf = new Map([...ctx.units].map(([k, u]) => [u, k] as const));
+  const stepAt = (u: Unit) => firstStep.get(keyOf.get(u) ?? '') ?? Infinity;
+  const walks = ctx.barbSteps.splice(0).filter(({ u }) => state.units.includes(u))
+    .map((w, i) => ({ w, i })).sort((a, z) => stepAt(a.w.u) - stepAt(z.w.u) || a.i - z.i).map(({ w }) => w);
   const ends = new Map(walks.map(({ u }) => [u, u.tileIndex] as const));
   for (const { u } of walks) u.tileIndex = from.get(u) ?? u.tileIndex;
   for (const { u, plots } of walks) {
