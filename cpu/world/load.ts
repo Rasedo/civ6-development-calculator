@@ -3,6 +3,8 @@ import { markBoost } from '../core/boosts';
 import type { CityStateType, Elevation, FeatureId, GameMap, GameState, TerrainId, Tile } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
+import { drawResearchTree } from '../core/researchTree';
+import { randRange } from '../core/rand';
 import { placeCityStateAt } from '../core/cityStates';
 import { civOf, emptySeat, leaderOf } from '../core/seats';
 import { spawnUnit } from '../core/units';
@@ -65,6 +67,8 @@ export function loadWorld(world: WorldFile): GameState {
     rivers: m.rivers, volcanoes: m.volcanoOrder, continents: m.continent, regions: m.region };
 
   const state = createGameFromMap(map, world.rngInit);
+  // the game's start draws its Future tree first on the play stream
+  state.researchTree = drawResearchTree((n, label) => randRange(state, n, label));
 
   // the exporter's MAX, not the placed count: placement drops a city-state it
   // cannot site, and the id space stays the width the GPU allocates.

@@ -6438,3 +6438,45 @@ after `_minor_ai_turn` and in `_free_cities_phase` after `_free_combat_desire`;
   player 1's cities nonzero from its t11 turn (met t10, initiated by the
   city-state), the game's from t12 — player 1's trade list at its t11 turn
   or the knowledge base's met record a turn later, unread.
+
+## H-1: the random Future tree — READ
+
+`drawResearchTree`, `treePrereqs`, `treeBaseCost`, `requiredRows`
+(`cpu/core/researchTree.ts`, `GameState.researchTree`); GPU
+`_init_research_tree`, `_draw_tree_rows`, `tree_t_pre` / `tree_c_pre`,
+`tree_t_cost` / `tree_c_cost`, `_prereq_t` / `_prereq_c` [B, N, N],
+`_tree_lv_t` / `_tree_lv_c`, `_tree_leaf_t`, `_tree_lin_c`; the replay's
+`importResearchTree`.
+
+- At the game's set-up (0xa56500) the civics' tree (0x2976d0) and then the
+  techs' (0x351fc0) are drawn on the synchronous generator. Per row in table
+  order a random-cost row (TechnologyRandomCosts / CivicRandomCosts) draws
+  one of its Costs whose level holds fewer than 7 rows, uniformly ("Choosing
+  a random cost for a tech to have"); every row joins its Cost's level.
+- The levels ascending; a level's candidates are the rows of the nearest
+  lower level holding any, weight 100, in table order. Each RandomPrereqs row
+  (Technologies_XP2 / Civics_XP2) of the level draws its count over
+  ceil(candidates / the level's rows) ("Choosing how many prerequisites ..."),
+  plus one, at most the candidates, then that many weighted picks (0x353070,
+  "Choosing a random prerequisite ..."), a pick kept once and its weight set
+  to 1 (0x354000) for the level's later rows.
+- Confirmed: every tree draw's range on runs/h1_duely1117-1128 as the rule
+  takes it (setup draws 98-137). runs/h1_duely1124: Seasteads on
+  Nanotechnology, Cybernetics on Nuclear Fusion, Smart Materials on
+  Robotics, 377 / 516 / 516 turns at t216 as logged; the city-states'
+  Future picks t210-235 53 of 53, every research score of the window as
+  logged.
+- The replay reads the tree off the draw log's set-up draws; a recording
+  that kept no log draws one on its first record's seed.
+
+## H-1: a city-state's units' boosts in the replay
+
+The replay runs the city-states' units on a copy and lays their
+improvements, clearings and routes after the engine's turn
+(`minorLaysAfter`, `minorClearsAfter`); the boosts those earn land there
+(`detectBoosts` per city-state), after the research AI's turn, as the game's
+do: runs/h1_duely1121 t41 city-state 4's Currency (its Trader's route),
+Archery taken in record t42; t47 city-state 2's Currency, t50 its Water Mill
+on a chop (Construction); runs/h1_duely1124 t49 a Quarry (Masonry);
+runs/h1_duely1117 t46 a resource Farm (Irrigation). The research the AI's
+turn left is AI_Research.csv's RESEARCHING row (`Ctx.researchAtTurn`).

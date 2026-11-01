@@ -90,6 +90,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
     units: [],
     nextUnitId: 0,
     rngState: 42,
+    researchTree: { prereqs: {}, baseCost: {} },
     disasters: false,
     fogOfWar: false,
     eventLog: [],

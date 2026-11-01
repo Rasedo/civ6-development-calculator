@@ -81,13 +81,12 @@ def _discounted(a: torch.Tensor, r: int, n: torch.Tensor) -> torch.Tensor:
     return torch.where(n < 0, torch.zeros_like(a), out)
 
 
-def _walk_slots(pre: list, dev) -> list:
+def _walk_lists(pre: list) -> list:
     """a tree's prerequisite walk slots three levels deep (each row's
-    prerequisites in the install's order, theirs, theirs): per level the
-    slot rows [N, K] (-1 empty) and each slot's parent slot in the level
-    above"""
+    prerequisites in its tree's order, theirs, theirs): per level the slot
+    rows per row and each slot's parent slot in the level above"""
     n = len(pre)
-    lv1 = [[p for p in pre[t]] for t in range(n)]
+    lv1 = [list(pre[t]) for t in range(n)]
     lv1_par = [[0 for _ in pre[t]] for t in range(n)]
     lv2, lv2_par, lv3, lv3_par = [], [], [], []
     for t in range(n):
@@ -105,12 +104,85 @@ def _walk_slots(pre: list, dev) -> list:
                 bp.append(m)
         lv3.append(b)
         lv3_par.append(bp)
+    return [(lv1, lv1_par), (lv2, lv2_par), (lv3, lv3_par)]
 
-    def pad(rows, fill):
-        k = max([len(x) for x in rows] + [1])
-        return torch.tensor([x + [fill] * (k - len(x)) for x in rows], dtype=torch.long, device=dev)
 
-    return [(pad(lv1, -1), pad(lv1_par, 0)), (pad(lv2, -1), pad(lv2_par, 0)), (pad(lv3, -1), pad(lv3_par, 0))]
+def _lineage_lists(pre: list) -> list:
+    """each row's lineage: the row, its prerequisites, theirs — each level's
+    rows once (`lineage`)"""
+    out = []
+    for c in range(len(pre)):
+        row, front = [c], [c]
+        for _ in range(2):
+            added: list = []
+            for e in front:
+                for p in pre[e]:
+                    if p not in added:
+                        added.append(p)
+            row += added
+            front = added
+        out.append(row)
+    return out
+
+
+def _pad_batch(rows_b: list, fill: int, dev) -> torch.Tensor:
+    """per game a list of rows (lists) as one [B, N, K] long tensor, K the
+    longest row of the batch"""
+    k = max([len(x) for rows in rows_b for x in rows] + [1])
+    return torch.tensor([[x + [fill] * (k - len(x)) for x in rows] for rows in rows_b], dtype=torch.long, device=dev)
+
+
+def _lcg_draw(s: int, n: int) -> tuple:
+    """`randRange` on a Python state: the next state and the draw in [0, n)"""
+    s = (s * LCG_MUL + LCG_ADD) & M32
+    return s, ((s >> 16) * (n & 0xFFFF)) >> 16
+
+
+def _draw_tree_rows(order: list, base: list, pre: list, rand_pre: list, rand_costs: list, s: int) -> tuple:
+    """`drawResearchTree`'s one tree on generator state `s`: the rows' Costs
+    drawn where random (a level of 7 rows passed over), the levels by cost,
+    each RandomPrereqs row's count and weighted picks over the nearest lower
+    level; returns (prerequisites per row, Cost per row, the state after)"""
+    levels: dict = {}
+    cost = list(base)
+    out = [list(p) for p in pre]
+    for i in order:
+        c = base[i]
+        opts = [x for x in rand_costs[i] if len(levels.get(x, [])) < 7]
+        if opts:
+            s, v = _lcg_draw(s, len(opts))
+            c = opts[v]
+            cost[i] = c
+        levels.setdefault(c, []).append(i)
+    keys = sorted(levels)
+    for k, key in enumerate(keys):
+        cand: list = []
+        j = k - 1
+        while j >= 0 and not cand:
+            cand = [[t, 100] for t in levels[keys[j]]]
+            j -= 1
+        lv = levels[key]
+        for i in lv:
+            if not rand_pre[i]:
+                continue
+            got: list = []
+            out[i] = got
+            if not cand:
+                continue
+            s, m = _lcg_draw(s, -(-len(cand) // len(lv)))
+            n = min(max(m + 1, 1), len(cand))
+            for _ in range(n):
+                s, v = _lcg_draw(s, sum(w for _t, w in cand))
+                at = 0
+                while at < len(cand) - 1:
+                    v -= cand[at][1]
+                    if v < 0:
+                        break
+                    at += 1
+                if cand[at][0] not in got:
+                    got.append(cand[at][0])
+                cand[at][1] = 1
+    return out, cost, s
 
 
 def _turns_at(rem: torch.Tensor, rate: torch.Tensor) -> torch.Tensor:
@@ -124,25 +196,67 @@ def _turns_at(rem: torch.Tensor, rate: torch.Tensor) -> torch.Tensor:
 
 
 class SimResearch:
+    def _init_research_tree(self) -> None:
+        """`drawResearchTree` at each game's start, on its generator: the
+        civics' tree, then the techs' (`_draw_tree_rows`), the state after
+        the draws the game's. Each game's prerequisites (`tree_t_pre` /
+        `tree_c_pre` [B, N, P], -1 pad, in its tree's order) and Standard
+        Costs (`tree_t_cost` / `tree_c_cost` [B, N]); from them the
+        prerequisite matrices (`_prereq_t` / `_prereq_c` [B, N, N]), the
+        research walk's and the civics walk's slots (`_tree_lv_t` /
+        `_tree_lv_c`, [B, N, K] per level), the leaf rows (`_tree_leaf_t`)
+        and the civics' lineage (`_tree_lin_c`)."""
+        rules, dev = self.rules, self.device
+        t_order = torch.argsort(self._tech_rank, stable=True).tolist()
+        c_order = torch.argsort(self._civic_rank, stable=True).tolist()
+        t_base = [int(x) for x in rules.t_cost_std.tolist()]
+        c_base = [int(x) for x in rules.c_cost_std.tolist()]
+        states = [int(x) for x in self.rng_state.tolist()]
+        t_pre_b, c_pre_b, t_cost_b, c_cost_b = [], [], [], []
+        for b in range(self.B):
+            st = states[b]
+            cp, cc, st = _draw_tree_rows(c_order, c_base, rules.c_prereqs, rules.c_random, rules.c_random_costs, st)
+            tp, tc, st = _draw_tree_rows(t_order, t_base, rules.t_prereqs, rules.t_random, rules.t_random_costs, st)
+            states[b] = st
+            t_pre_b.append(tp)
+            c_pre_b.append(cp)
+            t_cost_b.append(tc)
+            c_cost_b.append(cc)
+        self.rng_state.copy_(torch.tensor(states, dtype=torch.int64, device=dev))
+        self.tree_t_pre = _pad_batch(t_pre_b, -1, dev)
+        self.tree_c_pre = _pad_batch(c_pre_b, -1, dev)
+        self.tree_t_cost = torch.tensor(t_cost_b, dtype=torch.long, device=dev)
+        self.tree_c_cost = torch.tensor(c_cost_b, dtype=torch.long, device=dev)
+
+        def matrix(pre_b: list, n: int) -> torch.Tensor:
+            idx = [(b, i, p) for b, pre in enumerate(pre_b) for i, ps in enumerate(pre) for p in ps]
+            m = torch.zeros(self.B, n, n, dtype=torch.bool)
+            if idx:
+                bi, ii, pi = zip(*idx)
+                m[list(bi), list(ii), list(pi)] = True
+            return m.to(dev)
+
+        def levels(pre_b: list) -> list:
+            walks = [_walk_lists(pre) for pre in pre_b]
+            return [(_pad_batch([w[d][0] for w in walks], -1, dev), _pad_batch([w[d][1] for w in walks], 0, dev)) for d in range(3)]
+
+        self._prereq_t = matrix(t_pre_b, len(t_base))
+        self._prereq_c = matrix(c_pre_b, len(c_base))
+        self._tree_lv_t = levels(t_pre_b)
+        self._tree_lv_c = levels(c_pre_b)
+        self._tree_leaf_t = ~self._prereq_t.any(dim=1)
+        self._tree_lin_c = _pad_batch([_lineage_lists(pre) for pre in c_pre_b], -1, dev)
+
     def _rai_tables(self) -> dict:
         """the static tables of the research AI, built once: the table order,
-        each row's prerequisite walk slots three levels deep, the leaf rows,
         the value's terms"""
         cached = getattr(self, "_rai_cache", None)
         if cached is not None:
             return cached
         rules, dev = self.rules, self.device
-        pre = [list(p) for p in rules.t_prereqs]
-        nt = len(pre)
-        required = torch.zeros(nt, dtype=torch.bool, device=dev)
-        for t in range(nt):
-            for p in pre[t]:
-                required[p] = True
         ra, av = rules.research_ai, rules.ai_value
         cached = {
             "order": torch.argsort(self._tech_rank).tolist(),
-            "lv": _walk_slots(pre, dev),
-            "leaf": ~required,
             "unlocks": rules.t_ai_unlocks.to(dev),
             "space": rules.t_ai_space.to(dev),
             "mods": rules.t_ai_mods.to(dev),
@@ -175,11 +289,13 @@ class SimResearch:
         return torch.where(n == h, _discounted(a, r, n), full - _present_value(a, r, n))
 
     def _rai_levels(self, have: torch.Tensor, gate: torch.Tensor | None):
-        """the research walk's slots (`_tree_levels` over the tech tree)"""
-        return self._tree_levels(self._rai_tables()["lv"], have, gate)
+        """the research walk's slots (`_tree_levels` over each game's tech
+        tree)"""
+        return self._tree_levels(self._tree_lv_t, have, gate)
 
     def _tree_levels(self, lv: list, have: torch.Tensor, gate: torch.Tensor | None):
-        """the walk's slots that hold, per level ([B, N, K] each): a slot
+        """the walk's slots (`lv`, per level each game's [B, N, K] slots and
+        their parents) that hold, per level ([B, N, K] each): a slot
         holds where its parent held (the row itself at the first level), is
         unowned, is the first of its row in the level, and — with `gate`
         ([B, N] the researchable rows, the analysis' walk) — its parent is
@@ -189,8 +305,8 @@ class SimResearch:
         parent_on = None
         parent_tech = None
         for depth, (slot, par) in enumerate(lv):
-            K = slot.shape[1]
-            tech = slot.unsqueeze(0).expand(B, -1, -1)
+            K = slot.shape[2]
+            tech = slot
             valid = tech >= 0
             tc = tech.clamp(min=0)
             owned = have.gather(1, tc.reshape(B, -1)).reshape(B, -1, K)
@@ -199,7 +315,7 @@ class SimResearch:
                 if gate is not None:
                     up = up & ~gate.unsqueeze(2)
             else:
-                pidx = par.unsqueeze(0).expand(B, -1, -1)
+                pidx = par
                 up = parent_on.gather(2, pidx)
                 if gate is not None:
                     pt = parent_tech.gather(2, pidx).clamp(min=0)
@@ -633,7 +749,7 @@ class SimResearch:
         order, the rows whose next step is `key` ([B], -1 none) passed over"""
         T = self._rai_tables()
         turns, nxt, _base, score, owned = ent
-        leaf = T["leaf"]
+        leaf = self._tree_leaf_t
         order = T["order"]
         B = turns.shape[0]
         bi = torch.full((B,), order[0], dtype=torch.long, device=self.device)
@@ -646,7 +762,7 @@ class SimResearch:
             bn, cn = at(nxt, bi), nxt[:, c]
             bt, ct = at(turns, bi), turns[:, c]
             bo, co = at(owned, bi), owned[:, c]
-            bl, cl = leaf[bi], leaf[c]
+            bl, cl = at(leaf, bi), leaf[:, c]
             bd, cd = bn == bi, cn == ci
             gen = torch.where(bo != co, bo,
                               torch.where(bl & ~cl & bd & ~cd, torch.zeros_like(bo),

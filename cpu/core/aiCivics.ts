@@ -38,6 +38,7 @@ import { AI_GOVERNMENTS } from '../data/aiTables';
 import { gameTypeOf } from '../data/aliases';
 import { FORMATION_CIVIC } from '../data/units';
 import { researchCost } from './economy';
+import { treePrereqs } from './researchTree';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
 import { AI_RATE, FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
@@ -59,19 +60,15 @@ export interface CivicEntry {
   score: number;
 }
 
-/** the row's prerequisites in the install's order */
-function prereqs(id: string): readonly string[] {
-  return CIVICS[id]?.prereqs ?? [];
-}
-
 /** Has the seat the row (a repeatable row is never spent) */
 function owned(r: ResearchState, id: string): boolean {
   return !CIVICS[id]?.repeatable && r.civics.includes(id);
 }
 
-/** 0x3932d0: researchable now — unowned (or repeatable), every prerequisite owned */
-function researchable(r: ResearchState, id: string): boolean {
-  return !owned(r, id) && prereqs(id).every((p) => r.civics.includes(p));
+/** 0x3932d0: researchable now — unowned (or repeatable), every prerequisite
+ *  of this game's tree (`treePrereqs`) owned */
+function researchable(state: GameState, r: ResearchState, id: string): boolean {
+  return !owned(r, id) && treePrereqs(state, id).every((p) => r.civics.includes(p));
 }
 
 /** 0x39c0e0: the turns a row needs at `rate` (raw Culture a turn) — what is
@@ -94,8 +91,8 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
     const added: string[] = [];
     for (const e of front) {
       turns += turnsLeft(state, seat, r, e, rate);
-      if (researchable(r, e)) continue;
-      for (const p of prereqs(e)) {
+      if (researchable(state, r, e)) continue;
+      for (const p of treePrereqs(state, e)) {
         if (r.civics.includes(p) || added.includes(p)) continue;
         added.push(p);
         // the civic in hand is never taken as the next step
@@ -189,13 +186,13 @@ function formationCivic(state: GameState, seat: number, tier: number): string {
 
 /** the row and its prerequisites one and two levels up (0x61ee30's walk),
  *  each level's rows once */
-function lineage(id: string): string[] {
+function lineage(state: GameState, id: string): string[] {
   const out = [id];
   let front = [id];
   for (let level = 0; level < 2; level++) {
     const added: string[] = [];
     for (const e of front) {
-      for (const p of prereqs(e)) if (!added.includes(p)) added.push(p);
+      for (const p of treePrereqs(state, e)) if (!added.includes(p)) added.push(p);
     }
     out.push(...added);
     front = added;
@@ -203,16 +200,14 @@ function lineage(id: string): string[] {
   return out;
 }
 
-const LINEAGE = new Map(Object.keys(CIVICS).map((id) => [id, lineage(id)]));
-
 /** 0x61ee30: a row in reach scores its own value and its prerequisites'
  *  (a negative one counts nothing), a favored row then taken 1.5 times */
-function propagate(entries: CivicEntry[], favored: ReadonlySet<string>): void {
+function propagate(state: GameState, entries: CivicEntry[], favored: ReadonlySet<string>): void {
   const byId = new Map(entries.map((e) => [e.civic, e]));
   for (const e of entries) {
     if (e.turns < 0) continue;
     e.score = 0;
-    for (const p of LINEAGE.get(e.civic)!) e.score += Math.max(0, byId.get(p)?.base ?? 0);
+    for (const p of lineage(state, e.civic)) e.score += Math.max(0, byId.get(p)?.base ?? 0);
     if (favored.has(e.civic)) e.score = fmul(e.score, fxConst(1.5));
   }
 }
@@ -250,7 +245,7 @@ export function civicAnalysis(state: GameState, seat: number, culture: number,
     return { civic: id, next, turns, owned: false, base, score: base };
   });
   const leader = leaderOf(state, seat);
-  propagate(entries, new Set(leader ? CIVIC_AI_FAVORED[leader] ?? [] : []));
+  propagate(state, entries, new Set(leader ? CIVIC_AI_FAVORED[leader] ?? [] : []));
   for (const c of contracts) {
     const e = entries.find((x) => x.civic === c.civic);
     if (e && e.score >= 0) e.score += c.value;
@@ -287,8 +282,8 @@ export function civicDraw(state: GameState): CivicDraw {
 export function civicChoice(state: GameState, seat: number, entries: readonly CivicEntry[], key: string | null, draw: CivicDraw): string | null {
   const r = researchOf(state, seat);
   const b = best(entries, key);
-  if (b && researchable(r, b.next)) return b.next;
-  const open = CIVIC_TABLE_ORDER.filter((id) => CIVICS[id] && !r.civics.includes(id) && researchable(r, id));
+  if (b && researchable(state, r, b.next)) return b.next;
+  const open = CIVIC_TABLE_ORDER.filter((id) => CIVICS[id] && !r.civics.includes(id) && researchable(state, r, id));
   if (!open.length) return null;
   const k = draw(open.length);
   return k >= 0 ? open[k] : null;

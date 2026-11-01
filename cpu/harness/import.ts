@@ -92,6 +92,8 @@ import { districtSiteCost } from '../core/phase';
 import { P, bool, memCity, memField, memWords, num, plotAt, revealedPlots, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
 import { aliases, engineId, gameHash } from '../data/aliases';
 import type { RandLog } from './randLog';
+import { Civ6Random } from './civ6Random';
+import { drawResearchTree, type ResearchTree } from '../core/researchTree';
 
 /** A city's closing-pick ties as a record left them (`History.startTies`). */
 export interface StartTies {
@@ -654,6 +656,8 @@ export interface History {
   /** the game's own draw log (`Logs/RandCalls.csv`, `randLog.ts`), where the
    *  recording kept it */
   randLog?: RandLog;
+  /** the game's Future tree (`importResearchTree`), read once */
+  researchTree?: ResearchTree;
   /** the war-weariness ledger on the timeline (`readWeariness`), where the
    *  recording kept its logs */
   weary?: WearyRow[];
@@ -2128,6 +2132,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     t.cliffMask = edgeMask(map, rec, t, P.cliffBits);
   }
   const state = createGameFromMap(map, num(rec.seed) >>> 0);
+  state.researchTree = importResearchTree(rec, history);
   state.turn = rec.turn;
   if (history) {
     state.gameEra = history.gameEra;
@@ -4201,6 +4206,38 @@ function spentPersonGaps(ctx: Ctx, rec: TurnRecord, cityByKey: Map<string, City>
     }
   }
   ctx.scopeCity = undefined;
+}
+
+/** the labels of the game's start's tree draws (`drawResearchTree`) */
+const TREE_LABELS = new Set<string>(['Choosing a random cost for a tech to have', 'Choosing how many prerequisites for a tech to have',
+  'Choosing a random prerequisite for a tech to have', 'Choosing a random cost for a civic to have',
+  'Choosing how many prerequisites for a civic to have', 'Choosing a random prerequisite for a civic to have']);
+
+/**
+ * THE GAME'S FUTURE TREE (`GameState.researchTree`) as the recording shows
+ * it: the rule (`drawResearchTree`) on the values its start drew, the draw
+ * log's, each at the rule's label and range (runs/h1_duely1117-1128: every
+ * range as the rule takes it). A recording that kept no draw log shows no
+ * tree: the rule draws one on the generator from the first record's seed.
+ * The history keeps it once read.
+ */
+function importResearchTree(rec: TurnRecord, history?: History): ResearchTree {
+  if (history?.researchTree) return history.researchTree;
+  let tree: ResearchTree;
+  if (history?.randLog) {
+    const draws = history.randLog.draws.filter((d) => TREE_LABELS.has(d.label));
+    let i = 0;
+    tree = drawResearchTree((n, label) => {
+      const d = draws[i++];
+      if (!d || d.label !== label || d.range !== n) throw new Error(`the tree's draw ${i}: the rule's ${label} over ${n}, the log's ${d?.label} over ${d?.range}`);
+      return d.value;
+    });
+  } else {
+    const rng = new Civ6Random(num(rec.seed));
+    tree = drawResearchTree((n, label) => rng.get(n, label));
+  }
+  if (history) history.researchTree = tree;
+  return tree;
 }
 
 /**

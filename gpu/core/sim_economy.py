@@ -666,9 +666,10 @@ class SimEconomy:
     def _available_mask(self, done: torch.Tensor, prereq: torch.Tensor,
                         repeat: torch.Tensor | None = None) -> torch.Tensor:
         """[B, N] — the rows not yet complete, or REPEATABLE (`repeat`, a seat's
-        research: `availableTechsIn`), whose every prereq is complete (a
-        minor's research AIs pass it too)."""
-        missing = (prereq.unsqueeze(0) & ~done.unsqueeze(1)).any(dim=2)
+        research: `availableTechsIn`), whose every prereq of each game's tree
+        (`prereq` [B, N, N]) is complete (a minor's research AIs pass it
+        too)."""
+        missing = (prereq & ~done.unsqueeze(1)).any(dim=2)
         fresh = ~done if repeat is None else (~done | repeat.unsqueeze(0))
         return fresh & ~missing
 
@@ -686,18 +687,19 @@ class SimEconomy:
         return pts + g.long() * 10
 
     def _research_cost(self, is_civic: bool) -> torch.Tensor:
-        """[B, N] long — `researchCost`: each item's Standard Cost scaled by
+        """[B, N] long — `researchCost`: each item's Standard Cost in each
+        game (`tree_t_cost` / `tree_c_cost`, a random-cost row's drawn) scaled by
         its era against each game's era (a later era's item dearer, an
         earlier one's cheaper, `progress.*EraPct`) and by the speed, floored
         once."""
         rdv, pg = self.rules_dev, self.rules.progress
-        std = rdv.c_cost_std if is_civic else rdv.t_cost_std
+        std = self.tree_c_cost if is_civic else self.tree_t_cost
         era = (rdv.c_era if is_civic else rdv.t_era).unsqueeze(0)
         game = self.game_era.unsqueeze(1)
         after = int(pg["civicAfterEraPct" if is_civic else "techAfterEraPct"])
         before = int(pg["civicBeforeEraPct" if is_civic else "techBeforeEraPct"])
         pct = torch.where(era > game, after, torch.where(era < game, before, 0))
-        return torch.div(std.unsqueeze(0) * int(pg["speedPct"]) * (100 + pct), 10000, rounding_mode="floor")
+        return torch.div(std * int(pg["speedPct"]) * (100 + pct), 10000, rounding_mode="floor")
 
     @staticmethod
     def _boost_amount(cost: torch.Tensor, pct: torch.Tensor, points: torch.Tensor) -> torch.Tensor:

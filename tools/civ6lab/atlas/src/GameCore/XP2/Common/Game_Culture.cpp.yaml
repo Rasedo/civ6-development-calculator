@@ -33,3 +33,18 @@
     - "...wever it comes — a martyred Apostle, a village, Jeanne d'Arc — is created by Game_Culture 0x296c00: ONE \"Choosing a Relic\" draw over the 24 GREATWORK_RELIC rows not yet created, none left..."
     - "..., for i below the player's count (+0x1340 → +0x7f0), creates a Relic through 0x495860 → 0x296c00 (\"Choosing a Relic\") with the player's capital (0x36f460). No record shows it (no Kandy..."
   review: reviewed
+- addr: 0x2976d0
+  kind: function
+  name: Game_Culture
+  semantics: "the random Future tree of the civics, at the game's set-up before the techs': the techs' rule (0x351fc0) over the Civics, CivicRandomCosts and Civics_XP2 RandomPrereqs, under the civic labels."
+  status: PARTLY
+  cases:
+    - recording: h1_duely1124
+      turn: 1
+      value: "setup draws 98-115: five costs over 2, the counts and picks over 1, 100, 400, 301 as the techs' rule takes them"
+  impl:
+    - cpu/core/researchTree.ts:drawResearchTree
+    - gpu/core/sim_research.py:_init_research_tree
+    - cpu/harness/drawSites.ts:DRAW_SITES
+  readings: ["H-1: the random Future tree — READ"]
+  review: reviewed

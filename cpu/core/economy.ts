@@ -14,6 +14,7 @@ import { FEATURES } from '../../world/features';
 import { CIVIC_COST_AFTER_ERA_PCT, CIVIC_COST_BEFORE_ERA_PCT, COST_MULTIPLIER_PCT, GAME_COST_ESCALATION, HARVEST_IMPROVED_DEGRADATION, HARVEST_PILLAGED_DEGRADATION, TECH_COST_AFTER_ERA_PCT, TECH_COST_BEFORE_ERA_PCT, gameProgressPct, scaleByGameSpeed } from '../data/constants';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
+import { treeBaseCost } from './researchTree';
 import { RESOURCES } from '../../world/resources';
 import { minorLump } from './minorBuild';
 import { lumpFood } from './seatTurn';
@@ -33,7 +34,8 @@ import { lumpFood } from './seatTurn';
  * Selecting the SAME id is a no-op rather than a park-and-reload, so a record
  * that re-states the current pick cannot round-trip the pool through the map.
  */
-/** A TECHNOLOGY'S OR A CIVIC'S COST: its Standard Cost scaled by its era
+/** A TECHNOLOGY'S OR A CIVIC'S COST: its Standard Cost in this game (a
+ *  random-cost row's drawn, `treeBaseCost`) scaled by its era
  *  against the game era (`TECH_COST_*_ERA_PCT` / `CIVIC_COST_*_ERA_PCT`, an
  *  item of a later era dearer, an earlier one cheaper) and by the speed, then
  *  floored once (runs/h1_duelw1121: Pottery 10 of the Standard 25 in the
@@ -45,7 +47,7 @@ export function researchCost(state: GameState, id: string, civic: boolean, seat?
   const game = gameEra ?? (seat !== undefined ? eraHold?.get(seat) : undefined) ?? state.gameEra ?? 0;
   const pct = era > game ? (civic ? CIVIC_COST_AFTER_ERA_PCT : TECH_COST_AFTER_ERA_PCT)
     : era < game ? (civic ? CIVIC_COST_BEFORE_ERA_PCT : TECH_COST_BEFORE_ERA_PCT) : 0;
-  return Math.floor((def.baseCost * COST_MULTIPLIER_PCT * (100 + pct)) / 10000);
+  return Math.floor((treeBaseCost(state, id) * COST_MULTIPLIER_PCT * (100 + pct)) / 10000);
 }
 
 let eraHold: Map<number, number> | null = null;

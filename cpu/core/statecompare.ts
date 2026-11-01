@@ -56,6 +56,7 @@ import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
 import { routeOriginCenter } from './trade';
+import { treeBaseCost, treePrereqs } from './researchTree';
 import { floodRivers } from './disasters';
 import { GP_CITY_PERM, GP_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { laserSpeed } from './yields';
@@ -506,6 +507,19 @@ const GAME: Record<string, Extractor> = {
   victoryType: (s) => [s.victoryType ?? 0],
   victoryRow: (s) => [s.victoryRow ?? -1],
   congressSessions: (s) => [s.congressSessions ?? 0],
+  // THE GAME'S FUTURE TREE, flat: per tech then per civic (engine column
+  // order) its Standard Cost in this game, its prerequisites' count and
+  // their columns in the tree's order
+  researchTree: (s) => [[
+    ...Object.keys(TECHS).flatMap((id) => {
+      const pre = treePrereqs(s, id).map((p) => idx(TECH_IDX, p));
+      return [treeBaseCost(s, id), pre.length, ...pre];
+    }),
+    ...Object.keys(CIVICS).flatMap((id) => {
+      const pre = treePrereqs(s, id).map((p) => idx(CIVIC_IDX, p));
+      return [treeBaseCost(s, id), pre.length, ...pre];
+    }),
+  ]],
   // The running SCORED COMPETITION, flat: [kind, turnsLeft, score per civ
   // seat in ascending order, then membership]. -1 kind = none.
   competition: (s) => {

@@ -5012,8 +5012,6 @@ class SimInit:
         self._gen_aura_mp = int(rr["generalAuraMp"])  # the aura's movement half, already in mp_scale units
         self._gen_off = tiles_within_offsets(self._gen_aura_range).to(device)  # aura disk (hexDistance ≤ range)
 
-        self._prereq_t = self._prereq_matrix(rules.t_prereqs, NT).to(device)
-        self._prereq_c = self._prereq_matrix(rules.c_prereqs, NC).to(device)
         self._t_repeat = rules.t_repeat.to(device)
         self._c_repeat = rules.c_repeat.to(device)
         self._arangeT = torch.arange(T, device=device)
@@ -5161,6 +5159,8 @@ class SimInit:
                             torch.zeros(1, dtype=torch.bool, device=device))[0]
                     self.unit_next[b] += 1
 
+        # the game's start draws its Future tree first on the play stream
+        self._init_research_tree()
         self._pristine = {k: getattr(self, k).clone() for k in _MUTABLE}
         # Built outside inference mode, so the planes born above keep their
         # version counters; everything after runs inside it.
@@ -5521,12 +5521,4 @@ class SimInit:
         self._envoys_all_cache = self._suz_all_cache = None
         self._congress_slot_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
-
-    @staticmethod
-    def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:
-        m = torch.zeros(n, n, dtype=torch.bool)
-        for i, ps in enumerate(prereqs):
-            for p in ps:
-                m[i, p] = True
-        return m
 

@@ -17,8 +17,8 @@ describe('the late tree', () => {
     const r = state.seats[0].research;
     r.techs = Object.keys(TECHS);
     r.civics = Object.keys(CIVICS);
-    expect(availableTechsIn(r).map((t) => t.id)).toEqual(['FUTURE_TECH']);
-    expect(availableCivicsIn(r).map((c) => c.id)).toEqual(['FUTURE_CIVIC']);
+    expect(availableTechsIn(state, r).map((t) => t.id)).toEqual(['FUTURE_TECH']);
+    expect(availableCivicsIn(state, r).map((c) => c.id)).toEqual(['FUTURE_CIVIC']);
   });
 
   it('carries the install rows: costs, awards, the Seastead', () => {

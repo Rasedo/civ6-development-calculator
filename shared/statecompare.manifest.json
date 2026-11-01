@@ -94,6 +94,20 @@
           ]
         },
         {
+          "name": "researchTree",
+          "compare": "exact",
+          "covers": [
+            "GameState.researchTree"
+          ],
+          "planes": [
+            "tree_t_pre",
+            "tree_t_cost",
+            "tree_c_pre",
+            "tree_c_cost"
+          ],
+          "note": "The Future tree the game drew at its start, flat: per tech then per civic (engine column order) its Standard Cost, its prerequisites count and their columns in the drawn order."
+        },
+        {
           "name": "competition",
           "compare": "milli",
           "covers": [

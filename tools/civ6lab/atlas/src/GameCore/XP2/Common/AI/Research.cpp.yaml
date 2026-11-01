@@ -157,7 +157,7 @@
   cases:
     - recording: AI_Research.csv
       value: "Its log is AI_Research.csv (0x762b40: \"%d, %d, Tech, %s, %3.1f, %s, %d\" — OWNED / RESEARCHING / GOAL / BOOSTED, the score and the turns;"
-  impl: [cpu/core/aiResearch.ts:REQUIRED]
+  impl: [cpu/core/researchTree.ts:requiredRows]
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

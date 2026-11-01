@@ -11,6 +11,7 @@ import { worldEraIndex } from './eras';
 import { ERAS } from '../data/techs';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
+import { treePrereqs } from './researchTree';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, followedReligionOf, followersOf, unconvertedOf, type BeliefEffects, type BeliefDef } from '../data/religion';
@@ -157,25 +158,26 @@ export function isCivicComplete(state: GameState, id: string, seat: number): boo
 }
 
 /** the rows a seat may research now: not yet complete, or REPEATABLE (Future
- *  Tech, Future Civic), with every prereq complete */
-export function availableTechsIn(research: ResearchState): TechDef[] {
+ *  Tech, Future Civic), with every prereq of this game's tree (`treePrereqs`)
+ *  complete */
+export function availableTechsIn(state: GameState, research: ResearchState): TechDef[] {
   return Object.values(TECHS).filter(
-    (t) => (t.repeatable || !research.techs.includes(t.id)) && t.prereqs.every((p) => research.techs.includes(p)),
+    (t) => (t.repeatable || !research.techs.includes(t.id)) && treePrereqs(state, t.id).every((p) => research.techs.includes(p)),
   );
 }
 
-export function availableCivicsIn(research: ResearchState): CivicDef[] {
+export function availableCivicsIn(state: GameState, research: ResearchState): CivicDef[] {
   return Object.values(CIVICS).filter(
-    (c) => (c.repeatable || !research.civics.includes(c.id)) && c.prereqs.every((p) => research.civics.includes(p)),
+    (c) => (c.repeatable || !research.civics.includes(c.id)) && treePrereqs(state, c.id).every((p) => research.civics.includes(p)),
   );
 }
 
 export function availableTechs(state: GameState, seat: number): TechDef[] {
-  return availableTechsIn(seatOf(state, seat)!.research);
+  return availableTechsIn(state, seatOf(state, seat)!.research);
 }
 
 export function availableCivics(state: GameState, seat: number): CivicDef[] {
-  return availableCivicsIn(seatOf(state, seat)!.research);
+  return availableCivicsIn(state, seatOf(state, seat)!.research);
 }
 
 export interface Modifiers {

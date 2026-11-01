@@ -43,6 +43,7 @@ import {
 } from '../data/aiValue';
 import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_FAVORED, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
 import { researchCost } from './economy';
+import { treePrereqs, requiredRows } from './researchTree';
 import { randRange } from './rand';
 import { isBarbSeat, isFreeSeat, leaderOf, seatOf } from './seats';
 import { AI_RATE, FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
@@ -53,23 +54,17 @@ import { aiView } from './aiView';
 import { pseudoYieldWeights } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
-/** the seat's prerequisites of `id` in the install's order */
-function prereqs(id: string): readonly string[] {
-  return TECHS[id]?.prereqs ?? [];
-}
 
 /** Has the seat the row (a repeatable row is never spent) */
 function owned(r: ResearchState, id: string): boolean {
   return !TECHS[id]?.repeatable && r.techs.includes(id);
 }
 
-/** 0x4c8c40: researchable now — unowned (or repeatable), every prerequisite owned */
-export function researchable(r: ResearchState, id: string): boolean {
-  return !owned(r, id) && prereqs(id).every((p) => r.techs.includes(p));
+/** 0x4c8c40: researchable now — unowned (or repeatable), every prerequisite
+ *  of this game's tree (`treePrereqs`) owned */
+export function researchable(state: GameState, r: ResearchState, id: string): boolean {
+  return !owned(r, id) && treePrereqs(state, id).every((p) => r.techs.includes(p));
 }
-
-/** the rows no row requires (the comparator's leaf flag, 0x761b70) */
-const REQUIRED = new Set(Object.values(TECHS).flatMap((t) => t.prereqs));
 
 /** a Tech Contract the research AI holds: its technology, its value, raw,
  *  and whether it is live — accepted or in progress, the contracts a
@@ -130,8 +125,8 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
       // a row's turns, its cost in whole Science where they are not above 0
       const t = researchTurnsLeft(state, seat, r, e, rate);
       turns += t > 0 ? t : researchCost(state, e, false, seat);
-      if (researchable(r, e)) continue;
-      for (const p of prereqs(e)) {
+      if (researchable(state, r, e)) continue;
+      for (const p of treePrereqs(state, e)) {
         if (r.techs.includes(p) || added.includes(p)) continue;
         added.push(p);
         // the research in hand is never taken as the next step
@@ -227,13 +222,13 @@ const UNLOCKS = new Map(Object.values(TECHS).map((t) => {
 
 /** the unowned prerequisites one and two levels up (0x7604e0's walk), each
  *  level's rows once */
-function upstream(r: ResearchState, id: string): string[] {
+function upstream(state: GameState, r: ResearchState, id: string): string[] {
   const out: string[] = [];
   let front = [id];
   for (let level = 0; level < 2; level++) {
     const added: string[] = [];
     for (const e of front) {
-      for (const p of prereqs(e)) {
+      for (const p of treePrereqs(state, e)) {
         if (r.techs.includes(p) || added.includes(p)) continue;
         added.push(p);
       }
@@ -246,11 +241,11 @@ function upstream(r: ResearchState, id: string): string[] {
 
 /** 0x7604e0: a row in reach adds its unowned prerequisites' own values (a
  *  negative one adds nothing), a favored row then taken 1.5 times */
-function propagate(r: ResearchState, entries: ResearchEntry[], favored: ReadonlySet<string>): void {
+function propagate(state: GameState, r: ResearchState, entries: ResearchEntry[], favored: ReadonlySet<string>): void {
   const byId = new Map(entries.map((e) => [e.tech, e]));
   for (const e of entries) {
     if (e.turns < 0) continue;
-    for (const p of upstream(r, e.tech)) e.score += Math.max(0, byId.get(p)?.base ?? 0);
+    for (const p of upstream(state, r, e.tech)) e.score += Math.max(0, byId.get(p)?.base ?? 0);
     if (favored.has(e.tech)) e.score = fmul(e.score, fxConst(1.5));
   }
 }
@@ -279,9 +274,10 @@ export function researchAnalysis(state: GameState, seat: number, science: number
   const r = researchOf(state, seat);
   const rate = fxOf(science);
   const pw = pseudoYieldWeights(state, seat);
+  const required = requiredRows(state);
   let view: AiValueView | undefined;
   const fav = r.favTech && atWarForValue(state, seat) ? r.favTech : null;  const entries: ResearchEntry[] = TECH_TABLE_ORDER.filter((id) => TECHS[id]).map((id) => {
-    const leaf = !REQUIRED.has(id);
+    const leaf = !required.has(id);
     if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
       if (turns < 0) return { tech: id, next, turns, owned: false, leaf, base: 0, score: 0 };
@@ -296,7 +292,7 @@ export function researchAnalysis(state: GameState, seat: number, science: number
   });
   addContracts(entries, contracts);
   const leader = leaderOf(state, seat);
-  propagate(r, entries, new Set(leader ? RESEARCH_AI_FAVORED[leader] ?? [] : []));
+  propagate(state, r, entries, new Set(leader ? RESEARCH_AI_FAVORED[leader] ?? [] : []));
   return entries;
 }
 
@@ -357,9 +353,9 @@ export interface ResearchChoice {
 export function researchChoice(state: GameState, seat: number, entries: readonly ResearchEntry[], key: string | null, draw: ResearchDraw): ResearchChoice | null {
   const r = researchOf(state, seat);
   const b = best(entries, key);
-  if (b && b.turns > 0 && researchable(r, b.next)) return { tech: b.next, goal: b.tech };
+  if (b && b.turns > 0 && researchable(state, r, b.next)) return { tech: b.next, goal: b.tech };
   if (r.goal && !owned(r, r.goal)) return null;
-  const open = TECH_TABLE_ORDER.filter((id) => TECHS[id] && !r.techs.includes(id) && researchable(r, id));
+  const open = TECH_TABLE_ORDER.filter((id) => TECHS[id] && !r.techs.includes(id) && researchable(state, r, id));
   if (!open.length) return null;
   const k = draw(open.length);
   return k >= 0 ? { tech: open[k], goal: null } : null;
@@ -376,7 +372,7 @@ export function researchTurnChoice(state: GameState, seat: number, entries: read
   let b = entries[0];
   for (const c of entries.slice(1)) if (b.score < c.score && !c.owned) b = c;
   if (!b || b.next === r.tech) return null;
-  if (b.score > ref + RESEARCH_AI_TASK_BIAS * 10 * FX && researchable(r, b.next) && b.tech === b.next) {
+  if (b.score > ref + RESEARCH_AI_TASK_BIAS * 10 * FX && researchable(state, r, b.next) && b.tech === b.next) {
     return researchChoice(state, seat, entries, null, draw);
   }
   return null;
@@ -393,7 +389,7 @@ export function researchCompletionChoice(state: GameState, seat: number, entries
   const byId = new Map(entries.map((e) => [e.tech, e]));
   for (const e of entries) {
     if (e.turns < 0) continue;
-    for (const p of upstream(r, e.tech)) e.score += Math.max(0, byId.get(p)?.base ?? 0);
+    for (const p of upstream(state, r, e.tech)) e.score += Math.max(0, byId.get(p)?.base ?? 0);
   }
   addContracts(entries, contracts.filter((c) => c.live));
   return researchChoice(state, seat, entries, done, draw);

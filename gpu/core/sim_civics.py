@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .sim_research import _FX, _discounted, _fmul, _fx_const, _imul, _present_value, _turns_at, _walk_slots
+from .sim_research import _FX, _discounted, _fmul, _fx_const, _imul, _present_value, _turns_at
 
 # THE CIVICS AI (`cpu/core/aiCivics.ts`, GameCore_XP2 AI/CultureAi.cpp;
 # tools/civ6lab/dll_readings.md "H-1: the civics AI") — the city-states'
@@ -19,26 +19,10 @@ class SimCivics:
         if cached is not None:
             return cached
         rules, dev = self.rules, self.device
-        pre = [list(p) for p in rules.c_prereqs]
-        lineage = []
-        for c in range(len(pre)):
-            out, front = [c], [c]
-            for _ in range(2):
-                added: list = []
-                for e in front:
-                    for p in pre[e]:
-                        if p not in added:
-                            added.append(p)
-                out += added
-                front = added
-            lineage.append(out)
-        k = max(len(x) for x in lineage)
         av, ca = rules.ai_value, rules.civic_ai
         share = _fx_const(float(av["unlockShare"]))
         cached = {
             "order": torch.argsort(self._civic_rank).tolist(),
-            "lv": _walk_slots(pre, dev),
-            "lineage": torch.tensor([x + [-1] * (k - len(x)) for x in lineage], dtype=torch.long, device=dev),
             "unlocks": rules.c_ai_unlocks.to(dev),
             "mods": rules.c_ai_mods.to(dev),
             "rate": _fx_const(float(av["discountPct"])),
@@ -88,7 +72,7 @@ class SimCivics:
         tl = _turns_at(cost * _FX - prog, rate)
         tl = torch.where(tl <= 0, cost, tl)
         # the walk: turns through levels 0..2, out of reach where level 3 holds
-        lv = self._tree_levels(T["lv"], have, res)
+        lv = self._tree_levels(self._tree_lv_c, have, res)
         turns = tl.clone()
         nxt = col.expand(B, -1).clone()
         for depth, (row, on) in enumerate(lv):
@@ -105,10 +89,10 @@ class SimCivics:
         base = torch.where(turns < 0, torch.zeros_like(val), val)
         # the propagation (0x61ee30): a row in reach scores its lineage's own
         # values, a negative one counting nothing
-        lin = T["lineage"]
+        lin = self._tree_lin_c
         pos = base.clamp(min=0)
-        idx = lin.clamp(min=0).unsqueeze(0).expand(B, -1, -1)
-        g = pos.gather(1, idx.reshape(B, -1)).reshape(idx.shape) * (lin >= 0).long().unsqueeze(0)
+        idx = lin.clamp(min=0)
+        g = pos.gather(1, idx.reshape(B, -1)).reshape(idx.shape) * (lin >= 0).long()
         score = torch.where(turns >= 0, g.sum(dim=2), base)
         score = score + self._cai_contracts(s, score)
         return turns, nxt, base, score, spent

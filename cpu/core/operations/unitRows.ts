@@ -71,7 +71,7 @@ export function militaryFavTech(state: GameState, seat: number, records: readonl
     const u = AI_UNITS[AI_UNIT_INDEX.get(row.unit)!];
     if (u.domain === 'DOMAIN_SEA' || row.buildable || row.atWar <= best || !u.tech) continue;
     const tech = engineId('tech', u.tech, 'TECH_', TECHS);
-    if (!tech || !researchable(s.research, tech)) continue;
+    if (!tech || !researchable(state, s.research, tech)) continue;
     fav = tech;
     best = row.atWar;
   }

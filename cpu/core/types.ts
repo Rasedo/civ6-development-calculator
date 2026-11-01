@@ -1,6 +1,7 @@
 export * from '../../world/types';
 import type { ResearchEntry } from './aiResearch';
 import type { CivicEntry } from './aiCivics';
+import type { ResearchTree } from './researchTree';
 import type { CityAi } from './aiCityTrees';
 import type { OpsAi } from './operations/manager';
 import type { EconomicMemory } from './aiEconomic';
@@ -609,6 +610,9 @@ export interface GameState {
   units: Unit[];
   nextUnitId: number;
   rngState: number;
+  /** the Future tree the game drew at its start (`drawResearchTree`): its
+   *  RandomPrereqs rows' prerequisites and its random-cost rows' Costs */
+  researchTree: ResearchTree;
   disasters: boolean;
   fogOfWar: boolean;
   autoResearch?: boolean;

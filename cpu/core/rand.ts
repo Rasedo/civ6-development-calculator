@@ -34,6 +34,10 @@ export type DrawLabel =
   | 'Choosing random district type for Zone District quest' | 'Choosing random tech type for Trigger Tech Boost quest'
   | 'Choosing random civic type for Trigger Civic Boost quest' | 'Choosing random class type for Recruit Great Person Class quest'
   | 'BT Research Choice' | 'Random Civic Choice' | 'Random Religion Choice' | 'City Build District Choice'
+  // the game's start (`drawResearchTree`)
+  | 'Choosing a random cost for a tech to have' | 'Choosing how many prerequisites for a tech to have'
+  | 'Choosing a random prerequisite for a tech to have' | 'Choosing a random cost for a civic to have'
+  | 'Choosing how many prerequisites for a civic to have' | 'Choosing a random prerequisite for a civic to have'
   // the engines' draws at no labelled site of the game's
   | 'Engine: partisans' | 'Engine: breached dam'
   // the barbarians' turn

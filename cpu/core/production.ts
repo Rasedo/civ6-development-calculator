@@ -53,7 +53,7 @@ import { questDistrictBuilt } from './quests';
 export function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic', n: number): void {
   const rsr = owner.research;
   const rank = kind === 'tech' ? TECH_TABLE_RANK : CIVIC_TABLE_RANK;
-  const open = (kind === 'tech' ? [...availableTechsIn(rsr)] : [...availableCivicsIn(rsr)]).sort((a, b) => rank[a.id] - rank[b.id]);
+  const open = (kind === 'tech' ? [...availableTechsIn(state, rsr)] : [...availableCivicsIn(state, rsr)]).sort((a, b) => rank[a.id] - rank[b.id]);
   for (let i = 0; i < n; i++) {
     if (open.length === 0) return; // the tree is exhausted
     const next = open.splice(randRange(state, open.length, kind === 'tech' ? 'Choosing random tech to grant based on era' : 'Choosing random civic to grant based on era'), 1)[0];

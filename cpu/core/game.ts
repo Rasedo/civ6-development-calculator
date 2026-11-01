@@ -225,6 +225,7 @@ export function createGameFromMap(map: GameState['map'], rngInit: number): GameS
     units: [],
     nextUnitId: 0,
     rngState: rngInit >>> 0,
+    researchTree: { prereqs: {}, baseCost: {} },
     barbSeat: emptySeat(BARB_SEAT), // the hostile class has a seat too
     disasters: true,
     gameOver: false,

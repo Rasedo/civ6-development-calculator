@@ -38,6 +38,7 @@ import { itemCost } from './game';
 import { UNITS, URBAN_DEFENSES_TECH, civReplacement } from '../data/units';
 import { xpToNextLevel } from './promotions';
 import { logXpWrite } from './difflog';
+import { treePrereqs } from './researchTree';
 
 /** the CLASS a Great Person chassis carries — the unit id IS the class name. */
 export function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {
@@ -212,7 +213,7 @@ function freeTechs(state: GameState, seat: number, n: number): void {
   if (!owner) return;
   const rsr = owner.research;
   const open = Object.values(TECHS).filter(
-    (d) => !rsr.techs.includes(d.id) && d.prereqs.every((p) => rsr.techs.includes(p)),
+    (d) => !rsr.techs.includes(d.id) && treePrereqs(state, d.id).every((p) => rsr.techs.includes(p)),
   );
   for (let i = 0; i < n && open.length > 0; i++) {
     const pick = open.splice(randRange(state, open.length, 'Choosing random tech to grant based on era'), 1)[0];

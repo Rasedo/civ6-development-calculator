@@ -1924,11 +1924,11 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // pick is its no-op.
   if (techCol !== null && techCol !== undefined && techCol >= 0) {
     const t = Object.keys(TECHS)[techCol];
-    if (t && availableTechsIn(actor.research).some((d) => d.id === t)) selectResearch(actor.research, t);
+    if (t && availableTechsIn(state, actor.research).some((d) => d.id === t)) selectResearch(actor.research, t);
   }
   if (civicCol !== null && civicCol !== undefined && civicCol >= 0) {
     const c = Object.keys(CIVICS)[civicCol];
-    if (c && availableCivicsIn(actor.research).some((d) => d.id === c)) selectResearch(actor.research, c, true);
+    if (c && availableCivicsIn(state, actor.research).some((d) => d.id === c)) selectResearch(actor.research, c, true);
   }
   // the WAR verb: the recorded declare/peace applies HERE — before the
   // walkers, the exact position the GPU's pre-step war head uses, so a
@@ -3116,7 +3116,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       rsr.tech = null;
       techDone = true;
     }
-    if (!rsr.tech && availableTechsIn(rsr).length === 0) rsr.techProgress = Math.min(rsr.techProgress, 0);
+    if (!rsr.tech && availableTechsIn(state, rsr).length === 0) rsr.techProgress = Math.min(rsr.techProgress, 0);
 
     // GOLD, off the cities as the technologies left them; then the upkeep and
     // the bankruptcy that upkeep may force.
@@ -3193,7 +3193,7 @@ export function seatPhase(state: GameState, only?: { seats: ReadonlySet<number>;
       rsr.civic = null;
       civicDone = true;
     }
-    if (!rsr.civic && availableCivicsIn(rsr).length === 0) rsr.civicProgress = Math.min(rsr.civicProgress, 0);
+    if (!rsr.civic && availableCivicsIn(state, rsr).length === 0) rsr.civicProgress = Math.min(rsr.civicProgress, 0);
     // CIV6 (Legacy policy card): the card is unlocked by having BEEN in its
     // government, so the seat remembers the one it is in now. A seat whose
     // record never chose follows the newest government its civics unlock, and

@@ -3090,6 +3090,9 @@ export function buildRules() {
       baseCost: t.baseCost,
       era: ERAS.indexOf(t.era),
       prereqs: (t.prereqs ?? []).map((p) => techIdx.get(p)!),
+      // the game's start draws these rows' prerequisites and Costs (`drawResearchTree`)
+      randomPrereqs: t.randomPrereqs ? 1 : 0,
+      randomCosts: [...(t.randomCosts ?? [])],
       awardEnvoys: t.effects.reduce((n, e) => n + (e.kind === 'award' ? e.envoys ?? 0 : 0), 0),
       awardDvp: t.effects.reduce((n, e) => n + (e.kind === 'award' ? e.dvp ?? 0 : 0), 0),
       awardFavor: t.effects.reduce((n, e) => n + (e.kind === 'award' ? e.favor ?? 0 : 0), 0),
@@ -3116,6 +3119,8 @@ export function buildRules() {
       baseCost: c.baseCost,
       era: ERAS.indexOf(c.era),
       prereqs: (c.prereqs ?? []).map((p) => civicIdx.get(p)!),
+      randomPrereqs: c.randomPrereqs ? 1 : 0,
+      randomCosts: [...(c.randomCosts ?? [])],
       awardEnvoys: c.effects.reduce((n, e) => n + (e.kind === 'award' ? e.envoys ?? 0 : 0), 0),
       awardDvp: c.effects.reduce((n, e) => n + (e.kind === 'award' ? e.dvp ?? 0 : 0), 0),
       awardFavor: c.effects.reduce((n, e) => n + (e.kind === 'award' ? e.favor ?? 0 : 0), 0),

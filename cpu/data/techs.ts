@@ -63,6 +63,13 @@ export interface TechDef {
   repeatable?: boolean;
   /** CIV6 (`EmbarkAll`): every land unit may embark once it lands. */
   embarkAll?: boolean;
+  /** CIV6 (Technologies_XP2 `RandomPrereqs`): the row holds no
+   *  TechnologyPrereqs row; the game draws its prerequisites at its start
+   *  (`drawResearchTree`), its `prereqs` empty here */
+  randomPrereqs?: boolean;
+  /** CIV6 (TechnologyRandomCosts): the Costs the game draws the row's from
+   *  at its start, in the table's order (`drawResearchTree`) */
+  randomCosts?: readonly number[];
   /** PROVENANCE, per column — see TECH_SRC below. */
   src?: SrcMap;
 }
@@ -510,50 +517,64 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
   OFFWORLD_MISSION: {
     era: xml('Technologies', 'TechnologyType=TECH_OFFWORLD_MISSION', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_OFFWORLD_MISSION', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_OFFWORLD_MISSION (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no TechnologyPrereqs row of TECH_OFFWORLD_MISSION: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Technologies_XP2', 'TechnologyType=TECH_OFFWORLD_MISSION', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Technologies_XP2', 'TechnologyType=TECH_OFFWORLD_MISSION', 'RandomPrereqs', { expect: true }),
   },
   SMART_MATERIALS: {
     era: xml('Technologies', 'TechnologyType=TECH_SMART_MATERIALS', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_SMART_MATERIALS', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_SMART_MATERIALS (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no TechnologyPrereqs row of TECH_SMART_MATERIALS: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Technologies_XP2', 'TechnologyType=TECH_SMART_MATERIALS', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Technologies_XP2', 'TechnologyType=TECH_SMART_MATERIALS', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the TechnologyRandomCosts rows of TECH_SMART_MATERIALS, in the table\'s order', inputs: [xml('TechnologyRandomCosts', 'TechnologyType=TECH_SMART_MATERIALS&Cost=2200', 'Cost'), xml('TechnologyRandomCosts', 'TechnologyType=TECH_SMART_MATERIALS&Cost=2300', 'Cost')] },
     'effects.0.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_MINE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_SMART_MATERIALS', 'ImprovementType', { expect: 'IMPROVEMENT_MINE' }),
     'effects.0.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_MINE&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_SMART_MATERIALS', 'BonusYieldChange'),
   },
   ADVANCED_POWER_CELLS: {
     era: xml('Technologies', 'TechnologyType=TECH_ADVANCED_POWER_CELLS', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_ADVANCED_POWER_CELLS', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_ADVANCED_POWER_CELLS (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no TechnologyPrereqs row of TECH_ADVANCED_POWER_CELLS: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Technologies_XP2', 'TechnologyType=TECH_ADVANCED_POWER_CELLS', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Technologies_XP2', 'TechnologyType=TECH_ADVANCED_POWER_CELLS', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the TechnologyRandomCosts rows of TECH_ADVANCED_POWER_CELLS, in the table\'s order', inputs: [xml('TechnologyRandomCosts', 'TechnologyType=TECH_ADVANCED_POWER_CELLS&Cost=2200', 'Cost'), xml('TechnologyRandomCosts', 'TechnologyType=TECH_ADVANCED_POWER_CELLS&Cost=2300', 'Cost')] },
   },
   ADVANCED_AI: {
     era: xml('Technologies', 'TechnologyType=TECH_ADVANCED_AI', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_ADVANCED_AI', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_ADVANCED_AI (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no TechnologyPrereqs row of TECH_ADVANCED_AI: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Technologies_XP2', 'TechnologyType=TECH_ADVANCED_AI', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Technologies_XP2', 'TechnologyType=TECH_ADVANCED_AI', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the TechnologyRandomCosts rows of TECH_ADVANCED_AI, in the table\'s order', inputs: [xml('TechnologyRandomCosts', 'TechnologyType=TECH_ADVANCED_AI&Cost=2200', 'Cost'), xml('TechnologyRandomCosts', 'TechnologyType=TECH_ADVANCED_AI&Cost=2300', 'Cost')] },
   },
   CYBERNETICS: {
     era: xml('Technologies', 'TechnologyType=TECH_CYBERNETICS', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_CYBERNETICS', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_CYBERNETICS (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no TechnologyPrereqs row of TECH_CYBERNETICS: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Technologies_XP2', 'TechnologyType=TECH_CYBERNETICS', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Technologies_XP2', 'TechnologyType=TECH_CYBERNETICS', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the TechnologyRandomCosts rows of TECH_CYBERNETICS, in the table\'s order', inputs: [xml('TechnologyRandomCosts', 'TechnologyType=TECH_CYBERNETICS&Cost=2200', 'Cost'), xml('TechnologyRandomCosts', 'TechnologyType=TECH_CYBERNETICS&Cost=2300', 'Cost')] },
     'effects.0.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_CYBERNETICS', 'ImprovementType', { expect: 'IMPROVEMENT_LUMBER_MILL' }),
     'effects.0.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_LUMBER_MILL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_CYBERNETICS', 'BonusYieldChange'),
   },
   SEASTEADS: {
     era: xml('Technologies', 'TechnologyType=TECH_SEASTEADS', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_SEASTEADS', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_SEASTEADS (Technologies_XP2 RandomPrereqs); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no TechnologyPrereqs row of TECH_SEASTEADS: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Technologies_XP2', 'TechnologyType=TECH_SEASTEADS', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Technologies_XP2', 'TechnologyType=TECH_SEASTEADS', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the TechnologyRandomCosts rows of TECH_SEASTEADS, in the table\'s order', inputs: [xml('TechnologyRandomCosts', 'TechnologyType=TECH_SEASTEADS&Cost=2200', 'Cost'), xml('TechnologyRandomCosts', 'TechnologyType=TECH_SEASTEADS&Cost=2300', 'Cost')] },
     'effects.0.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'PrereqTech', { expect: 'TECH_SEASTEADS' }),
     'effects.1.dvp': xml('ModifierArguments', 'ModifierId=TECH_SEASTEADS_DIPLOVP&Name=Amount', 'Value'),
   },
   FUTURE_TECH: {
     era: xml('Technologies', 'TechnologyType=TECH_FUTURE_TECH', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_FUTURE_TECH', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_FUTURE_TECH (Expansion2 deletes the base row and its prereqs; Technologies_XP2 RandomPrereqs); every other Future tech this tree carries stands in' },
+    prereqs: { derived: 'no TechnologyPrereqs row of TECH_FUTURE_TECH: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Technologies_XP2', 'TechnologyType=TECH_FUTURE_TECH', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Technologies_XP2', 'TechnologyType=TECH_FUTURE_TECH', 'RandomPrereqs', { expect: true }),
     repeatable: xml('Technologies', 'TechnologyType=TECH_FUTURE_TECH', 'Repeatable', { expect: true }),
     'effects.0.projectPct': xml('ModifierArguments', 'ModifierId=FUTURE_TECH_PROJECT_PRODUCTION&Name=Amount', 'Value'),
   },
   PREDICTIVE_SYSTEMS: {
     era: xml('Technologies', 'TechnologyType=TECH_PREDICTIVE_SYSTEMS', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Technologies', 'TechnologyType=TECH_PREDICTIVE_SYSTEMS', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no TechnologyPrereqs row for TECH_PREDICTIVE_SYSTEMS (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no TechnologyPrereqs row of TECH_PREDICTIVE_SYSTEMS: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Technologies_XP2', 'TechnologyType=TECH_PREDICTIVE_SYSTEMS', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Technologies_XP2', 'TechnologyType=TECH_PREDICTIVE_SYSTEMS', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the TechnologyRandomCosts rows of TECH_PREDICTIVE_SYSTEMS, in the table\'s order', inputs: [xml('TechnologyRandomCosts', 'TechnologyType=TECH_PREDICTIVE_SYSTEMS&Cost=2200', 'Cost'), xml('TechnologyRandomCosts', 'TechnologyType=TECH_PREDICTIVE_SYSTEMS&Cost=2300', 'Cost')] },
     'effects.0.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_WIND_FARM', 'PrereqTech', { expect: 'TECH_PREDICTIVE_SYSTEMS' }),
     'effects.1.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_QUARRY&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_PREDICTIVE_SYSTEMS', 'ImprovementType', { expect: 'IMPROVEMENT_QUARRY' }),
     'effects.1.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_QUARRY&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_PREDICTIVE_SYSTEMS', 'BonusYieldChange'),
@@ -813,46 +834,44 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('TELECOMMUNICATIONS', 'Telecommunications', 'Information', 1850, ['COMPUTERS']),
 
-    // CIV6: the Future techs' only published gate is the Future ERA; the
-    // deepest Information-era nodes stand in as prereqs.
-    T('OFFWORLD_MISSION', 'Offworld Mission', 'Future', 2500, ['TELECOMMUNICATIONS', 'NUCLEAR_FUSION']),
-    T('SMART_MATERIALS', 'Smart Materials', 'Future', 2200, ['NANOTECHNOLOGY', 'ROBOTICS'], [
+    // CIV6 (Technologies_XP2 RandomPrereqs, TechnologyRandomCosts): the
+    // Future techs' prerequisites, and six of their Costs, are the game's
+    // draws at its start (`drawResearchTree`); the Costs here are the
+    // Technologies rows' own.
+    { ...T('OFFWORLD_MISSION', 'Offworld Mission', 'Future', 2500, []), randomPrereqs: true },
+    { ...T('SMART_MATERIALS', 'Smart Materials', 'Future', 2200, [], [
       // CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 226)
       { kind: 'improvementYields', improvement: 'MINE', yields: { production: 1 } },
-    ]),
-    T('ADVANCED_POWER_CELLS', 'Advanced Power Cells', 'Future', 2200, ['NUCLEAR_FUSION']),
+    ]), randomPrereqs: true, randomCosts: [2200, 2300] },
+    { ...T('ADVANCED_POWER_CELLS', 'Advanced Power Cells', 'Future', 2200, []), randomPrereqs: true, randomCosts: [2200, 2300] },
     // The two Future nodes the GIANT DEATH ROBOT's other upgrades hang on.
-    // Their published cost is "2200 or 2300", the same pair the two rows
-    // above carry, and this catalog reads that pair as 2200 throughout.
-    T('ADVANCED_AI', 'Advanced AI', 'Future', 2200, ['ROBOTICS']),
-    T('CYBERNETICS', 'Cybernetics', 'Future', 2200, ['ROBOTICS', 'NANOTECHNOLOGY'], [
+    { ...T('ADVANCED_AI', 'Advanced AI', 'Future', 2200, []), randomPrereqs: true, randomCosts: [2200, 2300] },
+    { ...T('CYBERNETICS', 'Cybernetics', 'Future', 2200, [], [
       // CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 227)
       { kind: 'improvementYields', improvement: 'LUMBER_MILL', yields: { production: 1 } },
-    ]),
+    ]), randomPrereqs: true, randomCosts: [2200, 2300] },
     // CIV6 (Predictive Systems): Future era, 2200 Science, "Unlocks Offshore
     // Wind Farm improvement" and "+1 Production to Quarry, Oil Well, and Oil
     // Rig improvements" — the Oil Rig's share waits on an improvement this
     // catalog does not hold.
-    T('PREDICTIVE_SYSTEMS', 'Predictive Systems', 'Future', 2200, ['TELECOMMUNICATIONS', 'ROBOTICS'], [
+    { ...T('PREDICTIVE_SYSTEMS', 'Predictive Systems', 'Future', 2200, [], [
       { kind: 'unlockImprovement', improvement: 'OFFSHORE_WIND_FARM' },
       { kind: 'improvementYields', improvement: 'QUARRY', yields: { production: 1 } },
       { kind: 'improvementYields', improvement: 'OIL_WELL', yields: { production: 1 } },
       { kind: 'improvementYields', improvement: 'OFFSHORE_OIL_RIG', yields: { production: 1 } },
-    ]),
+    ]), randomPrereqs: true, randomCosts: [2200, 2300] },
     // CIV6 (Seasteads): Future era, "Awards 1 Diplomatic Victory point", and
     // the Seastead improvement's PrereqTech.
-    T('SEASTEADS', 'Seasteads', 'Future', 2200, ['NANOTECHNOLOGY'], [
+    { ...T('SEASTEADS', 'Seasteads', 'Future', 2200, [], [
       { kind: 'unlockImprovement', improvement: 'SEASTEAD' },
       { kind: 'award', dvp: 1 },
-    ]),
+    ]), randomPrereqs: true, randomCosts: [2200, 2300] },
     // CIV6 (Future Tech): "Can be completed multiple times ... Also grants
     // all of your cities +5% Production towards city projects each time it
-    // is completed." It closes the tree, so every other Future tech stands
-    // in as its prereq.
-    { ...T('FUTURE_TECH', 'Future Tech', 'Future', 2600,
-      ['OFFWORLD_MISSION', 'SMART_MATERIALS', 'ADVANCED_POWER_CELLS', 'ADVANCED_AI', 'CYBERNETICS', 'PREDICTIVE_SYSTEMS', 'SEASTEADS'], [
+    // is completed."
+    { ...T('FUTURE_TECH', 'Future Tech', 'Future', 2600, [], [
         { kind: 'award', projectPct: 5 },
-      ]), repeatable: true },
+      ]), repeatable: true, randomPrereqs: true },
   ].map((t) => [t.id, t]),
 );
 

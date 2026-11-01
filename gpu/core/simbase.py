@@ -557,8 +557,12 @@ class Rules:
     civic_ai: dict  # the civics AI's constants (`aiCivics.ts`): policyFloor
     c_repeat: torch.Tensor  # bool [NC]
     t_prereqs: list  # list of lists
+    t_random: list  # per tech: Technologies_XP2 RandomPrereqs (`drawResearchTree`)
+    t_random_costs: list  # per tech its TechnologyRandomCosts Costs, in the table's order
     c_cost: torch.Tensor
     c_prereqs: list
+    c_random: list  # per civic: Civics_XP2 RandomPrereqs
+    c_random_costs: list  # per civic its CivicRandomCosts Costs
     war_weariness: dict  # the warWeariness block: era bases, decays, perAmenity and the per-city loss caps
     trade: dict  # {marketBidx, lighthouseBidx, foreignTradeCidx, capWonderWidx, range} — trade capacity/route anchors
     eras: dict  # {length, found, conquer, wonder, pantheon, religion, gp} — era-score events + age thresholds
@@ -827,8 +831,12 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         civic_ai=r["civicAi"],
         c_repeat=torch.tensor([bool(c["repeatable"]) for c in r["civics"]], dtype=torch.bool),
         t_prereqs=[t["prereqs"] for t in r["techs"]],
+        t_random=[bool(t["randomPrereqs"]) for t in r["techs"]],
+        t_random_costs=[[int(x) for x in t["randomCosts"]] for t in r["techs"]],
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
         c_prereqs=[c["prereqs"] for c in r["civics"]],
+        c_random=[bool(c["randomPrereqs"]) for c in r["civics"]],
+        c_random_costs=[[int(x) for x in c["randomCosts"]] for c in r["civics"]],
         war_weariness=r["warWeariness"],
         trade=r["trade"],
         eras=r["eras"],

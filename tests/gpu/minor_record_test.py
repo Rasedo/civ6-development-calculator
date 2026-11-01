@@ -93,7 +93,7 @@ def test_minor_research(rules) -> None:
     cul = float(sim._seat_city_walk(row, 0, amen_yf=yf)[0, 0, 4])
     assert cul > 0, "a live minor's city yields Culture"
     ccost = sim.rules_dev.c_cost
-    cavail = sim._available_mask(sim.citystate_civics[0:1, 0], sim._prereq_c)[0]
+    cavail = sim._available_mask(sim.citystate_civics[0:1, 0], sim._prereq_c[0:1])[0]
     ccheap = float(torch.where(cavail, ccost.to(sim.device), torch.full_like(ccost.to(sim.device), float("inf"))).min())
     turns = max(int(float(cost[pick]) // sci), int(ccheap // cul)) + 2
     for _ in range(turns):

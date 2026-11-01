@@ -401,6 +401,18 @@ def _barb_tribes_row(sim, b: int) -> list[int]:
     return row + [int(sim.barb_pool_size[b]), nf, *free, len(dying), *dying, len(slots), *slots, *defs]
 
 
+def _research_tree_row(sim, b: int) -> list:
+    """the game's Future tree, flat: per tech then per civic its Standard
+    Cost in this game, its prerequisites' count and their columns in the
+    tree's order (`researchTree`)"""
+    out = []
+    for cost, pre in ((sim.tree_t_cost, sim.tree_t_pre), (sim.tree_c_cost, sim.tree_c_pre)):
+        for i in range(cost.shape[1]):
+            ps = [int(p) for p in pre[b, i].tolist() if p >= 0]
+            out += [int(cost[b, i]), len(ps), *ps]
+    return out
+
+
 GAME = {
     "turn": lambda sim, b, rows: [sim.turn],
     "rng": lambda sim, b, rows: [int(sim.rng_state[b])],
@@ -408,6 +420,7 @@ GAME = {
     "victoryType": lambda sim, b, rows: [int(sim.victory_type[b])],
     "victoryRow": lambda sim, b, rows: [int(sim.victory_row[b])],
     "congressSessions": lambda sim, b, rows: [int(sim.congress_sessions[b])],
+    "researchTree": lambda sim, b, rows: [_research_tree_row(sim, b)],
     # ONE row, so ONE outer list. The game group has a single row and the
     # fold reads `vals[0]`: a FLAT list would compare only its first element
     # (the competition's kind, the first resolution's id, the first

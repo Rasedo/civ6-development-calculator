@@ -30,7 +30,7 @@ import { defaultWarKind, warBuffRowsOf, warKindAllowed } from './casusBelli';
 function openCosts(state: GameState, seat: number, civic: boolean): number[] {
   const research = seatOf(state, seat)!.research;
   const table = civic ? CIVICS : TECHS;
-  const open = new Set((civic ? availableCivicsIn(research) : availableTechsIn(research)).map((d) => d.id));
+  const open = new Set((civic ? availableCivicsIn(state, research) : availableTechsIn(state, research)).map((d) => d.id));
   return Object.values(table).map((d) => (open.has(d.id) ? researchOwed(research, d.id, d.cost) : -1));
 }
 

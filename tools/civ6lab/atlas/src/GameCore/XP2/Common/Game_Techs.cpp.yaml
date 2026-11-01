@@ -1,0 +1,49 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x351fc0
+  kind: function
+  name: Game_Techs
+  semantics: "the random Future tree of the techs, at the game's set-up (0xa56500 via 0x353df0). Per tech in table order (0xad6490): its Cost (+0x1c) joins the cost levels (40-byte entries {cost << 8, rows}); a tech with TechnologyRandomCosts rows (0xad64b0, matched on +0x18) draws one of those whose level holds fewer than 7 rows (0x3521d7) uniformly through the picker 0x152eb0 (\"Choosing a random cost for a tech to have\", range their count). The levels sorted by cost (0x351000); per level the candidates are the rows of the nearest lower level holding any (0x352850 walk), weight 100 (0x3528de). Per row of the level with Technologies_XP2 RandomPrereqs (+0x28 bit 2): count = ceil(candidates / the level's rows) in 24.8 (0x352bc8..0x352c1a), 0x8b6c10 over it (\"Choosing how many prerequisites for a tech to have\"), plus 1, at least 1, at most the candidates; that many weighted picks 0x353070 (\"Choosing a random prerequisite for a tech to have\"), each added to the node's list (+0x10) once and its weight set to 1 (0x354000). Any other row copies its TechnologyPrereqs pairs (+0x148)."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 1
+      value: "setup draws 116-137: six costs over 2, Seasteads on Nanotechnology, Cybernetics on Nuclear Fusion, Smart Materials on Robotics (2200 each); AI_Research.csv t216 377 / 516 / 516 turns"
+    - recording: h1_duely1128
+      turn: 1
+      value: "Advanced AI alone at 2200: its count drawn over 3, three prerequisites"
+  impl:
+    - cpu/core/researchTree.ts:drawResearchTree
+    - gpu/core/sim_research.py:_draw_tree_rows
+    - gpu/core/sim_research.py:_init_research_tree
+    - cpu/core/researchTree.ts:LEVEL_MAX
+    - cpu/harness/drawSites.ts:DRAW_SITES
+  readings: ["H-1: the random Future tree — READ"]
+  review: reviewed
+- addr: 0x353070
+  kind: function
+  name: Game_Techs
+  semantics: "the weighted vector's pick: one draw over the weights' total (0x353ce0) at the caller's label, the first entry whose running remainder falls below 0, else the last."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 1
+      value: the Future tree's picks over 300, 201, 102 as the weights fall to 1
+  impl: [cpu/core/researchTree.ts:drawResearchTree, gpu/core/sim_research.py:_draw_tree_rows]
+  readings: ["H-1: the random Future tree — READ"]
+  review: reviewed
+- addr: 0x354000
+  kind: function
+  name: Game_Techs
+  semantics: "the weighted vector's weight set: entry i's weight (+0x18 [i] +4) := the argument (asserted not negative)."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 1
+      value: "a drawn candidate's weight 1: the picks over 300, 201, 102, 3"
+  impl: [cpu/core/researchTree.ts:drawResearchTree]
+  readings: ["H-1: the random Future tree — READ"]
+  review: reviewed

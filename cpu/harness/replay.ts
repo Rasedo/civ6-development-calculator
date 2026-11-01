@@ -51,6 +51,7 @@ import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builde
 import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice, governmentSlots, policyWireOf, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
+import { treePrereqs } from '../core/researchTree';
 import { computeCityStats } from '../core/city';
 import { getModifiers } from '../core/effects';
 import type { ResearchEntry } from '../core/aiResearch';
@@ -304,6 +305,9 @@ interface Ctx {
    *  (`ResearchAiTally`), and each seat's research as the pair opened */
   researchAi: Record<ResearchParty, ResearchAiTally>;
   researchBefore: Map<number, string | null>;
+  /** each city-state's research as its research AI's turn left it, before
+   *  the boosts its units' turn earned (AI_Research.csv's RESEARCHING row) */
+  researchAtTurn: Map<number, string | null>;
   /** the game's AI log of research (`<dump>.logs/AI_Research.csv`): per
    *  `${turn}:${player}` the row researched and the goal */
   aiResearchLog: Map<string, AiResearchRows>;
@@ -519,15 +523,16 @@ function minorHolders(state: GameState): { s: Seat; party: ResearchParty }[] {
 }
 
 /** a research AI choice tallied against the record's research and the log's */
-function tallyResearchAi(ctx: Ctx, kind: ResearchParty, turn: number, player: number, ours: string | null, record: string | null): void {
+function tallyResearchAi(ctx: Ctx, kind: ResearchParty, turn: number, player: number, ours: string | null, record: string | null,
+  atTurn: string | null): void {
   const t = ctx.researchAi[kind];
   t.choices += 1;
   if (ours === record) t.record += 1;
   const logged = ctx.aiResearchLog.get(`${turn}:${player}`);
   if (logged) {
     t.logged += 1;
-    if (ours === logged.tech) t.log += 1;
-    score(ctx, `research.${kind}.log`, turn, player, `p${player}`, ours === logged.tech, ours, logged.tech);
+    if (atTurn === logged.tech) t.log += 1;
+    score(ctx, `research.${kind}.log`, turn, player, `p${player}`, atTurn === logged.tech, atTurn, logged.tech);
   }
   if (!t.first && ours !== record) t.first = { turn, player, ours, record, log: logged?.tech ?? null };
   score(ctx, `research.${kind}`, turn, player, `p${player}`, ours === record, ours, record);
@@ -1463,6 +1468,11 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
   copy.units = copy.units.filter((c) => !spentBuilders.has(c));
   minorOpsAfter(ctx, b, turn, copy, twin, keyOf, upgraded);
   minorClearsAfter(ctx, b);
+  // the boosts the city-states' units' turn earned land at its end, after
+  // their research AI's turn (runs/h1_duely1121 t41 city-state 4's Currency
+  // on its Trader's route: Archery taken in record t42)
+  ctx.researchAtTurn = new Map(ctx.state.cityStates.map((cs) => [cs.seat, cs.research.tech]));
+  for (const cs of ctx.state.cityStates) detectBoosts(ctx.state, cs.seat);
   const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c) && minorAiSeat(c.seat)) ended.set(u, c.tileIndex);
   const opOf = new Map<Unit, string>();
@@ -2069,10 +2079,9 @@ function applyResearch(ctx: Ctx, player: number, row: number, civic: boolean): v
     count(ctx, kind, 'applied');
     return;
   }
-  const open = (civic ? availableCivicsIn(r) : availableTechsIn(r)).some((x) => x.id === id);
+  const open = (civic ? availableCivicsIn(ctx.state, r) : availableTechsIn(ctx.state, r)).some((x) => x.id === id);
   selectResearch(r, id, civic);
-  const def = civic ? CIVICS[id] : TECHS[id];
-  const missing = (def?.prereqs ?? []).filter((p) => !(civic ? r.civics : r.techs).includes(p));
+  const missing = treePrereqs(ctx.state, id).filter((p) => !(civic ? r.civics : r.techs).includes(p));
   count(ctx, kind, open ? 'applied' : 'fallback', player, open ? undefined : `${id} lacks ${missing.join(',') || '(no prereq missing)'}`);
   if (!open && TRACE.has(kind)) console.error(`   ${kind} engine holds [${(civic ? r.civics : r.techs).join(',')}] at ${civic ? r.civic : r.tech} ${civic ? r.civicProgress : r.techProgress}`);
 }
@@ -4956,7 +4965,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
     engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
-    researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
+    researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
     scores: report.scores, turn: recs[0].turn, memoryLogs: new MemoryLogs(dumpPath), gameMemory: GameMemory.of(dumpPath), armyLogged: new Map(), minorLookTypes: new Map(),
@@ -5080,6 +5089,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     traceTurn = b.turn;
     const holders = [...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])];
     ctx.researchBefore = new Map(holders.map((s) => [s.seat, s.research.tech]));
+    ctx.researchAtTurn = new Map();
     ctx.civicBefore = new Map(holders.map((s) => [s.seat, s.research.civic]));
     const ds = source.decisions(a, b, cat);
     ctx.upgradeInto = new Set(ds.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
@@ -5753,7 +5763,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const ours = s.research.tech;
       const rec = recTech(b, pid);
       if (ours === ctx.researchBefore.get(s.seat) && rec === recTech(a, pid)) continue;
-      tallyResearchAi(ctx, party, a.turn, pid, ours, rec);
+      tallyResearchAi(ctx, party, a.turn, pid, ours, rec, ctx.researchAtTurn.has(s.seat) ? ctx.researchAtTurn.get(s.seat)! : ours);
       if (ours && !s.research.goal) ctx.researchAi[party].random += 1;
     }
     // the civics AI's analysis of each minor's turn against the log of the

@@ -16,6 +16,13 @@ export interface CivicDef {
   /** CIV6 (`Repeatable`): the row stays researchable once complete, and each
    *  completion pays its award again. */
   repeatable?: boolean;
+  /** CIV6 (Civics_XP2 `RandomPrereqs`): the row holds no CivicPrereqs row;
+   *  the game draws its prerequisites at its start (`drawResearchTree`), its
+   *  `prereqs` empty here */
+  randomPrereqs?: boolean;
+  /** CIV6 (CivicRandomCosts): the Costs the game draws the row's from at
+   *  its start, in the table's order (`drawResearchTree`) */
+  randomCosts?: readonly number[];
   /** PROVENANCE, per column — see CIVIC_SRC below. */
   src?: SrcMap;
 }
@@ -444,7 +451,9 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
   INFORMATION_WARFARE: {
     era: xml('Civics', 'CivicType=CIVIC_INFORMATION_WARFARE', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Civics', 'CivicType=CIVIC_INFORMATION_WARFARE', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no CivicPrereqs row for CIVIC_INFORMATION_WARFARE (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no CivicPrereqs row of CIVIC_INFORMATION_WARFARE: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Civics_XP2', 'CivicType=CIVIC_INFORMATION_WARFARE', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Civics_XP2', 'CivicType=CIVIC_INFORMATION_WARFARE', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the CivicRandomCosts rows of CIVIC_INFORMATION_WARFARE, in the table\'s order', inputs: [xml('CivicRandomCosts', 'CivicType=CIVIC_INFORMATION_WARFARE&Cost=3200', 'Cost'), xml('CivicRandomCosts', 'CivicType=CIVIC_INFORMATION_WARFARE&Cost=3300', 'Cost')] },
   },
   CORPORATE_LIBERTARIANISM: {
     era: xml('Civics', 'CivicType=CIVIC_CORPORATE_LIBERTARIANISM', 'EraType', { expect: 'ERA_INFORMATION' }),
@@ -465,30 +474,39 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
   SMART_POWER_DOCTRINE: {
     era: xml('Civics', 'CivicType=CIVIC_SMART_POWER_DOCTRINE', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Civics', 'CivicType=CIVIC_SMART_POWER_DOCTRINE', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no CivicPrereqs row for CIVIC_SMART_POWER_DOCTRINE (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no CivicPrereqs row of CIVIC_SMART_POWER_DOCTRINE: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Civics_XP2', 'CivicType=CIVIC_SMART_POWER_DOCTRINE', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Civics_XP2', 'CivicType=CIVIC_SMART_POWER_DOCTRINE', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the CivicRandomCosts rows of CIVIC_SMART_POWER_DOCTRINE, in the table\'s order', inputs: [xml('CivicRandomCosts', 'CivicType=CIVIC_SMART_POWER_DOCTRINE&Cost=3200', 'Cost'), xml('CivicRandomCosts', 'CivicType=CIVIC_SMART_POWER_DOCTRINE&Cost=3300', 'Cost')] },
   },
   EXODUS_IMPERATIVE: {
     era: xml('Civics', 'CivicType=CIVIC_EXODUS_IMPERATIVE', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Civics', 'CivicType=CIVIC_EXODUS_IMPERATIVE', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no CivicPrereqs row for CIVIC_EXODUS_IMPERATIVE (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no CivicPrereqs row of CIVIC_EXODUS_IMPERATIVE: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Civics_XP2', 'CivicType=CIVIC_EXODUS_IMPERATIVE', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Civics_XP2', 'CivicType=CIVIC_EXODUS_IMPERATIVE', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the CivicRandomCosts rows of CIVIC_EXODUS_IMPERATIVE, in the table\'s order', inputs: [xml('CivicRandomCosts', 'CivicType=CIVIC_EXODUS_IMPERATIVE&Cost=3200', 'Cost'), xml('CivicRandomCosts', 'CivicType=CIVIC_EXODUS_IMPERATIVE&Cost=3300', 'Cost')] },
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_FUTURE_VICTORY_SCIENCE', 'PrereqCivic', { expect: 'CIVIC_EXODUS_IMPERATIVE' }),
   },
   CULTURAL_HEGEMONY: {
     era: xml('Civics', 'CivicType=CIVIC_CULTURAL_HEGEMONY', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Civics', 'CivicType=CIVIC_CULTURAL_HEGEMONY', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no CivicPrereqs row for CIVIC_CULTURAL_HEGEMONY (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no CivicPrereqs row of CIVIC_CULTURAL_HEGEMONY: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Civics_XP2', 'CivicType=CIVIC_CULTURAL_HEGEMONY', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Civics_XP2', 'CivicType=CIVIC_CULTURAL_HEGEMONY', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the CivicRandomCosts rows of CIVIC_CULTURAL_HEGEMONY, in the table\'s order', inputs: [xml('CivicRandomCosts', 'CivicType=CIVIC_CULTURAL_HEGEMONY&Cost=3200', 'Cost'), xml('CivicRandomCosts', 'CivicType=CIVIC_CULTURAL_HEGEMONY&Cost=3300', 'Cost')] },
   },
   GLOBAL_WARMING_MITIGATION: {
     era: xml('Civics', 'CivicType=CIVIC_GLOBAL_WARMING_MITIGATION', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Civics', 'CivicType=CIVIC_GLOBAL_WARMING_MITIGATION', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'the install writes no CivicPrereqs row for CIVIC_GLOBAL_WARMING_MITIGATION (its only published gate is the era); the deepest node this tree carries stands in' },
+    prereqs: { derived: 'no CivicPrereqs row of CIVIC_GLOBAL_WARMING_MITIGATION: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Civics_XP2', 'CivicType=CIVIC_GLOBAL_WARMING_MITIGATION', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Civics_XP2', 'CivicType=CIVIC_GLOBAL_WARMING_MITIGATION', 'RandomPrereqs', { expect: true }),
+    randomCosts: { derived: 'the CivicRandomCosts rows of CIVIC_GLOBAL_WARMING_MITIGATION, in the table\'s order', inputs: [xml('CivicRandomCosts', 'CivicType=CIVIC_GLOBAL_WARMING_MITIGATION&Cost=3200', 'Cost'), xml('CivicRandomCosts', 'CivicType=CIVIC_GLOBAL_WARMING_MITIGATION&Cost=3300', 'Cost')] },
     'effects.0.envoys': xml('ModifierArguments', 'ModifierId=CIVIC_AWARD_THREE_INFLUENCE_TOKENS&Name=Amount', 'Value'),
     'effects.0.dvp': xml('ModifierArguments', 'ModifierId=CIVIC_MITIGATION_GRANT_DIPLOVP&Name=Amount', 'Value'),
   },
   FUTURE_CIVIC: {
     era: xml('Civics', 'CivicType=CIVIC_FUTURE_CIVIC', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Civics', 'CivicType=CIVIC_FUTURE_CIVIC', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { stylized: 'Civics_XP2 RandomPrereqs replaces the base CivicPrereqs rows of CIVIC_FUTURE_CIVIC; every other Future civic this tree carries stands in' },
+    prereqs: { derived: 'no CivicPrereqs row of CIVIC_FUTURE_CIVIC: the game draws them at its start (`drawResearchTree`)', inputs: [xml('Civics_XP2', 'CivicType=CIVIC_FUTURE_CIVIC', 'RandomPrereqs', { expect: true })] },
+    randomPrereqs: xml('Civics_XP2', 'CivicType=CIVIC_FUTURE_CIVIC', 'RandomPrereqs', { expect: true }),
     repeatable: xml('Civics', 'CivicType=CIVIC_FUTURE_CIVIC', 'Repeatable', { expect: true }),
     'effects.0.favor': xml('ModifierArguments', 'ModifierId=CIVIC_GRANT_FAVOR&Name=Amount', 'Value'),
     'effects.0.titles': xml('ModifierArguments', 'ModifierId=CIVIC_GRANT_PLAYER_GOVERNOR_POINTS&Name=Delta', 'Value'),
@@ -813,33 +831,29 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       // CIV6 (CivicModifiers CIVIC_AWARD_THREE_INFLUENCE_TOKENS): 3 envoys at completion
       { kind: 'award', envoys: 3 },
     ]),
-    // CIV6: Information Warfare's only published gate is the Future ERA; its
-    // real parents are Future civics this tree does not carry, so the deepest
-    // Information-era civic stands in as the prereq.
-    C('INFORMATION_WARFARE', 'Information Warfare', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
-    // CIV6: Future civics whose only published gate is the ERA stand on the
-    // deepest Information-era civic, as Information Warfare does. Of their
-    // policy cards (the FUTURE_VICTORY_* / FUTURE_COUNTER_* wildcards) this
-    // catalog carries Future Victory Science alone.
-    C('SMART_POWER_DOCTRINE', 'Smart Power Doctrine', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
-    C('EXODUS_IMPERATIVE', 'Exodus Imperative', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE'], [
+    // CIV6 (Civics_XP2 RandomPrereqs, CivicRandomCosts): the Future civics'
+    // prerequisites, and five of their Costs, are the game's draws at its
+    // start (`drawResearchTree`); the Costs here are the Civics rows' own. Of
+    // their policy cards (the FUTURE_VICTORY_* / FUTURE_COUNTER_* wildcards)
+    // this catalog carries Future Victory Science alone.
+    { ...C('INFORMATION_WARFARE', 'Information Warfare', 'Future', 3200, []), randomPrereqs: true, randomCosts: [3200, 3300] },
+    { ...C('SMART_POWER_DOCTRINE', 'Smart Power Doctrine', 'Future', 3200, []), randomPrereqs: true, randomCosts: [3200, 3300] },
+    { ...C('EXODUS_IMPERATIVE', 'Exodus Imperative', 'Future', 3200, [], [
       { kind: 'unlockPolicy', policy: 'FUTURE_VICTORY_SCIENCE' },
-    ]),
-    C('CULTURAL_HEGEMONY', 'Cultural Hegemony', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
+    ]), randomPrereqs: true, randomCosts: [3200, 3300] },
+    { ...C('CULTURAL_HEGEMONY', 'Cultural Hegemony', 'Future', 3200, []), randomPrereqs: true, randomCosts: [3200, 3300] },
     // CIV6 (Global Warming Mitigation): a Future civic that "unlocks the
     // Carbon Recapture project and awards 3 Envoys and 1 Diplomatic Victory
     // point".
-    C('GLOBAL_WARMING_MITIGATION', 'Global Warming Mitigation', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE'], [
+    { ...C('GLOBAL_WARMING_MITIGATION', 'Global Warming Mitigation', 'Future', 3200, [], [
       // CIV6: "Awards 3 Envoys. Awards 1 Diplomatic Victory point."
       { kind: 'award', envoys: 3, dvp: 1 },
-    ]),
+    ]), randomPrereqs: true, randomCosts: [3200, 3300] },
     // CIV6 (Future Civic): "Can be completed multiple times ... Also awards 1
-    // Governor title and 50 Diplomatic Favor each time it is completed." It
-    // closes the tree, so every other Future civic stands in as its prereq.
-    { ...C('FUTURE_CIVIC', 'Future Civic', 'Future', 3500,
-      ['INFORMATION_WARFARE', 'SMART_POWER_DOCTRINE', 'EXODUS_IMPERATIVE', 'CULTURAL_HEGEMONY', 'GLOBAL_WARMING_MITIGATION'], [
+    // Governor title and 50 Diplomatic Favor each time it is completed."
+    { ...C('FUTURE_CIVIC', 'Future Civic', 'Future', 3500, [], [
         { kind: 'award', favor: 50, titles: 1 },
-      ]), repeatable: true },
+      ]), repeatable: true, randomPrereqs: true },
   ].map((c) => [c.id, c]),
 );
 

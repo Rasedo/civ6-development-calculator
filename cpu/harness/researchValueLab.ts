@@ -20,14 +20,13 @@ import { advanceHistory, importTurn, newHistory } from './import';
 import { civicAnalysis, civicValue } from '../core/aiCivics';
 import { researchAnalysis, techValue } from '../core/aiResearch';
 import { pseudoYieldWeights } from '../core/aiWeights';
-import { CIVICS } from '../data/civics';
-import { TECHS } from '../data/techs';
 import { computeCityStats } from '../core/city';
 import { minorCity } from '../core/cityStates';
 import { minorBuildFacts, minorKnownUnits, minorResearchTerms, minorResourceCounts } from '../core/minorBuild';
 import { unitTable } from '../core/aiCityBuild';
 import { loadCityBuildCentre } from './cityBuildLog';
 import { AI_POLICIES } from '../data/aiTables';
+import { treePrereqs } from '../core/researchTree';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const dump = args[0];
@@ -161,7 +160,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
       for (const e of researchAnalysis(state, cs.seat, y.science, terms.tech)) {
         const l = logged.get(`TECH_${e.tech}`);
         if (l && !e.owned) tally('tech', `TECH_${e.tech}`, turn, player, l, e);
-        if (l && !e.owned && l[1] >= 0 && TECHS[e.tech].prereqs.every((x) => cs.research.techs.includes(x))) {
+        if (l && !e.owned && l[1] >= 0 && treePrereqs(state, e.tech).every((x) => cs.research.techs.includes(x))) {
           tallyOwn('tech', `TECH_${e.tech}`, l, techValue(state, cs.seat, e.tech, l[1], pseudoYieldWeights(state, cs.seat)) + (l[1] <= 50 ? terms.tech(e.tech, l[1]) : 0)
             + Math.round((contracts.get(key)?.get(`TECH_${e.tech}`) ?? 0) * 256), `t${turn} p${player}`);
         }
@@ -173,7 +172,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
       for (const e of civicAnalysis(state, cs.seat, y.culture, terms.civic)) {
         const l = logged.get(`CIVIC_${e.civic}`);
         if (l && !e.owned) tally('civic', `CIVIC_${e.civic}`, turn, player, l, e);
-        if (l && !e.owned && l[1] >= 0 && CIVICS[e.civic].prereqs.every((x) => cs.research.civics.includes(x))) {
+        if (l && !e.owned && l[1] >= 0 && treePrereqs(state, e.civic).every((x) => cs.research.civics.includes(x))) {
           tallyOwn('civic', `CIVIC_${e.civic}`, l, civicValue(state, cs.seat, e.civic, l[1], pseudoYieldWeights(state, cs.seat)) + (l[1] < 50 ? terms.civic(e.civic, l[1]) : 0)
             + (logPolicies === null ? 0 : policyTerm(`${turn + logPolicies}:${player}`, e.civic)), `t${turn} p${player}`);
         }

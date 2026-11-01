@@ -110,12 +110,12 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   // the set-up
   'Random Diplomatic Value': { owner: 'setup', n: [896, 896] },
   'Unknown': { owner: 'setup', n: [96, 96] },
-  'Choosing a random prerequisite for a tech to have': { owner: 'setup', n: [11, 9] },
-  'Choosing how many prerequisites for a tech to have': { owner: 'setup', n: [8, 8] },
-  'Choosing a random cost for a tech to have': { owner: 'setup', n: [6, 6] },
-  'Choosing a random prerequisite for a civic to have': { owner: 'setup', n: [8, 7] },
-  'Choosing how many prerequisites for a civic to have': { owner: 'setup', n: [6, 6] },
-  'Choosing a random cost for a civic to have': { owner: 'setup', n: [5, 5] },
+  'Choosing a random prerequisite for a tech to have': { owner: 'setup', cpu: 'drawResearchTree', gpu: '_init_research_tree', dll: '0x351fc0', n: [11, 9] },
+  'Choosing how many prerequisites for a tech to have': { owner: 'setup', cpu: 'drawResearchTree', gpu: '_init_research_tree', dll: '0x351fc0', n: [8, 8] },
+  'Choosing a random cost for a tech to have': { owner: 'setup', cpu: 'drawResearchTree', gpu: '_init_research_tree', dll: '0x351fc0', n: [6, 6] },
+  'Choosing a random prerequisite for a civic to have': { owner: 'setup', cpu: 'drawResearchTree', gpu: '_init_research_tree', dll: '0x2976d0', n: [8, 7] },
+  'Choosing how many prerequisites for a civic to have': { owner: 'setup', cpu: 'drawResearchTree', gpu: '_init_research_tree', dll: '0x2976d0', n: [6, 6] },
+  'Choosing a random cost for a civic to have': { owner: 'setup', cpu: 'drawResearchTree', gpu: '_init_research_tree', dll: '0x2976d0', n: [5, 5] },
 };
 
 /** The engines' draw sites the game has no site for: the driver's stand-ins
