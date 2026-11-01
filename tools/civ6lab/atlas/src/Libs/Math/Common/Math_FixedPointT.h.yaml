@@ -384,14 +384,19 @@
 - addr: 0x723bb0
   final: 0x4cf3b0
   kind: function
-  status: PARTLY
+  name: the promotion class weight
+  status: READ
   cases:
     - recording: 1124
       turn: 28
       value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+    - recording: lb1_mil1117
+      turn: 95
+      value: the modified vector (FinalRelease Military +0x410) 0 in all 21 classes for every player at 1117 t95, 1121 t150 / t152, 1128 t57; no write t1-95 to Caguana's classes 0-5 or the data pointer (data breakpoint)
   impl: [cpu/core/aiCityBuild.ts:CityBuildFacts, cpu/core/minorBuild.ts:promotionWeight]
   readings:
     - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
+    - "C-96: AI::Military's modified unit preferences hold 0 (live) — READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...ase 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x promo-class weight 0x723bb0,  pseudoYieldValue(UNIT_COMBAT...), minus maintenance gold if [r15+0x908]<3, then PV diff. trade ->..."

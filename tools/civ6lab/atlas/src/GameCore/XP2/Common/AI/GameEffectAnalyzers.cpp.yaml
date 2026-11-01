@@ -1339,6 +1339,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-130: the government values' parts at Hunza (live) — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (@f03ea0, vtable 0xd626c8; its parser 0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's..."

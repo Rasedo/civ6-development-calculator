@@ -357,6 +357,7 @@
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-130: the government values' parts at Hunza (live) — READ"
   context:
     - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
     - ...ceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
@@ -368,7 +369,9 @@
   name: valueBuildingAtPlot
   status: PARTLY
   impl: [cpu/core/aiCityBuild.ts:buildingTable, gpu/core/sim_cityvalue.py:_cv_building_table]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...urrent) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current != bld) + prereq buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H..."
   context:
@@ -581,6 +584,9 @@
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+    - recording: lb1_bv1128
+      turn: 51
+      value: "Nazca's Shrine 27.18 t49-56 with the claimed plots (0x527fd0), modifiers (0x529ed0) and neighbours (0x4fa40) terms 0, the Temple 5.57 / 14.82 / 15.02 / 24.8 / 38.93 at t51-55 (bvlog.py): the log's Shrine + X is 0x5cadc0's dependents pass"
   impl:
     - cpu/core/aiCityBuild.ts:buildingPerTurn
     - cpu/core/aiCityBuild.ts:buildingValue
@@ -596,6 +602,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
   notes:
     - "label: valueConstructible(modifiers+yields)"
     - ".claude/scratchpad/cb/notes.txt: ...]; g=s+256; if g<256 ->0 else den=max(trunc(rate*g/25600),2); out=((s*v>>8)<<8)/den. BUILDING value 0x7a7590 (generic constructible): per Building_YieldChanges entry: amt<<8 * (fx(1+cityPct[y]*.01)*fx(1+bldPc..."
@@ -661,12 +668,16 @@
 - addr: 0x7b0330
   final: 0x52fd20
   kind: function
+  name: the government value
   semantics: "a government's value: FX_MIN at start >= horizon, or for one held before (+0x350[g]) not current; per Government_SlotCounts row the slot type's best card / 10 over the slot's place; + Governments_XP2 Favor as PSEUDOYIELD_DIPLOMATIC_FAVOR, PV(horizon) - PV(start); + its modifiers (+0xb68[g]) by 0x7a4b20."
   status: READ
   cases:
     - recording: h1_duely1121
       turn: 56
       value: Hunza's Divine Right with Monarchy's walls housing, exact
+    - recording: lb1_gov1121
+      turn: 19
+      value: "Hunza (player 2): Autocracy 21.35 + 18 (EFFECT_ADJUST_FLAT_BONUS), Oligarchy 20.80 + 1 (the flat bonus; 0 at t15-18), Classical Republic 20.70, Chiefdom 3.80 (govlog.py); the civic value at T reads the values of T - 1"
   impl:
     - cpu/core/aiPolicyValue.ts:governmentValue
     - cpu/core/aiPolicyValue.ts:governmentValue
@@ -677,6 +688,7 @@
   readings:
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: the government values' parts at Hunza (live) — READ"
   context:
     - "...its (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to valueHorizons[0]; the first strictly highest; a different one is commanded (civics..."
     - "- The government's value (0x7b0330): FX_MIN when start >= horizon, or for one held before (PlayerCulture +0x350 [governmen..."

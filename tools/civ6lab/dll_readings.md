@@ -5403,3 +5403,75 @@ Move's danger flags ...") set no flag 2.
   city-state); a district project that starts on a record's 0 progress takes
   an overflow no record holds (1121 Hunza t85: the stat -1.73, the
   importer's -4.40).
+
+## C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed
+
+- After the plot analysis job fills the centre's buildings table, the city
+  update's 0x5cadc0 (its walk 0x5cb10d..0x5cb2ea; FinalRelease 0x3dfee0,
+  the walk FinalRelease 0x3e0170..0x3e01ed) walks the Buildings in database
+  order: a building B
+  that is not a wonder (+0x159 bit 0x10), for each row D of B's +0x198 list
+  (the BuildingPrereqs rows whose PrereqBuilding is B, live: Shrine 12 / 13
+  / 82 = Temple, Stave Church, Prasat; Temple the nine worship buildings,
+  Mahabodhi, Kotoku-in), takes the player's version of D (player +0x12f0
+  +0x230 [D], none -> skipped) and, where its value (CityBuildAI +0xd68
+  [D']) is above 0, adds it into B's slot (+0xd10 through 0x9034b0
+  (FinalRelease 0x72a920), the
+  table the PLOT ANALYSIS LOG prints). So a Shrine logs its own value plus
+  the Temple's once the Temple values above 0; a FX(-9999) dependent adds
+  nothing.
+- Live (runs/lb1_bv1128*, seed 1128 replayed, its logs identical to
+  runs/h1_duelv1128 at t49-t56): the building value 0x7a7590 (FinalRelease
+  0x52b900, `bvlog.py`) returns Nazca's Shrine 27.18 every turn t49-t56 with
+  the claimed-plots, modifiers and neighbours terms all 0; the table store
+  after 0x7a4d40 (FinalRelease 0x3e3ef3) writes 27.18; a data breakpoint on
+  the slot (`hwwatch.py`, t56) caught the one later write, FinalRelease
+  0x3e01e2 `add [rax+r15*4], edi`, 27.18 -> 70.43 = + the Temple's 43.25 —
+  the log's 32.75 / 42.0 / 42.2 / 51.98 / 66.11 / 70.43 at t51-t56 are
+  27.18 + the Temple's 5.57 / 14.82 / 15.02 / 24.8 / 38.93 / 43.25.
+- The same function's first loop (0x5caf30..0x5cb0a1) sums, per district,
+  the positive values of the buildings whose PrereqDistrict it is (the
+  player's version, 0x408860; skipping a building the city holds a +0x1e0
+  row of, or one of whose +0x1e0 rows comes earlier in the table), and the
+  loop at 0x5cb36b..0x5cb44e adds each district's sum into the positive
+  DISTRICTS slots of the plot evaluations (CityBuildAI +0xd80): the
+  district value's buildings term. Static only, no live case read.
+
+## C-96: AI::Military's modified unit preferences hold 0 (live) — READ
+
+- The promotion-class weight 0x723bb0 (FinalRelease 0x4cf3b0) reads, in
+  FinalRelease's layout, the player's Military (Player +0x680): +0x3e8 the default
+  vector's data, +0x3f8 its size (21, the promotion classes), +0x410 the
+  modified vector's data, unchecked against a size; max(default +
+  modified, 0.1), 0 where the default is 0.
+- Live: every player's modified vector reads 0 in all 21 classes at t57
+  (seed 1128), t95 (1117) and t93 / t150 / t152 (1121); a data breakpoint
+  (`hwwatch.py`) on Caguana's classes 0-5 and the vector's data pointer
+  caught no write t1-t95 (1117, covering its t88 and the t92 Trebuchet
+  contract, VALUE 22.0 as recorded), and on Antioch's t1-t127 (1121; the
+  instance died at t128 under the debugger, the t150 poll ran without it).
+  The term is 0 for every seat: the engines' 0 stands, and the Trebuchet /
+  Catapult and Field Cannon / Warrior cases lie elsewhere.
+
+## C-130: the government values' parts at Hunza (live) — READ
+
+- `govlog.py` on seed 1121 replayed (its AI_GovtPolicies Political
+  Philosophy lines identical to runs/h1_duely1121 t13-t26): the civics AI's
+  government values (0x620413 -> 0x7b0330 (FinalRelease 0x52fd20)) and each
+  government modifier's whole part (the modifiers' sum 0x7a4b20 (FinalRelease
+  0x529ed0)). Hunza (player 2): every modifier term is
+  EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (FinalRelease 0x476060, the analyzer
+  object's vtable slot 1 the modifier entry's +0 names); the others
+  (Autocracy's four non-analysed rows, Oligarchy's EFFECT_GRANT_ABILITY,
+  Classical Republic's) add 0. Autocracy's flat bonus 12 / 12 / 16 / 15 /
+  15 / 15 / 16 / 18 / 18 / 20 / 20 / 20 / 21 / 21 / 21 / 22 at t11-t26 over
+  a pre-modifier 22.86 (t11-14) / 21.35 (t15-19) / 19.65..24.35;
+  Oligarchy's 1 at t19-t22 and t26, 0 at t11-t18 and t23-t25, over 24.65 /
+  20.80 / 18.25..24.65; Classical Republic 20.50 / 20.70 / 22.0, no
+  modifier term; Chiefdom 5.50 / 3.80 / 2.10..5.50.
+- The civic value of turn T reads the government values the civics AI
+  stored at T - 1: sum max(v - v(Chiefdom), v / 2) over the three
+  governments reads 66.52 / 66.46 / 66.46 / 67.46 / 69.46 at t14-t18, and
+  Political Philosophy logs 436.1 / 435.1 / 435.0 / 435.0 / 436.0 / 438.0
+  at t14-t19: each log step (-1.0 at t15, +1.0 at t18, +2.0 at t19) is the
+  sum's step a turn before.

@@ -39,6 +39,7 @@
   status: PARTLY
   readings:
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e 0x5d0860 calls), 0x17071d: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held and complete (+0xb08), t..."
