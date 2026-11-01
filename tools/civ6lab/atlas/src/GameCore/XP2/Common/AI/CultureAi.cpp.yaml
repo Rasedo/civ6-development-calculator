@@ -36,6 +36,12 @@
       value: "A COMPLETION fires the delegate 0x6293e0 — the   government pass 0x625d70, then 0x626600 with the completed civic as the   key — over the entries the AI's last turn left, before this turn's   analysis"
     - recording: AI_GovtPolicies.csv
       value: its log AI_GovtPolicies.csv).
+    - recording: h1_duely1117
+      turn: 17
+      value: "Caguana's Charismatic Leader first scored 14.0 at t15; Political Philosophy's Autocracy and Classical Republic diplomatic slots 1.5 above from the t17 analysis, not t16 — the government values on the slot bests of the last turn's jobs"
+    - recording: h1_duely1117
+      turn: 2
+      value: "no Policies row at t1 on any of the five duely duels; every city-state's Code of Laws 95.9 at 7 turns at t2, the policy term at its 20.0 floor: the founding turn's jobs score no card"
   impl:
     - cpu/core/minorBuild.ts:minorResearch
     - gpu/core/sim_civics.py:_cai_turn

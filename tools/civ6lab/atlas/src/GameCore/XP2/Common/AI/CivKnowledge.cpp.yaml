@@ -65,6 +65,14 @@
   context:
     - "...; called at the tail of the knowledge base's ageing 0x5ebb30): the best record reset (0x5ea780), then per city of the player (its +0x12f0 list) and per city entry of its knowledge ba..."
   review: imported
+- addr: 0x5eab80
+  kind: function
+  name: the knowledge base's enemy unit counts
+  semantics: per unit type, +0x618[type] = the sum of the type's counts the knowledge base keeps for each player of the game's list at war with the player (IsAtWarWith), the player itself left out
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  review: reviewed
 - addr: 0x5eadb0
   kind: function
   status: PARTLY

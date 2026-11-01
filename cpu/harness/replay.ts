@@ -2445,7 +2445,7 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     if (settler) disbandUnit(state, settler.id);
     // the game's minor took its first turn the turn the city was founded:
     // its research and civics AIs' turns before the city stood, at no
-    // Science or Culture and no resources near a city (runs/h1_duelv1124 t1:
+    // Science or Culture, no card scored and no resources near a city (runs/h1_duelv1124 t1:
     // every minor's Pottery at 12 turns, 78.3, Writing its goal), its
     // military AI's Combat Desire, run before the founding on a player
     // that holds no city (its PSEUDOYIELD_UNIT_COMBAT weight, which the
@@ -2464,7 +2464,7 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     state.turn -= 1;
     placed.foundedTurn = state.turn;
     try {
-      minorResearch(state, placed.research, placed.seat, 0, 0, () => undefined, () => undefined, []);
+      minorResearch(state, placed.research, placed.seat, 0, 0, () => undefined, () => undefined, [], false);
       placed.combatDesire = minorCombatDesire(state, placed, state.turn - 1).desire;
       const fresh = !placed.cityAi;
       minorMilitaryTurn(state, placed);
@@ -4428,7 +4428,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * step's start and scout throttle. The non-majors' explored plots.
  */
 const SEAT_MEMORY = ['unitPool', 'armyKnown', 'armyAged', 'combatDesire', 'tradeSeat', 'agendas', 'campsKnown', 'cityAi', 'ops', 'opsNext', 'treeSlots', 'treeFree', 'unitStrength'] as const;
-const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'aiLeft', 'aiLeftSeen',
+const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues', 'civicPolicyBest', 'civicSlotBest', 'aiLeft', 'aiLeftSeen',
   'techCatchUp', 'civicCatchUp', 'favTech'] as const;
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgrading', 'upgradeTrigger'] as const;

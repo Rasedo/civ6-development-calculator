@@ -72,7 +72,7 @@ import { projectTable, type ProjectTableFacts } from './aiProjectValue';
 import { accrueStockpiles, canPayStockpile, capStockpiles, chargeUnitUpkeep, spendStockpile, stockFree, stockOf, stockpileCap, stockpileIncome, strategicSlot, unitResourceCost, unitUpkeepBill, upgradeGoldCost } from './stockpile';
 import { FX, FX_MIN, fmul, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { cityGrowth, aiView, storeUnitStrength } from './aiView';
-import { civicPolicyBest, governmentValues, policyScores } from './aiPolicyValue';
+import { civicPolicyBest, governmentValues, policyScores, slotTypeBest } from './aiPolicyValue';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
 import { minorTradeList, minorTradeValue } from './aiTrade';
@@ -316,13 +316,14 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
  * completion's choice at the bank (`minorResearchBank`), then the AIs' turns
  * (`minorResearchTurn`); a pick resumes the progress kept on it
  * (`selectResearch`). The Free Cities run both at once. Returns how many
- * trees completed a row this turn — the upgrade trigger's count.
+ * trees completed a row this turn — the upgrade trigger's count. `stood`
+ * false: a city-state's turn before its city stood (`minorResearchTurn`).
  */
 export function minorResearch(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
   terms: () => ReturnType<typeof minorResearchTerms> | undefined, urban: () => void,
-  contracts: readonly TechContract[]): number {
+  contracts: readonly TechContract[], stood = true): number {
   const gained = minorResearchBank(state, r, seat, science, culture, terms, urban, contracts);
-  minorResearchTurn(state, r, seat, science, culture, terms, contracts);
+  minorResearchTurn(state, r, seat, science, culture, terms, contracts, stood);
   return gained;
 }
 
@@ -378,14 +379,18 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
  * THE AIS' TURNS (list B, after the city's production and growth): the
  * research AI analyses the tree on the Science the city now makes and makes
  * its turn's choice (0x760980); the civics AI analyses its tree on the
- * government values and cards its last turn wrote, keeps this turn's (`governmentValues`,
- * `civicPolicyBest`, on the policy scores of the civics this analysis lists)
- * for the next and, with nothing in hand, chooses (0x620110). runs/h1_duelw1124 t5 Granada: grown
+ * government values and cards its last turn wrote, keeps this turn's (`governmentValues`
+ * on the last turn's best card per slot type, `civicPolicyBest` on the
+ * policy scores of the civics this analysis lists) for the next and, with
+ * nothing in hand, chooses (0x620110). runs/h1_duelw1124 t5 Granada: grown
  * to two citizens that turn, every row at 3.0 Science (Animal Husbandry 4
- * turns where 2.5 gives 5).
+ * turns where 2.5 gives 5). A city-state's turn before its city stood
+ * (`stood` false: its founding turn's) scores no card — no Policies row at
+ * t1 in any recording, and t2's Code of Laws at the policy floor, 95.9 at 7
+ * turns on all five runs/h1_duely duels.
  */
 export function minorResearchTurn(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
-  terms: () => ReturnType<typeof minorResearchTerms> | undefined, contracts: readonly TechContract[]): void {
+  terms: () => ReturnType<typeof minorResearchTerms> | undefined, contracts: readonly TechContract[], stood = true): void {
   let held: ReturnType<typeof minorResearchTerms> | undefined | null = null;
   const city = () => (held === null ? (held = terms()) : held);
   r.aiEntries = researchAnalysis(state, seat, science, city()?.tech, contracts);
@@ -393,16 +398,22 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
   r.aiLeft = researchInHandLeft(state, seat, r, fxOf(science));
   // the analysis on the government values and cards its last turn wrote,
-  // then the policy jobs on the civics this analysis lists, and on their
-  // scores the government values and the best card per civic (0x620110,
-  // 0x623b90) the next turn's analysis reads (runs/h1_duelv1121 Hunza t45:
-  // Civil Service first valued above 0 that turn, its Civil Prestige scored
-  // that turn, 62.0 as logged)
+  // then the policy jobs on the civics this analysis lists; the best card
+  // per civic (0x623b90) of their scores the next turn's analysis reads
+  // (runs/h1_duelv1121 Hunza t45: Civil Service first valued above 0 that
+  // turn, its Civil Prestige scored that turn, 62.0 as logged), the
+  // government values (0x7b0330, which 0x620110 runs before it rewrites
+  // the best card per slot type) on the slot bests of the last turn's
+  // jobs — a card first scored at T counts in a government's
+  // value from the analysis of T + 2 (runs/h1_duely1117 Caguana:
+  // Charismatic Leader first 14.0 at t15, Political Philosophy's
+  // Autocracy and Classical Republic 1.5 above at t17, not t16)
   r.civicAiEntries = civicAnalysis(state, seat, culture, city()?.civic);
   const view = aiView(state);
-  const scores = policyScores(view, seat);
+  const scores: ReadonlyMap<string, number> = stood ? policyScores(view, seat) : new Map();
   policyTracer?.(seat, scores);
-  r.civicGovValues = governmentValues(view, seat, scores);
+  r.civicGovValues = governmentValues(view, seat, r.civicSlotBest ? new Map(Object.entries(r.civicSlotBest)) : slotTypeBest(new Map()));
+  r.civicSlotBest = Object.fromEntries(slotTypeBest(scores));
   r.civicPolicyBest = civicPolicyBest(scores);
   if (!r.civic) takeCivic(r, civicChoice(state, seat, r.civicAiEntries, null, civicDraw(state)));
 }

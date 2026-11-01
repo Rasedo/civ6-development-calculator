@@ -317,6 +317,11 @@ class SimInit:
         # its best card per civic (0x623b90, raw, at least 0), written with them
         # (`ResearchState.civicPolicyBest`)
         self.citystate_civic_pol_best = torch.zeros(B, r_pad, nc_ai, dtype=torch.long, device=device)
+        # its best card per slot type of its policy jobs (raw, the slot types'
+        # order), written with them and read by the next turn's government
+        # values (`ResearchState.civicSlotBest`); before the first, a job
+        # that never ran: -1.0
+        self.citystate_slot_best = torch.full((B, r_pad, len(rules.civic_ai["slotTypes"])), -256, dtype=torch.long, device=device)
         # its strength over every domain as its turn started, before its
         # production (`Seat.unitStrength`, `_store_unit_strength`)
         self.citystate_unit_strength = torch.zeros(B, r_pad, dtype=torch.long, device=device)

@@ -170,10 +170,9 @@ export function governmentValue(view: AiView, seat: number, gov: string, best: R
 
 /** THE CIVICS AI'S GOVERNMENT VALUES (0x620110, after its propagation:
  *  +0xb38 [gov] = 0x7b0330(gov, the rate, start 0, valueHorizons[1])): every
- *  government's value on the best card per slot type of the seat's policy
- *  scores, by GOVERNMENT_ type */
-export function governmentValues(view: AiView, seat: number, scores: PolicyScores = policyScores(view, seat)): Record<string, number> {
-  const best = slotTypeBest(scores);
+ *  government's value on `best`, the best card per slot type, by
+ *  GOVERNMENT_ type */
+export function governmentValues(view: AiView, seat: number, best: ReadonlyMap<string, number>): Record<string, number> {
   return Object.fromEntries(AI_GOVERNMENTS.map((g) => [g.type, governmentValue(view, seat, g.type, best, AI_VALUE_HORIZON)]));
 }
 

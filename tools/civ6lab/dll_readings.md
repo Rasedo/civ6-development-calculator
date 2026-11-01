@@ -6402,6 +6402,39 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   analysis (1103 t12 minor 2: Craftsmanship completes, Military Tradition,
   726.8 at t11, is taken; the t12 log already scores Military Training
   797.9 first).
+- THE GOVERNMENT VALUES' CARDS (0x620110 -> 0x7b0330, READ): the turn
+  calls 0x7b0330 (0x620413, after the propagation 0x61ee30 at 0x6201dc)
+  before it rewrites the best card per slot type (+0x5b8, 0x620518; 0x7b0330
+  reads the slot type's entry at +0x610), so +0xb38 is written on the slot bests
+  of the policy jobs of the turn before — a card first scored at T counts in
+  a government's value from the analysis of T + 2 (runs/h1_duely1117
+  Caguana: Charismatic Leader first 14.0 at t15, Political Philosophy's
+  Autocracy and Classical Republic 1.5 above from t17, not t16), while the
+  civic value's policy term (0x623b90 per policy, the civic's +0x38 list)
+  reads the turn before's scores. A city-state's founding turn (the AI's
+  turn before its city stands) scores no card: no Policies row at t1 on
+  any recording, and t2's Code of Laws at the 20.0 floor (95.9 at 7 turns,
+  all five runs/h1_duely duels). Port: `minorResearchTurn`
+  (`ResearchState.civicSlotBest`), `sim_civics.py` (`citystate_slot_best`).
+- UNREAD, the analyzers 0 in the port that the governments' values name:
+  EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER 0x6b2060 (@f04260, vtable
+  0xd630e8; Oligarchy's and Theocracy's abilities through EFFECT_GRANT_ABILITY
+  0x6b5b30): on the context's unit (+0x90) and type (+0x5c, +8 its count,
+  COLLECTION_UNIT_COMBAT 0x69ed80 walking the unit types the knowledge base's
+  +0x618 counts nonzero), the type's Combat (Units +0x48) above 0: x =
+  Amount x COMBAT_POWER_SCALING (GlobalParameters +0x210) + GetCombat(unit,
+  0) (0x56dc90) - that Combat, 0 below 0; min(10, trunc(count x x)), the
+  context's +0xc0 its max. The knowledge base's +0x618 (0x5eab80): per unit
+  type the counts of the players at war with the player (IsAtWarWith over
+  the game's player list, the player itself left out). Not ported, and not
+  what puts Political Philosophy 1.0 above ours from the turn it enters the
+  horizon (all five duely duels): an enemy Scout known would give a Warrior
+  10, not 1. EFFECT_ADJUST_UNIT_BUILD_CHARGES
+  0x6aaec0 (@f040a0, vtable 0xd62d40): on the context's unit with charges
+  (+0xed0 above 0), per city of the player its CityBuildAI's best
+  improvement (+0x648) at its best plot (0x5d1cb0), the most of their values
+  (0x5d4ae0), x Amount, between the start and the horizon (0x7a2140), whole;
+  the policy jobs' COLLECTION_PLAYER_TRAINED_UNITS subjects unread.
 - MEASURED on the logs alone (29 duels): the completion's choice over the
   logged scores of the turn before takes the record's pick 3,558 of 3,626
   minor picks and 1,203 of 1,295 majors' (11 "Random Civic Choice" draws in

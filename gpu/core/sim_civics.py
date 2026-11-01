@@ -304,10 +304,12 @@ class SimCivics:
     def _cai_turn(self, s: int, alive: torch.Tensor, cul: torch.Tensor) -> None:
         """the AI's turn (0x620110): the analysis on the government values
         and cards its last turn wrote, kept for the next completion; then the
-        policy jobs on the civics this analysis lists, and on their scores
-        the government values (`governmentValues`) and the best card per
-        civic (`civicPolicyBest`, 0x623b90) kept for the next analysis; with
-        nothing in hand the choice"""
+        policy jobs on the civics this analysis lists, the best card per
+        civic of their scores (`civicPolicyBest`, 0x623b90) and the
+        government values (`governmentValues`) on the best card per slot
+        type of the last turn's jobs, kept for the next analysis, with this
+        turn's best per slot type for the next turn's values; with nothing in
+        hand the choice"""
         ent = self._cai_analysis(s, cul)
         turns, nxt, base, score, owned = ent
         m = alive.unsqueeze(1)
@@ -319,10 +321,14 @@ class SimCivics:
         self.citystate_cai_valid[:, s] = self.citystate_cai_valid[:, s] | alive
         ctx = self._pol_ctx(s)
         sc = self._pol_scores(s, ctx)
-        gov = self._pol_gov_values(s, ctx, sc)
+        slots = self._pol_tables()["slots"]
+        was = {st: self.citystate_slot_best[:, s, k] for k, st in enumerate(slots)}
+        gov = self._pol_gov_values(s, ctx, was)
+        now = self._pol_slot_best(sc)
         cards = self._pol_civic_best(sc, self.citystate_civic_pol_best.shape[2])
         self.citystate_gov_values[:, s] = torch.where(m, gov, self.citystate_gov_values[:, s])
         self.citystate_civic_pol_best[:, s] = torch.where(m, cards, self.citystate_civic_pol_best[:, s])
+        self.citystate_slot_best[:, s] = torch.where(m, torch.stack([now[st] for st in slots], dim=1), self.citystate_slot_best[:, s])
         self.citystate_gov_valid[:, s] = self.citystate_gov_valid[:, s] | alive
         go = alive & (self.citystate_cur_civic[:, s] < 0)
         if bool(go.count_nonzero()):

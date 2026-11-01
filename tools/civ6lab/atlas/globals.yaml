@@ -240,6 +240,14 @@
   context:
     - "...0x198310) adds Amount raw. EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 (@f03d20, vtable 0xd62ad0): the centre's strike 0x249ee0, its whole part above 0, x Amount / 100 truncated (0x51e..."
   review: imported
+- addr: 0xd62d40
+  kind: global
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...give a Warrior 10, not 1. EFFECT_ADJUST_UNIT_BUILD_CHARGES 0x6aaec0 (@f040a0, vtable 0xd62d40): on the context's unit with charges (+0xed0 above 0), per city of the player its CityB..."
+  review: imported
 - addr: 0xd62e78
   kind: global
   status: READ
@@ -269,6 +277,14 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
   context:
     - "- EFFECT_ADJUST_CITY_FREE_POWER (registry 0x6c9640: object @0xf03c90, vtable 0xd630b8, slot 1 0x6b1af0), READ: with the context's player and city, 0x7a67f0(player, city, Amo..."
+  review: imported
+- addr: 0xd630e8
+  kind: global
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...nments' values name: EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER 0x6b2060 (@f04260, vtable 0xd630e8; Oligarchy's and Theocracy's abilities through EFFECT_GRANT_ABILITY 0x6b5b30): on the c..."
   review: imported
 - addr: 0xd63100
   kind: global

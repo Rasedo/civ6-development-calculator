@@ -37,7 +37,7 @@
  * the browser build
 imports this.
  */
-import { AI_AGENDAS, AI_GOVERNMENTS } from '../data/aiTables';
+import { AI_AGENDAS, AI_GOVERNMENTS, AI_SLOT_TYPES } from '../data/aiTables';
 import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { installType } from './minorBuild';
@@ -687,12 +687,15 @@ function researchRecord(r: ResearchState | undefined): number[] {
 }
 
 /** the civics AI's government values in the governments' database order,
- *  then its best card per civic in table order, none before its first turn */
+ *  then its best card per civic in table order, then its best card per slot
+ *  type in the slot types' order, none before its first turn */
 function govValuesRow(r: ResearchState | undefined): number[] {
   const g = r?.civicGovValues;
   if (!g) return [];
   const best = r?.civicPolicyBest ?? {};
-  return [...AI_GOVERNMENTS.map((x) => g[x.type] ?? 0), ...[...CIVIC_IDX.keys()].map((id) => best[installType('civic', id, 'CIVIC_')] ?? 0)];
+  const slots = r?.civicSlotBest ?? {};
+  return [...AI_GOVERNMENTS.map((x) => g[x.type] ?? 0), ...[...CIVIC_IDX.keys()].map((id) => best[installType('civic', id, 'CIVIC_')] ?? 0),
+    ...AI_SLOT_TYPES.map((s) => slots[s.type] ?? 0)];
 }
 
 const wwPairs = (rec: Record<number, number>, live: (v: number) => boolean): number[] => {
