@@ -5540,3 +5540,32 @@ Move's danger flags ...") set no flag 2.
   Courser (46) must count (above D - 5), so D < 51; the engines' D is 51
   (35 + the Palace 3 + two walls 6 + seven envoys 7): one term of 0x24ae80
   over the city-state's centre unread.
+
+## C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins
+
+`minorContractPurchases` (after `minorKnowledge(…, true)` in `minorPhase`),
+`CityState.armyCounted`; `_minor_contract_purchases` after `_minor_knowledge`
+in the minors' phase, `_cv_known(s, before, after)`.
+
+- THE ORDER: the player AI's turn (0x6096c0) registers the tactical
+  knowledge step 0x785f30 (the ageing and the look 0x7877e0, the aimem
+  `tactical` / `log` sites) in its first job group (0x60b4c0) and the
+  economic AI's turn 0x687bf0 (the savings, then the contract purchases
+  0x5f3c40's walk) in the next (0x60e8c0). A unit the purchase makes is
+  recorded at once (player signal +0xc0 -> 0x7874a0), so its own record
+  stands at the end look, never at the log: runs/h1_duely1117 city-state 3's
+  t19 Warrior 393220, 2's t59 Archer 655365, 4's t69 Heavy Chariot 589825,
+  3's t102 Crossbowman 1245186; runs/h1_duely1124 3's t72 Heavy Chariot
+  (each absent at the log site, at age 0 at the end look). The engines buy
+  after the look: knowledge.army now matches on each of those turns (1117
+  t19 / t22 / t48 / t59 / t62 / t69 / t73 / t102, 1124 t18 / t27 / t40 /
+  t56 / t72, 1127 t22 / t30 / t46, 1128 t25 / t77).
+- The operations' candidates are weighed before the look (`minorMilitaryTurn`,
+  the camps' evidence of "C-97: the operations"), so before the purchases:
+  a unit bought that turn is no candidate's own strength (1117 t69 Attack
+  Barb Camp from t70, as logged), with no Movement test.
+- The unit production table (`armyCounted`) keeps the records the ageing
+  kept and those the purchases add; none the look's sightings add.
+- OPEN: where the military AI's turn (0x722690, registered after the
+  economic AI) reads its camps and own units from; the purchases' records
+  in the city AI's table read off no case.

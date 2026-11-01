@@ -35,7 +35,7 @@ import { detectBoosts } from './boosts';
 import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefensesFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
-import { freeCityThreat, minorAiTurn, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
+import { freeCityThreat, minorAiTurn, minorContractPurchases, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
 import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
@@ -92,7 +92,8 @@ import { militaryFavTech } from './operations/unitRows';
  *  and civics AIs' turns on the city so grown (`minorResearchAi`), its military
  *  AI's Combat Desire (`minorCombatDesire`), its savings and military AI's
  *  turn (`minorMilitaryTurn`), then its knowledge base's look
- *  (`minorKnowledge`), then its actions: a research
+ *  (`minorKnowledge`), its contract purchases (`minorContractPurchases`),
+ *  then its actions: a research
  *  completion's upgrades, its city AI's turn (`minorAiTurn`: its builds,
  *  purchases and trees, the trees' Builders' work), its routes' walk and a
  *  free Trader's route, its city's ranged strikes (the majors' own body
@@ -144,10 +145,14 @@ export function minorPhase(state: GameState): void {
     // t9: the barbarian Quadrireme the look records not counted, its Warrior
     // 10.1 over the Walls' 9.96, the game's Build City Building on the
     // Warrior at 10.0; runs/h1_duely1128 Hong Kong t106: Bologna's two
-    // Crossbowmen aged out uncounted, the game's Warrior)
+    // Crossbowmen aged out uncounted, the game's Warrior); its contract
+    // purchases after the look (`minorContractPurchases`), the record of a
+    // unit they make counted
     const before = new Set(cityState.armyKnown ?? []);
     minorKnowledge(state, cityState, true);
-    cityState.armyCounted = minorArmyCounts((cityState.armyKnown ?? []).filter((r) => before.has(r)));
+    const sighted = new Set((cityState.armyKnown ?? []).filter((r) => !before.has(r)));
+    minorContractPurchases(state, cityState);
+    cityState.armyCounted = minorArmyCounts((cityState.armyKnown ?? []).filter((r) => !sighted.has(r)));
     // its "Upgrade Units" trees' trigger: a technology gained
     // (TRIGGER_TECH_UPGRADE, AI_EVENT_GAIN_TECH). A civic gained alone starts
     // none, its TRIGGER_CIVIC_UPGRADE row (AI_EVENT_GAIN_CIVIC) notwithstanding:

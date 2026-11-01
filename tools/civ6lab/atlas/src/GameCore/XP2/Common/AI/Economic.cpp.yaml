@@ -34,6 +34,7 @@
       turn: 22
       value: "Valletta's Builder 47 (105) passes at t22 as logged: SLUSH + UNITS 105.47 with the remainder, 104.41 without"
   impl:
+    - cpu/core/minorCityAi.ts:minorContractPurchases
     - cpu/core/aiEconomic.ts:SLOT_PLOTS
     - cpu/core/aiEconomic.ts:savingsTurn
     - cpu/core/aiWeights.ts:strategies
@@ -49,6 +50,7 @@
     - gpu/core/sim_cityvalue.py:live_gold_boost
     - gpu/core/sim_cityvalue.py:_gold_boost_of
   readings:
+    - "C-129: a city-state's contract purchases come after its knowledge base's look"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
@@ -58,6 +60,7 @@
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+    - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/dp2/NOTES.md: ...2, -cost) (refund); r==0xc -> +0x6338[to][a]=1; always 0x64a300(+0xc28[to], a). - Economic AI turn 0x687bf0: delta = treasury(+0x13a0 +0xf8) - last(+0x1b8); each saving slot i:   savings(+0x540)[i] += delta..."

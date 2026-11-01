@@ -1089,8 +1089,7 @@ class SimMinorOps:
 
     def _mops_army_near(self, s: int, plot: torch.Tensor, radius: int, own: bool, u: dict) -> torch.Tensor:
         """`armyStrength` about `plot` [B] within `radius`: the minor's own
-        units as they stand, none whose turn is done (Movement 0: a unit
-        bought this turn), and its knowledge base's records (`recentOf`) of
+        units as they stand and its knowledge base's records (`recentOf`) of
         its units gone (`own`), or its records of the barbarians'"""
         r = self._mops_records(s)
         pz = plot.clamp(min=0).unsqueeze(1)
@@ -1105,7 +1104,7 @@ class SimMinorOps:
         gone = r["recent"] & (r["owner"] == self._mops_seat(s)) & ~standing & (rd <= radius)
         d = self.pair_dist[u["tile"].clamp(min=0), pz].to(torch.long)
         term = self._mops_army_term(u["combat"], u["ranged"], u["dmg"])
-        m = u["own"] & (u["mp"] > 0) & (d <= radius)
+        m = u["own"] & (d <= radius)
         return (torch.where(m, term, torch.zeros_like(term)).sum(dim=1)
                 + torch.where(gone, rterm, torch.zeros_like(rterm)).sum(dim=1))
 

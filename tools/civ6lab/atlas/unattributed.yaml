@@ -2457,6 +2457,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...PRODUCTION] (0x5d83c0 per yield), weights printed from r14+0x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCHASE 0x5f3ee0; queued '... CONTRACT %d' 0x5f3710. YIELD globals: f2f974 FOOD f2f978 PROD..."
   context:
@@ -2595,6 +2596,7 @@
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...SSES (READ): 0x6096c0 pushes three job lists (std::function, 0x40 bytes each) — +0x370 (0x60e8c0: the cities 0x5c2650, ..., the Economic AI 0x687bf0, the military 0x722690), +0x388 (0x..."
@@ -3575,6 +3577,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om the behaviour tree — \"HL: Rock Band Move\" (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a unit's name for its log (the band template over 118 and 155): the AI'..."

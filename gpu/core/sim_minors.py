@@ -21,7 +21,7 @@ class SimMinors:
         # it stands after that (its city presses a religion it follows on the
         # founder's turn); its military AI's Combat Desire; its savings and
         # military AI's turn (`_minor_military_turn`); its knowledge
-        # base's look; then its actions — the
+        # base's look; its contract purchases; then its actions — the
         # upgrades a completion triggers, its city AI's turn (`_minor_ai_turn`:
         # its builds, purchases and trees, the trees' Builders' work), its
         # trade routes, its city's ranged strikes (the majors' own body,
@@ -62,10 +62,14 @@ class SimMinors:
             self._minor_military_turn(s)
             # its city AI's turn reads the unit production table on the
             # records the look's ageing keeps, none its sightings add
-            # (`CityState.armyCounted`: those numbered before the look)
+            # (`CityState.armyCounted`: those numbered before the look); its
+            # contract purchases after the look (`minorContractPurchases`),
+            # the record of a unit they make counted (numbered after it)
             before = self.citystate_kb_next[:, s].clone()
             self._minor_knowledge(s, True)
-            self._cv_counted[s] = self._cv_known(s, before)
+            after = self.citystate_kb_next[:, s].clone()
+            self._minor_contract_purchases(s, self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0))
+            self._cv_counted[s] = self._cv_known(s, before, after)
             # its "Upgrade Units" trees' trigger: a technology gained
             # (`minorTurn`: a civic gained alone starts none)
             self.mops_upg_trig[:, s] |= alive & (techs > 0)

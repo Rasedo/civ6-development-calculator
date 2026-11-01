@@ -11,10 +11,8 @@
   cases:
     - recording: h1_duely1117
       turn: 69
-      value: "city-state 4's Heavy Chariot 589825 bought: no Attack Barb Camp candidate until t70 (a fit: no unit at Movement 0 counts)"
+      value: "city-state 4's Heavy Chariot 589825 bought: no Attack Barb Camp candidate until t70 (weighed before the purchases, which come after the look)"
   impl:
-    - cpu/core/minorOps.ts:minorEnv
-    - gpu/core/sim_minorops.py:_mops_army_near
     - cpu/core/operations/evaluate.ts:distLimit
     - cpu/core/operations/evaluate.ts:evaluate
     - cpu/core/operations/evaluate.ts:oddsOf

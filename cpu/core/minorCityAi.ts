@@ -7,7 +7,8 @@
  *
  *  - B: the Economic AI's savings turn (0x687bf0, `savingsTurn`), the
  *    military AI's turn (`minorOpsEvaluate`) — both `minorMilitaryTurn`,
- *    before the knowledge base's look;
+ *    before the knowledge base's look — and after the look its contract
+ *    purchases (`minorContractPurchases`);
  *  - A: the city's update (0x5ce680): its threat (0x5cbd10, `cityThreat`
  *    on its knowledge base's records; its operations, against no enemy,
  *    leave it as it is), the contract in hand checked (0x5d7e00), the slots
@@ -860,14 +861,26 @@ export function minorMilitaryTurn(state: GameState, cs: CityState): void {
   savingsTurn(eco, Math.trunc(cs.treasury * FX), minorGreatPersonClass(state));
   // its Gold boost, which its Gold weight reads until its next turn
   eco.goldBoost = economicGoldBoost(cs.netIncome ?? 0);
-  // its contract purchases, in its city on the threat its last update stored
-  if (cs.cityAi) {
-    const pcity = minorPurchaseCity(state, cs, cs.threat ?? -1);
-    const bcity = minorBuildingPurchaseCity(state, cs);
-    purchaseContracts(eco, cs.cityAi, false, (c) => (c.city === -1 || c.city === pcity.id ? [pcity] : []),
-      (_c, u) => minorBuyInstall(state, cs, u), (c) => (c.city === -1 || c.city === pcity.id ? bcity : null));
-  }
   minorOpsEvaluate(state, cs);
+}
+
+/**
+ * THE MINOR'S CONTRACT PURCHASES (0x687bf0 after the savings), in its city
+ * on the threat its last update stored: after its knowledge base's look, so
+ * its record of a unit it buys (the birth signal 0x7874a0) lands after the
+ * look's log and before its end look, and its operations' candidates, weighed
+ * before, never count it (runs/h1_duely1117: city-state 3's t19 Warrior,
+ * 2's t59 Archer, 4's t69 Heavy Chariot — Attack Barb Camp from t70 —, 3's
+ * t102 Crossbowman; each absent at the aimem log site, at age 0 at the end
+ * look).
+ */
+export function minorContractPurchases(state: GameState, cs: CityState): void {
+  if (cs.centerIndex < 0 || !cs.cityAi) return;
+  const eco = (cs.economy ??= newEconomicMemory());
+  const pcity = minorPurchaseCity(state, cs, cs.threat ?? -1);
+  const bcity = minorBuildingPurchaseCity(state, cs);
+  purchaseContracts(eco, cs.cityAi, false, (c) => (c.city === -1 || c.city === pcity.id ? [pcity] : []),
+    (_c, u) => minorBuyInstall(state, cs, u), (c) => (c.city === -1 || c.city === pcity.id ? bcity : null));
 }
 
 /** a Great Person class is available in the game (0x2f7eb0, the majors'

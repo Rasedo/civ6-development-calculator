@@ -6,7 +6,8 @@ city events, trees and contracts"). Each city-state's turn after its step
 
  - B: the Economic AI's savings turn (0x687bf0, `_cv_savings_turn`), the
    military AI's turn (`_mops_evaluate`, sim_minorops.py) — both
-   `_minor_military_turn`, before the knowledge base's look;
+   `_minor_military_turn`, before the knowledge base's look — and after the
+   look its contract purchases (`_minor_contract_purchases`);
  - A: the city's update (0x5ce680): its threat (0x5cbd10, `_minor_threat`),
    the contract in hand checked (0x5d7e00), the slots of trees no longer
    running freed, the plot analysis (0x5ce970, `_minor_plot_evals`), the
@@ -113,8 +114,6 @@ class SimMinorAi:
         # Gold weight reads until its next turn (`economicGoldBoost`)
         boost = _gold_boost_of(self.citystate_net_income[:, s])
         self.citystate_gold_boost[:, s] = torch.where(alive, boost, self.citystate_gold_boost[:, s])
-        # its contract purchases, in its city on the threat its last update stored
-        self._minor_contract_purchases(s, alive)
         self._mops_evaluate(s)
 
     def _minor_gp_class(self) -> torch.Tensor:

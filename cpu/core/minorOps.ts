@@ -122,17 +122,13 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
     // turns (runs/h1_duelw1121 Antioch: Attack Barb Camp invalid at t5 on
     // its two Warriors as they stand, valid at t9 alone, its Warrior lost
     // at t7 counted from its t6 record once the camp's Scout's record has
-    // aged out, invalid again at t10); none whose turn is done as the
-    // candidates are weighed: a unit its contract purchases made this turn
-    // sits its turn out at Movement 0 (the creation handler 0x60a440 sets
-    // turn done, 0x570b40; runs/h1_duely1117 t69 city-state 4's Heavy
-    // Chariot 589825 bought, Attack Barb Camp not started until t70)
+    // aged out, invalid again at t10)
     army: (p) => {
       if (p !== cs.seat) return recentOf(cs, p);
       const live = fresh().units(cs.seat);
       const ids = new Set(live.map((u) => u.id));
-      return [...live.filter((u) => u.movesLeft > 0).map((u) => ({ id: u.id, owner: cs.seat, type: u.type, plot: u.plot, combat: u.combat,
-        ranged: u.ranged, damage: u.damage, seen: state.turn })), ...recentOf(cs, p).filter((r) => !ids.has(r.id))];
+      return [...live.map((u) => ({ id: u.id, owner: cs.seat, type: u.type, plot: u.plot, combat: u.combat, ranged: u.ranged, damage: u.damage, seen: state.turn })),
+        ...recentOf(cs, p).filter((r) => !ids.has(r.id))];
     },
     camps: () => cs.campsKnown ?? [],
     known: () => fresh().knownCities(cs.seat),

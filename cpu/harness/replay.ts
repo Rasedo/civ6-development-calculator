@@ -95,7 +95,7 @@ import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, m
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
-import { holdMinorClears, minorAiTurn, minorGreatPersonClass, minorMilitaryTurn, minorSecondHook, traceMinorAi } from '../core/minorCityAi';
+import { holdMinorClears, minorAiTurn, minorContractPurchases, minorGreatPersonClass, minorMilitaryTurn, minorSecondHook, traceMinorAi } from '../core/minorCityAi';
 import { UPGRADE_MOVE, cityStateMilitary, holdSecondHook, traceMinorOps, unupgradedDeleted, upgradeMayGo } from '../core/minorOps';
 import { barbSpawnChange, holdBarbCaptures, traceBarbOps } from '../core/barbarianOps';
 import { opsOf } from '../core/operations/manager';
@@ -2516,6 +2516,7 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
       const fresh = !placed.cityAi;
       minorMilitaryTurn(state, placed);
       minorKnowledge(state, placed, false);
+      minorContractPurchases(state, placed);
       minorAiTurn(state, placed, fresh);
       minorSecondHook(state, placed, fresh);
       detectBoosts(state, placed.seat);
