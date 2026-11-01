@@ -222,7 +222,7 @@ class SimBarbOps:
         combat_ai = self._bop_combat_ai.take(ut)
         full = int(self.rules.combat["unitHp"])
         dmg = (full - self.barb_unit_hp).clamp(min=0)
-        st = torch.maximum(self._ai_combat("barb"), self._type_ranged_strength.take(ut)) - torch.div(dmg, 10, rounding_mode="floor")
+        st = torch.maximum(self._ai_combat("barb"), self._ai_ranged("barb")) - torch.div(dmg, 10, rounding_mode="floor")
         for k in range(int(self.n_tribes.max()) if self.B else 0):
             on = (self.tribe_op[:, k] > 0) & ~self.tribe_op_done[:, k]
             if not bool(on.count_nonzero()):
@@ -299,7 +299,11 @@ class SimBarbOps:
             self.bcap_form[r, ci] = False
             self.bcap_ready[r, ci] = False
             self.bcap_str[r, ci] = 0
-            self.bcap_estr[r, ci] = 0
+            # the start's strengths (0x73a120 -> 0x73eb60): the enemy's about
+            # the captive's plot, before the captive and its captor join
+            pl_full = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+            pl_full[r] = plot
+            self.bcap_estr[r, ci] = self._ops_enemy_str(BARB_SEAT, self.BK, pl_full, torch.full_like(pl_full, -1))[r]
             self.bcap_store[r, ci] = False
             self.bcap_store_goal[r, ci] = -1
         self.barb_capq.fill_(-1)
@@ -796,7 +800,7 @@ class SimBarbOps:
         uc = uu.clamp(min=0)
         du = d.repeat(1, uk.shape[1] // self.T)  # [B, U]
         et = self.unit_type.gather(1, uc).clamp(min=0, max=self.NU - 1)
-        ecb, erg, ebm = cb_all.gather(1, uc), self._type_ranged_strength.take(et), self._type_bombard.take(et)
+        ecb, erg, ebm = cb_all.gather(1, uc), self._ai_ranged().gather(1, uc), self._ai_bombard().gather(1, uc)
         full_all = torch.cat((self._full_mp("major") - self.major_unit_aura_mp,
                               self._full_mp("barb") - self.barb_unit_aura_mp), dim=1)
         emm = torch.div(full_all.gather(1, uc), self._mp_scale, rounding_mode="floor")

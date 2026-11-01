@@ -6690,3 +6690,45 @@ aiModifiers.ts), the replay's `MINOR_STORES`; GPU `citystate_gp_points`,
   district's buildings, 0x43d5f9) and the +0x628 class list are not ported
   (no city-state recording reads them); a major's store between its turns
   (the flat bonus reads it, the engines read `greatPersonPointsPerTurn`).
+
+## C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins
+
+`startOperation` (cpu/core/operations/manager.ts) through `refreshStrengths`;
+`barbOpStart` (cpu/core/barbarianOps.ts); `aiStrengths`, `aiFormed`,
+`aiRanged` (cpu/core/tactical.ts), read by `unitView` and `militaryStrength`
+(cpu/core/aiView.ts). GPU `_mops_start` (gpu/core/sim_minorops.py),
+`_barb_captures` (gpu/core/sim_barbops.py), `_ai_combat`, `_ai_formed`,
+`_ai_ranged`, `_ai_bombard` (gpu/core/sim_tactics.py) at the members'
+strength (`_mops_units`, `_barb_ops_refresh`), the endangered sum, Garrison
+City, the danger map, the flee test and the stored unit strength
+(`_store_unit_strength`).
+
+- THE START (0x73a120): after the teams (0x73a5e0) and the target and rally
+  (0x73e7d0), before the "Started" line, the enemy's strength about the
+  target (0x73eb60) and the team rebuild and update (0x73f7d0, dl 1: the
+  team update's fifth argument, which only skips its member release at
+  0x73fffd). The start by name (0x7265b0) passes enemy -1 (the watched
+  +0x248, value +0x2a0); the barbarians' city assault (0x1497d0) sets its
+  enemy after it, so the start counts every player.
+- THE AI STRENGTHS (0x56dc90 with dl 0, 0x56e3e0, 0x56daa0): the type's
+  Combat (embarked: the era's EmbarkedStrength), RangedCombat, Bombard, each
+  plus the unit's own term (+0x18a8 / +0x18ac / +0x18b0) where above 0; a
+  strength above 0 adds the formation's (+0xc90: 1 a Corps,
+  COMBAT_CORPS_STRENGTH_MODIFIER gp +0x198; 2 an Army,
+  COMBAT_ARMY_STRENGTH_MODIFIER gp +0x17c) and the player's 0x4f2b50 term;
+  Combat and RangedCombat then 0x56df30 (unit +0x1170 x the era's
+  ChronologyIndex). The operations' member strength, the recruit's offer,
+  the danger map and the standing strength read them.
+- CONFIRMED (one-seed aimem traces): runs/h1_duely1117 t9 the barbarians'
+  Barbarian Attack on 12:19 at Target Str 43 in its start turn, its tree
+  unticked; runs/h1_duely1121 t33 Barbarian Attack's 53 likewise;
+  runs/h1_duely1124 t184-212 city-state 3's Attack Barb Camp with the
+  Cuirassier Corps 1835008 (UnitFormCorps t149) at the game's 58-90 (t190:
+  70 = 64 + 10 - 4 at 40 damage); runs/h1_duely1117 t169-179 city-state 3's
+  and t203-213 city-state 4's City Defense with their Corps at 70 / 90 /
+  100.
+- OPEN: the knowledge base's records carry no formation (0x5eadb0's kinds
+  1 / 2 add the same terms to an enemy's Corps / Army: the target side);
+  the unit terms +0x18a8 / +0x18ac / +0x18b0, +0x1170 and 0x4f2b50 held 0;
+  a capture's start reading a record the game adds later (1117 t33 the
+  Scout 851971 on 33:12, 33 against 23); 1124 t111 a capture's start at 167 against 97, untraced.

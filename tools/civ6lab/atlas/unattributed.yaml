@@ -766,7 +766,7 @@
   final: 0xdd220
   kind: function
   name: tribeStartAssault
-  semantics: "the city assault's start: refused while the raid or the assault stands; the operation, its tree's tags. It sets op +0x2a0 to the city's owner — the assault's enemy, so its Attack Units takes that player's units (and any civilian), and Siege City's update errors with +0x2a0 at -1."
+  semantics: "the city assault's start: refused while the raid or the assault stands; the operation, its tree's tags. It sets op +0x2a0 to the city's owner — the assault's enemy, so its Attack Units takes that player's units (and any civilian), and Siege City's update errors with +0x2a0 at -1. The enemy is set after the start by name (0x7265b0 -> 0x73a120 with -1, then 0x73e7d0, then the city's owner into the watched +0x248 at 0x1498a5), so the start's strengths count every player."
   status: READ
   cases:
     - recording: h1_duelw1117-1128
@@ -777,6 +777,7 @@
     - gpu/core/sim_barbops.py:_barb_start_op
     - cpu/core/barbarianOps.ts:barbarianTrees
   readings:
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -4073,6 +4074,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's flag any, el..."

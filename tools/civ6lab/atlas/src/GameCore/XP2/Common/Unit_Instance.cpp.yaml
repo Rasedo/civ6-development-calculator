@@ -126,15 +126,21 @@
 - addr: 0x56daa0
   final: 0x3a3480
   kind: function
-  semantics: a unit's bombard strength.
+  semantics: "a unit's bombard strength: the type's Bombard plus +0x18b0 where above 0; above 0 the formation's (+0xc90: Corps gp +0x198, Army +0x17c, with 0x4f2b50)."
   status: READ
   cases:
     - recording: 1120
       turn: 50
       value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
-  impl: [cpu/core/tactical.ts:canFight, cpu/core/tactical.ts:aiStrengths]
+  impl:
+    - cpu/core/tactical.ts:canFight
+    - cpu/core/tactical.ts:aiStrengths
+    - gpu/core/sim_tactics.py:_ai_bombard
+    - cpu/core/tactical.ts:aiFormed
+    - gpu/core/sim_tactics.py:_ai_formed
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"
@@ -169,9 +175,12 @@
 - addr: 0x56dc90
   final: 0x3a3590
   kind: function
-  semantics: a unit's Combat.
+  semantics: "a unit's Combat (dl 0 the AI's): the type's Combat (row +0x48; with its flag2 0x20 the owner's best trained melee, PlayerStats +0xf0, where above); with dl 0 an embarked unit (not +0x18c3, formation class neither 1 nor 2, +0x21e0 -1) its owner's era's EmbarkedStrength; plus +0x18a8 where above 0; above 0, a Corps (+0xc90 1) adds COMBAT_CORPS_STRENGTH_MODIFIER (gp +0x198) and an Army (2) COMBAT_ARMY_STRENGTH_MODIFIER (gp +0x17c), each with the player's 0x4f2b50 term; above 0, 0x56df30 (+0x1170 x the era's ChronologyIndex)."
   status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 190
+      value: "city-state 3's Cuirassier Corps 1835008 (UnitFormCorps t149), 40 damage: Attack Barb Camp's team strength 70 = 64 + 10 - 4"
     - recording: h1_duelw1117
       turn: 107
       value: the city-state's embarked Trebuchet at its era's embarked strength
@@ -187,6 +196,8 @@
       turn: 191
       value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
   impl:
+    - cpu/core/tactical.ts:aiFormed
+    - gpu/core/sim_tactics.py:_ai_formed
     - cpu/core/tactical.ts:canFight
     - cpu/core/tactical.ts:aiStrengths
     - cpu/core/tactical.ts:within
@@ -200,6 +211,7 @@
     - gpu/core/sim_civics.py:_store_unit_strength
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-94: the wounded law and the garrison — READ"
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
@@ -224,7 +236,9 @@
   kind: function
   semantics: the formation strength term of the AI's combat strength.
   status: PARTLY
-  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  readings:
+    - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...place; then +0x18a8 where positive, the formation's strength (+0xc90 1 corps, 2 army), 0x56df30. GetRangedCombat 0x56e3e0 and GetBombardCombat 0x56daa0 have no embarked test. Of the A...
@@ -328,15 +342,23 @@
 - addr: 0x56e3e0
   final: 0x3a3c80
   kind: function
-  semantics: a unit's ranged strength.
+  semantics: "a unit's ranged strength: the type's RangedCombat (row +0x6c), plus +0x18ac where above 0; above 0 the formation's (+0xc90: Corps gp +0x198, Army +0x17c, with 0x4f2b50) and 0x56df30."
   status: READ
   cases:
     - recording: 1120
       turn: 50
       value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
-  impl: [cpu/core/units.ts:ranged, cpu/core/tactical.ts:canFight, cpu/core/tactical.ts:aiStrengths]
+  impl:
+    - cpu/core/units.ts:ranged
+    - cpu/core/tactical.ts:canFight
+    - cpu/core/tactical.ts:aiStrengths
+    - cpu/core/tactical.ts:aiRanged
+    - gpu/core/sim_tactics.py:_ai_ranged
+    - cpu/core/tactical.ts:aiFormed
+    - gpu/core/sim_tactics.py:_ai_formed
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"

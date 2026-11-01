@@ -177,7 +177,10 @@ function limitsOf(view: AiView, seat: number): { base: Map<string, number>; perW
 const stagingPlots = (view: AiView, seat: number): readonly number[] => view.cityPlots(seat);
 
 /** start an operation (0x73a120): a pool slot, its teams, target and rally,
- *  its tree */
+ *  its tree; then, before its "Started" line, the enemy's strength about the
+ *  target (0x73eb60) and the teams' update (0x73f7d0), as the refresh takes
+ *  them (runs/h1_duely1117 t9: the barbarians' Barbarian Attack on 12:19
+ *  holds Target Str 43 in its start turn, its tree unticked) */
 function startOperation(ai: OpsAi, env: OpsEnv, def: AiOpDef, enemy: number, target: number, rally: number): Operation {
   const nodes = treeOf(def.tree ?? '');
   const op: Operation = {
@@ -191,6 +194,7 @@ function startOperation(ai: OpsAi, env: OpsEnv, def: AiOpDef, enemy: number, tar
   }
   const slot = ai.free.length ? ai.free.pop()! : ai.slots.length;
   ai.slots[slot] = op;
+  refreshStrengths(context(ai, env, op));
   env.log(`${def.name}, Started`);
   return op;
 }

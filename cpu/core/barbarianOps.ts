@@ -231,14 +231,16 @@ function barbEnv(state: GameState, pass: Pass | null): OpsEnv {
  * A TRIBE STARTS ITS RAID OR ITS CITY ASSAULT (0x149980 / 0x1497d0): never
  * beside another; the manager's start by name with the city's plot, the
  * target set (0x73e7d0) — the rally the tribe's camp —, the assault against
- * the city's owner (op +0x2a0), the tree's Tribe tag the tribe.
+ * the city's owner (op +0x2a0) after the start (whose strengths count every
+ * player), the tree's Tribe tag the tribe.
  * Whether it started; its tree ticks in the trees' walk.
  */
 export function barbOpStart(state: GameState, tribe: BarbTribe, target: BarbTarget, assault: boolean): boolean {
   if (tribe.op) return false;
   const ai = opsOfBarbs(state);
   const env = barbEnv(state, null);
-  const op = startOperationAt(ai, env, assault ? BARB_ASSAULT_DEF : BARB_RAID_DEF, assault ? target.seat : -1, target.plot, tribe.plot);
+  const op = startOperationAt(ai, env, assault ? BARB_ASSAULT_DEF : BARB_RAID_DEF, -1, target.plot, tribe.plot);
+  if (assault) op.enemy = target.seat;
   op.triggerValue = (state.barbTribes ?? []).indexOf(tribe);
   tribe.op = { id: op.id, assault, target };
   return true;

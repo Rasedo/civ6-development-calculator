@@ -164,10 +164,21 @@
 - addr: 0x73a120
   final: 0x4ddd60
   kind: function
-  semantics: "an operation's start (\"Started\" line)."
-  status: PARTLY
-  impl: [cpu/core/operations/manager.ts:startOperation, gpu/core/sim_minorops.py:_mops_start]
+  semantics: "an operation's start: the player (+0x98), the enemy (arg5, the watched +0x248 whose value is +0x2a0; 0x7265b0 passes -1), its teams (0x73a5e0), the target and rally (0x73e7d0), the tree; then the enemy's strength about the target (0x73eb60) and the team rebuild and update (0x73f7d0 with dl 1, r8b 1: the team update's fifth argument set, its member release at 0x73fffd skipped) before the \"Started\" line (rbp the log)."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 9
+      value: the barbarians' Barbarian Attack on 12:19 holds Target Str 43 in its start turn, its tree unticked (aimem endlook)
+    - recording: h1_duely1121
+      turn: 33
+      value: Barbarian Attack started holds 0|53 at the end look
+  impl:
+    - cpu/core/operations/manager.ts:startOperation
+    - gpu/core/sim_minorops.py:_mops_start
+    - gpu/core/sim_barbops.py:_barb_captures
   readings:
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
@@ -175,6 +186,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...(0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
+  review: reviewed
+- addr: 0x73a5e0
+  final: 0x4de200
+  kind: function
+  semantics: "an operation's teams from its definition (the assert \"Trying to initialize an operation with n... m_opDefinition->Teams.size() > 0\"), called by the start 0x73a120 before the target (0x73e7d0); its team conditions read as newTeams / the GPU's IsCoastalTarget, the body itself unread."
+  status: PARTLY
+  readings:
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
+  context:
+    - "- THE START (0x73a120): after the teams (0x73a5e0) and the target and rally (0x73e7d0), before the \"Started\" line, the enemy's strength a..."
   review: reviewed
 - addr: 0x73a840
   final: 0x4de360
@@ -403,6 +424,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
     - "C-60: the Free Cities Raid"
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x73e870
@@ -453,6 +475,9 @@
     - cpu/core/operations/nodes.ts:enemyStrengthAbout
     - gpu/core/sim_minorops.py:_ops_counted
     - gpu/core/sim_minorops.py:_ops_enemy_str
+    - cpu/core/operations/manager.ts:startOperation
+    - gpu/core/sim_barbops.py:_barb_captures
+    - gpu/core/sim_minorops.py:_mops_start
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -461,15 +486,20 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-129: an operation's enemy strength reads the knowledge base after the tactical look, before a later player's blows — the aimem sites read, the replay's copy"
     - "C-95: an operation's enemy strength"
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
   context:
     - "...; a type of none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120,..."
   review: reviewed
 - addr: 0x73f7d0
   final: 0x4e2670
   kind: function
-  semantics: "the team rebuild (before the team update): lists the operation's units by its id (0x6092c0 on +0x720) and adds each one alive that no team of it holds to its first team (0x737f90); resets no field."
+  semantics: "the team rebuild (before the team update): lists the operation's units by its id (0x6092c0 on +0x720) and adds each one alive that no team of it holds to its first team (0x737f90); resets no field. Its dl goes to the team update as its fifth argument (the start 0x73a120 passes 1, the refreshes 0x727510 / 0x728010 0), its r8b as the sixth (1 at all three)."
   status: PARTLY
-  impl: [cpu/core/operations/assault.ts:WEIGHED, cpu/core/operations/nodes.ts:refreshStrengths]
+  impl:
+    - cpu/core/operations/assault.ts:WEIGHED
+    - cpu/core/operations/nodes.ts:refreshStrengths
+    - cpu/core/operations/manager.ts:startOperation
+    - gpu/core/sim_minorops.py:_mops_start
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -478,6 +508,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...f none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")..."
@@ -512,5 +543,6 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
     - "C-99: Defend Units' ship release and the team update's members — READ (0x73d1f0, 0x73fba0 at 0x73fc75 -> 0x732cd0), both twins"
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

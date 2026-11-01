@@ -15,7 +15,7 @@ import { CITY_STRIKE_RANGE, plotPressureLead } from './phase';
 import { governorSum } from './governors';
 import { CITY_STATE_SUZERAIN_BONUS, MINOR_UPGRADE_GOLD, govInfluence } from '../data/cityStates';
 import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf, warsOf } from './seats';
-import { aiDefenderOf, aiStrengths, districtHealth, planUnit, reachPlots, tacticalTargets, type Target } from './tactical';
+import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit, reachPlots, tacticalTargets, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
@@ -764,7 +764,7 @@ function militaryStrength(state: GameState, seat: number, withGold: boolean): nu
   for (const u of unitsOf(state, seat)) {
     const d = UNITS[u.type];
     if (!d) continue;
-    const str = Math.max(aiStrengths(state, u).melee, d.ranged?.strength ?? 0) << 8;
+    const str = Math.max(aiStrengths(state, u).melee, aiRanged(u)) << 8;
     const left = Math.max(0, u.hp) << 8;
     sum += Math.trunc((Math.trunc((str * left) / 256) * 256) / (UNIT_HP << 8));
   }
@@ -788,8 +788,8 @@ export function storeUnitStrength(state: GameState, seat: number): void {
 function unitView(state: GameState, u: Unit): AiUnitView {
   const d = UNITS[u.type];
   return { id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_'), plot: u.tileIndex, founder: !!d?.settler,
-    combat: aiStrengths(state, u).melee, ranged: d?.ranged?.strength ?? 0, range: d?.ranged?.range ?? 0, damage: UNIT_HP - u.hp,
+    combat: aiStrengths(state, u).melee, ranged: aiRanged(u), range: d?.ranged?.range ?? 0, damage: UNIT_HP - u.hp,
     movesLeft: Math.trunc(u.movesLeft * 256 / MP_SCALE),
     baseMoves: u.embarked && !d?.naval ? EMBARK_MOVES + embarkTechMoves(state, u.seat) : d?.moves ?? 0,
-    bombard: d?.bombard ?? 0, domain: d?.air ? 'air' : d?.naval ? 'sea' : 'land', defender: aiDefenderOf(state, u) };
+    bombard: aiFormed(u, d?.bombard ?? 0), domain: d?.air ? 'air' : d?.naval ? 'sea' : 'land', defender: aiDefenderOf(state, u) };
 }

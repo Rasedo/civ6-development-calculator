@@ -165,6 +165,7 @@
   status: UNREAD
   readings:
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-99: an operation's start takes its strengths; a unit's AI strengths with its formation — READ (0x73a120, 0x56dc90, 0x56e3e0, 0x56daa0, 0x1497d0), both twins"
   context:
     - ...E_MULTIPLIER x -0.01f cut toward 0; the entries' kinds 1 / 2 add gp +0x198 / +0x17c and 0x4f2b50 terms, unread); the odds min(0.9, ((ours - theirs) / min(best ours, best theirs) + 1) x...
   review: imported

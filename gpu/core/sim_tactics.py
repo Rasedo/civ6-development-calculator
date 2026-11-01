@@ -3604,7 +3604,7 @@ class SimTactics:
         """[B, P] long — `aiStrengths`' combat over pool `pre` (the merged
         pool for None), 0x56dc90 with 0: the type's Combat, an embarked land
         combat unit's its owner's era's embarked strength
-        (`_embarked_def_cs`)."""
+        (`_embarked_def_cs`); above 0 with its formation's (`_ai_formed`)."""
         p = "unit" if pre is None else f"{pre}_unit"
         ut = getattr(self, f"{p}_type").clamp(min=0, max=self.NU - 1)
         seat = getattr(self, f"{p}_seat")
@@ -3614,7 +3614,27 @@ class SimTactics:
             for sv in torch.unique(seat[emb]).tolist():
                 cs = self._embarked_def_cs(torch.full((self.B,), int(sv), dtype=torch.long, device=self.device))
                 out = torch.where(emb & (seat == sv), cs.unsqueeze(1).to(out.dtype), out)
-        return out
+        return self._ai_formed(pre, out)
+
+    def _ai_formed(self, pre: str | None, strength: torch.Tensor) -> torch.Tensor:
+        """[B, P] — `aiFormed` over pool `pre` (the merged pool for None): a
+        strength above 0 plus its unit's formation's (0x56dc90 at 0x56dd98,
+        0x56e3e0, 0x56daa0: a Corps' / an Army's)"""
+        p = "unit" if pre is None else f"{pre}_unit"
+        form = self._formation_cs.take(getattr(self, f"{p}_formation").clamp(min=0, max=self._form_max))
+        return torch.where(strength > 0, strength + form.to(strength.dtype), strength)
+
+    def _ai_ranged(self, pre: str | None = None) -> torch.Tensor:
+        """[B, P] long — `aiRanged` over pool `pre` (the merged pool for
+        None): the type's ranged strength with its formation's (0x56e3e0)"""
+        ut = getattr(self, "unit_type" if pre is None else f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        return self._ai_formed(pre, self._type_ranged_strength.take(ut))
+
+    def _ai_bombard(self, pre: str | None = None) -> torch.Tensor:
+        """[B, P] long — the type's bombard strength with its formation's
+        (0x56daa0) over pool `pre` (the merged pool for None)"""
+        ut = getattr(self, "unit_type" if pre is None else f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        return self._ai_formed(pre, self._type_bombard.take(ut))
 
     def _embark_waived(self, frm: torch.Tensor, to: torch.Tensor, rows: torch.Tensor | None = None) -> torch.Tensor:
         """`stepCost`'s embark waiver (the embark rule 0x530420, the
@@ -3653,8 +3673,8 @@ class SimTactics:
         U = self.unit_tile.shape[1]
         ut = self.unit_type.clamp(min=0, max=self.NU - 1)
         melee = self._ai_combat()
-        bomb = self._type_bombard.take(ut)
-        rng_s = torch.where(bomb > 0, torch.zeros_like(bomb), self._type_ranged_strength.take(ut))
+        bomb = self._ai_bombard()
+        rng_s = torch.where(bomb > 0, torch.zeros_like(bomb), self._ai_ranged())
         tile = self.unit_tile
         tc = tile.clamp(min=0)
         ok = (self.unit_alive & (tile >= 0) & self._seats_hostile(seat, self.unit_seat) & seen.gather(1, tc)
@@ -3843,8 +3863,8 @@ class SimTactics:
         and ranged; tactical) or 15 (`unitDanger`; homeland)."""
         ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         melee = self._ai_combat(pre)
-        bomb = self._type_bombard.take(ut)
-        rng_s = torch.where(bomb > 0, torch.zeros_like(bomb), self._type_ranged_strength.take(ut))
+        bomb = self._ai_bombard(pre)
+        rng_s = torch.where(bomb > 0, torch.zeros_like(bomb), self._ai_ranged(pre))
         d = danger.gather(1, getattr(self, f"{pre}_unit_tile").clamp(min=0))
         hp_max = int(self.rules.combat["unitHp"])
         damage = hp_max - getattr(self, f"{pre}_unit_hp")

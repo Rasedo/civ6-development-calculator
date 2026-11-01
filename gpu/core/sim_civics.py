@@ -221,7 +221,7 @@ class SimCivics:
         seat = FREE_SEAT if s == self.FR else 100 + s
         mine = self.major_unit_alive & (self.major_unit_seat == seat)
         mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
-        st = torch.maximum(self._ai_combat("major"), self._type_ranged_strength.take(mt)) << 8
+        st = torch.maximum(self._ai_combat("major"), self._ai_ranged("major")) << 8
         left = self.major_unit_hp.clamp(min=0) << 8
         hp = int(self.rules.combat["unitHp"]) << 8
         per = torch.div(torch.div(st * left, 256, rounding_mode="trunc") * 256, hp, rounding_mode="trunc")

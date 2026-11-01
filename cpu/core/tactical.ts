@@ -20,7 +20,7 @@ import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious, waterWalks,
   setBarbStepLook, unitsHostile, unitVisibleTo,
-  waterEnterable,
+  waterEnterable, formationCS,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -1219,13 +1219,27 @@ export function unitDanger(melee: number, ranged: number, bombard: number): numb
  *  0x56daa0): combat — an embarked land combat unit's its owner's era's
  *  embarked strength (IsEmbarked, formation class neither SUPPORT nor
  *  CIVILIAN) — ranged (none for a unit with a bombard) and bombard, its own
- *  embarked or not */
+ *  embarked or not; each above 0 with its formation's strength (+0xc90: a
+ *  Corps COMBAT_CORPS_STRENGTH_MODIFIER, an Army
+ *  COMBAT_ARMY_STRENGTH_MODIFIER, `aiFormed`) */
 export function aiStrengths(state: GameState, u: Unit): { melee: number; ranged: number; bombard: number } {
   const d = UNITS[u.type];
-  const bombard = d?.bombard ?? 0;
-  const melee = u.embarked && unitDomain(u.type) === 'military' ? embarkedDefenseCS(state, u.seat) : d?.combat ?? 0;
-  return { melee, ranged: bombard > 0 ? 0 : d?.ranged?.strength ?? 0, bombard };
+  const bombard = aiFormed(u, d?.bombard ?? 0);
+  const melee = aiFormed(u, u.embarked && unitDomain(u.type) === 'military' ? embarkedDefenseCS(state, u.seat) : d?.combat ?? 0);
+  return { melee, ranged: bombard > 0 ? 0 : aiRanged(u), bombard };
 }
+
+/** a strength the AI reads with the unit's formation (0x56dc90 at 0x56dd98,
+ *  0x56e3e0, 0x56daa0): above 0, plus the formation's (runs/h1_duely1124
+ *  t190: city-state 3's Cuirassier Corps 1835008, 40 damage, holds Attack
+ *  Barb Camp's strength at 70 = 64 + 10 - 4) */
+export function aiFormed(u: Unit, strength: number): number {
+  return strength > 0 ? strength + formationCS(u) : strength;
+}
+
+/** a unit's ranged strength as the AI reads it (0x56e3e0), with its
+ *  formation's */
+export const aiRanged = (u: Unit): number => aiFormed(u, UNITS[u.type]?.ranged?.strength ?? 0);
 
 /**
  * THE DANGER MAP (InfluenceMap 0x717460, the player's m_influence, a plot
