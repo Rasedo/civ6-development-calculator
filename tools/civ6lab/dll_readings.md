@@ -5475,3 +5475,32 @@ Move's danger flags ...") set no flag 2.
   Political Philosophy logs 436.1 / 435.1 / 435.0 / 435.0 / 436.0 / 438.0
   at t14-t19: each log step (-1.0 at t15, +1.0 at t18, +2.0 at t19) is the
   sum's step a turn before.
+
+## C-130: Discipline's knowledge records and a levied unit's return
+
+- 0x6bef40 (EFFECT_ADJUST_UNIT_BARBARIAN_COMBAT) and 0x5eb0f0 (the known
+  strength, through 0x5ef870) are ported as read in both twins
+  (`knownStrength`, `_pol_barbarian_combat`). For each fighting unit
+  subject, the plot comes from 0x90290 and the area is the first dword of
+  the plot's +8. 0x5eb0f0 runs once per barbarian player (0x483b50
+  +0x29f0) and once for the player itself (+0x128), with no region and an
+  age limit of 10. It walks DB.Units in order and takes the records of the
+  area or of no region (+0x18 / +0x1c). Each record of age (+0xc) 10 or
+  less adds max(Combat, RangedCombat). The amount applies only where the
+  player's own sum is below the barbarians'.
+- A levied unit sent home (`sendLevyHome` / `_minor_levy_return`) is made
+  anew under the minor, so every record of it becomes a gone unit's
+  (`unitMadeAnew`). The minor's own knowledge base takes the unit at its
+  tactical turn's look, not at the return. Before this change both twins
+  recorded it at once.
+- Confirmed on runs/h1_duely1121 Hunza t56:
+  - Its five Warriors come home (UnitAddedToMap after its research step,
+    before PlayerTurnActivated).
+  - They are absent from its knowledge base at the tactical site
+    (seq 4264) and on it at the log (seq 4266).
+  - Discipline's own sum is the Horseman's 36, under the barbarians' 85,
+    so all six units count: 102 as logged.
+  - With the records at the return, ours read 136 (0).
+- Also matched: runs/h1_duely1117 p3 t88 Discipline 17 and
+  runs/h1_duely1124 p4 t83 Discipline 68 (both 0 before). Divine Right and
+  Reformed Church at 1121 t58 now score 414.7, as logged.

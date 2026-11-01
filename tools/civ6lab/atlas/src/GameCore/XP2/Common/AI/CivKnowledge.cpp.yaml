@@ -105,7 +105,11 @@
 - addr: 0x5eb0f0
   final: 0x3f2530
   kind: function
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 56
+      value: "Hunza's own sum 36 (records of age <= 10: two Builders 0, the Horseman 36), the barbarians' 85 (two Galleys 30, the Quadrireme 25; a Galley of age 18 out)"
   impl:
     - cpu/core/aiModifiers.ts:START_ERA
     - cpu/core/aiModifiers.ts:ANALYZERS
@@ -116,9 +120,10 @@
   readings:
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
-  context:
-    - "...scipline's 0x6bef40 (a combat unit; the barbarians' units the AI knows within 10 of it, 0x5eb0f0 over the barbarian list, against its own: the amount from the start to the horizon wh..."
-  review: imported
+    - "C-130: Discipline's knowledge records and a levied unit's return"
+  notes:
+    - "over DB.Units in order, 0x5ef870's records of the type (record +0x18 the area, or +0x1c the region given: -1 with none, so a record of no region counts), each of age (+0xc) at most the limit adding max(Combat +0x48, RangedCombat +0x6c)"
+  review: reviewed
 - addr: 0x5eb2c0
   final: 0x3f2700
   kind: function
@@ -372,6 +377,7 @@
       value: "its parser 0x6bedb0 stores fx(expf(Amount x   COMBAT_POWER_SCALING)) at +8, GlobalParameters +0x210, 0.04 under   Expansion1's Replace: Discipline's 5 reads 1.2214, from the start to the   horizon who"
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-130: Discipline's knowledge records and a levied unit's return"
   context:
     - "...er, &area, &region, maxAge): over the Units in order, the player's records of the type (0x5ef870: record +0x18 the area or +0x1c the region given, -1 for none — so a record on a plot o..."
   review: imported

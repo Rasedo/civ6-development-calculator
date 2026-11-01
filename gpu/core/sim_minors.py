@@ -469,13 +469,10 @@ class SimMinors:
             # where the minor may stand (`jumpMadeAnew`)
             self._jump_made_anew(100 + s, m)
             # each unit made anew under the minor (`sendLevyHome`): the
-            # record it held of the unit before the levy a gone unit's, and
-            # a record of the unit it made
+            # record any knowledge base held of the unit before the levy a
+            # gone unit's; the minor's own takes it at its tactical look
             b, u = m.nonzero(as_tuple=True)
-            g = u + self.POOL_LO["major"]
-            self._kb_unit_anew(b, g)
-            for j in range(int(b.numel())):
-                self._kb_birth(s, 100 + s, b[j:j + 1], g[j:j + 1])
+            self._kb_unit_anew(b, u + self.POOL_LO["major"])
         self.citystate_levy_seat[:, s] = torch.where(back, torch.full_like(ls, -1), ls)
         self.citystate_levy_ends[:, s] = torch.where(back, torch.full_like(ls, -1), self.citystate_levy_ends[:, s])
 

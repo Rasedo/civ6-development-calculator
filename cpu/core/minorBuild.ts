@@ -212,10 +212,14 @@ export function holdMinorStart(fn: ((state: GameState, cityState: CityState) => 
 /** the levied army is the minor's again where it stands. The game removes
  *  each unit and makes it anew under the minor (runs/h1_duelw1117 t42:
  *  China's three levied Warriors removed, three Warriors of city-state 3
- *  added on their plots), so the minor's knowledge base records each as a
- *  unit it made (0x7874a0), and every knowledge base's record of the unit
- *  before is that of a unit gone, aging on (`unitMadeAnew`): its own Warrior
- *  records 5 -> 8 on the turn's line */
+ *  added on their plots): every knowledge base's record of the unit before
+ *  is that of a unit gone, aging on (`unitMadeAnew`), and the minor's own
+ *  takes the unit at its tactical turn's look, not at its return (no unit
+ *  signal 0x7874a0): its own Warrior records 5 -> 8 on the turn's line;
+ *  runs/h1_duely1121 Hunza t56, its five Warriors home before its turn
+ *  opens, absent from its knowledge base at the tactical site and on it at
+ *  the log, Discipline's own strength 36 under the barbarians' 85 (102 as
+ *  logged) */
 function sendLevyHome(state: GameState, cityState: CityState): void {
   for (const u of state.units) if (u.leviedFrom === cityState.seat) levyUnitHome(state, cityState, u);
   delete cityState.levySeat;
@@ -229,8 +233,6 @@ function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
   unitMadeAnew(state, u);
   // where the minor may stand (`jumpMadeAnew`)
   jumpMadeAnew(state, u);
-  (cityState.armyKnown ??= []).push({ id: u.id, owner: cityState.seat, type: u.type, seen: cityState.armyAged ?? state.turn,
-    plot: u.tileIndex, damage: 0 });
 }
 
 /**
