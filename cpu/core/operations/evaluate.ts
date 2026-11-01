@@ -102,16 +102,19 @@ function targetsOf(view: AiView, seat: number, c: Candidate, inputs: EvalInputs)
       const whole = best ? best.score >> 8 : 0;
       return best && whole > 0 ? [{ plot: best.plot, value: whole << 8, enemyStr: 0 }] : [];
     }
-    // of the seat's coastal cities the most populous (the first of equals),
-    // the first sea plot (not a Lake) of the ring walk within 4 of it; the
-    // enemy strength the largest best combat strength of the majors
+    // of the seat's cities that train ships (0x1c77c0: coastal land, or a
+    // completed Harbor — runs/h1_duely1121 Hunza on inland 11:5 starts
+    // Naval Superiority at 12:3 the turn its Harbor completes, t218) the
+    // most populous (the first of equals), the first sea plot (not a Lake)
+    // of the ring walk within 4 of it; the enemy strength the largest best
+    // combat strength of the majors
     case 'TARGET_NAVAL_SUPERIORITY': {
       let best = 0;
       let at = NO_PLOT;
       const plots = view.plots();
       for (const city of view.cityPlots(seat)) {
         const pop = view.cityPopulation(city);
-        if (pop <= best || !plots[city].coastal) continue;
+        if (pop <= best || !view.cityTrainsSea(seat, city)) continue;
         const sea = view.plotsRing(city, 4).find((p) => plots[p].water && !plots[p].lake);
         if (sea === undefined) continue;
         best = pop;

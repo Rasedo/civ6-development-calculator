@@ -154,7 +154,7 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
       index: t.index, x: t.col, y: t.row, water: isWater(t),
       owner: tileSeat(t), district: !!t.district || centres.has(t.index), city: centres.has(t.index),
       area: t.area ?? -1, region: t.region ?? -1,
-      coastal: isCoastalLand(map, t), lake: t.terrain === 'LAKE',
+      lake: t.terrain === 'LAKE',
     }))),
     plotsWithin: (p, r) => {
       const t = map.tiles[p];
@@ -536,6 +536,11 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
     barbarianSeat: () => BARB_SEAT,
     cityPopulation: (p) => cityHolders(state).flatMap((s) => s.cities).find((c) => c.centerIndex === p)?.population
       ?? state.cityStates.find((cs) => cs.centerIndex === p)?.population ?? 0,
+    cityTrainsSea: (i, p) => {
+      const city = seatCities(i).find((c) => c.centerIndex === p);
+      return !!city && (isCoastalLand(map, map.tiles[p])
+        || city.districts.some((d) => d.type === 'HARBOR' && map.tiles[d.tileIndex].districtComplete));
+    },
     // the engine's roster is the seven governors every seat may appoint
     // a title civic the caller's moment holds and the state does not yet
     // grants its title too

@@ -484,6 +484,16 @@
   context:
     - "...aged (+0x4d bit 0); AdjacentDistrict: that type, complete (0x811b0) and not pillaged (0x811f0), WHOEVER OWNS IT. After the six: divided by TilesRequired when over 1 (0x3640e0, fixed..."
   review: imported
+- addr: 0x81230
+  final: 0x5e880
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...1a48, DB.Districts) — a completed Harbor — else its centre's plot is coastal (vt +0x40, 0x81230). runs/h1_duely1121 Hunza on inland 11:5: its Harbor completes at t218 (City_BuildQueue..."
+  review: imported
 - addr: 0x81240
   final: 0x5e890
   kind: function
@@ -2110,6 +2120,7 @@
     - cpu/core/operations/nodes.ts:OpsContext
     - gpu/core/sim_minorops.py:_x_garrison
     - gpu/core/sim_minorops.py:end_turn
+    - cpu/core/minorOps.ts:cities
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -2125,6 +2136,7 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
+    - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:

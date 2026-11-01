@@ -17,7 +17,7 @@ const W = 12;
 const H = 12;
 const plots: AiMapPlotView[] = Array.from({ length: W * H }, (_v, i) => ({
   index: i, x: i % W, y: Math.floor(i / W), water: false, impassable: false, feature: null, resource: null,
-  owner: -1, district: false, city: false, area: 0, region: 0, continent: 0, coastal: false, freshWater: false, lake: false,
+  owner: -1, district: false, city: false, area: 0, region: 0, continent: 0, freshWater: false, lake: false,
 }));
 const at = (x: number, y: number) => y * W + x;
 /** the hex distance of offset rows (odd rows shifted right) */

@@ -5504,3 +5504,39 @@ Move's danger flags ...") set no flag 2.
 - Also matched: runs/h1_duely1117 p3 t88 Discipline 17 and
   runs/h1_duely1124 p4 t83 Discipline 68 (both 0 before). Divine Right and
   Reformed Church at 1121 t58 now score 414.7, as logged.
+
+## C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins
+
+`minorEnv` (`army`, `held`), `freeCitiesMilitary`, `evaluate`
+(TARGET_NAVAL_SUPERIORITY), `AiView.cityTrainsSea`; `_mops_army_near`,
+`_u_recruit`, `_mops_naval_target`.
+
+- THE RECRUIT'S OFFER (0x60a8c0: unassigned +0x7d0, turn not done +0x530):
+  a unit made in the AI's turn has its turn done at creation (the handler
+  0x60a440 on player signal +0x60 sets 0x570b40); in the engines a unit the
+  minor buys stands at Movement 0, in the pass's `done`. Recruit Units and
+  Find Available Unit offer no unit of `done` (a city-state's and the Free
+  Cities' `held`; the GPU's `_u_recruit` off `view["done"]`):
+  runs/h1_duely1124 t72 city-state 3's City Defense recruits none, its Heavy
+  Chariot bought that turn, and completes; t73 it takes the Chariot.
+- THE CANDIDATES' OWN STRENGTH (0x746920 -> 0x5eadb0 within 10 of the rally)
+  counts no unit at Movement 0: runs/h1_duely1117 t69 city-state 4's Heavy
+  Chariot 589825 bought (contract 177), its Attack Barb Camp at 35:6 not a
+  candidate until t70 (Started, the Chariot recruited). A FIT: the reading's
+  0x5eadb0 walks the knowledge base, whose own record of a purchase the
+  aimem sites show only at the end look (1117 t14 / t19 / t59 / t69 / t102:
+  the bought unit absent at the log site); the engines keep their own live
+  units and drop those at Movement 0.
+- TARGET_NAVAL_SUPERIORITY (0x747230 over 0x1c77c0 for the sea): a city
+  trains ships where a district of its trains the domain (0x1aed10 over the
+  city's districts +0x1a48, DB.Districts) — a completed Harbor — else its
+  centre's plot is coastal (vt +0x40, 0x81230). runs/h1_duely1121 Hunza on
+  inland 11:5: its Harbor completes at t218 (City_BuildQueue 184.2 / 165)
+  and Naval Superiority starts at 12:3 that turn, as logged; never before.
+- OPEN: 0x1aed10's completion test read off the case (a placed Harbor
+  t215-217 starts none); the Harbor's replacements (no recording holds one).
+  runs/h1_duely1128 t148 Bologna's City Defense (threat 1 from player 1): the
+  Trebuchet 65 alone short of D + 20 at t147, so D > 45, and at t148 the new
+  Courser (46) must count (above D - 5), so D < 51; the engines' D is 51
+  (35 + the Palace 3 + two walls 6 + seven envoys 7): one term of 0x24ae80
+  over the city-state's centre unread.

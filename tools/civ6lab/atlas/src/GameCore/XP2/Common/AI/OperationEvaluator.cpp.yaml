@@ -7,16 +7,24 @@
   final: 0x4e6130
   kind: function
   status: PARTLY
+  cases:
+    - recording: h1_duely1117
+      turn: 69
+      value: "city-state 4's Heavy Chariot 589825 bought: no Attack Barb Camp candidate until t70 (a fit: no unit at Movement 0 counts)"
   impl:
+    - cpu/core/minorOps.ts:minorEnv
+    - gpu/core/sim_minorops.py:_mops_army_near
     - cpu/core/operations/evaluate.ts:distLimit
     - cpu/core/operations/evaluate.ts:evaluate
     - cpu/core/operations/evaluate.ts:oddsOf
     - cpu/export/rules.ts:rules
   readings:
+    - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
+    - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The evaluation (job \"Op Evaluation\", 0x746920): MustBeAtWar, MustHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each tar..."

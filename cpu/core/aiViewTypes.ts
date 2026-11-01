@@ -24,7 +24,6 @@ export interface AiMapPlotView {
    *  land) */
   area: number;
   region: number;
-  coastal: boolean;
   /** a Lake plot */
   lake: boolean;
 }
@@ -184,6 +183,10 @@ export interface AiView extends AiValueView {
   barbarianSeat(): number;
   /** the citizens of the city whose centre is the plot, 0 for none */
   cityPopulation(plot: number): number;
+  /** the seat's city whose centre the plot is trains ships (0x1c77c0 for
+   *  the sea: its centre coastal land, or a completed sea district of its,
+   *  0x1aed10: the Harbor) */
+  cityTrainsSea(seat: number, plot: number): boolean;
   // THE WAR OPERATIONS' VIEW
   /** the cities the seat's knowledge base holds: every city whose centre the
    *  seat has revealed, its own included */

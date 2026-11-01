@@ -1089,7 +1089,8 @@ class SimMinorOps:
 
     def _mops_army_near(self, s: int, plot: torch.Tensor, radius: int, own: bool, u: dict) -> torch.Tensor:
         """`armyStrength` about `plot` [B] within `radius`: the minor's own
-        units as they stand and its knowledge base's records (`recentOf`) of
+        units as they stand, none whose turn is done (Movement 0: a unit
+        bought this turn), and its knowledge base's records (`recentOf`) of
         its units gone (`own`), or its records of the barbarians'"""
         r = self._mops_records(s)
         pz = plot.clamp(min=0).unsqueeze(1)
@@ -1104,7 +1105,7 @@ class SimMinorOps:
         gone = r["recent"] & (r["owner"] == self._mops_seat(s)) & ~standing & (rd <= radius)
         d = self.pair_dist[u["tile"].clamp(min=0), pz].to(torch.long)
         term = self._mops_army_term(u["combat"], u["ranged"], u["dmg"])
-        m = u["own"] & (d <= radius)
+        m = u["own"] & (u["mp"] > 0) & (d <= radius)
         return (torch.where(m, term, torch.zeros_like(term)).sum(dim=1)
                 + torch.where(gone, rterm, torch.zeros_like(rterm)).sum(dim=1))
 
@@ -1204,10 +1205,11 @@ class SimMinorOps:
         return same < Tm.limits.get(typ, 0)
 
     def _mops_naval_target(self, s: int) -> torch.Tensor:
-        """TARGET_NAVAL_SUPERIORITY of minor `s` (0x747230): where its city is
-        coastal land, the first sea plot (not a Lake) of the ring walk within
-        4 of it; [B] -1 none. Its value 100 and the enemy strength (the
-        majors' largest best combat strength) weigh no other target"""
+        """TARGET_NAVAL_SUPERIORITY of minor `s` (0x747230): where its city
+        trains ships (0x1c77c0: coastal land, or a completed Harbor), the
+        first sea plot (not a Lake) of the ring walk within 4 of it; [B] -1
+        none. Its value 100 and the enemy strength (the majors' largest best
+        combat strength) weigh no other target"""
         ring = getattr(self, "_mops_ring4", None)
         if ring is None:
             ring = self._mops_ring4 = torch.tensor(simbase.barb_ring_table(self.W, self.H, self.wrap_x, 4),
@@ -1218,8 +1220,11 @@ class SimMinorOps:
         pc = pl.clamp(min=0)
         sea = (pl >= 0) & self.water.gather(1, pc) & (self.terrain.gather(1, pc) != self._terr_lake)
         first = sea.long().argmax(dim=1, keepdim=True)
-        has = (sea.any(dim=1) & (ctr >= 0) & self.coastal_land.gather(1, cc.unsqueeze(1)).squeeze(1)
-               & (self.citystate_pop[:, s] > 0))
+        trains = self.coastal_land.gather(1, cc.unsqueeze(1)).squeeze(1)
+        if self._harbor_didx >= 0:
+            ht = self.city_dist_tile[:, self._CITY_MINOR0 + s, 0, self._harbor_didx]
+            trains = trains | ((ht >= 0) & self.district_complete.gather(1, ht.clamp(min=0).unsqueeze(1)).squeeze(1))
+        has = sea.any(dim=1) & (ctr >= 0) & trains & (self.citystate_pop[:, s] > 0)
         return torch.where(has, pl.gather(1, first).squeeze(1), torch.full_like(ctr, -1))
 
     def _mops_naval_eval(self, rally: torch.Tensor, sea: torch.Tensor) -> torch.Tensor:
@@ -2154,7 +2159,8 @@ def _u_recruit(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
     rng = tree.int_(i, "Recruit Range")
     rng = -1 if rng is None else rng
     u = sim._mops_units(s)
-    busy = sim._mops_busy(s)
+    # the evaluator's offer (0x60a8c0): in no job, its turn not done
+    busy = sim._mops_busy(s) | c.view["done"]
     offer, _n = sim._mops_in_order(u["own"] & ~busy & at.unsqueeze(1), u["key"])
     sim._mops_recruit(s, k, offer, in_prog, rng, u, at)
     # the lower-priority operations' units, in slot then team then join order

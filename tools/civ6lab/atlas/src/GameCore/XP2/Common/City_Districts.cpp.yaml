@@ -123,6 +123,24 @@
   context:
     - "...the player's cities (+0x12f0 -> +0xd8, list order); a city holding the class's district (0x1aec20 on city +0x1a48 with (district, true, 0) — completed) and of greater population (+0x588,..."
   review: imported
+- addr: 0x1aed10
+  final: 0x11ef20
+  kind: function
+  name: a district of the city trains the domain
+  semantics: the city's districts (+0x1a48) hold one whose DB.Districts row (+0x1308) trains units of the domain; 0x1c77c0's first arm
+  status: PARTLY
+  cases:
+    - recording: h1_duely1121
+      turn: 218
+      value: Hunza's Harbor completes (City_BuildQueue 184.2 / 165) and Naval Superiority starts at 12:3 from inland 11:5; the placed Harbor t215-217 starts none (the completion test read off the case)
+  impl:
+    - cpu/core/aiView.ts:cityTrainsSea
+    - gpu/core/sim_minorops.py:_mops_naval_target
+    - cpu/core/aiViewTypes.ts:AiView
+  readings:
+    - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships"
+    - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
+  review: reviewed
 - addr: 0x1aeff0
   final: 0x11f230
   kind: function

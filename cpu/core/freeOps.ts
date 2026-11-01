@@ -194,7 +194,8 @@ export function freeRaidCheck(state: GameState, city: City): void {
 export function freeCitiesMilitary(state: GameState): void {
   freeCityTactics(state, (pass) => {
     const ops = opsOfFree(state);
-    operationsRun(ops, freeEnv(state, pass));
+    // the units whose turn is done out of the operations' offers (0x60a8c0)
+    operationsRun(ops, { ...freeEnv(state, pass), held: () => [...pass.done] });
     for (const id of opsOf(ops).flatMap(opUnits)) {
       const u = unitOf(state, id);
       if (u) passFinish(pass, u, 'Operation', u.tileIndex);

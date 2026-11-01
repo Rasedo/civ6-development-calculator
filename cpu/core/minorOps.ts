@@ -122,13 +122,17 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
     // turns (runs/h1_duelw1121 Antioch: Attack Barb Camp invalid at t5 on
     // its two Warriors as they stand, valid at t9 alone, its Warrior lost
     // at t7 counted from its t6 record once the camp's Scout's record has
-    // aged out, invalid again at t10)
+    // aged out, invalid again at t10); none whose turn is done as the
+    // candidates are weighed: a unit its contract purchases made this turn
+    // sits its turn out at Movement 0 (the creation handler 0x60a440 sets
+    // turn done, 0x570b40; runs/h1_duely1117 t69 city-state 4's Heavy
+    // Chariot 589825 bought, Attack Barb Camp not started until t70)
     army: (p) => {
       if (p !== cs.seat) return recentOf(cs, p);
       const live = fresh().units(cs.seat);
       const ids = new Set(live.map((u) => u.id));
-      return [...live.map((u) => ({ id: u.id, owner: cs.seat, type: u.type, plot: u.plot, combat: u.combat, ranged: u.ranged, damage: u.damage, seen: state.turn })),
-        ...recentOf(cs, p).filter((r) => !ids.has(r.id))];
+      return [...live.filter((u) => u.movesLeft > 0).map((u) => ({ id: u.id, owner: cs.seat, type: u.type, plot: u.plot, combat: u.combat,
+        ranged: u.ranged, damage: u.damage, seen: state.turn })), ...recentOf(cs, p).filter((r) => !ids.has(r.id))];
     },
     camps: () => cs.campsKnown ?? [],
     known: () => fresh().knownCities(cs.seat),
@@ -424,7 +428,12 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
     const ops = opsOfMinor(cs);
     const env = minorEnv(state, cs, pass);
     operationsRun(ops, { ...env, trees: [{ priority: UPGRADE_TREE_PRIORITY, tick: () => upgradeTreesTick(state, cs, pass) }],
-      cityHook: () => (hookHeld ?? ((_st, _cs, run) => run()))(state, cs, () => minorSecondHook(state, cs)), held: () => cs.upgrading ?? [] });
+      cityHook: () => (hookHeld ?? ((_st, _cs, run) => run()))(state, cs, () => minorSecondHook(state, cs)),
+      // out of the operations' offers (0x60a8c0: unassigned, turn not done
+      // +0x530): the units the trees hold and those whose turn is done — a
+      // unit bought this turn among them (runs/h1_duely1124 t72 city-state
+      // 3's City Defense recruits no Heavy Chariot bought that turn, t73 it)
+      held: () => [...(cs.upgrading ?? []), ...pass.done] });
     for (const id of opsOf(ops).flatMap(opUnits)) {
       const u = state.units.find((x) => x.id === id && x.seat === cs.seat);
       if (u) passFinish(pass, u, 'Operation', u.tileIndex);

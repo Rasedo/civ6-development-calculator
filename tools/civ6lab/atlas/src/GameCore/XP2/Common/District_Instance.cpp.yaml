@@ -224,6 +224,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...in) onto the   plots within its range. Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot bes..."
   context:
