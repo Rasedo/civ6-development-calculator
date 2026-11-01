@@ -60,12 +60,16 @@ export function newScores(): DecisionScores {
 /** a decision scored; `clean` whether its player's memory was clean as the
  *  turn opened (undefined for a player whose memory is not compared) */
 const ROWS = new Set((process.env.AISCORE_ROWS ?? '').split(',').filter(Boolean));
+const MISSES = process.env.AISCORE_MISSES === '1';
 
 export function scoreDecision(s: DecisionScores, kind: string, turn: number, subject: string, equal: boolean,
   ours: unknown, game: unknown, clean?: boolean): void {
   const k = (s[kind] ??= { compared: 0, equal: 0 });
-  // AISCORE_ROWS=<kind>,<kind>: every row of those kinds, one line each
-  if (ROWS.has(kind)) console.error(`SCORE ${kind} t${turn} ${subject} ${equal ? '=' : 'X'} ${whole(ours)} // ${whole(game)}`);
+  // AISCORE_ROWS=<kind>,<kind>: every row of those kinds, one line each;
+  // AISCORE_MISSES=1: every missed row of every kind (`c` marks a clean memory)
+  if (ROWS.has(kind) || (MISSES && !equal)) {
+    console.error(`SCORE ${kind} t${turn} ${subject} ${equal ? '=' : 'X'}${clean ? 'c' : ''} ${whole(ours)} // ${whole(game)}`);
+  }
   const take = (x: { compared: number; equal: number; first?: KindScore['first'] }) => {
     x.compared += 1;
     if (equal) x.equal += 1;
