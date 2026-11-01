@@ -79,7 +79,7 @@ import { eruptionHazardTurns, floodHazardTurns } from './disasters';
 import { baseAdjacency, buildingPillaged, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
 import { builderHarvest, builderRemoveFeature, purchaseSpotBlocked } from './units';
-import { aiStrengths, dangerPlane, moveTo, reachPlots, turnsToPlot } from './tactical';
+import { aiStrengths, dangerPlane, moveTo, moveUnitDanger, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import {
   installType, minorBuildFacts, minorBuilderLays, minorBuildingPrice, minorBuyBuilding, minorBuyUnit, minorItemFor, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
@@ -598,7 +598,12 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
       const unit = unitOf(u);
       if (!unit) return;
       if (kind === 'move') {
-        moveTo(state, unit, plot, false, safe ? (p) => (danger ??= dangerPlane(state, cs.seat))[p] > 0 : undefined);
+        // Move Unit's execution (0x7eeba0): without Allow Danger a location
+        // on the danger map takes no move (0x7eed65), and the order's path
+        // flags are 0x100a (0x1000 with Allow Danger)
+        const plane = safe ? (danger ??= dangerPlane(state, cs.seat)) : null;
+        if (plane && plane[plot] > 0) return;
+        moveTo(state, unit, plot, false, true, true, plane ? moveUnitDanger(plane) : undefined);
         return;
       }
       const tile = state.map.tiles[plot];

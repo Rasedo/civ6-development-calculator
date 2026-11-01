@@ -219,8 +219,8 @@ export interface CityTreeWorld {
   clearProduction(city: ContractCity): void;
   /** a unit order the tree gives (moved, improvement built, the plot it
    *  stands on cleared: its improvement, else its feature — `harvest` its
-   *  resource); a move with `safe` is not taken where its walk would end on
-   *  a plot of danger */
+   *  resource); a move with `safe` (no Allow Danger) is not taken to a plot
+   *  of danger, and its path's first turn steps onto none */
   order(unit: number, kind: 'move' | 'improve' | 'clear' | 'harvest', plot: number, improvement?: string, safe?: boolean): void;
   /** the player's danger map at the plot (0x716a60) */
   danger(plot: number): number;
@@ -792,9 +792,11 @@ const protectUnit: BtHandler<Ctx> = {
 // Improvement) or clears (Clear Plot) on the turn it arrives. Without Allow
 // Danger, a location on the player's danger map (0x7f040d) lets the kept unit
 // go once it reaches it (SUCCESS, none kept) and keeps no unit by its path,
-// and the execution takes no walk ending on a plot of danger (0x7eed65:
+// and the execution takes no move to a location of danger (0x7eed65:
 // runs/h1_duelw1127 Mexico City's purchased Builder of t22 on its centre
-// to t39, beside its tree's Farm plot under the barbarians' threat)
+// to t39, beside its tree's Farm plot under the barbarians' threat), its
+// path's first turn stepping onto no plot of danger (the order's flags 0x2 /
+// 0x8)
 const moveUnit: BtHandler<Ctx> = {
   update(node, run, ctx) {
     const m = run.mem[node.index];

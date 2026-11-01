@@ -25,7 +25,7 @@ import type { ArmyRecord, CityState, GameState, Unit } from './types';
 import { UNITS } from '../data/units';
 import { gameTypeOf } from '../data/aliases';
 import { aiView } from './aiView';
-import { cityStateTactics, moveTo, passEnd, passFinish, passReachAt, plotDistance, stackedAt, swapUnits, type Pass } from './tactical';
+import { cityStateTactics, moveTo, moveUnitDanger, passEnd, passFinish, passReachAt, plotDistance, stackedAt, swapUnits, type Pass } from './tactical';
 import { ownAiType, passOrders, passView } from './opsOrders';
 import { newOpsAi, operationsEvaluate, operationsRun, opContracts, opsOf, startOperationNamed, type OpsAi, type OpsEnv } from './operations/manager';
 import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge';
@@ -347,13 +347,14 @@ function upgradeArrived(state: GameState, pass: Pass, units: readonly Unit[], ta
  *  tree unit with a target (+0x830) off its plot: Allow Danger false, a
  *  target on the danger map (0x716a60) is gone for only where the unit's
  *  planning in the pass (+0x1fc0, `passReachAt`) reaches it this turn with
- *  Movement left (0x791300; runs/h1_duely1121 t80-112: city-state 2's
- *  Horseman 786438 on 8:6, its planning holding its centre 11:5 at (1/0),
- *  stays); then the
+ *  Movement left (0x791300); then the
  *  swap onto it (0x972880: a unit of its own stacking with it on the target
  *  beside it changes places), then the move there (0x962030) under the
- *  path flag 0x1000 (the order's 0x100a), whose first turn may not end on
- *  the target its own stacking unit holds (runs/h1_duely1128 t33: Hong
+ *  order's path flags 0x100a: 0x1000, whose first turn may not end on the
+ *  target its own stacking unit holds, and 0x2 / 0x8, its first turn
+ *  stepping onto no plot of the danger map (runs/h1_duely1121 t74-112:
+ *  city-state 2's Horseman 786438 on 8:6, every plot beside it on the danger
+ *  map, stays where its centre 11:5 stands free; runs/h1_duely1128 t33: Hong
  *  Kong's Warrior 131073 on 8:5, two plots from its centre 9:7 that a
  *  Swordsman holds, stands, its Warrior 196610 on 7:5, three plots off,
  *  goes to 9:6; Bologna t154: its Warrior 2228224 on 4:10 swaps onto its
@@ -366,7 +367,7 @@ function upgradeMove(state: GameState, pass: Pass, u: Unit, p: number): void {
     swapUnits(state, pass, u, p);
     return;
   }
-  moveTo(state, u, p, false, undefined, true);
+  moveTo(state, u, p, false, true, true, moveUnitDanger(pass.danger));
 }
 
 /** Upgrade Units' full test (0x58fff0 with r8 0): the research, the minor's

@@ -1819,9 +1819,9 @@ class SimMinorOps:
         its planning in the pass (`op`'s, `passReachAt`) reaches it this turn
         with Movement left; then, its own unit there
         beside it, the swap onto it where that one has Movement left
-        (0x972880), else the move there (0x962030) under the path flag
-        0x1000, whose first turn may not end on the target its own unit
-        holds"""
+        (0x972880), else the move there (0x962030) under the path flags
+        0x100a: 0x1000, whose first turn may not end on the target its own
+        unit holds, and 0x2 / 0x8, its first turn onto no plot of danger"""
         pre, seat = self._mops_pre(s), self._mops_seat(s)
         b = torch.arange(self.B, device=self.device)
         uc = us.clamp(min=0)
@@ -1839,7 +1839,7 @@ class SimMinorOps:
         if not bool(m.any()):
             return
         beside = self._mops_swap(s, us, dest, m)
-        self._tac_move_to(m & ~beside, uc, dc, pre, seat, strike=False, later_turns=True)
+        self._tac_move_to(m & ~beside, uc, dc, pre, seat, strike=False, danger=self._move_unit_danger(op["danger"]), later_turns=True)
 
     def _mops_swap(self, s: int, us: torch.Tensor, dest: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         """`swapUnits` (UNITOPERATION_SWAP_UNITS 0x972880) for the unit at

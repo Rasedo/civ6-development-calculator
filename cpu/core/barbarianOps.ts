@@ -26,7 +26,7 @@ import { NO_PLOT, addMember, opDef, opUnits, type Operation } from './operations
 import type { BarbarianHooks } from './operations/barbarian';
 import { BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataFloat, dataInt, dataTag, tick, type BtHandler, type BtNode, type BtRun } from './behaviorTree';
 import { AI_OP_DEFS, AI_TREES } from '../data/aiOperations';
-import { moveTo, passEnd, passPillage, passReachAt, passSafePlot, turnsToPlot, type Pass } from './tactical';
+import { moveTo, moveUnitDanger, passEnd, passPillage, passReachAt, passSafePlot, turnsToPlot, type Pass } from './tactical';
 import { barbUnitFor, handicapOf, raidBoldness } from './barbarians';
 import { BARB_TAG_UNITS, barbForce, type BarbTag } from '../data/barbarians';
 import { gameTypeOf } from '../data/aliases';
@@ -569,8 +569,11 @@ const SCOUT_NODES: Readonly<Record<string, BtHandler<ScoutCtx>>> = {
       const reach = c.pass.plan.has(u.id) ? passReachAt(c.state, c.pass, u, loc, 1, false, range) : -1;
       const plot = reach >= 0 ? reach : loc;
       passEnd(c.pass, u);
-      if (!(dataBool(node, 'Allow Danger') ?? true) && c.pass.danger[plot] > 0) return;
-      if (u.tileIndex !== plot) moveTo(c.state, u, plot, false);
+      // the order's path flags 0x1000, and 0x2 / 0x8 without Allow Danger
+      // (its first turn onto no plot of danger)
+      const safe = !(dataBool(node, 'Allow Danger') ?? true);
+      if (safe && c.pass.danger[plot] > 0) return;
+      if (u.tileIndex !== plot) moveTo(c.state, u, plot, false, true, true, safe ? moveUnitDanger(c.pass.danger) : undefined);
     },
   },
   // NOTIFY OWNER (0x7c6fa0 -> 0x148270, the scout's tree): the tribe raids

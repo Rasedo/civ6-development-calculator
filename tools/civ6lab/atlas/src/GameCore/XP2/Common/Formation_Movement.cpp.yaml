@@ -373,6 +373,9 @@
     - recording: 1124
       turn: 115
       value: those that see   it go (1124 t115-t117, 1117 t13).
+    - recording: h1_duely1121
+      turn: 74
+      value: "flags 2 / 8 (Move Unit's 0x100a): city-state 2's Horseman 786438 on 8:6 under Upgrade Units, every plot beside it on the danger map, holds t74-112 where its centre 11:5 stands free"
   impl:
     - cpu/core/tactical.ts:enterable
     - cpu/core/tactical.ts:planningSearch
@@ -380,6 +383,8 @@
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:search
     - gpu/core/sim_tactics.py:update_parents
+    - cpu/core/tactical.ts:moveUnitDanger
+    - gpu/core/sim_tactics.py:_move_unit_danger
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -389,6 +394,7 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+    - "C-99: Move Unit's path flags 0x2 / 0x8 — READ (0x2720a0, 0x716080), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."

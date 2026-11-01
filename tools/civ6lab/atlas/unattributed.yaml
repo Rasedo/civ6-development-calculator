@@ -3361,10 +3361,17 @@
 - addr: 0x716080
   final: 0x4c4fe0
   kind: function
-  status: PARTLY
+  name: the danger map's own-strike lambda
+  semantics: "per plot within an own district's strike (the lambda @d6c2b8 from 0x717d97): the district's own plot skipped; a plot of danger above 0 down by the strike, 1 at least; the district's plot set to 0 before it (0x717d34) where its defence is above 0"
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 80
+      value: city-state 2's centre 11:5 off the danger map, every plot beside its Horseman 786438 on 8:6 on it (25 to 85)
   impl: [cpu/core/tactical.ts:dangerPlane]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-99: Move Unit's path flags 0x2 / 0x8 — READ (0x2720a0, 0x716080), both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...yer's own cities: the centre 0, each plot their strike covers down by   its strength to 1 at least (0x716080). Features' DangerValue last (none in   the install). - PARTLY READ: the unit flag +0x18bd (taken a..."
   context:

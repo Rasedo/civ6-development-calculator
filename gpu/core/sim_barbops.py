@@ -1561,7 +1561,8 @@ class SimBarbOps:
                 dest[rows] = torch.where(r >= 0, r, camp[rows])
             done[bidx[mexe], su[mexe]] = True
             now = self.barb_unit_tile[bidx, su]
-            self._tac_move_to(mexe & (now != dest), su, dest.clamp(min=0), strike=False)
+            # the order's path flag 0x1000 (Allow Danger: no 0x2 / 0x8)
+            self._tac_move_to(mexe & (now != dest), su, dest.clamp(min=0), strike=False, later_turns=True)
         # NOTIFY OWNER (the scout's tree): a raid at once where the Boldness
         # reaches the raid's and no raid of the tribe stands, else the city to
         # its raid list

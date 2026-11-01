@@ -523,9 +523,11 @@ class SimTactics:
         its full Movement, unmoved by its Movement left. With no `explore`
         (a move order's path flag 1) no step leaves a plot the player never
         revealed but the unit's own. With `danger` (a move order's flags 8 /
-        0x8000: the danger map [N, T], flag 8 [N], flag 0x8000 [N]) no node
-        of the path's first turn links a child of danger (any child under
-        flag 8, a water child under flag 0x8000)."""
+        0x8000 / 2: the danger map [N, T], flag 8 [N], flag 0x8000 [N], flag
+        2 [N]) no node of the path's first turn links a child of danger (any
+        child under flag 8, a water child under flag 0x8000), and under flag
+        2 no node links a child on the ground of a player at war with the
+        unit's."""
         dev = self.device
         N, T = rows.shape[0], self.T
         NONE = _KEY_NONE
@@ -835,10 +837,16 @@ class SimTactics:
             if danger is not None:
                 # a move order's danger flags (0x2720a0 at 0x272590..
                 # 0x272612): from a node of the path's first turn, under flag
-                # 8 no child of danger, under flag 0x8000 no water child of it
-                d_pl, d_any, d_wat = danger
+                # 8 no child of danger, under flag 0x8000 no water child of it;
+                # under flag 2 (at 0x2724c8) no child on the ground of a
+                # player at war with the unit's
+                d_pl, d_any, d_wat, d_war = danger
                 hot = (d_pl.gather(1, nbc) > 0) & (d_any.unsqueeze(1) | (d_wat.unsqueeze(1) & water_n.gather(1, nbc)))
                 ok = ok & ~(hot & (bt <= 1))
+                if bool(d_war.any()):
+                    own_t = self.tile_seat[rows]
+                    war_t = (own_t >= 0) & (own_t != seat) & self._seats_hostile(seat, self.tile_seat)[rows]
+                    ok = ok & ~(war_t.gather(1, nbc) & d_war.unsqueeze(1))
             if link is not None:
                 link(nbc, best, turns, moves, ok)
             linked6[ar, best] = torch.where(act.unsqueeze(1), ok, linked6[ar, best])
@@ -1082,8 +1090,14 @@ class SimTactics:
         cost = torch.where(fw & tw, mp1, torch.where(fw != tw, trans, land))
         return torch.where(naval, mp1, cost)
 
+    def _move_unit_danger(self, plane: torch.Tensor) -> tuple:
+        """`moveUnitDanger`: Move Unit's order without Allow Danger (0x7eeba0's
+        flags 0x100a) over the danger map `plane` [B, T] — flags 8 and 2"""
+        on = torch.ones(self.B, dtype=torch.bool, device=self.device)
+        return (plane, on, torch.zeros_like(on), on)
+
     def _tac_move_to(self, mask: torch.Tensor, us: torch.Tensor, dest: torch.Tensor, pre: str = "barb",
-                     seat: int = BARB_SEAT, strike: bool = True, avoid: torch.Tensor | None = None,
+                     seat: int = BARB_SEAT, strike: bool = True,
                      later_turns: bool = False, explore: bool = True, danger: tuple | None = None) -> None:
         """`moveTo` for the unit at local slot `us` [B] of pool `pre` (its
         player `seat`) in the games of `mask`: the pathfinder's path to `dest`
@@ -1091,13 +1105,14 @@ class SimTactics:
         turn (a zone of control ends it); it walks through its own units and
         other players' but never ends on another player's unit or its own
         that stacks with it. A path ending on a plot it attacks into stops at
-        its side, and with `strike` (the barbarians') it strikes there; a walk
-        whose end `avoid` [B, T] names stays put. With `later_turns` (the
-        order's path flag 0x1000) the path's turns after its first may end on
-        a plot its own stacking unit holds, its first not; with no `explore`
-        (its flag 1) the path leaves no plot the player never revealed; with
-        `danger` (the danger map [B, T], the order's flag 8 [B] and flag
-        0x8000 [B]) its first turn steps onto no plot of danger."""
+        its side, and with `strike` (the barbarians') it strikes there. With
+        `later_turns` (the order's path flag 0x1000) the path's turns after
+        its first may end on a plot its own stacking unit holds, its first
+        not; with no `explore` (its flag 1) the path leaves no plot the player
+        never revealed; with `danger` (the danger map [B, T], the order's
+        flag 8 [B], flag 0x8000 [B] and flag 2 [B]) its first turn steps onto
+        no plot of danger, and under flag 2 no step onto the ground of a
+        player at war with it."""
         if not bool(mask.count_nonzero()):
             return
         dev = self.device
@@ -1196,9 +1211,6 @@ class SimTactics:
             if not bool(back_off.count_nonzero()):
                 break
             stop = stop - back_off.long()
-        if avoid is not None:
-            end = path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)
-            stop = torch.where((stop > 0) & avoid[rows, end], torch.zeros_like(stop), stop)
         if later_turns:
             # its first turn may not end on the destination its own stacking
             # unit holds: no path
@@ -2796,7 +2808,7 @@ class SimTactics:
                 f8[rows] = torch.where(wk, ~comb | paired, ~comb & ~paired)
                 f80 = torch.zeros(B, dtype=torch.bool, device=dev)
                 f80[rows] = ~naval & (self._type_air.take(ut) == 0)
-                dg = (danger, f8, f80)
+                dg = (danger, f8, f80, torch.zeros_like(f8))
             self._tac_move_to(ms & ~hit, us, full, pre, seat, strike=False, later_turns=True, explore=False, danger=dg)
             self._tac_move_to(ms & hit, us, full, pre, seat, strike=True, later_turns=True, explore=False, danger=dg)
             moves.append((torch.where(ms, us, torch.full_like(us, -1)), before, torch.where(ms, full, torch.full_like(us, -1))))

@@ -5297,3 +5297,41 @@ planning's first turn (`_tac_danger_need`).
   first-step tests and the zone-of-control wait are not in the engines (no
   recorded case named); runs/h1_duely1128 t171 (strong, 0 to 0) 9:3 -> 9:4
   for 14:16, the engines' 10:3: a path choice, not these flags.
+
+## C-99: Move Unit's path flags 0x2 / 0x8 — READ (0x2720a0, 0x716080), both twins
+
+One path test for both move orders: `PathDanger` (its `war`, flag 2) and
+`moveUnitDanger` through `moveTo` / `pathTo` / `search` (cpu/core/tactical.ts),
+from `upgradeMove` (cpu/core/minorOps.ts), the city trees' move order
+(cpu/core/minorCityAi.ts) and the scout tree's Move Unit (cpu/core/barbarianOps.ts);
+`_move_unit_danger` and the danger tuple's fourth member through `_tac_move_to`
+/ `_tac_search` (gpu/core/sim_tactics.py), from `_mops_upgrade_move`
+(sim_minorops.py), the city trees' `order` (sim_minorai.py), the scout's Move
+Unit (sim_barbops.py). Operation Move's flags (the section "C-123: Operation
+Move's danger flags ...") set no flag 2.
+
+- MOVE UNIT'S EXECUTION (0x7eeba0) orders its swap and its move with the
+  flags 0x100a, 0x1000 where the node's Allow Danger holds (no data: true;
+  BehaviorTrees.xml TreeData sets it false on the Upgrade Units tree's node
+  4 and the city trees' Move Units, true on Barbarian Found City's), in
+  both its branches (the Location's at 0x7eec91, the targets' at
+  0x7eee6a). The Location branch takes no move where the plot (its
+  planning's within To Range) is on the danger map (0x7eed65).
+- THE PATH'S VALIDITY (0x2720a0, the new node rdi, its parent rbp): flag 2
+  (0x2724c8) refuses a node whose plot's owner is at war with the path's
+  player (0x3dcec0 on the owner's diplomacy +0x1300); flag 8 refuses a node
+  of danger from a parent of turn 1 or less, as read for Operation Move.
+- THE DANGER MAP'S OWN DISTRICTS (0x717c85..0x717dc6, the lambda 0x716080):
+  a district with a defence above 0 sets its plot to 0; each plot within its
+  strike but its own, above 0, goes down by the strike to 1 at least — as
+  `dangerPlane` holds it.
+- CONFIRMED: runs/h1_duely1121 city-state 2's Horseman 786438 on 8:6, in an
+  Upgrade Units tree from t74 (aimem `assigned`), its six neighbours on the
+  danger map (25 to 85): it holds every turn where the engines walked it
+  into its free centre 11:5 (t78, t80-89 ...); runs/h1_duely1124 t91
+  city-state 4's Catapult 786437 goes round 427 (danger 32) onto 426 as
+  recorded.
+- OPEN: runs/h1_duely1124 t92 city-state 3's Catapult 1245186 on 743 walks
+  743 -> 699 -> 656 in the game, 699 at 25 on the engines' danger map (the
+  barbarian Archer 3801089 on 38:18, 76 damage, seen at age 0): the engines
+  find no path. The Archer's danger there (its reach, its health) unread.

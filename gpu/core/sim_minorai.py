@@ -2516,9 +2516,14 @@ class _MinorWorld:
         if not bool(alive.count_nonzero()):
             return
         if kind == "move":
-            # a move with `safe` takes no walk ending on a plot of danger
+            # Move Unit's execution (0x7eeba0): without Allow Danger (`safe`)
+            # a location on the danger map takes no move (0x7eed65), and the
+            # order's path flags are 0x100a (0x1000 with Allow Danger)
+            plane = self._danger_map() if safe else None
+            if plane is not None:
+                alive = alive & ~(plane.gather(1, plot.clamp(min=0).unsqueeze(1)).squeeze(1) > 0)
             sim._tac_move_to(alive, g, plot, pre="major", seat=self.seat, strike=False,
-                             avoid=(self._danger_map() > 0) if safe else None)
+                             danger=sim._move_unit_danger(plane) if plane is not None else None, later_turns=True)
             sim._gen_ver += 1
             return
         ut = sim.major_unit_tile.gather(1, g.unsqueeze(1)).squeeze(1)

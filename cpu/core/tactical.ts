@@ -323,12 +323,18 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
  */
 /** a move order's danger flags over the player's danger map (`dangerPlane`):
  *  `any` its flag 8, every plot of danger; `water` its flag 0x8000, a water
- *  plot of danger */
+ *  plot of danger; `war` its flag 2, the ground of a player at war with the
+ *  unit's */
 export interface PathDanger {
   plane: ArrayLike<number>;
   any: boolean;
   water: boolean;
+  war: boolean;
 }
+
+/** Move Unit's order without Allow Danger (0x7eeba0's flags 0x100a): flags 2
+ *  and 8 */
+export const moveUnitDanger = (plane: ArrayLike<number>): PathDanger => ({ plane, any: true, water: false, war: true });
 
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false,
@@ -409,8 +415,10 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // a move order's danger flags (the path validity 0x2720a0 at
       // 0x272590..0x272612): from a node of the path's first turn, under
       // flag 8 no child of danger (the player's danger map 0x716a90 above
-      // 0), under flag 0x8000 no water child of danger
+      // 0), under flag 0x8000 no water child of danger; under flag 2 (at
+      // 0x2724c8) no child on the ground of a player at war with the unit's
       if (danger && best.turns <= 1 && danger.plane[to.index] > 0 && (danger.any || (danger.water && isWater(to)))) continue;
+      if (danger?.war && tileSeat(to) !== NO_SEAT && tileSeat(to) !== unit.seat && unitsHostile(state, unit, { seat: tileSeat(to) })) continue;
       const s = price(best, to, di, attack);
       if (s.turns > maxTurns) continue;
       // a path's turn may not end on a plot its own stacking unit holds (the
@@ -588,13 +596,13 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
  *  ends it), the engine's step paying each; it walks through its own units
  *  but stops short of a plot of its own unit that stacks with it. A path
  *  ending on a plot it attacks into stops at its side, and with `strike`
- *  the unit strikes it there; a walk whose end `avoid` names stays put. With
- *  `laterTurns` (the order's path flag 0x1000) the path's turns after its
- *  first may end on a plot its own stacking unit holds, its first not; with
- *  no `explore` (its flag 1) the path leaves no plot the player never
- *  revealed; with `danger` (its flags 8 / 0x8000) its first turn steps
- *  onto no plot of danger. */
-export function moveTo(state: GameState, unit: Unit, dest: number, strike = true, avoid?: (tile: number) => boolean,
+ *  the unit strikes it there. With `laterTurns` (the order's path flag
+ *  0x1000) the path's turns after its first may end on a plot its own
+ *  stacking unit holds, its first not; with no `explore` (its flag 1) the
+ *  path leaves no plot the player never revealed; with `danger` (its flags
+ *  8 / 0x8000) its first turn steps onto no plot of danger, (its flag 2)
+ *  no step onto the ground of a player at war with it. */
+export function moveTo(state: GameState, unit: Unit, dest: number, strike = true,
   laterTurns = false, explore = true, danger?: PathDanger): void {
   let path = pathTo(state, unit, dest, laterTurns, explore, danger);
   // a path ending on a plot it attacks into: it walks to its side, and
@@ -602,7 +610,7 @@ export function moveTo(state: GameState, unit: Unit, dest: number, strike = true
   const last = path.length ? path[path.length - 1] : -1;
   const into = last >= 0 && attackPlot(state, unit, last);
   if (into) path = path.slice(0, -1);
-  walk(state, unit, path, avoid);
+  walk(state, unit, path);
   if (into && strike && unit.movesLeft > 0 && attacksLeftOf(unit) > 0 && state.units.includes(unit)
     && plotDistance(state, unit.tileIndex, last) === 1) {
     meleeAttack(state, unit.id, last, unit.seat);
@@ -620,7 +628,7 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
 }
 
 /** the walk of a path as far as the unit's Movement carries it this turn */
-function walk(state: GameState, unit: Unit, path: number[], avoid?: (tile: number) => boolean): void {
+function walk(state: GameState, unit: Unit, path: number[]): void {
   const { tiles } = state.map;
   // how far its Movement carries it along the path this turn
   const full = unit.movesFull ?? unitFullMoves(state, unit);
@@ -643,9 +651,6 @@ function walk(state: GameState, unit: Unit, path: number[], avoid?: (tile: numbe
     if (mp <= 0 || inEnemyZoc(state, p, unit)) break;
   }
   while (stop > 0 && (stackedAt(state, unit, path[stop - 1]) || foreignAt(state, unit, path[stop - 1]))) stop -= 1;
-  // a walk whose end `avoid` names is not taken (Move Unit's danger test,
-  // 0x7eed65)
-  if (avoid && stop > 0 && avoid(path[stop - 1])) return;
   for (let i = 0; i < stop; i++) {
     if (stepUnit(state, unit, tiles[path[i]]) !== 'moved') return;
   }
@@ -2984,8 +2989,8 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     const combat = (UNITS[u.type]?.combat ?? 0) > 0;
     const paired = formed(u);
     const danger: PathDanger = { plane: pass.danger, any: weak ? !combat || paired : !combat && !paired,
-      water: !UNITS[u.type]?.naval && unitDomain(u.type) !== 'air' };
-    moveTo(state, u, dest, strike, undefined, true, false, danger);
+      water: !UNITS[u.type]?.naval && unitDomain(u.type) !== 'air', war: false };
+    moveTo(state, u, dest, strike, true, false, danger);
   }
   return out;
 }

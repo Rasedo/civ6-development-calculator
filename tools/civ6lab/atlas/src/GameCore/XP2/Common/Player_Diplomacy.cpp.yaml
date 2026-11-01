@@ -300,6 +300,7 @@
     - "H-1: the city-states' quests — READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-99: Move Unit's path flags 0x2 / 0x8 — READ (0x2720a0, 0x716080), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...49cc0 / 0x449940), the client has met the actor (0x3daaf0) and is not at war with it (0x3dcec0), then the logic's own test; weight 1 each; one draw \"Selecting a random new quest\" ove..."
