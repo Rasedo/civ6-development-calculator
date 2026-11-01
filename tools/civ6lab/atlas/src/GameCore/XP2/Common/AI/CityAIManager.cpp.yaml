@@ -3,6 +3,18 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x5c24e0
+  final: 0x3d8fc0
+  kind: function
+  semantics: "the City AI manager's handler on player signal +0x258 (bound by 0x5c27e0 at 0x5c2a87): unless every city's +0x4d0 / +0xcf0 gate holds, once per manager (+0xa8) each city's yields update 0x5cc510, then each city's City Analysis job 0x5ce3f0 (0x5ce910 -> 0x5ce970 per plot evaluation). The analysis so runs on the same signal as the military AI's strengths (0x7271d0), in the minor's own turn before its city update 0x5ce680, and each evaluation reads the plot's owner at that moment (0x5ceac1): a plot annexed in a major's start is the minor's in that turn's analysis."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 47
+      value: "Hong Kong's 272 (8:6), annexed in China's start, takes the Camp tree that turn: its Builder 983040 steps to 8:7 in Hong Kong's t47 actions and lays the Camp at t48"
+  readings:
+    - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
+  review: reviewed
 - addr: 0x5c2610
   final: 0x3d90f0
   kind: function
@@ -14,6 +26,7 @@
     - gpu/core/sim_minorai.py:_minor_second_hook
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...es, military), then A (the cities 0x5c2650 -> 0x5ce680), then C (the second city hook 0x5c2610 -> 0x5ce5b0: the Default Specialization where the queue is empty, then TryPurchaseUnits..."
@@ -31,6 +44,19 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+    - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
   context:
     - "- The city's turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantage..."
+  review: reviewed
+- addr: 0x5c27e0
+  final: 0x3d9210
+  kind: function
+  semantics: "the City AI manager's set-up: binds its handlers to the player's signals — 0x5c2650 (the cities' AI turn) on +0x1f8, 0x5c2610 (the second city hook) on +0x210, 0x5c26b0 on +0x228, 0x5c30b0 on +0x1e0, 0x5c24e0 (the City Analysis) on +0x258. Callers: the player's set-up 0x469790 and the loads 0x47ffb0 / 0x5c2b50."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 47
+      value: the City Analysis on +0x258 beside the military AI's strengths, the minor's annexed 272 owned in that turn's evaluations
+  readings:
+    - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
   review: reviewed

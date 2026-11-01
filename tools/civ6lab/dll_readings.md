@@ -7541,3 +7541,42 @@ replay's `minorShots` landed in `minorAi`; GPU `_minor_pass`.
   32:11 (a fort, no unit of its own on it in the records); h1_duely1127
   t88-96 city-state 3's Galley 393216 on 30:19 takes 28:17 where ours
   29:15 (danger 0 in our map, its Movement 0 there).
+
+## H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained
+
+- THE SIGNAL: the City AI manager's set-up 0x5c27e0 binds the cities' AI
+  turn 0x5c2650 to player signal +0x1f8, the second city hook 0x5c2610 to
+  +0x210, and the City Analysis handler 0x5c24e0 to +0x258 (0x5c2a87), the
+  signal the player AI's update 0x608580 fires before its turn start, beside
+  the military AI's strengths 0x7271d0. 0x5c24e0 runs each city's yields
+  update 0x5cc510 (once per manager, +0xa8) and its City Analysis job
+  0x5ce3f0 (0x5ce910 -> 0x5ce970 per plot evaluation); the city update
+  0x5ce680 then runs the improvement pick 0x5c9a00 and the events on that
+  analysis. The evaluation's owner test (0x5ceac1: the plot's owner +0x1c
+  the player's, its city +0xc the city's +0xf8) reads the plot as it stands,
+  so a plot a major's start annexes is the minor's in that turn's analysis:
+  the engines' `minorPlotEvals` / `_minor_plot_evals` read the owner at the
+  minor's city AI turn, as ported.
+- CONFIRMED: runs/h1_duely1128 t47 Hong Kong's 272 (8:6), annexed in China's
+  start, takes the Camp tree that turn (its Builder 983040 to 8:7 in Hong
+  Kong's t47 actions, the Camp laid at t48). A rule hiding a plot from the
+  improvement event the turn it is annexed fits 1117 t44 but misses that
+  Camp and 1124's Builders (one-seed carried t2-100: builder.improve 1124
+  +2, 1128 +2; unit.bought 1124 +1), and is not ported.
+- OPEN: runs/h1_duely1117 t44-t45 Antananarivo. The game's pick
+  (aimem m_bestImprovementToMake) is the Mine from t40 to t46 (the Farm at
+  t46's end look, the Plantation t47, the Mine t48), and its improvement
+  event starts no tree at t44 or t45, so its best Mine plot is valued 0 or
+  less there: 210 (34:4, Tundra Hills, Copper), annexed in China's t44
+  start and worked from t45, is not among its owned improvable plots above
+  0, where the engines value its Mine 71.45 and start the tree at t44. The
+  pick also stays the Mine at t45 with 295 (Rice on Floodplains Grassland,
+  annexed in China's t45 start) owned, which the engines value 71.45 as a
+  Farm at t45 and 103.1 at t46. Which term of 0x5ce970 / 0x7a58f0 leaves a
+  freshly annexed plot unvalued is unread.
+- THE ENVOYS' POSTED AMANI under the most-envoys count: 1121 t181 / t233 and
+  1127 t132 / t148 are Amani leaving (her two envoys gone from the record's
+  count, the plots she bought kept: 1121 p2 [[1,6]] five plots past the
+  seven at t180, [[1,4]] still five at t181); runs/h1_duelw1119 t97
+  Babylon, Amani established there, China's 1 -> 3 beside Rome's 2: most 3,
+  one plot as recorded (the sum's 5 gave the engines' two).

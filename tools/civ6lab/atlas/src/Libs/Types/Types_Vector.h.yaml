@@ -604,6 +604,7 @@
     - gpu/core/sim_civics.py:_cai_turn
   readings:
     - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
+    - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
   review: reviewed
 - addr: 0x727510
   final: 0x4d26e0
