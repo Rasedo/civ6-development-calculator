@@ -40,6 +40,7 @@ import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, jumpMade
 import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats, withPercent256 } from './city';
+import { upgradeRoads } from './eras';
 import { researchCost, selectResearch } from './economy';
 import { CP_ACCEPTED, CP_CANCELLED, CP_FAILED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
@@ -83,7 +84,8 @@ import { militaryFavTech } from './operations/unitRows';
  *  A levied army due home comes home first; the city's grid is resolved
  *  before its yields read it. Then, as every player's turn runs
  *  (tools/civ6lab/turn_order_civ6.md): its economy (`minorEconomy`) and the
- *  research that completes on it, then its city — the Production its city
+ *  research that completes on it, its roads at the era that brings
+ *  (`upgradeRoads`), then its city — the Production its city
  *  makes now, its strategic resources' income and its units' fuel, then growth and borders on the city as it stands after that
  *  (`minorGrowth`) — its city presses a religion it follows on that
  *  religion's founder's turn (`spreadReligiousPressure`) — then its research
@@ -103,6 +105,11 @@ export function minorPhase(state: GameState): void {
     minorLevyReturn(state, cityState);
     minorPower(state, cityState);
     const techs = minorEconomy(state, cityState);
+    // the era its research brings re-lays its roads at once (the era signal
+    // 0x4d9a70 -> 0x5134c0), before its units move (runs/h1_duely1128 Hong
+    // Kong t156: its Industrial era, its new Builder from the centre to 9:9
+    // on Industrial roads at 0.75 with Movement left, the Farm laid there)
+    upgradeRoads(state, cityState.seat, cityState.research);
     storeUnitStrength(state, cityState.seat);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
     // its strategic resources after its city's turn, as the player's DoTurn

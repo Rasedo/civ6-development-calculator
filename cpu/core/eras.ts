@@ -259,8 +259,10 @@ export function layRoad(state: GameState, seat: number, t: Tile): void {
  *  plot it owns that carries a road takes the player's best road, the
  *  Railroad apart; `r.roadTier` holds the tier its era last gave
  *  (runs/h1_duely1128: China's 18 roads Industrial at its t145 era, the
- *  city-states' plots each at its own, records 154, 155 and 157) */
-function upgradeRoads(state: GameState, seat: number, r: ResearchState): void {
+ *  city-states' plots each at its own, records 154, 155 and 157). A
+ *  city-state's era comes at its research step, its roads re-laid there,
+ *  before its units move (`minorPhase`) */
+export function upgradeRoads(state: GameState, seat: number, r: ResearchState): void {
   const tier = bestRoadTier(civEraIndex(r.techs, r.civics));
   if (tier <= (r.roadTier ?? 0)) return;
   r.roadTier = tier;

@@ -1475,14 +1475,20 @@ class SimSeats:
         re-lays the roads of the plots it owns, the Railroad apart"""
         rows = list(range(self.n_majors)) + [self.n_majors + c for c in range(self.citystate_techs.shape[1])]
         for row in rows:
-            held = self.civ_road_tier[:, row] if row < self.n_majors else self.citystate_road_tier[:, row - self.n_majors]
-            tier = self._row_road_tier(row)
-            up = tier > held
-            if not bool(up.count_nonzero()):
-                continue
-            held.copy_(torch.where(up, tier, held))
-            m = up.unsqueeze(1) & self.road & ~self.railroad & (self.tile_seat == int(self._ROW_SEAT[row]))
-            self.road_tier.copy_(torch.where(m, tier.unsqueeze(1).expand_as(self.road_tier), self.road_tier))
+            self._upgrade_roads(row)
+
+    def _upgrade_roads(self, row: int) -> None:
+        """`upgradeRoads` of row `row`: its era brought a new road
+        (`_row_road_tier` above the tier it last gave), the roads of the plots
+        it owns re-laid, the Railroad apart"""
+        held = self.civ_road_tier[:, row] if row < self.n_majors else self.citystate_road_tier[:, row - self.n_majors]
+        tier = self._row_road_tier(row)
+        up = tier > held
+        if not bool(up.count_nonzero()):
+            return
+        held.copy_(torch.where(up, tier, held))
+        m = up.unsqueeze(1) & self.road & ~self.railroad & (self.tile_seat == int(self._ROW_SEAT[row]))
+        self.road_tier.copy_(torch.where(m, tier.unsqueeze(1).expand_as(self.road_tier), self.road_tier))
 
     def _game_era_turn(self, t: int) -> None:
         """`gameEraTurn` on the turn `t` opens, before its starts. Where no

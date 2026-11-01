@@ -50,10 +50,17 @@
   final: 0x3619b0
   kind: function
   status: PARTLY
-  impl: [cpu/core/eras.ts:upgradeRoads]
+  cases:
+    - recording: h1_duely1128
+      turn: 156
+      value: "Hong Kong's Industrial era at its research step: its new Builder 2621440 from 9:7 to 9:9 on Industrial roads (0.75) with 0.25 Movement left lays the Farm there that turn (record t157 roads Industrial)"
+  impl:
+    - cpu/core/eras.ts:upgradeRoads
+    - cpu/core/minorBuild.ts:minorPhase
+    - gpu/core/sim_seats.py:_upgrade_roads
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-127: a city-state's roads re-laid at its research step"
   context:
     - "- The upgrade (0x5134c0, called only from Player_Trade's era handler 0x4d9a70 with LOC_NOTIFICATION_ROADS_UPGRA..."
-  review: imported
+  review: reviewed

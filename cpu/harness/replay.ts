@@ -1328,13 +1328,15 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     t.district = r.district;
     t.districtComplete = r.districtComplete;
     t.districtPillaged = r.districtPillaged;
-    t.road = r.road;
-    // ...on the first record's road types: a road a player's era brings lands
+    // ...on the first record's road types: a road a major's era brings lands
     // at the turn's end (runs/h1_duely1128 t145: China's Industrial era, the
-    // minors' planning on Medieval roads, Industrial ones from record 146);
-    // a road new since, record t+1's
+    // minors' planning on Medieval roads, Industrial ones from record 146),
+    // a city-state's at its research step (the engine's turn re-laid them:
+    // `minorPhase`); a road new since, record t+1's
     const was = ctx.roadTiersWas?.[i] ?? -1;
-    const tier = was >= 0 ? was : (r.roadTier ?? 0);
+    const relaid = was >= 0 && t.road && isCityStateSeat(t.ownerSeat) ? Math.max(was, t.roadTier ?? 0) : was;
+    t.road = r.road;
+    const tier = was >= 0 ? relaid : (r.roadTier ?? 0);
     if (tier > 0) t.roadTier = tier;
     else delete t.roadTier;
   });

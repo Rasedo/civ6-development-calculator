@@ -14,10 +14,10 @@ class SimMinors:
         # each minor in turn — the `minorPhase` order, one minor at a time
         # because a district one minor lands may lend a neighbour's district
         # adjacency across the border: its levied army home when due, its
-        # grid; its economy and the research it completes; its city — the
-        # step works the item in hand; its strategic resources' income
-        # (`_seat_accrue_stockpile`, a major's body over its own bank) and its
-        # units' fuel after its city's turn; then growth and borders on the city as
+        # grid; its economy and the research it completes, its roads at the
+        # era that brings; its city — the step works the item in hand; its
+        # strategic resources' income (`_seat_accrue_stockpile`, a major's body
+        # over its own bank) and its units' fuel after its city's turn; then growth and borders on the city as
         # it stands after that (its city presses a religion it follows on the
         # founder's turn); its military AI's Combat Desire; its savings and
         # military AI's turn (`_minor_military_turn`); its knowledge
@@ -36,6 +36,9 @@ class SimMinors:
             self._minor_levy_return(s)
             self._minor_power(s)
             techs = self._minor_economy(s)
+            # the era its research brings re-lays its roads at once, before
+            # its units move (`upgradeRoads`)
+            self._upgrade_roads(self.n_majors + s)
             self._store_unit_strength(s, alive)
             self._minor_build(s, self._minor_production(s))
             # its strategic resources after its city's turn (`minorPhase`), then

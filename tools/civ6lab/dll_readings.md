@@ -5335,3 +5335,26 @@ Move's danger flags ...") set no flag 2.
   743 -> 699 -> 656 in the game, 699 at 25 on the engines' danger map (the
   barbarian Archer 3801089 on 38:18, 76 damage, seen at age 0): the engines
   find no path. The Archer's danger there (its reach, its health) unread.
+
+## C-127: a city-state's roads re-laid at its research step
+
+- The era handler 0x4d9a70 -> 0x5134c0 re-lays a player's road plots when
+  its era brings a new road. A city-state's era comes at its research step
+  (`minorEconomy` / `_minor_economy`), and its roads take the new type there,
+  before its units move: `upgradeRoads` (cpu/core/eras.ts) called from
+  `minorPhase` (cpu/core/minorBuild.ts) right after the economy, the GPU's
+  `_upgrade_roads(row)` (gpu/core/sim_seats.py) from `_city_state_phase`.
+  The turn's change (`upgradeAllRoads` / `_upgrade_all_roads`) still
+  upgrades the majors and the Free Cities. The replay's copy of the minors'
+  units' turn keeps a city-state's re-laid tier above the first record's.
+- Confirmed: runs/h1_duely1128 Hong Kong t156. Scientific Theory and The
+  Enlightenment bring its Industrial era. Its new Builder 2621440 goes
+  9:7 -> 9:8 -> 9:9: the road step at 0.75, then the plain step at 1.0,
+  leaves it 0.25 Movement, and it lays the Farm on 405 that turn. With
+  Medieval roads it would arrive with none. Record t157 holds the roads
+  Industrial; the t157 trip back ends at 0.25 Movement, as recorded.
+- Open: a major's era. China's Industrial era at its t145 start leaves the
+  minors' planning that turn on Medieval roads. That would fit an immediate
+  upgrade only if the minors read China's plots through their own revealed
+  route types, which neither twin models. So the majors stay at the turn's
+  change.
