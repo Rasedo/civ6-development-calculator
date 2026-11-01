@@ -49,6 +49,13 @@ export const AI_PROJECT_SHARE = srcConst('aiValue.projectShare', 1, {
   lab: 'tools/civ6lab/dll_readings.md H-1: the research AI (0x7b3e50: the project loop, 0x100 or 0x400)',
 });
 
+/** What one unlocked space race project stands for, times PSEUDOYIELD_SPACE_RACE
+ *  of its chain's length squared, a yield a turn in the project share's place
+ *  (0x7b3e50: 0x7b51ec SpaceRace, 0.1 at 0xd2f320). */
+export const AI_SPACE_RACE_SHARE = srcConst('aiValue.spaceRaceShare', 0.1, {
+  lab: 'tools/civ6lab/dll_readings.md H-1: the research AI (0x7b3e50: the project loop, 0x7b51ec..0x7b5256, 0.1 at 0xd2f320)',
+});
+
 /** The share one unlocked building, wonder or district stands for (0x7b3e50
  *  and 0x7a9a10: 0.5 at 0xd20458, a wonder's and a district's through their
  *  pseudo-yields). */

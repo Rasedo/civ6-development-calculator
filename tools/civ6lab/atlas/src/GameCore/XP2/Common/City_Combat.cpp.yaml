@@ -6,9 +6,18 @@
 - addr: 0x197ff0
   final: 0x111800
   kind: function
-  status: PARTLY
-  impl: [cpu/core/aiProjectValue.ts:ProjectValueFacts]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 89
+      value: Cardiff Repair Outer Defenses 3255.0 = 42 x 8 x 1 x 10 x 248/256; t107 4708.1 (54 x 9 x 1); t158 10656.3 (55 x 10 x 2); Granada t127 21971.3 (108 over the Encampment 99, x 7 x 3)
+  impl:
+    - cpu/core/rules.ts:outerDamage
+    - gpu/core/sim_minors.py:_minor_outer_damage
+    - cpu/core/aiProjectValue.ts:ProjectValueFacts
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "...defences: +1 for a city of two districts or more (city +0x1a60, the districts' count, 0x197ff0's array), +2 for a capital (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), popul..."
-  review: imported
+  review: reviewed

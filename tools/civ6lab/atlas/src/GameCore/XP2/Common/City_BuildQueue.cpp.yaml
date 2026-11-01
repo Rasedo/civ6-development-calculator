@@ -610,18 +610,26 @@
 - addr: 0x17e690
   final: 0x1005d0
   kind: function
-  status: PARTLY
+  status: READ
   cases:
+    - recording: h1_duely1117
+      turn: 134
+      value: "Valletta t134-141: its pillaged Lighthouse picked under the pillaged Harbor (NO BUILDS AT ALL each turn), queued t143 as its repair"
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/core/aiCityBuild.ts:PickFacts]
+  impl:
+    - cpu/core/minorBuild.ts:minorPickFacts
+    - gpu/core/sim_cityvalue.py:_MinorFacts
+    - cpu/core/aiCityBuild.ts:PickFacts
+    - cpu/core/minorBuild.ts:freeCityPickFacts
+    - gpu/core/sim_cityvalue.py:building_held
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...AT ALL').  bestBuilding: value table plotEval(cityCenter)+0x28[bld]; skip if already in queue/has (0x17e690>0); adj via 0x5d2d10(list r15+0x528):    -1 -> +0.5 ; 1 -> +2.0 ; wonder(+0x159&4 && +0x228 == f2f9..."
   context:
     - "...rst in table order on a tie). Plain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not Mu..."
-  review: imported
+  review: reviewed
 - addr: 0x17f070
   final: 0x100e80
   kind: function

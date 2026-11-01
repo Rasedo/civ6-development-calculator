@@ -222,9 +222,6 @@ class Project:
     def progress_pct(self):
         return 9
 
-    def space_race_standing(self):
-        return 0
-
     def defence_repairs(self):
         return 0
 

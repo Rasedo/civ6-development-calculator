@@ -3956,6 +3956,19 @@
   context:
     - "...the plot, +0x1b a flag that drops the plot — 0xa3a210) of the city's plots, the lambda 0x79ecc0 counting each kept plot and those of them holding a district: + (districts x 15 + plots..."
   review: imported
+- addr: 0x79f030
+  final: 0x526de0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 202
+      value: "the Moon Landing's chain 2 (its ProjectPrereqs Launch Earth Satellite): Satellites 40.0 a turn, 679.2 at 4 turns"
+  impl: [cpu/core/aiProjectValue.ts:projectChain]
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+  review: reviewed
 - addr: 0x79f0c0
   final: 0x526e70
   kind: function
@@ -4026,13 +4039,22 @@
 - addr: 0x7b8a30
   final: 0x534c10
   kind: function
-  status: PARTLY
-  impl: [cpu/core/aiProjectValue.ts:ProjectValueFacts, cpu/core/aiResearch.ts:techValue]
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 189
+      value: "Rocketry's own value 10.0 a turn from landing (Launch Earth Satellite, chain 1) above the engines' none: 178.7 at 3 turns, 196.5 at 1; Satellites 40.0 (the Moon Landing, chain 2), 679.2 at 4 turns .. 785.7 at 1"
+  impl:
+    - cpu/core/aiProjectValue.ts:projectChain
+    - cpu/core/aiResearch.ts:techUnlocks
+    - gpu/core/sim_cityvalue.py:_project_chain
+    - cpu/core/aiResearch.ts:techValue
   readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "- SpaceRace (+0xe8 bit 2): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared, and 1.0 per space-race project the player has completed."
-  review: imported
+  review: reviewed
 - addr: 0x7b8bd0
   kind: function
   status: READ

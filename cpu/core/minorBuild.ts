@@ -32,7 +32,7 @@ import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
 import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, amenityTier, gameProgressPct } from '../data/constants';
 import { detectBoosts } from './boosts';
-import { canPlaceDistrictIn, fitEncampOuter, outerPool, urbanDefensesFit, wallsMax } from './rules';
+import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefensesFit, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
 import { freeCityThreat, minorAiTurn, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
@@ -763,15 +763,26 @@ function minorTraders(state: GameState, cityState: CityState): number {
  *  Center row always). */
 function minorRepairTarget(state: GameState, cityState: CityState): string | undefined {
   if (!cityState.pillagedBuildings?.length) return undefined;
-  return centerBuildingIds().find((id) => {
-    if (!buildingPillaged(cityState, id)) return false;
-    const def = BUILDINGS[id];
-    if (def.district === 'CITY_CENTER') return true;
-    return (cityState.districts ?? []).some((d) => {
-      const t = state.map.tiles[d.tileIndex];
-      return t.district === def.district && t.districtComplete && !t.districtPillaged;
-    });
+  return centerBuildingIds().find((id) => minorRepairable(state, cityState, id));
+}
+
+/** a pillaged building of the minor whose district stands complete and
+ *  unpillaged (a City Center row always): its repair the queue takes */
+function minorRepairable(state: GameState, cityState: CityState, id: string): boolean {
+  if (!buildingPillaged(cityState, id)) return false;
+  const def = BUILDINGS[id];
+  if (def.district === 'CITY_CENTER') return true;
+  return (cityState.districts ?? []).some((d) => {
+    const t = state.map.tiles[d.tileIndex];
+    return t.district === def.district && t.districtComplete && !t.districtPillaged;
   });
+}
+
+/** the minor's item for an install type, a building it holds pillaged its
+ *  repair (the queue's building entry repairs it) */
+export function minorItemFor(cityState: CityState, type: string): Exclude<MinorItem, { none: true }> | null {
+  const it = minorItemOfType(type);
+  return it && 'building' in it && buildingPillaged(cityState, it.building) ? { repair: it.building } : it;
 }
 
 /** What a minor's step may hold: a unit it trains, a building it raises, a
@@ -975,6 +986,7 @@ export function minorQueueOk(state: GameState, cityState: CityState, item: Exclu
     if (PROJECTS[item.project]?.repair) return repairAvailable(state, minorCity(cityState));
     return minorProjectOk(state, cityState, item.project);
   }
+  if ('repair' in item) return minorRepairable(state, cityState, item.repair);
   return false;
 }
 
@@ -1583,10 +1595,10 @@ function foundingProduction(stats: ReturnType<typeof computeCityStats>): number 
 
 /** What the PROJECTS table (`aiProjectValue.ts`) reads of a minor's city
  *  beside its city build facts: its completions (player +0x1330), one city
- *  producing, the game's progress; the space-race standing, the outer
- *  defences' repair count, the loyalty and the effects' unlocks not read
- *  (none), no favoured items */
-export function minorProjectFacts(cityState: CityState, facts: CityBuildFacts): ProjectTableFacts {
+ *  producing, the game's progress, its outer defences' damage
+ *  (`outerDamage`); the loyalty and the effects' unlocks not read (none), no
+ *  favoured items */
+export function minorProjectFacts(state: GameState, cityState: CityState, facts: CityBuildFacts): ProjectTableFacts {
   const r = cityState.research;
   return {
     view: facts.view,
@@ -1596,8 +1608,7 @@ export function minorProjectFacts(cityState: CityState, facts: CityBuildFacts): 
     advanced: (p) => facts.view.projectCompletions(cityState.seat, p),
     buildTurns: (p) => facts.buildTurns(p),
     progressPct: gameProgressPct(r.techs.length, r.civics.length),
-    spaceRaceStanding: 0,
-    defenceRepairs: 0,
+    defenceRepairs: outerDamage(state, minorCity(cityState)),
     population: facts.population,
     districts: facts.districtCount,
     loyaltyFalling: false,
@@ -1623,7 +1634,7 @@ export function minorTables(state: GameState, cityState: CityState, known: (unit
   return {
     buildings: buildingTable(facts),
     units: unitTable(facts).map((v) => v ?? FX_MIN),
-    projects: projectTable(minorProjectFacts(cityState, facts)),
+    projects: projectTable(minorProjectFacts(state, cityState, facts)),
   };
 }
 
@@ -1638,9 +1649,14 @@ export function minorTables(state: GameState, cityState: CityState, known: (unit
  *  (`minorUnderThreat`, on the threat its city AI stored). */
 export function minorPickFacts(state: GameState, cityState: CityState, facts: CityBuildFacts): PickFacts {
   return {
+    // 0x17e690: the queue's building entries of the type — the item in hand,
+    // a repair's its building's; a building the city holds the CanConstruct
+    // refuses unless pillaged (runs/h1_duely1117 Valletta t134-141: its
+    // pillaged Lighthouse picked, the queue refusing it under the pillaged
+    // Harbor, NO BUILDS AT ALL)
     buildingHeld: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
-      return minorItemType(cityState) === b || (!!id && (cityState.buildings ?? []).includes(id));
+      return !!id && (cityState.prodItem === `building:${id}` || cityState.prodItem === `repair:${id}`);
     },
     canConstruct: (b) => constructibleNow(facts, AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]),
     reasonsClear: (b) => {
@@ -1998,7 +2014,7 @@ function freeCityProjectFacts(state: GameState, city: City, facts: CityBuildFact
     advanced: () => 0,
     buildTurns: (p) => facts.buildTurns(p),
     progressPct: gameProgressPct(r.techs.length, r.civics.length),
-    spaceRaceStanding: 0, defenceRepairs: 0, population: city.population, districts: facts.districtCount, loyaltyFalling: false,
+    defenceRepairs: outerDamage(state, city), population: city.population, districts: facts.districtCount, loyaltyFalling: false,
     buildingValue: (b, t) => {
       const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b) ?? -1];
       return row ? buildingValue(facts, row, t) : 0;
@@ -2027,10 +2043,9 @@ export function freeCityPickFacts(state: GameState, city: City, facts: CityBuild
   const unlocks = computeUnlocksIn(r, []);
   const inHand = city.queue[0]?.kind === 'building' ? installType('building', city.queue[0].building, 'BUILDING_') : null;
   return {
-    buildingHeld: (b) => {
-      const id = engineId('building', b, 'BUILDING_', BUILDINGS);
-      return inHand === b || (!!id && city.buildings.includes(id));
-    },
+    // 0x17e690: the queue's head of the type; a held building the
+    // CanConstruct refuses
+    buildingHeld: (b) => inHand === b,
     canConstruct: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !!id && freeCityBuildingOk(state, city, id, unlocks) && constructibleNow(facts, AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]);

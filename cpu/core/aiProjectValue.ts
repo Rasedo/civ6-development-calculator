@@ -3,7 +3,7 @@
  * `tools/civ6lab/dll_readings.md` "C-96: the project value") and the city
  * centre's PROJECTS table (0x5ce970's project loop, AI_CityBuild.csv's
  * PROJECTS rows): what completing a project in `t` turns is worth to `h` —
- * the projects it opens, its space-race standing, its Great Person points,
+ * the projects it opens, its place in the space race, its Great Person points,
  * the outer defences it mends, paid once at `t`; then the loyalty a citizen
  * it brings, the building it creates less those it consumes, and its
  * completion modifiers.
@@ -30,10 +30,8 @@ export interface ProjectValueFacts {
    *  integer percent of the further of the player's two trees
    *  (`gameProgressPct`) */
   progressPct: number;
-  /** the player's space-race standing a SpaceRace project squares
-   *  (0x7b8a30) */
-  spaceRaceStanding: number;
-  /** the city's damaged outer defences count (+0x1880, 0x197ff0), its
+  /** the most damage one of the city's outer defences holds (0x197ff0,
+   *  `outerDamage`), its
    *  population (+0x588) and its districts (0x1ae8f0) */
   defenceRepairs: number;
   population: number;
@@ -47,6 +45,17 @@ export interface ProjectValueFacts {
 }
 
 const PROJECT = new Map(AI_PROJECTS.map((r) => [r.type, r] as const));
+
+/** 0x7b8a30 -> 0x79f030: a project's place in its chain, the longest run of
+ *  ProjectPrereqs (+0x130) down from it, itself counted — 1 for Launch Earth
+ *  Satellite, 2 for the Moon Landing, 5 for the lasers (a recursive functor:
+ *  1 + the depth handed in, at least each prerequisite's own) */
+export function projectChain(project: string): number {
+  // the table itself, not PROJECT: aiResearch's module load calls this
+  // before this module's own constants stand
+  const row = AI_PROJECTS.find((r) => r.type === project);
+  return 1 + Math.max(0, ...(row?.prereqs ?? []).map(projectChain));
+}
 
 /** PSEUDOYIELD_NUCLEAR_WEAPON's amounts a WMD project opens: 250.0 at the
  *  player's value (@0xd71c24), and 1000.0 at the player's less at none */
@@ -71,7 +80,8 @@ export function projectValue(f: ProjectValueFacts, project: string, t: number, h
     }
   }
   if (row.spaceRace) {
-    v += pseudoYieldValue(f.view, f.seat, f.spaceRaceStanding * f.spaceRaceStanding * FX, 'PSEUDOYIELD_SPACE_RACE');
+    const n = projectChain(project);
+    v += pseudoYieldValue(f.view, f.seat, n * n * FX, 'PSEUDOYIELD_SPACE_RACE');
     for (const p of AI_PROJECTS) {
       if (p.spaceRace && f.advanced(p.type) > 0) v += pseudoYieldValue(f.view, f.seat, FX, 'PSEUDOYIELD_SPACE_RACE');
     }

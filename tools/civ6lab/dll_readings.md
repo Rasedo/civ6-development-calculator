@@ -3981,7 +3981,17 @@ building tables).
   (0x5d0860), unit (0x5d2600) and project (0x5d1f10) of the city centre's
   evaluation (tables +0x28, +0x40, +0x38; each best starts at FX(-9999) and
   takes a strictly higher value, the first in table order on a tie). Plain
-  pick (flags 1, 0): the building not queued or held (0x17e690 > 0),
+  pick (flags 1, 0): the building not queued (0x17e690, READ: the
+  queue's entries +0x1d0 (count +0x1e0, 0x38 each) of directive +0x30 1 and
+  type +0x14 the building — a held building is CanConstruct's to refuse, a
+  pillaged one is not and its queue entry repairs it: runs/h1_duely1117
+  Valletta t134-141 its pillaged Lighthouse picked under the pillaged Harbor,
+  NO BUILDS AT ALL each turn, its Build City Building trees SUBMITTED and
+  FAILED, the Lighthouse queued at t143 and repaired at the repair's pace;
+  `minorPickFacts`, `minorItemFor`), a repair waiting behind the item in
+  hand where its building fell (1127 Muscat t231-240: the Bank pillaged under
+  the Sewer, the Sewer finished, the walls' repair, then the Bank; 1121
+  Ayutthaya t196-215 the Shipyard behind its Neighborhood),
   CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear,
   not MustPurchase (Buildings +0x159 bit 4 — MustPurchase, no row sets it),
   its value x0.5 where the favoured-items verdict (CityBuildAI +0x528,
@@ -5100,7 +5110,9 @@ Manhattan Project and the nuclear device.
   200.0, summed; a WMD one (+0x148) adds PSEUDOYIELD_NUCLEAR_WEAPON 250.0
   (@0xd71c24) at the player's value and 1000.0's at the player's less at
   none.
-- SpaceRace (+0xe8 bit 1): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared, and
+- SpaceRace (+0xe8 bit 1): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared
+  (functor vt 0xd71b28 +0x10 -> 0x79f030: the project's chain through its
+  ProjectPrereqs, itself counted, READ — the research value's same walk), and
   1.0 per space-race project the player has completed.
 - Project_GreatPersonPoints (+0x108..+0x110): each class's pseudo-yield
   (+0x40 -> +0x90 -> +0x14) of its Points escalated by the progression
@@ -5108,8 +5120,14 @@ Manhattan Project and the nuclear device.
   100 - Points) x p / 100, p the game's progress percent max(100 x techs
   // 77, 100 x civics // 61) (1124 t32 .. t34's Campus grants 29 / 30 /
   31: 16 points at 9%) —, x4.
-- OuterDefenseRepair (+0xe8 bit 0), where the city's +0x1880 count is
-  above 0: that count x the population (+0x588) x 0x1ae8f0 x 10.0.
+- OuterDefenseRepair (+0xe8 bit 0), where 0x197ff0 is above 0: that
+  damage x the population (+0x588) x 0x1ae8f0 x 10.0. 0x197ff0, READ: over
+  the city's districts (+0x1a50, count +0x1a60, 0x1ae510) with outer defences
+  (district +0xb08 set) the most GetDamage (0x24ae50, hash 0x6da56a3d — the
+  outer defences' damage) — runs/h1_duelv1124 Cardiff t89 42 x 8 x 1 x 10
+  discounted a turn (248/256): 3255.0 as logged; t107 54 x 9 x 1: 4708.1;
+  t158 55 x 10 x 2: 10656.3; Granada t127 the centre's 108 over its
+  Encampment's 99, x 7 x 3: 21971.3 (`outerDamage`).
 - A diplomatic-victory row (+0xe8 bit 4, or the Projects_XP2 row's +0x60
   bit 1, with 0x25afc0): per its rows PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT
   of the era's points.
@@ -6057,9 +6075,18 @@ Contract %d").
   player's plots of it, 0x1aba40); per building (+0x90) the player's
   version (+0x230) 0.5, a wonder (+0x158 & 0x40) PSEUDOYIELD_WONDER of 0.5;
   per district the player may have (0x406c00) PSEUDOYIELD_DISTRICT of 0.5;
-  per project (+0x160) 1.0 (4.0 where [player+0x1290]+0x6e8 counts it),
-  PSEUDOYIELD_SPACE_RACE of 0x7b8a30² (a std::function walk, unread) for a
-  space race one, + NUCLEAR_WEAPON of 1.0 for a weapon (+0x148), each paid
+  per project (+0x160) 1.0 (4.0 where [player+0x1290]+0x6e8 counts it), a
+  space race one (+0xe8 bit 1, 0x7b51ec) in its place 0.1 (@0xd2f320, x the
+  pseudo-yield's value >> 8) of PSEUDOYIELD_SPACE_RACE of n² — n the
+  project's chain, 0x7b8a30 (functor vt 0xd71b58 +0x10 -> 0x79f030, depth 0):
+  1 + the depth handed in, the most of the same walk over each of its
+  ProjectPrereqs (+0x130, each entry's +0x30 the prerequisite project): Launch
+  Earth Satellite 1, the Moon Landing 2, Mars Base 3, Exoplanet 4, the lasers
+  5 — READ (runs/h1_duely1124 t189-205: Rocketry's own value 10.0 a turn
+  from landing above the engines' none, 178.7 at 3 turns, 196.5 at 1;
+  Satellites 40.0, 679.2 at 4 turns .. 785.7 at 1; 1128 t225 Satellites
+  785.7; Nanotechnology 90, Smart Materials 160 at their landings), +
+  NUCLEAR_WEAPON of 1.0 for a weapon (+0x148), each paid
   from landing; per improvement the resources near the cities (0x5d45c0 -> 0x7a21e0);
   the governments' (+0x130, 0x7b26b0); x1.5 (0x7b5b22..0x7b5b7f: fx(1.5)
   times the value so far, >> 8) where the row is the military AI's

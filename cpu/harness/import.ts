@@ -328,7 +328,11 @@ export function minorHead(cat: Catalog, c: DumpCity, W: number): MinorItem | und
   }
   if (head.BuildingType !== undefined) {
     const building = engineRowOf(cat, 'building', head.BuildingType);
-    return building ? { building } : undefined;
+    if (!building) return undefined;
+    // a building the city holds pillaged heads the queue as its repair
+    // (runs/h1_duely1117 Valletta t144-148: its pillaged Lighthouse queued,
+    // 45 -> 56 at the repair's pace)
+    return c.buildings.some(([bi, pil]) => bi === head.BuildingType && pil) ? { repair: building } : { building };
   }
   if (head.DistrictType !== undefined) {
     const district = engineRowOf(cat, 'district', head.DistrictType) as DistrictId | null;

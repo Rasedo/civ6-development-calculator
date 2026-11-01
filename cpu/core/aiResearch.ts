@@ -39,14 +39,15 @@ import { ERAS, TECHS, TECH_TABLE_ORDER } from '../data/techs';
 import { gameTypeOf } from '../data/aliases';
 import { AI_BUILDINGS, AI_PROJECTS } from '../data/aiBuildTables';
 import {
-  AI_PROJECT_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
+  AI_PROJECT_SHARE, AI_SPACE_RACE_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
 } from '../data/aiValue';
 import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_FAVORED, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
 import { researchCost } from './economy';
 import { randRange } from './rand';
 import { isBarbSeat, isFreeSeat, leaderOf, seatOf } from './seats';
 import { AI_RATE, FX, aiGameEra, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
-import { AI_TECH_MODIFIERS } from '../data/aiTables';
+import { AI_PSEUDOYIELD_DEFAULT, AI_TECH_MODIFIERS } from '../data/aiTables';
+import { projectChain } from './aiProjectValue';
 import { modifiersValue } from './aiModifiers';
 import { aiView } from './aiView';
 import { pseudoYieldWeights } from './aiWeights';
@@ -149,9 +150,10 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
  * one; the game era `aiGameEra`), and per building it unlocks a share (a wonder's at
  * PSEUDOYIELD_WONDER), per district a share at PSEUDOYIELD_DISTRICT, per
  * project `AI_PROJECT_SHARE` and a weapon project PSEUDOYIELD_NUCLEAR_WEAPON
- * of 1.0 more — each a yield a turn from landing to the horizon, each
- * pseudo-yield at the seat's weight `pw` (`aiWeights.ts`). A space race
- * project's term (0x7b8a30) is not read: none. Then the row's modifiers
+ * of 1.0 more, a space race project in the share's place `AI_SPACE_RACE_SHARE`
+ * of PSEUDOYIELD_SPACE_RACE of its chain's length squared (`projectChain`,
+ * 0x7b8a30) — each a yield a turn from landing to the horizon, each
+ * pseudo-yield at the seat's weight `pw` (`aiWeights.ts`). Then the row's modifiers
  * (TechnologyModifiers) analysed from landing to the horizon (0x7a4b20) on
  * `view` (the state's `aiView` where none is given). Past the horizon
  * -9999.
@@ -183,7 +185,8 @@ function techValueParts(state: GameState, seat: number, id: string, turns: numbe
       + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns)
       + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
       + n.projects * fromLanding(fxConst(AI_PROJECT_SHARE), turns)
-      + n.weapons * fromLanding(pseudoYield(PSEUDOYIELD_NUCLEAR_WEAPON, FX, w('PSEUDOYIELD_NUCLEAR_WEAPON')), turns),
+      + n.weapons * fromLanding(pseudoYield(PSEUDOYIELD_NUCLEAR_WEAPON, FX, w('PSEUDOYIELD_NUCLEAR_WEAPON')), turns)
+      + n.space.reduce((v, k) => v + fromLanding(fmul(pseudoYield(SPACE_RACE, k * k * FX, w('PSEUDOYIELD_SPACE_RACE')), SPACE_SHARE), turns), 0),
     mods: mods.length ? modifiersValue({ view: view ?? aiView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0,
   };
 }
@@ -195,11 +198,16 @@ function atWarForValue(state: GameState, seat: number): boolean {
   return (seatOf(state, seat)?.wars ?? []).some((p) => !isBarbSeat(p));
 }
 
+/** PSEUDOYIELD_SPACE_RACE's DefaultValue and a space race project's share, raw */
+const SPACE_RACE = AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_SPACE_RACE;
+const SPACE_SHARE = fxConst(AI_SPACE_RACE_SHARE);
+
 /** what a technology unlocks that its value counts: the buildings and
  *  wonders whose PrereqTech it is that no civilization's trait holds (each
  *  player's version of a building once), the districts, the projects but the
- *  space race's, the weapon projects among them */
-export function techUnlocks(id: string): { buildings: number; wonders: number; districts: number; projects: number; weapons: number } {
+ *  space race's, the weapon projects among them, and the space race's
+ *  projects by their chains' lengths (`projectChain`) */
+export function techUnlocks(id: string): { buildings: number; wonders: number; districts: number; projects: number; weapons: number; space: readonly number[] } {
   return UNLOCKS.get(id)!;
 }
 
@@ -213,6 +221,7 @@ const UNLOCKS = new Map(Object.values(TECHS).map((t) => {
     districts: t.effects.filter((e) => e.kind === 'unlockDistrict').length,
     projects: p.length,
     weapons: p.filter((x) => x.wmd).length,
+    space: AI_PROJECTS.filter((x) => x.tech === type && x.spaceRace).map((x) => projectChain(x.type)),
   }];
 }));
 

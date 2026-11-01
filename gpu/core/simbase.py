@@ -540,6 +540,7 @@ class Rules:
     c_award_projpct: torch.Tensor  # long [NC]
     t_repeat: torch.Tensor  # bool [NT] — CIV6 `Repeatable`: researchable again once complete
     t_ai_unlocks: torch.Tensor  # long [NT, 5] — what the research AI's value counts: buildings, districts, wonders, projects, weapon projects (`techUnlocks`)
+    t_ai_space: torch.Tensor  # long [NT, K] — the research AI value's space race projects, each its chain's length (`techUnlocks`' space, `projectChain`), 0 pad
     t_ai_mods: torch.Tensor  # long [NT, 2] — the research AI value's modifiers (TechnologyModifiers): spies, sea movement Amounts
     t_embark_all: torch.Tensor  # bool [NT] — CIV6 `EmbarkAll`
     t_embark_unit: torch.Tensor  # bool [NT] — an EmbarkUnitType (`RESEARCH_AI_EMBARK_UNIT`)
@@ -579,6 +580,11 @@ def _class_mask(rows: list, n: int) -> torch.Tensor:
             if 0 <= int(c) < out.shape[1]:
                 out[i, int(c)] = True
     return out
+
+
+def _space_k(r: dict) -> int:
+    """the most space race projects one technology unlocks (at least 1)"""
+    return max([len(t["aiSpace"]) for t in r["techs"]] + [1])
 
 
 def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
@@ -800,6 +806,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         t_repeat=torch.tensor([bool(t["repeatable"]) for t in r["techs"]], dtype=torch.bool),
         t_ai_unlocks=torch.tensor([[int(t["aiBuildings"]), int(t["aiDistricts"]), int(t["aiWonders"]), int(t["aiProjects"]), int(t["aiWeapons"])]
                                    for t in r["techs"]], dtype=torch.long),
+        t_ai_space=torch.tensor([[int(x) for x in t["aiSpace"]] + [0] * (_space_k(r) - len(t["aiSpace"])) for t in r["techs"]],
+                                dtype=torch.long),
         t_ai_mods=torch.tensor([[int(t["aiSpies"]), int(t["aiSeaMoves"])] for t in r["techs"]], dtype=torch.long),
         t_embark_all=torch.tensor([bool(t["embarkAll"]) for t in r["techs"]], dtype=torch.bool),
         t_embark_unit=torch.tensor([bool(t["embarkUnit"]) for t in r["techs"]], dtype=torch.bool),

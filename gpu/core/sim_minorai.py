@@ -316,6 +316,7 @@ class SimMinorAi:
         bests = self._cv_bests(b_tab, u_tab, p_tab, f)
         take = idle & takes_turn(ai, s, hand, bests[1][1], bests[2][1])
         key, site = self._minor_contract_item(s, hand)
+        key = self._minor_repair_key(s, key)
         ok = (key >= 0) & self._minor_queue_ok(s, key, site)
         q = queue_contract(ai, s, hand, w, ok, take)
         if bool(q.count_nonzero()):
@@ -326,7 +327,7 @@ class SimMinorAi:
         ai.in_hand[:, s] = torch.where(rest, -1, ai.in_hand[:, s])
         if bool(rest.count_nonzero()):
             kind, row, val = self._cv_pick(b_tab, u_tab, p_tab, f, bests)
-            pkey = self._minor_pick_key(kind, row)
+            pkey = self._minor_repair_key(s, self._minor_pick_key(kind, row))
             ok2 = rest & (pkey >= 0) & self._minor_queue_ok(s, pkey, torch.full_like(pkey, -1))
             if bool(ok2.count_nonzero()):
                 self._minor_set_item(s, ok2, pkey, torch.full_like(pkey, -1))
@@ -469,6 +470,16 @@ class SimMinorAi:
                                       torch.where((d >= 0) & (dk >= 0) & (plot >= 0), self._mk_d0 + dk, neg)))
         site = torch.where((d >= 0) & (u < 0) & (b < 0), plot, neg)
         return key, site
+
+    def _minor_repair_key(self, s: int, key: torch.Tensor) -> torch.Tensor:
+        """`minorItemFor`: a building item minor `s` holds pillaged as its
+        repair's key"""
+        is_b = (key >= self._mk_b0) & (key < self._mk_d0)
+        bi = (key - self._mk_b0).clamp(min=0, max=self.city_bldg_pillaged.shape[3] - 1)
+        row = self._CITY_MINOR0 + s
+        pil = self.city_bldg_pillaged[:, row, 0].gather(1, bi.unsqueeze(1)).squeeze(1) \
+            & self.city_bldg[:, row, 0].gather(1, bi.unsqueeze(1)).squeeze(1)
+        return torch.where(is_b & pil, self._mk_r0 + bi, key)
 
     def _minor_pick_key(self, kind: torch.Tensor, row: torch.Tensor) -> torch.Tensor:
         """the Default Specialization's pick (kind 0 building, 1 unit, 2
@@ -2205,8 +2216,9 @@ class _MinorWorld:
 
     def event_building(self):
         """0x5d0860 with neither the checks nor the defensive filter: the best
-        building not held or in hand whose prerequisite building and district
-        stand, FX(-9999) none"""
+        building not queued (a held one valued at none, a pillaged one as
+        unbuilt) whose prerequisite building and district stand, FX(-9999)
+        none"""
         f = self.f
         like = f.like()
         idx = torch.full_like(like, -1)

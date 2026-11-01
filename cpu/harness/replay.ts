@@ -66,7 +66,7 @@ import { freeCitiesMilitary, traceFreeOps } from '../core/freeOps';
 import { barbarianTactics, barbMovesNow, dangerPlane, refreshBarbarians, tacticsDrawing, knowledgeLook, traceKnowledge, traceTactics } from '../core/tactical';
 import { barbSlots, barbSlotsDying, barbarianRules, barbarianTechs, barbScoutLook, foundTribe, holdBarbBattles, plotsSeenNow, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
-import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
+import { CITY_STATE_MAX_HP, MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
 import { minorRouteCandidate } from '../core/aiTrade';
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
@@ -4440,13 +4440,16 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  (runs/h1_duelw1121 Hunza t7: Pottery's 1.5 over, Astrology 7 turns as
  *  logged), the barbarian kills a boost counts, the wars' clocks; a
  *  city-state's production overflow, its powered project and repair waits,
+ *  the turn its city was last hit (the walls' repair waits three quiet
+ *  turns: runs/h1_duely1124 Cardiff t86-88 NO BUILDS AT ALL, the repair
+ *  from t89),
  *  its fuel shortfall, its strategic stockpile and the queue front's
  *  reservation on it (the importer reads a minor's none), the trade routes the record's routes laid (the
  *  importer reads a city-state's none), the turn its city was founded */
 const GAME_STORES = ['warTurns'] as const;
 const SEAT_STORES = ['barbKills'] as const;
 const RESEARCH_STORES = ['techOverflow', 'civicOverflow'] as const;
-const MINOR_STORES = ['prodOverflow', 'fullyPowered', 'repairWait', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved'] as const;
+const MINOR_STORES = ['prodOverflow', 'fullyPowered', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved'] as const;
 
 /** the named fields of `from` onto `to`, a field `from` lacks dropped */
 function carryFields(from: object, to: object, keys: readonly string[]): void {
@@ -4616,6 +4619,16 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
   for (const cs of world.cityStates) {
     const o = state.cityStates.find((x) => x.id === cs.id);
     if (o) seatPair(o, cs, true);
+    // a pillaged building beside another item at the queue's head: its
+    // repair waits for that item (runs/h1_duely1127 Muscat t231-240, the
+    // Bank pillaged under its Sewer, the Sewer finished first)
+    if (cs.pillagedBuildings?.length && cs.prodItem && !cs.prodItem.startsWith('repair:')) cs.repairWait = true;
+    // a city the record shows hit since the engine's last turn (its hit
+    // points or its walls lower) was hit at this record's turn: the walls'
+    // repair waits three quiet turns from it (runs/h1_duely1124 Cardiff, hit
+    // at record 86 and 104, the repair queued by the turns 89 and 107)
+    if (o && ((cs.hp ?? CITY_STATE_MAX_HP) < (o.hp ?? CITY_STATE_MAX_HP)
+      || (cs.outerHp ?? Infinity) < (o.outerHp ?? Infinity))) cs.lastHitTurn = a.turn;
     bindQueuedContracts(ctx, cs, imp, a.turn - 1);
   }
   seatPair(state.barbSeat, world.barbSeat, true);

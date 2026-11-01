@@ -81,7 +81,7 @@ import { builderHarvest, builderRemoveFeature, purchaseSpotBlocked } from './uni
 import { aiStrengths, dangerPlane, moveTo, reachPlots, turnsToPlot } from './tactical';
 import { randRange } from './rand';
 import {
-  installType, minorBuildFacts, minorBuilderLays, minorBuildingPrice, minorBuyBuilding, minorBuyUnit, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
+  installType, minorBuildFacts, minorBuilderLays, minorBuildingPrice, minorBuyBuilding, minorBuyUnit, minorItemFor, minorItemOfType, minorItemType, minorKnownUnits, minorPickFacts, minorRepairsDistrictAt, minorUnderThreat,
   minorProjectFacts, minorResourceCounts, minorResourceFacts, minorSetItem, minorUnitPrice, minorUnitVersion, minorQueueOk,
   minorCanTrain, researchHolds, unitObsoleteIn,
 } from './minorBuild';
@@ -407,8 +407,9 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
 }
 
 /** 0x5d0860 with neither the checks nor the defensive filter: the best
- *  building not held or in hand whose prerequisite building and district
- *  stand (CanConstruct's reasons clear), FX(-9999) none */
+ *  building not queued (a held one valued at none, a pillaged one valued
+ *  as unbuilt) whose prerequisite building and district stand
+ *  (CanConstruct's reasons clear), FX(-9999) none */
 export function eventBuilding(t: CityBuildTables, pf: PickFacts): { index: number; value: number } {
   let index = -1;
   let value = FX_MIN;
@@ -636,7 +637,7 @@ export function minorContractCity(state: GameState, cs: CityState): CityTreeCity
   const tables: CityBuildTables = {
     buildings: buildingTable(facts),
     units: unitTable(facts).map((v) => v ?? FX_MIN),
-    projects: projectTable(minorProjectFacts(cs, facts)),
+    projects: projectTable(minorProjectFacts(state, cs, facts)),
   };
   return minorTreeCity(state, cs, facts, tables, minorPickFacts(state, cs, facts), [], cs.threat ?? -1);
 }
@@ -927,7 +928,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
   const tables: CityBuildTables = {
     buildings: buildingTable(facts),
     units: unitTable(facts).map((v) => v ?? FX_MIN),
-    projects: projectTable(minorProjectFacts(cs, facts)),
+    projects: projectTable(minorProjectFacts(state, cs, facts)),
   };
   cs.unitValues = tables.units;
   cs.buildingValues = tables.buildings;
@@ -976,7 +977,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
   // reads the kept tables)
   if (fresh && !cs.prodItem) {
     const ff = minorBuildFacts(state, cs, known, fresh, units, true);
-    const ft: CityBuildTables = { buildings: buildingTable(ff), units: unitTable(ff).map((v) => v ?? FX_MIN), projects: projectTable(minorProjectFacts(cs, ff)) };
+    const ft: CityBuildTables = { buildings: buildingTable(ff), units: unitTable(ff).map((v) => v ?? FX_MIN), projects: projectTable(minorProjectFacts(state, cs, ff)) };
     emptyQueuePick(state, cs, ai, city, ft, minorPickFacts(state, cs, ff));
   }
   if (tracer) {
@@ -1033,7 +1034,7 @@ export function minorSecondHook(state: GameState, cs: CityState, fresh = false):
 function emptyQueuePick(state: GameState, cs: CityState, ai: CityAi, city: CityTreeCity, tables: CityBuildTables, pf: PickFacts): void {
   const hand = cityContracts(ai, city, () => undefined);
   const bests = specializationBests(tables, pf);
-  const item = hand ? contractItemOf(hand) : null;
+  const item = hand ? contractItemOf(cs, hand) : null;
   // the queue's refusal FAILS the contract and the turn falls to the pick
   // (0x5d5162 -> 0x5d516a)
   if (hand && takesTurn(hand, bests.unit.value, bests.project.value)
@@ -1044,7 +1045,7 @@ function emptyQueuePick(state: GameState, cs: CityState, ai: CityAi, city: CityT
   }
   ai.inHand[city.id] = -1;
   const pick = defaultSpecialization(tables, pf);
-  const it = pick ? minorItemOfType(pick.type) : null;
+  const it = pick ? minorItemFor(cs, pick.type) : null;
   if (pick && it && minorQueueOk(state, cs, it)) {
     minorSetItem(state, cs, it);
     cs.prodSetValue = pick.value;
@@ -1052,9 +1053,9 @@ function emptyQueuePick(state: GameState, cs: CityState, ai: CityAi, city: CityT
 }
 
 /** a contract's item as the minor's item (a district at the contract's plot) */
-function contractItemOf(c: AiContract) {
+function contractItemOf(cs: CityState, c: AiContract) {
   if (c.unit) return minorItemOfType(c.unit);
-  if (c.building) return minorItemOfType(c.building);
+  if (c.building) return minorItemFor(cs, c.building);
   if (c.district) {
     const id = engineId('district', c.district, 'DISTRICT_', DISTRICTS) as DistrictId | null;
     return id && c.plot >= 0 ? { district: id, site: c.plot } : null;

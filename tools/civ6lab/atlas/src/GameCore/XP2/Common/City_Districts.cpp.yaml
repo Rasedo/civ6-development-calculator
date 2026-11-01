@@ -3,6 +3,18 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x1ae510
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 89
+      value: "0x197ff0, READ: over   the city's districts (+0x1a50, count +0x1a60, 0x1ae510) with outer defences   (district +0xb08 set) the most GetDamage (0x24ae50, hash 0x6da56a3d — the   outer defences' damage)"
+  readings:
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+  context:
+    - "...) x 0x1ae8f0 x 10.0. 0x197ff0, READ: over the city's districts (+0x1a50, count +0x1a60, 0x1ae510) with outer defences (district +0xb08 set) the most GetDamage (0x24ae50, hash 0x6da56a3..."
+  review: imported
 - addr: 0x1ae530
   final: 0x11e9e0
   kind: function

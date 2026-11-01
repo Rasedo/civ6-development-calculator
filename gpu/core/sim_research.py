@@ -144,6 +144,7 @@ class SimResearch:
             "lv": _walk_slots(pre, dev),
             "leaf": ~required,
             "unlocks": rules.t_ai_unlocks.to(dev),
+            "space": rules.t_ai_space.to(dev),
             "mods": rules.t_ai_mods.to(dev),
             "embark": rules.t_embark_all.to(dev),
             "embark_unit": rules.t_embark_unit.to(dev),
@@ -156,6 +157,8 @@ class SimResearch:
             "embark_add": _fx_const(float(ra["embarkAll"])),
             "share": _fx_const(float(av["unlockShare"])),
             "project": _fx_const(float(av["projectShare"])),
+            "space_share": _fx_const(float(av["spaceRaceShare"])),
+            "py_space": _fx_const(float(av["pySpaceRace"])),
             "py_nuclear": _fx_const(float(av["pyNuclearWeapon"])),
             "py_district": _fx_const(float(av["pyDistrict"])),
             "py_wonder": _fx_const(float(av["pyWonder"])),
@@ -541,8 +544,10 @@ class SimResearch:
         row of an era before the game's counts once per era between, plus
         one), a share per building, a district's and a wonder's at their
         pseudo-yields (the district's at the minor's weight), a project's
-        share and a weapon project's PSEUDOYIELD_NUCLEAR_WEAPON of 1.0, each
-        from landing to the horizon; past the horizon -9999. `mods` adds the
+        share and a weapon project's PSEUDOYIELD_NUCLEAR_WEAPON of 1.0, a space
+        race project the space race share of PSEUDOYIELD_SPACE_RACE of its
+        chain's length squared (a minor's weight none), each from landing to
+        the horizon; past the horizon -9999. `mods` adds the
         rows' TechnologyModifiers (`_rai_mods`)"""
         T = self._rai_tables()
         B, NT = turns.shape
@@ -558,6 +563,12 @@ class SimResearch:
                + u[:, :, 2] * self._rai_from_landing(torch.full_like(own, _imul(T["share"], T["py_wonder"])), nn)
                + u[:, :, 3] * self._rai_from_landing(torch.full_like(own, T["project"]), nn)
                + u[:, :, 4] * self._rai_from_landing(torch.full_like(own, _imul(_FX, T["py_nuclear"])), nn))
+        for k in range(T["space"].shape[1]):
+            n = T["space"][:, k].unsqueeze(0)
+            if not bool((n > 0).any()):
+                continue
+            a = _fmul(_imul(n * n * _FX, T["py_space"]), torch.full_like(n, T["space_share"])).expand(B, NT)
+            val = val + (n > 0).long() * self._rai_from_landing(a, nn)
         if mods:
             val = val + self._rai_mods(s, nn)
         return torch.where(turns > T["horizon"], torch.full_like(val, _fx_const(-9999)), val)

@@ -827,6 +827,19 @@ export function encampOuterMissing(state: GameState, city: City): number {
   return missing;
 }
 
+/** the outer defences' damage the repair value reads (0x197ff0): over the
+ *  city's districts with outer defences — the centre's walls, each complete
+ *  Encampment — the most HP one lacks */
+export function outerDamage(state: GameState, city: City): number {
+  const max = wallsMax(state, city);
+  let most = max - outerPool(state, city);
+  for (const d of city.districts) {
+    const t = state.map.tiles[d.tileIndex];
+    if (t.district === 'ENCAMPMENT' && t.districtComplete) most = Math.max(most, max - encampOuterPool(state, city, t));
+  }
+  return Math.max(0, most);
+}
+
 /** the write half: every walls site that refits the centre's perimeter refits
  *  the Encampment's own pool too, at the same tier's full value. */
 export function fitEncampOuter(state: GameState, city: City): void {

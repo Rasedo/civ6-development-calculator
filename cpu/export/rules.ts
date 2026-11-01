@@ -33,7 +33,7 @@ import { PANTHEONS, RELIGION_TYPES, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_B
 import { PROJECTS, isSpaceProject, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import {
-  AI_DISCOUNT_PCT, AI_POLICY_HORIZON, AI_PROJECT_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON,
+  AI_DISCOUNT_PCT, AI_POLICY_HORIZON, AI_PROJECT_SHARE, AI_SPACE_RACE_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON,
   PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
 } from '../data/aiValue';
 import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
@@ -1042,6 +1042,8 @@ export function buildRules() {
       pyNuclearWeapon: PSEUDOYIELD_NUCLEAR_WEAPON,
       unlockShare: AI_UNLOCK_SHARE,
       projectShare: AI_PROJECT_SHARE,
+      spaceRaceShare: AI_SPACE_RACE_SHARE,
+      pySpaceRace: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_SPACE_RACE,
       // the resources term's pseudo-yields and the yields' DefaultValue (AI_YIELDS order)
       pyHappiness: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_HAPPINESS,
       // the civics' modifiers' and formations' pseudo-yields
@@ -3097,6 +3099,7 @@ export function buildRules() {
       aiWonders: techUnlocks(t.id).wonders,
       aiProjects: techUnlocks(t.id).projects,
       aiWeapons: techUnlocks(t.id).weapons,
+      aiSpace: techUnlocks(t.id).space,
       ...techAiModifiers(t.id),
       embarkAll: t.embarkAll ? 1 : 0,
       embarkUnit: RESEARCH_AI_EMBARK_UNIT.includes(t.id) ? 1 : 0,

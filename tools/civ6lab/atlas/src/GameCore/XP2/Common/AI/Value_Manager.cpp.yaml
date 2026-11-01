@@ -785,6 +785,7 @@
     - cpu/data/aiResearch.ts:RESEARCH_AI_EMBARK_UNIT
     - cpu/data/aiValue.ts:AI_PROJECT_SHARE
     - cpu/core/aiResearch.ts:researchAnalysis
+    - cpu/data/aiValue.ts:AI_SPACE_RACE_SHARE
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"

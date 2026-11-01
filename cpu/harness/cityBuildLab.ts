@@ -317,7 +317,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     // THE PROJECTS TABLE: the analysis' gates and the value at the build turns
     const loggedProjects = centre.get(`${turn}:${player}:${imp.dumpOfMinor.get(cs)?.name}`)?.PROJECTS;
     if (loggedProjects) {
-      const projectFacts = minorProjectFacts(cs, facts);
+      const projectFacts = minorProjectFacts(state, cs, facts);
       const oursProjects = projectTable(projectFacts);
       tallyRow(AI_PROJECTS.map((p) => p.type), projectsAll, turn, player, loggedProjects, oursProjects, projectsPer);
       if (projectsOut !== null) {

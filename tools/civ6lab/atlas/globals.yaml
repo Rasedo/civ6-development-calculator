@@ -96,10 +96,12 @@
 - addr: 0xd2f320
   kind: global
   status: PARTLY
+  impl: [cpu/data/aiValue.ts:AI_SPACE_RACE_SHARE]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...1358 +0xf8). The value 0x7a60d0: f = 1 + w, q = 0x655840; f q >= 0 -> f + q, else +-0.1 (@0xd2f320, f's sign) where |q| > |f|, else f + q; the amount x (f x DefaultValue). A followed strat..."
@@ -410,6 +412,28 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - ...th N = 0 every entry reads 1.0. Value +0x160 = N / +0x30 (0x16e940, truncated); x1.25 (@0xd70c98) for a TraitType unit; a shortfall of the maintenance resource scales it; the player's...
+  review: imported
+- addr: 0xd71b28
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+  context:
+    - "- SpaceRace (+0xe8 bit 1): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared (functor vt 0xd71b28 +0x10 -> 0x79f030: the project's chain through its ProjectPrereqs, itself counted, READ..."
+  review: imported
+- addr: 0xd71b58
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1121
+      turn: 30
+      value: "its writer unread), the era before through the   players' starts of the turn a new era begins: runs/h1_duelw1121 t30 and t60,   every major's, city-state's and the Free Cities' Tech and Civic rows as "
+    - recording: 1128
+      turn: 225
+      value: 1128 t225 Satellites   785.7;
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...lue >> 8) of PSEUDOYIELD_SPACE_RACE of n² — n the project's chain, 0x7b8a30 (functor vt 0xd71b58 +0x10 -> 0x79f030, depth 0): 1 + the depth handed in, the most of the same walk over ea..."
   review: imported
 - addr: 0xd71be8
   kind: global

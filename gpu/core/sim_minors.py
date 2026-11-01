@@ -969,6 +969,20 @@ class SimMinors:
                 + (self._route_post_gold(row, _dc) * _p_want.long()).double()
         return rk
 
+    def _minor_outer_damage(self, s: int) -> torch.Tensor:
+        """[B] `outerDamage` (0x197ff0) for minor `s`'s city: the most HP
+        its centre's walls or its Encampment's lack"""
+        row = self._CITY_MINOR0 + s
+        mx = self._walls_tier_hp.take(self._minor_walls_tier(s)).long()
+        most = mx - torch.minimum(self.city_outer_hp[:, row, 0], mx)
+        if self._encamp_didx >= 0:
+            et = self.city_dist_tile[:, row, 0, self._encamp_didx]
+            e0 = et.clamp(min=0).unsqueeze(1)
+            live = (et >= 0) & self.district_complete.gather(1, e0).squeeze(1)
+            ecur = torch.minimum(self.encamp_outer_hp.gather(1, e0).squeeze(1), mx)
+            most = torch.where(live, torch.maximum(most, mx - ecur), most)
+        return most.clamp(min=0)
+
     def _minor_repair(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B] bool, [B] f64) — `repairAvailable` and `projectCost` for minor
         `s`'s city: walls standing and breached (the centre's pool or its
@@ -1675,8 +1689,10 @@ class SimMinors:
         them, the repair of its own pillaged one there), a unit it may train,
         a project it may run (the walls' repair while available)"""
         row = self._CITY_MINOR0 + s
-        is_u, is_b, is_d, is_p, _is_r = self._mk_kinds(key)
+        is_u, is_b, is_d, is_p, is_r = self._mk_kinds(key)
         ok = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        if bool(is_r.any()):
+            ok = ok | (is_r & self._minor_repairable(s, key - self._mk_r0))
         if bool(is_u.any()):
             ok = ok | (is_u & self._minor_can_train(s, key))
         if bool(is_b.any()):
@@ -1784,19 +1800,30 @@ class SimMinors:
             ok = ok & (self.city_outer_hp[:, row, 0] >= self._walls_tier_hp.take(self._minor_walls_tier(s)))
         return ok
 
-    def _minor_repair_target(self, s: int) -> torch.Tensor:
-        """[B] long — `minorRepairTarget`: the pillaged building minor `s`
-        repairs next, the first in the layout whose district stands complete
-        and unpillaged (a City Center row always); -1 for none."""
+    def _minor_repairable_plane(self, s: int) -> torch.Tensor:
+        """[B, NB] `minorRepairable`: minor `s`'s pillaged buildings whose
+        district stands complete and unpillaged (a City Center row always)"""
         row = self._CITY_MINOR0 + s
-        NB = int(self._b_req_district.shape[0])
         pil = self.city_bldg_pillaged[:, row, 0] & self.city_bldg[:, row, 0]            # [B, NB]
         rq = self._b_req_district
         dt = self.city_dist_tile[:, row, 0][:, rq.clamp(min=0)]                          # [B, NB]
         d0 = dt.clamp(min=0)
         clean = (dt >= 0) & self.district_complete.gather(1, d0) & ~self.district_pillaged.gather(1, d0)
-        ok = pil & ((rq < 0).unsqueeze(0) | clean)
-        first = torch.where(ok, torch.arange(NB, device=self.device).unsqueeze(0), torch.full_like(dt, NB)).min(dim=1).values
+        return pil & ((rq < 0).unsqueeze(0) | clean)
+
+    def _minor_repairable(self, s: int, bi: torch.Tensor) -> torch.Tensor:
+        """[B] the building `bi` ([B]) of minor `s` repairable (`minorRepairable`)"""
+        ok = self._minor_repairable_plane(s)
+        b0 = bi.clamp(min=0, max=ok.shape[1] - 1).unsqueeze(1)
+        return (bi >= 0) & ok.gather(1, b0).squeeze(1)
+
+    def _minor_repair_target(self, s: int) -> torch.Tensor:
+        """[B] long — `minorRepairTarget`: the pillaged building minor `s`
+        repairs next, the first in the layout whose district stands complete
+        and unpillaged (a City Center row always); -1 for none."""
+        NB = int(self._b_req_district.shape[0])
+        ok = self._minor_repairable_plane(s)
+        first = torch.where(ok, torch.arange(NB, device=self.device).unsqueeze(0), torch.full_like(ok, NB, dtype=torch.long)).min(dim=1).values
         return torch.where(first < NB, first, torch.full_like(first, -1))
 
     def _minor_spawn(self, s: int, mask: torch.Tensor, ui: torch.Tensor,

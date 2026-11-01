@@ -91,7 +91,7 @@ describe('the housing value (0x7a3d70) over the growth forecast (0x5cb570), raw 
 /** a city-state at 9% of the game's progress */
 const project = (over: Partial<ProjectValueFacts> = {}): ProjectValueFacts => ({
   view, seat: 0, cityId: 1, capital: true, advanced: () => 0, buildTurns: () => 10, progressPct: 9,
-  spaceRaceStanding: 0, defenceRepairs: 0, population: 3, districts: 1, loyaltyFalling: false,
+  defenceRepairs: 0, population: 3, districts: 1, loyaltyFalling: false,
   buildingValue: () => 0, hasBuilding: () => false, ...over,
 });
 

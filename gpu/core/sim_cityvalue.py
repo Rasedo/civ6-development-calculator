@@ -26,6 +26,13 @@ _COMBAT_PSEUDO = ("PSEUDOYIELD_UNIT_COMBAT", "PSEUDOYIELD_UNIT_NAVAL_COMBAT", "P
 _PLOTS_CAP = 150 * _FX
 
 
+def _project_chain(proj: dict, project: str) -> int:
+    """`projectChain` (0x7b8a30): the longest run of ProjectPrereqs down from
+    the project, itself counted"""
+    row = proj.get(project)
+    return 1 + max([0] + [_project_chain(proj, p) for p in (row or {}).get("prereqs", [])])
+
+
 def _t(x, like: torch.Tensor) -> torch.Tensor:
     """a fact as a long tensor of `like`'s shape"""
     if isinstance(x, torch.Tensor):
@@ -628,8 +635,8 @@ class SimCityValue:
                 v = v + self._cv_pseudo(torch.full_like(like, _NUCLEAR_SPREAD * _FX), "PSEUDOYIELD_NUCLEAR_WEAPON", w) \
                     - self._cv_pseudo(torch.full_like(like, _NUCLEAR_SPREAD * _FX), "PSEUDOYIELD_NUCLEAR_WEAPON")
         if row["spaceRace"]:
-            st = _t(f.space_race_standing(), like)
-            v = v + self._cv_pseudo(st * st * _FX, "PSEUDOYIELD_SPACE_RACE", f.pseudo_w("PSEUDOYIELD_SPACE_RACE"))
+            n = _project_chain(T["proj"], project)
+            v = v + self._cv_pseudo(torch.full_like(like, n * n * _FX), "PSEUDOYIELD_SPACE_RACE", f.pseudo_w("PSEUDOYIELD_SPACE_RACE"))
             for p in T["proj_rows"]:
                 if p["spaceRace"]:
                     done = _t(f.advanced(p["type"]), like) > 0
@@ -2119,11 +2126,8 @@ class _MinorFacts:
         sim, s = self.sim, self.s
         return sim._progress_pct_of(sim.citystate_techs[:, s].sum(dim=1), sim.citystate_civics[:, s].sum(dim=1))
 
-    def space_race_standing(self):
-        return 0
-
     def defence_repairs(self):
-        return 0
+        return self.sim._minor_outer_damage(self.s)
 
     def districts(self):
         return self.district_count()
@@ -2254,7 +2258,11 @@ class _MinorFacts:
         return 0
 
     def building_held(self, b):
-        return self.current_is(b) | self.has_building(b)
+        # 0x17e690: the queue's building entries of the type — the item in
+        # hand, a repair's its building's (`minorPickFacts`)
+        bi = self._building_index(b)
+        rk = self.sim.citystate_item[:, self.s] == (self.sim._mk_r0 + bi)
+        return self.current_is(b) | (rk & (bi >= 0))
 
     def can_construct(self, b):
         return self.sim._cv_constructible(self, self.T["bld"][b])
@@ -2330,6 +2338,17 @@ class _FreeFacts(_MinorFacts):
     def forecast_growth(self):
         # a Free City's update reads its growth as it stands
         return self.growth()
+
+    def building_held(self, b):
+        # 0x17e690: the queue's head of the type (`freeCityPickFacts`)
+        return self.current_is(b)
+
+    def defence_repairs(self):
+        # `outerDamage` of the Free City in column j
+        sim = self.sim
+        mx = sim._walls_max_all(self.row)[:, self.j]
+        most = mx - torch.minimum(sim.city_outer_hp[:, self.row, self.j], mx)
+        return torch.maximum(most, sim._enc_outer_missing(self.row)[:, self.j]).clamp(min=0)
 
     def power_short(self):
         demand, supply, _near, _ppr = self.sim._city_power_need(self.row)
