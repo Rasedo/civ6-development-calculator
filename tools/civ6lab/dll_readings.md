@@ -7633,3 +7633,43 @@ replay's `minorShots` landed in `minorAi`; GPU `_minor_pass`.
   formation keeps its path (0x272aa0): runs/h1_duely1121 t109 the Musketman
   3473423 stopped on 6:17 for its Movement walks on to 6:16 once its own unit
   on 6:16 left it, the game's stays on 6:17; plot vt +0x40 unread.
+
+## C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins
+
+`pathTo` (cpu/core/tactical.ts); `_tac_move_to`'s destination mask
+(gpu/core/sim_tactics.py).
+
+- THE REQUEST: the MoveTo definition's handler 0x962310 (its table @0xd99b40
+  +0x40; the sibling table @0xd98910 holds 0x95d8d0 at that slot) reads the
+  order's target plot (the operation's vt +0x68) and, where the unit owner's
+  visibility count of it (0x5d3f0 +0x290) is 0, clears the attack flag 0x10
+  in the order's flags (parameters +8 -> +8). The execution 0x962380 reads
+  the flags after it: such an order fights no battle at its first step
+  (0x962699) and its destination test 0x2714b0 runs under location flag 0,
+  where another player's unit on the plot, seen or not, refuses it
+  (0x586360's best defender 0x208b80 under 0x108). So a destination another
+  player's unit holds out of the player's sight is no path, the attack
+  orders' too (Attack Civilians 0x773270 sets 0x10 at 0x77332a).
+- Confirmed: runs/h1_duely1117 t80 the Attack Civilian Warrior 3670030 holds
+  for the Settler 1769481 on 31:13 out of its sight, likewise t85 / t88 /
+  t97 / t100 / t103, and the movers go for a civilian in their sight at
+  t31-t36 and t68; t11 the rampaging Scout 131073 and Warrior 589832 hold for
+  14:8, a city-state's Warrior on it out of their sight.
+- Open: runs/h1_duely1128 t24 the barbarian Scout 393221 on 15:7 for 8:7
+  takes 14:7 / 13:7 in the game only where city-state 2's Warrior on 12:8
+  is seen (with 12:8 unseen its path 15:8 / 14:8 / 13:8 costs 3851776 to
+  turn 6, the game's 4109056); no barbarian unit sees 12:8 as it moves but
+  the Scout 262147's walk 13:8 -> 13:7 -> 14:7 earlier in the pass passed
+  13:7, which sees it, and the placement 0x586d40 -> 0x58f3f0 adds each
+  node's sight and drops the last. runs/h1_duely1127 t36 the Warrior 2031626
+  (Operation, 12:14 for 12:7): its two routes tie, 11:13 ... 11:7 and 12:13
+  ... 13:7 both 3086848 to turn 6; the engines close 11:7 first, the game
+  13:7 — the open list's order on equal keys (0x775a0), not sight.
+  runs/h1_duely1117 t26 the Galley 720906 on 26:1 for 33:3 (HL Explore,
+  flags 0x40 / 0x42 from 0x70ce90): the engines' path follows the game's
+  walks t26-t28 / t31-t32 to 28:18 and ends turn 7 there (7/0) on the
+  barbarians' own Galley 1835026, the Quadrireme 1572876 on 27:18 beside
+  it, both placed there by Wander earlier in the pass; the turn-end stacking
+  test (0x2720a0 at 0x27228b) refuses them, while the game walks on: the
+  count 0x585d90 (its own units by the stacking test 0x9406e0 vt +0xb8, the
+  pair test 0x518f40) is the open reading.

@@ -256,6 +256,16 @@
   context:
     - ...rray of Players by id (0x37b760 (FinalRelease 0x26c770) reads it; the game's own lookup 0x5d3e0 (FinalRelease 0x44f00) takes game +0x240 +0x20, 0x8a08a0 (FinalRelease 0x63d080)); a Pl...
   review: reviewed
+- addr: 0x5d3f0
+  final: 0x44f10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...get plot (the operation's vt +0x68) and, where the unit owner's visibility count of it (0x5d3f0 +0x290) is 0, clears the attack flag 0x10 in the order's flags (parameters +8 -> +8). T...
+  review: imported
 - addr: 0x66a90
   final: 0x4c850
   kind: function
@@ -457,6 +467,7 @@
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...st. The open list is a list sorted by total cost, equal totals by known cost (AddToOpen 0x775a0 scans from the head or the tail by a float midpoint, so a tie lands first or last by th...
@@ -2035,6 +2046,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   context:
     - "...that keep it out (0x585d90: its own of its class, vtable +0xb8; another player's where 0x518f40 refuses the pair), none with MakeTradeRoute (+0x1b9 bit 64) or Spy (+0x1ba bit 2). Th..."
   review: reviewed
@@ -2561,6 +2573,7 @@
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights hold raises..."
@@ -6406,6 +6419,16 @@
   context:
     - ...that can act moves to its plot (0x962190, flag 0x10) and raids the target where it may (0x95b100 -> 0x95b7c0). The raid wrecks the plot's improvement, else its district, 3 Movement s...
   review: reviewed
+- addr: 0x95d8d0
+  final: 0x668be0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...nition's handler 0x962310 (its table @0xd99b40 +0x40; the sibling table @0xd98910 holds 0x95d8d0 at that slot) reads the order's target plot (the operation's vt +0x68) and, where the u...
+  review: imported
 - addr: 0x95eae0
   final: 0x669b80
   kind: function

@@ -449,17 +449,18 @@
   kind: function
   name: the path's destination test
   semantics: "the formation path's destination test (the A* instance's +0x20 / +0x28 pair laid by 0x26f330, called by GeneratePath 0x77d10 at 0x78060 before the search): with search flag 0x4000 a plot the player does not see now passes; else the location test 0x586900 under the order's flags mapped (4 -> 8, 0x10 -> 1, 0x20 -> 2, 0x2000 -> 0x80): an order without the attack flag 0x10 has no path to a plot another player's unit holds, seen or not"
-  status: PARTLY
+  status: READ
   cases:
     - recording: h1_duely1117
       turn: 11
       value: the rampaging Scout 131073 and Warrior 589832 hold for 14:8, a city-state's Warrior on it out of their sight
     - recording: h1_duely1117
       turn: 80
-      value: the Attack Civilian movers hold for a civilian out of their sight (t80 Warrior 3670030 for the Settler on 31:13, t85 / t88 / t97 / t100 / t103) and go for one in it (t31-t36, t68); under 0x10 the refusal is the recorded moves', not this test's
+      value: "the Attack Civilian movers hold for a civilian out of their sight (t80 Warrior 3670030 for the Settler on 31:13, t85 / t88 / t97 / t100 / t103) and go for one in it (t31-t36, t68): the order's request 0x962310 drops 0x10 for a plot out of sight, so this test runs under location flag 0"
   impl: [cpu/core/tactical.ts:pathTo, gpu/core/sim_tactics.py:_tac_move_to]
   readings:
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   review: reviewed
 - addr: 0x2715a0
   final: 0x1a94b0
@@ -609,6 +610,7 @@
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."

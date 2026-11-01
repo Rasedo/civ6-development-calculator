@@ -10,6 +10,7 @@
   status: PARTLY
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...player revealed it, no other player's unit on it and none of   its own that it may not stack with (0x9406e0); the nearest the target, a   plot of another area (plot +8) counted three times as far; strictly n..."
   context:

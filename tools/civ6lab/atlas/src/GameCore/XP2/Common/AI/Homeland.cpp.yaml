@@ -198,6 +198,7 @@
     - gpu/core/sim_tactics.py:_CITY_STRIKE_RANGE
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EXPLORE LAND (0x70ce90): up to three rounds over the homeland's units; each unit not done (+0x770) with Moveme..."

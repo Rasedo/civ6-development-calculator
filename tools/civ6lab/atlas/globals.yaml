@@ -588,6 +588,24 @@
   context:
     - "- THE TRANSFER (0x93fa10, the unit manager's vtable +0x80 at 0xd92c18; the levy's return 0x4502b0 calls it with the 5th argument 1): the old unit is destro..."
   review: reviewed
+- addr: 0xd98910
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the MoveTo definition's handler 0x962310 (its table @0xd99b40 +0x40; the sibling table @0xd98910 holds 0x95d8d0 at that slot) reads the order's target plot (the operation's vt +0x68) a...
+  review: imported
+- addr: 0xd99b40
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE REQUEST: the MoveTo definition's handler 0x962310 (its table @0xd99b40 +0x40; the sibling table @0xd98910 holds 0x95d8d0 at that slot) reads the order's tar..."
+  review: imported
 - addr: 0xdb11b8
   kind: global
   semantics: "the volcano component's vtable: +0x68 0xa1d2b0, +0x50 0xa1d310, +0x58 0xa1d130, +0x60 0xa1d450."

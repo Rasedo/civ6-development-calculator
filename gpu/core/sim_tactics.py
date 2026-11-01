@@ -1326,7 +1326,10 @@ class SimTactics:
         if not bool(mask.count_nonzero()):
             return
         # a destination another player's unit holds out of the player's sight
-        # is no path (`pathTo`)
+        # is no path, an attack order's too (`pathTo`): the order's request
+        # (0x962310) drops the attack flag where the owner's visibility count
+        # of the plot is 0, and the destination test (0x2714b0) under location
+        # flag 0 refuses a plot another player's unit holds, seen or not
         dc = dest.clamp(min=0).unsqueeze(1)
         at_u = getattr(self, f"{pre}_unit_tile").gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
         unseen = ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat).gather(1, dc).squeeze(1)

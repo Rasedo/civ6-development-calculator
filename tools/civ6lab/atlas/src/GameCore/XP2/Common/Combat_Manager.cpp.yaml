@@ -290,6 +290,7 @@
     - cpu/core/tactical.ts:boarded
     - gpu/core/sim_tactics.py:_tac_boarded
     - cpu/core/tactical.ts:Ground
+    - cpu/core/tactical.ts:pathTo
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: the garrison requirement — READ"
@@ -302,6 +303,7 @@
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   context:
     - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units in its own order the comparator 0x523d60 keeps the..."
     - "...s with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a Mili..."

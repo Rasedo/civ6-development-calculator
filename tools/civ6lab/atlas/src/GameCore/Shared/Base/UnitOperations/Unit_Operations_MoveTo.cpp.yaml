@@ -60,6 +60,26 @@
   context:
     - "...for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40,..."
   review: reviewed
+- addr: 0x962310
+  final: 0x66d070
+  kind: function
+  name: the MoveTo request's attack flag
+  semantics: "the MoveTo definition's handler at its table @0xd99b40 +0x40 (the sibling table @0xd98910 holds 0x95d8d0 there, which only sets its fourth argument's +1): (operation, unit, parameters) — the order's target plot (the operation's vt +0x68); where the unit owner's visibility count of it (0x5d3f0 +0x290) is 0, the parameters' flags (+8 -> +8) lose the attack flag 0x10. The execution 0x962380 reads the flags after it (r12d), so an attack order to a plot the player does not see now has no battle at its first step and its destination test (0x2714b0) runs under location flag 0."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 80
+      value: the Attack Civilian movers (flag 0x10, 0x773270 at 0x77332a) hold for a civilian out of their sight (t80 Warrior 3670030 for the Settler 1769481 on 31:13, t85 / t88 / t97 / t100 / t103) and go for one in it (t31-t36, t68)
+    - recording: h1_duely1117
+      turn: 11
+      value: the rampaging Scout 131073 and Warrior 589832 hold for 14:8, a city-state's Warrior on it out of their sight
+  impl:
+    - cpu/core/tactical.ts:pathTo
+    - gpu/core/sim_tactics.py:_tac_move_to
+    - cpu/core/tactical.ts:Ground
+  readings:
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
+  review: reviewed
 - addr: 0x962380
   final: 0x66d0e0
   kind: function
@@ -90,4 +110,5 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-95: Operation Move's ring test takes no path (0x815d50) — READ, both twins"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   review: reviewed

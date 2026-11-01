@@ -150,7 +150,8 @@ interface Ground {
    *  ground (runs/h1_duely1121 t58-77: the barbarian Scout 131073's
    *  "tertiary regions" 10:9 past China's units out of its sight). A
    *  destination holding another player's unit it does not see now has no
-   *  path (`pathTo`; `turnsToPlot` ends on no unit's plot but an attack's)
+   *  path, the order's attack flag dropped at its request (`pathTo`, 0x962310;
+   *  `turnsToPlot` ends on no unit's plot but an attack's)
    *  (runs/h1_duely1117 t80 / t85 / t88 / t97 / t100 / t103: the
    *  Attack Civilian movers hold for a civilian out of their sight, t31-t36
    *  / t68 go for one in it) */
@@ -734,7 +735,11 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTur
 export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false, explore = true,
   danger?: PathDanger, mates: readonly Unit[] = []): number[] {
   // a destination another player's unit holds out of the player's sight is
-  // no path (`Ground`'s pass), an attack order's too
+  // no path, an attack order's too: the move order's request (0x962310)
+  // drops the attack flag 0x10 where the owner's visibility count of its
+  // plot is 0, and the destination test (0x2714b0) then tests the plot under
+  // location flag 0, where another player's unit there, seen or not, refuses
+  // it (0x586360's best defender 0x208b80 under 0x108)
   if (dest !== unit.tileIndex && foreignAt(state, unit, dest)
     && plotsSeenNow(state, new Set([unit.seat]))[dest] !== 1) return [];
   let found = null as PNode | null;

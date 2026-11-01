@@ -232,6 +232,7 @@
   impl: [cpu/core/tactical.ts:attackCivilians]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-124: an attack order to a plot out of sight loses its attack flag — READ (0x962310), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...her unit goes in; the sort 0x76f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a..."
