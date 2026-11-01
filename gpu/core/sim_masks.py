@@ -754,6 +754,16 @@ class SimMasks:
         its maximum Movement". `_spent_mp` is refreshUnits' own gate — the pool
         this unit was GRANTED last refresh, not its type's base moves.
         CIV6 (Expert Crew): "Can attack after moving" lifts the gate outright."""
+        out = self._moves_and_shoots(pre)
+        if bool(out.all()):
+            return out
+        return out | ~self._spent_mp(pre)
+
+    def _moves_and_shoots(self, pre: str) -> torch.Tensor:
+        """[B, U] `movesAndShoots` — may the unit shoot after it moved this turn
+        (0x56dc40, the AI planning's spot rule reads it): any unit but a siege
+        one, a siege one with Expert Crew or whose maximum Movement tops its
+        type's."""
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         # CIV6 (Hwacha, ABILITY_NO_MOVE_AND_SHOOT): the same gate, on a chassis
         # that carries no Bombard Strength.
@@ -762,7 +772,7 @@ class SimMasks:
         # an OR that every slot already passes cannot change
         if bool(out.all()):
             return out
-        out = out | ~self._spent_mp(pre) | self._promo_pool_flag(pre, "SIEGE_MOVE_SHOOT")
+        out = out | self._promo_pool_flag(pre, "SIEGE_MOVE_SHOOT")
         if bool(out.all()):
             return out
         return out | (self._full_mp(pre) > self._mp_scale * self._type_moves[typ])

@@ -40,6 +40,7 @@
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the..."

@@ -102,6 +102,7 @@
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
   context:
     - "...d Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (..."
   review: reviewed
@@ -149,7 +150,7 @@
   final: 0x4bca20
   kind: function
   name: exploreOk
-  semantics: "may the explorer go to the plot: revealed, ownership, +0x4c, area, city; the turn test on a plot at war unread Not its own plot; revealed; another player's ground only at war with it (and the game turn below the regions record's +0x128); +0x4c not above 0 (no unit on it); its own area unless it embarks (0x56c480), a hull on water; no city centre but its player's."
+  semantics: "may the explorer go to the plot: no live storm on it (0x28b120 -> 0x28b5d0, unported), revealed, ownership, +0x4c, area, city; the turn test on a plot at war unread. No live storm on it; not its own plot; revealed; another player's ground only at war with it (and the game turn below the regions record's +0x128); +0x4c not above 0 (no unit on it); its own area unless it embarks (0x56c480), a hull on water; no city centre but its player's."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -157,6 +158,7 @@
   impl: [cpu/core/tactical.ts:exploreOk, gpu/core/sim_tactics.py:_tac_explore_ok]
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
   context:
     - "...left; per plot closed, in order: no danger (0x716a90), not chosen, one it may go to (0x70bd40: not its own plot; revealed; another player's ground only at war with it; +0x4c not abo..."
     - "...rger (0x70a6c0's second flag: not carried); the turn test on a plot of a player at war (0x70bd40: the game turn below the regions record's +0x128; taken as passing); a goody hut's plot..."

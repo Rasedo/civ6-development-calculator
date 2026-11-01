@@ -25,7 +25,7 @@ import {
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { cityDefenseStrength, districtGarrisonedStrength, embarkedDefenseCS, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, meleeAttack, meleeUnitStrengths, movesAndShoots, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { encampOuterPool, outerPool } from './rules';
 import { cityStateAt, minorCity } from './cityStates';
@@ -1099,7 +1099,9 @@ export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at
  *    each link it prices the spots (0x790c60, six at most a target, a plot
  *    once) of each unit target or COMBAT_DISTRICT — at range a plot within
  *    the range (in sight beyond 1; a land unit's on land), its turn the
- *    step's, the next where it ends with no Movement; in melee the plot an
+ *    step's, the next where it ends with no Movement or, for a unit that may
+ *    not shoot after moving (`movesAndShoots`), where it is not the unit's
+ *    own plot; in melee the plot an
  *    attack on the target's plot is linked from, of the attack's turn, and a
  *    plot beside the target no other player's unit holds that the step ends
  *    on with no Movement (the next turn) or that is the unit's own (this
@@ -1114,6 +1116,9 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
   const lim = maxMoves(state, unit) * PLAN_TURNS + R;
   const naval = !!UNITS[unit.type]?.naval;
   const fights = canFight(unit);
+  // a spot it moves to takes the next turn where it may not shoot after
+  // moving (0x790c60 at 0x791021..0x79103c, the context's +0x28 0x56dc40)
+  const shoots = movesAndShoots(state, unit);
   const entries: PlanEntry[] = [];
   for (const e of targets) {
     if (plotDistance(state, unit.tileIndex, e.tile) > lim) continue;
@@ -1147,7 +1152,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
         spot = parent;
         fixed = true;
       }
-      if (!fixed && M === 0) turns = T + 1;
+      if (!fixed && (M === 0 || (spot !== unit.tileIndex && !shoots))) turns = T + 1;
       if (dd > R || E.spots.length >= 6) continue;
       if (!naval && (R === 0 ? water(TP) : water(spot))) continue;
       if (dd > 0 && ty === 'CIVILIAN') continue;

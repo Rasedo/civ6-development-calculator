@@ -1063,6 +1063,9 @@ class SimTactics:
         civ = plan["civ"]                    # [N, E] a CIVILIAN entry
         R = plan["rng"].unsqueeze(1)         # [N, 1] the unit's range, 0 in melee
         fights = plan["fights"].unsqueeze(1)
+        # [N, 1, 1] it may shoot after moving (`movesAndShoots`): else a spot
+        # off its own plot takes the next turn (0x790c60 at 0x791021..0x79103c)
+        shoots = plan["shoots"].view(-1, 1, 1)
         foreign = plan["foreign"][rows]      # [N, T] another player's fighter holds the plot
         N, E = tp.shape
         tpc = tp.clamp(min=0)
@@ -1094,7 +1097,7 @@ class SimTactics:
             sp = torch.where(taken, par.view(N, 1, 1).expand(N, K, E), P.unsqueeze(2).expand(N, K, E))
             w_p = water.gather(1, P).unsqueeze(2)
             bad = taken & torch.where(nav.unsqueeze(1), ~w_p & ~ctr.gather(1, P).unsqueeze(2), w_p)
-            tu = torch.where(~fixed & m0, T.unsqueeze(2) + 1, T.unsqueeze(2)).expand(N, K, E)
+            tu = torch.where(~fixed & (m0 | (~own & ~shoots)), T.unsqueeze(2) + 1, T.unsqueeze(2)).expand(N, K, E)
             w_sp = water.gather(1, sp.reshape(N, K * E)).reshape(N, K, E)
             ok = (valid.unsqueeze(2) & (tpk >= 0) & ~bad & (dd <= Rk) & fights.unsqueeze(1)
                   & ~(~nav.unsqueeze(1) & torch.where(Rk == 0, w_tp.unsqueeze(1), w_sp))
@@ -1645,7 +1648,8 @@ class SimTactics:
         es = torch.where(emb >= 0, self.unit_seat.gather(1, emb.clamp(min=0)), torch.full_like(emb, seat))
         et = self.unit_type.gather(1, emb.clamp(min=0)).clamp(min=0, max=self.NU - 1)
         foreign = (ms != seat) | ((es != seat) & self._type_dom_mil.take(et))
-        plan = {"tp": tp, "civ": civ, "rng": rng, "fights": self._tac_can_fight(pre)[rows, slots], "foreign": foreign}
+        plan = {"tp": tp, "civ": civ, "rng": rng, "fights": self._tac_can_fight(pre)[rows, slots], "foreign": foreign,
+                "shoots": self._moves_and_shoots(pre)[rows, slots]}
         res = self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre, plan=plan, from_full=True, listed=True)
         sn = res["spot_n"]
         dealt = torch.zeros(N, E, dtype=torch.long, device=dev)

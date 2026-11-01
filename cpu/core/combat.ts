@@ -1027,13 +1027,21 @@ export function siegeAssist(state: GameState, attacker: Unit, targetIndex: numbe
  * shot, which is what "when it attempts to shoot" asks for.
  */
 export function siegeMayShoot(state: GameState, unit: Unit): boolean {
+  return unit.movesLeft >= grantedMoves(state, unit) || movesAndShoots(state, unit);
+}
+
+/**
+ * May the unit shoot after it moved this turn (0x56dc40, the AI planning's
+ * spot rule reads it as its +0x28): any unit but a siege one, a siege one
+ * with Expert Crew or whose maximum Movement tops its type's.
+ */
+export function movesAndShoots(state: GameState, unit: Unit): boolean {
   const def = UNITS[unit.type];
   // CIV6 (Hwacha, ABILITY_NO_MOVE_AND_SHOOT): "Cannot move and attack in the
   // same turn" — the siege rule, written on a chassis that carries no Bombard.
   if (def?.bombard === undefined && !def?.noMoveAndShoot) return true;
   // CIV6 (Expert Crew): "Can attack after moving."
   if (promoFlag(unit, 'SIEGE_MOVE_SHOOT')) return true;
-  if (unit.movesLeft >= grantedMoves(state, unit)) return true;
   return unitFullMoves(state, unit) + generalAuraMP(state, unit) > (def.moves ?? 2) * MP_SCALE;
 }
 

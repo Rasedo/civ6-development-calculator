@@ -6327,3 +6327,76 @@ the replay's `foldResearchParked` (`History.researchParked`).
   record's yield (the bank before the AI's turn). runs/h1_duely1117
   city-state 3's Sanitation, in hand t149-t154: 50 turns at t156, 49 at t160
   as logged, beside Economics' 58 at the same cost.
+
+## C-99: a siege unit's planning spots — READ (0x790c60 at 0x791021..0x79103c, 0x793400, 0x56dc40), both twins
+
+`planUnit`'s `shoots` and `movesAndShoots` (cpu/core/tactical.ts,
+cpu/core/combat.ts; `siegeMayShoot` its unmoved case on top);
+`_tac_spot_link`'s `shoots`, `_tac_plan`'s plan["shoots"] and
+`_moves_and_shoots` (gpu/core/sim_tactics.py, gpu/core/sim_masks.py).
+
+- THE PLANNING CONTEXT (0x793400): +0x14 the unit's domain, +0x18 its plot,
+  +0x20 its owner, +0x24 GetRange, +0x28 0x56dc40, +0x29 a combat, ranged or
+  bombard strength, +0x2a a religious strength.
+- MAY SHOOT AFTER MOVING (0x56dc40): the unit's byte +0x1290, else GetMaxMoves
+  (0x56e130) above its Units row's BaseMoves (+0x38; the row filler 0xad1f60).
+  The five duels' Operation Attack Units rows: Archers 13, Slingers 11, Field
+  Cannons 3 move and strike in one row; Catapults 0 of 13, Trebuchets 0 of 17
+  (a Bombard 1, 1124 t180); so the byte stands for every unit but a siege one
+  (Bombard Strength or ABILITY_NO_MOVE_AND_SHOOT) without Expert Crew — the
+  engines' `movesAndShoots`, the siege rule less its unmoved case.
+- THE SPOT'S TURN (0x790c60, the ranged / general path at 0x791021): the
+  link's turn, the next where the link ends with no Movement, and the next
+  too where the spot is not the unit's own plot and +0x28 is clear. So a
+  Catapult's spot it moves to is next turn's: the assignment's blow there is
+  halved and it moves with no attack.
+- CONFIRMED: runs/h1_duely1117 t89 city-state 4's City Defense Catapult on
+  33:8 strikes 34:8 from where it stands (AI_Operation.csv "At 33:8, Move
+  33:8, Attack 34:8"); t90 the Catapult on 31:6 moves with no strike, as
+  logged ("At 31:6, Move 32:6, Attack -9999:-9999"; the engines' goes to 32:7,
+  its position carried).
+- OPEN (C-99): 1117 t89 the Catapult on 32:7 (spot 32:7 this turn, 32 dealt)
+  takes 32:8 next turn's in our assignment where the game strikes from 32:7;
+  1117 t84 city-state 4's City Defense Catapult 917509 on 33:6
+  takes the 2-turn spot 34:7 (the Man-at-Arms' own plot, a ranged spot at
+  distance 0 as 0x790c60 reads) in our assignment, where the game logs no row
+  for it and record t85 holds it on 32:5 (no AI_Operation / AI_Tactical row
+  moves it).
+
+## C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained
+
+`passPatrol` / `exploreTarget` / `exploreOk` (cpu/core/tactical.ts);
+`_x_naval_patrol`, `_tac_explore`, `_tac_explore_ok`.
+
+- THE CANDIDATE LIST (0x26df90's list callback 0x26dab0): a plot is appended
+  on GetBest's NotifyList 3 (0x781e0, parent argument 0), once (0x791270) —
+  the BFS's closing order; NotifyList 1 / 2 (AddToOpen, GetBest) append
+  nothing. A plot the player sees now (+0x50 & 2) joins only with +0x50 &
+  0x40 (0x586900 under flag 1, set by 0x271be0) and no mountain / impassable
+  feature (+0x50 & 0xc), then 0x586900 under the search's flags. Naval
+  Patrol passes 0x70aa40 search flags 0 (0x26df90 adds 0x800, 0x100 for an
+  unmoved formation), a chosen list of its own, the first round on.
+- THE SELECTION (0x70aa40 at 0x70ab21..0x70ac5b): the first plot of the
+  largest unrevealed count, strictly larger replacing (the route-led plot
+  aside); the fallback the first plot of the largest unseen count, the first
+  candidate always taken.
+- EXPLORE'S PLOT TEST (0x70bd40) first refuses a plot under a live storm
+  (0x28b120 -> 0x28b5d0 GetActiveStormAtPlot: the plot in a live storm's
+  footprint, 0x28d6b0) — unported: no recorded explorer stands beside a
+  storm.
+- OPEN: runs/h1_duely1127 city-state 3's Galley 393216 t62 (from 29:15:
+  30:17, 29:17, 28:17 close in that order, unrevealed counts 10 / 9 / 10 in
+  the engines, the game takes 28:17) and t63 (from 28:17: 30:17 and 30:18 at
+  7 / 7, the game takes 30:18): the engines' counts tie where the game's
+  later plot wins; the plots only 30:17's look holds (31:15, 32:16, 32:17,
+  32:18) are land no unit of the city-state saw (its army records hold
+  Rome's Warriors on 31:15 / 32:16 unseen at t62). t67 / t89 / t93 / t95 /
+  t97: the Galley ends Operation Move on 30:19 with 1 Movement left (records
+  68 / 90 moves 1) and Naval Patrol moves it no further; the engines' patrol
+  then takes the fallback 30:18 (822 // 866). The interpreter runs Pillage
+  and Patrol after Choose Target's subtree (0x7cb3d0 executes every SUCCESS /
+  RUNNING node in node order; 0x803880 RUNNING with units), and 30:18 passes
+  every test read here, so what stops the patrol after a move is unread (the
+  formation's Movement +0x218 the search starts on, 0x271909, against the
+  unit's +0xdb0 after the move: unread). t66 / t68 / t72 / t74 / t76: the
+  hurt Galley's Move to Safety (C-99's "t66-75 the same hurt Galley stays").

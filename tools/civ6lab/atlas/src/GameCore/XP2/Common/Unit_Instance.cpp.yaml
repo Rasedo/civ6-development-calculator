@@ -149,6 +149,23 @@
     - "...es each LOW or MEDIUM unit that threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength within its range (0x56e3d0), any other nearer than twice its Movement (0x56..."
     - "...t it sees now (0x5033a0) with a combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its strength (0x716400: bombard > 0 — the combat strength where it tops the bombard..."
   review: reviewed
+- addr: 0x56dc40
+  final: 0x3a3540
+  kind: function
+  name: movesAndShoots
+  semantics: "may the unit shoot after it moved: its byte +0x1290 (the constructor clears it; set where it may: every unit but a siege one, the five duels' Archers, Slingers and Field Cannons move and strike in one Attack Units row), else GetMaxMoves (0x56e130) above its Units row's BaseMoves (+0x38, the row filler 0xad1f60)."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 89
+      value: city-state 4's Catapult on 33:8 strikes 34:8 from where it stands (AI_Operation.csv); t90 the one on 31:6 moves with no strike
+  impl:
+    - cpu/core/combat.ts:movesAndShoots
+    - gpu/core/sim_masks.py:_moves_and_shoots
+    - cpu/core/tactical.ts:shoots
+  readings:
+    - "C-99: a siege unit's planning spots — READ (0x790c60 at 0x791021..0x79103c, 0x793400, 0x56dc40), both twins"
+  review: reviewed
 - addr: 0x56dc90
   final: 0x3a3590
   kind: function
@@ -270,6 +287,7 @@
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-95: the clear-terrain start Movement"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
+    - "C-99: a siege unit's planning spots — READ (0x790c60 at 0x791021..0x79103c, 0x793400, 0x56dc40), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...bard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The   type ids (0x5bcb80, each global the..."
   context:

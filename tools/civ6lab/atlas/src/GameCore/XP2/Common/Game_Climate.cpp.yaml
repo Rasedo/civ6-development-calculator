@@ -330,6 +330,26 @@
     - "\"Pick One Off Start Plot\" 0x288020 walks every plot in index order and keeps those 0x28aa00 passes with the event's +0x30 (1 for the one-offs: the plot alone) under the predicate 0x..."
     - "0x287e80 builds the list of every plot whose score 0x28ff20 is above 0 (the area test 0x28aa00 with the row's predicate, times Spacing + 1, less Spacing − d where the nearest live drou..."
   review: reviewed
+- addr: 0x28b120
+  final: 0x1bcc00
+  kind: function
+  semantics: the game's climate (Game_Climate), its storms and droughts (a getter, the argument unread).
+  status: PARTLY
+  readings: ["C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EXPLORE'S PLOT TEST (0x70bd40) first refuses a plot under a live storm (0x28b120 -> 0x28b5d0 GetActiveStormAtPlot: the plot in a live storm's footprint, 0x28d6b0) — unp..."
+  review: reviewed
+- addr: 0x28b5d0
+  final: 0x1bd0a0
+  kind: function
+  semantics: "GetActiveStormAtPlot: the first live storm (+0x8d0..+0x8d8, each an index into +0x8b0) whose footprint (0x28d6b0) holds the plot, else none."
+  status: PARTLY
+  readings: ["C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EXPLORE'S PLOT TEST (0x70bd40) first refuses a plot under a live storm (0x28b120 -> 0x28b5d0 GetActiveStormAtPlot: the plot in a live storm's footprint, 0x28d6b0) — unported: no re..."
+  review: reviewed
 - addr: 0x28c0d0
   final: 0x1bd9f0
   kind: function
@@ -448,7 +468,9 @@
     - recording: 1115
       value: "38 of 38   births and first walks (1115: 28, 1116: 10) land the recorded plot and   FertilityAdded."
   impl: [cpu/data/disasters.ts:stormFootprintOffsets]
-  readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116"]
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
   context:
     - "...with its draw spent; each step strikes; then a Preview draw. The strike: the footprint 0x28d6b0 (centre; Hexes 3 adds NE and NW; 7 the six in direction order; 19 every axial (dq, dr)..."
   review: reviewed
