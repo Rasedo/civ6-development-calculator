@@ -303,6 +303,7 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-97: the majors' meeting"
     - "C-129: a unit made anew that no plot takes is destroyed, its own plot refused by a hostile defender alone; a bankruptcy's disband before the look — READ, both twins"
+    - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."

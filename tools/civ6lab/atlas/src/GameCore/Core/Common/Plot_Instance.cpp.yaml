@@ -187,6 +187,7 @@
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
   notes:
     - the new owner's visibility count raised on the plot and on each plot beside it (neighbour walk, vtable +0x58), no line of sight
   context:

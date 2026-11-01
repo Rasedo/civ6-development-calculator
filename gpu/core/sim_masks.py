@@ -3052,7 +3052,8 @@ class SimMasks:
 
     def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius,
                        see_through: torch.Tensor | None = None, placed: bool | None = None,
-                       disk: torch.Tensor | None = None) -> None:
+                       disk: torch.Tensor | None = None, movers: torch.Tensor | None = None,
+                       from_tile: torch.Tensor | None = None) -> None:
         """revealAround's twin: lift `seat_row`'s fog within `radius` of
         `tiles` (or over `disk` [K, T] where given: `_city_look`'s union of
         its plots' rings, one look). rows [K] batch indices (UNIQUE per call — advanced-index
@@ -3075,7 +3076,9 @@ class SimMasks:
         install carries no maps arm.
         `placed` (`majorLook`'s): the look is the seat's own unit's stepping
         there — a unit's look (`see_through` given) unless a city-state's it
-        is suzerain of lends it (`_suzerain_look`)."""
+        is suzerain of lends it (`_suzerain_look`). `movers` ([K, R] merged
+        slots, -1 pads) and `from_tile` ([K], -1 placed anew): the units whose
+        step or placement the look is, and the plot they left (`Look.mover`)."""
         if not self.fog_of_war or rows.numel() == 0:
             return
         # `see_through` names a look cut by the line of sight (revealAround's
@@ -3085,6 +3088,9 @@ class SimMasks:
         elif disk is None:
             disk = self.pair_dist[tiles.clamp(min=0)] <= (
                 radius.unsqueeze(1) if torch.is_tensor(radius) else radius)
+        # the rivers its own unit's look names, the seat's sight as it stood
+        if see_through is not None and placed is not False:
+            self._name_rivers_look(rows, seat_row, disk, movers, from_tile)
         new = disk & ~self.seat_explored[rows, seat_row]
         # CIV6 (Kandy): the natural wonders none of whose plots the seat had
         # seen before this look, read before the write (`liftFog`)
@@ -3286,6 +3292,64 @@ class SimMasks:
             suz = self.citystate_suzerain[rows, :self.S].gather(1, (seats - 100).clamp(min=0, max=self.S - 1))
             m = m | (cs & (suz == g))
         return m
+
+    def _seat_sees_plot(self, b: int, g: int, p: int, movers: list[int], frm: int) -> bool:
+        """`seatSeesPlot` in game `b`: major `g` sees plot `p` now — its plot or
+        one beside, a centre within two, a unit whose sight reaches it, its own
+        or a city-state's it is suzerain of; the `movers` (merged slots) look
+        from `frm` (none where -1)."""
+        bb = torch.tensor([b], dtype=torch.long, device=self.device)
+        own = self._eyes_of(bb, self.tile_seat[bb], g)[0]  # [T]
+        dist = self.pair_dist[p].long()  # [T]
+        if bool((own & (dist <= 1)).any()):
+            return True
+        if bool((self._eyes_of(bb, self._centre_seat_plane()[bb], g)[0] & (dist <= 2)).any()):
+            return True
+        mine = self.major_unit_alive[b] & self._eyes_of(bb, self.major_unit_seat[bb], g)[0]
+        for j in mine.nonzero(as_tuple=True)[0].tolist():
+            at = frm if j in movers else int(self.major_unit_tile[b, j])
+            if at < 0:
+                continue
+            utp = self.unit_type[bb, j]
+            upr = self.unit_promos[bb, j]
+            rad = self._unit_sight(utp, upr, self.unit_seat[bb, j], bb)
+            if int(self.pair_dist[at, p]) > int(rad[0]):
+                continue
+            look = self._los_disk(bb, torch.tensor([at], dtype=torch.long, device=self.device), rad,
+                                  self._sees_through(utp, upr))
+            if bool(look[0, p]):
+                return True
+        return False
+
+    def _name_rivers_look(self, rows: torch.Tensor, seat_row, disk: torch.Tensor,
+                          movers: torch.Tensor | None, from_tile: torch.Tensor | None) -> None:
+        """`nameRiversInLook`: a major's own unit's look over `disk` ([K, T],
+        the games `rows`, unique) names each unnamed flood river one of whose
+        own plots (`_flood_own`) it takes from no sight (`_seat_sees_plot`, the
+        `movers` [K, R] merged slots looking from `from_tile` [K], -1 placed
+        anew; None: the unit looks from where it stands)."""
+        own = self._flood_own
+        if own.shape[1] == 0 or rows.numel() == 0:
+            return
+        live = ((self._flood_sites[0] >= 0) & ~self.river_named)[rows]  # [K, n]
+        if not bool(live.count_nonzero()):
+            return
+        K, n, k = rows.numel(), own.shape[1], own.shape[2]
+        o = own[rows]
+        hit = disk.gather(1, o.clamp(min=0).reshape(K, n * k)).reshape(K, n, k) & (o >= 0) & live.unsqueeze(2)
+        if not bool(hit.count_nonzero()):
+            return
+        sr = seat_row if torch.is_tensor(seat_row) else torch.full_like(rows, int(seat_row))
+        for i in hit.any(dim=2).any(dim=1).nonzero(as_tuple=True)[0].tolist():
+            b, g = int(rows[i]), int(sr[i])
+            if g < 0 or g >= self.n_majors:
+                continue
+            mv = [] if movers is None else [int(x) for x in movers[i].tolist() if int(x) >= 0]
+            frm = -1 if from_tile is None else int(from_tile[i])
+            for p in sorted(set(int(x) for x in o[i][hit[i]].tolist())):
+                if self._seat_sees_plot(b, g, p, mv, frm):
+                    continue
+                self.river_named[b] |= live[i] & (o[i] == p).any(dim=1)
 
     def _suzerain_look(self, rows: torch.Tensor, s: torch.Tensor, tiles: torch.Tensor, radius,
                        see_through: torch.Tensor | None) -> None:
@@ -3578,7 +3642,8 @@ class SimMasks:
             self._reveal_around(rows, row, spot.take(rows),
                                 self._unit_sight(type_idx.take(rows), torch.zeros_like(slot),
                                                  torch.full_like(slot, row), rows),
-                                see_through=self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)])
+                                see_through=self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)],
+                                movers=(slot + self.POOL_LO[pre]).unsqueeze(1), from_tile=torch.full_like(slot, -1))
         elif 100 <= seat < 100 + self.S:
             _sight = self._unit_sight(type_idx.take(rows), torch.zeros_like(slot))
             _thr = self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)]

@@ -12752,7 +12752,7 @@ class SimSeats:
                 self._occ_set(vr, ttc[vr], _gs)
                 # ...and looks from the plot it entered, as a step does
                 self._unit_look(vr, a_seat[vr, u], ttc[vr], a_type[vr, u].clamp(min=0, max=self.NU - 1),
-                                self._promo_pool(atk_kind)[0][vr, u])
+                                self._promo_pool(atk_kind)[0][vr, u], movers=_gs.unsqueeze(1), from_tile=here[vr])
                 if major:
                     self._clear_camp_at(adv, ttc, a_seat[:, u], self._row_of(a_seat[:, u]))
             # the defender's player records the attacker that stands, where
@@ -13624,8 +13624,12 @@ class SimSeats:
                 see_thr = see_thr | ((_rr >= 0) & self._sees_through(
                     self.unit_type.gather(1, _rc.unsqueeze(1)).squeeze(1),
                     self.unit_promos.gather(1, _rc.unsqueeze(1)).squeeze(1)))
+            # ...the formation looking from the plot it left as the new look
+            # lands (`Look.mover`)
+            _mv = torch.cat([gslot.unsqueeze(1), rider], dim=1).index_select(0, rows)
             self._reveal_around(rows[major], srow[major], dest.take(rows)[major], sight.take(rows)[major],
-                                see_through=see_thr.take(rows)[major])
+                                see_through=see_thr.take(rows)[major], movers=_mv[major],
+                                from_tile=here.take(rows)[major])
         # ...and a city-state's mover's look reveals and meets the majors it
         # takes in (`revealAround`'s `minorLook`)
         mnr = (srow >= 100) & (srow < 100 + self.S)
@@ -14321,11 +14325,13 @@ class SimSeats:
                 f":{tag} {int(self.unit_xp[_b, _u])}")
 
     def _unit_look(self, rows: torch.Tensor, seat: torch.Tensor, tile: torch.Tensor,
-                   u_type: torch.Tensor, u_promos: torch.Tensor) -> None:
+                   u_type: torch.Tensor, u_promos: torch.Tensor, movers: torch.Tensor | None = None,
+                   from_tile: torch.Tensor | None = None) -> None:
         """`revealAround` of a unit's look from `tile` ([K] each, `rows`
         unique): the barbarians' revealed plots, a major's fog (its meetings
         with it), a city-state's revealed plots, meetings and its suzerain's
-        look."""
+        look. `movers` / `from_tile` ([K, R] / [K]): `_reveal_around`'s, the
+        units whose step the look is and the plot they left."""
         sight = self._unit_sight(u_type, u_promos, seat, rows)
         thr = self._sees_through(u_type, u_promos)
         brb = seat == BARB_SEAT
@@ -14333,7 +14339,9 @@ class SimSeats:
             self._barb_reveal(rows[brb], tile[brb], self._unit_sight(u_type[brb], u_promos[brb]), see_through=thr[brb])
         major = (seat >= 0) & (seat < self.n_majors)
         if bool(major.count_nonzero()):
-            self._reveal_around(rows[major], seat[major], tile[major], sight[major], see_through=thr[major])
+            self._reveal_around(rows[major], seat[major], tile[major], sight[major], see_through=thr[major],
+                                movers=None if movers is None else movers[major],
+                                from_tile=None if from_tile is None else from_tile[major])
         mnr = (seat >= 100) & (seat < 100 + self.S)
         if bool(mnr.count_nonzero()):
             self._minor_look(rows[mnr], seat[mnr] - 100, tile[mnr], sight[mnr], thr[mnr])

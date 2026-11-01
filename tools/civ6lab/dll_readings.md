@@ -6777,3 +6777,33 @@ read by `canUpgradeUnit` / `upgradeUnit`, `minorUpgradeVisible` /
 - Open: 0x4dd270's disband count reads floor(S / 10) for the shortfall S
   where the lab's runs/bankrupt_m35 lost one unit a turn at S 35
   (`GOLD_DISBANDS_PER_TURN`); its balance operand (+0xf8 >> 8) unidentified.
+
+## C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins
+
+- THE CALL: the unit sight update 0x58aa90 (a move 0x58f3f0, a placement
+  0x586d40) changes the unit owner's count per plot of the look (0x508d50) and,
+  where it answers 2 (a count rose from 0), calls 0x534950 with the plot and
+  the owner — its first-revealed flag (the sixth argument) is not read. 0x534950
+  names the plot's rivers (0xa29730) for a FULL_CIV owner where the plot's
+  +0x37 is above 0. A move adds the new sight before it drops the old.
+- THE COUNT: 0x508d50 walks the players receiving the owner's visibility
+  (0x50a510: the owner, and a suzerain the city-state shares with, 0x508330
+  adding the giver's own count +0x288 into the receiver's +0x290). So a plot a
+  suzerained city-state sees is visible to the suzerain, and its own unit's look
+  there names nothing; a city-state's unit's look names nothing (not FULL_CIV).
+- Ported: `nameRiversInLook` (cpu/core/disasters.ts) from `majorLook`'s own-unit
+  looks, `seatSeesPlot` (cpu/core/fog.ts) the count's test with the stepping
+  units at the plot they left (`Look.mover`: `stepUnit`, `spawnUnit`, the melee
+  advance, the portal); `_name_rivers_look` / `_seat_sees_plot`
+  (gpu/core/sim_masks.py) from `_reveal_around` (`movers`, `from_tile`), the
+  start units' looks at the load. The importer replays the records' unit events
+  (`recordRiverNames`, cpu/harness/riverNames.ts); the action replay walks the
+  majors' units in their first logged step's order (`syncUnits`).
+- Confirmed: every flood river of runs/h1_duely1117, 1121, 1124, 1127, 1128
+  named in the logged turn (Game_RandomEvents.csv's Floodable Rivers, counted
+  the turn after), in the engine replay and the importer alike; runs/h1_duely1124
+  the Salween at t72 (China's Catapult on 39:9 takes 41:9; 40:9-41:12 in
+  Granada's sight shared from t51, China's Heavy Chariot, whose look held 41:9,
+  gone first), Granada's floodplain Farm on 524 at t72 as logged.
+- Open: a plot's owner change inside a turn (0x84760's count) is not replayed by
+  the importer; an ally's shared sight (Poundmaker) is not a receiver.

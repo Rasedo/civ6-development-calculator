@@ -12,8 +12,14 @@
     - recording: h1_duelw1124
       turn: 1
       value: "Case (runs/h1_duelw1124, planning rows   t1-60, inside the replay): of the 123 plots the game listed that the   barbarians had not revealed, every one lies beside a revealed plot and   none within two"
-  impl: [cpu/core/barbarians.ts:plotsSeenNow, gpu/core/sim_barb.py:_barb_seen]
+  impl:
+    - gpu/core/sim_masks.py:_seat_sees_plot
+    - cpu/core/fog.ts:seatSeesPlot
+    - cpu/core/barbarians.ts:plotsSeenNow
+    - gpu/core/sim_barb.py:_barb_seen
+    - cpu/core/disasters.ts:nameRiversInLook
   readings:
+    - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
@@ -22,13 +28,17 @@
 - addr: 0x508d50
   final: 0x35a7f0
   kind: function
-  semantics: "the visibility count change. The visibility count change: the only path to the reveal 0x50d390 for a barbarian. Its callers: a unit's sight update (0x58aa90 per plot of 0x58b1d0's line-of-sight list, from 0x58f3f0 on a move, 0x586d40), a plot's owner (0x84760), an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0: the plot and the six beside it, no line of sight), the scripted operations."
+  semantics: "the visibility count change. The visibility count change: the only path to the reveal 0x50d390 for a barbarian. Its callers: a unit's sight update (0x58aa90 per plot of 0x58b1d0's line-of-sight list, from 0x58f3f0 on a move, 0x586d40), a plot's owner (0x84760), an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0: the plot and the six beside it, no line of sight), the scripted operations. Over the players receiving the given player's visibility (0x50a510: itself, and those it shares with — a suzerain of a city-state, 0x508330) each receiver's count (+0x290; its own +0x288 for the player itself, 0x502530) changes; answers 2 where a count rose from 0, 1 where one fell to 0 (the last receiver changed)."
   status: PARTLY
   impl:
+    - gpu/core/sim_masks.py:_seat_sees_plot
     - cpu/core/barbarians.ts:othersSee
     - cpu/core/barbarians.ts:CAMP_SIGHT
     - cpu/core/fog.ts:minorLook
+    - cpu/core/fog.ts:seatSeesPlot
+    - cpu/core/disasters.ts:nameRiversInLook
   readings:
+    - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
@@ -39,6 +49,18 @@
   context:
     - "...signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2: the plot's visibility count fo..."
   review: reviewed
+- addr: 0x50a510
+  final: 0x35b3b0
+  kind: function
+  semantics: "the players receiving a player's visibility (the vector 0x508d50 walks per count change): the player itself and those it shares with (0x508330)."
+  status: PARTLY
+  impl: [cpu/core/fog.ts:seatSeesPlot]
+  readings:
+    - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE COUNT: 0x508d50 walks the players receiving the owner's visibility (0x50a510: the owner, and a suzerain the city-state shares with, 0x508330 adding the giver's own..."
+  review: imported
 - addr: 0x50a690
   kind: function
   semantics: the plot's resource as a team sees it (artifacts excluded).

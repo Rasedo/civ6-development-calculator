@@ -352,7 +352,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     // order (the start first) — static, so the TS rule's own answer ships
     // (`floodRivers`)
     floodLists: floodRivers(map).map((r) => r.list.map((t) => t.index)),
-    // each flood site's own plots, whose sight names it (`nameRivers`)
+    // each flood site's own plots, a look at which names it (`nameRiversInLook`)
     floodOwn: floodRivers(map).map((r) => r.own.map((t) => t.index)),
     maxCamps,
     // the deforestation denominator, stamped off the map as it was loaded

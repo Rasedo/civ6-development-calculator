@@ -1,5 +1,5 @@
 
-import type { GameState, Tile } from './types';
+import type { GameState, Tile, Unit } from './types';
 import type { GameMap } from '../../world/types';
 import { citiesOf, civOf, isBarbSeat, isCityStateSeat, isCiv, leaderOf, majorsAlive, majorsMet, seatOf, seatsAllied, setMetTurnWith, tileSeat, unitsOf } from './seats';
 import { hasMet, meetCityState, meetCityStates, suzerainOf } from './cityStates';
@@ -16,6 +16,7 @@ import { UNITS } from '../data/units';
 import { gpPermOf } from '../data/greatPeople';
 import { suzerainWonderRelics } from './cityStates';
 import { createRelic } from './greatWorks';
+import { nameRiversInLook } from './disasters';
 
 export const SIGHT_RANGE = 2;
 
@@ -153,9 +154,19 @@ export function losDisk(map: GameMap, from: Tile, radius: number, seeThrough: bo
   return out;
 }
 
-/** A look cut by the line of sight (`losDisk`): Sentry's `seeThrough`. */
+/** A look cut by the line of sight (`losDisk`): Sentry's `seeThrough`.
+ *  `mover`: the units whose step or placement this look is, already standing
+ *  on the plot, and the plot they stepped from (-1 placed anew) — their sight
+ *  from there still counts while the new one is added (a move adds the new
+ *  sight before it drops the old, 0x58f3f0 -> 0x58aa90). A look without one
+ *  counts its unit where it stands. */
 export interface Look {
   seeThrough: boolean;
+  mover?: LookMover;
+}
+export interface LookMover {
+  units: readonly Unit[];
+  from: number;
 }
 
 /** Can an eye standing on `from` see `to` (`losDisk` out to `to`'s ring)?
@@ -268,8 +279,9 @@ function majorLookMeets(state: GameState, seat: number, tileIndex: number, radiu
 /** Does a major see the plot now (`plotsSeenNow` for one seat, at one plot):
  *  a unit of its whose sight reaches it, a city centre of its within two, a
  *  plot of its beside it or the plot itself — and what each city-state it
- *  is suzerain of sees so (`majorLook`). */
-function seatSeesPlot(state: GameState, seat: number, t: Tile): boolean {
+ *  is suzerain of sees so (`majorLook`). A `mover`'s units look from the
+ *  plot they stepped from (none where placed anew). */
+export function seatSeesPlot(state: GameState, seat: number, t: Tile, mover?: LookMover): boolean {
   const { map } = state;
   const eyes = [seat, ...state.cityStates.filter((cs) => suzerainOf(cs) === seat).map((cs) => cs.seat)];
   if (tileSeat(t) >= 0 && eyes.includes(tileSeat(t))) return true;
@@ -282,7 +294,9 @@ function seatSeesPlot(state: GameState, seat: number, t: Tile): boolean {
   }
   for (const u of state.units) {
     if (!eyes.includes(u.seat)) continue;
-    const from = map.tiles[u.tileIndex];
+    const moving = mover?.units.includes(u);
+    if (moving && mover!.from < 0) continue;
+    const from = map.tiles[moving ? mover!.from : u.tileIndex];
     if (hexDistance(map, from.col, from.row, t.col, t.row) <= unitSight(u, state) && canSee(map, from, t, unitSeesThrough(u))) return true;
   }
   return false;
@@ -381,6 +395,9 @@ export function revealAround(
  */
 function majorLook(state: GameState, seat: number, tileIndex: number, radius: number, los: Look | undefined,
                    placed: boolean): void {
+  // the rivers its own unit's look names: before the look's write, the
+  // seat's sight as it stood (`nameRiversInLook`)
+  if (placed && los) nameRiversInLook(state, seat, losDisk(state.map, state.map.tiles[tileIndex], radius, los.seeThrough), los.mover);
   const { found, wonders } = liftFog(state, seat, tileIndex, radius, los);
   // A city-state is MET the moment this look takes in a plot of its
   // territory or a unit of its, in the move that does (runs/h1_duelw1121 t6:

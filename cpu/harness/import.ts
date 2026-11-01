@@ -37,7 +37,9 @@ import { civEraIndex, cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetac
 import { tileYields } from '../core/yields';
 import type { EventReplay } from './eventReplay';
 import { floodplainList } from './eventDraws';
-import { countFlood, eruptionRings, floodRiverIndex, nameRivers, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
+import { countFlood, eruptionRings, floodRiverIndex, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
+import { fogActive } from '../core/fog';
+import { recordRiverNames, riverLookOf, startRiverNames, type RiverLook } from './riverNames';
 import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPTION_SCI_P, ERUPTION_WONDER, DROUGHT_HEXES, DROUGHT_TURNS, FLOOD_YIELD_ROWS, STORM_EVENTS, STORM_MOVEMENT, STORM_ROWS } from '../data/disasters';
 import { isWater } from '../../world/query';
 import { FEATURE_ID, TERRAIN_BASE } from '../data/aliases';
@@ -477,9 +479,11 @@ function leaderRow(leader: string): number {
  */
 export interface History {
   firstTurn: number;
-  /** the flood rivers the records' looks have named so far (`nameRivers`,
-   *  `GameState.riverNamed`) */
+  /** the flood rivers the records' events have named so far
+   *  (`recordRiverNames`, `GameState.riverNamed`), and the majors' sight as
+   *  the last record stood (`riverLookOf`) */
   riverNamed?: boolean[];
+  riverLook?: RiverLook;
   last: TurnRecord | null;
   /** the record folded in before `last`, and the one before that */
   before: TurnRecord | null;
@@ -2656,6 +2660,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
 
   // the units
   let nextId = 0;
+  const unitByKey = new Map<string, Unit>();
   for (const u of rec.units) {
     const seat = seatOfGame(u.owner);
     if (seat === NO_SEAT) continue;
@@ -2689,6 +2694,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     const levy = history?.levied.get(`${u.owner}:${u.id}`);
     if (levy !== undefined && seatOfGame(levy) !== NO_SEAT) unit.leviedFrom = seatOfGame(levy);
     state.units.push(unit);
+    unitByKey.set(`${u.owner}:${u.id}`, unit);
     // the levy in force: the major holding the minor's army, and its term
     // from the levy's turn (`levyUnits`): the minor's PlayerInfluence
     // m_iLevyTurnCounter, the turns since the levy (1 the record after it;
@@ -2812,12 +2818,20 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       (civic ? r.civicRetained : r.techRetained)[id] = before ? Math.min(researchCost(state, id, civic, s.seat), parked + before.amount) : parked;
     }
   }
-  // the rivers named so far: the history's, then this record's look — the
-  // turn start's sight over the record's positions (`nameRivers`); the
-  // history takes them as it reaches the record
-  state.riverNamed = history?.riverNamed ? [...history.riverNamed] : undefined;
-  nameRivers(state);
-  if (history && history.last === rec && state.riverNamed) history.riverNamed = [...state.riverNamed];
+  // the rivers named so far: the history's, then those the record's events
+  // name over the record before's sight (`recordRiverNames`), the first
+  // record's the start's; the history takes them, and this record's sight,
+  // as it reaches the record
+  state.riverNamed = history?.riverNamed ? [...history.riverNamed] : startRiverNames(state);
+  const riverLook = history?.riverLook;
+  const actions = (rec as { actions?: unknown[][] }).actions;
+  if (state.riverNamed && riverLook && riverLook.turn < rec.turn && actions) {
+    recordRiverNames(riverLook, actions, state.riverNamed, seatOfPlayer, unitByKey);
+  }
+  if (history && history.last === rec) {
+    if (state.riverNamed) history.riverNamed = [...state.riverNamed];
+    if (fogActive(state)) history.riverLook = riverLookOf(state, rec.turn, unitByKey);
+  }
   // a repair in hand: the record's progress holds the share it resumed at,
   // which the minor's step prices out of the repair (`minorRepairResumed`)
   for (const [minor, item] of repairsInHand) {

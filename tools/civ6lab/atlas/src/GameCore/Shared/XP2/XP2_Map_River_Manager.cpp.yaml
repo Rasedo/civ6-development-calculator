@@ -69,7 +69,7 @@
     - cpu/core/disasters.ts:riverRevealed
     - cpu/harness/drawSites.ts:DRAW_SITES
     - cpu/harness/eventPick.ts:named
-    - cpu/core/disasters.ts:nameRivers
+    - cpu/core/disasters.ts:nameRiversInLook
   readings:
     - "H-1: draws the AI takes, draws the engines lack"
     - "H-1: the flood's river walk — READ"
@@ -80,7 +80,7 @@
   review: reviewed
 - addr: 0xa29730
   kind: function
-  semantics: "names a plot's rivers (-> \"Random River\" 0xa292a0); a river whose namer field is 0 (player 0's) is named again. Over the plot's rivers (the manager's +0x190 plot-to-rivers map, 0xa285b0 — the rivers whose edges SetXOfRiver laid on the plot or across it) each river found by ID (+0xb8..+0xc0, +4) whose namer +0x48 is 0 or name +0 is -1 takes the player as namer and a name (0xa292a0). A river's merged network does not name it: its own plots alone. Ported: nameRivers (disasters.ts, GameState.riverNamed), _name_rivers / river_named."
+  semantics: "names a plot's rivers (-> \"Random River\" 0xa292a0); a river whose namer field is 0 (player 0's) is named again. Over the plot's rivers (the manager's +0x190 plot-to-rivers map, 0xa285b0 — the rivers whose edges SetXOfRiver laid on the plot or across it) each river found by ID (+0xb8..+0xc0, +4) whose namer +0x48 is 0 or name +0 is -1 takes the player as namer and a name (0xa292a0). A river's merged network does not name it: its own plots alone. Ported: nameRiversInLook (disasters.ts, GameState.riverNamed), _name_rivers_look / river_named."
   status: READ
   cases:
     - recording: h1_duelv1127
@@ -95,11 +95,13 @@
     - recording: 1103
       value: "1103–1124 every river edge and volcano plot as recorded);"
   impl:
+    - gpu/core/sim_masks.py:_name_rivers_look
     - cpu/core/disasters.ts:riverRevealed
     - cpu/harness/drawSites.ts:DRAW_SITES
     - cpu/harness/eventPick.ts:named
-    - cpu/core/disasters.ts:nameRivers
+    - cpu/core/disasters.ts:nameRiversInLook
   readings:
+    - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
     - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
     - "H-1: draws the AI takes, draws the engines lack"
     - "H-1: the flood's river walk — READ"

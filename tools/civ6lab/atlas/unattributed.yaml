@@ -2492,12 +2492,14 @@
   kind: function
   semantics: a unit's sight walk (-> 0x58b1d0) changing the visibility counts.
   status: PARTLY
+  impl: [cpu/core/fog.ts:Look]
   readings:
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights hold raises..."

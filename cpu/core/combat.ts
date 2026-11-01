@@ -2129,6 +2129,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   const taken = state.units.includes(attacker) ? seizable(state, attacker, targetIndex) : null;
   if (taken) {
     for (const u of taken) seizeCivilian(state, u, attacker);
+    const left = attacker.tileIndex;
     attacker.tileIndex = targetIndex;
     // an amphibious victor comes ashore: `stepUnit`'s own transition rule
     if (!def.naval && !waterWalks(attacker.type)) {
@@ -2138,7 +2139,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     // (runs/h1_duelw1121 t33: Rome's Warrior kills the barbarians' Scout on
     // the wooded hill at (38,13), and record t34 holds the plots beside it
     // revealed)
-    revealAround(state, attacker.seat, targetIndex, unitSight(attacker, state), { seeThrough: unitSeesThrough(attacker) });
+    revealAround(state, attacker.seat, targetIndex, unitSight(attacker, state), { seeThrough: unitSeesThrough(attacker), mover: { units: [attacker], from: left } });
     clearCampFor(state, attacker, targetIndex); // every seat clears it
   }
   // the defender's player records the attacker that stands, where its

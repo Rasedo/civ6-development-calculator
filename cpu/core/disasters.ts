@@ -8,8 +8,7 @@ import { hasRiver, isCoastalLand, isImpassable, isWater } from '../../world/quer
 import { isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { atRngPoint, randRange, randWeighted, type DrawLabel } from './rand';
-import { fogActive, isExplored } from './fog';
-import { plotsSeenNow } from './barbarians';
+import { fogActive, isExplored, seatSeesPlot, type LookMover } from './fog';
 import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, isCityStateSeat, cityHolders, drawCitizenName } from './seats';
 import { raiseAidRequest } from './competition';
 import { DISTRICTS } from '../data/districts';
@@ -639,7 +638,7 @@ export function floodSeverity(state: GameState): number {
  *  Floodplains list in flood order (`floodplainRun`, `start` first) and its
  *  own plots — each of its edges' plot and the plot across (the river
  *  vector's entry, `riverPlotList`), the plots whose sight names it
- *  (`nameRivers`). */
+ *  (`nameRiversInLook`). */
 export interface FloodRiver {
   id: number;
   start: Tile;
@@ -688,36 +687,61 @@ export function volcanoOrder(map: GameMap): Tile[] {
 
 /**
  * May this river flood yet? READ: 0xa2cfc0 skips a river whose name is
- * unset (`nameRivers` names it). With no fog every river is revealed.
+ * unset (`nameRiversInLook` names it). With no fog every river is revealed.
  */
 export function riverRevealed(state: GameState, river: FloodRiver): boolean {
   if (!fogActive(state)) return true;
   return !!state.riverNamed?.[river.id];
 }
 
+/** per plot the flood rivers whose own plots hold it (`FloodRiver.own`) */
+const riversAtCache = new WeakMap<readonly Tile[], Map<number, number[]>>();
+export function floodRiversAt(map: GameMap): Map<number, number[]> {
+  const hit = riversAtCache.get(map.tiles);
+  if (hit) return hit;
+  const out = new Map<number, number[]>();
+  for (const r of floodRivers(map)) {
+    for (const t of r.own) {
+      const ids = out.get(t.index) ?? [];
+      if (!ids.includes(r.id)) ids.push(r.id);
+      out.set(t.index, ids);
+    }
+  }
+  riversAtCache.set(map.tiles, out);
+  return out;
+}
+
 /**
- * THE RIVERS' NAMES (0x534950 -> 0xa29730 -> "Random River" 0xa292a0, from
- * the sight update 0x58aa90): a river takes its name the first time one of
- * its own plots lies in a major's own sight (`plotsSeenNow` of the majors,
- * without the sight of the city-states they are suzerain of: runs/h1_duely1124
- * Granada's centre on the Salween in China's shared sight from t50, the
- * river logged floodable from t73 and Granada's floodplain Farm on 524
- * unvalued until t72) — read at each turn start, the look from the turn's
- * positions. The name itself (a draw over the namer's names left) is not
- * drawn here (AUDIT C-74); the action replay reads the majors' sight again
- * after their actions, before the city-states' turns. MEASURED: the floodable
- * rivers (Game_RandomEvents.csv, a river named in turn t counted from t+1)
- * turn by turn — runs/h1_duely1127 t2, t28, t58, t105 as the game's,
- * h1_duely1124 t34 as the game's and t68 for t72; the plots a major's record
- * has revealed name runs/h1_duelv1127's at t16 and t48, 1124's at t11 and t29.
+ * THE RIVERS' NAMES (the unit sight update 0x58aa90 -> 0x534950 -> 0xa29730
+ * -> "Random River" 0xa292a0): a major's own unit's look — its step, its
+ * placement — names each unnamed flood river one of whose own plots it
+ * takes from the seat's visibility count 0 (0x508d50 answering 2: the plot
+ * newly visible to the unit's owner, revealed before or not). The count is
+ * the seat's whole sight (`seatSeesPlot`): its units, its plots and their
+ * ring, its centres' two rings, and what each city-state it is suzerain of
+ * sees (the outgoing visibility, 0x508330); the stepping units still count
+ * from the plot they left. A city-state's unit's look names nothing for its
+ * suzerain (0x534950 asks FULL_CIV of the unit's owner); a city's or a
+ * claimed plot's reveal is no sight update. The name itself (a draw over the
+ * namer's names left) is not drawn here (AUDIT C-74). MEASURED: the floodable
+ * rivers (Game_RandomEvents.csv, a river named in turn t counted from t+1),
+ * the engine replay walking the majors' logged steps in order and the
+ * importer over the records' unit events (`recordRiverNames`): every river
+ * of runs/h1_duely1117-1128 named in the logged turn
+ * (h1_duely1124's Salween at t72 by China's Catapult on 39:9, Granada's
+ * plots and China's Heavy Chariot's look holding the others: Granada's
+ * floodplain Farm on 524 laid t72).
  */
-export function nameRivers(state: GameState): void {
-  if (!fogActive(state)) return;
-  const rivers = floodRivers(state.map);
-  const named = (state.riverNamed ??= rivers.map(() => false));
-  if (rivers.every((r) => named[r.id])) return;
-  const seen = plotsSeenNow(state, new Set(state.seats.filter((s) => isCiv(s.seat)).map((s) => s.seat)), false);
-  for (const r of rivers) if (!named[r.id] && r.own.some((t) => seen[t.index] === 1)) named[r.id] = true;
+export function nameRiversInLook(state: GameState, seat: number, look: Iterable<number>, mover?: LookMover): void {
+  if (!fogActive(state) || !isCiv(seat)) return;
+  const named = (state.riverNamed ??= floodRivers(state.map).map(() => false));
+  const at = floodRiversAt(state.map);
+  for (const p of look) {
+    const ids = at.get(p);
+    if (!ids || ids.every((r) => named[r])) continue;
+    if (seatSeesPlot(state, seat, state.map.tiles[p], mover)) continue;
+    for (const r of ids) named[r] = true;
+  }
 }
 
 /** a float as the game's fixed point (raw: whole part << 8 | the fraction's 256ths) */
@@ -1596,9 +1620,6 @@ function accident(state: GameState, seat: number, city: City, sev: number): void
 export function disasterPhase(state: GameState): void {
   atRngPoint(state, { kind: 'step', seat: -1, turn: state.turn });
   const map = state.map;
-  // the rivers the majors' sight names, before any flood reads them
-  nameRivers(state);
-
   for (const t of map.tiles) {
     if (t.droughtTurns > 0) t.droughtTurns -= 1;
     // CIV6: fallout lasts "for 10 turns" / "for 20 turns" from the blast, and

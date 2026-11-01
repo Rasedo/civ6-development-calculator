@@ -181,16 +181,20 @@
 - addr: 0x58aa90
   final: 0x3b4040
   kind: function
-  semantics: "the unit sight update: raises game signal +0x10c8 per plot whose owner's visibility count went from 0 to more (0x508d50 answering 2); a move adds the new sight before dropping the old. Calls 0x534950 on a FULL_CIV player's plot first revealed."
+  semantics: "the unit sight update: raises game signal +0x10c8 per plot whose owner's visibility count went from 0 to more (0x508d50 answering 2); a move adds the new sight before dropping the old. Calls 0x534950 (the rivers' and territories' names) for every such plot, its sixth argument whether the owner's revealed plots (+0x2f0) lacked it."
   status: PARTLY
   impl:
+    - cpu/core/fog.ts:LookMover
+    - gpu/core/sim_masks.py:_name_rivers_look
     - cpu/harness/drawSites.ts:DRAW_SITES
     - cpu/core/barbarians.ts:othersSee
-    - cpu/core/disasters.ts:nameRivers
+    - cpu/core/disasters.ts:nameRiversInLook
     - cpu/core/tactical.ts:barbarianPhase
     - cpu/core/units.ts:barbStepLook
     - gpu/core/sim_seats.py:_step_verb
+    - cpu/core/fog.ts:Look
   readings:
+    - "C-119: the rivers' names on the visibility count — READ (0x58aa90 -> 0x534950, 0x508d50, 0x508330), ported both twins"
     - "H-1: the raids — READ"
     - "H-1: draws the AI takes, draws the engines lack"
     - "H-1: the raids — READ"

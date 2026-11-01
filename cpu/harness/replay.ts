@@ -90,7 +90,6 @@ import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { nameRivers } from '../core/disasters';
 import { civicAgendas, setupAgendas } from '../core/agendas';
 import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorUnitPrice, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
@@ -3855,7 +3854,12 @@ function markRoutedTraders(ctx: Ctx, a: TurnRecord, st = ctx.state, twin: (u: Un
  *  record's moves; `keepMoves`: a unit the record holds where the engine
  *  left it keeps the engine's moves, which its rest reads */
 function syncUnits(ctx: Ctx, b: TurnRecord, only?: number, keepMoves = false): void {
-  for (const r of b.units) {
+  // the units walk in the order of their first logged step, those yet to
+  // walk where the pair's first record holds them (a river's name: runs/
+  // h1_duely1124 t72 China's Heavy Chariot leaves 43:9 before its Catapult
+  // looks at 41:9 from 39:9)
+  const first = (r: TurnRecord['units'][number]) => ctx.steps.get(`${r.owner}:${r.id}`)?.[0]?.ord ?? Infinity;
+  for (const r of [...b.units].sort((x, y) => (first(x) === first(y) ? 0 : first(x) < first(y) ? -1 : 1))) {
     if (only !== undefined && r.owner !== only) continue;
     const u = unitOf(ctx, `${r.owner}:${r.id}`);
     if (!u) continue;
@@ -5358,10 +5362,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // DiplomacySummary.csv, the record of t62 the first to show it; 1117
       // t20: China's Scout gone from 41:12 by city-state 3's look)
       for (const p of otherMajors) syncUnits(ctx, b, p);
-      // ...and the rivers their sight names there, which the city-states'
-      // turns after read (runs/h1_duely1127 t28: the fourth river logged from
-      // t29, Muscat's floodplain Farm on 747 laid in its turn of t28)
-      nameRivers(state);
       // ...taking into the turn's heal the moves their actions spent
       for (const [u, kept] of movesKept) if (others.includes(u.seat)) u.movesLeft = kept ? grantedMoves(state, u) : 0;
       for (const seat of others) detectBoosts(state, seat);

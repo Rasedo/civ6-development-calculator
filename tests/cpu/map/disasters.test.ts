@@ -718,7 +718,7 @@ describe('the turn\'s one random event', () => {
       return at;
     };
     expect(floodsAt(2000)).toBe(0);
-    // its name (`nameRivers`: a major's sight on one of its own plots)
+    // its name (`nameRiversInLook`: a major's unit's look at one of its own plots)
     state.riverNamed = floodRivers(state.map).map((r) => r.id === river.id);
     expect(floodsAt(2000)).toBeGreaterThan(0);
   });

@@ -2306,7 +2306,7 @@ class SimInit:
         _fl_idx = _fl[:, :, 0]
         self._flood_sites = (_fl_idx, (_fl_idx >= 0).sum(dim=1))
         # each flood site's own plots (`FloodRiver.own`, -1 pads), whose
-        # sight names it (`_name_rivers`), and whether it has its name
+        # look names it (`_name_rivers_look`), and whether it has its name
         n_own = max(max((len(lst) for f in fixtures for lst in f["floodOwn"]), default=0), 1)
         _fo = torch.full((B, n_fl, n_own), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
@@ -5161,6 +5161,14 @@ class SimInit:
                             torch.tensor([_s0], dtype=torch.long, device=device),
                             torch.zeros(1, dtype=torch.bool, device=device))[0]
                     self.unit_next[b] += 1
+        # the start units' looks name every flood river one of whose own
+        # plots they take in (`nameRiversInLook` at `spawnUnit`: no sight
+        # before them)
+        if self.fog_of_war and self._flood_own.shape[1] > 0:
+            _seen0 = self.seat_explored.any(dim=1)  # [B, T]
+            _own0 = self._flood_own
+            _hit0 = _seen0.gather(1, _own0.clamp(min=0).reshape(B, -1)).reshape(_own0.shape) & (_own0 >= 0)
+            self.river_named |= (self._flood_sites[0] >= 0) & _hit0.any(dim=2)
 
         # the game's start draws its Future tree first on the play stream
         self._init_research_tree()

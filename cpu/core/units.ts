@@ -1111,7 +1111,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
       sight = Math.max(sight, unitSight(rider, state));
       seeThrough = seeThrough || unitSeesThrough(rider);
     }
-    revealAround(state, unit.seat, to.index, sight, { seeThrough });
+    revealAround(state, unit.seat, to.index, sight, { seeThrough, mover: { units: [unit, ...riders], from: from.index } });
     // CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a natural
     // wonder for the first time."
     if (neighbors(state.map, to).some((t) => naturalWonderAt(t) !== null)) {
@@ -1909,7 +1909,7 @@ export function spawnUnit(
     holder.armyKnown.push({ id: unit.id, owner: seat, type: unitType, seen: holder.armyAged ?? state.turn, plot: unit.tileIndex, damage: 0 });
   }
   questUnitAdded(state, seat, unitType);
-  revealAround(state, seat, unit.tileIndex, unitSight(unit, state), { seeThrough: unitSeesThrough(unit) });
+  revealAround(state, seat, unit.tileIndex, unitSight(unit, state), { seeThrough: unitSeesThrough(unit), mover: { units: [unit], from: -1 } });
   // CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): a chassis whose price
   // climbs is priced off every copy the seat has ever acquired, so the tally is
   // taken at the one place a unit is born — a purchase, a grant or a Great
