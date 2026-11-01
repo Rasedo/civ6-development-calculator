@@ -110,7 +110,8 @@ export function minorPhase(state: GameState): void {
     // order: `chargeUnitUpkeep`)
     chargeUnitUpkeep(state, cityState.seat);
     minorPower(state, cityState);
-    const gained = minorEconomy(state, cityState);
+    const techsWas = cityState.research.techs.length;
+    minorEconomy(state, cityState);
     storeUnitStrength(state, cityState.seat);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
     // its city AI's forecast, between the production and the growth: of the
@@ -133,8 +134,13 @@ export function minorPhase(state: GameState): void {
     const units = state.units.filter((u) => u.seat === cityState.seat).length;
     minorMilitaryTurn(state, cityState);
     minorKnowledge(state, cityState, true);
-    // its "Upgrade Units" trees' trigger: a technology or civic gained
-    if (gained > 0) cityState.upgradeTrigger = true;
+    // its "Upgrade Units" trees' trigger: a technology gained
+    // (TRIGGER_TECH_UPGRADE, AI_EVENT_GAIN_TECH). A civic gained alone starts
+    // none, its TRIGGER_CIVIC_UPGRADE row (AI_EVENT_GAIN_CIVIC) notwithstanding:
+    // over the five duely duels a tech gain is followed by a new tree on
+    // 1042 of 1061 minor-turns, a civic gain with no tech on 68 of 446
+    // (runs/h1_duely1124 t84 city-state 4, runs/h1_duely1128 t139 Bologna)
+    if (cityState.research.techs.length > techsWas) cityState.upgradeTrigger = true;
     minorAiTurn(state, cityState, fresh, units);
     minorTrade(state, cityState, !ordersHeld);
     const city = minorCity(cityState);

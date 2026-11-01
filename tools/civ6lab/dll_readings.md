@@ -12670,3 +12670,26 @@ rows and Trader plots t70-152).
   (Units_XP2 ResourceCost 20 Horses against the city-state's stock; the
   stock is not in the record).
 
+
+## C-99: the Upgrade Units trees start on a technology gained alone — FIT (records), both twins
+
+`minorTurn`'s trigger (cpu/core/minorBuild.ts, `upgradeTrigger`); `_minor_turn`'s
+`mops_upg_trig` (gpu/core/sim_minors.py).
+
+- MinorCivTriggeredTrees binds TRIGGER_TECH_UPGRADE (AI_EVENT_GAIN_TECH)
+  and TRIGGER_CIVIC_UPGRADE (AI_EVENT_GAIN_CIVIC), both "Upgrade Units"
+  (Leaders.xml). Over the five duely duels a minor's technology gained is
+  followed by a new Upgrade Units tree in the AI memory on 1042 of 1061
+  minor-turns; a civic gained with no technology on 68 of 446. So a civic
+  starts none: where the civic event's dispatch stops for a city-state is
+  UNREAD (0x800c60, the handler, starts a tree for each row it is handed).
+  Cases: runs/h1_duely1124 t84 city-state 4's civic, no tree, its Warrior
+  851972 wandering t85-90; runs/h1_duely1128 t139 Bologna's civic at 0
+  Gold, its Warriors and Men-at-Arms wandering t139-170.
+- LAB, the Heal family's entry: runs/h1_duely1124 t53 city-state 4's
+  Warrior 327683 (62 health on 36:7) Heals in the game, while the engines'
+  danger map reads 25 there (the barbarian Archer 3473429 on 40:8, range 2
+  over its one-turn reach), as on 131073 at 38:8, which the game sends on
+  Chase Target. Whether the game's map leaves the Archer's reach short
+  (its one-turn search's zones of control, flags 0x311) is unread; 29
+  Wander // Heal rows on the five seeds.

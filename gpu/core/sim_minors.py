@@ -38,7 +38,8 @@ class SimMinors:
             # its units' fuel, out of the same bank, before its grid
             self._seat_charge_upkeep(self._CITY_MINOR0 + s)
             self._minor_power(s)
-            gained = self._minor_economy(s)
+            techs_was = self.citystate_techs[:, s].sum(dim=1)
+            self._minor_economy(s)
             self._store_unit_strength(s, alive)
             self._minor_build(s, self._minor_production(s))
             # its city AI's update reads, between the production and the
@@ -57,8 +58,9 @@ class SimMinors:
             units = (self.major_unit_alive & (self.major_unit_seat == 100 + s)).sum(dim=1)
             self._minor_military_turn(s)
             self._minor_knowledge(s, True)
-            # its "Upgrade Units" trees' trigger: a technology or civic gained
-            self.mops_upg_trig[:, s] |= alive & (gained > 0)
+            # its "Upgrade Units" trees' trigger: a technology gained
+            # (`minorTurn`: a civic gained alone starts none)
+            self.mops_upg_trig[:, s] |= alive & (self.citystate_techs[:, s].sum(dim=1) > techs_was)
             # its city AI ran before this turn (the City Analysis job's list
             # takes none the turn the city is founded)
             ran = self.citystate_ai_on[:, s].clone()
