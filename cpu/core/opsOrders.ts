@@ -277,9 +277,9 @@ export function passOrders(state: GameState, seat: number, pass: Pass, changed: 
       return out.map((a) => ({ unit: a.unit.id, from: a.from, move: a.move, attack: a.attack }));
     },
     moveUpdate: (members, store, goal, target, range, spread) => passMoveUpdate(state, pass, members, store, goal, target, range, spread),
-    moveExec: (members, goal, range, arrived, ready, zero, leaderNamed, weak, formed) => {
+    moveExec: (members, goal, range, arrived, ready, zero, leaderNamed, weak, mates) => {
       const out = passMoveExec(state, pass, members, goal, range, arrived, ready, (u) => zero(u.id, gameTypeOf('unit', u.type, 'UNIT_')), leaderNamed,
-        weak, (u) => formed(u.id));
+        weak, (u) => mates(u.id).map(unitOf).filter((x): x is Unit => !!x));
       changed();
       return out.map((x) => ({ type: gameTypeOf('unit', x.unit.type, 'UNIT_'), from: x.from, dest: x.dest, after: x.unit.tileIndex }));
     },

@@ -2898,11 +2898,13 @@ export function passMoveUpdate(state: GameState, pass: Pass, members: readonly n
  *  0x585eb0; asked of a unit off its goal): no path to it, a plot it would attack into (a unit at war
  *  with it, a city centre of a player at war with it — flag 0x40 bars that
  *  to every unit —, an Encampment that bars it), or one of its own that
- *  stacks with it */
-function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<number>): boolean {
+ *  stacks with it or with a member of its formation (`mates`: 0x585eb0
+ *  takes the most 0x585d90 counts over the formation's members, +0x728 /
+ *  +0x738) */
+function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<number>, mates: readonly Unit[]): boolean {
   if (!paths.has(goal)) return true;
   if (attackPlot(state, u, goal)) return true;
-  return stackedAt(state, u, goal) || foreignAt(state, u, goal);
+  return [u, ...mates].some((m) => stackedAt(state, m, goal)) || foreignAt(state, u, goal);
 }
 
 /**
@@ -2924,7 +2926,10 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * member on the goal itself skips the test, 0x817905..0x817921: runs/
  * h1_duely1121 t31-t32 city-state 3's City Defense Warrior on 42:18 goes
  * for 42:18, runs/h1_duely1117 t112-t121 its Crossbowman of Range 2 on
- * 42:13 for 41:13); the first plot of its planning of two turns at the radius
+ * 42:13 for 41:13; barred to a member of a formation where one of its own
+ * stacks with any member: runs/h1_duely1121 t157-t173 Builder Capture's
+ * Settlers beside their Musketmen go for 4:19 / 4:18 beside the camp 3:19
+ * its Spearman holds); the first plot of its planning of two turns at the radius
  * (0x791300) where it lies in the goal's region, else of the plots within
  * the radius of the goal (the ring walk 0x6aef0, the test 0x815d50) one in
  * the goal's region before one outside, then the nearest it, its own plot or
@@ -2932,7 +2937,7 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * flag. The order's danger flags (0x816e70..0x816e85, 0x817839..0x8178b1):
  * where the operation is weaker than its target (op +0x4b0 below +0x510,
  * `weak`) flag 8 for a unit with no combat (0x56dc90) or one in a formation
- * holding a civilian (0x266950(2): Make Formation's pair, `formed`), else
+ * holding a civilian (0x266950(2): Make Formation's pair, `mates`), else
  * for a unit with no combat in no formation; flag 0x8000 for a land unit
  * (+0x650 2) in no formation with a ship (0x266950(3)) — runs/h1_duely1121
  * t158-t160: Builder Capture's Builder 4522014 and Line Infantry 4128797 on
@@ -2941,7 +2946,7 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  */
 export function passMoveExec(state: GameState, pass: Pass, members: readonly number[], goal: number, range: number,
   arrived: boolean, ready: boolean, zero: (u: Unit) => boolean = () => false, leaderNamed = false, weak = false,
-  formed: (u: Unit) => boolean = () => false): { unit: Unit; from: number; dest: number }[] {
+  mates: (u: Unit) => readonly Unit[] = () => []): { unit: Unit; from: number; dest: number }[] {
   const out: { unit: Unit; from: number; dest: number }[] = [];
   if (arrived && ready && !leaderNamed) return out;
   const region = state.map.tiles[goal].region ?? -1;
@@ -2955,7 +2960,8 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     const z = zero(u);
     let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, rangeOf(u));
     const paths = pathPlots(state, u);
-    if (u.tileIndex !== goal && moveBarred(state, u, goal, paths)) r = Math.max(1, r);
+    const mine = mates(u);
+    if (u.tileIndex !== goal && moveBarred(state, u, goal, paths, mine)) r = Math.max(1, r);
     else if (range > 0 && leaderNamed && !z) r = Math.max(1, r);
     let dest = goal;
     let strike = false;
@@ -2987,7 +2993,7 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     finish(pass, u, 'Operation', dest);
     out.push({ unit: u, from: u.tileIndex, dest });
     const combat = (UNITS[u.type]?.combat ?? 0) > 0;
-    const paired = formed(u);
+    const paired = mine.length > 0;
     const danger: PathDanger = { plane: pass.danger, any: weak ? !combat || paired : !combat && !paired,
       water: !UNITS[u.type]?.naval && unitDomain(u.type) !== 'air', war: false };
     moveTo(state, u, dest, strike, true, false, danger);

@@ -2702,7 +2702,9 @@ class SimTactics:
         has none), nearest the goal first: its radius (the smaller of the
         node's Unit distance `rng` and its Range, `_tac_range`: 0 in melee; 0 for a ship or
         a unit of `zero` [B, P]; at least 1 where the goal is barred to a
-        member off it, and with a Leader Tag named), its plot (its planning's at the radius in the goal's
+        member off it — one of its own stacking with it or, in a formation
+        `formed`, with the formation's other member —, and with a Leader Tag
+        named), its plot (its planning's at the radius in the goal's
         region, else the ring walk's), its turn done, its move order — over
         the pass's danger map `danger` [B, T] its flag 8 where the operation
         is `weak` [B] (its strength below its target's) for a unit with no
@@ -2750,8 +2752,18 @@ class SimTactics:
             r = torch.where(naval | z, torch.zeros_like(ut), torch.clamp(self._tac_range(rows, ur, pre), max=rng))
             here = tile_p[rows, ur]
             path = self._tac_search(rows, ur, seat, 1 << 30, True, pre=pre)["closed"] >= 0    # [N, T]
-            own = self._tac_own_mil(seat)[rows]
-            barred = ((~path.gather(1, gr.unsqueeze(1)).squeeze(1)) | atk[rows, gr] | own[torch.arange(rows.numel(), device=dev), gr]
+            # one of its own stacking with it or with its formation's other
+            # member (0x585eb0 over the formation: a formation is Make
+            # Formation's pair, a civilian and a fighter)
+            nr = torch.arange(rows.numel(), device=dev)
+            o_m = self._tac_own_mil(seat)[rows][nr, gr]
+            o_c = self._tac_own_class(self.civilian_at, seat)[rows][nr, gr]
+            o_s = self._tac_own_class(self.support_at, seat)[rows][nr, gr]
+            sup_m = self._type_support.take(ut)
+            civ_m = self._type_civilian.take(ut) & ~sup_m
+            fm = formed[rows, ur] if formed is not None else torch.zeros_like(naval)
+            stacks = torch.where(sup_m, o_s, torch.where(civ_m, o_c, o_m)) | (fm & (o_m | o_c))
+            barred = ((~path.gather(1, gr.unsqueeze(1)).squeeze(1)) | atk[rows, gr] | stacks
                       | foreign[rows, gr]) & (here != gr)
             r = torch.where(barred, r.clamp(min=1), r)
             if leader:
@@ -3301,6 +3313,13 @@ class SimTactics:
         for pl in (self.military_at, self.embarked_at):
             out |= (pl >= 0) & (self.unit_seat.gather(1, pl.clamp(min=0)) == seat)
         return out
+
+    def _tac_own_class(self, plane: torch.Tensor, seat: int) -> torch.Tensor:
+        """[B, T] — a unit of `seat` of the occupancy `plane`'s class (the
+        civilians' or the support units'), a Trader none, holds the plot
+        (`stackedAt` for a civilian or a support unit)."""
+        pc = plane.clamp(min=0)
+        return (plane >= 0) & (self.unit_seat.gather(1, pc) == seat) & (self.unit_type.gather(1, pc) != self._trader_idx)
 
     def _seat_pool_slots(self, k: int, pre: str, seat: int, act: torch.Tensor) -> None:
         """`poolSlots` for pool row `k` (a city-state's, or the Free Cities'

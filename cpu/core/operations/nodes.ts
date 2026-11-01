@@ -83,12 +83,12 @@ export interface OpsContext {
    *  cap, the node's Unit distance; zero: a unit whose
    *  radius is 0 (a formation's, the Leader Tag's), leaderNamed: the node
    *  names a Leader Tag; weak: the operation's strength below its target's
-   *  (the order's danger flags); formed: a unit in a formation — each
-   *  mover's type, its plot before, the plot it went for and the plot it
-   *  stands on */
+   *  (the order's danger flags); mates: the other members of a unit's
+   *  formation (none outside one) — each mover's type, its plot before, the
+   *  plot it went for and the plot it stands on */
   moveExec(members: readonly number[], goal: number, range: number, arrived: boolean, ready: boolean,
     zero: (id: number, type: string) => boolean, leaderNamed: boolean, weak: boolean,
-    formed: (id: number) => boolean): readonly { type: string; from: number; dest: number; after: number }[];
+    mates: (id: number) => readonly number[]): readonly { type: string; from: number; dest: number; after: number }[];
   /** Operation Defend Units' orders, where the seat's units' turn gives
    *  them; none, the node moves no unit */
   defend?: DefendOrders;
@@ -632,7 +632,7 @@ const operationMove: BtHandler<OpsContext> = {
       if (goal === NO_PLOT) continue;
       const v = ctx.view();
       const moved = ctx.moveExec(t.members, goal, range, arrived, ready, (id, type) => paired.has(id) || (!!leader && hasAiType(type, leader)), !!leader,
-        ctx.op.strength < ctx.op.enemyStrength, (id) => paired.has(id));
+        ctx.op.strength < ctx.op.enemyStrength, (id) => ctx.op.formations.find((f) => f.includes(id))?.filter((x) => x !== id) ?? []);
       for (const x of moved) ctx.log(`${ctx.op.def}, Operation Move, ${x.type}, ${xy(v, x.from)}, ${xy(v, x.dest)}, ${xy(ctx.view(), x.after)}`);
     }
   },

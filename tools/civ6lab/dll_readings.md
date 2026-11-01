@@ -5601,3 +5601,51 @@ in the minors' phase, `_cv_known(s, before, after)`.
   Gold yield itself 15 -> 14 in m_xCachedNetIncomeExcludingTrade), the rest
   fractions or gains (a change between the record and the treasury turn).
   The engines take no term.
+
+## C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy
+
+`passDefend` / `hurt` (cpu/core/opsOrders.ts), `_bop_defend_exec`
+(gpu/core/sim_barbops.py); `moveBarred`'s `mates` through `passMoveExec`
+(cpu/core/tactical.ts, from `operationMove`'s formation, cpu/core/operations/
+nodes.ts), `_op_move_exec`'s `stacks` and `_tac_own_class`
+(gpu/core/sim_tactics.py); `barbarianAi`'s damage at the turn's open
+(cpu/harness/replay.ts).
+
+- PROTECT UNITS' SECOND PASS (0x80d790 at 0x80de60..0x80ebfc): over every
+  member of each team (+0x18, not the endangered list): alive (+0x770), with
+  Movement (+0xdb0), on a plot, outside Protect Outside Range of the target;
+  then hurt — damage +0xcf0 at least maxHP x AutoProtect Percentage x 0.01
+  (`setae` at 0x80df44; the node's data, 33 where the tree gives none: no
+  TreeData row for "Escort Worker To Camp" node 5) — or a land unit afloat
+  in danger outside a naval formation; any other member is skipped. The hurt
+  take the promotion, the bombard stop, the ship release, the afloat move,
+  then with Movement the pillage order 0x963190 where the district's
+  (0x51a080) or improvement's (0x51a160) plunder is above 0 ("Plunder %d
+  %d"), then a barbarian's orders end (0x469ce0). The test reads the damage
+  the unit holds as the barbarians' turn opens: the blows of the players
+  before them in the turn landed (the game runs the players in order, the
+  barbarians last), its own pillage heal not.
+- CONFIRMED (the action log's UnitDamageChanged before the barbarians'
+  PlayerTurnActivated): runs/h1_duely1121 t157 Line Infantry 4128797 on 9:12
+  at 38 (China's centre's strike 31 -> 38, seq 59110, before the
+  barbarians' turn at 59219) logs "Plunder 9 12", healed to 0 (59247); t168
+  / t169 Line Infantry 4456462 on 6:10 at 39 / 45 logs "Plunder 6 10"; t167
+  at 32 none. The replay's copy (`barbarianAi`) sets each unit it maps to the
+  log's last damage before that open, else the pair's first record's.
+- THE FORMATION BAR (0x816cb0 at 0x81794d..0x817985): the goal is barred to a
+  member off it where 0x586360 (flags 0x40) refuses it, a unit at war holds
+  it (0x5862e0), or 0x585eb0 on the unit's formation (+0x1fb8) is above 0 —
+  the most own units stacking (0x585d90) over the formation's members
+  (+0x728, count +0x738); barred, the radius is at least 1. So an escorted
+  civilian is barred from a camp its tribe's defender holds.
+- CONFIRMED: runs/h1_duely1121 t157-t173 the Settler teams' Settler (4325384,
+  4390925) logs the escort's ring plot (4:19 / 4:18 beside the camp 3:19,
+  the Spearman 1376265 on it) where the engines took 3:19, and the 6:10
+  team's Settler 4587543 logs 4:18 (t167-t173).
+- OPEN: runs/h1_duely1121 t169 the 5:17 team steps 5:17 -> 5:18 for 4:18
+  over plots our danger map holds at 0 (the game holds); t172 it steps to
+  6:18 on a later-turn path past 5:18's danger 20 (the game holds); t159
+  the 7:19 team ends on 6:19 for 4:19 where the game's ends on 6:18, and
+  runs/h1_duely1128 t171 / t173 the capture team steps 9:3 -> 10:3 and
+  9:5 -> 10:5 for 14:16 where the game's takes 9:4 / 9:6: the formation's
+  path (0x2726b0 -> 0x272aa0) against a single member's, unread.

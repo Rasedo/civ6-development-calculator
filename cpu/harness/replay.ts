@@ -905,11 +905,18 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // runs/h1_duely1121 t102, China's Great Scientist on 5:12, teleported to
   // 6:12 in their turn)
   const start = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
+  const startDamage = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, num(r.damage)]));
   for (const c of copy.units) {
     const u = twin.get(c);
     const key = u ? keyOf.get(u) ?? '' : '';
     const at = u && (!isBarbSeat(u.seat) || !before.has(u)) && open !== undefined ? last.get(key) ?? start.get(key) : undefined;
     if (at !== undefined) c.tileIndex = at;
+    // ...with the damage it holds then: the blows of the players before
+    // them landed, its own turn's pillage heal and the turn's end heal not
+    // (runs/h1_duely1121 t157: the Line Infantry 4128797 on 9:12 at 38 after
+    // China's centre's strike, its Protect Units plunder healing it to 0)
+    const hurt = open === undefined ? undefined : damage.get(key) ?? startDamage.get(key);
+    if (hurt !== undefined) c.hp = UNIT_HP - hurt;
   }
   // the plots stand as the barbarians' turn opens: their pillages of the
   // turn, which the record's actions landed, not yet made
