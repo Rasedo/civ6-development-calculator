@@ -12736,3 +12736,23 @@ rows and Trader plots t70-152).
   event takes the Warrior (CONTRACT 25, VALUE 10.0) — the carried unit
   table's Warrior below the game's, not a contract rule.
 
+## C-96 / C-129: a city-state's unit production table counts the records before its turn's look — the aimem sites read, both twins
+
+- A city-state's city AI turn reads the military AI's unit production
+  table (0x7989e0) as that AI's turn left it: on the knowledge base's
+  army records before the turn's look, not those the look adds. Recorded
+  (aimem sites, runs/h1_duely1121 p2 Hunza t9): the tactical site holds
+  its own units and a barbarian Spearman, the log site adds the
+  barbarian Quadrireme the look met; on the tactical site's records the
+  Warrior's entry is 3 / (2 x 1.0 + 1 x 1.2) = 0.9375, its value 10.1
+  over the Walls' 9.96, and the game's Build City Building tree is on the
+  Warrior (AI_CityBuild.csv t9 CONTRACT 25, VALUE 10.0); on the log
+  site's (the Quadrireme counted, 0.738) the engines' 7.95 took the Walls
+  and a Masonry Tech Contract at 9.0 (p2 Masonry +9.0 t10-t15). The
+  aimem import is on the same records, so the miss was both modes'.
+  Ported: `CityState.armyCounted` (the records' counts at the military
+  AI's turn, read by `minorKnownUnits` until the city AI's turn ends;
+  GPU `_cv_counted`, read by `_cv_known`). Its five-duel gain is the
+  research scores' city terms on the same tables (1117 +70, 1121 +38
+  carried).
+

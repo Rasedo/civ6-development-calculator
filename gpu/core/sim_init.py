@@ -437,6 +437,9 @@ class SimInit:
         self.citystate_kb_seen = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_plot = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_damage = torch.zeros(_kb, dtype=torch.int16, device=device)
+        # per minor in its city AI's turn, its records by AI_UNITS row as its
+        # military AI's turn counted them (`CityState.armyCounted`)
+        self._cv_counted: dict[int, torch.Tensor] = {}
         # the district project (projects-table row, -1 none) its last turn's
         # Production went toward and did not finish — the queue head the
         # religious step reads (`buildProject`)

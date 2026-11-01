@@ -1203,7 +1203,10 @@ class SimCityValue:
     def _cv_known(self, s: int) -> torch.Tensor:
         """`minorKnownUnits`: minor `s`'s knowledge base's army records by
         AI_UNITS row ([B, NU_ai]; a record of an engine unit with no row not
-        counted)"""
+        counted) — during its city AI's turn those its military AI's turn
+        counted, before the look (`_cv_counted`)"""
+        if s in self._cv_counted:
+            return self._cv_counted[s]
         T = self._cv_tables()
         slot = self.citystate_kb_slot[:, s]
         typ = self.citystate_kb_type[:, s].long()

@@ -133,6 +133,13 @@ export function minorPhase(state: GameState): void {
     // turn's purchases
     const units = state.units.filter((u) => u.seat === cityState.seat).length;
     minorMilitaryTurn(state, cityState);
+    // its city AI's turn reads the military AI's unit production table as
+    // that turn left it, on the records before the look (runs/h1_duely1121
+    // Hunza t9: the barbarian Quadrireme the look records not counted, its
+    // Warrior 10.1 over the Walls' 9.96, the game's Build City Building on
+    // the Warrior at 10.0; aimem's log site holds the Quadrireme, its
+    // tactical site not)
+    cityState.armyCounted = minorArmyCounts(cityState);
     minorKnowledge(state, cityState, true);
     // its "Upgrade Units" trees' trigger: a technology gained
     // (TRIGGER_TECH_UPGRADE, AI_EVENT_GAIN_TECH). A civic gained alone starts
@@ -142,6 +149,7 @@ export function minorPhase(state: GameState): void {
     // (runs/h1_duely1124 t84 city-state 4, runs/h1_duely1128 t139 Bologna)
     if (cityState.research.techs.length > techsWas) cityState.upgradeTrigger = true;
     minorAiTurn(state, cityState, fresh, units);
+    delete cityState.armyCounted;
     minorTrade(state, cityState, !ordersHeld);
     const city = minorCity(cityState);
     cityStrikes(state, city, cityStrikeStrength(state, city));
@@ -1489,12 +1497,18 @@ function minorResearchResources(state: GameState, cityState: CityState, counts: 
 /** A minor's knowledge base's unit counts (0x5eb650 over every player): its
  *  army records by type */
 export function minorKnownUnits(cityState: CityState): (unit: string) => number {
-  const n = new Map<string, number>();
+  const n = cityState.armyCounted ?? minorArmyCounts(cityState);
+  return (unit) => n[unit] ?? 0;
+}
+
+/** a city-state's knowledge base's army records by install unit type */
+function minorArmyCounts(cityState: CityState): Record<string, number> {
+  const n: Record<string, number> = {};
   for (const r of cityState.armyKnown ?? []) {
     const t = installType('unit', r.type, 'UNIT_');
-    n.set(t, (n.get(t) ?? 0) + 1);
+    n[t] = (n[t] ?? 0) + 1;
   }
-  return (unit) => n.get(unit) ?? 0;
+  return n;
 }
 
 /** A minor's city growth as the growth forecast reads it (`CityGrowth`) */
