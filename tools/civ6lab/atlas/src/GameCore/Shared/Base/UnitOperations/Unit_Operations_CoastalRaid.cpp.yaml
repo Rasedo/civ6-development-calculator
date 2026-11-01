@@ -6,13 +6,14 @@
 - addr: 0x95b7c0
   final: 0x666ce0
   kind: function
+  semantics: "the coastal raid: wrecks the plot's improvement, else its district, 3 Movement spent (none for a raider that raids free)."
   status: PARTLY
   impl: [cpu/core/combat.ts:coastalRaid, cpu/core/tactical.ts:coastalRaids]
-  readings: ["C-95: Coastal Raid — READ, ported"]
+  readings: ["C-95: Coastal Raid — READ, ported", "C-95: Coastal Raid"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...oves to its plot (0x962190, flag 0x10) and raids the target where it may (0x95b100 -> 0x95b7c0). The raid wrecks the plot's improvement, else its district, 3 Movement spent (none for...
-  review: imported
+  review: reviewed
 - addr: 0x95ba10
   kind: function
   semantics: "a coastal raid: raises game signal +0x8d0."

@@ -7,9 +7,11 @@
   final: 0x51bd50
   kind: function
   name: planSpot
-  semantics: "the planning's cost callback on each link: lays a target's spots (melee: the attack's parent, the next-turn plot beside, the own plot; ranged: within range, sight beyond 1), six a target, the first link wins"
+  semantics: "the planning's cost callback on each link: lays a target's spots (melee: the attack's parent, the next-turn plot beside, the own plot; ranged: within range, sight beyond 1), six a target, the first link wins. Melee — the plot an attack on the target's plot is linked from (the attack's turn), a plot beside the target no other player's unit holds that the step ends on with no Movement (the next turn) or that is the unit's own plot (this turn); ranged (+0x19f8 the range) — any linked plot within the range (in sight beyond 1, 0x5cf2b0), its turn the step's, the next where it ends with no Movement; a civilian's plot taken from the plot it is linked from; a land unit's spot (and a melee one's target) never water. Ported: planUnit (cpu/core/tactical.ts), _tac_plan."
   status: READ
   cases:
+    - recording: h1_duelw1124
+      value: "the barbarians' Attack Units rows: 206 of 330 take the logged move and attack"
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
@@ -21,6 +23,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
+    - "C-95: the planning's spots and the combat prediction"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...t again keeps its place and takes the fewer turns, or at equal turns the more Movement (0x790c60). The planning runs once for every unit at the start of the AI's turn. Flag 0x800 skips...
@@ -76,9 +79,11 @@
   final: 0x51c4b0
   kind: function
   name: predictCombat
-  semantics: "the planning's combat simulation: the blow from where the attacker stands at the expected roll (COMBAT_MAX_EXTRA_DAMAGE/2); dealt +0x64, taken +0x7c, per spot the target's blow back +0x94 / +0xac; a kill sets +0x60 At 0x79174a: per spot dealt = the larger of the simulation's two results ([rbp-0xc], [rbp-8]; 150 a civilian), the kill byte (+0xc4) dealt >= the target's health, `wins` (+0x60) dealt > it; the blow back per spot re-simulated (0x205720 with the sides swapped through 0x213e00, the location the spot) into +0x94 / +0xac."
+  semantics: "the planning's combat simulation: the blow from where the attacker stands at the expected roll (COMBAT_MAX_EXTRA_DAMAGE/2); dealt +0x64, taken +0x7c, per spot the target's blow back +0x94 / +0xac; a kill sets +0x60 At 0x79174a: per spot dealt = the larger of the simulation's two results ([rbp-0xc], [rbp-8]; 150 a civilian), the kill byte (+0xc4) dealt >= the target's health, `wins` (+0x60) dealt > it; the blow back per spot re-simulated (0x205720 with the sides swapped through 0x213e00, the location the spot) into +0x94 / +0xac. The roll at COMBAT_MAX_EXTRA_DAMAGE / 2 (damageExpected); the strengths the blow resolves on from the plot the attacker stands on (meleeUnitStrengths, rangedUnitStrengths); a ranged blow and one on an embarked defender take none. Ported: predictBlow, _tac_predict."
   status: READ
   cases:
+    - recording: h1_duelw1124
+      value: "the barbarians' Attack Units rows: 206 of 330 take the logged move and attack"
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
@@ -98,6 +103,7 @@
     - "C-95: the planning's spots and the combat prediction — READ, ported"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: Attack Units — READ, ported"
+    - "C-95: the planning's spots and the combat prediction"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...each unit's spots per target from its planning (turns, the planning's combat simulation 0x791470: the damage dealt +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); fo..."
@@ -117,7 +123,7 @@
 - addr: 0x791e00
   kind: function
   name: UnitPlanning
-  semantics: plans one unit (AI Unit Planning's chunk body).
+  semantics: "plans one unit (AI Unit Planning's chunk body). Calls the breadth-first search 0x26dcd0 with its third argument 1 (flags 0x115), which installs the start callback 0x26eea0 at +0xa8. Ported: search's fromFull (planUnit), _tac_search's from_full."
   status: PARTLY
   impl:
     - cpu/core/tactical.ts:reachPlots
@@ -128,6 +134,7 @@
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
+    - "C-95: the planning sets out on the full Movement, the walk on the turn's restored"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...h finder pool's count) chunks; N <= 1 plans each unit serially on the calling thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then the wait. The pool (0xf01920, count at +...

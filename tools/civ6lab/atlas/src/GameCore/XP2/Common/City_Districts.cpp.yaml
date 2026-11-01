@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x1ad720
   kind: function
+  semantics: walks the city's districts (+0x1308) of the type at the city's own plot (+0xf8 / +0x218) and returns true where one IsPillaged (0x24c3a0).
   status: READ
   cases:
     - recording: h1_duely1124
@@ -27,6 +28,7 @@
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
+    - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type"
   review: reviewed
 - addr: 0x1ae510
   kind: function
@@ -44,7 +46,7 @@
 - addr: 0x1ae530
   final: 0x11e9e0
   kind: function
-  semantics: the city's district of a type.
+  semantics: the city's district of a type. Used by CanConstruct's prerequisite-district test on the city's districts (+0x1a48).
   status: PARTLY
   impl:
     - cpu/core/aiModifiers.ts:adjacencyValue
@@ -55,6 +57,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...nt stored as fx(Amount x 0.01f)): a city subject with the district (context +0x78, else 0x1ae530 by DistrictType); per building of the district type (Districts +0x130 list, the first r..."
@@ -63,6 +66,7 @@
   final: 0x11eae0
   kind: function
   name: City_Districts most allowed
+  semantics: "the most districts the population allows: ceil(population (+0x588) / the globals' +0x2ac) + the city's extra (+0x20), 1 below +0x2ac 1; the district value's half chronology term stands while it exceeds 0x1ae8f0(1, 0, 1, 0, 0)."
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -72,6 +76,7 @@
   readings:
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   notes:
     - ceil(population +0x588 / globals +0x2ac) + the districts object's +0x20; 1 where +0x2ac is below 1
   review: reviewed
@@ -79,7 +84,7 @@
   final: 0x11eb20
   kind: function
   name: City_Districts count (flags)
-  semantics: "the city's districts counted with flags: not InternalOnly (+0xe1 bit 2), complete (+0xb08), RequiresPopulation (+0xe1 bit 6), pillaged or not."
+  semantics: "the city's districts counted with flags: not InternalOnly (+0xe1 bit 2), complete (+0xb08), RequiresPopulation (+0xe1 bit 6), pillaged or not. The district value body calls it (1, 0, 1, 0, 0): the city's districts that require population, complete or not; the fifth flag tests 0x24c3b0."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -97,6 +102,7 @@
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   context:
     - "...the yield, unweighted, span), EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT 0x6b4e80 (Amount x 0x1ae8f0(1, 1, 1, 0, 0): the city's districts not InternalOnly (+0xe1 bit 2), complete (+0xb08..."
   review: reviewed
@@ -155,30 +161,36 @@
 - addr: 0x1aeff0
   final: 0x11f230
   kind: function
+  semantics: the city's district of a type holds fallout (CanConstruct's refusal +0x2b).
   status: PARTLY
   readings:
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...hen 0x1ad720 (a district of the type in the city stands pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29. A held pillaged building's path (0x1707ec -> 0x17084...
-  review: imported
+  review: reviewed
 - addr: 0x1af120
   final: 0x11f370
   kind: function
+  semantics: a CanConstruct refusal on the city's district of the type (reason +0x29).
   status: PARTLY
   readings:
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...the type in the city stands pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29. A held pillaged building's path (0x1707ec -> 0x170840) reads its district again...
-  review: imported
+  review: reviewed
 - addr: 0x1af250
   final: 0x11f460
   kind: function
+  semantics: the district is pillaged (IsPillaged; CanConstruct on a held pillaged building's district, +0x218).
   status: PARTLY
   readings:
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...aged building's path (0x1707ec -> 0x170840) reads its district again through +0x218 and 0x1af250 (IsPillaged) alike. Ported for the minor's pick on a building it does not hold pillag...
-  review: imported
+  review: reviewed

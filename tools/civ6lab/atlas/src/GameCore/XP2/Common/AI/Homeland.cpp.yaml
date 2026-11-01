@@ -6,15 +6,16 @@
 - addr: 0x7094f0
   final: 0x4ba700
   kind: function
+  semantics: queues a homeland unit's operation (the plunder) for the move's end.
   status: READ
   cases:
     - recording: h1_duelw1124
       turn: 137
       value: "A civilian goes too: runs/h1_duelw1124 t137-t151,   t170-t173 the barbarians' captured Builder stands each turn on the plot of   player 4's Trader."
-  readings: ["C-95: the homeland's Plunder Trader — READ, ported"]
+  readings: ["C-95: the homeland's Plunder Trader — READ, ported", "C-95: the homeland's Plunder Trader"]
   context:
     - "...a move order onto it (0x962190) and the plunder (PLUNDER_TRADE_ROUTE 0x955950) queued (0x7094f0); the queue carried out as the move ends (0x70a440). A civilian goes too: runs/h1_duelw..."
-  review: imported
+  review: reviewed
 - addr: 0x70a250
   final: 0x4bafa0
   kind: function
@@ -237,9 +238,12 @@
   final: 0x4c0520
   kind: function
   name: homelandPlunderTrader
-  semantics: "the homeland's Plunder Trader: each TRADER entry, each homeland unit not queued with a planning reaching its plot this turn, the row and the move onto it with the plunder queued"
+  semantics: "the homeland's Plunder Trader: each TRADER entry, each homeland unit not queued with a planning reaching its plot this turn, the row and the move onto it with the plunder queued. First of \"Default Barbarian HL\": each TRADER entry of the player's target list (+0x12b8 +0x370, 40-byte entries), each homeland unit (+0x208) not yet in the move list (+0x220), not +0x770, with a planning (+0x1fc0) reaching the entry's plot this turn (0x791300: one turn, range 0): the row (the count 1), a move order onto it (0x962190) and the plunder (PLUNDER_TRADE_ROUTE 0x955950) queued (0x7094f0), carried out as the move ends (0x70a440). A civilian goes too. Ported: homelandPlunder (cpu/core/tactical.ts), _tac_homeland_plunder."
   status: READ
   cases:
+    - recording: h1_duelw1124
+      turn: 151
+      value: the barbarians' captured Builder stands each turn t137-t151 on the plot of player 4's Trader
     - recording: h1_duelw1124
       turn: 137
       value: "A civilian goes too: runs/h1_duelw1124 t137-t151,   t170-t173 the barbarians' captured Builder stands each turn on the plot of   player 4's Trader."
@@ -247,13 +251,14 @@
       turn: 137-151
       value: the barbarians' captured Builder stands each turn on the plot of player 4's Trader
   impl: [cpu/core/tactical.ts:homelandPlunder, gpu/core/sim_tactics.py:_tac_homeland_plunder]
-  readings: ["C-95: the homeland's Plunder Trader — READ, ported"]
+  readings: ["C-95: the homeland's Plunder Trader — READ, ported", "C-95: the homeland's Plunder Trader"]
   context:
     - "- 0x70f610, first of \"Default Barbarian HL\": each TRADER entry of the player's target list (+0x12b..."
   review: reviewed
 - addr: 0x70fae0
   final: 0x4c09f0
   kind: function
+  semantics: takes the promotion value 0x7b5d70 (as Operation Protect Units does).
   status: READ
   cases:
     - recording: AI_Tactical.csv
@@ -261,9 +266,10 @@
   readings:
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70)"
   context:
     - "...t row with the greatest max(modifiers, 5 x +0x24). Operation Protect Units (0x80d790) and 0x70fae0 take the same value. Unported: the promotion modifiers' analyzers (AUDIT C-96)."
-  review: imported
+  review: reviewed
 - addr: 0x710f40
   final: 0x4c1f40
   kind: function

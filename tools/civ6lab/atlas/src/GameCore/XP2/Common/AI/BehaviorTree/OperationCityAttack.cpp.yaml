@@ -42,9 +42,12 @@
   final: 0x570bf0
   kind: function
   name: Garrison City (execution)
-  semantics: "Garrison City's execution: the unit on the city — the operation's garrison, or with none a military unit of the seat standing there (0x81100a: formation class 0 or 3 takes the garrison's branch at 0x811129) — has its turn ended (0x570b40 with dl 1) before the swap and fortify tests; a candidate it moves in (0x811038) or beside the city (0x8111d7) likewise. Over the operation's units in order, the one on the city its garrison (its ranged strength or its Bombard less 5, its Combat); of those whose planning reaches the city in a turn (0x791300) the candidate by ranged, then Bombard less 5, then Combat strength above the garrison's; with no garrison and no military unit of the seat on the city (formation class neither 0 nor 3), the candidate moves in and fortifies (0x56d6f0) unless ranged; with a garrison and a stronger candidate, the candidate moves to its planning's spot by the city and swaps in (0x972880); else the garrison fortifies (0x95eae0) where it has no range and the teams' +0x98 - +0x94 is at most 10."
-  status: PARTLY
+  semantics: "Garrison City's execution: the unit on the city — the operation's garrison, or with none a military unit of the seat standing there (0x81100a: formation class 0 or 3 takes the garrison's branch at 0x811129) — has its turn ended (0x570b40 with dl 1) before the swap and fortify tests; a candidate it moves in (0x811038) or beside the city (0x8111d7) likewise. Over the operation's units in order, the one on the city its garrison (its ranged strength or its Bombard less 5, its Combat); of those whose planning reaches the city in a turn (0x791300) the candidate by ranged, then Bombard less 5, then Combat strength above the garrison's; with no garrison and no military unit of the seat on the city (formation class neither 0 nor 3), the candidate moves in and fortifies (0x56d6f0) unless ranged; with a garrison and a stronger candidate, the candidate moves to its planning's spot by the city and swaps in (0x972880); else the garrison fortifies (0x95eae0) where it has no range and the teams' +0x98 - +0x94 is at most 10. Each unit it takes keeps its Movement; the moves end (0x56d6f0) only for a candidate it moves onto the city with no RangedCombat (0x56e3e0, 0x811110), and, with no stronger candidate (0x811133..0x811149), for a garrison of no Range (0x56e3d0) it fortifies where every team's +0x98 less +0x94 is at most 10 (0x810f80..0x810fac; the team update's attack and enemy strengths, unported: taken as held); with no garrison of the operation's, a unit of the seat on the city of formation class 0 or 3 takes the garrison's branch (0x81100a -> 0x811129) at no strength, so a stronger candidate moves beside it. Ported: garrisonExecute (operations/assault.ts), _x_garrison. At 0x8111d2: the candidate's swap (to 0x811323): with a stronger candidate the candidate's turn done (0x570b40); its planning's plot at range 1 of the city with Movement left (0x791300) ordered to (0x962030) where it is not its own plot; then UNITOPERATION_SWAP_UNITS (0x972880) onto the city exchanges it with the garrison (0x972540); standing on the city its moves end (0x56d6f0); then the candidate takes AI type DEFENDER and the garrison its type's own (0x1e60f0 on +0x168; unported). Ported: garrisonExecute with the pass's swap (swapUnits), _x_garrison and _mops_swap."
+  status: READ
   cases:
+    - recording: h1_duely1117
+      turn: 89
+      value: "Antananarivo t85 / t89: its garrisoned Catapult 917509 (Range 2) 32:5 -> 32:6 before the city's purchase of a Catapult"
     - recording: h1_dueldA1117
       turn: 24
       value: "Antananarivo: City Defense's Warrior on 32:5 stays, only 29:3 moves (-> 30:3)"
@@ -62,6 +65,8 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
+    - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers"
+    - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap"
   notes:
     - the fortify test's teams' +0x98 less +0x94 (the team update's attack and enemy strengths) unported, taken as held; the swap command 0x972880 unported
   context:

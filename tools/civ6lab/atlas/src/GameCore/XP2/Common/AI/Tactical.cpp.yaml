@@ -69,7 +69,7 @@
 - addr: 0x7710f0
   kind: function
   name: tacticalUnit
-  semantics: "the tactical pass's unit selector: AI type EXPLORE or above, not in an AI system (+0x770), on the map, +0xf90 not above 0; an explorer (PSEUDOYIELD_UNIT_EXPLORER) at EXPLORE only while its tribe (+0x11d0) rampages; a unit +0xf30 holds kept where the player's +0x1278 lists it; a Spy (+0x1ba bit 2) out; one with +0x1c70 / +0x1c74 set kept whatever its type"
+  semantics: "the tactical pass's unit selector: AI type EXPLORE or above, not in an AI system (+0x770), on the map, +0xf90 not above 0; an explorer (PSEUDOYIELD_UNIT_EXPLORER) at EXPLORE only while its tribe (+0x11d0) rampages; a unit +0xf30 holds kept where the player's +0x1278 lists it; a Spy (+0x1ba bit 2) out; one with +0x1c70 / +0x1c74 set kept whatever its type. The rest are the homeland's: a city-state's Move to Safety and End Turn, the Free Cities' End Turn; a city-state's or the Free Cities' explorer is never EXPLORE (no rampaging tribe). Ported: ownMilitaryAi / militaryAiTypeOf / tacticalUnit (cpu/core/tactical.ts), _minor_ai / _minor_tactical (gpu/core/sim_tactics.py)."
   status: READ
   cases:
     - recording: h1_duely1117-1128
@@ -85,6 +85,7 @@
   readings:
     - "C-95: Attack Units — READ, ported"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE UNIT SELECTOR (0x7710f0): a unit of AI type EXPLORE or above; an explorer (PSEUDOYIELD_UNIT_EXPLORER: the Scout..."
@@ -142,9 +143,12 @@
 - addr: 0x771670
   final: 0x503660
   kind: function
-  semantics: "the rampage strike: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or COMBAT_DISTRICT strikes, first moving to the first plot of its reach this turn with Movement left within range and none of its own stacking; else MOVE_TO the target's plot with the attack flag 0x10."
+  semantics: "the rampage strike: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or COMBAT_DISTRICT strikes, first moving to the first plot of its reach this turn with Movement left within range and none of its own stacking; else MOVE_TO the target's plot with the attack flag 0x10. Its arguments the tactical object (its unit list +0x270, 0x30 a unit: +0x24 dealt, +0x28 taken), the target, its plot, two flags ([rbp+0x108] the exchange filter: taken above dealt skipped; [rbp+0x110] the survival filter: damage + taken — twice taken in the ranged loop — at the unit's health skipped). A fighter or COMBAT_DISTRICT target (0x208b80, the type test at 0x7716f4) takes the ranged loop (Ranged or Bombard above 0) then the melee loop, which skips a ranged unit and gives each other one MOVE_TO (0x962030) on the target with flag 0x10 (0x771e44). A melee unit's MOVE_TO with the attack flag on a target its player does not see now goes nowhere — a FIT (the pathfinder's own test unread); ported as the attack plots taken only on a plot the player sees now (groundOf's attack, _tac_attack_planes)."
   status: READ
   cases:
+    - recording: h1_duely1117
+      turn: 21
+      value: the Scout at 13:13 for Valletta's unseen 14:8 stays t13-t21; the melee movers on an unseen target stay 167 of 169
     - recording: 1124
       value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
     - recording: h1_duely1117
@@ -153,6 +157,7 @@
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
+    - "C-95: a strike's move order onto a plot out of sight"
   context:
     - "...lse the nearest (strictly nearer replaces; the list's first of equals), and strikes it (0x771670: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or CO..."
   review: reviewed
@@ -220,14 +225,14 @@
   final: 0x5055c0
   kind: function
   name: coastalRaidCarryOut
-  semantics: "the queue carried out: each queued unit that can act to its plot (attack flag), then the raid"
+  semantics: "the queue carried out: each queued unit that can act to its plot (attack flag), then the raid. The move to the plot is 0x962190 (flag 0x10); the raid 0x95b100 -> 0x95b7c0: the plot's improvement wrecked, else its district, 3 Movement spent (none for a raider that raids free); the pillage signal scores the tribe. Ported: coastalRaid (cpu/core/combat.ts), _barb_coastal_raid."
   status: READ
   cases:
     - recording: h1_duelw1117-1128
       turn: all
       value: 9 of 9 Coastal Raid rows take the move
   impl: [cpu/core/tactical.ts:coastalRaids, gpu/core/sim_tactics.py:_tac_coastal_raid]
-  readings: ["C-95: Coastal Raid — READ, ported"]
+  readings: ["C-95: Coastal Raid — READ, ported", "C-95: Coastal Raid"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...nge 1 (0x791300) is queued with it (0x7803d0, \"Coastal Raid\"); the queue carried out (0x7735d0): each queued unit that can act moves to its plot (0x962190, flag 0x10) and raids the t..."
@@ -236,9 +241,12 @@
   final: 0x5057b0
   kind: function
   name: Heal (moves)
-  semantics: "each queued unit: not of the sea domain, or a hull on its own territory, fortifies (0x56ef30 / 0x95eae0) or sleeps (0x9686d0); a hull off it takes its nearest city (first of equals) and moves there (0x962030) only where 0x586360 (flag 0x10) answers 0 — no place on the city's plot nor within 10 of it; the turn done (0x570b40)"
+  semantics: "each queued unit: not of the sea domain, or a hull on its own territory, fortifies (0x56ef30 / 0x95eae0) or sleeps (0x9686d0); a hull off it takes its nearest city (first of equals) and moves there (0x962030) only where 0x586360 (flag 0x10) answers 0 — no place on the city's plot nor within 10 of it; the turn done (0x570b40) A hull off its territory (the plot's owner byte +0x1c) heads for its player's nearest city (+0x12f0 +0xd8, GetPlotDistance strictly nearer) only where neither the city's plot nor any within 10 takes it: it holds. Ported: heal (cpu/core/tactical.ts), Heal in _minor_pass / _free_tactics (gpu/core/sim_tactics.py)."
   status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 126
+      value: city-state 3's Quadrireme 1048577 heals on 38:17 off its territory every turn t93-126; t157-177 its Frigate, t211-221 its Battleship
     - recording: h1_duely1124
       turn: 93-126
       value: city-state 3's Quadrireme 1048577 heals on 38:17 off its territory every turn (record t+1 38:17); t157-177 its Frigate, t211-221 its Battleship hold too
@@ -246,6 +254,7 @@
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...area (plot +8) counted three times as far; strictly nearer   replaces. - HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has   taken damage (+0xcf0 > 0), in no formation (0x8be30), on a pl..."
   context:
@@ -327,8 +336,11 @@
 - addr: 0x774970
   final: 0x5069c0
   kind: function
+  semantics: "over the UnitPromotions rows in database order that the unit can earn (0x55d750), the row's modifiers gathered (+0x28) and valued by 0x7b5d70 (start 0, the horizon [GlobalAI+0x2f0][0], the discount 0x6fec30); the first row strictly above the best so far (from 0) is taken. Ported: aiPromotionPick."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      value: every city-state pick of h1_duelw1117-1128 the first row of the highest Level it may take (melee Battlecry then Commando, ranged Volley, siege Grape Shot)
     - recording: AI_Tactical.csv
       value: "The tactical move Promotion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv);"
   impl:
@@ -338,10 +350,11 @@
   readings:
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70)"
   context:
     - "## C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "...tion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv); 0x774970 then runs each: over the UnitPromotions rows in database order that the unit can earn (0x..."
-  review: imported
+  review: reviewed
 - addr: 0x774e90
   final: 0x506ec0
   kind: function
@@ -491,7 +504,7 @@
 - addr: 0x778b40
   final: 0x50aa90
   kind: function
-  semantics: "BARBARIAN RAMPAGE: the tribes whose camp a unit took (0x152df0); each of their units, in pool order, takes of the planning's targets of that player the nearest with a spot, else the nearest (strictly nearer replaces) and strikes it (0x771670). With no target 0x1479e0."
+  semantics: "BARBARIAN RAMPAGE: the tribes whose camp a unit took (0x152df0); each of their units, in pool order, takes of the planning's targets of that player the nearest with a spot, else the nearest (strictly nearer replaces) and strikes it (0x771670). With no target 0x1479e0. At 0x778f57: Barbarian Rampage passes both filters 0 and its one unit with r13 = 0 at +0x24 / +0x28: no filter."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -503,6 +516,7 @@
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
+    - "C-95: a strike's move order onto a plot out of sight"
   context:
     - ...ander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage (0x778b40).
     - "- Barbarian Rampage (0x778b40), the target list (0x783980), Attack Civilians, Plunder Trader, Chase Target, Attack Un..."
@@ -538,9 +552,11 @@
   final: 0x50b3d0
   kind: function
   name: coastalRaid
-  semantics: "Coastal Raid: each improvement or passive district target on coastal land, each raider whose planning holds a plot beside it queued"
+  semantics: "Coastal Raid: each improvement or passive district target on coastal land, each raider whose planning holds a plot beside it queued. Each IMPROVEMENT, then PASSIVE_DISTRICT entry on coastal land (0x82a10), each unit of the move's list alive, +0x650 == 0, CanRaid (+0x18bd), whose two-turn planning holds a plot at range 1 (0x791300), queued (0x7803d0, \"Coastal Raid\"). Ported: coastalRaids (cpu/core/tactical.ts), _tac_coastal_raid."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      value: 9 of 9 Coastal Raid rows of the five duels take the move
     - recording: h1_duelw1117-1128
       turn: all
       value: 9 of 9 Coastal Raid rows take the move
@@ -549,6 +565,7 @@
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: Coastal Raid — READ, ported"
+    - "C-95: Coastal Raid"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage (0x778b40).
@@ -650,9 +667,11 @@
 - addr: 0x77ac30
   final: 0x50cab0
   kind: function
-  semantics: the AI's promotion choice (the tactical Promotion move).
-  status: PARTLY
+  semantics: "the AI's promotion choice (the tactical Promotion move). The tactical move Promotion: each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\"); 0x774970 runs each. Ported: the city-states' tactical Promotion after Attack Medium Priority (Tactics.xml's Minor Civ Tactical), GPU _tac_promotion."
+  status: READ
   cases:
+    - recording: h1_duelw1117
+      value: every city-state pick of h1_duelw1117-1128 the first row of the highest Level it may take (melee Battlecry then Commando, ranged Volley, siege Grape Shot)
     - recording: AI_Operation.csv
       value: "- Not ported (AUDIT C-96): Attack High/Medium/Low (C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' ope"
   impl: [cpu/core/tactical.ts:promotion, gpu/core/sim_tactics.py:_tac_promotion]
@@ -660,6 +679,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' operations (Naval   Superiority, City Defense, Attack Barb C..."
   context:

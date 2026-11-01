@@ -68,22 +68,25 @@
 - addr: 0x266470
   final: 0x1a3d30
   kind: function
+  semantics: the unit is exempt from the river crossing's cost.
   status: PARTLY
-  readings: ["C-95: a river crossing's Movement — READ"]
+  readings: ["C-95: a river crossing's Movement — READ", "C-95: a river crossing's Movement"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the step crosses a river (0x531510 on the from / to plots) and the unit is not exempt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x3..."
-  review: imported
+  review: reviewed
 - addr: 0x266510
   final: 0x1a3dd0
   kind: function
+  semantics: the ignore-shores ability (the embark rules waive MOVEMENT_EMBARK_COST).
   status: PARTLY
   readings:
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
+    - "C-99: a shore crossing's carried Movement"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...land): MOVEMENT_EMBARK_COST unless a FreeEmbark district (or the ignore-shores ability 0x266510); then, FreeEmbark or not, where the Movement the step starts with exceeds the TO domai..."
-  review: imported
+  review: reviewed
 - addr: 0x2665b0
   final: 0x1a3e70
   kind: function
@@ -105,13 +108,15 @@
 - addr: 0x266660
   final: 0x1a3f20
   kind: function
+  semantics: the formation's GetMaxMoves (the planning's start node).
   status: PARTLY
   readings:
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
+    - "C-95: the planning sets out on the full Movement, the walk on the turn's restored"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...+0x1bc, read by the step cost 0x26e920 for the start) to GetMaxMoves (0x56e130, through 0x266660 on the formation) << 8 — the unit's full Movement, not its Movement left. The \"unmove..."
-  review: imported
+  review: reviewed
 - addr: 0x266690
   final: 0x1a3f50
   kind: function

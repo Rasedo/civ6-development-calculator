@@ -6,9 +6,11 @@
 - addr: 0x7989e0
   kind: function
   name: the military AI's unit production table
-  semantics: "the military AI's unit production table (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in the Units' order, for each unit the player's version of itself, an obsolete one (0x538460) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers. Per entry its flags (+0x08 obsolete, +0x0b Units +0x1ba bit 128, +0x0c TraitType +0x2d0, +0x0e a held strategic resource), Cost +0x38, Range +0x68, max(Combat, RangedCombat), Combat, the Units_XP2 maintenance resource and amount, a per-player vector of 64. The opposition: per Units row of Combat above 0 not obsolete to the player with a combat pseudo-yield (or none), over the player list (0x483b50 +0x4a0) the knowledge base's count of it (0x5eb650), N their total (the at-war ones, 0x469cd0, apart); each entry's +0x30 sums count x efficiency[that row][the entry] (GlobalAI +0x3c8), +0x2c the at-war counts, the per-player vector likewise. With N = 0 every entry reads 1.0. Value +0x160 = N / +0x30 (0x16e940, truncated); x1.25 (@0xd70c98) for a TraitType unit; a shortfall of the maintenance resource scales it; the player's units of each type counted into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The value 0x799b9d computes from the counts (+0x510, +0x4a0) feeds asserts only."
+  semantics: "the military AI's unit production table (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in the Units' order, for each unit the player's version of itself, an obsolete one (0x538460) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers. Per entry its flags (+0x08 obsolete, +0x0b Units +0x1ba bit 128, +0x0c TraitType +0x2d0, +0x0e a held strategic resource), Cost +0x38, Range +0x68, max(Combat, RangedCombat), Combat, the Units_XP2 maintenance resource and amount, a per-player vector of 64. The opposition: per Units row of Combat above 0 not obsolete to the player with a combat pseudo-yield (or none), over the player list (0x483b50 +0x4a0) the knowledge base's count of it (0x5eb650), N their total (the at-war ones, 0x469cd0, apart); each entry's +0x30 sums count x efficiency[that row][the entry] (GlobalAI +0x3c8), +0x2c the at-war counts, the per-player vector likewise. With N = 0 every entry reads 1.0. Value +0x160 = N / +0x30 (0x16e940, truncated); x1.25 (@0xd70c98) for a TraitType unit; a shortfall of the maintenance resource scales it; the player's units of each type counted into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The value 0x799b9d computes from the counts (+0x510, +0x4a0) feeds asserts only. The efficiency read at 0x7992b9 is data[width x opposing + entry] (the matrix +0x28 width, +0x30 data, the opposing type the loop's index [rbp+0xc00], the entry's unit +0 of its record): the log (0x79b8a0) prints row r, column c as data[width x r + c], so the value reads AI_UnitEfficiency.csv's row the opposing unit, column the entry (unitEfficiency()[i][k]). At 0x798cc2: the entry's buildable byte +0x0e (to 0x798d11): PrereqTech and PrereqCivic held and the StrategicResource stocked above 0 (0x4aa790, ownership 0)."
   status: READ
   cases:
+    - recording: h1_duelv1117
+      value: the other orientation drops the lab's units within 0.005 from 7,815 to 6,099
     - recording: h1_duelv1124
       value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
     - recording: AI_Knowledge.csv
@@ -33,6 +35,8 @@
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
     - "C-96 / C-129: a city-state's unit production table counts the records its look's ageing keeps, none its sightings add — the aimem sites read, both twins"
+    - "C-96: the standing army and the Combat Desire's city terms"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 on PrereqTech/Civic turns), maintenance as plain Gold..."
   context:
@@ -42,7 +46,7 @@
 - addr: 0x79a320
   final: 0x5236c0
   kind: function
-  semantics: "the military AI's city hook: copies the unit production table per city, the +0x2c / +0x30 times the city's extra copies."
+  semantics: "the military AI's city hook: copies the unit production table per city, the +0x2c / +0x30 times the city's extra copies. The copy the purchase list (0x5d2810) ranks, sorted by 0x79d3a0."
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -53,6 +57,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung"
   context:
     - "...ityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0x5ce3f0: the job object at +0xcc0, vtable 0xd59af0 -> 0x5c..."
     - ...9d computes from the player's counts (+0x510, +0x4a0) feeds asserts only. The city hook 0x79a320 copies the table per city, the +0x2c / +0x30 times the extra copies.
@@ -61,9 +66,12 @@
   final: 0x5237a0
   kind: function
   name: the unit efficiencies job
-  semantics: "the unit efficiencies job (\"Could not find a neutral player\"): per pair of Units rows both without strength (max(Combat, RangedCombat, Bombard) 0 and AntiAirCombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both, 100 / damage the exchanges to kill, a range advantage ((Range - 1) / the other's moves, rounded up) added where the domains match, AntiAirCombat terms against air; M[a][b] = a's exchanges-to-die over b's. Logged once a game as AI_UnitEfficiency.csv (\", %3.2f\")."
+  semantics: "the unit efficiencies job (\"Could not find a neutral player\"): per pair of Units rows both without strength (max(Combat, RangedCombat, Bombard) 0 and AntiAirCombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both, 100 / damage the exchanges to kill, a range advantage ((Range - 1) / the other's moves, rounded up) added where the domains match, AntiAirCombat terms against air; M[a][b] = a's exchanges-to-die over b's. Logged once a game as AI_UnitEfficiency.csv (\", %3.2f\"). The neutral player's units are allocated off the map (0x4eeb70 with plot -1, -1: no terrain, full health); the diagonal 1.0 (0x79a7c5); per pair of Units rows i < j (the inner loop from i + 1, 0x79a8b7) a row is weak where max(Combat +0x48, RangedCombat +0x6c, Bombard +0x40) is 0 and AntiAirCombat +0x34 not above 0: i weak and j strong M[i][j] 0.01 (raw 2: floor 0 | trunc(0.01 x 256)) and M[j][i] 100.0; i strong and j weak M[i][j] 100.0 and M[j][i] 1.0 (0x79a9fd); both weak 1.0 both ways (0x79a95e). Two strong rows: two simulations (0x205720, flag set: the damage law's expectation), i on j (+0xf80) and j on i (-0x30); per unit its damage over both (+0x7c attacker / +0xc4 defender words, << 8, at least 1.0), its exchanges 0x640000 / damage (24.8, truncated). The range term (0x79ab16..0x79abeb): the earlier row's ceil((Range - 1) / the other's BaseMoves +0x38) where its Range +0x68 is above the other's and at least the other's moves, else the later row's ceil((Range - 1) / the earlier's moves) where its Range is at least those moves; neither where the two differ both in AntiAirCombat > 0 and in being air units (0x79aafa: 0xadd590 == 1, DOMAIN_AIR); the term << 8 added to that unit's exchanges; M[i][j] = (ex_i << 8) / ex_j, M[j][i] the other way (0x79af67, 0x79b064), truncated. The anti-air term (0x79b115..0x79b63f): i holding AntiAirCombat against an air j, t = AntiAirCombat << 8 x 0.05 (raw 12) >> 8; M[j][i] -= min(t, M[j][i]) and M[i][j] += max(M[i][j], t) (the cmovge picks); else j holding it against an air i, the same with the entries swapped. Both units are the neutral player's, so every COLLECTION_UNIT_COMBAT EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER of either unit whose requirements hold (PLAYER_IS_ATTACKING met, the opponent the defender) counts for the attacker: the Berserker's +10, the Redcoat's +10, the Digger's +5 raise its attack and its attacker's on it; ANTI_SPEAR / ANTI_CAVALRY count for the attacker alone; the Carolean's per-unused-Movement term +3 x 3 BaseMoves both ways; REQUIREMENT_OPPONENT_IS_STRONGER met where the defender's Combat tops the attacker's (a fit on its 19 pairs, the requirement's code unread). Ported: unitEfficiency (cpu/core/aiUnitEfficiency.ts), rules.unitEfficiency (GPU). At 0x79b8a0: the unit production table's log: row r, column c printed as data[width x r + c]."
   status: READ
   cases:
+    - recording: h1_duelv1117
+      turn: 3
+      value: AI_UnitEfficiency.csv 20,736 of 20,736 entries at 0.01; Valletta Heavy Chariot 3.33 / 5.67, Spearman 1.25 / 2.12 (t2 / t3 UNITS rows)
     - recording: h1_duelv1117
       turn: 2
       value: Valletta's Heavy Chariot 3.33 / 5.67 at t2 / t3 on the job's Warrior row 137 (the printed 0.54's 138 gave 3.30 / 5.61); the Spearman 1.25 / 2.12 on 213
@@ -78,6 +86,8 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
+    - "C-96: the standing army and the Combat Desire's city terms"
   notes:
     - every entry of AI_UnitEfficiency.csv at its printed 0.01 (20,736); the anti-air term 0x79b115 ported
   context:
@@ -86,7 +96,11 @@
 - addr: 0x79b9c0
   final: 0x5242d0
   kind: function
-  status: PARTLY
+  semantics: "a unit type's own AI type: the highest UnitAiInfos flag of the type up to COMBAT 3, -1 none (Recruit Units' reset and the standing army's EXPLORE clause read it). EXPLORE for the military chassis with UNITAI_EXPLORE and no UNITAI_COMBAT (Units.xml: the Scout, the Skirmisher, the Ranger, Spec Ops, the Highlander, the Okihtcitaw, the Warak'aq)."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      value: "every city-state Scout's AI_Tactical.csv row of the five duely duels HL: End Turn (165 of 165); its Skirmishers and Rangers wander (180, 69 rows)"
   impl:
     - cpu/core/operations/nodes.ts:OpsContext
     - cpu/core/operations/nodes.ts:update
@@ -96,11 +110,13 @@
   readings:
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-96: the standing army and the Combat Desire's city terms"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ng army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "...of AI type COMBAT (3) — or EXPLORE (2) whose type's highest AI flag up to 3 is COMBAT (0x79b9c0) while the player's units exceed twice its cities — with no operation (+0x7d0 == -1), o..."
-  review: imported
+  review: reviewed
 - addr: 0x79ba50
   kind: function
   semantics: raises the player signal +0x168 for a not-yet-trainable unit (its PrereqTech or PrereqCivic unheld, 0x4cb590 / 0x39d490); its one listener the research AI's 0x75d3d0.

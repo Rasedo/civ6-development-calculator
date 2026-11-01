@@ -17,12 +17,13 @@
   final: 0x14e100
   kind: function
   name: City_Trade
+  semantics: "City_Trade: the player has a constructed trading post in the city; false against a player the owner is at war with (the trade range's refuel)."
   status: PARTLY
   impl: [cpu/core/tradePath.ts:posts]
   readings: ["C-20: the Trader's path and range"]
   context:
     - ...he ORIGIN city or of a city where the player has a constructed trading post (City_Trade 0x1f99d0, false against a player the owner is at war with) refuels it to TRADE_ROUTE_LAND_RANG...
-  review: imported
+  review: reviewed
 - addr: 0x1fa000
   final: 0x14e6b0
   kind: function

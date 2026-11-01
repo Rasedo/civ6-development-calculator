@@ -44,15 +44,19 @@
 - addr: 0x66b490
   final: 0x440ea0
   kind: function
-  semantics: "The action record's cost (+0x68): the state's DiplomaticStateActions Cost less the price's Gold value (0x671650) less the trust term (0x671b80); solved on the logged rows Cost - 0.5 x price x (1 + w_gold) - T."
+  semantics: "The action record's cost (+0x68): the state's DiplomaticStateActions Cost less the price's Gold value (0x671650) less the trust term (0x671b80); solved on the logged rows Cost - 0.5 x price x (1 + w_gold) - T. The price's Gold valued at 0x7a6690; T is non-zero on exactly the turns the \"Threat and Trust\" row's first cell toward the sender is."
   status: PARTLY
   cases:
+    - recording: h1_duelv1127
+      turn: 79
+      value: "Rome toward China, Delegation / Embassy on one turn: t68 (Unfriendly) 58.0 / 72.5 and t79 (Neutral) -7.0 / -12.5 at 1 + w 1.4, T 10; t117 68.0 / 82.5 at T 0"
     - recording: h1_duelv1127
       turn: 68
       value: Rome's logged cost toward China 58.0 (Delegation) / 72.5 (Embassy) in Unfriendly = 75 / 100 - 0.5 x 10 / 25 x 1.4 - 10
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
+    - "C-97: the proposals and the religion's choices as seat actions"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...ion rows print \", %3.1f:%3.1f\" = FIRST 0x66cc40 (record +0x48, \"Desired\", the PICK's score), SECOND 0x66b490 (record +0x68, \"Cost\"). 0.0:0.0 = attempt turn. Threat row \"threat:n:trust\" = +0x6560[p] : 0x650550..."
     - ".claude/scratchpad/dp2/NOTES.md: ...:   action must be in receiver's state lists (+0x2f58[from] +0x20 or +0x40) else reject(2);   value 0x66b490 on +0xca8[from] record: >0 -> reject (2), <=0 -> accept (1).   EMPIRICAL 20/20 (accept.py): accept..."
@@ -639,11 +643,12 @@
 - addr: 0x674a10
   final: 0x447f00
   kind: function
-  semantics: "the Embassy's perform: sends the action (\"Processing Action From AI to AI\") and spends the cost from savings slot 1 (0x68acd0)."
+  semantics: "the Embassy's perform: sends the action (\"Processing Action From AI to AI\") and spends the cost from savings slot 1 (0x68acd0). It stamps the last action's turn toward the player (0x3e6d20)."
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...ation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friends..."
   context:
@@ -652,27 +657,33 @@
 - addr: 0x674b60
   final: 0x448050
   kind: function
+  semantics: "a deal-carrying diplomatic action's perform: sends the action and stamps the last action's turn toward the player (0x3e6d20)."
   status: PARTLY
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus"
   context:
     - ...rms of the Delegation (0x674960), the Embassy (0x674a10) and the deal-carrying actions (0x674b60, 0x675100, 0x675410), and 0x681b60. The missions' can-do asks it + AI_TURNS_BETWEEN_P...
-  review: imported
+  review: reviewed
 - addr: 0x675100
   final: 0x4484b0
   kind: function
+  semantics: "a deal-carrying diplomatic action's perform: sends the action and stamps the last action's turn toward the player (0x3e6d20)."
   status: PARTLY
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus"
   context:
     - ...elegation (0x674960), the Embassy (0x674a10) and the deal-carrying actions (0x674b60, 0x675100, 0x675410), and 0x681b60. The missions' can-do asks it + AI_TURNS_BETWEEN_PEACE_OFFERS...
-  review: imported
+  review: reviewed
 - addr: 0x675410
   final: 0x448780
   kind: function
+  semantics: "a deal-carrying diplomatic action's perform: sends the action and stamps the last action's turn toward the player (0x3e6d20)."
   status: PARTLY
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus"
   context:
     - ...(0x674960), the Embassy (0x674a10) and the deal-carrying actions (0x674b60, 0x675100, 0x675410), and 0x681b60. The missions' can-do asks it + AI_TURNS_BETWEEN_PEACE_OFFERS (3) below...
-  review: imported
+  review: reviewed

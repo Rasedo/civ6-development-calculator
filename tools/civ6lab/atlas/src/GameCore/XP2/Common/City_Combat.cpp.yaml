@@ -6,7 +6,7 @@
 - addr: 0x197ff0
   final: 0x111800
   kind: function
-  semantics: over the city's districts (+0x1a50, count +0x1a60, 0x1ae510) with outer defences (district +0xb08 set) the most GetDamage (0x24ae50, hash 0x6da56a3d).
+  semantics: "over the city's districts (+0x1a50, count +0x1a60, 0x1ae510) with outer defences (district +0xb08 set) the most GetDamage (0x24ae50, hash 0x6da56a3d). The outer defences' hit points down: the repair project's count (+0x1880) for its price (0x17a680) and its value (0x7b28c0)."
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -23,6 +23,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew — the repair READ (0x17a680, 0x7b28c0's count), the jump a fit, both twins"
+    - "C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew"
   context:
     - "...defences: +1 for a city of two districts or more (city +0x1a60, the districts' count, 0x197ff0's array), +2 for a capital (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), popul..."
   review: reviewed

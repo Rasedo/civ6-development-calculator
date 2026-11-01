@@ -6,10 +6,12 @@
 - addr: 0x108210
   final: 0xb4510
   kind: function
+  semantics: a listener of the cache event stream (Culture) holding the CityFocusChanged hash.
   status: PARTLY
   readings:
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
+    - "C-112: the citizen manager has no turn of its own"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...96320; the other sites holding the hash are the cache event streams' listeners (Culture 0x108210, Religion 0x11ea50, Techs 0x1259a0, Treasury 0x1295c0). The assign 0x197230's one calle...
-  review: imported
+  review: reviewed

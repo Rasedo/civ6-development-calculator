@@ -48,17 +48,24 @@
 - addr: 0x276bc0
   final: 0x1ada70
   kind: function
+  semantics: "the revolt into a Free City: makes the city's record (0x273c50)."
   status: PARTLY
   readings:
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "C-60: the Free City's grant"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE RECORD (0x273c50, made at the revolt by 0x276bc0): the city, live, the count 0; its allowed units (+0x28, one flag per Units row): each..."
-  review: imported
+  review: reviewed
 - addr: 0x276d90
   final: 0x1adb80
   kind: function
-  status: PARTLY
+  semantics: "the raid signal of a combat on a Free City's district: the attacker (+0x70); the Free City's record by the plot (0x277470), then the raid's start (0x274ea0). Ported: freeRaidSignal (cpu/core/freeOps.ts), _free_raid_signal (gpu/core/sim_minorai.py)."
+  status: READ
+  cases:
+    - recording: h1_duelw1123
+      turn: 205
+      value: "Rome's Warrior pillages Chen's improvement: player 62 \"Free Cities Raid, Started\", TARGET 11:13 (Rome's capital), complete t213"
   impl:
     - cpu/core/combat.ts:cityAssault
     - gpu/core/sim_minorai.py:_free_raid_signal
@@ -66,23 +73,30 @@
     - gpu/core/sim_seats.py:_assault_city
   readings:
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-60: the Free Cities Raid"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...# C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unrea..."
     - "...eeCities_Manager, the listeners 0x2765f0 connects): a combat on a Free City's district (0x276d90: the attacker, +0x70); a Free City's district pillaged (0x276e70: the owner of the last..."
-  review: imported
+  review: reviewed
 - addr: 0x276ff0
   final: 0x1adda0
   kind: function
-  status: PARTLY
+  semantics: "the raid signal of a Free City's improvement pillaged: the owner of the last unit on the plot; the record by the plot (0x277470), then 0x274ea0."
+  status: READ
+  cases:
+    - recording: h1_duelw1123
+      turn: 205
+      value: "Rome's Warrior pillages Chen's improvement: player 62 \"Free Cities Raid, Started\", TARGET 11:13 (Rome's capital), complete t213"
   impl:
     - cpu/core/phase.ts:impWreckable
     - gpu/core/sim_minorai.py:_free_raid_plot
     - gpu/core/sim_orders.py:_arms
   readings:
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-60: the Free Cities Raid"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...s Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
     - "...76e70: the owner of the last unit on the plot); an improvement of a Free City pillaged (0x276ff0: the owner of the last unit on the plot); 0x276a40 (a Free City with a flag, the plot's..."
-  review: imported
+  review: reviewed

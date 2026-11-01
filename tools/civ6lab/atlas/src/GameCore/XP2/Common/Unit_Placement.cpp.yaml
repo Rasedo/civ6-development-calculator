@@ -183,7 +183,7 @@
 - addr: 0x586360
   final: 0x3b08e0
   kind: function
-  semantics: "the unit location test: refuses a plot for its terrain (impassable, the unit's domain), another player's closed borders, a unit type that needs a district off one, or a hostile defender there (0x208b80) — never for the owner's own units. The domain test reads the unit's domain (+0x650; DOMAIN_SEA 0, DOMAIN_LAND 2): a sea unit stands on water, on a plot not of water only where a district stands (plot virtual +0x40) whose info word +0x14 carries the water bit (0x81240 argument 0, bit 1); a land unit the same with the land bit (argument 2, bit 4) on water it may not embark onto. A City Centre's word answers both: a hull stands on its centre."
+  semantics: "the unit location test: refuses a plot for its terrain (impassable, the unit's domain), another player's closed borders, a unit type that needs a district off one, or a hostile defender there (0x208b80) — never for the owner's own units. The domain test reads the unit's domain (+0x650; DOMAIN_SEA 0, DOMAIN_LAND 2): a sea unit stands on water, on a plot not of water only where a district stands (plot virtual +0x40) whose info word +0x14 carries the water bit (0x81240 argument 0, bit 1); a land unit the same with the land bit (argument 2, bit 4) on water it may not embark onto. A City Centre's word answers both: a hull stands on its centre. With flag 0x10 (refused) or 0x20 (always) it answers 2 where FindAlternateLocation finds a plot within 10 (out-parameter that plot), 1 where the plot takes the unit (out-parameter the plot), 0 else; FindAlternateLocation reads it as nonzero = may enter (0x585ba5)."
   status: READ
   cases:
     - recording: h1_dueld1128
@@ -225,6 +225,7 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
@@ -269,7 +270,7 @@
 - addr: 0x586d40
   final: 0x3b11b0
   kind: function
-  semantics: "places a unit at a plot (unit, plot, flags, ...): flags 1 run the location test 0x586360 with no flag bit set; a refused plot goes to FindAlternateLocation 0x585940 (range 10)."
+  semantics: "places a unit at a plot (unit, plot, flags, ...): flags 1 run the location test 0x586360 with no flag bit set; a refused plot goes to FindAlternateLocation 0x585940 (range 10). Each player whose visibility count of the plot is above 0 meets the unit's owner (0x5246f0)."
   status: PARTLY
   impl: [cpu/core/fog.ts:majorLookMeets, cpu/core/units.ts:spawnUnit]
   readings:
@@ -280,6 +281,7 @@
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+    - "C-97: the majors' meeting"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."

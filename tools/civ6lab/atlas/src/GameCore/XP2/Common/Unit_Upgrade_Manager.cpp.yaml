@@ -6,7 +6,7 @@
 - addr: 0x58fff0
   kind: function
   name: minorCanUpgrade
-  semantics: "a unit can upgrade (upgrade manager, unit, test-visible): not a barbarian's (0x56ee80), an upgrade type it may take (0x5909a0 -> 0x5374c0); the visible test takes no resource."
+  semantics: "a unit can upgrade (upgrade manager, unit, test-visible): not a barbarian's (0x56ee80), an upgrade type it may take (0x5909a0 -> 0x5374c0); the visible test takes no resource. R8 0 the full test (the resource and the Gold), r8 1 the visible one."
   status: PARTLY
   impl:
     - cpu/core/minorBuild.ts:minorCanUpgrade
@@ -25,6 +25,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
+    - "C-96: the upgrade trees' deletion"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...units of a desired type or, upgradeable, each whose upgrade passes the visible test (0x58fff0 with r8 1) are found; found none, or upgradeable, the evaluator (0x60a8c0, the tree's p...

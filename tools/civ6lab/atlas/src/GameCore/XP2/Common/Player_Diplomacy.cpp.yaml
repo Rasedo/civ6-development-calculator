@@ -5,61 +5,81 @@
 # set `review: reviewed`.
 - addr: 0x3bdb10
   kind: function
-  status: PARTLY
-  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  semantics: "a city sort of war weariness's split: population descending, EASTL insertion sort under 29 elements (ties keep the city list's order)."
+  status: READ
+  cases:
+    - recording: ww_xsec
+      value: need = ceil(pop/2) 135/135 cities; every losing city within need + its category's cap 20/20; founded losers the seat's most populous founded cities 10/10
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)", "B-D-S1: the war-weariness split"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL insertion under 29: ties keep the city list's order); oppon..."
-  review: imported
+  review: reviewed
 - addr: 0x3bdbc0
   kind: function
-  status: PARTLY
-  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  semantics: "a city sort of war weariness's split: population descending, EASTL insertion sort under 29 elements (ties keep the city list's order)."
+  status: READ
+  cases:
+    - recording: ww_xsec
+      value: need = ceil(pop/2) 135/135 cities; every losing city within need + its category's cap 20/20; founded losers the seat's most populous founded cities 10/10
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)", "B-D-S1: the war-weariness split"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...plomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL insertion under 29: ties keep the cit..."
-  review: imported
+  review: reviewed
 - addr: 0x3bdc70
   kind: function
-  status: PARTLY
-  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  semantics: "a city sort of war weariness's split: population descending, EASTL insertion sort under 29 elements (ties keep the city list's order)."
+  status: READ
+  cases:
+    - recording: ww_xsec
+      value: need = ceil(pop/2) 135/135 cities; every losing city within need + its category's cap 20/20; founded losers the seat's most populous founded cities 10/10
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)", "B-D-S1: the war-weariness split"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...location 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL insertion under 29: ties keep the city list's or..."
-  review: imported
+  review: reviewed
 - addr: 0x3bdd20
   final: 0x1d1ed0
   kind: function
-  status: PARTLY
-  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  semantics: "a city sort of war weariness's split: population descending, EASTL insertion sort under 29 elements (ties keep the city list's order)."
+  status: READ
+  cases:
+    - recording: ww_xsec
+      value: need = ceil(pop/2) 135/135 cities; every losing city within need + its category's cap 20/20; founded losers the seat's most populous founded cities 10/10
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)", "B-D-S1: the war-weariness split"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL insertion under 29: ties k..."
-  review: imported
+  review: reviewed
 - addr: 0x3bddd0
   final: 0x292690
   kind: function
+  semantics: an opponent sort of war weariness's split (at-war opponents first, then at peace).
   status: PARTLY
-  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)", "B-D-S1: the war-weariness split"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ng, EASTL insertion under 29: ties keep the city list's order); opponent sorts 0x3bde80 / 0x3bddd0. Check: `dll_ww.py`."
-  review: imported
+  review: reviewed
 - addr: 0x3bde80
   final: 0x292740
   kind: function
+  semantics: an opponent sort of war weariness's split (at-war opponents first, then at peace).
   status: PARTLY
-  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)", "B-D-S1: the war-weariness split"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...on descending, EASTL insertion under 29: ties keep the city list's order); opponent sorts 0x3bde80 / 0x3bddd0. Check: `dll_ww.py`."
-  review: imported
+  review: reviewed
 - addr: 0x3cda00
   final: 0x29eb40
   kind: function
-  semantics: war weariness's amenity losses per city.
+  semantics: "war weariness's amenity losses per city. Per opponent o with weariness W[o] > 0 against the seat: L(o) = W[o] // WAR_WEARINESS_POINTS_FOR_AMENITY_LOSS 400, floored per opponent; at-war opponents first (A), then at peace (B): L(o) to the seat's cities whose original owner is o, most populous first, each min(rest, need + LOSS_OVER_REQ_AMENITIES_AT_WAR_CITY 3) (B: + NONFOUNDED_CITY 1); the pool left to cities founded by a third party, need + 1; the rest to the seat's founded cities, need + 0. The per-opponent W's reader unread."
   status: READ
   cases:
+    - recording: ww_xsec
+      value: need = ceil(pop/2) 135/135 cities; every losing city within need + its category's cap 20/20; founded losers the seat's most populous founded cities 10/10
     - recording: h1_duelw1128
       turn: 199
       value: "Recorded:   runs/h1_duelw1128 Xi'an, China's weariness 474 after its t199 attacks and   no amenity lost at record 200, 424 after its t200 decay and one lost at   record 201 (the growth at t200 on the "
@@ -72,6 +92,7 @@
   readings:
     - "B-D-S1: the war-weariness split — CLOSED (structure)"
     - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
+    - "B-D-S1: the war-weariness split"
   context:
     - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb..."
     - "- War weariness's amenity losses (0x3cda00, `warWearinessLosses`) are laid by 0x3d7020, whose one caller is Player DoTurn (0x4e465..."
@@ -147,6 +168,7 @@
 - addr: 0x3d8510
   final: 0x2a5420
   kind: function
+  semantics: the player's Movement modifier (player +0x1300), a term of GetMaxMoves.
   status: READ
   cases:
     - recording: AI_Planning.csv
@@ -157,9 +179,10 @@
       value: "the planning lab (each minor's planning at its   pass against AI_Planning.csv, seed 1124 to t250): rows equal 1112 -> 1230   of 1829, plots differing 521 -> 382."
   readings:
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   context:
     - "...etMaxMoves' own terms — the unit's Movement modifiers (+0x1920), the player's (+0x1300, 0x3d8510), the start plot's clear-terrain (+0x1924, its plot vt +0x18 at 1), own-ground (+0x1928..."
-  review: imported
+  review: reviewed
 - addr: 0x3d8d20
   final: 0x2a5950
   kind: function

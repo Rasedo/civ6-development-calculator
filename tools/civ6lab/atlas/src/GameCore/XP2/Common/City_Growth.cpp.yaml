@@ -98,7 +98,7 @@
 - addr: 0x1b5620
   final: 0x124060
   kind: function
-  semantics: the city growth object's surplus Food.
+  semantics: the city growth object's surplus Food. Read live by housingValue (0x7a3d70).
   status: PARTLY
   cases:
     - recording: 1124
@@ -115,6 +115,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing"
   context:
     - "...+0x1788, the rate, population, Housing, T, H): S = the Food surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(le..."
     - "...span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth object's surplus (0x1b5620), 2.0 with no city, x fx(Amount x 0.01), bare Food, between. EFFECT_ADJUST_CITY_ALL_MIL..."
@@ -131,7 +132,7 @@
 - addr: 0x1b5840
   final: 0x124190
   kind: function
-  semantics: the city growth object's Housing.
+  semantics: the city growth object's Housing. Read live by housingValue (0x7a3d70).
   status: PARTLY
   cases:
     - recording: 1124
@@ -141,6 +142,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing"
   context:
     - "...d surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left) = 0 below CITY_HOUSING_LEFT_ZERO_GROWTH (-4), 0.25 t..."
   review: reviewed

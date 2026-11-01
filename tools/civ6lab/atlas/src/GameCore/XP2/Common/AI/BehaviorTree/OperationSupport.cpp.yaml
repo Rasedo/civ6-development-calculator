@@ -32,9 +32,12 @@
 - addr: 0x816cb0
   kind: function
   name: opMoveExec
-  semantics: "Operation Move's execution: none where the operation is ready, arrived and the node names no Leader Tag (+0x7c, the tag's AiType, -1 skips); each member alive with Movement left (+0x770, +0xdb0; its turn done or not) nearest first: the radius, barred at least 1 off the goal (a member on the goal skips the test), its planning's plot at the radius in the goal's region, else the ring walk, the move order; its danger flags: op +0x4b0 below +0x510 (0x816e70), flag 8 for a unit with no combat or in a formation holding a civilian (0x266950(2)), else for one with no combat in no formation; 0x8000 for a land unit in no formation with a ship Radius = min(Unit distance (the node's slot 3; 1 where it names none), the unit's Range +0x19f8), 0 where the path finder's +0x1fb8 +0x738 is above 1 or the unit carries the node's Leader Tag (0x79cb30); at least 1 where the goal is barred — no path or an attack into it (0x586360 under flag 0x40), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90) — and, the goal open, for a unit outside the tag and any formation where the node names a Leader Tag and Range above 0. With a radius the ring walk 0x6aef0 (0x69010's order) around the goal with the test 0x815d50; none, the goal."
+  semantics: "Operation Move's execution: none where the operation is ready, arrived and the node names no Leader Tag (+0x7c, the tag's AiType, -1 skips); each member alive with Movement left (+0x770, +0xdb0; its turn done or not) nearest first: the radius, barred at least 1 off the goal (a member on the goal skips the test), its planning's plot at the radius in the goal's region, else the ring walk, the move order; its danger flags: op +0x4b0 below +0x510 (0x816e70), flag 8 for a unit with no combat or in a formation holding a civilian (0x266950(2)), else for one with no combat in no formation; 0x8000 for a land unit in no formation with a ship Radius = min(Unit distance (the node's slot 3; 1 where it names none), the unit's Range +0x19f8), 0 where the path finder's +0x1fb8 +0x738 is above 1 or the unit carries the node's Leader Tag (0x79cb30); at least 1 where the goal is barred — no path or an attack into it (0x586360 under flag 0x40), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90) — and, the goal open, for a unit outside the tag and any formation where the node names a Leader Tag and Range above 0. With a radius the ring walk 0x6aef0 (0x69010's order) around the goal with the test 0x815d50; none, the goal. At 0x81705b: the movers (to 0x81706f): each team member alive (+0x770) with Movement left (+0xdb0), its turn done or not; a member on the goal skips the barred test (0x817905..0x817921), so a melee one goes for its own plot. Ported: passMoveExec (tactical.ts), _op_move_exec."
   status: READ
   cases:
+    - recording: h1_duely1117
+      turn: 179
+      value: city-state 3's Crossbowman, Trebuchet, Field Cannon on 42:13 -> 41:13 t112-t179
     - recording: h1_duelw1124
       turn: 17
       value: 3:9 -> 3:9, 3:13 -> 3:11 around a held rally 3:10
@@ -70,6 +73,7 @@
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
+    - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers"
   context:
     - ...e Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (...
     - "- Operation Move's destination (0x816cb0): radius = min(Range to goal, the unit's attack Range +0x19f8), 0 for a unit in a forma..."

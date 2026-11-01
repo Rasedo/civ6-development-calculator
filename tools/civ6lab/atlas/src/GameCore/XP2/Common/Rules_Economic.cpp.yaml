@@ -205,8 +205,11 @@
 - addr: 0x5267a0
   final: 0x3703c0
   kind: function
-  semantics: the cost progression (type 1 takes n as given; GlobalParameters +0x37c).
-  status: PARTLY
+  semantics: "the cost progression (type 1 takes n as given; GlobalParameters +0x37c). Type 1: E(x) = x + (x x GAME_COST_ESCALATION(1000) // 100 - x) x p // 100 (the policy-unlock price's escalation, p the percent held)."
+  status: READ
+  cases:
+    - recording: dll_policy
+      value: 853 / 853 reads exact (ladders +1 517/517, -1 63/63, probe base 7/7, probe steps 266/266)
   impl:
     - cpu/core/effects.ts:policyEscalated
     - cpu/data/constants.ts:GAME_COST_ESCALATION
@@ -217,6 +220,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "B-D: the policy-unlock price"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...etCostToUnlockPolicies` 0x398e70 (Lua `GetCostToUnlockPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Check: `dll_policy.py`."
@@ -224,13 +228,17 @@
 - addr: 0x5275a0
   final: 0x370f40
   kind: function
-  semantics: the amenity need of a population.
-  status: PARTLY
+  semantics: the amenity need of a population. Need = max(0, ceil(pop / CITY_POP_PER_AMENITY 2) - CITY_AMENITIES_FOR_FREE 0).
+  status: READ
+  cases:
+    - recording: ww_xsec
+      value: need = ceil(pop/2) 135/135 cities; every losing city within need + its category's cap 20/20; founded losers the seat's most populous founded cities 10/10
   readings:
     - "B-D-S1: the war-weariness split — CLOSED (structure)"
     - "H-1: the luxury allocation — READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "B-D-S1: the war-weariness split"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL inser..."
@@ -241,9 +249,12 @@
   kind: function
   name: diploActionPrice
   signature: int price(player, DiplomaticActionType)
-  semantics: "The diplomatic action's gold price: the DiplomaticActions row's Cost (+0x20) through the game speed (0x525400) as fixed point, less its remainder by GlobalParameters PURCHASE_DIVISOR (+0x5b0, 5): Delegation 10, Resident Embassy 25 online."
+  semantics: "The diplomatic action's gold price: the DiplomaticActions row's Cost (+0x20) through the game speed (0x525400) as fixed point, less its remainder by GlobalParameters PURCHASE_DIVISOR (+0x5b0, 5): Delegation 10, Resident Embassy 25 online. Called from the handlers 0x237c60 / 0x238330 and the evaluator; the Delegation 25 -> 12 -> 10 online, the Resident Embassy 50 -> 25."
   status: READ
   cases:
+    - recording: h1_duelv1127
+      turn: 191
+      value: Rome's treasury 559 -> 575 the turn after China's Delegation at t79 (its own yield 6, +10), 1341 -> 1371 after the Embassy at t191 (yield 5, +25)
     - recording: h1_duelv1127
       turn: 79
       value: Rome's treasury 559 -> 575 after China's Delegation (+10 beside its yield 6); 1341 -> 1371 after the Embassy at t191 (+25)
@@ -254,6 +265,7 @@
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
+    - "C-97: the proposals and the religion's choices as seat actions"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...action (Worth +0x24, Cost +0x18),   less the action's gold cost valued at the owner's Gold weight (0x527610 ->   0x7a6690), both sign-clipped by the owner's preference of the action   (+0x6240, the AiFavored..."
   context:

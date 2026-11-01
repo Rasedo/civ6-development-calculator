@@ -130,7 +130,7 @@
 - addr: 0x3366a0
   final: 0x23ca50
   kind: function
-  semantics: "UNIT_DAMAGE_LAND / NAVAL's applier: the units the damage KILLS (damage >= COMBAT_MAX_HIT_POINTS)."
+  semantics: "UNIT_DAMAGE_LAND / NAVAL's applier: the units the damage KILLS (damage >= COMBAT_MAX_HIT_POINTS). It does not refuse an unowned plot (the owner only sets the damage percent); one \"Random Event Unit Damage Roll\" per unit of the row's domain on the plot (not dead, not civilian), MinHP + rand(MaxHP - MinHP). The draw comes before any immunity: the owner's damage percent (0x468060), the player's event immunity (0x468100), the unit's own counter (+0x1110) and its ability list zero the damage after it; a spared unit still spends its draw."
   status: PARTLY
   impl:
     - cpu/core/disasters.ts:unitDamageDraws
@@ -145,6 +145,7 @@
     - "C-41: the eruption's soil, the ring and the gates"
     - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
     - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
+    - "C-1: the nuclear accident's plant and the spared unit's draw"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...GED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and UNIT_KILLED_CIVILIAN 0x33a070 do not (the owner only sets the damage percent). Fl...
@@ -177,11 +178,12 @@
   final: 0x23d300
   kind: function
   name: IMPROVEMENT_DESTROYED
+  semantics: "IMPROVEMENT_DESTROYED's applier: refuses an unowned plot."
   status: PARTLY
   readings: ["C-41: the eruption's soil, the ring and the gates"]
   context:
     - "...o the damage TYPE, not the family: IMPROVEMENT_PILLAGED 0x33aba0, IMPROVEMENT_DESTROYED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780, POPULATION_LOSS 0x33a6e0 ref..."
-  review: imported
+  review: reviewed
 - addr: 0x338710
   final: 0x23b7f0
   kind: function
@@ -310,9 +312,12 @@
   final: 0x23f040
   kind: function
   name: UNIT_KILLED_CIVILIAN
-  semantics: "the plot's units of the unit container's layer 0 (0x75c50 with r9d 0) not dead (+0x770), of formation class CIVILIAN (GetFormationClass 2), without CanRetreatWhenCaptured (unit info +0x1b8 bit 8), whose owner is not immune to the event (0x468100, m_aRandomEventNoUnitDamage) are collected and killed; a Trader (its own layer) is not among them; the layers' assignment unread UNIT_KILLED_CIVILIAN's applier: the civilians killed."
+  semantics: "the plot's units of the unit container's layer 0 (0x75c50 with r9d 0) not dead (+0x770), of formation class CIVILIAN (GetFormationClass 2), without CanRetreatWhenCaptured (unit info +0x1b8 bit 8), whose owner is not immune to the event (0x468100, m_aRandomEventNoUnitDamage) are collected and killed; a Trader (its own layer) is not among them; the layers' assignment unread UNIT_KILLED_CIVILIAN's applier: the civilians killed. It does not refuse an unowned plot. Ported: strikeUnits / _strike_units spare a Trader."
   status: PARTLY
   cases:
+    - recording: h1_duelw1127
+      turn: 160
+      value: "the major flood at 43:13: Muscat's centre's UNIT_KILLED_CIVILIAN draw 6 < 15, its Trader in the centre alive after"
     - recording: h1_duelw1127
       turn: 160
       value: "the major flood at 43:13: Muscat's centre the reach's plot 5 (its CITY_GARRISON band after the 5th draw), UNIT_KILLED_CIVILIAN draw 6 < 15 on it, its Trader in the centre survives (Units Killed = 0)"
@@ -321,6 +326,7 @@
     - "C-41: the eruption's soil, the ring and the gates"
     - "C-96: an event's civilian kill spares a Trader — PARTLY READ"
     - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
+    - "C-96: an event's civilian kill spares a Trader"
   review: reviewed
 - addr: 0x33a280
   kind: function

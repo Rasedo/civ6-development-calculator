@@ -6,7 +6,7 @@
 - addr: 0x972880
   final: 0x67c690
   kind: function
-  semantics: UNITOPERATION_SWAP_UNITS (hash 0x7fa205d1) pushed through the unit's operation queue (+0x60); its CanStart unread.
+  semantics: UNITOPERATION_SWAP_UNITS (hash 0x7fa205d1) pushed through the unit's operation queue (+0x60); its CanStart unread. CanStart is 0x9724c0 through the partner 0x972540.
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:garrisonExecute
@@ -25,6 +25,7 @@
     - "C-95: Attack Units — READ, ported"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ..., the candidate moves to its planning's spot by the city and swaps in (the swap command 0x972880, unported); else the garrison fortifies (0x95eae0) where it has no range and the team...

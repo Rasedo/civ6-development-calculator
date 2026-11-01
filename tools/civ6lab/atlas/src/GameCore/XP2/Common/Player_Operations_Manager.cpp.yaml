@@ -17,7 +17,7 @@
   final: 0x30d330
   kind: function
   name: APPOINT_GOVERNOR
-  semantics: the player operation handler (the great person pass among them).
+  semantics: "the player operation handler (the great person pass among them). At 0x48c219: APPOINT_GOVERNOR: CanAppoint 0x430fa0 then Appoint 0x430590 on the PARAM_GOVERNOR_TYPE value, looked up by 0x28a940 (an index below the table's size, a hash otherwise); the governor record stores the raw value ([+4]). The install's screens pass the row Index (GovernorPanel.lua 551, GovernorDetailsPanel.lua 375-376, GovernorAssignmentChooser.lua 402-404)."
   status: PARTLY
   readings:
     - "B-24r: the governor operations"

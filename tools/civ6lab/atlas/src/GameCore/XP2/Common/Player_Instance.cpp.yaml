@@ -61,23 +61,28 @@
 - addr: 0x468060
   final: 0x2f8060
   kind: function
+  semantics: the owner's random-event unit damage percent.
   status: PARTLY
-  readings: ["C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"]
+  readings:
+    - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
+    - "C-1: the nuclear accident's plant and the spared unit's draw"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...nit that passes the alive / domain gates BEFORE any immunity: the owner's damage percent (0x468060), the player's event immunity (0x468100), the unit's own counter (+0x1110) and its abilit..."
-  review: imported
+  review: reviewed
 - addr: 0x468100
   final: 0x2f80a0
   kind: function
+  semantics: "the player's m_aRandomEventNoUnitDamage: its owner is immune to the event's unit damage."
   status: PARTLY
   readings:
     - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
     - "C-96: an event's civilian kill spares a Trader — PARTLY READ"
+    - "C-96: an event's civilian kill spares a Trader"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...BEFORE any immunity: the owner's damage percent (0x468060), the player's event immunity (0x468100), the unit's own counter (+0x1110) and its ability list each zero the damage after the dr..."
-  review: imported
+  review: reviewed
 - addr: 0x4681a0
   final: 0x2f80e0
   kind: function
@@ -137,6 +142,7 @@
 - addr: 0x469cd0
   final: 0x2f9780
   kind: function
+  semantics: IsAtWarWith (the barbarians at war with every player).
   status: READ
   cases:
     - recording: AI_Knowledge.csv
@@ -176,13 +182,14 @@
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
+    - "C-95: an operation's enemy strength"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...d). - The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0,..."
   context:
     - ...unit info lacks the +0x1ba bit 2, and whose player the mover's player is at war with (0x469cd0), it calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religi...
     - "...rds, AI_Knowledge.csv's ARMY lines \"UNIT_X count age\"), N their total (the at-war ones, 0x469cd0, apart); each entry's +0x30 sums count x efficiency[that row][the entry] (GlobalAI +0x3..."
     - "...giving, by its district (0x810d0): the player's own a FRIENDLY_CITY; a player's at war (0x469cd0) a COMBAT_DISTRICT where the district defends (0x24c2f0: a City Center, an Encampment)..."
-  review: imported
+  review: reviewed
 - addr: 0x469ce0
   final: 0x2f9790
   kind: function

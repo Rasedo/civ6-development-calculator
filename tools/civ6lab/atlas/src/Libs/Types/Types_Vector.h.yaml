@@ -29,11 +29,12 @@
   final: 0x1ab5c0
   kind: function
   name: freeCityRaise
-  semantics: "a unit of a class for a Free City's record: of its allowed units (+0x28) the highest Combat (+0x48), placed by the ring walk within 3"
+  semantics: "a unit of a class for a Free City's record: of its allowed units (+0x28) the highest Combat (+0x48), placed by the ring walk within 3. The first of equals; the ring walk 0x6aef0."
   status: PARTLY
   impl: [cpu/core/phase.ts:freeCityChassis]
   readings:
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "C-60: the Free City's grant"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...(0x152eb0) over CLASS_MELEE, CLASS_RANGED, CLASS_LIGHT_CAVALRY, weight 1 each; the unit 0x273a40: of the record's allowed units (+0x28) of the class, the highest Combat (+0x48, the fir..."
@@ -42,11 +43,12 @@
   final: 0x1ab750
   kind: function
   name: freeCityRecordInit
-  semantics: "a Free City's record at the revolt: the city, the count, the allowed units (CanTrain there, the +0x2b0 lines), the allowed buildings, the pair"
+  semantics: "a Free City's record at the revolt: the city, the count, the allowed units (CanTrain there, the +0x2b0 lines), the allowed buildings, the pair. Made at the revolt by 0x276bc0: the city, live, the count 0; its allowed units (+0x28, one flag per Units row): each unit the city can train (CanTrain 0x172820 on its build queue, the former owner's then) but those flagged +0x1b8 bit 0x40, those with religious strength (+0x78), the air ones (domain +0x20 2 with +0x44 0) and those whose class def (0x28a940) bears +0x48 bit 0x10 — a unit with a list at +0x2b0..+0x2b8 (its count +0x2d0) flags that list's units with no list of their own in its place; its allowed buildings (+0x48: +0x54 set, +0x58 above 0, constructible there); +0x1c the player's +0x12f0 +0xf4 where above 0; then the revolt's pair, 0x273a40 at CLASS_MELEE, 2 units within 3. Ported: City.freeAllowed / city_free_allowed (the former owner's trainableIn at the revolt), freeCityChassis / _free_chassis; the +0x2b0 lists read as the units' own rows (a LAB)."
   status: PARTLY
   impl: [cpu/core/phase.ts:freeCityAllowed, gpu/core/sim_phase.py:_free_city_grant]
   readings:
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "C-60: the Free City's grant"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "## C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
@@ -56,7 +58,7 @@
   final: 0x1abac0
   kind: function
   name: freeCityRecordTurn
-  semantics: "a Free City's record each Free Cities turn: the count +0x18 to 5, the cap of 6 of its units, the Builder for a pillaged improvement within 2 with no HIGH target within 5, else one draw over melee, ranged, light cavalry alike; then the repairs"
+  semantics: "a Free City's record each Free Cities turn: the count +0x18 to 5, the cap of 6 of its units, the Builder for a pillaged improvement within 2 with no HIGH target within 5, else one draw over melee, ranged, light cavalry alike; then the repairs. Each Free City's record (+0x0c the city, +0x14 live) every Free Cities turn: the count +0x18 rises by one; at 5 or more the units whose +0x11d0 names the record (the city's grants), +0x7d0 == -1, are counted — a unit with build charges (+0xed0 > 0) kept aside as its Builder — and with 6 or more the grant waits, the count held. With no Builder of its own, no HIGH_PRIORITY_UNIT target of the player's list within 5 of the city (0x272fa0) and a pillaged improvement (+0x44 set, +0x4d bit 0) within 2, CLASS_BUILDER is raised; else ONE draw \"Free Cities Unit Choice\" (0x152eb0) over CLASS_MELEE, CLASS_RANGED, CLASS_LIGHT_CAVALRY, weight 1 each, the unit 0x273a40. The count back to 0. Then, the city not producing (+0x2350 == 0), the first pillaged district it may repair (0x173f70), else a pillaged building's repair (requests 0x97a1b0 / 0x97a0d0). Ported: freeCityGrant (cpu/core/phase.ts), _free_city_grant (gpu/core/sim_phase.py); the repairs open (AUDIT C-60). It opens with: +0x24 (the raid's tree) set and its tree gone, +0x24 = -1 (+0x20 kept)."
   status: PARTLY
   cases:
     - recording: h1_duelw1123
@@ -79,6 +81,8 @@
     - "H-1: draws with no game site"
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-60: the Free City's grant"
+    - "C-60: the Free Cities Raid"
   context:
     - "...theon pick (`_seat_pantheon_race`) and the Free Cities' grant (\"Free Cities Unit Choice\", 0x274010, one weighted pick: the engines' `freeCityGrantType` / `_free_grant_type` take it as the..."
   review: reviewed
@@ -159,6 +163,7 @@
   review: reviewed
 - addr: 0x4c1cd0
   kind: function
+  semantics: "an int vector's element (data +0, size +0x10): the promotion class weight's vectors."
   status: PARTLY
   cases:
     - recording: 1121
@@ -169,13 +174,14 @@
       value: 1117 Caguana t88 the Trebuchet at 22 (ours 25.20) over the Catapult (ours   25.81).
   readings:
     - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
+    - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite"
   context:
     - "...constructor registers), each an int vector of fixed point indexed by promotion class (0x4c1cd0: data +0, size +0x10); the weight max(default + modified, 0.1), 0 where the default is..."
-  review: imported
+  review: reviewed
 - addr: 0x58aa90
   final: 0x3b4040
   kind: function
-  semantics: "the unit sight update: raises game signal +0x10c8 per plot whose owner's visibility count went from 0 to more (0x508d50 answering 2); a move adds the new sight before dropping the old."
+  semantics: "the unit sight update: raises game signal +0x10c8 per plot whose owner's visibility count went from 0 to more (0x508d50 answering 2); a move adds the new sight before dropping the old. Calls 0x534950 on a FULL_CIV player's plot first revealed."
   status: PARTLY
   impl:
     - cpu/harness/drawSites.ts:DRAW_SITES
@@ -191,6 +197,7 @@
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-100: the rivers' names and the flood cut"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2:...
@@ -247,13 +254,15 @@
 - addr: 0x675e40
   final: 0x72f750
   kind: function
+  semantics: an index into GlobalAI +0x39a8, the per-district DistrictModifiers lists (the district value's modifiers).
   status: PARTLY
   readings:
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96: the district value's remaining terms"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...HE MODIFIERS (0x7a4b20 at 0x7adc10): the list GlobalAI +0x39a8 indexed by the district (0x675e40), filled once (0x6e0736..0x6e08f5) per Districts row from \"SELECT ModifierId from Distr..."
-  review: imported
+  review: reviewed
 - addr: 0x682440
   kind: function
   name: hintPowerBuilding
@@ -481,9 +490,12 @@
 - addr: 0x71fb80
   kind: function
   name: the military AI's regional strengths
-  semantics: "the military AI's turn (a city-state from 0x7204bc). The strengths: the yardstick B = max(1, PlayerUnits +0xf0 (the best melee Combat made), 0x4bd030); per player in the players list (0x483b50 +0x50) the strength summed over the military AI's primary region list (+0x1290 +0x2f0, every region within three of its cities) of the records 0x5eb430 returns (no area; the record's +0x1c, its plot's region, against the region's id; age at most 2), each unit's max(Combat, RangedCombat) where it plus 20 exceeds B; the player itself adds each city's unit at the head of its queue (0x179860) of such strength — Regional (+0x398); a player at war (0x469cd0) or flagged (+0xd18) gives Enemy (+0x3f8) its max and, not a tribe (0x469ce0), raises the floor M (from -0.5, 0xd5fed0) by 0.5 (0xd20458); any other gives Other (+0x458) its max and, flagged at +0xc58, raises M by 0.25 (0xd2f324). The Combat Desire (0x721302; PSEUDOYIELD_UNIT_COMBAT, +0x790): W := 0; Regional below Enemy: (Enemy - Regional) x 0.05 (0xd55ff0); else below the target, the cities (player +0x12f0 +0xc0) times B: (target - Regional) / B, whole; else Regional - 20 above Enemy: where Regional + 60 is below Other, (Other - Regional - 60) x 0.025 (0xd6ced0) capped at 2.0, else (Enemy - max(Other - 60, Regional)) x 0.025 capped at 3.0. W below -M is 0, else at least M; with no war footing (+0x4b8) and no city's CityBuildAI +0x1b8 at or above 0 at most 2.0; plus PSEUDOYIELD_STANDING_ARMY_VALUE (@0xf2e2b4, 0x7a60d0) of the cities' CityBuildAI +0x2d8 summed. Logged as AI_Military.csv Regional / Enemy / Other Strength and Combat Desire. Also PSEUDOYIELD_UNIT_EXPLORER (desired +0x930 - held +0x9f0) - 1.0 and NAVAL_COMBAT (+0x990 - +0xa50) - 1.0 (0x7204c3..0x7205ae); +0x7e8 for UNIT_COMBAT, NAVAL, EXPLORER, NUCLEAR, STANDING_ARMY. THE FAV TECH (at 0x720676 / 0x721ad4): the tracked \"Fav Tech\" (+0xd30, value +0xd88) set to -1, then over the unit production table ([player+0x1290]+0x268, 0x168-byte entries in the Units' database order, 0x7989e0) — an entry with +0x0e clear (0x798cc2), +0x0a clear (its domain DOMAIN_SEA, 0x798c83), +0x2c (the sum over the players at war with it, 0x469cd0, of the knowledge base's count of each opposing type 0x5eb650 times the efficiency M[opposing][entry], 0x7992b0..0x7994af) above the best so far (0 from 0x7204b1), and the unit's PrereqTech (+0x280) researchable now (0x4c8c40) — the tech set (0x731d10) and its sum the best; NO_TECH where none."
+  semantics: "the military AI's turn (a city-state from 0x7204bc). The strengths: the yardstick B = max(1, PlayerUnits +0xf0 (the best melee Combat made), 0x4bd030); per player in the players list (0x483b50 +0x50) the strength summed over the military AI's primary region list (+0x1290 +0x2f0, every region within three of its cities) of the records 0x5eb430 returns (no area; the record's +0x1c, its plot's region, against the region's id; age at most 2), each unit's max(Combat, RangedCombat) where it plus 20 exceeds B; the player itself adds each city's unit at the head of its queue (0x179860) of such strength — Regional (+0x398); a player at war (0x469cd0) or flagged (+0xd18) gives Enemy (+0x3f8) its max and, not a tribe (0x469ce0), raises the floor M (from -0.5, 0xd5fed0) by 0.5 (0xd20458); any other gives Other (+0x458) its max and, flagged at +0xc58, raises M by 0.25 (0xd2f324). The Combat Desire (0x721302; PSEUDOYIELD_UNIT_COMBAT, +0x790): W := 0; Regional below Enemy: (Enemy - Regional) x 0.05 (0xd55ff0); else below the target, the cities (player +0x12f0 +0xc0) times B: (target - Regional) / B, whole; else Regional - 20 above Enemy: where Regional + 60 is below Other, (Other - Regional - 60) x 0.025 (0xd6ced0) capped at 2.0, else (Enemy - max(Other - 60, Regional)) x 0.025 capped at 3.0. W below -M is 0, else at least M; with no war footing (+0x4b8) and no city's CityBuildAI +0x1b8 at or above 0 at most 2.0; plus PSEUDOYIELD_STANDING_ARMY_VALUE (@0xf2e2b4, 0x7a60d0) of the cities' CityBuildAI +0x2d8 summed. Logged as AI_Military.csv Regional / Enemy / Other Strength and Combat Desire. Also PSEUDOYIELD_UNIT_EXPLORER (desired +0x930 - held +0x9f0) - 1.0 and NAVAL_COMBAT (+0x990 - +0xa50) - 1.0 (0x7204c3..0x7205ae); +0x7e8 for UNIT_COMBAT, NAVAL, EXPLORER, NUCLEAR, STANDING_ARMY. THE FAV TECH (at 0x720676 / 0x721ad4): the tracked \"Fav Tech\" (+0xd30, value +0xd88) set to -1, then over the unit production table ([player+0x1290]+0x268, 0x168-byte entries in the Units' database order, 0x7989e0) — an entry with +0x0e clear (0x798cc2), +0x0a clear (its domain DOMAIN_SEA, 0x798c83), +0x2c (the sum over the players at war with it, 0x469cd0, of the knowledge base's count of each opposing type 0x5eb650 times the efficiency M[opposing][entry], 0x7992b0..0x7994af) above the best so far (0 from 0x7204b1), and the unit's PrereqTech (+0x280) researchable now (0x4c8c40) — the tech set (0x731d10) and its sum the best; NO_TECH where none. At 0x7218a5: the military AI's turn sums the standing army's shortfall (+0x2d8) over the player's cities (city +0x31d0 the CityBuildAI) and adds pseudoYieldValue(PSEUDOYIELD_STANDING_ARMY_VALUE, 1.0) x that sum (0.1 at DefaultValue, raw 25 each) to the Combat Desire; the cap of 2.0 lifts with the war footing or a city's threat +0x1b8 at or above 0. At 0x721158: the war footing +0x4b8 (the player AI's [+0x12a0], an autovariable at +0x460, setter 0x29fdf0, value at +0x58) is written by the military AI's turn alone: cleared here each turn, set to 1 at 0x72142b on the branch behind 0x72118a's IsMajor (0x469db0) — a city-state skips to 0x721302, so its war footing is always clear."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 32
+      value: Nazca's t32 Horseman is not the war footing's
     - recording: h1_duely1127
       value: 466 of 513 city-state and Free Cities turns' Fav Tech as logged (t1-t130)
     - recording: h1_duelv1124
@@ -520,6 +532,8 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-96: the standing army and the Combat Desire's city terms"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhatta..."
   context:
@@ -758,9 +772,15 @@
 - addr: 0x7f4e00
   final: 0x55c550
   kind: function
-  semantics: "Build Unit's update: its \"already held\" test reads the city's buildings (0x18e9f0 City_Buildings -> 0x18fe60 HasBuilding), not its queue."
+  semantics: "Build Unit's update: its \"already held\" test reads the city's buildings (0x18e9f0 City_Buildings -> 0x18fe60 HasBuilding), not its queue. At 0x7f510d: Build Unit's district test (to 0x7f513c): the desired district held (0x1aec20 on the city's districts +0x1a48, its third argument 1: complete) and 0x1ad720 false SUCCEEDS; a pillaged district is not held, the tree submits its contract, which the city's queue takes as the district's repair. Ported: districtHeld / district_held. At 0x7f50e9: Build Unit's building test (to 0x7f5103): the city holds the building (0x18e9f0) and it is not pillaged (0x18fe60) -> held (0x7f513c); a pillaged one is not held, the contract stands and the queue takes it as the repair. Ported: buildingHeld / buildingBlocked, _MinorWorld.building_held / building_blocked."
   status: PARTLY
   cases:
+    - recording: h1_duely1121
+      turn: 215
+      value: "Ayutthaya's pillaged Shipyard: contract 649 submitted t209, queued t215 (value 1311.8) over the Builder's 668"
+    - recording: h1_duely1128
+      turn: 149
+      value: Nazca's Holy Site pillaged at t24, DISTRICT_HOLY_SITE contracts t49-t149
     - recording: h1_duely1128
       turn: 49
       value: "0x7f510d..0x7f513c: a pillaged district is not held; Nazca's Holy Site (pillaged t24) DISTRICT_HOLY_SITE contracts t49-t149"
@@ -776,18 +796,25 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
   context:
     - "...ab0 — WEAK to the backup, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the uni..."
   review: reviewed
 - addr: 0x7f7da0
   final: 0x55ef10
   kind: function
-  semantics: "Reserve Plot: reserves the plot for the tree; another tree's reservation yields to a value 20.0 above it (0x5d74c0)."
+  semantics: "Reserve Plot: reserves the plot for the tree; another tree's reservation yields to a value 20.0 above it (0x5d74c0). The events do not share plots by rule: both read the turn's analysis as it stands and either may name the same plot; Reserve Plot hands it to the higher value, and the district tree whose Reserve Plot fails ends."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1121
+      turn: 2
+      value: "Antioch: the district tree takes the Commercial Hub at a 5.25 plot (999) and posts Currency at 5.0, the Camp tree Animal Husbandry at 48.0, as logged"
   impl: [cpu/core/aiCityTrees.ts:reservePlot, gpu/core/sim_citytrees.py:_u_reserve_plot]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-99: the district and improvement events on one plot — the eruption's turns (a LAB, both twins)"
+    - "C-99: the district and improvement events on one plot"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reservation yields to a value 20.0 above it); Check Plot 0x7f..."
@@ -806,12 +833,13 @@
 - addr: 0x81d360
   final: 0x57cc20
   kind: function
+  semantics: "Spy EscapeRoute: the AI's escape route choice."
   status: PARTLY
-  readings: ["C-16: the espionage roll's bands — READ"]
+  readings: ["C-16: the espionage roll's bands — READ", "C-16: the espionage roll's bands"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...is one weighted pick over the offered routes (weights as read in C-16); \"Spy EscapeRoute\" 0x81d360 is the AI's route choice, which the driver makes."
-  review: imported
+  review: reviewed
 - addr: 0xc6f950
   kind: function
   semantics: adds to the city's per-unit production modifier (city +0x2c0[unit]).

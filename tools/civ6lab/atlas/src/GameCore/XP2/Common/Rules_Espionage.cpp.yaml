@@ -56,10 +56,13 @@
   review: reviewed
 - addr: 0x52aea0
   kind: function
-  semantics: the escape's resolution (-> 0x52b090).
+  semantics: the escape's resolution (-> 0x52b090). Killed 3..v-3, caught v-2..v-1, away v..18, the other three weights 0.
   status: PARTLY
   impl: [cpu/core/espionage.ts:spyEscape, gpu/core/sim_spy.py:_spy_escape]
-  readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
+  readings:
+    - "C-16: the counterspy and the escape"
+    - "C-16: the espionage roll's bands — READ"
+    - "C-16: the espionage roll's bands"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "..., mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_..."
@@ -83,10 +86,16 @@
   review: reviewed
 - addr: 0x52b2a0
   kind: function
-  semantics: "the espionage mission roll (\"Rolling Espionage Result\")."
-  status: PARTLY
+  semantics: "the espionage mission roll (\"Rolling Espionage Result\"). ONE weighted pick (0x287c00) over six weights in index order (table 0x52b8f0); the needed roll T (0x529b60): a5 = clamp(T, 8, 18), a4 = clamp(T - 2, 7, 17), a3 = clamp(T - 3, 6, 16), a2 = clamp(T - 5, 5, 15), a1 = clamp(T - 7, 4, 14); the weights the 3d6 counts (0xf02c70, of 216; summed by 0x52b5c0) over 3..a1-1 (killed), a1..a2-1 (captured), a2..a3-1 (fail, must escape), a3..a4-1 (fail, undetected), a4..a5-1 (success, must escape), a5..18 (success, undetected). Ported: missionWeights / _mission_weights (threshold t = T - 2)."
+  status: READ
+  cases:
+    - recording: lab
+      value: "the lab's tables base 13, k = 2: 66/61/32/54/29/11 of 256 = floor(count x 256 / 216)"
   impl: [cpu/core/espionage.ts:missionDraw, gpu/core/sim_spy.py:_mission_draw]
-  readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
+  readings:
+    - "C-16: the counterspy and the escape"
+    - "C-16: the espionage roll's bands — READ"
+    - "C-16: the espionage roll's bands"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...age: mission target `ComputeNeededDieRoll` 0x529b60, outcome table 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b0..."
@@ -95,20 +104,24 @@
 - addr: 0x52b5c0
   final: 0x373f10
   kind: function
+  semantics: sums the 3d6 counts over a band.
   status: PARTLY
   impl: [cpu/core/espionage.ts:diceBand, gpu/core/sim_spy.py:_dice_band]
-  readings: ["C-16: the espionage roll's bands — READ"]
+  readings: ["C-16: the espionage roll's bands — READ", "C-16: the espionage roll's bands"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...5), a1 = clamp(T − 7, 4, 14); the weights are the 3d6 counts (0xf02c70, of 216; summed by 0x52b5c0) over 3..a1−1 (killed), a1..a2−1 (captured), a2..a3−1 (fail, must escape), a3..a4−1 (fail..."
-  review: imported
+  review: reviewed
 - addr: 0x52b8f0
   final: 0x374180
   kind: function
-  semantics: the espionage mission's outcome table.
+  semantics: the espionage mission's outcome table. The six bands of the mission roll (killed, captured, fail escaping, fail undetected, success escaping, success undetected) over the clamped thresholds of T.
   status: PARTLY
   impl: [cpu/core/espionage.ts:missionWeights, gpu/core/sim_spy.py:_mission_weights]
-  readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
+  readings:
+    - "C-16: the counterspy and the escape"
+    - "C-16: the espionage roll's bands — READ"
+    - "C-16: the espionage roll's bands"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "Rules_Espionage: mission target `ComputeNeededDieRoll` 0x529b60, outcome table 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 →..."

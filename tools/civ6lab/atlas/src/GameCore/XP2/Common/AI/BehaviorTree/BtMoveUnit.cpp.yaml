@@ -19,8 +19,15 @@
   final: 0x556c30
   kind: function
   name: moveUnitExec
-  semantics: "Move Unit's execution: the kept unit, else each of its units, moves — the unit's planned walk (0x791300, one turn), the location aside taking none ending on a plot of danger (0x7eed65 -> 0x7ef0bb). The held unit's turn ends; it goes for the plot at To Range its planning reaches this turn, else the location (a plot of danger only where Allow Danger), woken (0x53e20) and moved (0x972880 / 0x962030)."
+  semantics: "Move Unit's execution: the kept unit, else each of its units, moves — the unit's planned walk (0x791300, one turn), the location aside taking none ending on a plot of danger (0x7eed65 -> 0x7ef0bb). The held unit's turn ends; it goes for the plot at To Range its planning reaches this turn, else the location (a plot of danger only where Allow Danger), woken (0x53e20) and moved (0x972880 / 0x962030). At 0x7eee6a: Move Unit's execution with no Location: over the tree's units in the player's order (0x6092c0), each with a target (+0x830 / +0x834 valid) off its plot (+0x220 / +0x224): its turn done (0x570b40, dl 1: the flag +0x530, no Movement spent); with Allow Danger false (the node's byte, rbp+0x50) a target on the danger map (0x716a60) is gone for only where the unit's planning (+0x1fc0) reaches it this turn with Movement left (0x791300, r8 1, r9b 1); then UNITOPERATION_SWAP_UNITS onto it (0x972880) and UNITOPERATION_MOVE_TO there (0x962030), both with the flags 0x100a (0x1000 with Allow Danger). At 0x7eef84: with Allow Danger false a target on the danger map is gone for only where the unit's planning (+0x1fc0, the pass's: 0x791300, 1 turn, Movement left) reaches it, not a fresh search. Ported: upgradeMove (cpu/core/minorOps.ts), _mops_upgrade_move (gpu/core/sim_minorops.py)."
   status: PARTLY
+  cases:
+    - recording: h1_duely1121
+      turn: 112
+      value: city-state 2's Horseman 786438 fortified on 8:6 under an Upgrade Units tree, its planning holding its centre 11:5 at (1/0), stays there t80-112
+    - recording: h1_duely1128
+      turn: 154
+      value: "Bologna: its Warrior 2228224 on 4:10 swaps onto its centre with the Trebuchet, then Warrior 2162692 on 5:8 swaps onto it with the first (record t+1)"
   impl:
     - cpu/core/barbarianOps.ts:SCOUT_NODES
     - cpu/core/aiCityTrees.ts:execute
@@ -45,6 +52,8 @@
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-99: Move Unit's path flags 0x2 / 0x8 — READ (0x2720a0, 0x716080), both twins"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
@@ -78,9 +87,12 @@
   final: 0x557910
   kind: function
   name: Upgrade Units execution
-  semantics: "Upgrade Units' execution (a player no human drives), over the tree's units in the player's order (0x6092c0): the full test (0x58fff0 r8 0) passing, the economic AI's upgrade (0x68c940); else, with Can Delete, the deletion (UNITCOMMAND_DELETE 0x73cd1698) of an excess obsolete unit (0x591000 -1, or at most one promotion and more than 10 of its type 0x4f2c90); the full and visible tests failing: released (+0x778 -1, turn done 0x570b40) and, Can Delete, deleted; the visible one passing: Can Delete, on its own ground and no resource asked, deleted."
+  semantics: "Upgrade Units' execution (a player no human drives), over the tree's units in the player's order (0x6092c0): the full test (0x58fff0 r8 0) passing, the economic AI's upgrade (0x68c940); else, with Can Delete, the deletion (UNITCOMMAND_DELETE 0x73cd1698) of an excess obsolete unit (0x591000 -1, or at most one promotion and more than 10 of its type 0x4f2c90); the full and visible tests failing: released (+0x778 -1, turn done 0x570b40) and, Can Delete, deleted; the visible one passing: Can Delete, on its own ground and no resource asked, deleted. At 0x7ef8b3: Upgrade Units' execution: Can Delete (r14) the node's data byte — the tree gives node 3 no TreeData row (DataName \"Can Delete\", Required False), so true. Per unit in the player's order: the full test (0x58fff0, r8 0) passing — the economic AI's upgrade (0x68c940) bought, done; else, Can Delete, 0x591000 -1 deletes; else at most one promotion (+0x1bc0's count, 0x382f0 <= 1) and more than 10 of its type (0x4f2c90 > 0xa) deletes. The full test failing: the visible test (r8 1) failing — released (+0x778 -1), its turn done (0x570b40), Can Delete deleted; passing — Can Delete, on its own ground (the plot's owner +0x1c = the unit's +0x2e0) with 0x591000 -1, deleted (UNITCOMMAND_DELETE through vt +0x48 / +0x58). Ported: upgradeTreesTick / upgradeMayGo / unupgradedDeleted (cpu/core/minorOps.ts), _mops_upgrade_trees."
   status: READ
   cases:
+    - recording: h1_duelu1128
+      turn: 240
+      value: "Bologna at 0 Gold: eight Scouts (Skirmisher: no resource) held t231-t239, all gone at t240 as Steel lands; its Infantry (Mechanized Infantry: Oil) kept"
     - recording: h1_duelu1128
       turn: 240
       value: "Bologna at 0 Gold: its eight Scouts (Skirmisher, no resource) deleted as Steel lands; its Infantry (Mechanized Infantry, Oil) kept"
@@ -92,6 +104,7 @@
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
+    - "C-96: the upgrade trees' deletion"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...s tables): Find Unit Targets update 0x7ed200, Upgrade Units update 0x7f0ea0 / execution 0x7ef850."
@@ -114,9 +127,12 @@
   final: 0x5580a0
   kind: function
   name: moveUnitUpdate
-  semantics: "Move Unit's update: its kept unit (+0x50, kept across turns; an id of 0 or -1 none) alive with a planning: SUCCESS where the planning reaches the location within one turn (0x791300, the flag clear), else RUNNING. None kept: over its units in order, the first reaching it this turn with Movement left (the flag set) is kept and it SUCCEEDS; else the first reaching it this turn, where none is kept yet, or the one whose path (0x272a60) takes the fewest turns, is kept, RUNNING; none FAILURE. \"Allow Danger\" 0 (every city tree's): the location read on the player's danger map (0x7f040d: 0x716a60 on player +0x12d8, x + y x width into 0x716a90); a location of danger lets the kept unit that reaches it go (+0x50 -1, SUCCESS), and a unit is kept by its path only where the location is clear (0x7f057e). With no Location (0x7f067c) SUCCESS where every tree unit with a target is done. No Location SUCCESS, no unit SUCCESS; the unit it holds (the node's memory): its planning reaching a plot at To Range of the location this turn (0x791300) SUCCESS, else RUNNING, a held unit with no planning FAILURE; none held, the unit whose planning reaches the location this turn — one with Movement left there first —, else the one whose path (0x272a60 on the unit's path finder +0x1fb8, flag 0x1000, at 0x7f05a0) takes the fewest turns (above 0, fewer than the best so far) is held: SUCCESS where it reaches it with Movement left, else RUNNING; none FAILURE. A camp its own defender holds is such a goal. With no Location (from 0x7f067c): over the tree's units, each with a target (+0x830) reaching it within a turn with Movement left (0x791300) or whose target holds danger (0x716a60, Allow Danger false) passes; one with no planning (+0x1fc0) or none reaching it RUNNING, else SUCCESS."
+  semantics: "Move Unit's update: its kept unit (+0x50, kept across turns; an id of 0 or -1 none) alive with a planning: SUCCESS where the planning reaches the location within one turn (0x791300, the flag clear), else RUNNING. None kept: over its units in order, the first reaching it this turn with Movement left (the flag set) is kept and it SUCCEEDS; else the first reaching it this turn, where none is kept yet, or the one whose path (0x272a60) takes the fewest turns, is kept, RUNNING; none FAILURE. \"Allow Danger\" 0 (every city tree's): the location read on the player's danger map (0x7f040d: 0x716a60 on player +0x12d8, x + y x width into 0x716a90); a location of danger lets the kept unit that reaches it go (+0x50 -1, SUCCESS), and a unit is kept by its path only where the location is clear (0x7f057e). With no Location (0x7f067c) SUCCESS where every tree unit with a target is done. No Location SUCCESS, no unit SUCCESS; the unit it holds (the node's memory): its planning reaching a plot at To Range of the location this turn (0x791300) SUCCESS, else RUNNING, a held unit with no planning FAILURE; none held, the unit whose planning reaches the location this turn — one with Movement left there first —, else the one whose path (0x272a60 on the unit's path finder +0x1fb8, flag 0x1000, at 0x7f05a0) takes the fewest turns (above 0, fewer than the best so far) is held: SUCCESS where it reaches it with Movement left, else RUNNING; none FAILURE. A camp its own defender holds is such a goal. With no Location (from 0x7f067c): over the tree's units, each with a target (+0x830) reaching it within a turn with Movement left (0x791300) or whose target holds danger (0x716a60, Allow Danger false) passes; one with no planning (+0x1fc0) or none reaching it RUNNING, else SUCCESS. At 0x7f067c: with no Location: no unit in the tree, SUCCESS; else over the tree's units (0x6092c0) each with a target (+0x830 / +0x834 valid): with a planning reaching the target this turn (0x791300: 1 turn, no Movement asked) and Allow Danger false, a target on the danger map (0x716a60) passes; else its planning reaching the target this turn with Movement left (r9b 1) passes; no planning, or neither, RUNNING. Every unit passing, SUCCESS: the tree ends and frees its units. Ported: upgradeArrived in upgradeTreesTick (cpu/core/minorOps.ts), Move Unit's update in _mops_upgrade_trees."
   status: PARTLY
   cases:
+    - recording: h1_duely1128
+      turn: 154
+      value: "Bologna at 0 Gold: its Upgrade Units tree 5963782 holds four units t151-153 that walk to its centre; the tree gone at t154, the units wander from t156"
     - recording: h1_duelw1121
       turn: 64
       value: camp 12:14's Scout reports 6:12 at t64 and walks home round the mountains, home at t73
@@ -136,6 +152,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
+    - "C-99: Move Unit's update with no Location ends the Upgrade Units trees"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.

@@ -176,11 +176,12 @@
   review: reviewed
 - addr: 0x147c20
   kind: function
-  semantics: a clans' tribe test of the path validity (with 0x151550).
+  semantics: a clans' tribe test of the path validity (with 0x151550). The turns the tribe was bribed (the assault tree's Notify Owner lists a city only then).
   status: PARTLY
   readings:
     - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-95: the barbarians' operations on the manager"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...r the assault (+0x60); the assault's tree lists nothing but where the tribe was bribed (0x147c20's turns).
@@ -216,7 +217,7 @@
   final: 0xdc0a0
   kind: function
   name: tribeTreeNotified
-  semantics: "a tribe's tree done: the scout's tree, threshold RaidingBoldness (BarbarianTribes +0x24, a name's +0x38 override): boldness at it, no raid running (+0x3c) and no bribe -> the raid starts at once (0x149980), else the city to the raid list (+0x48); a raid's tree, threshold CityAttackBoldness (+0x1c): the city assault (0x1497d0) or its list (+0x60)."
+  semantics: "a tribe's tree done: the scout's tree, threshold RaidingBoldness (BarbarianTribes +0x24, a name's +0x38 override): boldness at it, no raid running (+0x3c) and no bribe -> the raid starts at once (0x149980), else the city to the raid list (+0x48); a raid's tree, threshold CityAttackBoldness (+0x1c): the city assault (0x1497d0) or its list (+0x60). The assault's tree lists nothing but where the tribe was bribed (0x147c20's turns)."
   status: READ
   cases:
     - recording: h1_duelw1117-1128
@@ -235,6 +236,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-95: the barbarians' operations on the manager"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The scout home (Notify Owner 0x7c6fa0 -> 0x153ea0 -> 0x148270): for the scout's tree, threshold RaidingBoldness (BarbarianTribes +0x24, a name's +0..."

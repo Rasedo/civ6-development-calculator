@@ -73,12 +73,13 @@
 - addr: 0x362130
   final: 0x25c630
   kind: function
+  semantics: the improvement is the barbarian camp (GetNextBuyablePlot's RING_COST).
   status: PARTLY
-  readings: ["Border plot: GetNextBuyablePlot — READ"]
+  readings: ["Border plot: GetNextBuyablePlot — READ", "Border plot: GetNextBuyablePlot"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...4d0) and RING_COST when d > 3; an improvement adds RING_COST if it is the barbarian camp (0x362130), else IMPROVEMENT_COST; a natural wonder (0x82e90) NW_COST; YIELD_POINT_COST per yield p...
-  review: imported
+  review: reviewed
 - addr: 0x362ec0
   final: 0x25d270
   kind: function

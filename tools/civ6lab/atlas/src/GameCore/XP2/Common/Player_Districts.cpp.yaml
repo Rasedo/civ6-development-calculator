@@ -6,7 +6,7 @@
 - addr: 0x406c00
   final: 0x2c3fc0
   kind: function
-  semantics: the player may have the district.
+  semantics: the player may have the district. The plot analysis's +0x55 gate reads it on the player's districts (+0x1308). The player's own version of the district type (its table +0x430); CanConstruct's prerequisite-district test reads it.
   status: PARTLY
   impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
   readings:
@@ -17,6 +17,8 @@
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
+    - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Zone District Type (0x84e120 / 0x84e030): the actor's own district (0x406c00) with RequiresPopulation (+0xe1 bit 6), its era known and at most the actor's (0x93e5..."
@@ -38,15 +40,17 @@
 - addr: 0x408860
   final: 0x2c43b0
   kind: function
+  semantics: a district type's replacement (the building's PrereqDistrict looked up through it, CanConstruct 0x17071d).
   status: PARTLY
   readings:
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
     - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e 0x5d0860 calls), 0x17071d: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held and complete (+0xb08), t..."
-  review: imported
+  review: reviewed
 - addr: 0x4088a0
   kind: function
   name: DistrictType

@@ -73,7 +73,7 @@
 - addr: 0x286f80
   final: 0x1b9b10
   kind: function
-  semantics: "After a rise that halts storm fertility, per plot off water and impassable it draws no yield row; where the removal is above 0 it runs 0xa1c0c0 instead and takes the removed count off FertilityAdded. A storm's strike: the footprint 0x28d6b0 minus the struck list; per plot each damage row one rand(100) against Percentage x pct // 100 (the row's CoastalLowlandPercentage on a lowland plot), its own rolls after it; then off water and impassable plots each yield row one rand(100)."
+  semantics: "After a rise that halts storm fertility, per plot off water and impassable it draws no yield row; where the removal is above 0 it runs 0xa1c0c0 instead and takes the removed count off FertilityAdded. A storm's strike: the footprint 0x28d6b0 minus the struck list; per plot each damage row one rand(100) against Percentage x pct // 100 (the row's CoastalLowlandPercentage on a lowland plot), its own rolls after it; then off water and impassable plots each yield row one rand(100). Each plot at most once per storm (the struck list +0x38), the rows' Percentage at 100%, 50% on the storm's last turn, Percentage x pct // 100 in integers against rand(100) for the damage and the yield rows alike."
   status: READ
   cases:
     - recording: h1_duelw1123
@@ -201,8 +201,12 @@
 - addr: 0x288250
   final: 0x1baaa0
   kind: function
+  semantics: "\"Pick Storm Start Plot\": passes 0x2900c0 a COUNT, not a radius — 2 for Hexes >= 19, 1 for Hexes >= 3, 0 otherwise; ONE uniform draw over the qualifying plots in ascending order (0x2883a4 passes the vector's size, not its total). Replayed: cpu/harness/eventReplay.ts."
   status: READ
   cases:
+    - recording: h1_duelw1115
+      turn: 243
+      value: 22 of 22 recorded storm births on 1115 / 1116 (hurricanes t45 ... t243); TORNADO_FAMILY 8 of 8 at -1
     - recording: h1_duelw1115
       value: "0x28aa00 with that count: 0 fails every plot (TORNADO_FAMILY never starts: 8 of 8 recorded at -1 on runs/h1_duelw1115 / 1116);"
     - recording: 1115
@@ -217,18 +221,19 @@
     - cpu/core/disasters.ts:stormStartRadius
     - cpu/core/disasters.ts:stormStart
     - cpu/harness/eventDraws.ts:stormStartPlots
-  readings: ["C-49 tail: the storm's start plot — READ (REVERSED)"]
+  readings: ["C-49 tail: the storm's start plot — READ (REVERSED)", "C-49 tail: the storm's start plot"]
   context:
     - "\"Pick Storm Start Plot\" 0x288250 passes 0x2900c0 a COUNT, not a radius: 2 for Hexes ≥ 19, 1 for Hexes ≥ 3, 0 otherwise. 0x..."
-  review: imported
+  review: reviewed
 - addr: 0x288740
   final: 0x1baf40
   kind: function
+  semantics: "the climate observer: takes the amount of a resource consumed (x CLIMATE_CO2_PERCENT_FROM_UNITS 50% for a unit's upkeep) and the resource's CO2perkWh — carbon follows the resources burnt, not the Power."
   status: PARTLY
   readings: ["B-24r: the governor operations"]
   context:
     - "- Carbon: the climate observer 0x288740 takes the AMOUNT of a resource consumed (x CLIMATE_CO2_PERCENT_FROM_UNITS 50% for a uni..."
-  review: imported
+  review: reviewed
 - addr: 0x288f40
   final: 0x1c8620
   kind: function
@@ -274,7 +279,7 @@
 - addr: 0x28a940
   final: 0x2209a0
   kind: function
-  semantics: the row whose +0x1c lifts the city name list's cap of 10.
+  semantics: "the row whose +0x1c lifts the city name list's cap of 10. A table lookup that takes an index when it is below the table's size and a hash otherwise. A resource's Resource_Consumption row by Resources +0x1c: +0x48 bit 0 Accumulate, +0x24 ImprovedExtractionRate."
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -292,6 +297,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   context:
     - "...CanAppoint 0x430fa0 -> Appoint 0x430590): the PARAM_GOVERNOR_TYPE value is looked up by 0x28a940, which takes an INDEX when it is below the table's size and a HASH otherwise — and the..."
     - "...item whose Projects row (0xad5f10, +0x1c its index) has a Projects_XP2 row (0xad5fb0 / 0x28a940) — its +0x24, ReligiousPressureModifier (Holy Site Prayers 100, every other row 0). Rec..."
@@ -300,7 +306,7 @@
 - addr: 0x28aa00
   final: 0x1bc560
   kind: function
-  semantics: a one-off's plot walk with the event's radius (+0x30) under the predicate (the functor 0xd267d0's call 0x292e10).
+  semantics: a one-off's plot walk with the event's radius (+0x30) under the predicate (the functor 0xd267d0's call 0x292e10). With 0x2900c0's count (0 / 1 / 2) as the radius argument.
   status: READ
   cases:
     - recording: h1_duelw1115
@@ -318,6 +324,7 @@
     - "C-49 tail: the storm's start plot — READ (REVERSED)"
     - "C-74: the one-off start — READ"
     - "C-74: the drought's start pick — READ (REVERSED)"
+    - "C-49 tail: the storm's start plot"
   context:
     - "...50 passes 0x2900c0 a COUNT, not a radius: 2 for Hexes ≥ 19, 1 for Hexes ≥ 3, 0 otherwise. 0x28aa00 with that count: 0 fails every plot (TORNADO_FAMILY never starts: 8 of 8 recorded at -1 o..."
     - "\"Pick One Off Start Plot\" 0x288020 walks every plot in index order and keeps those 0x28aa00 passes with the event's +0x30 (1 for the one-offs: the plot alone) under the predicate 0x..."
@@ -338,7 +345,7 @@
 - addr: 0x28c500
   kind: function
   name: STORM_STEP_COST_OFF
-  semantics: "a storm step: one \"Storm Direction\" weighted draw over the PrevailingWinds rows (XML order) whose latitude band holds the plot and whose neighbour exists (0xeff670 / 0xeff688), cost 1 on the storm's terrain else 2 of Movement 8; a drawn step past what is left ends the walk with its draw spent."
+  semantics: "a storm step: one \"Storm Direction\" weighted draw over the PrevailingWinds rows (XML order) whose latitude band holds the plot and whose neighbour exists (0xeff670 / 0xeff688), cost 1 on the storm's terrain else 2 of Movement 8; a drawn step past what is left ends the walk with its draw spent. The storm moves to the drawn neighbour whatever the terrain; an empty RandomEvent_Terrains list is every terrain (hurricanes: Ocean only); no other storm blocks a plot."
   status: READ
   cases:
     - recording: 1115
@@ -690,8 +697,12 @@
 - addr: 0x2900c0
   final: 0x1c1160
   kind: function
+  semantics: "with the count: 0 fails every plot (TORNADO_FAMILY never starts); 1 asks the plot alone to pass the predicate (its terrain in the row's RandomEvent_Terrains); 2 the plot, all six ring-1 plots on the map, and one of them passing. Its weight (valid x (Spacing + 1), less Spacing - d near a live storm) only sorts plots into the vector of weight > 0."
   status: READ
   cases:
+    - recording: h1_duelw1115
+      turn: 243
+      value: 22 of 22 recorded storm births on 1115 / 1116 (hurricanes t45 ... t243); TORNADO_FAMILY 8 of 8 at -1
     - recording: h1_duelw1115
       value: "0x28aa00 with that count: 0 fails every plot (TORNADO_FAMILY never starts: 8 of 8 recorded at -1 on runs/h1_duelw1115 / 1116);"
     - recording: 1115
@@ -703,10 +714,10 @@
       turn: 13
       value: t13, t47, t48, t83, t191, t211, t225 on 1116).
   impl: [cpu/core/disasters.ts:stormStart]
-  readings: ["C-49 tail: the storm's start plot — READ (REVERSED)"]
+  readings: ["C-49 tail: the storm's start plot — READ (REVERSED)", "C-49 tail: the storm's start plot"]
   context:
     - "\"Pick Storm Start Plot\" 0x288250 passes 0x2900c0 a COUNT, not a radius: 2 for Hexes ≥ 19, 1 for Hexes ≥ 3, 0 otherwise. 0x28aa00 with that..."
-  review: imported
+  review: reviewed
 - addr: 0x2910d0
   final: 0x1c2130
   kind: function

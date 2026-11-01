@@ -6,13 +6,17 @@
 - addr: 0x5579b0
   final: 0x392900
   kind: function
-  semantics: the trade path's range callback, memoised on the (parent, child) node pair.
-  status: PARTLY
+  semantics: "the trade path's range callback, memoised on the (parent, child) node pair. The range, a budget in 1/256 walked along the path: the origin node starts at TRADE_ROUTE_BASE_RANGE 15 (+ player trade +0x1b0); per edge a land<->water switch (0x558300) caps it at 1; then a from-plot holding a TradeEmbark district (Districts +0xe1 bit 7: City Centre, Harbor, Royal Navy Dockyard, Cothon) of the origin city or of a city where the player has a constructed trading post (0x1f99d0) refuels it to TRADE_ROUTE_LAND_RANGE_REFUEL 15 toward land, WATER_RANGE 30 (+ Portugal's row) toward water; the destination's own district to 3; the step costs 1; an edge leaving less than 0 is refused (0x5590a9). Onto a plot that is neither land nor water the refuel is the larger of the two; else a TradeEmbark district of the destination's city sets 3 (+0x1b0); a refuel sets the context's flag +0x1cc; left = r - 1. The context's +0x1a2 (a player-trade count +0x4b0 / +0x510 <= 0) is set in every recorded game."
+  status: READ
+  cases:
+    - recording: trade_path
+      value: the 31 distinct startable paths fit the budget with the origin's refuel alone (31 / 31)
   impl: [cpu/core/tradePath.ts:TRADE_DEST_REFUEL, cpu/core/tradePath.ts:TRADE_COST_SWITCH]
   readings:
     - "C-20: the Trader's path and range"
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-20 tail: the trade path's land and water tests and the switch"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_tradepath.py`."
@@ -22,8 +26,11 @@
 - addr: 0x557e40
   final: 0x392ba0
   kind: function
-  semantics: "the trade-route path pool's sizing (the engine's value under hash 0xe09781a7, MaxGameCoreTradeRouteThreads). The trade path's callbacks: the destination test 0x271490, destination-valid 0x629460 (1), no heuristic, cost 0x558970, valid 0x558db0, notify 0x558900, neighbours 0x558d60 / 0x271b50, context 0x558ba0."
+  semantics: "the trade-route path pool's sizing (the engine's value under hash 0xe09781a7, MaxGameCoreTradeRouteThreads). The trade path's callbacks: the destination test 0x271490, destination-valid 0x629460 (1), no heuristic, cost 0x558970, valid 0x558db0, notify 0x558900, neighbours 0x558d60 / 0x271b50, context 0x558ba0. At 0x557fd0: XP2 Trade_Movement.cpp: installs the trade pathfinder's callbacks — step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0; the path the least-cost one within the range budget (A*, heuristic 0x271490), not a greedy step."
   status: PARTLY
+  cases:
+    - recording: trade_path
+      value: the 31 distinct startable paths fit the budget with the origin's refuel alone (31 / 31)
   readings:
     - "C-20: the Trader's path and range"
     - "H-1: the trade path's search, its score and the Canal — READ"
@@ -48,29 +55,39 @@
 - addr: 0x558300
   final: 0x393060
   kind: function
-  status: PARTLY
+  semantics: "the edge is a land<->water switch (the range caps at 1, the cost +10000 off a refuelling district). A switch where one end is land and the other water (IsLand 0x5583a0 / IsWater 0x558460): a City Centre's plot, neither, makes none."
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      turn: 212
+      value: "Rome's Trader to Shenyang: Rome -> Antium's centre 796 -> the coast -> Shenyang's Harbor 479 -> 522, the step onto Rome's Harbor a switch paying 10000"
   impl: [cpu/core/tradePath.ts:TRADE_COST_SWITCH, cpu/core/tradePath.ts:walk]
   readings:
     - "C-20: the Trader's path and range"
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
+    - "C-20 tail: the trade path's land and water tests and the switch"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...at TRADE_ROUTE_BASE_RANGE 15 (+ player trade +0x1b0). Per edge: a land<->water switch (0x558300) caps the budget at 1; then a from-plot holding a TradeEmbark district (Districts byte..."
     - "The range callback 0x5579b0, per edge: r = the from-node's range; a switch (0x558300) caps r at 1; a from-plot holding a TradeEmbark district of the origin city or of a city..."
-  review: imported
+  review: reviewed
 - addr: 0x5583a0
   final: 0x3930d0
   kind: function
   name: IsLand
-  semantics: "IsLand: a district plot's info word +0x14 & 4 (both masks, or neither, is neither land nor water)."
+  semantics: "IsLand: a district plot's info word +0x14 & 4 (both masks, or neither, is neither land nor water). With a district on the plot (plot virtual +0x40) land = bit 4 and not bit 1 of the info word +0x14 (0x81240); without one, land = not water (0x834d0). A City Centre's plot is neither. Ported: walk / _trade_reach."
   status: READ
   cases:
+    - recording: h1_duelw1108
+      turn: 212
+      value: "Rome's Trader to Shenyang: Rome -> Antium's centre 796 -> the coast -> Shenyang's Harbor 479 -> 522, the step onto Rome's Harbor a switch paying 10000"
     - recording: h1_duelw1124
       value: "A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->   Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold   district rows twice over (score 23 >= 11) — 12 Gold, which water al"
   impl: [cpu/core/tradePath.ts:walk]
   readings:
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-20 tail: the trade path's land and water tests and the switch"
   context:
     - "IsLand 0x5583a0 / IsWater 0x558460 (Trade_Movement.cpp): when the plot's virtual +0x40 holds (a district..."
     - "- IsLand 0x5583a0 / IsWater 0x558460 read a district plot's info word +0x14 (masks 4 and 1): both, or nei..."
@@ -79,15 +96,19 @@
   final: 0x393150
   kind: function
   name: IsWater
-  semantics: "IsWater: a district plot's info word +0x14 & 1."
+  semantics: "IsWater: a district plot's info word +0x14 & 1. With a district, water = bit 1 and not bit 4 of the info word +0x14 (a plot carrying both or neither is neither); without one 0x834d0."
   status: READ
   cases:
+    - recording: h1_duelw1108
+      turn: 212
+      value: "Rome's Trader to Shenyang: Rome -> Antium's centre 796 -> the coast -> Shenyang's Harbor 479 -> 522, the step onto Rome's Harbor a switch paying 10000"
     - recording: h1_duelw1124
       value: "A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->   Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold   district rows twice over (score 23 >= 11) — 12 Gold, which water al"
   impl: [cpu/core/tradePath.ts:walk]
   readings:
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-20 tail: the trade path's land and water tests and the switch"
   context:
     - "IsLand 0x5583a0 / IsWater 0x558460 (Trade_Movement.cpp): when the plot's virtual +0x40 holds (a district stands there), they..."
     - "- IsLand 0x5583a0 / IsWater 0x558460 read a district plot's info word +0x14 (masks 4 and 1): both, or neither, is neither la..."
@@ -121,7 +142,7 @@
 - addr: 0x558970
   final: 0x393470
   kind: function
-  semantics: "the trade path's cost: adds nothing onto a plot whose district word holds both masks (0x810a0 mask 5) or onto a city centre (0x81120)."
+  semantics: "the trade path's cost: adds nothing onto a plot whose district word holds both masks (0x810a0 mask 5) or onto a city centre (0x81120). In 1/100 move: 100; +10000 for a switch not at a refuelling district; onto a city centre or a tunnelled mountain +0; a route +10 when it is the highest-PlacementValue route (Railroad), else +50; water with no route +50; land with no route +100 x the plot's movement cost. At 0x558a08: the step cost swaps its 100 for 10100 where 0x558300 answers a switch and the context's refuel flag +0x1cc is clear."
   status: PARTLY
   impl:
     - cpu/core/tradePath.ts:COST_LAB
@@ -131,6 +152,7 @@
     - "C-20: the Trader's path and range"
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-20 tail: the trade path's land and water tests and the switch"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "XP2 Trade_Movement.cpp: the pathfinder's callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_t..."

@@ -6,20 +6,24 @@
 - addr: 0x97a0d0
   final: 0x6834a0
   kind: function
+  semantics: a repair request on the city's production (the Free City's grant's building repair).
   status: PARTLY
   readings:
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "C-60: the Free City's grant"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0 skips. BUILD (AUDIT C-60): the repairs (requests on the city's production, 0x97a1b0 / 0x97a0d0, the Free City's build the pick takes over), the Builder's work."
-  review: imported
+  review: reviewed
 - addr: 0x97a1b0
   final: 0x683580
   kind: function
+  semantics: a repair request on the city's production (the Free City's grant's district repair).
   status: PARTLY
   readings:
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "C-60: the Free City's grant"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...units +0x7d0 skips. BUILD (AUDIT C-60): the repairs (requests on the city's production, 0x97a1b0 / 0x97a0d0, the Free City's build the pick takes over), the Builder's work."
-  review: imported
+  review: reviewed

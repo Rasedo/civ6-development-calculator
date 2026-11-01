@@ -135,9 +135,11 @@
 - addr: 0x1aa7f0
   final: 0x11bf20
   kind: function
-  semantics: "GetNextBuyablePlot's scorer: every unowned plot within 5 touching the city scored d x DISTANCE_MULTIPLIER x 2 + the resource / water / ring / improvement / wonder / yield costs, less the unowned neighbours' seen resources and wonders; the lowest cost's ties walked dq outer, dr inner, for 0x1ab1c0's draw."
+  semantics: "GetNextBuyablePlot's scorer: every unowned plot within 5 touching the city scored d x DISTANCE_MULTIPLIER x 2 + the resource / water / ring / improvement / wonder / yield costs, less the unowned neighbours' seen resources and wonders; the lowest cost's ties walked dq outer, dr inner, for 0x1ab1c0's draw. A resource the player sees (0x4ab4b0) adds RESOURCE_COST when d <= 3; any other plot WATER_COST if water (0x834d0) and RING_COST when d > 3; an improvement RING_COST if the barbarian camp (0x362130), else IMPROVEMENT_COST; a natural wonder (0x82e90) NW_COST; YIELD_POINT_COST per yield point to the owner (0x82280); then each unowned neighbour with a seen resource -1, with a natural wonder -1, and -1 once more if such a wonder lies within 3 of the centre. BASE_MULTIPLIER and DISTANCE_DIVISOR are not read."
   status: READ
   cases:
+    - recording: h1_duel
+      value: 2,489 of 2,780 city-turns of the H-1 duels with the game's own plot yields
     - recording: h1_duelw1116
       value: "turn_order_civ6.md A8): on runs/h1_duelw1116 player 0's starts take exactly its city count 248 of 249 turns, the three city-states theirs 222, 217 and 248 of 249 (the rest one more: a quest's draw aft"
     - recording: h1_duelw1116
@@ -151,6 +153,7 @@
     - "Border plot: GetNextBuyablePlot — READ"
     - "H-1: the start of a player's turn — the border pick (witnesses)"
     - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+    - "Border plot: GetNextBuyablePlot"
   context:
     - 0x1aa7f0 scores every plot within PLOT_INFLUENCE_MAX_ACQUIRE_DISTANCE (5) of the centre that is un...
     - "...in the scorer's walk over the plots within 5 of the centre, axial dq outer and dr inner (0x1aa7f0) — not tile-index order: replaying each start's picks from the `pre` seed over the record..."

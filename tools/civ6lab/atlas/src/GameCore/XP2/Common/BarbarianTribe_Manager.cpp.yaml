@@ -69,13 +69,14 @@
 - addr: 0x1514a0
   final: 0xe30f0
   kind: function
-  semantics: "the barbarian manager's turn, first in the turn's close: the techs 0x14f530, the camp step 0x14fcc0, each living tribe's turn (0x1488a0) in the tribes' order, then the clans' 0x8e1bf0."
+  semantics: "the barbarian manager's turn, first in the turn's close: the techs 0x14f530, the camp step 0x14fcc0, each living tribe's turn (0x1488a0) in the tribes' order, then the clans' 0x8e1bf0. The barbarians' Movement is restored as their turn opens, before this turn grants the techs (0x14f530) — a FIT (barbMovesNow / refreshBarbarians, _barb_reset_mp)."
   status: PARTLY
   readings:
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
+    - "C-95: the planning sets out on the full Movement, the walk on the turn's restored"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context: ["## H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   review: reviewed
@@ -163,15 +164,17 @@
   review: reviewed
 - addr: 0x152d60
   kind: function
+  semantics: the barbarian tribe rampages (the tactical selector keeps an explorer of that tribe at EXPLORE).
   status: READ
   cases:
     - recording: AI_Tactical.csv
       value: "Every city-state Scout's AI_Tactical.csv row of the   five duely duels is HL: End Turn (165 of 165);"
   readings:
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   context:
     - "...RER, the Scout) at EXPLORE only while the barbarian tribe its +0x11d0 names rampages (0x152d60) — a city-state's or the Free Cities' never; a unit +0xf30 holds only where the player'..."
-  review: imported
+  review: reviewed
 - addr: 0x152df0
   final: 0xe40d0
   kind: function

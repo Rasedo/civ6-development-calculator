@@ -510,8 +510,12 @@
 - addr: 0x6ad2b0
   kind: function
   name: EFFECT_ADJUST_IMPROVEMENT_HOUSING
+  semantics: "EFFECT_ADJUST_IMPROVEMENT_HOUSING's analyzer (registry 0x6c9640: the name's object @0xf03ef8, its vtable @0xd62e78, slot 1): with the modifier's arguments (r8) and the context's player (+0x80) set, on the context's city (+0x70): 0x7a3d70(CityBuildAI 0x0a5c20, the city's growth +0x1788, the rate +0xbc, the population +0x588, the Amount (arguments +0x08), start +0xb4, horizon +0xb8), its whole part (sar 8) added to +0xc0. The Farm's FARM_HOUSING_WITH_MAYAB_TRAIT (Amount 1; its REQUIREMENT_PLAYER_TYPE_MATCHES not in the registry's requirement list, so the set holds) is the Farm's second housing term. Ported: aiModifiers.ts (EFFECT_ADJUST_IMPROVEMENT_HOUSING), sim_cityvalue.py (_cv_analyze)."
   status: READ
   cases:
+    - recording: h1_duelv1117
+      turn: 45
+      value: Caguana's Farm rows 18.00 at t6, 88.00 at t45; the plotValueLab's 7,708 Farm rows exact
     - recording: h1_duelv1117
       turn: 6
       value: "Caguana's Farm rows: FARM_HOUSING_WITH_MAYAB_TRAIT (its PLAYER_TYPE_MATCHES requirement unregistered, so met) adds the housing value's whole part, 18.00 at t6, 30.00 at t12, 47.00 at t38, 88.00 at t45; Caguana's Farm rows 2,092 exact as with the earlier fit"
@@ -520,6 +524,7 @@
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing"
   notes:
     - the registry 0x6c9640 names it EFFECT_ADJUST_IMPROVEMENT_HOUSING (object @0xf03ef8, vtable @0xd62e78, slot 1); the context's city +0x70, +0x80 set; 0x7a3d70(CityBuildAI, city +0x1788, rate +0xbc, population +0x588, Amount (args +8), start +0xb4, horizon +0xb8), sar 8 into +0xc0
   review: reviewed

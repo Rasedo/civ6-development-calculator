@@ -80,12 +80,13 @@
 - addr: 0x1b22d0
   final: 0x1216a0
   kind: function
-  semantics: a unit's Gold purchase price in the city.
+  semantics: a unit's Gold purchase price in the city. The cost, its modifiers, the Gold multiplier, the step; no CanTrain test.
   status: PARTLY
   impl: [cpu/core/aiEconomic.ts:PurchaseCity]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...take the first. 0x68be60 (Economic, city or all, unit, flag): per city, the Gold price 0x1b22d0 (below 0 skipped); the UNITS and SLUSH slots together above it with UNITS above half..."
@@ -190,9 +191,11 @@
 - addr: 0x519090
   final: 0x366940
   kind: function
-  semantics: "the damage law: v = trunc((24 + r) x expf(x) + 0.5), x = (10 x D) >> 8, D the strength difference in 1/256 (k = trunc(COMBAT_POWER_SCALING 0.04 x 256)); clamped [1, 100] for units; on a district's hit points with its walls standing less trunc(v x t / 256), t = trunc(256 x left / max); the outer defence's hit taken at the combat type's percent (melee 15, ranged 50, bombard 100). On the hit points' hash (0x5e97d629) with the bypass flag clear and the outer defense standing (left = max - damage > 0) it subtracts trunc(v x t / 256), t = trunc(256 x left / max) (0x16e940, 0x16e7d0): intact walls let 1 through after the clamp; then the clamp to [+0x1c, +8]."
+  semantics: "the damage law: v = trunc((24 + r) x expf(x) + 0.5), x = (10 x D) >> 8, D the strength difference in 1/256 (k = trunc(COMBAT_POWER_SCALING 0.04 x 256)); clamped [1, 100] for units; on a district's hit points with its walls standing less trunc(v x t / 256), t = trunc(256 x left / max); the outer defence's hit taken at the combat type's percent (melee 15, ranged 50, bombard 100). On the hit points' hash (0x5e97d629) with the bypass flag clear and the outer defense standing (left = max - damage > 0) it subtracts trunc(v x t / 256), t = trunc(256 x left / max) (0x16e940, 0x16e7d0): intact walls let 1 through after the clamp; then the clamp to [+0x1c, +8]. The factor per point is e^(10/256) = 1.03984, not 1.04 (a 1.04 fit sees 0.99597 D). The struck side's strength 0 takes COMBAT_MAX_HIT_POINTS; the striker's 0 deals COMBAT_MINIMUM_DAMAGE."
   status: READ
   cases:
+    - recording: dll_damage
+      value: the 12 drawn interceptions 12 / 12 and their previews 12 / 12 (the 1.04 law 8 / 12 and 0 / 12)
     - recording: h1_duelw1124
       turn: 13
       value: "a barbarian Warrior's blow on a city-state Warrior: CombatLog 18 / 32"
@@ -209,6 +212,7 @@
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...mbat: one \"Unit Combat Damage\" draw rand(COMBAT_MAX_EXTRA_DAMAGE 12) per damage figure (0x519090; the preview takes the midpoint 6, no draw); \"Unit Capture Chance\" on a capture; an int..."
@@ -238,9 +242,11 @@
 - addr: 0x522630
   final: 0x36d0d0
   kind: function
-  semantics: "the Combat a wounded unit loses, 24.8: (10 << 8) less x its +0x1868 reduction, x (damage x 100 / max HP) >> 8, each percent a float32 x 0.01f cut to 1/256."
+  semantics: "the Combat a wounded unit loses, 24.8: (10 << 8) less x its +0x1868 reduction, x (damage x 100 / max HP) >> 8, each percent a float32 x 0.01f cut to 1/256. The engines' woundPenalty and its GPU twin round 10 - HP/10 instead (AUDIT C-94); the garrison term reads the law. M = COMBAT_WOUNDED_DAMAGE_MULTIPLIER (gp +0x238, 10) << 8, less m x the reduction percent (+0x1868, the Samurai's NoReduction): 82 damage -> 209/256 -> 2090/256 lost, not 8.2. Callers: the district preview, the unit-vs-unit strength (DAMAGED_UNIT_DESC), the air strikes (woundedLoss256, _wounded_loss)."
   status: READ
   cases:
+    - recording: h1_duel1108
+      value: Jiaodong's garrison term 30.8359375 = 29 + 36 - 26 - 2090/256
     - recording: 1121
       turn: 191
       value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
@@ -260,6 +266,7 @@
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - DLL rules the engines contradict
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-94: the wounded law and the garrison"
   context:
     - "- 0x522630, the Combat a wounded unit loses, 24.8: m = COMBAT_WOUNDED_DAMAGE_ MULTIPLIER (gp +0x23..."
     - "...56dc90 with the formation's) is strictly greater, and only then takes its wounds off (0x522630). Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75, 16 HP) over an Ironclad (70..."
@@ -288,12 +295,13 @@
 - addr: 0x5d83c0
   final: 0x3eae80
   kind: function
-  semantics: the city's yield advantage per yield (read by the log 0x5cdd70 as Food Adv. / Prod. Adv.).
+  semantics: "the city's yield advantage per yield (read by the log 0x5cdd70 as Food Adv. / Prod. Adv.). Flag 0: x = the greater of the city AI's stored yield (CityBuildAI +0x1118, unread) and the city's yield; mean and deviation the knowledge base's where it holds +0x1d0 entries or more, else the defaults' mean x 6 and deviation x fx(2.449) (626 >> 8); (x - mean) x 256 / deviation, x - mean where the deviation is 0. Flag 1 (AI_CityBuild's Food / Prod Adv.) takes 37 and sqrt(37)."
   status: PARTLY
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
+    - "C-97: the AI's knowledge of the map's cities"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...S chooser).  advantage line 0x5cdd70: Food Adv = adv[YIELD_FOOD], Prod Adv = adv[YIELD_PRODUCTION] (0x5d83c0 per yield), weights printed from r14+0x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCH..."
   context:
@@ -304,7 +312,7 @@
 - addr: 0x647f10
   kind: function
   name: threatTurn
-  semantics: "The threat (+0x6428, data +0x6480) per met player: (a) the knowledge base entry +4 (best victory progress) above 0.4, x 100; (b) 0.05 x the player's military strength above the owner's where the lead passes 100; (c) 0.2 x +0x12a0 +0x698[p] above the owner's strength past 100."
+  semantics: "The threat (+0x6428, data +0x6480) per met player: (a) the knowledge base entry +4 (best victory progress) above 0.4, x 100; (b) 0.05 x the player's military strength above the owner's where the lead passes 100; (c) 0.2 x +0x12a0 +0x698[p] above the owner's strength past 100. The threat's (a) is the entry +4 of 0x5eb7c0 (0.4 the constant @d5fec8), (b) 0.05 @d55ff0 x p's strength (0x4bd0d0) above the owner's, (c) 0.2 @d5aff0; +0x6420 counts the majors met, the owner among them. PARTLY READ: which victories (a) reads and how (the vfunc +0x58), and (c)'s +0x12a0 +0x698."
   status: PARTLY
   cases:
     - recording: h1_duelv1127
@@ -313,6 +321,7 @@
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus"
   review: reviewed
 - addr: 0x67aaf0
   final: 0x44c9a0
@@ -385,9 +394,12 @@
 - addr: 0x700810
   final: 0x4b52a0
   kind: function
-  semantics: "the pseudo-yield weight (this the GrandStrategic): [player +0x12a0] +0x7e8[p] + +0x620[p] + the PseudoYields list system's array (GlobalAI +0x2010, retrieval 0x6e3e20 -> +0x748, default +0x760) + the +0x768 / +0x780 list, held at -1.0 at least (@0xd136f4); a Great Person class's pseudo-yield (index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0; PSEUDOYIELD_DISTRICT (@0xf2e274) adds 0.5 x Eras.ChronologyIndex (+0x1c) of the player's era (0x467eb0: player +0x1358 +0xf8). The +0x620 array's writer is unread."
+  semantics: "the pseudo-yield weight (this the GrandStrategic): [player +0x12a0] +0x7e8[p] + +0x620[p] + the PseudoYields list system's array (GlobalAI +0x2010, retrieval 0x6e3e20 -> +0x748, default +0x760) + the +0x768 / +0x780 list, held at -1.0 at least (@0xd136f4); a Great Person class's pseudo-yield (index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0; PSEUDOYIELD_DISTRICT (@0xf2e274) adds 0.5 x Eras.ChronologyIndex (+0x1c) of the player's era (0x467eb0: player +0x1358 +0xf8). The +0x620 array's writer is unread. A city-state's PSEUDOYIELD_GPP_GENERAL weight stands at its floor (-1.0, factor 0) — a LAB on the Encampment's residual (pseudoYieldWeights, _MinorFacts.pseudo_w)."
   status: PARTLY
   cases:
+    - recording: h1_duelv1124
+      turn: 2
+      value: "Granada at (42,11): the Encampment 52.43 as logged with the General weight at its floor (55.54 without)"
     - recording: h1_duelw1124
       turn: 2
       value: "minor 3's Astrology 124.0: the Holy Site at 1.5 x PSEUDOYIELD_DISTRICT"
@@ -403,6 +415,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb4/NOTES.md: ...f2e270 SPY,   f2e274 DISTRICT, f2e2a0 NUCLEAR, f2e2b4 STANDING_ARMY, f2e2bc TOURISM. (pyglob.py) - 0x700810 pseudo weight: max(-1, mil[+0x7e8]+ai[+0x620]+list768+list748); GP pseudos +GA pts 0x2c4230. - Mili..."
@@ -415,7 +428,7 @@
   final: 0x4cf3b0
   kind: function
   name: the promotion class weight
-  semantics: "the promotion class weight: PromotionClass (Units +0x288) none -> 1.0; the class's base (+0x708) 0 -> 0 (a city-state's RECON, MinorCivUnitBuilds -100); else max(base + the +0x778 term, 0.1)."
+  semantics: "the promotion class weight: PromotionClass (Units +0x288) none -> 1.0; the class's base (+0x708) 0 -> 0 (a city-state's RECON, MinorCivUnitBuilds -100); else max(base + the +0x778 term, 0.1). It reads player +0x12a0, AI::Military: +0x708 m_defaultUnitPreferences and +0x778 m_modifiedUnitPreferences (the names its constructor 0x71a960 registers), each an int vector of fixed point indexed by promotion class (0x4c1cd0: data +0, size +0x10). The default holds the lists' Values / 100; the modified one's writer is unread — no instruction addresses Military +0x778 but its constructor, destructor, sizing (0x71d970) and this, so it is written through a pointer held elsewhere; no AI list names a RANGED or SIEGE class. The engines hold the modified term 0."
   status: READ
   cases:
     - recording: 1124
@@ -429,6 +442,7 @@
     - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
     - "C-96: AI::Military's modified unit preferences hold 0 (live) — READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...ase 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x promo-class weight 0x723bb0,  pseudoYieldValue(UNIT_COMBAT...), minus maintenance gold if [r15+0x908]<3, then PV diff. trade ->..."
     - ".claude/scratchpad/cb4/NOTES.md: ...ous branch adds tourism terms (minor TOURISM weight -1 => 0); tail: extra copies,   promotion class 0x723bb0, strategic resource gate (0x4aa790 / 0x5d45c0 => value 0), maintenance < handicap 3, PV...  NEXT: u..."
@@ -471,6 +485,7 @@
   final: 0x526bc0
   kind: function
   name: the neighbours functor
+  semantics: "the neighbours functor: a neighbour holding a WONDER (the plot's +0x30 object's +0x1e, the test of 0x5ce970's wonder loop) adds the building value 0x7a7590 of its wonder with the context's list less with a fresh one (one placeholder entry, x and y -9999, so the nested value walks no neighbours); else one holding an improvement (+0x44) the improvement yields value 0x7b1320 likewise; T and H the candidate's."
   status: READ
   cases:
     - recording: 1127
@@ -479,6 +494,7 @@
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-96: the district value's remaining terms"
   notes:
     - "per neighbour: a WONDER (the plot object +0x1e) its building value 0x7a7590 with the context's plot list less a fresh one, else an improvement (+0x44) 0x7b1320 likewise; no district revalued; not ported"
   context:

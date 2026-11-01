@@ -6,15 +6,19 @@
 - addr: 0x960f40
   final: 0x66bf70
   kind: function
-  semantics: "MakeTradeRoute's per-turn check: with the route held (0x553210) and the Trader on its origin plot, the game turn at or past 0x552bc0(start +0x20) removes the route (0x5521f0); away from home it runs on."
+  semantics: "MakeTradeRoute's per-turn check: with the route held (0x553210) and the Trader on its origin plot, the game turn at or past 0x552bc0(start +0x20) removes the route (0x5521f0); away from home it runs on. Unit_Operations_MakeTradeRoute.cpp (FinalRelease 0x66bf70): the route's origin and destination cities (0x57580 on the operation's plots); the Trader on the origin plot (unit +0x220 / +0x224); the game turn the game object's +0x110. Nothing else ends a route at its term. Ported: tradeRouteExpiry / _expire_seat_routes."
   status: READ
   cases:
+    - recording: h1_duely1127
+      turn: 144
+      value: Hattusa's route to China begins t115 in the Renaissance, home at t134 short of the Industrial era's 20 the check reads, ends t144
     - recording: h1_duely1127
       turn: 134
       value: Hattusa's China route home at t134, ended at t144
   impl: [cpu/core/trade.ts:tradeRouteMinDuration]
   readings:
     - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
+    - "C-108: a trade route's term and its end"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - Unit_Operations_MakeTradeRoute.cpp 0x960f40 (FinalRelease 0x66bf70), the operation's per-turn check, and Trade_Manager 0x552bc0 (Fina...

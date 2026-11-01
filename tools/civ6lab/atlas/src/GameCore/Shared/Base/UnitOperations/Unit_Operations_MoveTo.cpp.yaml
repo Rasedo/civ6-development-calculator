@@ -42,13 +42,14 @@
 - addr: 0x962190
   final: 0x66cef0
   kind: function
-  semantics: a move order with flags.
+  semantics: a move order with flags. The homeland's move order onto a target's plot (Plunder Trader).
   status: PARTLY
   impl: [cpu/core/tactical.ts:homelandPlunder]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Coastal Raid — READ, ported"
     - "C-95: the homeland's Plunder Trader — READ, ported"
+    - "C-95: the homeland's Plunder Trader"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40,..."

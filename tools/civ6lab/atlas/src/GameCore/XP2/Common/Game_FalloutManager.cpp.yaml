@@ -6,8 +6,9 @@
 - addr: 0x2d0e00
   final: 0x1ed570
   kind: function
+  semantics: "the nuclear accident's damage: lands its rows through the shared applier 0x336a50."
   status: PARTLY
   readings: ["C-41: the eruption's soil, the ring and the gates"]
   context:
     - .... Floods (0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0) share the appliers.
-  review: imported
+  review: reviewed

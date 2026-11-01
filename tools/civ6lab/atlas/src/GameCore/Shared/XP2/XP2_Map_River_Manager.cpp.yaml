@@ -5,13 +5,15 @@
 # set `review: reviewed`.
 - addr: 0xa285b0
   kind: function
+  semantics: "the river manager's plot-to-rivers map (+0x190): the rivers whose edges lie on the plot or across it."
   status: PARTLY
   readings:
     - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
+    - "C-100: the rivers' names and the flood cut"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the plot, the player): over the plot's rivers (the manager's +0x190 plot-to-rivers map, 0xa285b0 — the rivers whose edges SetXOfRiver laid on the plot or across it, the river vector's..."
-  review: imported
+  review: reviewed
 - addr: 0xa28900
   final: 0x72c4c0
   kind: function
@@ -78,9 +80,12 @@
   review: reviewed
 - addr: 0xa29730
   kind: function
-  semantics: "names a plot's rivers (-> \"Random River\" 0xa292a0); a river whose namer field is 0 (player 0's) is named again."
+  semantics: "names a plot's rivers (-> \"Random River\" 0xa292a0); a river whose namer field is 0 (player 0's) is named again. Over the plot's rivers (the manager's +0x190 plot-to-rivers map, 0xa285b0 — the rivers whose edges SetXOfRiver laid on the plot or across it) each river found by ID (+0xb8..+0xc0, +4) whose namer +0x48 is 0 or name +0 is -1 takes the player as namer and a name (0xa292a0). A river's merged network does not name it: its own plots alone. Ported: nameRivers (disasters.ts, GameState.riverNamed), _name_rivers / river_named."
   status: READ
   cases:
+    - recording: h1_duelv1127
+      turn: 106
+      value: the Floodable Rivers column named at t1, t1, t3, t29, t59, t106 as the majors' sight over each river's own plots
     - recording: h1_duelw1118
       value: "runs/ h1_duelw1118: 7 draws, ranges 5, 4, 3 and 9, 8, 7, 6, one pool per civ;"
     - recording: 1117
@@ -98,6 +103,7 @@
     - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
     - "H-1: draws the AI takes, draws the engines lack"
     - "H-1: the flood's river walk — READ"
+    - "C-100: the rivers' names and the flood cut"
   notes:
     - over the plot's rivers (+0x190 plot-to-rivers, 0xa285b0) each found by ID whose namer +0x48 is 0 or name -1 takes the player and a name (0xa292a0)
   context:

@@ -271,9 +271,12 @@
 - addr: 0x4cb930
   final: 0x3352c0
   kind: function
-  semantics: "a minor's tech catch-up, from the handler 0x427bf0 every player's object runs when a player gains an item (player, item): where the gainer is FULL_CIV (0x469db0) and the receiver lacks the item (0x4cb2f0) and is neither FULL_CIV nor TRIBE (0x469ce0) — a city-state or the Free Cities — it counts the players of the game's list +0xb50 holding the item, and where at least max(1, (len + 1) x 50 / 100) do (the immediate 0x32), SETS the receiver's progress on the item to its cost less one ((cost << 8) - 0x100 through 0x4cc950), at the cost of the moment; a major's progress is not touched."
+  semantics: "a minor's tech catch-up, from the handler 0x427bf0 every player's object runs when a player gains an item (player, item): where the gainer is FULL_CIV (0x469db0) and the receiver lacks the item (0x4cb2f0) and is neither FULL_CIV nor TRIBE (0x469ce0) — a city-state or the Free Cities — it counts the players of the game's list +0xb50 holding the item, and where at least max(1, (len + 1) x 50 / 100) do (the immediate 0x32), SETS the receiver's progress on the item to its cost less one ((cost << 8) - 0x100 through 0x4cc950), at the cost of the moment; a major's progress is not touched. The Free Cities player (62) is among its receivers: with no city it makes no Science, and a row completes once the game era's price falls below that progress. Ported: freeCitiesPhase through minorResearch, _free_cities_phase through _minor_research (the row FR)."
   status: READ
   cases:
+    - recording: h1_duelw1123
+      turn: 32
+      value: player 62's Pottery at 11 of 12 from turn 2, done at t32 when the Classical prices make it 10; then Writing, Animal Husbandry, ... one a turn to t38
     - recording: h1_duelw1121
       turn: 4
       value: Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10
@@ -294,6 +297,7 @@
   readings:
     - "H-1: a minor's research catch-up — READ"
     - "C-60: the Free Cities' research — READ (the catch-up's receivers), ported"
+    - "C-60: the Free Cities' research"
   context:
     - 0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every play...
   review: reviewed

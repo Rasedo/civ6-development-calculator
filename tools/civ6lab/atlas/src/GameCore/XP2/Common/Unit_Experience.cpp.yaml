@@ -6,6 +6,7 @@
 - addr: 0x55d750
   final: 0x3969a0
   kind: function
+  semantics: the unit can earn the promotion row.
   status: READ
   cases:
     - recording: AI_Tactical.csv
@@ -14,6 +15,7 @@
   readings:
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70)"
   context:
     - "...70 then runs each: over the UnitPromotions rows in database order that the unit can earn (0x55d750), the row's modifiers gathered (+0x28) and valued by 0x7b5d70 (start 0, the horizon [Glob..."
-  review: imported
+  review: reviewed

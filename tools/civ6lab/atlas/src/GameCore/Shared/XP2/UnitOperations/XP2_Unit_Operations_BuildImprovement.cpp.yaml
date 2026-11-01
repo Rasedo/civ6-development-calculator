@@ -6,9 +6,12 @@
 - addr: 0xa4cee0
   final: 0x7490c0
   kind: function
-  semantics: "an improvement laid: runs the full citizen reassign 0x196320."
+  semantics: "an improvement laid: runs the full citizen reassign 0x196320. At 0xa4d25b: raises CityFocusChanged (0xe808a01e) where the improvement is laid (BuildImprovement), beside the full reassign."
   status: READ
   cases:
+    - recording: h1_duely1121
+      turn: 19
+      value: "Hunza's repeated re-places t5, t7, t9, t17, t19 with no Food ever favored: each row the action after its Builder's ImprovementAddedToMap"
     - recording: 1121
       turn: 41
       value: "Recorded: a city-state's envoy annex re-places before its growth (1121   Hunza t41: 229 annexed, the growth on surplus 3 where the record's set   read 4;"
@@ -17,6 +20,7 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
+    - "C-112: the citizen manager has no turn of its own"
   context:
     - "...6320: the favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy annex re-places before its growth (1121 Hu..."
   review: reviewed

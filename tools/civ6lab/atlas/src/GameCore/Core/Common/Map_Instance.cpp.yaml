@@ -6,11 +6,12 @@
 - addr: 0x6fe50
   final: 0x52cc0
   kind: function
-  semantics: the plot owner's route rung count (+0x12e0).
+  semantics: "the plot owner's route rung count (+0x12e0). Player_Trade's m_iImprovedRouteLevel (player +0x12e0), raised by EFFECT_ADJUST_PLAYER_IMPROVED_ROUTE_LEVEL alone: Persia's TRAIT_SATRAPIES_IMPROVED_ROUTE_LEVEL (ImprovedRouteLevel 1); 0 for every player of the engines' roster, nothing to port."
   status: PARTLY
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
     - "C-95: the best route's owner term — READ, nothing to port"
+    - "C-95: the best route's owner term"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...OnlyWithUnit ones (the Railroad) only with a unit; then the plot owner's +0x12e0 count (0x6fe50) raises the value by that many rungs — UNREAD which effect sets it (0 in every recorded..."

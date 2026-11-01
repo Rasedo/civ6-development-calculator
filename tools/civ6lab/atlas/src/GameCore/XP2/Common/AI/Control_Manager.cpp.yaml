@@ -58,7 +58,7 @@
 - addr: 0x6092c0
   final: 0x401ba0
   kind: function
-  semantics: lists a control's units by the units' control field (FinalRelease unit +0x300).
+  semantics: "lists a control's units by the units' control field (FinalRelease unit +0x300). Recruit Units' list: the player's units (+0xd8) with +0x7d0 the operation's id and +0x770 clear."
   status: PARTLY
   impl:
     - cpu/core/barbarianOps.ts:recruit
@@ -85,6 +85,7 @@
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
+    - "C-96: the standing army and the Combat Desire's city terms"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...able slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list..."

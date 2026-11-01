@@ -136,15 +136,18 @@
 - addr: 0x750fe0
   final: 0x4ee820
   kind: function
-  semantics: "the founding (after waiting for the Belief Analysis job): the leader's FavoredReligions, then the civilization's, the first not founded (0x340490), else \"Random Religion Choice\" over the religions not founded but the pantheon's row and the one flagged +0x40 bit 1; then 0x751430 per belief the founding grants."
+  semantics: "the founding (after waiting for the Belief Analysis job): the leader's FavoredReligions, then the civilization's, the first not founded (0x340490), else \"Random Religion Choice\" over the religions not founded but the pantheon's row and the one flagged +0x40 bit 1; then 0x751430 per belief the founding grants. It takes a ReligionType; the game names it by Religions.Name (the RequiresCustomName rows are a human's own naming, which the AI's choice passes over). Ported: religionChoice (the engines carry the type: RELIGION_TYPES, civ_religion_type)."
   status: PARTLY
   cases:
+    - recording: h1_duelw1117
+      value: the founding's religion names the record's on 5 / 5 duels (Qin's favoured Taoism)
     - recording: h1_duelw1117
       value: the religions' beliefs 17 of 17 on the log's scores (the Follower, then a Worship belief, the Enhancer and Founder after)
   impl: [cpu/core/game.ts:adoptBeliefs]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
+    - "C-97: the proposals and the religion's choices as seat actions"
   context:
     - "- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start 0x74ea60 (registered for a full civ..."
     - "...ss whatever it scores, and once one stands only a better Follower does. The founding (0x750fe0, after waiting for the job): the leader's FavoredReligions, then the civilization's, th..."

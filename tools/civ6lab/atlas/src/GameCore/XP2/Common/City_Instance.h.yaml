@@ -7,15 +7,17 @@
   final: 0x3e8150
   kind: function
   name: CityBuildAI
+  semantics: the CityBuildAI object of a city (the housing analyzer's first argument to 0x7a3d70).
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...y the score lines they miss, with their analyzers and whether they reach CityBuildAI (0xa5c20): `.claude` analysis `anlist.py` / `ancalls.py`."
-  review: imported
+  review: reviewed
 - addr: 0xb48710
   kind: function
   semantics: "EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES' apply: registers the yield type and Amount on the city's +0x1da8 table (0xc705d0)."

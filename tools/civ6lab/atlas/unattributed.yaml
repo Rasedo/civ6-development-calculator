@@ -311,12 +311,16 @@
   final: 0x4e9a0
   kind: function
   name: Game_Climate
-  status: PARTLY
+  semantics: "a plot's latitude: lat = Bottom + (Top - Bottom) x (100y // H) // 100 (the map's 90 / -90; x / W on a Y-wrapping map); every PrevailingWinds row with Min <= lat <= Max joins the storm step's band (both ends inclusive)."
+  status: READ
+  cases:
+    - recording: dll_storm
+      value: two bands pool at 60, 30, 5, 0, -5, -30, -60
   impl: [cpu/data/disasters.ts:gameLatitude]
   readings: ["C-49: the storm's walk"]
   context:
     - "- Latitude (0x69d80): lat = Bottom + (Top - Bottom) x (100y // H) // 100 (the map's 90 / -90; x / W on a Y-..."
-  review: imported
+  review: reviewed
 - addr: 0x6aef0
   final: 0x4f780
   kind: function
@@ -526,11 +530,12 @@
 - addr: 0x81240
   final: 0x5e890
   kind: function
-  semantics: "a district's info word (+0x14) bit test: argument 0 the water bit (1), argument 2 the land bit (4)."
+  semantics: "a district's info word (+0x14) bit test: argument 0 the water bit (1), argument 2 the land bit (4). Argument 1 tests bit 2. Who writes word +0x14 is unread."
   status: PARTLY
   readings:
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+    - "C-20 tail: the trade path's land and water tests and the switch"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...rtual +0x40 holds (a district stands there), they read the plot info's word +0x14 through 0x81240 — argument 0 tests bit 1, 1 bit 2, 2 bit 4: land = bit 4 and not bit 1, water = bit 1 and..."
@@ -658,9 +663,12 @@
 - addr: 0x116f80
   final: 0x2af30
   kind: function
-  semantics: "the experience object's getter: +8 the promotion flag, +0xc the experience points, +0x10 the level."
+  semantics: "the experience object's getter: +8 the promotion flag, +0xc the experience points, +0x10 the level. The experience a unit holds counts from its first, kept through its promotions; the next level needs 15 x L(L+1)/2 at level L (a LAB on the records; the promotion flag's writer unread). Ported: xpToNextLevel / _xp_to_next, takePromotion / _take_promotion."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 122
+      value: 2:1900545 at level 2 with 45 promoted to level 3 at t122 (46); 2:2883584 at level 3 with 54 takes no promotion
     - recording: h1_duelm1117
       turn: 21
       value: Qin's Warrior 131073 at 11 points, as GetExperiencePoints
@@ -674,6 +682,7 @@
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
     - "C-99: a unit's experience is never spent — LAB on the records, ported"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-99: a unit's experience is never spent"
   context:
     - "...ion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv); 0x774970 then runs..."
   review: reviewed
@@ -734,7 +743,7 @@
   final: 0xdd220
   kind: function
   name: tribeStartAssault
-  semantics: "the city assault's start: refused while the raid or the assault stands; the operation, its tree's tags"
+  semantics: "the city assault's start: refused while the raid or the assault stands; the operation, its tree's tags. It sets op +0x2a0 to the city's owner — the assault's enemy, so its Attack Units takes that player's units (and any civilian), and Siege City's update errors with +0x2a0 at -1."
   status: READ
   cases:
     - recording: h1_duelw1117-1128
@@ -750,6 +759,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
+    - "C-95: the barbarians' operations on the manager"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...or a raid's own tree ending: threshold CityAttackBoldness (+0x1c) and the city assault (0x1497d0) or its list (+0x60)."
@@ -758,8 +768,12 @@
 - addr: 0x149980
   final: 0xdd3d0
   kind: function
-  semantics: "the raid's start: 0x73e7d0(op, the city's plot +0x158, &tribe +0x10)."
-  status: PARTLY
+  semantics: "the raid's start: 0x73e7d0(op, the city's plot +0x158, &tribe +0x10). The raid names no enemy (op +0x2a0 -1); the target set with 0x73e7d0 (the target, the rally — the tribe's camp —, each team's goals); the tree's trigger value the tribe's index; a tribe holds one at a time. Ported: cpu/core/barbarianOps.ts, gpu/core/sim_barbops.py."
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 9
+      value: the raid starts on the log's turn t9
   impl: [cpu/core/barbarianOps.ts:barbOpStart, cpu/core/barbarianOps.ts:SCOUT_NODES]
   readings:
     - "H-1: the raids — READ"
@@ -767,6 +781,7 @@
     - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-95: the barbarians' operations on the manager"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...100); boldness at it, no raid running (+0x3c) and no bribe -> the raid starts at once (0x149980), else the city goes on the raid list (+0x48). For a raid's own tree ending: threshold..."
@@ -840,7 +855,7 @@
 - addr: 0x1e60f0
   final: 0x2ca0f0
   kind: function
-  semantics: "sets a unit's assignment (+0x778) — -1 releases it."
+  semantics: "sets a unit's assignment (+0x778) — -1 releases it. Garrison City's swap sets the candidate's AI type (+0x168) to DEFENDER and the garrison's to its type's own through it."
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -854,6 +869,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
+    - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap"
   context:
     - "...+0x7d0 the operation's id and +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0: the highest UnitAiInfos flag of the type up to COMBAT 3,..."
   review: reviewed
@@ -1002,23 +1018,28 @@
 - addr: 0x26d6f0
   final: 0x1a6250
   kind: function
+  semantics: "the planning's cost callback, on every link the two-turn search prices (the start node linked from itself): calls 0x790c60."
   status: PARTLY
   impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
-  readings: ["C-95: the planning's spots and the combat prediction — READ, ported"]
+  readings:
+    - "C-95: the planning's spots and the combat prediction — READ, ported"
+    - "C-95: the planning's spots and the combat prediction"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SPOTS (the cost callback 0x26d6f0 -> 0x790c60 on every link the planning's two-turn search prices, the start node linked..."
-  review: imported
+  review: reviewed
 - addr: 0x26d7f0
   final: 0x1a6350
   kind: function
+  semantics: "stores a node's step: +0x28 Movement, +0x2c turns, +0x20 the carry."
   status: PARTLY
   readings:
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
+    - "C-99: a shore crossing's carried Movement"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...les add (0x26ee80), +0x38 a carry the rules add (0x26ee90), stored as the node's +0x20 (0x26d7f0: +0x28 Movement, +0x2c turns, +0x20 carry). The next step from a node pays the node's c..."
-  review: imported
+  review: reviewed
 - addr: 0x26d890
   final: 0x1a63f0
   kind: function
@@ -1110,6 +1131,7 @@
 - addr: 0x272fa0
   final: 0x1aad20
   kind: function
+  semantics: "a target of the player's tactical list of HIGH_PRIORITY_UNIT within a distance of a plot (the Free City's grant: within 5 of the city)."
   status: PARTLY
   impl:
     - cpu/core/phase.ts:freeCityGrant
@@ -1118,79 +1140,99 @@
     - cpu/data/seats.ts:FREE_CITY_BUILDER_THREAT
   readings:
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "C-60: the Free City's grant"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...der of its own, no HIGH_PRIORITY_UNIT target of the player's list within 5 of the city (0x272fa0) and a pillaged improvement (+0x44 set, +0x4d bit 0) on a plot within 2 of it, CLASS_BU...
-  review: imported
+  review: reviewed
 - addr: 0x274ea0
   final: 0x1ac590
   kind: function
   name: freeRaidStart
-  semantics: |
-    a Free City's record (+0x20 the player raided, +0x24 the raid's tree, both -1: never raided) and the player: "Free Cities Raid" started by name (0x7265b0), the target the player's first city's plot (+0x12f0's first, its +0x158; -9999 none), 0x73e7d0 setting target, rally (the Free City's plot +0x0c) and the teams' goals; +0x24 the tree's id, +0x20 the player
+  semantics: "a Free City's record (+0x20 the player raided, +0x24 the raid's tree, both -1: never raided) and the player: \"Free Cities Raid\" started by name (0x7265b0), the target the player's first city's plot (+0x12f0's first, its +0x158; -9999 none), 0x73e7d0 setting target, rally (the Free City's plot +0x0c) and the teams' goals; +0x24 the tree's id, +0x20 the player. A Free City raids once in its life. Nothing writes the operation's enemy (op +0x2a0): the raid runs against none, so its Attack Units lists every major's units and the threat's 0x723cf0 skip holds back nothing. Ported: freeRaidStart / _free_raid_start."
   status: READ
   cases:
+    - recording: h1_duelw1123
+      turn: 206
+      value: the raid's Attack Units lines list Owner 0 and Owner 1 targets at t205, a Great General's at t206
     - recording: h1_duelw1123
       turn: 205
       value: "Rome's Warrior pillages Chen's improvement: Free Cities Raid Started, TARGET 11:13, Contract for UNIT_ARCHER"
   impl: [cpu/core/freeOps.ts:freeRaidStart, gpu/core/sim_minorai.py:_free_raid_start]
   readings:
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-60: the Free Cities Raid"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "## C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0..."
     - "...record by the plot (0x277470: the records' +0x0c / +0x10 plot, +0x14 live) and calls 0x274ea0."
     - "- THE START 0x274ea0: where the record's +0x24 (the operation's tree) and +0x20 (the player) are both -1 — a..."
-  review: imported
+  review: reviewed
 - addr: 0x2765f0
   final: 0x1ad4a0
   kind: function
+  semantics: "FreeCities_Manager's listener hookup: connects the raid signals 0x276d90, 0x276e70, 0x276ff0 and 0x276a40."
   status: PARTLY
   readings:
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-60: the Free Cities Raid"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SIGNALS (FreeCities_Manager, the listeners 0x2765f0 connects): a combat on a Free City's district (0x276d90: the attacker, +0x70); a Free..."
-  review: imported
+  review: reviewed
 - addr: 0x276a40
   final: 0x1ad8f0
   kind: function
+  semantics: "a raid signal: a Free City with a flag, the plot's last unit's owner, then 0x277470 / 0x274ea0; the event it listens to unread."
   status: PARTLY
   readings:
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-60: the Free Cities Raid"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ..., the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported
     - "...improvement of a Free City pillaged (0x276ff0: the owner of the last unit on the plot); 0x276a40 (a Free City with a flag, the plot's last unit's owner; its event unread). Each finds t..."
     - "...in the Free Cities' tactical pass once each unit's planning is taken. LAB: the signal 0x276a40's event; the last unit on a pillaged plot read as the pillager (a coastal raid's and an..."
-  review: imported
+  review: reviewed
 - addr: 0x276e70
   final: 0x1adc20
   kind: function
-  status: PARTLY
+  semantics: "the raid signal of a Free City's district pillaged: the owner of the last unit on the plot; the record by the plot (0x277470), then 0x274ea0."
+  status: READ
+  cases:
+    - recording: h1_duelw1123
+      turn: 205
+      value: "Rome's Warrior pillages Chen's improvement: player 62 \"Free Cities Raid, Started\", TARGET 11:13 (Rome's capital), complete t213"
   impl:
     - cpu/core/phase.ts:impWreckable
     - gpu/core/sim_minorai.py:_free_raid_plot
     - gpu/core/sim_orders.py:_arms
   readings:
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-60: the Free Cities Raid"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
     - "...Free City's district (0x276d90: the attacker, +0x70); a Free City's district pillaged (0x276e70: the owner of the last unit on the plot); an improvement of a Free City pillaged (0x276..."
-  review: imported
+  review: reviewed
 - addr: 0x277470
   final: 0x1ae160
   kind: function
-  status: PARTLY
+  semantics: "finds a Free City's record by the plot: the records' +0x0c / +0x10 plot, +0x14 live."
+  status: READ
+  cases:
+    - recording: h1_duelw1123
+      turn: 205
+      value: "Rome's Warrior pillages Chen's improvement: player 62 \"Free Cities Raid, Started\", TARGET 11:13 (Rome's capital), complete t213"
   impl: [cpu/core/freeOps.ts:freeRaidSignal]
   readings:
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-60: the Free Cities Raid"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "## C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal..."
     - "...last unit's owner; its event unread). Each finds the Free City's record by the plot (0x277470: the records' +0x0c / +0x10 plot, +0x14 live) and calls 0x274ea0."
-  review: imported
+  review: reviewed
 - addr: 0x27a680
   final: 0x1b05e0
   kind: function
@@ -1246,7 +1288,8 @@
 - addr: 0x29fdf0
   final: 0x5102c0
   kind: function
-  status: PARTLY
+  semantics: "a watched bool's setter (writes the member + 0x58): CityBuildAI +0x1c0, the enemy at the gates (+0x218)."
+  status: READ
   cases:
     - recording: h1_duelw1103
       turn: 46
@@ -1254,17 +1297,19 @@
   readings:
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-96: the city under threat and a pillaged district's repair"
   context:
     - "...NEMY AT THE GATES (READ): the value of a watched bool at CityBuildAI +0x1c0 (its setter 0x29fdf0 writes +0x1c0 + 0x58). Its one writer is the threat 0x5cbd10 itself: cleared as the wal..."
-  review: imported
+  review: reviewed
 - addr: 0x2a81f0
   final: 0x1d0c10
   kind: function
-  semantics: the recency of a player's last contact (against GlobalParameters +0x268, the focus pick).
+  semantics: the recency of a player's last contact (against GlobalParameters +0x268, the focus pick). The focus pick (0x647bb0) counts a declared friend only within this recency, GlobalParameters +0x268 through the game speed.
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...0x6780 (0x647bb0: the met   major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency   0x2a81f0 against GlobalParameters +0x268), the trust +0x6480 writer and   +0x6420, the Gold weight inside th..."
   context:
@@ -1319,14 +1364,16 @@
 - addr: 0x2d1f20
   final: 0x1ed940
   kind: function
+  semantics: the climate component (the one the district repair's FLOODED / CONTAMINATED reasons read); its turn runs after the random-event step.
   status: PARTLY
   readings:
     - "C-93: the climate step after the events — CLOSED"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-93: the climate step after the events"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...335040, the weights and \"Random Event Roll\" — and only then the climate component's turn (0x2d1f20's component, the one the district repair's FLOODED / CONTAMINATED reasons read). The engi..."
-  review: imported
+  review: reviewed
 - addr: 0x2d2090
   final: 0x1edda0
   kind: function
@@ -1350,13 +1397,17 @@
 - addr: 0x2d33a0
   final: 0x1eef10
   kind: function
-  semantics: the accident's strike (-> 0x33b350).
-  status: PARTLY
+  semantics: "the accident's strike (-> 0x33b350). It walks the event's RandomEvent_Damages rows; for each row, before its draw, it pillages every Buildings_XP2 row with NuclearReactor (+0x48 bit 8: BUILDING_POWER_PLANT alone) in the city owning the plot through the city's building pillage 0x193190 directly (not 0x336a50), when the plot's district is owned and not already pillaged — no draw, past Reinforced Materials; then one \"Pillage Improvement Chance\" rand(100) < Percentage applies the row through 0x336a50; a ring walk over 1..Hexes (RandomEvents +0x30, 0 for the accident) follows."
+  status: READ
+  cases:
+    - recording: lab 5e
+      value: the plant pillaged 9 of 9
   impl: [cpu/core/disasters.ts:nuclearAccident]
   readings:
     - "C-41: the eruption's soil, the ring and the gates"
     - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
     - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
+    - "C-1: the nuclear accident's plant and the spared unit's draw"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0) share the appliers.
@@ -1365,12 +1416,13 @@
 - addr: 0x2d58f0
   final: 0x1f02a0
   kind: function
-  semantics: the GlobalParameters loader.
+  semantics: the GlobalParameters loader. MOVEMENT_RIVER_COST (Base GlobalParameters.xml 2) into the parameter block +0x50c (beside MOVEMENT_EMBARK_COST +0x504 and MOVEMENT_PORTAL_COST +0x508).
   status: PARTLY
   readings:
     - "C-95: a river crossing's Movement — READ"
     - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-95: a river crossing's Movement"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ll_gp.py` (the GlobalParameters struct: each parameter's field offset, from the loader at 0x2d58f0), `dll_vtab.py` (vtables pointing into a code range) and `dll_rng.py` (every draw on the..."
@@ -1616,6 +1668,7 @@
   final: 0x307950
   kind: function
   name: player valid and a full civ
+  semantics: "the player is valid and a full civilization (a major): the enemy strength's city term (0x73eb60)."
   status: PARTLY
   impl: [cpu/core/barbarians.ts:next, cpu/core/barbarians.ts:wonders]
   readings:
@@ -1625,6 +1678,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
+    - "C-95: an operation's enemy strength"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...p, To Range 1, then Notify Owner) when none runs (+0x38) and the owner is a full civ (0x484a10 -> 0x469db0, hash 0x253718b0); the throttle becomes turn + max(0, BARBARIAN_MAX_THROTTL...
@@ -1632,16 +1686,21 @@
 - addr: 0x484ab0
   final: 0x3079b0
   kind: function
-  status: PARTLY
+  semantics: "the players manager's meet; its three callers in the visibility manager (0x5246f0, 0x524890, 0x5249c0). Effects: each side's BOOST_TRIGGER_MEET_CIV rows; PLAYER_MET_ALL_MAJORS (3, FIRST_IN_WORLD 5) for each side that has now met every living major. Ported: meetMajors, majorLookMeets, seatSeesPlot (cpu/core/fog.ts); _meet_majors, _major_look_meets, _eyes_of, _suzerain_look (gpu/core/sim_masks.py)."
+  status: READ
   cases:
+    - recording: h1_duelw1114
+      turn: 15
+      value: both majors' Writing boosted the turn they met
     - recording: DiplomacySummary.csv
       value: "measured against the records' `met` lists and DiplomacySummary.csv."
   impl: [cpu/core/fog.ts:meetMajors]
   readings:
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
+    - "C-97: the majors' meeting"
   context:
     - "The players manager's meet (0x484ab0) and its three callers in the visibility manager. Ported in both twins (`meetMajors`, `ma..."
-  review: imported
+  review: reviewed
 - addr: 0x4a0e90
   final: 0x319150
   kind: function
@@ -1968,33 +2027,51 @@
 - addr: 0x5246f0
   final: 0x36eb50
   kind: function
-  status: PARTLY
+  semantics: "the meet on a unit placed on a plot another player sees (from the placement 0x586d40: each player whose visibility count of the plot is above 0); a city-state's sight is its suzerain's."
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 89
+      value: Rome's Warrior steps beside Bologna's unit and China, Bologna's suzerain, meets Rome that turn (DiplomacySummary.csv's Met line)
   impl: [cpu/core/fog.ts:majorLookMeets]
   readings:
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
+    - "C-97: the majors' meeting"
   context:
     - "- The triggers: a unit placed on a plot another player sees (0x5246f0, from the placement 0x586d40: each player whose visibility count of the plot is above..."
-  review: imported
+  review: reviewed
 - addr: 0x524890
   final: 0x36ecf0
   kind: function
-  status: PARTLY
+  semantics: "the meet on a plot coming into view: its owner is met."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 61
+      value: the meeting turn equals DiplomacySummary.csv's Met line
   impl: [cpu/core/fog.ts:majorLookMeets]
   readings:
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
+    - "C-97: the majors' meeting"
   context:
     - ...hose visibility count of the plot is above 0); a plot coming into view meets its owner (0x524890); a unit coming into view meets its owner (0x5249c0).
-  review: imported
+  review: reviewed
 - addr: 0x5249c0
   final: 0x36ee10
   kind: function
-  status: PARTLY
+  semantics: "the meet on a unit coming into view: its owner is met."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 61
+      value: the meeting turn equals DiplomacySummary.csv's Met line
   impl: [cpu/core/fog.ts:majorLookMeets]
   readings:
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
+    - "C-97: the majors' meeting"
   context:
     - ...t coming into view meets its owner (0x524890); a unit coming into view meets its owner (0x5249c0).
-  review: imported
+  review: reviewed
 - addr: 0x52e970
   final: 0x376540
   kind: function
@@ -2138,8 +2215,12 @@
   final: 0x37e6c0
   kind: function
   name: unitObsolete
+  semantics: "(unit, player): true where the player holds the unit's MandatoryObsoleteTech (+0x240), MandatoryObsoleteCivic (+0x238), ObsoleteTech (+0x250) or ObsoleteCivic (+0x248) — no upgrade-line test. Ported: unitObsoleteIn / researchHolds (minorBuild.ts), _unit_obsolete_in (sim_minors.py)."
   status: READ
   cases:
+    - recording: h1_duelu1117
+      turn: 195
+      value: Valletta, Gunpowder held, its Warrior contract 680 ACCEPTED in the purchase list unbought t195-t220 with its Gold over the price; the purchase list lists no obsolete unit
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
     - recording: h1_duelu1117
@@ -2157,6 +2238,7 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
   notes:
     - true where the player holds the unit's MandatoryObsoleteTech +0x240, MandatoryObsoleteCivic +0x238, ObsoleteTech +0x250 or ObsoleteCivic +0x248
   context:
@@ -2194,7 +2276,7 @@
 - addr: 0x558db0
   final: 0x393840
   kind: function
-  semantics: "the trade path's node test: closes water while the context's +0x1a1 is clear."
+  semantics: "the trade path's node test: closes water while the context's +0x1a1 is clear. Closes an impassable plot, a mountain with no tunnel, a plot a major has not revealed, water when the Trader cannot embark, a foreign centre of a player at war, a plot whose feature has DangerValue > 0 (burning forest / jungle, the Bermuda Triangle) unless it is the destination; a switch edge needs a TradeEmbark district at one end."
   status: READ
   cases:
     - recording: 1112
@@ -2231,23 +2313,28 @@
 - addr: 0x559b30
   final: 0x3943b0
   kind: function
-  status: PARTLY
+  semantics: a trade route's origin yields per turn (the plunder payout's V).
+  status: READ
+  cases:
+    - recording: plunder
+      value: 16 / 16 plunders, the two 50s among them (Quebec -> Halifax V 6, Quebec -> Ngaruawahia V 8)
   impl: [cpu/core/trade.ts:routeYieldValue]
-  readings: ["B-31r-S1: the plunder payout — CLOSED"]
+  readings: ["B-31r-S1: the plunder payout — CLOSED", "B-31r-S1: the plunder payout"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "Trade_Manager plunder 0x5545e0 (yield loop 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, speed scaling 0x5254d0). Check: `dll_plunder.py`."
-  review: imported
+  review: reviewed
 - addr: 0x559bc0
   final: 0x394440
   kind: function
+  semantics: a trade route's destination yields per turn (the plunder payout's V; 0 in every record).
   status: PARTLY
   impl: [cpu/core/trade.ts:routeYieldValue]
-  readings: ["B-31r-S1: the plunder payout — CLOSED"]
+  readings: ["B-31r-S1: the plunder payout — CLOSED", "B-31r-S1: the plunder payout"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e_Manager plunder 0x5545e0 (yield loop 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, speed scaling 0x5254d0). Check: `dll_plunder.py`."
-  review: imported
+  review: reviewed
 - addr: 0x55d990
   final: 0x396b10
   kind: function
@@ -2367,6 +2454,7 @@
 - addr: 0x5909a0
   final: 0x3b8010
   kind: function
+  semantics: "the upgrade type: 0x5374c0 on the unit's def and the player (the furthest rung)."
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -2380,9 +2468,10 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung"
   context:
     - "..., unit, test-visible 1) — not a barbarian's (0x56ee80) and an upgrade type it may take (0x5909a0 -> 0x5374c0) — the Amount x its upgrade's Gold (0x590520 << 8) as Gold at the player'..."
-  review: imported
+  review: reviewed
 - addr: 0x590a30
   final: 0x3b8080
   kind: function
@@ -2402,8 +2491,12 @@
   final: 0x3b8620
   kind: function
   name: upgradeResource
+  semantics: "the unit's upgrade (0x5909a0) row's +0x2c8 — its StrategicResource — index, -1 none."
   status: READ
   cases:
+    - recording: h1_duelw1128
+      turn: 250
+      value: "Hong Kong's Warriors (Swordsman: Iron) and Men-at-Arms (Musketman: Niter) held at 0 Gold t144-t250"
     - recording: h1_duelu1128
       turn: 240
       value: "the upgrade's StrategicResource (+0x2c8) index, -1 none: Bologna's Scouts (Skirmisher, none) deleted, Hong Kong's Warriors (Swordsman, Iron) held"
@@ -2415,6 +2508,7 @@
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
+    - "C-96: the upgrade trees' deletion"
   notes: [returns the upgrade's StrategicResource, not a district]
   context:
     - "...MMAND_DELETE, 0x73cd1698) of an excess obsolete unit: no district asked by its upgrade (0x591000 -1), or at most one promotion and more than 10 of its type (0x4f2c90); the full test fa..."
@@ -2463,12 +2557,13 @@
 - addr: 0x5c4910
   final: 0x3dae20
   kind: function
-  semantics: the standing army's weakest unit.
+  semantics: the standing army's weakest unit. The first of the lowest Combat (0x56dc90) in the list.
   status: PARTLY
   impl: [cpu/core/minorCityAi.ts:minorStandingArmy]
   readings:
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-96: the standing army and the Combat Desire's city terms"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...th player +0x1278 holding it (then it is released: COMBAT 3, home -1); the list sorted (0x5c4910); each unit of AI type COMBAT (3) — or EXPLORE (2) whose type's highest AI flag up to..."
@@ -2614,7 +2709,7 @@
   final: 0x3fa8e0
   kind: function
   name: the contract eligibility
-  semantics: "under threat (0x5cdc50) a district only where its Districts row has hit points: +0x58 set and +0x5c non-zero (the City Center, the Encampment and its replacements)"
+  semantics: "under threat (0x5cdc50) a district only where its Districts row has hit points: +0x58 set and +0x5c non-zero (the City Center, the Encampment and its replacements) At 0x5f62d3: under threat a district passes only where its Districts row has +0x58 set and +0x5c non-zero (0x5f6304): the hit points (districtDefensive / d_defensive). At 0x5f67ec: a unit contract is eligible where COMPLETED, else not MustPurchase and CanTrain (sixth argument clear)."
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -2633,6 +2728,8 @@
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+    - "C-96: the city under threat and a pillaged district's repair"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
   context:
     - "...0 runs each city's listener 0x5d6050 in city order: a city that may take it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where..."
   review: reviewed
@@ -3356,7 +3453,7 @@
 - addr: 0x6c9640
   final: 0x4891b0
   kind: function
-  semantics: "the modifier analysis registry: 211 effect names, 27 collections, 66 requirements (EffectType / CollectionType / RequirementType hashes to analyzer objects)."
+  semantics: "the modifier analysis registry: 211 effect names, 27 collections, 66 requirements (EffectType / CollectionType / RequirementType hashes to analyzer objects). A REQUIREMENT not in its requirement list (REQUIREMENT_PLAYER_TYPE_MATCHES) holds in a modifier's analysis."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:REGISTERED_REQUIREMENTS]
   readings:
@@ -3366,6 +3463,7 @@
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66 requirements; the effects the policies and gover..."
@@ -3538,12 +3636,12 @@
 - addr: 0x6fe2b0
   final: 0x4b2fb0
   kind: function
-  semantics: "the FoundCity unit's settle turns term (with 0x17a600). The best region top other than a given plot: the \"Settle New City\" operation's target (TARGET_SETTLE_LOCATION); \"Operation Change Target\" takes the best top other than the old target."
+  semantics: "the best region top other than a given plot (this, out plot, plot): over the region entries (+0x188, count +0x198, 0x168 bytes each) with +0x160 set, the entry's top site (+0x30: x +0, y +4, score +8) whose score passes the best so far (from 0) and whose plot is not the one given; out its plot; returns the score >> 8 (0 with none). The \"Settle New City\" operation's target (0x747230: value the whole part << 8; Operation Change Target takes the best top other than the old target); its other callers the first turn settler 0x70d250, the unit value's FoundCity term (0x7b62c0, with 0x17a600) and 0x7bad50; the victory condition Has Settle Spot reads it (PARTLY READ there)."
   status: READ
   cases:
-    - recording: 1124
-      turn: 28
-      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+    - recording: h1_duelv1124
+      turn: 15
+      value: every eval line equal t3-t15, Settle New City 27 / 48 / 72 ... 114
   impl: [cpu/core/operations/evaluate.ts:targetsOf, cpu/core/operations/types.ts:OpsSettle]
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -3683,6 +3781,7 @@
 - addr: 0x71d970
   final: 0x4cb210
   kind: function
+  semantics: AI::Military's vector sizing (+0x708 / +0x778 among them).
   status: PARTLY
   cases:
     - recording: 1121
@@ -3693,9 +3792,10 @@
       value: 1117 Caguana t88 the Trebuchet at 22 (ours 25.20) over the Catapult (ours   25.81).
   readings:
     - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
+    - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite"
   context:
     - ...000..0xc00000 addresses +0x778 of the Military but its constructor, destructor, sizing (0x71d970) and 0x723bb0 (the displacement and immediate scans), so it is written through a poin...
-  review: imported
+  review: reviewed
 - addr: 0x71e370
   final: 0x4cb740
   kind: function
@@ -3775,7 +3875,7 @@
 - addr: 0x723cf0
   kind: function
   name: warOperationExists
-  semantics: "The military AI's operations (+0x318): one of the type (5) against the player (+0x2a0)."
+  semantics: "The military AI's operations (+0x318): one of the type (5) against the player (+0x2a0). A running operation of the city's owner against the player (op +0x2a0) whose target lies within 5 of the city: the city's threat (0x5cbd10) passes that player over while the city is undamaged."
   status: PARTLY
   impl:
     - cpu/core/operations/cityThreat.ts:OWN_OPERATION_RANGE
@@ -3793,6 +3893,7 @@
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-60: the Free Cities Raid"
   review: reviewed
 - addr: 0x723db0
   kind: function
@@ -4083,12 +4184,13 @@
 - addr: 0x7803d0
   final: 0x50fd30
   kind: function
+  semantics: "queues a unit with its target for the tactical move (\"Coastal Raid\")."
   status: PARTLY
-  readings: ["C-95: Coastal Raid — READ, ported"]
+  readings: ["C-95: Coastal Raid — READ, ported", "C-95: Coastal Raid"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...18bd) whose planning of two turns holds a plot at range 1 (0x791300) is queued with it (0x7803d0, \"Coastal Raid\"); the queue carried out (0x7735d0): each queued unit that can act moves..."
-  review: imported
+  review: reviewed
 - addr: 0x787f50
   final: 0x516430
   kind: function
@@ -4415,9 +4517,15 @@
 - addr: 0x79d3a0
   final: 0x525660
   kind: function
-  semantics: "the unit production table's sort: +0x0e, +0x2c, +0x30, strength."
-  status: PARTLY
+  semantics: "the unit production table's sort: +0x0e, +0x2c, +0x30, strength. Its first key +0x0e is the table's buildable byte (0x7989e0 at 0x798cc2 / 0x798d11): PrereqTech and PrereqCivic held and the StrategicResource stocked above 0 (0x4aa790, ownership 0) — a city-state that trains and buys a Horseman without Horses lists it after every unit it holds the means of. Ported: unitBuildable, _mops_stock_buildable (seatUnitRows). Its second key +0x2c, the at-war sums, counts the barbarians as a player at war (0x469cd0). Ported: purchaseEntries (minorCityAi.ts), _minor_purchase_rows; seatUnitRows, _mops_unit_rows."
+  status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 72
+      value: "Granada (player 3), threatened at 1: every player's sums Catapult 5668, Quadrireme 4457, at war Quadrireme 854, Catapult 811 — the game bought the Quadrireme"
+    - recording: h1_duely1127
+      turn: 39
+      value: "Hattusa (player 3), threatened at 5, its list by the sums Horseman 21.2, Galley 15.6: the game bought the Galley (393216)"
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
   impl: [cpu/core/minorCityAi.ts:purchaseEntries, gpu/core/sim_minorai.py:_minor_purchase_rows]
@@ -4425,6 +4533,8 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung"
+    - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers"
   context:
     - ...nance resource scales it; the player's units of each type counted into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The value 0x799b9d computes from the player's counts (...
   review: reviewed
@@ -4513,11 +4623,13 @@
 - addr: 0x79f280
   kind: function
   name: the neighbours walk
+  semantics: "the neighbours walk, called by the district value body alone (0x7add12) at its top level (the analysis context's plot list +0x10 empty): the body first pushes the candidate onto the context's list (0x7b8bd0, its one caller 0x7adc88), then walks radius 1 (0x6b1b0) with the functor @0xd71be8 (0x7b8a20 -> 0x79ed40). No neighbour district is revalued. The improvement half moves no row of the five duels' DISTRICTS (a city-state's improvements take no district adjacency before the Industrial Zone's rows); the wonder half not ported (a city-state builds none)."
   status: PARTLY
   readings:
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the district value's remaining terms"
   notes:
     - radius 1 (0x6b1b0) with the functor @0xd71be8 (invoke 0x7b8a20 -> 0x79ed40), at the top level only
     - "PARTLY: the walk and functor read; what the context's plot list changes is unread, and a port of the improvement half lowered the plot values lab's Farms (runs/h1_duelv1127 10,904 -> 9,376), so no confirming case"
@@ -4554,15 +4666,17 @@
 - addr: 0x7b8a20
   final: 0x534c00
   kind: function
+  semantics: "the neighbours functor's invoke (vtable @0xd71be8): calls 0x79ed40 on the ring's plot."
   status: READ
   cases:
     - recording: h1_duelv1127
       value: A   port of the improvement half (each neighbour's yields value with the   improvement on the plot less as the map stands) lowered the plot values   lab's Farms on runs/h1_duelv1127 10,904 -> 9,376 ex
   readings:
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96: the district value's remaining terms"
   context:
     - "...ist +0x10 empty): a walk of radius 1 (0x6b1b0) with a functor (vtable @0xd71be8, invoke 0x7b8a20 -> 0x79ed40): a neighbour holding a district (+0x1e) adds valueConstructible 0x7a7590 o..."
-  review: imported
+  review: reviewed
 - addr: 0x7b8a30
   final: 0x534c10
   kind: function
@@ -4585,15 +4699,17 @@
   review: reviewed
 - addr: 0x7b8bd0
   kind: function
+  semantics: "pushes a plot onto the analysis context's plot list (+0x10): the plot's x, y, index and the district; its one caller the district value body (0x7adc88)."
   status: READ
   cases:
     - recording: 1127
       value: "(An earlier port of the same   for an improvement's own value — no such term exists — lowered 1127's   Farms 10,904 -> 9,376.)"
   readings:
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96: the district value's remaining terms"
   context:
     - "...'s plot list +0x10 empty): the body first pushes the candidate onto the context's list (0x7b8bd0, its one caller 0x7adc88: the plot's x, y, index and the district), then walks radius..."
-  review: imported
+  review: reviewed
 - addr: 0x7baa20
   final: 0x535f90
   kind: function
@@ -5228,9 +5344,12 @@
   final: 0x564650
   kind: function
   name: AI_EVENT_DESIRE_SETTLE
-  semantics: "starts the capture's operation at the event (no tick of its own). The named definition by 0x7265b0 with its flag, the target the first payload unit's plot (+0x220), the candidate's rally the plot; each payload unit to its team (addMember 0x737e80, the unit leaving the team it held). The start runs at the event, inside the trees' walks where a tree's blow took the civilian: its tree ticks in its priority's walk where that is yet to come; a capture of the tactical pass after the walks first ticks in the next turn's. A trigger row (+0x388) with no operation makes a tree in the manager (0x7fef20, its nodes 0x7faa60; none, dropped) and starts it at the row's priority (0x7cb230): one Upgrade Units tree per technology or civic gained (TRIGGER_TECH_UPGRADE / TRIGGER_CIVIC_UPGRADE, Priority 3), no test of a tree already running."
+  semantics: "starts the capture's operation at the event (no tick of its own). The named definition by 0x7265b0 with its flag, the target the first payload unit's plot (+0x220), the candidate's rally the plot; each payload unit to its team (addMember 0x737e80, the unit leaving the team it held). The start runs at the event, inside the trees' walks where a tree's blow took the civilian: its tree ticks in its priority's walk where that is yet to come; a capture of the tactical pass after the walks first ticks in the next turn's. A trigger row (+0x388) with no operation makes a tree in the manager (0x7fef20, its nodes 0x7faa60; none, dropped) and starts it at the row's priority (0x7cb230): one Upgrade Units tree per technology or civic gained (TRIGGER_TECH_UPGRADE / TRIGGER_CIVIC_UPGRADE, Priority 3), no test of a tree already running. For a city-state a civic gained starts no Upgrade Units tree (a FIT on the records: a technology gained is followed by a new tree on 1042 of 1061 minor-turns, a civic alone on 68 of 446); where the civic event's dispatch stops is unread. Ported: upgradeTrigger (minorTurn), _minor_turn's mops_upg_trig."
   status: PARTLY
   cases:
+    - recording: h1_duely1124
+      turn: 84
+      value: city-state 4's civic gained, no tree, its Warrior 851972 wandering t85-90
     - recording: h1_duelw1128
       turn: 26
       value: the raid's Slinger to the capture (t25-26), the raid's team two Warriors
@@ -5242,6 +5361,7 @@
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the Upgrade Units trees start on a technology gained alone — FIT (records), both twins"
+    - "C-99: the Upgrade Units trees start on a technology gained alone"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's..."
@@ -5593,7 +5713,7 @@
   final: 0x57c0a0
   kind: function
   name: Recruit Units (update)
-  semantics: "Recruit Units' update (data +0x00 Already in progress, +0x10 Contract ID, +0x20 Recruit Range, +0x30 Allow creation, +0x40 Recruit Value, +0x50 Time Limit, +0x60 Allow Stealing): \"Contract for\" names the first team's unit to build (0x739cd0), NONE for none; done (+0x88) with no units FAILURE; the tag's contract FAILED: FAILURE; COMPLETED: it leaves the tree; with creation and a unit, the unit asked (+0x8c). Not done, not ready (0x73aa60) and not in progress: RUNNING with a contract or a unit asked, else FAILURE; otherwise done, SUCCESS. The recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations."
+  semantics: "Recruit Units' update (data +0x00 Already in progress, +0x10 Contract ID, +0x20 Recruit Range, +0x30 Allow creation, +0x40 Recruit Value, +0x50 Time Limit, +0x60 Allow Stealing): \"Contract for\" names the first team's unit to build (0x739cd0), NONE for none; done (+0x88) with no units FAILURE; the tag's contract FAILED: FAILURE; COMPLETED: it leaves the tree; with creation and a unit, the unit asked (+0x8c). Not done, not ready (0x73aa60) and not in progress: RUNNING with a contract or a unit asked, else FAILURE; otherwise done, SUCCESS. The recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations. After the recruit (0x60a8c0, whose offer does not exclude a DEFENDER) it lists the operation's units (0x6092c0: +0x7d0 the operation's id, +0x770 clear) and sets each one's AI type (+0x168, setter 0x1e60f0) to its type's own (0x79b9c0) at 0x81cb90..0x81cbd3, before the strengths (0x73f7d0): the standing army counts it no more. Ported: ownAiType (cpu/core/opsOrders.ts), _u_recruit (gpu/core/sim_minorops.py)."
   status: READ
   cases:
     - recording: h1_duelv1128
@@ -5608,6 +5728,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "C-96: the standing army and the Combat Desire's city terms"
   context:
     - "...up, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority..."
   review: reviewed
@@ -5813,6 +5934,7 @@
 - addr: 0x9034b0
   final: 0x72a920
   kind: function
+  semantics: "a unit's modifier block (+0x18c8): field +4 the clear-terrain start Movement GetMaxMoves adds as +0x1924."
   status: PARTLY
   cases:
     - recording: 1121
@@ -5821,11 +5943,12 @@
     - "C-95: the clear-terrain start Movement — PARTLY READ, ported"
     - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
+    - "C-95: the clear-terrain start Movement"
   notes:
     - "a synced variable's mutable access: marks the holder changed (0xccf080) where it is tracked (+0x50), returns the holder + 0x58 (CityBuildAI +0xd10 -> +0xd68, +0xd80 -> +0xdd8)"
   context:
     - ..._CLEAR_TERRAIN; the effect 0xc0a3a0, its unit apply 0xb76b20 adding Amount to the block 0x9034b0 of unit +0x18c8, field +4); GetMaxMoves (0x56e130) adds unit +0x1924 where the unit's...
-  review: imported
+  review: reviewed
 - addr: 0x93d570
   final: 0x64d740
   kind: function
@@ -5918,13 +6041,14 @@
 - addr: 0x95b100
   final: 0x666620
   kind: function
+  semantics: the coastal raid operation's start (-> 0x95b7c0).
   status: PARTLY
   impl: [cpu/core/combat.ts:coastalRaid, cpu/core/tactical.ts:coastalRaids]
-  readings: ["C-95: Coastal Raid — READ, ported"]
+  readings: ["C-95: Coastal Raid — READ, ported", "C-95: Coastal Raid"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...that can act moves to its plot (0x962190, flag 0x10) and raids the target where it may (0x95b100 -> 0x95b7c0). The raid wrecks the plot's improvement, else its district, 3 Movement s...
-  review: imported
+  review: reviewed
 - addr: 0x95eae0
   final: 0x669b80
   kind: function
@@ -5994,12 +6118,13 @@
 - addr: 0x9686d0
   final: 0x672d40
   kind: function
-  semantics: the sleep order.
+  semantics: the sleep order. The sleep order (Heal's where the unit cannot fortify).
   status: PARTLY
   impl: [cpu/core/tactical.ts:heal]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...SIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify   (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside   its own territory heads for its player's nearest city (first of equals) —   wher..."
   context:
@@ -6009,19 +6134,25 @@
   final: 0x67c2d0
   kind: function
   name: CanStart
+  semantics: "UNITOPERATION_SWAP_UNITS' CanStart: through the partner test 0x972540."
   status: PARTLY
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved int..."
-  review: imported
+  review: reviewed
 - addr: 0x972540
   final: 0x67c350
   kind: function
   name: swapPartner
+  semantics: "the swap's partner (the operation's vt +0xc0; CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); (0x56e760 set: the path test 0x272a60 flag 4); over the units on the target's layer (0x75c50) one of the same owner (+0x2e0) and relation (vt +0xc8 on +0x160) with Movement left, not moved into a zone of control, (its Movement +0xdb0 under the unit's plot's cost << 8 needs 0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4). Ported: swapUnits (cpu/core/tactical.ts), _tac_carry_out's swap."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 154
+      value: "Bologna: its Warrior 2228224 on 4:10 swaps onto its centre with the Trebuchet, then Warrior 2162692 on 5:8 swaps onto it with the first (record t+1)"
     - recording: h1_duely1128
       value: t154 Bologna's Warriors 2228224 and 2162692 swap onto its centre in turn; t146 Hong Kong's Warrior 2424833 stays beside its centre, the fortified garrison there with no Movement
   impl:
@@ -6031,6 +6162,7 @@
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit w..."
@@ -6038,13 +6170,19 @@
 - addr: 0x972a50
   final: 0x67c860
   kind: function
+  semantics: "UNITOPERATION_SWAP_UNITS' Start: the partner (0x972540); the unit's formation to the target (flags | 4), then the partner's to the unit's plot."
   status: PARTLY
+  cases:
+    - recording: h1_duely1128
+      turn: 154
+      value: "Bologna: its Warrior 2228224 on 4:10 swaps onto its centre with the Trebuchet, then Warrior 2162692 on 5:8 swaps onto it with the first (record t+1)"
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SWAP'S PARTNER (0x972540, the operation's vt +0xc0, CanStart 0x9724c0 and Start 0x972a50 through it): the unit with Movement left (0x56c690), not moved into a zone of control (..."
-  review: imported
+  review: reviewed
 - addr: 0x975920
   final: 0x67f1f0
   kind: function
@@ -6068,12 +6206,14 @@
 - addr: 0x9766c0
   final: 0x67fdd0
   kind: function
+  semantics: a city plot command handler; kind 5 toggles a plot's citizen (0x1956b0).
   status: PARTLY
   readings:
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
   context:
     - "...4e7a0), and 0x1956b0 (a plot's citizen toggled, reached only from the command handler 0x9766c0, a plot command of kind 5): no plot-yield change among them, so what moves runs/h1_duel..."
-  review: imported
+  review: reviewed
 - addr: 0x977aa0
   final: 0x680f70
   kind: function
@@ -6176,20 +6316,25 @@
   final: 0x6aca70
   kind: function
   name: GetCostToUnlockPolicies
-  status: PARTLY
-  readings: ["B-D: the policy-unlock price — CLOSED"]
+  semantics: "the Lua GetCostToUnlockPolicies: calls PlayerCulture::GetCostToUnlockPolicies 0x398e70."
+  status: READ
+  cases:
+    - recording: dll_policy
+      value: 853 / 853 reads exact (ladders +1 517/517, -1 63/63, probe base 7/7, probe steps 266/266)
+  readings: ["B-D: the policy-unlock price — CLOSED", "B-D: the policy-unlock price"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "`PlayerCulture::GetCostToUnlockPolicies` 0x398e70 (Lua `GetCostToUnlockPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Ch..."
-  review: imported
+  review: reviewed
 - addr: 0x9af6c0
   final: 0x6ba120
   kind: function
+  semantics: the trade manager's path cache (GetTradeRoutePath reads it; it answers pairs CanStartTradeRoute refuses).
   status: PARTLY
   readings: ["C-20: the Trader's path and range"]
   context:
     - ".../ 31). The sweep's GetTradeRoutePath paths (read from the trade manager's path cache, 0x9af6c0, which answers pairs CanStartTradeRoute refuses: 10 of the 54 recorded) carry 44 pure-l..."
-  review: imported
+  review: reviewed
 - addr: 0x9bbaa0
   final: 0x6c6100
   kind: function
@@ -6378,12 +6523,13 @@
 - addr: 0xa55190
   final: 0x7507f0
   kind: function
+  semantics: "the turn's world step: the random-event step 0x338710 first, then the climate component's turn (0x2d1f20's component). The engines' endTurn runs disasterPhase then climateTurn, the same order."
   status: PARTLY
-  readings: ["C-93: the climate step after the events — CLOSED"]
+  readings: ["C-93: the climate step after the events — CLOSED", "C-93: the climate step after the events"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "The turn's world step 0xa55190 calls the random-event step 0x338710 — the droughts' tick and the storms' walk (0x288f40:..."
-  review: imported
+  review: reviewed
 - addr: 0xa57930
   final: 0x752dc0
   kind: function
@@ -6527,13 +6673,15 @@
 - addr: 0xad41e0
   final: 0x7cf550
   kind: function
+  semantics: "the Units_XP2 row reader: the sixth column, after the five flags, at +0x20 (ResourceCost), ResourceMaintenanceAmount at +0x24."
   status: PARTLY
   readings:
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
+    - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...rray per Units row with 0x5254d0(the Units_XP2 row +0x20): ResourceCost (the row reader 0xad41e0 writes the sixth column, after the five flags, at +0x20, ResourceMaintenanceAmount at +..."
-  review: imported
+  review: reviewed
 - addr: 0xad5010
   final: 0x7d04a0
   kind: function
@@ -6722,6 +6870,7 @@
   review: reviewed
 - addr: 0xb028c0
   kind: function
+  semantics: "REQUIREMENT unit in owner territory: returns 1 (unmet) where the unit's plot is null; its Inverse met."
   status: READ
   cases:
     - recording: AI_UnitEfficiency.csv
@@ -6729,6 +6878,7 @@
   impl: [cpu/core/aiUnitEfficiency.ts:holds]
   readings:
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
   context:
     - "...e (their opponent test reads the defender). A unit requirement with no plot is unmet (0xb028c0 in-owner-territory, 0xb12d50 home-continent, 0xb95b80 coast: return 1 where the unit's..."
   review: reviewed
@@ -6750,6 +6900,7 @@
   review: reviewed
 - addr: 0xb12d50
   kind: function
+  semantics: "REQUIREMENT unit on home continent: returns 1 (unmet) where the unit's plot is null; its Inverse met."
   status: READ
   cases:
     - recording: AI_UnitEfficiency.csv
@@ -6757,6 +6908,7 @@
   impl: [cpu/core/aiUnitEfficiency.ts:holds]
   readings:
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
   context:
     - "...s the defender). A unit requirement with no plot is unmet (0xb028c0 in-owner-territory, 0xb12d50 home-continent, 0xb95b80 coast: return 1 where the unit's plot is null), its Inverse me..."
   review: reviewed
@@ -6854,8 +7006,6 @@
       value: "the field's writer is unread — the port counts   the seat's military units of the domain (runs/h1_duelw1104: Rome 43+ land   units to Qin's 8, Trajan's Standing Army -6 at 106 = the meeting + 30)."
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
-  context:
-    - "- MILITARY_STRENGTH_LEAD (0xb548f0): the same lead test on the player stats' per-domain strength (0x4bd0d0: LAND +0x330, S..."
   review: reviewed
 - addr: 0xb61120
   kind: function
@@ -6885,14 +7035,17 @@
   review: reviewed
 - addr: 0xb76b20
   kind: function
+  semantics: "the clear-terrain start Movement's unit apply: adds Amount to the block 0x9034b0 of unit +0x18c8, field +4."
   status: PARTLY
   cases:
     - recording: 1121
       value: "1121-1128: Woods and Marsh   flat 2 (14 and 4 unit-turns), Desert / Plains / Grassland flat 3, Plains /   Desert Hills 2."
-  readings: ["C-95: the clear-terrain start Movement — PARTLY READ, ported"]
+  readings:
+    - "C-95: the clear-terrain start Movement — PARTLY READ, ported"
+    - "C-95: the clear-terrain start Movement"
   context:
     - ...s HEAVYCHARIOT / LIGHTCHARIOT_FASTER_CLEAR_TERRAIN; the effect 0xc0a3a0, its unit apply 0xb76b20 adding Amount to the block 0x9034b0 of unit +0x18c8, field +4); GetMaxMoves (0x56e130)...
-  review: imported
+  review: reviewed
 - addr: 0xb7eee0
   kind: function
   name: NEW_WARMONGER
@@ -6958,6 +7111,7 @@
 - addr: 0xb95b80
   final: 0x8e7150
   kind: function
+  semantics: "REQUIREMENT unit on coast: returns 1 (unmet) where the unit's plot is null."
   status: READ
   cases:
     - recording: AI_UnitEfficiency.csv
@@ -6965,6 +7119,7 @@
   impl: [cpu/core/aiUnitEfficiency.ts:holds]
   readings:
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
   context:
     - "...equirement with no plot is unmet (0xb028c0 in-owner-territory, 0xb12d50 home-continent, 0xb95b80 coast: return 1 where the unit's plot is null), its Inverse met; the plot's, the neig..."
   review: reviewed
@@ -7127,13 +7282,15 @@
 - addr: 0xc7a880
   final: 0x950f50
   kind: function
+  semantics: "the SQL string \"SELECT ModifierId from DistrictModifiers where DistrictType = ? ORDER BY ModifierId\" (the district value's modifiers list)."
   status: PARTLY
   readings:
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96: the district value's remaining terms"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...\"SELECT ModifierId from DistrictModifiers where DistrictType = ? ORDER BY ModifierId\" (0xc7a880): the Aqueduct's, the Bath's, the Cothon's and the Suguba's; no specialty district carr..."
-  review: imported
+  review: reviewed
 - addr: 0xc7e9b0
   final: 0x954be0
   kind: function
@@ -7220,15 +7377,17 @@
 - addr: 0xcef33c
   final: 0x9b0fdc
   kind: function
+  semantics: "ceilf (the CRT's): the threat term's L = ceil(+0x6420 x 0.25) / ceil(+0x6420 x 0.5)."
   status: PARTLY
   cases:
     - recording: h1_duelv1127
       value: "On the missions' paired desire and   cost rows T is the weight (n = 1, L = 1 in a duel): runs/h1_duelv1127 Qin   toward Rome T = 10 on 185 of 185 rows, the threat 32 - 52;"
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus"
   context:
     - ...the rank, L = ceil(+0x6420 x 0.25) / ceil(+0x6420 x 0.5) / +0x6420 by the mode (ceilf, 0xcef33c; +0x6420 the majors met counted by 0x647f10, the owner among them), 0 where n > L, else...
-  review: imported
+  review: reviewed
 - addr: 0x39b140
   binary: F
   kind: function

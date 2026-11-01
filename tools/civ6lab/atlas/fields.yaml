@@ -1,8 +1,5 @@
-# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
-# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
-# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
-# labels and not yet reviewed: verify against the disassembly, then edit and
-# set `review: reviewed`.
+# The DLL's struct fields: owner, offset, type, what it holds and its writers.
+# `review: reviewed` records; see tools/civ6lab/atlas.py.
 - kind: field
   owner: AnalysisContext
   offset: 0x40
@@ -1518,6 +1515,15 @@
   review: reviewed
 - kind: field
   owner: DiplomaticAI
+  offset: 0x6428
+  name: threatVar
+  semantics: the threat's autovariable (data +0x6480 per player), rewritten each diplomatic AI turn by 0x647f10.
+  status: PARTLY
+  writers: [0x647f10]
+  readings: ["C-97: the sender's pick, the savings, the threat and the focus"]
+  review: reviewed
+- kind: field
+  owner: DiplomaticAI
   offset: 0x6480
   name: threat
   semantics: "per player: the threat (24.8; the rank 0x650550 orders it)."
@@ -1546,6 +1552,15 @@
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: DiplomaticAI
+  offset: 0x6728
+  name: focusVar
+  semantics: the focus's autovariable (data +0x6780), set at the AI turn's close by 0x647bb0.
+  status: PARTLY
+  writers: [0x647bb0]
+  readings: ["C-97: the sender's pick, the savings, the threat and the focus"]
   review: reviewed
 - kind: field
   owner: DiplomaticAI
@@ -1680,6 +1695,15 @@
   review: reviewed
 - kind: field
   owner: EconomicAI
+  offset: 0x160
+  name: balanceVar
+  semantics: the balance's watched autovariable (value +0x1b8), set to the treasury at the savings turn's end.
+  status: PARTLY
+  writers: [0x687bf0]
+  readings: ["C-96: the savings' accrual"]
+  review: reviewed
+- kind: field
+  owner: EconomicAI
   offset: 0x1b8
   name: balance
   type: fx
@@ -1688,6 +1712,23 @@
   writers: [0x731d10]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  review: reviewed
+- kind: field
+  owner: EconomicAI
+  offset: 0x458
+  name: savingsTotalWeight
+  semantics: "the DefaultSavings list's total weight (SLUSH_FUND 3, UNITS 4, PLOTS 1, GREAT_PEOPLE 1 in SavingTypes order): each slot takes the treasury's change x fx(weight / total)."
+  status: PARTLY
+  readings: ["C-97: the sender's pick, the savings, the threat and the focus"]
+  review: reviewed
+- kind: field
+  owner: EconomicAI
+  offset: 0x4b8
+  name: savingsWeights
+  semantics: "per SavingTypes slot: the DefaultSavings weight."
+  status: PARTLY
+  writers: [0x687bf0]
+  readings: ["C-96: the savings' accrual"]
   review: reviewed
 - kind: field
   owner: EconomicAI
@@ -1709,6 +1750,15 @@
   writers: [0x687bf0, 0x68acd0]
   readings:
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
+  review: reviewed
+- kind: field
+  owner: EconomicAI
+  offset: 0x598
+  name: savingsVar
+  semantics: "the savings' autovariable (data +0x5b8: the slots, 0 SLUSH_FUND, 1 UNITS, 2 PLOTS, 3 GREAT_PEOPLE)."
+  status: PARTLY
+  writers: [0x687bf0]
+  readings: ["C-97: the sender's pick, the savings, the threat and the focus"]
   review: reviewed
 - kind: field
   owner: EconomicAI
@@ -1808,6 +1858,85 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   review: reviewed
 - kind: field
+  owner: FreeCityRecord
+  offset: 0xc
+  name: plot
+  semantics: the Free City's plot (x at +0x0c, y at +0x10; the raid's rally).
+  status: PARTLY
+  writers: [0x277470]
+  readings: ["C-60: the Free Cities Raid"]
+  review: reviewed
+- kind: field
+  owner: FreeCityRecord
+  offset: 0x14
+  name: live
+  semantics: the record is live (0x277470's find).
+  status: PARTLY
+  readings: ["C-60: the Free Cities Raid"]
+  review: reviewed
+- kind: field
+  owner: FreeCityRecord
+  offset: 0x18
+  name: count
+  semantics: a count taken to 5 each Free Cities turn (0x274010).
+  status: PARTLY
+  writers: [0x274010]
+  readings: ["C-60: the Free Cities Raid"]
+  review: reviewed
+- kind: field
+  owner: FreeCityRecord
+  offset: 0x1c
+  name: playerCityFlag
+  semantics: the player's +0x12f0 +0xf4 where above 0 (set at the record's making).
+  status: PARTLY
+  writers: [0x273c50]
+  readings: ["C-60: the Free City's grant"]
+  review: reviewed
+- kind: field
+  owner: FreeCityRecord
+  offset: 0x20
+  name: raidedPlayer
+  semantics: the player the Free City raided, -1 never.
+  status: READ
+  cases:
+    - recording: h1_duelw1123
+      turn: 205
+      value: "Rome's Warrior pillages Chen's improvement: player 62 \"Free Cities Raid, Started\", TARGET 11:13 (Rome's capital), complete t213"
+  writers: [0x274ea0]
+  readings: ["C-60: the Free Cities Raid"]
+  review: reviewed
+- kind: field
+  owner: FreeCityRecord
+  offset: 0x24
+  name: raidTree
+  semantics: the raid operation's tree id, -1 none; cleared when the tree is gone (0x274010).
+  status: READ
+  cases:
+    - recording: h1_duelw1123
+      turn: 205
+      value: "Rome's Warrior pillages Chen's improvement: player 62 \"Free Cities Raid, Started\", TARGET 11:13 (Rome's capital), complete t213"
+  writers: [0x274ea0, 0x274010]
+  readings: ["C-60: the Free Cities Raid"]
+  review: reviewed
+- kind: field
+  owner: FreeCityRecord
+  offset: 0x28
+  name: allowedUnits
+  semantics: "one flag per Units row: the units the city could train at the revolt, less the flagged, religious, air and class-barred ones."
+  status: PARTLY
+  writers: [0x273c50]
+  readings: ["C-60: the Free City's grant"]
+  review: reviewed
+- kind: field
+  owner: FreeCityRecord
+  offset: 0x48
+  name: allowedBuildings
+  semantics: the buildings the Free City may build (+0x54 set, +0x58 above 0, constructible there).
+  status: PARTLY
+  writers: [0x273c50]
+  readings: ["C-60: the Free City's grant"]
+  review: reviewed
+- kind: field
   owner: Game (FinalRelease)
   offset: 0xc0
   name: turn
@@ -1888,6 +2017,16 @@
   review: reviewed
 - kind: field
   owner: GlobalAI
+  offset: 0x1d0
+  name: knowledgeMinEntries
+  type: int
+  semantics: "the non-barbarian players counted at the defaults (0x6df230): the entries a knowledge base needs before its own city statistics stand in."
+  status: PARTLY
+  writers: [0x6df230]
+  readings: ["C-97: the AI's knowledge of the map's cities"]
+  review: reviewed
+- kind: field
+  owner: GlobalAI
   offset: 0x290
   name: discountRate
   type: fx
@@ -1947,6 +2086,36 @@
   writers: [0x6dfc70]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  review: reviewed
+- kind: field
+  owner: GlobalParameters
+  offset: 0x504
+  name: MOVEMENT_EMBARK_COST
+  type: int
+  semantics: the embark cost.
+  status: PARTLY
+  writers: [0x2d58f0]
+  readings: ["C-95: a river crossing's Movement"]
+  review: reviewed
+- kind: field
+  owner: GlobalParameters
+  offset: 0x508
+  name: MOVEMENT_PORTAL_COST
+  type: int
+  semantics: the portal cost.
+  status: PARTLY
+  writers: [0x2d58f0]
+  readings: ["C-95: a river crossing's Movement"]
+  review: reviewed
+- kind: field
+  owner: GlobalParameters
+  offset: 0x50c
+  name: MOVEMENT_RIVER_COST
+  type: int
+  semantics: the river crossing's cost (2); read by 0x5301e0 alone.
+  status: PARTLY
+  writers: [0x2d58f0]
+  readings: ["C-95: a river crossing's Movement"]
   review: reviewed
 - kind: field
   owner: Governors
@@ -2083,6 +2252,36 @@
   readings: ["H-1: the district adjacency — READ"]
   review: reviewed
 - kind: field
+  owner: KnowledgeArmyRecord
+  offset: 0x0
+  name: unit
+  type: int
+  semantics: the unit's id (in the player's unit list 0x4f2310).
+  status: PARTLY
+  readings: ["C-95: the target list's knowledge-base entries"]
+  review: reviewed
+- kind: field
+  owner: KnowledgeArmyRecord
+  offset: 0xc
+  name: age
+  type: int
+  semantics: the ageing's count since the unit was last seen.
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 50
+      value: "Caguana's Warrior records: the t50 one at age 0 counted, t33 / t35 skipped"
+  readings: ["C-95: the target list's knowledge-base entries"]
+  review: reviewed
+- kind: field
+  owner: KnowledgeArmyRecord
+  offset: 0x10
+  name: plot
+  semantics: the plot recorded (x +0x10, y +0x14).
+  status: PARTLY
+  readings: ["C-95: the target list's knowledge-base entries"]
+  review: reviewed
+- kind: field
   owner: KnowledgeBase
   offset: 0x18
   name: armyRecords
@@ -2167,10 +2366,16 @@
   offset: 0x6d8
   name: tradeRouteValue
   type: fx
-  semantics: "the trade AI's route value K (logged AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280)."
+  semantics: "the trade AI's route value K (logged AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280). K, a trade route's turn value (the Trader's value reads it; logged in AI_Knowledge.csv)."
   status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 32
+      value: p3's Trader value 55.21 as logged on K from AI_Knowledge.csv a turn back
   writers: [0x5e9b20]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the Trader's value"
   review: reviewed
 - kind: field
   owner: KnowledgeBase
@@ -2316,6 +2521,20 @@
   review: reviewed
 - kind: field
   owner: MilitaryAI
+  offset: 0x460
+  name: warFootingVar
+  semantics: "the war footing's autovariable (value at +0x4b8), written by the military AI's turn alone: cleared each turn, set for a major only."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 32
+      value: Nazca (a city-state) never on a war footing
+  writers: [0x71fb80]
+  readings:
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
   offset: 0x4b8
   name: defensive
   semantics: "set: the city's pick is the defensive one."
@@ -2332,6 +2551,23 @@
   writers: [0x71fb80]
   readings:
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0x708
+  name: m_defaultUnitPreferences
+  semantics: "per promotion class: the AI lists' Values / 100 (a city-state's RECON / NAVAL_CARRIER -100)."
+  status: PARTLY
+  writers: [0x71a960]
+  readings: ["C-96: the promotion class weight's vectors and the event building's pillaged prerequisite"]
+  review: reviewed
+- kind: field
+  owner: MilitaryAI
+  offset: 0x778
+  name: m_modifiedUnitPreferences
+  semantics: "per promotion class: the modified preference (its writer unread, through a pointer held elsewhere; 0 live)."
+  status: PARTLY
+  readings: ["C-96: the promotion class weight's vectors and the event building's pillaged prerequisite"]
   review: reviewed
 - kind: field
   owner: MilitaryAI
@@ -2685,6 +2921,19 @@
   status: PARTLY
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  review: reviewed
+- kind: field
+  owner: PlanningNode
+  offset: 0x20
+  name: carry
+  semantics: the Movement carried past a shore crossing, paid on the next step.
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 88
+      value: Nazca's Horseman 31:6 (1/4) -> 31:5 (1/1) carrying 2, 32:4 (2/0) (AI_Planning.csv)
+  writers: [0x26d7f0]
+  readings: ["C-99: a shore crossing's carried Movement"]
   review: reviewed
 - kind: field
   owner: PlanningNode
@@ -3094,6 +3343,15 @@
   review: reviewed
 - kind: field
   owner: PlayerDiplomacy
+  offset: 0x1160
+  name: lastActionTurnVar
+  semantics: the last action's turn autovariable (data +0x11b8), written by 0x3e6d20.
+  status: PARTLY
+  writers: [0x3e6d20]
+  readings: ["C-97: the sender's pick, the savings, the threat and the focus"]
+  review: reviewed
+- kind: field
+  owner: PlayerDiplomacy
   offset: 0x11b8
   name: lastActionTurn
   type: int[]
@@ -3210,13 +3468,43 @@
   review: reviewed
 - kind: field
   owner: PlayerStats
+  offset: 0x270
+  name: airStrength
+  semantics: the air strength (0x4bd0d0 domain 1, DOMAIN_AIR); writer unread.
+  status: PARTLY
+  readings: ["C-97: the majors' opinion"]
+  review: reviewed
+- kind: field
+  owner: PlayerStats
   offset: 0x2d0
   name: landStrength
   type: int
-  semantics: the land strength (0x4bd0d0 domain 2); writer unread.
-  status: PARTLY
+  semantics: the land strength (0x4bd0d0 domain 2); writer unread. 0x4bd0d0's domain 2 (DOMAIN_LAND).
+  status: READ
+  cases:
+    - recording: h1_duelw1104
+      turn: 106
+      value: "Rome 43+ land units to Qin's 8: Trajan's Standing Army -6 at the meeting + 30 (MILITARY_STRENGTH_LEAD on the land strength)"
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: the majors' opinion"
+  review: reviewed
+- kind: field
+  owner: PlayerStats
+  offset: 0x330
+  name: seaStrength
+  semantics: the sea strength (0x4bd0d0 domain 0, DOMAIN_SEA); writer unread.
+  status: PARTLY
+  readings: ["C-97: the majors' opinion"]
+  review: reviewed
+- kind: field
+  owner: PlayerStats
+  offset: 0x390
+  name: m_iMilitaryStrengthFromGold
+  semantics: the part of +0x210 from Gold (the treasury's fraction), taken off by 0x4bd0d0's every-domain read unless its third argument is set.
+  status: PARTLY
+  writers: [0x4bc720]
+  readings: ["C-97: the majors' opinion"]
   review: reviewed
 - kind: field
   owner: PlayerUnits
@@ -3246,6 +3534,20 @@
   semantics: "per unit row: the current Production cost (0x4f2b20)."
   status: PARTLY
   readings: ["H-1: a unit's Production cost in the queue — READ"]
+  review: reviewed
+- kind: field
+  owner: PlayerUnits
+  offset: 0x430
+  name: resourceCost
+  semantics: "per Units row: the speed-scaled Units_XP2 ResourceCost (the vector object +0x3d8, count +0x440)."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 33
+      value: "Nazca, Horses from its pillaged Holy Site alone: Equestrian Orders 25.0 (20 Horses) through t31, 25.0 from t33 (10 Horses) after its first Horseman"
+  writers: [0x4f2df0, 0x4f31f0]
+  readings:
+    - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
   review: reviewed
 - kind: field
   owner: Player_Influence
@@ -3596,9 +3898,10 @@
   offset: 0x48
   name: namer
   type: int
-  semantics: the player who named it.
+  semantics: "the player who named it. the player who named the river (0 is also taken as unnamed: re-named)."
   status: PARTLY
-  readings: ["H-1: the flood's river walk — READ"]
+  writers: [0xa29730]
+  readings: ["H-1: the flood's river walk — READ", "C-100: the rivers' names and the flood cut"]
   review: reviewed
 - kind: field
   owner: River
@@ -3616,6 +3919,14 @@
   status: PARTLY
   writers: [0xa28900]
   readings: ["H-1: the flood's river walk — READ"]
+  review: reviewed
+- kind: field
+  owner: RiverManager
+  offset: 0x190
+  name: plotRivers
+  semantics: the plot-to-rivers map (0xa285b0).
+  status: PARTLY
+  readings: ["C-100: the rivers' names and the flood cut"]
   review: reviewed
 - kind: field
   owner: TacticalAI
@@ -4041,6 +4352,18 @@
   status: PARTLY
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
+  review: reviewed
+- kind: field
+  owner: Unit
+  offset: 0x1858
+  name: plunderPercent
+  type: int
+  semantics: "the unit's plunder percent (EFFECT_ADJUST_UNIT_PLUNDER_YIELDS: Total War, Letter of Marque, the admirals' abilities add into it)."
+  status: READ
+  cases:
+    - recording: plunder
+      value: 16 / 16 plunders, the two 50s among them (Quebec -> Halifax V 6, Quebec -> Ngaruawahia V 8)
+  readings: ["B-31r-S1: the plunder payout"]
   review: reviewed
 - kind: field
   owner: Unit
@@ -4500,6 +4823,28 @@
   status: PARTLY
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  review: reviewed
+- kind: field
+  owner: Units_XP2
+  offset: 0x20
+  name: ResourceCost
+  type: int
+  semantics: the strategic resource cost (the row reader 0xad41e0's sixth column).
+  status: PARTLY
+  writers: [0xad41e0]
+  readings:
+    - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
+  review: reviewed
+- kind: field
+  owner: Units_XP2
+  offset: 0x24
+  name: ResourceMaintenanceAmount
+  type: int
+  semantics: the strategic resource maintenance amount.
+  status: PARTLY
+  writers: [0xad41e0]
+  readings:
+    - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
   review: reviewed
 - kind: field
   owner: Units_XP2

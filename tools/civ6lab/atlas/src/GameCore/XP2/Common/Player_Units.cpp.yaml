@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x4ed6e0
   kind: function
+  semantics: "At 0x4ed94a: Player_Units' unit pool count (+0xc0; the pool of 0x2200-byte units from +0xc0): every unit of the player, civilians and traders included."
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -19,10 +20,12 @@
     - recording: h1_duelv1127
       turn: 102
       value: h1_duelv1127 t102 / t128;
-  readings: ["C-96: the unit value's unit count and the founding Production — READ, both twins"]
+  readings:
+    - "C-96: the unit value's unit count and the founding Production — READ, both twins"
+    - "C-96: the unit value's unit count and the founding Production"
   context:
     - "...99)): +0xc0 is Player_Units' unit pool count (the pool of 0x2200-byte units at +0xc0.., 0x4ed94a), every unit of the player, civilians and traders included. The City Analysis that hold..."
-  review: imported
+  review: reviewed
 - addr: 0x4ee3f0
   final: 0x34c950
   kind: function
@@ -168,7 +171,7 @@
 - addr: 0x4f2c90
   final: 0x34f6b0
   kind: function
-  semantics: the player holds a unit of the type (an obsolete unit's entry kept while one is held).
+  semantics: the player holds a unit of the type (an obsolete unit's entry kept while one is held). The count of the player's units of the type (Upgrade Units deletes past 10).
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -182,22 +185,29 @@
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
     - "C-96: the upgrade trees' deletion — READ (0x7ef850's branches, 0x591000), both twins"
+    - "C-96: the upgrade trees' deletion"
   context:
     - ...Tech +0x240, ObsoleteCivic +0x248 / Tech +0x250 held) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers; per...
   review: reviewed
 - addr: 0x4f2cc0
   final: 0x34f6e0
   kind: function
-  status: PARTLY
+  semantics: "a unit's strategic cost: Player_Units' per-unit array at +0x430 (the vector object +0x3d8, its count +0x440), doubled for a Corps (formation 1), tripled for an Army (2)."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 33
+      value: "Nazca, Horses from its pillaged Holy Site alone: Equestrian Orders 25.0 (20 Horses) through t31, 25.0 from t33 (10 Horses) after its first Horseman"
   impl: [cpu/core/stockpile.ts:formationResourceCost]
   readings:
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
+    - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...me speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - "...n's charge): for a unit with a Units_XP2 row (+0x198) and a StrategicResource (+0x1a0), 0x4f2cc0(the player's units +0x12e8, unit, formation) — the per-unit array at +0x430 (the vector..."
-  review: imported
+  review: reviewed
 - addr: 0x4f2d50
   final: 0x34f770
   kind: function
@@ -215,37 +225,51 @@
   final: 0x34f810
   kind: function
   name: Player_Units
-  status: PARTLY
+  semantics: "fills Player_Units' per-unit strategic cost array (+0x430) per Units row with 0x5254d0(the Units_XP2 row +0x20): ResourceCost through the game speed's CostMultiplier (online 20 -> 10)."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 33
+      value: "Nazca, Horses from its pillaged Holy Site alone: Equestrian Orders 25.0 (20 Horses) through t31, 25.0 from t33 (10 Horses) after its first Horseman"
   impl: [cpu/core/stockpile.ts:unitBaseResourceCost]
   readings:
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
+    - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - ...ounts (+0x390 [unit] for formations 1 / 2, then the percent +0x3b0 [unit]), at least 1. 0x4f2df0 / 0x4f31f0 (from 0x4f2f40) fill the array per Units row with 0x5254d0(the Units_XP2 row...
-  review: imported
+  review: reviewed
 - addr: 0x4f2f40
   final: 0x34f910
   kind: function
+  semantics: calls 0x4f2df0 / 0x4f31f0 to fill the strategic cost array.
   status: PARTLY
   readings:
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
+    - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ormations 1 / 2, then the percent +0x3b0 [unit]), at least 1. 0x4f2df0 / 0x4f31f0 (from 0x4f2f40) fill the array per Units row with 0x5254d0(the Units_XP2 row +0x20): ResourceCost (t..."
-  review: imported
+  review: reviewed
 - addr: 0x4f31f0
   final: 0x34fb20
   kind: function
-  status: PARTLY
+  semantics: fills Player_Units' per-unit strategic cost array (+0x430) like 0x4f2df0 (from 0x4f2f40).
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 33
+      value: "Nazca, Horses from its pillaged Holy Site alone: Equestrian Orders 25.0 (20 Horses) through t31, 25.0 from t33 (10 Horses) after its first Horseman"
   impl: [cpu/core/stockpile.ts:unitBaseResourceCost]
   readings:
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
+    - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - ...90 [unit] for formations 1 / 2, then the percent +0x3b0 [unit]), at least 1. 0x4f2df0 / 0x4f31f0 (from 0x4f2f40) fill the array per Units row with 0x5254d0(the Units_XP2 row +0x20):...
-  review: imported
+  review: reviewed
 - addr: 0x4f4a50
   kind: function
   name: the unit versions

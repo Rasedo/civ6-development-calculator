@@ -319,9 +319,12 @@
 - addr: 0x73d1f0
   final: 0x4e09f0
   kind: function
-  semantics: "Defend Units' release: the unit's assignment +0x778 to -1 (0x1e60f0); then per team (stride 0x118) the team is copy-constructed onto the stack (0x735110), the unit's id erased from the COPY's member list, the copy destroyed — the team keeps the unit, and its +0x7d0 holds: a released unit stays its operation's member."
+  semantics: "Defend Units' release: the unit's assignment +0x778 to -1 (0x1e60f0); then per team (stride 0x118) the team is copy-constructed onto the stack (0x735110), the unit's id erased from the COPY's member list, the copy destroyed — the team keeps the unit, and its +0x7d0 holds: a released unit stays its operation's member. What releases a hurt ship from Naval Superiority's team on one turn and keeps it on another is unread (a LAB)."
   status: PARTLY
   cases:
+    - recording: h1_duely1127
+      turn: 114
+      value: the Galley 393216 leaves its team at t113-114, but stays in it t66-75 (damage 34 then 60, 30:19)
     - recording: h1_duelw1130
       turn: 19
       value: tribe 0's Warrior 851979 stays in the raid's team W/S/W through t31
@@ -336,6 +339,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-99: Move Unit's update with no Location ends the Upgrade Units trees — READ, both twins"
+    - "C-99: Move Unit's update with no Location ends the Upgrade Units trees"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t is suzerain of, an ally's; 2 no one's; 3 another's) is released from the operation (0x73d1f0: its operation field +0x778 to -1, out of every team); one fortified afloat to its safe..."
@@ -367,7 +371,7 @@
 - addr: 0x73e7d0
   final: 0x4e1850
   kind: function
-  semantics: "sets an operation's target and rally: the target to op +0x2a8, the rally through the autovariable at op +0x2c0 (0x7eb220) to op +0x318, then each team's goals, slot 0 (+0xe8) the rally and slot 1 (+0xf0) the target."
+  semantics: "sets an operation's target and rally: the target to op +0x2a8, the rally through the autovariable at op +0x2c0 (0x7eb220) to op +0x318, then each team's goals, slot 0 (+0xe8) the rally and slot 1 (+0xf0) the target. The Free Cities Raid's start (0x274ea0) calls it with the raided player's first city's plot and the Free City's plot as the rally."
   status: PARTLY
   impl:
     - cpu/core/barbarianOps.ts:barbOpStart
@@ -379,6 +383,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
+    - "C-60: the Free Cities Raid"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x73e870
@@ -412,9 +417,12 @@
   final: 0x4e1bf0
   kind: function
   name: the operation's enemy strength
-  semantics: "of the players counted (the operation's enemy, else each at war with the seat): the knowledge base's army within 3 of the target (0x5eadb0), each known city within 3 its defense (0x5eb2c0), the first defended one its owner's best melee strength less the enemy's army there"
+  semantics: "of the players counted (the operation's enemy, else each at war with the seat): the knowledge base's army within 3 of the target (0x5eadb0), each known city within 3 its defense (0x5eb2c0), the first defended one its owner's best melee strength less the enemy's army there. Over the player list (+0x4a0): the operation's enemy (op +0x2a0), else (-1) each player the seat is at war with (0x469cd0; the barbarians at war with every player). For each, the army within 3 of the target (0x5eadb0, minimum 0: each record max(Combat, RangedCombat) less its damage x 0.1), the enemy's own kept apart ([rbp+0x6f]); then of its known cities (kb m_knownCities, 0xe0-byte entries) within 3 of the target, each its defense (0x5eb2c0 without its byte, whole); the first with a defense above 0 — where the enemy is none or a full civilization (0x484a10) — adds the owner's best trained melee (PlayerStats +0xf0, 0x4d9320) less the enemy's army there, where that is the smaller. The team's readiness (0x73fba0) reads it. Ported: refreshStrengths / enemyStrengthAbout (cpu/core/operations/nodes.ts), _ops_enemy_str (gpu/core/sim_minorops.py)."
   status: READ
   cases:
+    - recording: h1_duelw1127
+      turn: 43
+      value: "the barbarians' raid Not Ready t36-t43 where a garrisoned city stands: the members' 65 against 83 to 121"
     - recording: h1_duelw1127
       turn: 36
       value: "Barbarian Attack Not Ready t36-t43: the members' 65 against 83 to 121 (a garrisoned city within 3)"
@@ -433,6 +441,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-129: an operation's enemy strength reads the knowledge base after the tactical look, before a later player's blows — the aimem sites read, the replay's copy"
+    - "C-95: an operation's enemy strength"
   context:
     - "...; a type of none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120,..."
   review: reviewed

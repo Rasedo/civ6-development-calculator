@@ -6,16 +6,19 @@
 - addr: 0x186460
   final: 0x106510
   kind: function
+  semantics: "the build queue's dump: names +0x2f0 m_axProjectProductionMultiplier."
   status: PARTLY
   readings:
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...lier — the queue's m_axProjectProductionMultiplier [project] (+0x2f0, named by the dump 0x186460), times the district-type multiplier 0x178c50 of the project's district where it has on..."
-  review: imported
+  review: reviewed
 - addr: 0x1baa90
   kind: function
+  semantics: "the city's construction: sets the build queue's yield type (+0x1f0, 0x17d210) to Production."
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -24,10 +27,12 @@
     - recording: 1121
       turn: 1
       value: "CONFIRMED: every   city-state founding of the five duely duels picks the game's item at the   game's value (AI_CityBuild.csv t1 Default Specialization): Antananarivo   and Muscat the Slinger at 8.3 (t"
-  readings: ["C-96: the unit value's unit count and the founding Production — READ, both twins"]
+  readings:
+    - "C-96: the unit value's unit count and the founding Production — READ, both twins"
+    - "C-96: the unit value's unit count and the founding Production"
   context:
     - ...te::Value 0xaa740; build queue +0x1f0 is the yield type, set at the city's construction 0x1baa90 -> 0x17d210). The founding city's first City Analysis reads it before the Palace lands...
-  review: imported
+  review: reviewed
 - addr: 0x263240
   kind: function
   status: READ
@@ -191,7 +196,7 @@
 - addr: 0x71a960
   final: 0x4c88d0
   kind: function
-  semantics: "the military AI's constructor: its job pass 2 (+0xf8)."
+  semantics: "the military AI's constructor: its job pass 2 (+0xf8). At 0x71b68a: the military AI's constructor writes +0x4b8 (the war footing) by displacement here; the turn's writes are 0x71fb80's."
   status: READ
   cases:
     - recording: 1123
@@ -206,6 +211,7 @@
     - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
+    - "C-96: the Free Cities' city build AI, threat and Combat Desire"
   context:
     - "...LAB: +0x4b8's writer (the only displacement writes are the military AI's constructor 0x71a960 at 0x71b68a and 0x264296); the Free Cities Raid's target as an operation near the city..."
   review: reviewed

@@ -80,10 +80,11 @@
 - addr: 0x6504a0
   kind: function
   name: theirPreference
-  semantics: "The other player's preference of an action in the owner's eyes (+0x62b0[p][a]): 1 above 0, -1 below, 0 none; -1 for no action."
+  semantics: "The other player's preference of an action in the owner's eyes (+0x62b0[p][a]): 1 above 0, -1 below, 0 none; -1 for no action. T's fallback in 0x671b80 where the owner's own preference of the action (+0x6240) is none."
   status: PARTLY
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus"
   review: reviewed
 - addr: 0x6504f0
   kind: function

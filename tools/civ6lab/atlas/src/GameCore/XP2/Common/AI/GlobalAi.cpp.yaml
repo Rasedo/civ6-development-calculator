@@ -54,21 +54,24 @@
   final: 0x49df60
   kind: function
   name: GlobalAI
+  semantics: "GlobalAI's defaults, once a game: per yield the mean and the sample deviation (24.8) of the plot yields of every non-barbarian player's start plot and the six beside it, each read for that player; +0x1d0 the players counted — the entries the knowledge base needs before its own statistics stand in."
   status: PARTLY
   readings:
     - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
+    - "C-97: the AI's knowledge of the map's cities"
   context:
     - "- The defaults (GlobalAI 0x6df230, once a game): per yield the mean and the sample deviation (24.8) of the plot yields of..."
-  review: imported
+  review: reviewed
 - addr: 0x6dfc70
   final: 0x49e5b0
   kind: function
-  semantics: "GlobalAI's start: analyses every building's BuildingModifiers (0x6cef90) into GlobalAI +0x3948[building]."
+  semantics: "GlobalAI's start: analyses every building's BuildingModifiers (0x6cef90) into GlobalAI +0x3948[building]. At 0x6e0736: fills GlobalAI +0x39a8 once (to 0x6e08f5) per Districts row from \"SELECT ModifierId from DistrictModifiers where DistrictType = ? ORDER BY ModifierId\" (0xc7a880): the Aqueduct's, the Bath's, the Cothon's and the Suguba's; no specialty district carries one."
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96: the district value's remaining terms"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...odifier evaluator: a building's BuildingModifiers are analysed once, at GlobalAI's start (0x6dfc70 -> 0x6cef90 into GlobalAI +0x3948[building]): each entry holds an effect analyzer and a c..."

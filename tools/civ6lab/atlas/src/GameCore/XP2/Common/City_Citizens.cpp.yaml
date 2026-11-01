@@ -44,12 +44,14 @@
 - addr: 0x1956b0
   final: 0x10fe70
   kind: function
+  semantics: "a plot's citizen toggled (reached only from the command handler 0x9766c0, a plot command of kind 5): runs the full citizen reassign 0x196320."
   status: PARTLY
   readings:
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
   context:
     - ...(0x1a8b70), the culture bomb (0x524e30), an improvement laid (0xa4cee0, 0xa4e7a0), and 0x1956b0 (a plot's citizen toggled, reached only from the command handler 0x9766c0, a plot com...
-  review: imported
+  review: reviewed
 - addr: 0x195940
   final: 0x10fff0
   kind: function
@@ -100,7 +102,7 @@
   review: reviewed
 - addr: 0x196320
   kind: function
-  semantics: "the full reassign: save the forced counts (+0x08), unassign all (0x196440), assign (0x197230), lay the forced counts back (0x196e30)."
+  semantics: "the full reassign: save the forced counts (+0x08), unassign all (0x196440), assign (0x197230), lay the forced counts back (0x196e30). Its callers: the building completions (0x180cb0, 0x181700), the favored / disfavored yield setters (0x196f90, 0x1970e0), AnnexPlot (0x1a8b70), the culture bomb (0x524e30), an improvement laid (0xa4cee0, 0xa4e7a0), and 0x1956b0 (a plot's citizen toggled); no plot-yield change among them."
   status: READ
   cases:
     - recording: h1_duelw1129
@@ -128,6 +130,7 @@
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
   context:
     - "...1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced cou..."
     - "...nd writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the event (hash 0xe808a01e) — the city command 0x975920..."
@@ -154,7 +157,7 @@
   review: reviewed
 - addr: 0x196f90
   kind: function
-  semantics: "SetDisfavoredYield: asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); runs the full reassign 0x196320 whatever the value was and fires the event (hash 0xe808a01e)."
+  semantics: "SetDisfavoredYield: asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); runs the full reassign 0x196320 whatever the value was and fires the event (hash 0xe808a01e). At 0x197095: raises CityFocusChanged (0xe808a01e) beside the full reassign."
   status: READ
   cases:
     - recording: h1_duelw1129
@@ -170,13 +173,14 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
+    - "C-112: the citizen manager has no turn of its own"
   context:
     - "...d (`favored`, `disfavored`) and on each CityFocusChanged row (one letter per Yields row). 0x196f90 asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); 0x1970e0..."
     - "...ng one (0x1a903c). Other callers of 0x196320: the favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy an..."
   review: reviewed
 - addr: 0x1970e0
   kind: function
-  semantics: "SetFavoredYield: asserts the yield is not disfavored and writes the favored byte (+0x38); runs the full reassign 0x196320 and fires the event (hash 0xe808a01e): every CityFocusChanged row is a full re-place."
+  semantics: "SetFavoredYield: asserts the yield is not disfavored and writes the favored byte (+0x38); runs the full reassign 0x196320 and fires the event (hash 0xe808a01e): every CityFocusChanged row is a full re-place. At 0x1971e5: raises CityFocusChanged (0xe808a01e) beside the full reassign."
   status: READ
   cases:
     - recording: h1_duelw1129
@@ -192,13 +196,14 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
+    - "C-112: the citizen manager has no turn of its own"
   context:
     - ...0x196f90 asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the e...
     - "...0x1a903c). Other callers of 0x196320: the favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy annex re-pla..."
   review: reviewed
 - addr: 0x197230
   kind: function
-  semantics: "places the unassigned citizens: one entry per free slot of the 37-plot hexspace, scored food / favored / other; a DP table over entries x count, better = need met, then favored, then other, strict; the backtrack's N assigned (0x194d90). Need = max(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached food yield (0x1cb8b0, m_bIsCached), consumption 0x5276c0 of the new population; one entry per free slot of each plot of the 37-plot hexspace (0x5cc00), the plot's capacity 0x195940 less its workers; scored by 0x195f90, picked by 0x193dc0; the N = unassigned count of the last row's backtrack assigned (0x194d90)."
+  semantics: "places the unassigned citizens: one entry per free slot of the 37-plot hexspace, scored food / favored / other; a DP table over entries x count, better = need met, then favored, then other, strict; the backtrack's N assigned (0x194d90). Need = max(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached food yield (0x1cb8b0, m_bIsCached), consumption 0x5276c0 of the new population; one entry per free slot of each plot of the 37-plot hexspace (0x5cc00), the plot's capacity 0x195940 less its workers; scored by 0x195f90, picked by 0x193dc0; the N = unassigned count of the last row's backtrack assigned (0x194d90). Its one caller is the full reassign 0x196320: a city-state's citizens move only at its triggers (the focus setters, an improvement laid, growth, starvation, an annex, a culture bomb, a district placed, a wonder built), no per-turn update. Ported: minorReplaceCitizens at those triggers."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -215,6 +220,7 @@
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - DLL rules the engines contradict
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
+    - "C-112: the citizen manager has no turn of its own"
   context:
     - ...s the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced counts back 0x196e30), else 0x197230 places the unassigned ones beside th...
     - "0x197230: need = max(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached f..."

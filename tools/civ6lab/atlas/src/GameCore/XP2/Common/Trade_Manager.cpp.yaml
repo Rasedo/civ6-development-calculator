@@ -227,13 +227,15 @@
   review: imported
 - addr: 0x5521f0
   kind: function
+  semantics: removes a trade route (at its term with the Trader home).
   status: PARTLY
   readings:
     - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
+    - "C-108: a trade route's term and its end"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...object +0x110) at or past 0x552bc0(the operation's start turn +0x20) removes the route (0x5521f0). Nothing else ends a route at its term: away from home it runs on."
-  review: imported
+  review: reviewed
 - addr: 0x5526a0
   final: 0x38f2c0
   kind: function
@@ -256,9 +258,12 @@
   final: 0x38f720
   kind: function
   name: Trade_Manager
-  semantics: "a trade route's end turn: start + speed(TRADE_ROUTE_TURN_DURATION_BASE, gp +0x714) + speed(the GAME era's Eras_XP2 TradeRouteMinimumEndTurnChange +0x30) read when asked; at least start + 1. Online 10 + 0 / 0 / 5 / 5 / 10 / 10 / 10 / 15 / 15 by era."
+  semantics: "a trade route's end turn: start + speed(TRADE_ROUTE_TURN_DURATION_BASE, gp +0x714) + speed(the GAME era's Eras_XP2 TradeRouteMinimumEndTurnChange +0x30) read when asked; at least start + 1. Online 10 + 0 / 0 / 5 / 5 / 10 / 10 / 10 / 15 / 15 by era. Trade_Manager (FinalRelease 0x38f720): the era the era manager 0x2c3660's m_eCurrentGameEra (+0x108) read at the check, not at the route's start; the Eras_XP2 row present at +0x2c. Ported: tradeRouteMinDuration / _trade_min_duration."
   status: READ
   cases:
+    - recording: h1_duely1127
+      turn: 144
+      value: Hattusa's route to China begins t115 in the Renaissance, home at t134 short of the Industrial era's 20 the check reads, ends t144
     - recording: h1_duely1127
       turn: 114
       value: Hattusa's route to China begun t95 ends t114 (Renaissance 15)
@@ -268,6 +273,7 @@
     - cpu/core/trade.ts:tradeRouteMinDuration
   readings:
     - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
+    - "C-108: a trade route's term and its end"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e.cpp 0x960f40 (FinalRelease 0x66bf70), the operation's per-turn check, and Trade_Manager 0x552bc0 (FinalRelease 0x38f720), the term. Check: runs/h1_duely1127 Hattusa (the records' route r..."
@@ -309,13 +315,15 @@
 - addr: 0x553210
   final: 0x38fbb0
   kind: function
+  semantics: the trade route is still held (MakeTradeRoute's check).
   status: PARTLY
   readings:
     - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
+    - "C-108: a trade route's term and its end"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...n and destination cities (0x57580 on the operation's plots); with the route still held (0x553210) and the Trader standing on the origin plot (unit +0x220 / +0x224 against the origin),...
-  review: imported
+  review: reviewed
 - addr: 0x553680
   kind: function
   semantics: the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0).
@@ -344,9 +352,11 @@
   review: reviewed
 - addr: 0x5545e0
   kind: function
-  semantics: "the plunder payout: V = sum over yields of (origin + destination) x (1 Gold, else 2); base = max(50, V x speed(TRADE_ROUTE_TURN_DURATION_BASE) // 2); + base x the plundering unit's +0x1858 percent // 100; Gold, no draw."
+  semantics: "the plunder payout: V = sum over yields of (origin + destination) x (1 Gold, else 2); base = max(50, V x speed(TRADE_ROUTE_TURN_DURATION_BASE) // 2); + base x the plundering unit's +0x1858 percent // 100; Gold, no draw. The yield loop 0x554860..0x554a4e over the origin yields 0x559b30 and the destination's 0x559bc0; the 50 a literal, unscaled (online 5V); Total War, Letter of Marque and the admirals' abilities all write EFFECT_ADJUST_UNIT_PLUNDER_YIELDS into the unit's one +0x1858 field: they add."
   status: READ
   cases:
+    - recording: plunder
+      value: 16 / 16 plunders, the two 50s among them (Quebec -> Halifax V 6, Quebec -> Ngaruawahia V 8)
     - recording: plunder
       turn: 0
       value: 16 / 16 recorded plunders (runs/plunder_*)
@@ -356,7 +366,7 @@
     - cpu/core/trade.ts:routePlunderGold
     - cpu/core/trade.ts:routeYieldValue
     - gpu/core/sim_seats.py:_trade_walk_tick
-  readings: ["B-31r-S1: the plunder payout — CLOSED"]
+  readings: ["B-31r-S1: the plunder payout — CLOSED", "B-31r-S1: the plunder payout"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - Trade_Manager plunder 0x5545e0 (yield loop 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, spee...

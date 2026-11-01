@@ -7,9 +7,11 @@
   final: 0x366f30
   kind: function
   name: Rules_Combat
-  semantics: "a combat's experience: base 1 (ranged / bombard) else 2; attacker ceil(1 + base + k D/A), defender ceil(base + k A/D), k = KILL_BONUS 2 on a kill, the strengths the raw Combat / Ranged / Bombard columns with corps / army; x the side's XP percent rounded up; at most 8 (EXPERIENCE_MAXIMUM_ONE_COMBAT, Expansion2); a barbarian's 1."
+  semantics: "a combat's experience: base 1 (ranged / bombard) else 2; attacker ceil(1 + base + k D/A), defender ceil(base + k A/D), k = KILL_BONUS 2 on a kill, the strengths the raw Combat / Ranged / Bombard columns with corps / army; x the side's XP percent rounded up; at most 8 (EXPERIENCE_MAXIMUM_ONE_COMBAT, Expansion2); a barbarian's 1. The ranged side's strength is its raw Ranged or Bombard column (a Bomber 110, not 110 - 17)."
   status: READ
   cases:
+    - recording: dll_xp
+      value: the Bomber's +3 on Infantry 4 / 4 strikes
     - recording: dll_xp
       turn: 0
       value: the Bomber's +3 on Infantry 4 / 4 strikes
@@ -22,6 +24,7 @@
   readings:
     - "B-89 tail: an air strike's XP — READ, one term open"
     - "C-34: the interception's damage, XP, weariness and the answers"
+    - "B-89 tail: an air strike's XP"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "Rules_Combat 0x5197e0 (called by every resolver; the air strike 0x203cb0 picks the combat type 0x204451: BOMBAR..."
@@ -58,7 +61,7 @@
 - addr: 0x51a240
   final: 0x3674e0
   kind: function
-  semantics: a melee blow's damage on GetCombat's strengths.
+  semantics: a melee blow's damage on GetCombat's strengths. A side of base strength 0 or less takes trunc(COMBAT_MIN_CIVILIAN_DAMAGE_PERCENT 65 (GlobalParameters +0x1f0) x 0.01 x 100) = 65; else the law 0x519090.
   status: READ
   cases:
     - recording: 1124
@@ -77,6 +80,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the attacker's damage — is never drawn where the defender is embarked (..."
   review: reviewed
@@ -172,13 +176,14 @@
 - addr: 0x520270
   kind: function
   name: visibilityCS
+  semantics: "the district-defender strength (called by the district attack 0x207080): carries the diplomatic-visibility (ESPIONAGE) bonus (visibilityCS)."
   status: PARTLY
   impl: [cpu/core/combat.ts:cityStrikeDefenderCS]
   readings: ["C-26: the struck unit's terms (install audit)"]
   context:
     - "...erm's modifiers and requirements from the layered install; the district-defender strength 0x520270 (called by the district attack 0x207080) carries the diplomatic-visibility (\"ESPIONAGE\")..."
     - "...TYPE_MATCHES COMBAT_RANGED and NOT attacking: a city's shot is ranged); `visibilityCS` (0x520270)."
-  review: imported
+  review: reviewed
 - addr: 0x5212f0
   kind: function
   semantics: "a player flag that takes a melee attack's outer defense damage at 100%."

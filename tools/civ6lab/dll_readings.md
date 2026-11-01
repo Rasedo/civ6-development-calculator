@@ -3807,7 +3807,7 @@ The opinion is the diplomatic modifiers' sum (24.8): AI_Diplomacy.csv (0x652bb0:
 - The Delegation's +3 ends at the Resident Embassy's +5 (runs/h1_duelw1110 t99).
 - Requirements: PLAYER_YIELD_LEAD 0xb6ff10 (MinimumDelta; the ratio to 1/256);
   COMPETING_MINORS 0xb61120; NOT_COMPETING_MINORS 0xb32500;
-  MILITARY_STRENGTH_LEAD 0xb548f0 (0x4bd0d0: LAND +0x330, SEA +0x270, AIR +0x2d0;
+  MILITARY_STRENGTH_LEAD 0xb548f0 (0x4bd0d0: LAND +0x2d0, SEA +0x330, AIR +0x270;
   runs/h1_duelw1104 Trajan −6 at 106); NEW_WARMONGER 0xb7eee0 (args 0xb81dd0;
   0x3d8d20: −20% of grievances, ≥ −60); SETTLED_CITIES 0xb96bf0 (args 0xb986e0;
   0x3d8da0 kind 0xfadf5055); FORCE_INCURSION 0xc00500 (+0x1280 +0x40 / +0x48,

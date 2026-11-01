@@ -222,7 +222,7 @@
   final: 0x31f820
   kind: function
   name: Player_Resources copies held
-  semantics: the copies of a resource the player holds.
+  semantics: "the copies of a resource the player holds. (r, 1): Player_Resources +0x2e0[r][0] less the reserved (0x4aa530, with the flag) plus +0x2e0[r][1] — a strategic one's stockpile."
   status: READ
   cases:
     - recording: h1_duelv1121
@@ -238,6 +238,7 @@
     - "H-1: the luxury allocation — READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   notes: [+0x2e0[r][0] less the reserved (0x4aa530) where the flag is set, plus +0x2e0[r][1]]
   context:
     - "...(`m_aiNoCapResources` > 0, the Luxury Policy's duplicate) multiplies it by its copies (0x4a93c0) and carries a wrap flag; a luxury the player owns adds `m_iExtraAmenitiesPerOwnedLuxur..."
@@ -246,6 +247,7 @@
   final: 0x5fa840
   kind: function
   name: the city's accumulation percent by terrain
+  semantics: "the city's +0x1e00 percent at the plot's terrain (+0x2c): the accumulation rate's multiplier."
   status: READ
   cases:
     - recording: h1_duelv1121
@@ -254,6 +256,7 @@
   impl: [cpu/core/stockpile.ts:accumulationPct, gpu/core/sim_minorai.py:accumulation_pct]
   readings:
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   notes:
     - the array +0x18 indexed by the plot's terrain (+0x2c), bounds +0x28; read on the city's +0x1e00
   review: reviewed

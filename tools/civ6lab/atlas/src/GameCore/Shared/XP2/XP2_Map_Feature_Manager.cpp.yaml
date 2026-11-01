@@ -126,7 +126,7 @@
 - addr: 0xa1c1a0
   final: 0x722c30
   kind: function
-  semantics: "an eruption's damage: each row, each neighbour in DirectionTypes order not impassable and bare / Removable / Volcanic Soil, a bonus resource removed, one rand(100)."
+  semantics: "an eruption's damage: each row, each neighbour in DirectionTypes order not impassable and bare / Removable / Volcanic Soil, a bonus resource removed, one rand(100). A BONUS resource (RESOURCECLASS_BONUS) is removed before the draw, land or water, any owner; a landed draw applies the row through 0x336a50."
   status: READ
   cases:
     - recording: h1_duelw1119
@@ -366,9 +366,11 @@
 - addr: 0xa219e0
   final: 0x727bb0
   kind: function
-  semantics: "an eruption's soil: each yield row, each such neighbour off water, one \"Fertility Gain Chance\" rand(100)."
+  semantics: "an eruption's soil: each yield row, each such neighbour off water, one \"Fertility Gain Chance\" rand(100). A feature that is neither Removable (Woods, Rainforest, Marsh) nor the row's own (Volcanic Soil) skips the plot; per row a landed draw paints Volcanic Soil (ReplaceFeature true on every eruption row, the raw setter 0x896c40) and the row's yield +1 (0xa190d0) — no district, city-centre or wonder gate, no food gate: a plot is painted when any row lands."
   status: READ
   cases:
+    - recording: volcano_own
+      value: painted share on 201 bare eligible plots 30/67, 46/67, 54/67 against the reading's 0.448 / 0.662 / 0.862
     - recording: h1_duelw1108
       turn: 217
       value: "Records: runs/h1_duelw1108   plot 609 (Plains, Volcanic Soil) reads 5 Food at t217 after four Food   draws."
@@ -424,7 +426,7 @@
 - addr: 0xa22150
   final: 0x728260
   kind: function
-  semantics: "a natural wonder's eruption: 0xa1c760 then 0xa21680 — for each of the wonder's plots in turn, for each damage row, the plot itself (impassable: no draw) and its six (0xeff670 / 0xeff688); the soil likewise, plot by plot, its draws labelled \"Pillage Improvement Chance\"."
+  semantics: "a natural wonder's eruption: 0xa1c760 then 0xa21680 — for each of the wonder's plots in turn, for each damage row, the plot itself (impassable: no draw) and its six (0xeff670 / 0xeff688); the soil likewise, plot by plot, its draws labelled \"Pillage Improvement Chance\". A plot two wonder plots share is taken twice."
   status: READ
   cases:
     - recording: h1_duelw1119

@@ -79,9 +79,12 @@
 - addr: 0x26e920
   final: 0x1a7150
   kind: function
-  semantics: "the step's cost rules (0x531660..0x530240): into a city at most CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1 bit 2) stands at the FROM or the TO plot, the completion (0x811b0) read off the FROM plot's district in both cases; a land unit whose player may embark it takes water (a turn on the domain's pool: [r9 + 0x180 + domain*4]). A step's turns and Movement (24.8): a parent with no Movement starts the next turn at the domain's full Movement; a step costing more than the Movement left waits for the next turn (turns + 1, Movement 0), unless the parent is the unit's own plot and the unit has not moved (flag 0x100) or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) save under flag 0x800. Between two plots the player never revealed (node +0x51 & 1, 0x154c0) the step costs the parent's or 1 and no rule runs."
+  semantics: "the step's cost rules (0x531660..0x530240): into a city at most CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1 bit 2) stands at the FROM or the TO plot, the completion (0x811b0) read off the FROM plot's district in both cases; a land unit whose player may embark it takes water (a turn on the domain's pool: [r9 + 0x180 + domain*4]). A step's turns and Movement (24.8): a parent with no Movement starts the next turn at the domain's full Movement; a step costing more than the Movement left waits for the next turn (turns + 1, Movement 0), unless the parent is the unit's own plot and the unit has not moved (flag 0x100) or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) save under flag 0x800. Between two plots the player never revealed (node +0x51 & 1, 0x154c0) the step costs the parent's or 1 and no rule runs. Its context: +0x18 the TO domain's full Movement ([pathfinder + 0x180 + domain*4] by the TO plot's water), +0x20 the Movement the step starts with (the parent's, or the new turn's full), +0x34 the cost the rules add (0x26ee80), +0x38 a carry the rules add (0x26ee90), stored as the node's +0x20 (0x26d7f0). The next step from a node pays the node's carry on top of its rules' cost (0x26ed00: [parent + 0x20] + cost); a step left short clears it. Ported: search's price and walk (cpu/core/tactical.ts), price6 and _tac_move_to's walk."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 88
+      value: Nazca's Horseman 31:6 (1/4) -> 31:5 (1/1) carrying 2, 32:4 (2/0) (AI_Planning.csv)
     - recording: h1_duelw1117
       turn: 72
       value: city-state 2's Swordsman embarking from 15:6 onto its Harbor 14:7 plans 1/0
@@ -106,41 +109,53 @@
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
     - "C-99: the carry under a zone of control — READ (0x26e920), both twins"
+    - "C-99: a shore crossing's carried Movement"
   review: reviewed
 - addr: 0x26ee80
   final: 0x1a74c0
   kind: function
+  semantics: the step context's cost the rules add (+0x34).
   status: PARTLY
   readings:
     - "C-95: a river crossing's Movement — READ"
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
+    - "C-99: a shore crossing's carried Movement"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...empt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x34 += x through 0xac650). A crossing is the terrain's cost plus 2 (`RIVER_CROSS_MP`..."
     - "...step starts with (the parent's, or the new turn's full), +0x34 the cost the rules add (0x26ee80), +0x38 a carry the rules add (0x26ee90), stored as the node's +0x20 (0x26d7f0: +0x28 M..."
-  review: imported
+  review: reviewed
 - addr: 0x26ee90
   final: 0x1a74d0
   kind: function
+  semantics: the step context's carry the rules add (+0x38), stored as the node's +0x20.
   status: PARTLY
   readings:
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
+    - "C-99: a shore crossing's carried Movement"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...w turn's full), +0x34 the cost the rules add (0x26ee80), +0x38 a carry the rules add (0x26ee90), stored as the node's +0x20 (0x26d7f0: +0x28 Movement, +0x2c turns, +0x20 carry). The..."
-  review: imported
+  review: reviewed
 - addr: 0x26eea0
   final: 0x1a74e0
   kind: function
-  status: PARTLY
+  semantics: "GeneratePath calls it first: it sets the start node's Movement (+0x1bc, read by the step cost 0x26e920 for the start) to GetMaxMoves (0x56e130, through 0x266660 on the formation) << 8 — the unit's full Movement, not its Movement left; the unmoved flag 0x100 stays the formation's own (+0x4b8). The planning's start node: the one reader of GetMaxMoves (0x56e130); later turns start on the pool of the plot's domain (0x2715a0)."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 61
+      value: the Quadriremes 1900549 / 2228245 and the Galley 2293780 wander to plots 4 away (the planning's reach) and stop 3 along
   impl: [cpu/core/tactical.ts:startMoves, gpu/core/sim_tactics.py:_tac_search]
   readings:
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-95: the planning sets out on the full Movement, the walk on the turn's restored"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...rch 0x26dcd0 with its third argument 1 (flags 0x115), which installs the start callback 0x26eea0 at +0xa8; GeneratePath calls it first, and it sets the start node's Movement (+0x1bc, r...
-  review: imported
+  review: reviewed
 - addr: 0x26ef40
   final: 0x1a7510
   kind: function
@@ -209,7 +224,7 @@
 - addr: 0x26f980
   final: 0x1a7e90
   kind: function
-  semantics: the zone of control query (finder, from, to, the path's destination) -> 0x530f50.
+  semantics: "the zone of control query (finder, from, to, the path's destination) -> 0x530f50. Under no flag 0x800, on a step that starts no turn, it sets the step's minimum cost to the Movement it starts with; the parent's carry is added on top (0x26ed00), so a step into a zone of control from a node carrying Movement is left short: a wait a turn on, the unit's own unmoved plot or a turn's first step spending everything. Ported: price's zone branch, price6's waits."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -230,6 +245,7 @@
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-99: the carry under a zone of control — READ (0x26e920), both twins"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+    - "C-99: the carry under a zone of control"
   context:
     - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."
     - "- THE ZONE OF CONTROL'S TEST (Rules_Movement 0x530f50, READ; through 0x26f980(finder, from, to, the path's destination) from the path cost 0x26e920, the move's step..."
@@ -237,7 +253,7 @@
   review: reviewed
 - addr: 0x26fe20
   kind: function
-  semantics: "Walks the destination plot's units from the last to the first; for each not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's is at war with (0x469cd0), calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 with the capture flag 1), a 1 or a 2 leaves it be; then the mover completes its step. A formation's move: the path flag 0x2000 becomes 0x80 for each member's placement (0x587ca0); the formation moves only if every member's placement succeeds."
+  semantics: "Walks the destination plot's units from the last to the first; for each not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's is at war with (0x469cd0), calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 with the capture flag 1), a 1 or a 2 leaves it be; then the mover completes its step. A formation's move: the path flag 0x2000 becomes 0x80 for each member's placement (0x587ca0); the formation moves only if every member's placement succeeds. The engines' melee order onto a religious unit only shares its plot, and their seizure takes no plot the mover cannot stand on without embarking (AUDIT C-94)."
   status: READ
   cases:
     - recording: 1121
@@ -269,6 +285,7 @@
 - addr: 0x270980
   final: 0x1a8da0
   kind: function
+  semantics: a movement-cost callback calling the river term 0x5301e0.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -280,19 +297,21 @@
   readings:
     - "C-95: a river crossing's Movement — READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: a river crossing's Movement"
   context:
     - "...nt cost's river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the uni..."
     - "...er, from, to, the path's destination) from the path cost 0x26e920, the move's step cost 0x270980 and the walk 0x26fe20 at 0x270800, which stores the answer on the formation +0x518): th..."
-  review: imported
+  review: reviewed
 - addr: 0x270be0
   final: 0x1a8f00
   kind: function
+  semantics: a movement-cost callback calling the river term 0x5301e0.
   status: PARTLY
-  readings: ["C-95: a river crossing's Movement — READ"]
+  readings: ["C-95: a river crossing's Movement — READ", "C-95: a river crossing's Movement"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the unit is not..."
-  review: imported
+  review: reviewed
 - addr: 0x270dd0
   final: 0x1a9060
   kind: function
@@ -323,7 +342,7 @@
 - addr: 0x271490
   final: 0x30c70
   kind: function
-  semantics: a path search's destination test.
+  semantics: a path search's destination test. The trade path's A* heuristic (0x557fd0's search).
   status: PARTLY
   readings:
     - "C-20: the Trader's path and range"
@@ -337,9 +356,12 @@
   final: 0x1a94b0
   kind: function
   name: pathfinder pool init
-  semantics: "the pool's per-domain full Movement (+0x180 + domain*4, 0..4): the largest of the formation's units' 0x56d9f0(unit, domain); +0x194 the largest GetMaxMoves"
+  semantics: "the pool's per-domain full Movement (+0x180 + domain*4, 0..4): the largest of the formation's units' 0x56d9f0(unit, domain); +0x194 the largest GetMaxMoves. Only the start node reads GetMaxMoves (the planning's 0x26eea0); a later turn starts on the pool of its plot's domain, and the shore crossing's carry reads the same pool. Ported: domainPool (cpu/core/tactical.ts), _tac_pool (gpu/core/sim_tactics.py)."
   status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 55
+      value: city-state 4's Heavy Chariot 83 (base 2, 3 on a clear start plot) lists every second-turn plot one Movement under GetMaxMoves' (AI_Planning.csv t29-55)
     - recording: h1_duely1124
       turn: 29-55
       value: city-state 4's Heavy Chariot 83 plans its second turn on its base 2, not GetMaxMoves' 3 on a clear start plot (AI_Planning.csv)
@@ -350,6 +372,7 @@
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   context:
     - ...is of the land domain (finder +0x1f2 = 0x2669d0( formation, 2), set by the pool's init 0x2715a0 at +0x180 +0x72) and the plot is water, +1000 (0x3e800) where its player is not human (...
   review: reviewed
@@ -390,9 +413,12 @@
 - addr: 0x2720a0
   final: 0x1a9f00
   kind: function
-  semantics: "the path validity: flag 1 lets no step leave a plot the player never revealed but the unit's own; 0x1000 lets a later turn end on its own stacking unit. Each node records (0x271be0) whether its player sees its plot (+0x50 & 2) and the count of the unit's own stacking units on it, the unit itself not counted (0x585eb0, +0x54); the walk back through the parents refuses the link, at each node after which a turn begins, where the plot is seen and the count reaches the stacking limit (+0x1b0), search flags +4 / +0x1000 clear. The other turn-end tests (0x272262..0x272313) on a seen node after which a turn begins: a mountain (+0x50 & 4, terrain bits 0x4924) or an impassable feature (+0x50 & 8) unless the finder's +0x1f6 lets it, water under flag 0x80 (+0x50 & 0x10), a city not at war (+0x51 & 2) — the stacking, mountain and city tests off under flag +4 (the planning's search carries it). After the walk (0x272372..0x272692): the embarking tests under the unit's +0x1f2 / +0x1f1 bytes on a revealed child; flag 2: a child owned by a player at war refused; a clans' tribe test (0x151550, 0x147c20); under the finder's +0x1f7 byte or flag 8, a child whose danger (0x716a90) is above 0 refused from a parent of turn 1 or less, under flag 0x8000 the same for a water child; flag 1: a parent not revealed refused unless it is the unit's own plot, and a child in a major's territory not at war refused unless the player may enter it (0x3dab70). The chain walk (0x272230..0x27235a): each node, its parent +0x0, its turn +0x2c, the newest from the instance's +0x1dc; a node ending a turn (+0x50 & 2) whose stacking count (+0x54) reaches the limit (+0x1b0) is refused unless +0x51 & 4 with +0x1f8, or flags & 4; with flags & 0x1000 (the validity's flag word +0xe0, 0x2721df) only where that node's turn is 1 or less (0x27229b): a turn after the first free to end on the unit's own stacking unit."
+  semantics: "the path validity: flag 1 lets no step leave a plot the player never revealed but the unit's own; 0x1000 lets a later turn end on its own stacking unit. Each node records (0x271be0) whether its player sees its plot (+0x50 & 2) and the count of the unit's own stacking units on it, the unit itself not counted (0x585eb0, +0x54); the walk back through the parents refuses the link, at each node after which a turn begins, where the plot is seen and the count reaches the stacking limit (+0x1b0), search flags +4 / +0x1000 clear. The other turn-end tests (0x272262..0x272313) on a seen node after which a turn begins: a mountain (+0x50 & 4, terrain bits 0x4924) or an impassable feature (+0x50 & 8) unless the finder's +0x1f6 lets it, water under flag 0x80 (+0x50 & 0x10), a city not at war (+0x51 & 2) — the stacking, mountain and city tests off under flag +4 (the planning's search carries it). After the walk (0x272372..0x272692): the embarking tests under the unit's +0x1f2 / +0x1f1 bytes on a revealed child; flag 2: a child owned by a player at war refused; a clans' tribe test (0x151550, 0x147c20); under the finder's +0x1f7 byte or flag 8, a child whose danger (0x716a90) is above 0 refused from a parent of turn 1 or less, under flag 0x8000 the same for a water child; flag 1: a parent not revealed refused unless it is the unit's own plot, and a child in a major's territory not at war refused unless the player may enter it (0x3dab70). The chain walk (0x272230..0x27235a): each node, its parent +0x0, its turn +0x2c, the newest from the instance's +0x1dc; a node ending a turn (+0x50 & 2) whose stacking count (+0x54) reaches the limit (+0x1b0) is refused unless +0x51 & 4 with +0x1f8, or flags & 4; with flags & 0x1000 (the validity's flag word +0xe0, 0x2721df) only where that node's turn is 1 or less (0x27229b): a turn after the first free to end on the unit's own stacking unit. Under 0x1000 a target its own stacking unit holds reached within the first turn is no path; reached later, the walk goes its first turn's way. Ported: moveTo(laterTurns) / pathTo, _tac_move_to(later_turns)."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 35
+      value: Hong Kong's Warrior 131073 on 8:5, two plots from its centre a Warrior then a Swordsman holds, stands t33-34 and goes in at t35
     - recording: h1_duelw1121
       turn: 11
       value: the Horse Archer at 34:8 for 30:7 takes the path whose turn ends on the free 33:6, not through 33:7 / 32:7 held by its own units
@@ -437,6 +463,7 @@
     - "C-99: Move Unit's path flags 0x2 / 0x8 — READ (0x2720a0, 0x716080), both twins"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."

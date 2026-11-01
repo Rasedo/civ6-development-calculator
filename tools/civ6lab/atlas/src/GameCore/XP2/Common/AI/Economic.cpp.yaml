@@ -27,9 +27,12 @@
   final: 0x457120
   kind: function
   name: savingsTurn
-  semantics: "The economic AI's turn: the gold boost; the savings — the treasury's change since the balance shared by the DefaultSavings weights, a slot below 0 cleared, slot 2 held at 150 with the excess to slot 0, slot 3 to slot 0 with no Great Person class left, the change the slots did not take (truncation, a cleared slot's debt) to slot 0, slot 0's debt met from the slots in order (all cleared at a treasury of 0 or less)."
+  semantics: "The economic AI's turn: the gold boost; the savings — the treasury's change since the balance shared by the DefaultSavings weights, a slot below 0 cleared, slot 2 held at 150 with the excess to slot 0, slot 3 to slot 0 with no Great Person class left, the change the slots did not take (truncation, a cleared slot's debt) to slot 0, slot 0's debt met from the slots in order (all cleared at a treasury of 0 or less). Not for a barbarian or a human: delta = the treasury (player +0x13a0 +0xf8) less the balance (+0x1b8); per slot of the SavingTypes (4) its weight (+0x4b8[i]) over the total (+0x458) as float, to 24.8 (floor << 8 | trunc(frac x 256)); the share (fx x delta) >> 8 added to the slot (+0x540[i]), the shares summed; a slot below 0 (0x688045) cleared, its debt taken off the sum (0x688064). PLOTS (slot 2) above 0x9600 (150.0): the excess to slot 0. No Great Person class available (0x2f7eb0, 0x6882f0..0x688339): slot 3 to slot 0. The remainder (0x68845b..0x68851b): slot 0 += delta - sum. The debt (0x6885bd..0x68872b): slot 0 below 0 — the treasury at 0 or less clears every slot; else slot 0 set to 0 and each slot in order gives min(slot, owed). The balance set to the treasury (0x688836, the watched +0x160). Ported: savingsTurn (cpu/core/aiEconomic.ts), _cv_savings_turn (gpu/core/sim_cityvalue.py)."
   status: READ
   cases:
+    - recording: h1_duelu1117
+      turn: 22
+      value: "Valletta's Builder 47 (105 Gold) first passes the test at t22 as logged: SLUSH + UNITS 105.47 with the remainder (104.41 without)"
     - recording: h1_duelu1117
       turn: 22
       value: "Valletta's Builder 47 (105) passes at t22 as logged: SLUSH + UNITS 105.47 with the remainder, 104.41 without"
@@ -61,6 +64,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
     - "C-129: a city-state's contract purchases come after its knowledge base's look — the job order READ (0x6096c0), the birth record's timing off the aimem sites, both twins"
+    - "C-96: the savings' accrual"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/dp2/NOTES.md: ...2, -cost) (refund); r==0xc -> +0x6338[to][a]=1; always 0x64a300(+0xc28[to], a). - Economic AI turn 0x687bf0: delta = treasury(+0x13a0 +0xf8) - last(+0x1b8); each saving slot i:   savings(+0x540)[i] += delta..."
@@ -212,8 +216,12 @@
   final: 0x459320
   kind: function
   name: TryPurchaseUnits
-  semantics: "TryPurchaseUnits(Economic, city or all, unit, flag): per city, the Gold price 0x1b22d0 (below 0 skipped); the UNITS and SLUSH slots together above it with UNITS above half of it or SLUSH above twice it, or — the city threatened (0x68c027: CityBuildAI +0x1b8's sign bit clear) — the balance (+0x1b8) at or above it; the purchase request (0x977570, the game core's +0x48 / +0x50); then the spend: UNITS then SLUSH for the overflow, a threatened city's from each slot in order; the balance less the price (0x68c0ad: the sum strictly above the price). 0x5ce5b0's tail loops the pick 0x5d2810 (domain -1) and this (flag 0) until either fails."
+  semantics: "TryPurchaseUnits(Economic, city or all, unit, flag): per city, the Gold price 0x1b22d0 (below 0 skipped); the UNITS and SLUSH slots together above it with UNITS above half of it or SLUSH above twice it, or — the city threatened (0x68c027: CityBuildAI +0x1b8's sign bit clear) — the balance (+0x1b8) at or above it; the purchase request (0x977570, the game core's +0x48 / +0x50); then the spend: UNITS then SLUSH for the overflow, a threatened city's from each slot in order; the balance less the price (0x68c0ad: the sum strictly above the price). 0x5ce5b0's tail loops the pick 0x5d2810 (domain -1) and this (flag 0) until either fails. The Gold price 0x1b22d0 holds no CanTrain test, so an obsolete unit's contract passes the savings test and the purchase request refuses it (the command's own validation unread). Ported: the minor's purchase request (minorPurchaseCity canPurchase), _minor_contract_purchases."
   status: PARTLY
+  cases:
+    - recording: h1_duelu1117
+      turn: 195
+      value: Valletta, Gunpowder held, its Warrior contract 680 ACCEPTED in the purchase list unbought t195-t220 with its Gold over the price; the purchase list lists no obsolete unit
   impl:
     - cpu/core/aiEconomic.ts:tryPurchaseUnits
     - gpu/core/sim_cityvalue.py:_cv_try_purchase
@@ -223,6 +231,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
   context:
     - ...pick on an empty queue (queue +0x1e0 / +0x1d0) and then walks 0x5d2810's items through 0x68be60.
   review: reviewed

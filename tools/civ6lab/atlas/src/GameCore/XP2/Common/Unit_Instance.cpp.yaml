@@ -6,11 +6,12 @@
 - addr: 0x56c480
   final: 0x3a23e0
   kind: function
-  semantics: the unit can embark.
+  semantics: the unit can embark. The unit can embark (the pathfinder pool's embarked Movement on water).
   status: PARTLY
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...r with it; +0x4c not above 0, taken as no unit on it; its own area unless it embarks (0x56c480), a hull on water; no city centre but its player's); its two counts over its sight (0x5...
@@ -241,8 +242,12 @@
 - addr: 0x56e130
   final: 0x3a3a00
   kind: function
-  semantics: a unit's Movement.
+  semantics: "a unit's Movement. The clear-terrain term applies where the plot's vt +0x18 answers 1 — taken as the plot's movement cost, a city's centre 1 (PARTLY READ: vt +0x18 itself unread). Ported: startTileMoves (cpu/core/units.ts), _start_tile_mp (gpu/core/sim_economy.py). GetMaxMoves: the unit's Movement with its modifiers (+0x1920), the player's (+0x1300, 0x3d8510), the start plot's clear-terrain (+0x1924, plot vt +0x18 at 1), own-ground (+0x1928) and foreign-ground (+0x192c) Movement; the pathfinder pool's +0x194."
   status: PARTLY
+  cases:
+    - recording: h1_duely1117
+      turn: 74
+      value: "city-state 4's Heavy Chariot 589825: 3 Movement on its centre 32:5 (Grassland Hills), 2 on 33:7 (Grassland Woods) and 34:7 (Grassland Hills), 3 on 36:8 (Plains)"
   impl:
     - cpu/core/tactical.ts:maxMoves
     - cpu/core/aiModifiers.ts:ANALYZERS
@@ -260,6 +265,8 @@
     - "C-95: the clear-terrain start Movement — PARTLY READ, ported"
     - "C-95: the planning sets out on the full Movement, the walk on the turn's restored — READ (the planning), FIT (the restore's place)"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-95: the clear-terrain start Movement"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...bard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The   type ids (0x5bcb80, each global the..."
   context:
@@ -279,7 +286,7 @@
 - addr: 0x56e3d0
   final: 0x3a3c70
   kind: function
-  semantics: "a unit's Range (unit +0x19f8): 0 for a melee unit."
+  semantics: "a unit's Range (unit +0x19f8): 0 for a melee unit. Garrison City fortifies a garrison of Range 0 alone."
   status: PARTLY
   impl: [cpu/core/tactical.ts:dangerPlane, cpu/core/tactical.ts:passNavalPillage]
   readings:
@@ -289,6 +296,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
+    - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...at   threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an A..."
     - ".claude/scratchpad/st1/reading.md: ...the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd also onto the land plots   beside each reach plot (the ring..."
@@ -325,24 +333,28 @@
 - addr: 0x56e760
   final: 0x3a4000
   kind: function
+  semantics: "a unit flag the swap's partner test reads: set, the path test (0x272a60 flag 4) and the partner's Movement against the plot's cost are skipped; its meaning unread."
   status: PARTLY
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "...0), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); (0x56e760 set: the path test 0x272a60 flag 4); over the units on the target's layer (0x75c50) one..."
-  review: imported
+  review: reviewed
 - addr: 0x56e780
   final: 0x3a4020
   kind: function
+  semantics: the unit moved into a zone of control this turn (the swap's partner test refuses it).
   status: PARTLY
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
+    - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...through it): the unit with Movement left (0x56c690), not moved into a zone of control (0x56e780), the target at distance 1 (0x1deb0); (0x56e760 set: the path test 0x272a60 flag 4); ov..."
-  review: imported
+  review: reviewed
 - addr: 0x56ee80
   final: 0x3a4730
   kind: function
@@ -361,7 +373,7 @@
 - addr: 0x56ef30
   final: 0x3a47e0
   kind: function
-  semantics: the fortify mission.
+  semantics: the fortify mission. The fortify mission (Heal's on a land unit or a hull at home, -> 0x95eae0).
   status: PARTLY
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -369,6 +381,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
+    - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...and, the   gossip strings GOSSIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify   (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside   its own territory heads for its player's nearest ci..."
   context:

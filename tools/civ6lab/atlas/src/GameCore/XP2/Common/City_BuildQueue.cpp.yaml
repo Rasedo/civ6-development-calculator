@@ -168,9 +168,15 @@
   final: 0xf61c0
   kind: function
   name: CanConstruct
-  semantics: "CanConstruct (the pick's): true with its reason fields +0x54 / +0x68 clear; its result's second byte says refused for good. Refuses a held building (not a pillaged one: its repair stands), one MutuallyExclusiveBuildings names, a Capital row off the capital, a government building above the tier, a worship building the city's religion does not offer, RequiresAdjacentRiver off a river, a Flood Barrier with no coastal lowland; not a district no plot can hold yet."
+  semantics: "CanConstruct (the pick's): true with its reason fields +0x54 / +0x68 clear; its result's second byte says refused for good. Refuses a held building (not a pillaged one: its repair stands), one MutuallyExclusiveBuildings names, a Capital row off the capital, a government building above the tier, a worship building the city's religion does not offer, RequiresAdjacentRiver off a river, a Flood Barrier with no coastal lowland; not a district no plot can hold yet. Its result (exit 0x17143f): the result byte [rsi] (set 1 at 0x1705c2, cleared by each refusal) and the reason +0x18 clear; +0x1 set refuses too. The prerequisite-district test at 0x17071d runs where the city holds the district complete (+0xb08) and 0x406c00 holds (the player's own version of the district type, its table +0x430); then 0x1ad720 (pillaged) refuses with +0x2a. At 0x17071d: the pick's prerequisite-district test: the building's PrereqDistrict (+0x160) or its replacement (0x408860) looked up in the city's districts (+0x1a48, 0x1ae530); held, +0xb08 set and 0x406c00 true, the reason +0x1c cleared, then 0x1ad720 (a district of the type in the city pillaged) sets +0x2a and fails, 0x1aeff0 (fallout) +0x2b, 0x1af120 +0x29; a held building pillaged (0x18e9f0, then 0x18fe60 true at 0x17082b) reads its district again through +0x218 and 0x1af250 (IsPillaged). Ported: pickDistrictPillaged (cpu/core/minorBuild.ts) / _pick_district_pillaged (gpu/core/sim_cityvalue.py); a building the city holds pillaged is let through. At 0x1707f1: the contract eligibility's CanConstruct (to 0x170832): a held building refused unless pillaged."
   status: PARTLY
   cases:
+    - recording: h1_duely1117
+      turn: 141
+      value: "Valletta t134-141: its pillaged Lighthouse picked under its pillaged Harbor, refused at the queue, NO BUILDS AT ALL"
+    - recording: h1_duely1128
+      turn: 32
+      value: "Nazca's pillaged Holy Site: the Shrine refused at the pick, the Horseman at 33.68 over the Shrine at 60.34"
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
@@ -189,6 +195,8 @@
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
+    - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer"
   notes: ["label: CanConstruct(city.buildQueue,...)"]
   context:
     - "...lain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not MustPurchase (Buildings +0x159 bi..."
@@ -222,9 +230,12 @@
   final: 0xf86d0
   kind: function
   name: CanTrain
-  semantics: "CanTrain(city, unit, ..., sixth argument): the sixth argument set (+0xe8, the CityBuildAI's call with the player AI +0x12a0 +0xba8 flag) skips the PrereqTech and PrereqCivic checks (0x172951..0x1729ab), so a locked unit is valued on the research AI's turns."
-  status: PARTLY
+  semantics: "CanTrain(city, unit, ..., sixth argument): the sixth argument set (+0xe8, the CityBuildAI's call with the player AI +0x12a0 +0xba8 flag) skips the PrereqTech and PrereqCivic checks (0x172951..0x1729ab), so a locked unit is valued on the research AI's turns. Its sixth argument is a byte at [rbp + 0xe8] (the caller's [rsp + 0x28]): the PrereqTech (Units +0x280, HasTech 0x4cb2f0 on player +0x1338) and PrereqCivic (+0x270, HasCivic 0x39d1f0 on +0x1310) refuse unless it is set (0x17296d / 0x172995); then 0x538460 — the unit obsolete — refuses unless it is set (0x1729be..0x1729ca, test r12b; je to the refusal 0x1738e2). The byte is clear in the best unit 0x5d2600 (0x5d2760), the purchase pick 0x5d2810 (0x5d28ba), the contracts' eligibility 0x5f6050 (0x5f67ec), the queue 0x5ca5a0 (0x5ca61e) and the expected count 0x5d4750 (0x5d47be); set only in the plot analysis's unit loop 0x5ce970: the unit table values an obsolete unit while the queue, the Default Specialization, the eligibility and the purchase never take it. Ported: minorCanTrain and the Free Cities' canTrain, GPU _minor_can_train, _MinorFacts.can_train / _FreeFacts.can_train."
+  status: READ
   cases:
+    - recording: h1_duelu1117
+      turn: 195
+      value: Valletta, Gunpowder held, its Warrior contract 680 ACCEPTED in the purchase list unbought t195-t220 with its Gold over the price; the purchase list lists no obsolete unit
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
@@ -249,6 +260,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
   notes: ["label: CanTrain(unit)"]
   context:
     - ...x5 first); the unit without FoundCity (+0x1b9 bit 2) or BuildCharges (+0x44), CanTrain (0x172820), not MustPurchase (+0x1b9 bit 128). Defensive pick (flags 1, 1; the military AI's +0x4...
@@ -264,10 +276,13 @@
   review: imported
 - addr: 0x173f70
   kind: function
+  semantics: the city may repair the pillaged district (the Free City's grant takes the first).
   status: PARTLY
   readings:
     - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "C-60: the Free City's grant"
   notes: ["imported: READ in its section, no confirming case found beside it"]
+  review: reviewed
 - addr: 0x175730
   final: 0xfb520
   kind: function
@@ -462,9 +477,12 @@
   final: 0xfdca0
   kind: function
   name: projectCost
-  semantics: "a project's price: OuterDefenseRepair (+0xe8 bit 0) the city's +0x1880 count (0x197ff0) over GlobalParameters +0x1bc COMBAT_HEAL_CITY_OUTER_DEFENSES, through the speed 0x5254d0; else the cost progression model"
-  status: PARTLY
+  semantics: "a project's price: OuterDefenseRepair (+0xe8 bit 0) the city's +0x1880 count (0x197ff0) over GlobalParameters +0x1bc COMBAT_HEAL_CITY_OUTER_DEFENSES, through the speed 0x5254d0; else the cost progression model. Ported: projectCost (REPAIR_HP_PER_COST), GPU _repair_price."
+  status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 83
+      value: City_BuildQueue.csv Production Needed 2 for Granada t83 (40 down) and Cardiff t90 (42 down)
     - recording: h1_duely1124
       turn: 83
       value: Granada's Repair Outer Defenses at Production Needed 2 (City_BuildQueue.csv) with 40 down; Cardiff t90 2 with 42 down
@@ -478,13 +496,14 @@
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew — the repair READ (0x17a680, 0x7b28c0's count), the jump a fit, both twins"
+    - "C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew"
   context:
     - "...8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x17a680 (OuterDefenseRepair's own; else the cost progression model: game progress 1, 8; 0x5254d..."
-  review: imported
+  review: reviewed
 - addr: 0x17a8c0
   final: 0xfde60
   kind: function
-  semantics: a project's production modifier in the city.
+  semantics: a project's production modifier in the city. The queue's m_axProjectProductionMultiplier[project] (+0x2f0, named by the dump 0x186460) x the district-type multiplier 0x178c50 of the project's district where it has one.
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -493,6 +512,7 @@
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
   context:
     - "...o 1.0 fixed point, 30 being +11.7%, over the city's Production x the project's modifier 0x17a8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x1..."
   review: reviewed
@@ -552,7 +572,7 @@
 - addr: 0x17b890
   kind: function
   name: turnsToBuildProject
-  semantics: "a project's build turns (Amount added raw to 1.0 fixed point): over the city's Production x the project's modifier 0x17a8c0 (the queue's per-project +0x2f0 and its district's 0x178c50), the cost 0x17a680 less the progress kept +0x260 and the store +0x1f4, through 0x8c4540."
+  semantics: "a project's build turns (Amount added raw to 1.0 fixed point): over the city's Production x the project's modifier 0x17a8c0 (the queue's per-project +0x2f0 and its district's 0x178c50), the cost 0x17a680 less the progress kept +0x260 and the store +0x1f4, through 0x8c4540. The rate: GetYield(Production) x 0x17a8c0's multiplier x (1 + the caller's percent); no term a city-state's Manhattan Project lacks."
   status: PARTLY
   impl:
     - cpu/core/aiModifiers.ts:ANALYZERS
@@ -562,13 +582,17 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
   review: reviewed
 - addr: 0x17bb40
   kind: function
   name: turnsToTrainUnit
-  semantics: "the unit's train turns in the city (unit, 0, &extra): the city's Production (0x1cb9f0) x (the unit's production multiplier 0x17c1c0 + extra), the cost (0x17bfa0) less the unit's progress (+0x230)."
+  semantics: "the unit's train turns in the city (unit, 0, &extra): the city's Production (0x1cb9f0) x (the unit's production multiplier 0x17c1c0 + extra), the cost (0x17bfa0) less the unit's progress (+0x230). The city's Production read live (0x1cb9f0 -> 0x1c5350 -> 0xaa740; the build queue's +0x1f0 the yield type, set at the city's construction 0x1baa90 -> 0x17d210): the founding city's first analysis reads it before the Palace lands and before the minor's PLAYER_CITIES modifiers — its plots' and buildings' Production less the Palace's 2, under the happiness of its amenities less the Palace's 2 (Displeased, -10%). Ported: foundingProduction (minorBuild.ts), _MinorFacts._founding_production."
   status: READ
   cases:
+    - recording: h1_duelv1117
+      turn: 1
+      value: "Antananarivo 1 x 0.9: Builder / Slinger / Warrior T 10 / 19 / 23; Valletta 3 x 0.9: T 4 / 7 / 8"
     - recording: 1124
       value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
   impl:
@@ -587,6 +611,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
+    - "C-96: the unit value's unit count and the founding Production"
   context:
     - "...t, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot wit..."
     - "...buildings' turns (+0x258), then, but for MustPurchase (+0x1b9 bit 128), the train turns 0x17bb40 and +10 while the city builds another item; negative T values FX(-9999). Measured: the..."
@@ -628,9 +653,12 @@
 - addr: 0x17c2e0
   final: 0xfec80
   kind: function
-  semantics: "a unit's strategic charge in a city: the speed-scaled Units_XP2 ResourceCost (Player_Units +0x430) times the formation's multiple, a Corps / Army less trunc of m_xCorpsArmyDiscount +0x390, less round of m_xStrategicResourceRequirementModifier +0x3b0, at least 1 last."
+  semantics: "a unit's strategic charge in a city: the speed-scaled Units_XP2 ResourceCost (Player_Units +0x430) times the formation's multiple, a Corps / Army less trunc of m_xCorpsArmyDiscount +0x390, less round of m_xStrategicResourceRequirementModifier +0x3b0, at least 1 last. For a unit with a Units_XP2 row (+0x198) and a StrategicResource (+0x1a0): 0x4f2cc0(the player's units +0x12e8, unit, formation), less the city's discounts. Ported: unitBaseResourceCost (resCost in rules.json); the engines apply the floor of 1 before the formation multiple."
   status: READ
   cases:
+    - recording: h1_duely1128
+      turn: 33
+      value: "Nazca, Horses from its pillaged Holy Site alone: Equestrian Orders 25.0 (20 Horses) through t31, 25.0 from t33 (10 Horses) after its first Horseman"
     - recording: h1_duely1128
       turn: 33
       value: Nazca's Horseman trained on 10 Horses (ResourceCost 20 online 10)
@@ -639,6 +667,7 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
+    - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project"
   context:
     - ...8 / +0x1a0), no progress (0x17d1a0) and a StrategicResource (+0x2c8) reserves its cost (0x17c2e0, its formation's) where the stock less the reservations (0x4aa790) covers it (0x4a7400)...
   review: reviewed
@@ -693,6 +722,7 @@
 - addr: 0x17d210
   final: 0xff720
   kind: function
+  semantics: sets the build queue's yield type (+0x1f0) at the city's construction (0x1baa90).
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -701,10 +731,12 @@
     - recording: 1121
       turn: 1
       value: "CONFIRMED: every   city-state founding of the five duely duels picks the game's item at the   game's value (AI_CityBuild.csv t1 Default Specialization): Antananarivo   and Muscat the Slinger at 8.3 (t"
-  readings: ["C-96: the unit value's unit count and the founding Production — READ, both twins"]
+  readings:
+    - "C-96: the unit value's unit count and the founding Production — READ, both twins"
+    - "C-96: the unit value's unit count and the founding Production"
   context:
     - ...aa740; build queue +0x1f0 is the yield type, set at the city's construction 0x1baa90 -> 0x17d210). The founding city's first City Analysis reads it before the Palace lands (the record'...
-  review: imported
+  review: reviewed
 - addr: 0x17d660
   final: 0xff9f0
   kind: function
@@ -828,21 +860,25 @@
 - addr: 0x180cb0
   final: 0x1020b0
   kind: function
+  semantics: "a building completion: runs the full citizen reassign 0x196320."
   status: PARTLY
   readings:
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
   context:
     - "...L CITIZEN REASSIGN 0x196320's callers (the DLL's call sites): the building completions (0x180cb0, 0x181700), the favored / disfavored yield setters (0x196f90, 0x1970e0), AnnexPlot (0x1..."
-  review: imported
+  review: reviewed
 - addr: 0x181700
   final: 0x1029c0
   kind: function
+  semantics: "a building completion: runs the full citizen reassign 0x196320."
   status: PARTLY
   readings:
     - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers — a fit and a reading"
+    - "C-100 / C-112: a city-state's power and its regional buildings, the citizen reassign's callers"
   context:
     - "...REASSIGN 0x196320's callers (the DLL's call sites): the building completions (0x180cb0, 0x181700), the favored / disfavored yield setters (0x196f90, 0x1970e0), AnnexPlot (0x1a8b70), th..."
-  review: imported
+  review: reviewed
 - addr: 0x183b30
   final: 0x1047b0
   kind: function

@@ -36,12 +36,8 @@
 - addr: 0x82a10
   final: 0x5fe00
   kind: function
-  semantics: the city has water (a NAVAL unit's exit with no Harbor). The plot is beside an ocean-sized water body.
+  semantics: "IsCoastalLand(plot, minWaterSize): false on a water plot (terrain 15 / 16 Coast / Ocean, or a terrain whose row +0x48 bit 4 is set); else true where one of the six neighbours (0xeff670 / 0xeff688) is such water, not impassable (+0x3a bit 3), and its water body (the plot's +0x10 area, size +4) holds at least minWaterSize plots (-1: GlobalParameters +0x528 OCEAN_MIN_WATER_SIZE, 10; 0 or less any): land beside an ocean-sized body, a lake shore not. The unit value's NAVAL exit (a city with no Harbor), the standing army's coastal city, Coastal Raid's coastal land and the settle score's coastal term read it on the plot."
   status: PARTLY
-  cases:
-    - recording: 1124
-      turn: 28
-      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
   readings:
     - "C-74: the event draw, the volcanoes, the drought"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

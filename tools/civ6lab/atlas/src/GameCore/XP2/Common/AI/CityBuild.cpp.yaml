@@ -51,7 +51,7 @@
 - addr: 0x5ca5a0
   final: 0x3df600
   kind: function
-  semantics: queues the picked unit.
+  semantics: queues the picked unit. Calls CanTrain (0x172820) with its sixth argument clear (0x5ca61e).
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -61,6 +61,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...pick building if bv>=uv && bv>=pv; else unit if uv>=pv; else project. CanConstruct checks 0x5c9ea0/0x5ca5a0/0x5ca450;  fail -> 0x5d2810 fallback ('Generic Offense' / 'NO BUILDS AT ALL').  bestBuilding: value..."
   context:
@@ -69,8 +70,12 @@
 - addr: 0x5ca7e0
   kind: function
   name: the standing army
+  semantics: "the standing army, a step of the city's full update (after the threat 0x5cbd10). The quota, CityBuildAI +0x220's watched value (+0x278, the setter 0x731d10), is pseudoYieldValue(PSEUDOYIELD_STANDING_ARMY_NUMBER, 1.0, the owner) x fx(sqrtf(the population +0x588)) (sqrtf the IAT slot @0xcf47b0), whole (sar 8). The list: the player's units (+0x12e8 +0xd8) of AI type DEFENDER (+0x1c0 == 4) homed on the city (+0x11d0 == city +0xf8) — one with +0xf30 above 0 that player +0x1278 holds (0x623910 >= 0) released (COMBAT 3, home -1); the weakest found (0x5c4910); then per unit of AI type COMBAT (3) — or EXPLORE (2) whose type's highest AI flag up to 3 is COMBAT (0x79b9c0) while the player's units exceed twice its cities — in no operation (+0x7d0 == -1), of the land (+0x650 == 2) or the sea (0) beside a coastal city (0x82a10), not so held: below the quota it joins (DEFENDER, homed); else where its Combat (0x56dc90) tops the weakest's it takes the weakest's place (the weakest COMBAT, home -1), the weakest found again after each change. The shortfall, CityBuildAI +0x280's watched value (+0x2d8), is the quota less the list (below 0 where the list outgrew a fallen quota). Ported: minorStandingArmy / minorStandingArmyShort (cpu/core/minorCityAi.ts), _minor_standing_army / _minor_standing_short (gpu/core/sim_minorai.py); the EXPLORE clause and the +0xf30 release not ported."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 10
+      value: "Hunza's standing DEFENDER recruited by Attack Barb Camp at t9: the Combat Desire 0.0 at t10, 0.1 from t11, the shortfall 1"
     - recording: h1_duelv1117
       value: the Combat Desire as logged 264 -> 602 of 747 minor-turns with the shortfall at PSEUDOYIELD_STANDING_ARMY_VALUE each
   impl:
@@ -83,6 +88,7 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-96: the standing army and the Combat Desire's city terms"
   context:
     - "...] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0x5ce3f0: the job o..."
   review: reviewed
@@ -117,9 +123,12 @@
   final: 0x3e02c0
   kind: function
   name: growthForecast
-  semantics: "the growth forecast (CityBuildAI +0x6c8 turns, +0x738 withheld Food, +0x7a8 population; each turn's full update): the current factor g (0x1b5f70); where g < 1 a step (0, S(1 - g), pop); the turns to the next citizen 0x1b6390; then per next citizen while the turn is below 100 (+0x6c0): its factor, a step where it changes, the whole turns its threshold takes at g x S, S less 2.0 (at least 0). A city-state's forecast is of its citizens and store before the turn's growth."
+  semantics: "the growth forecast (CityBuildAI +0x6c8 turns, +0x738 withheld Food, +0x7a8 population; each turn's full update): the current factor g (0x1b5f70); where g < 1 a step (0, S(1 - g), pop); the turns to the next citizen 0x1b6390; then per next citizen while the turn is below 100 (+0x6c0): its factor, a step where it changes, the whole turns its threshold takes at g x S, S less 2.0 (at least 0). A city-state's forecast is of its citizens and store before the turn's growth. Its caller in the full update unread; the city AI's analysis reads the forecast of the turn before (a LAB fit: the growth as the last turn read it, before that turn's Builders acted: CityState.aiGrowthSeen)."
   status: PARTLY
   cases:
+    - recording: h1_duely1117
+      turn: 136
+      value: "Caguana 657: the Batey over the Farm removes the Farm t135, the Farm laid again t136 (179.73 over the Batey's 109.68 on the forecast still holding the Farm's Food), and so to t221"
     - recording: h1_duelv1121
       turn: 18
       value: Ayutthaya's Granary 14.11 with no housing term (the forecast of population 2)
@@ -129,6 +138,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...8709, anyT +4503 (13212), onlyOurs 1318.  DONE (code): - aiCityBuild.ts: CityGrowth/growthForecast (0x5cb570)/housingValue (0x7a3d70)/turnsToGrow (0x1b6390); unitValueExit   (0x7b62c0 exits: T>=H, version, no..."
   context:
@@ -139,9 +149,15 @@
   final: 0x3e05a0
   kind: function
   name: the city's threat (m_cityThreat)
-  semantics: "the city's threat (CityBuildAI m_cityThreat +0x160, data +0x1b8, set by the city's update 0x5ce680): per player of the game's list (+0x4a0) but the owner and a declared friend (0x3da770): a full civ the owner fights (0x469cd0) or that has denounced it (0x3da5e0) or that it denounced (0x3da8e0), and the barbarians, are hostile (margin 5.0); another full civ, margin 20.0 or the centre's garrison term where higher (0x5cc088: 0x24a180(centre, out, 0, 0)); a city-state the owner does not fight is skipped. An undamaged city with an operation of the owner against the player whose target lies within 5 of it (0x723cf0) skips the player. The knowledge base's units of the player within 5 (a full civ's) or 3 (0x5eadb0) each by its unit row: s = max(Combat +0x48, RangedCombat +0x6c, Bombard + 20 where +0x40 is above 0), counted where it bombards, where ranged and s above D - 15.0, or s above D - 5.0 (D the centre's GetDefenseStrength, 24.8, without its garrison: 0x5cbd72 calls 0x24ae80 with r8b set), an explorer never, nor a barbarian's (0x484910) of a type in the barbarian manager's list (+0x298, vector +0x2f0; 0x153e40); their sum at D plus the margin or more threatens the city, at level 2 (+1 above 2 of city +0x1a60, +2 with +0x5e8, +1 with +0x1c78's list, + +0x588 / 5), at most 1 for a player not hostile; the first such player decides, else -1. The units within 2 above 5.0 strength (a second 0x5eadb0) set the autovariable +0x1c0."
+  semantics: "the city's threat (CityBuildAI m_cityThreat +0x160, data +0x1b8, set by the city's update 0x5ce680): per player of the game's list (+0x4a0) but the owner and a declared friend (0x3da770): a full civ the owner fights (0x469cd0) or that has denounced it (0x3da5e0) or that it denounced (0x3da8e0), and the barbarians, are hostile (margin 5.0); another full civ, margin 20.0 or the centre's garrison term where higher (0x5cc088: 0x24a180(centre, out, 0, 0)); a city-state the owner does not fight is skipped. An undamaged city with an operation of the owner against the player whose target lies within 5 of it (0x723cf0) skips the player. The knowledge base's units of the player within 5 (a full civ's) or 3 (0x5eadb0) each by its unit row: s = max(Combat +0x48, RangedCombat +0x6c, Bombard + 20 where +0x40 is above 0), counted where it bombards, where ranged and s above D - 15.0, or s above D - 5.0 (D the centre's GetDefenseStrength, 24.8, without its garrison: 0x5cbd72 calls 0x24ae80 with r8b set), an explorer never, nor a barbarian's (0x484910) of a type in the barbarian manager's list (+0x298, vector +0x2f0; 0x153e40); their sum at D plus the margin or more threatens the city, at level 2 (+1 above 2 of city +0x1a60, +2 with +0x5e8, +1 with +0x1c78's list, + +0x588 / 5), at most 1 for a player not hostile; the first such player decides, else -1. The units within 2 above 5.0 strength (a second 0x5eadb0) set the autovariable +0x1c0. The Free Cities' city threat is the same walk: the majors fought, the city-states not (freeCityThreat / _free_city_threat, stored per city as City.aiThreat / city_ai_threat). At 0x5cbd9e: the enemy at the gates (+0x1c0's watched value, +0x218) cleared as the walk opens; per player the walk reads — past the friendship, the city-state-not-fought and the 0x723cf0 skips, with records within its range (the first 0x5eadb0's strength above 0) — after its strength sum, 0x5eadb0 again at radius 2, least strength 5 (the type's larger of Combat +0x48 and RangedCombat +0x6c), age 2: its out list's entries per unit type [type, count] (0x5eafd2), their counts summed above 2 — three units or more — set it (0x5cc3d4) for the rest of the walk. A player the owner fights (the war flag [rbp+0x6f], the barbarians not) with +0x218 set threatens the city at once (0x5cc3d9 -> 0x5cc475), the margin unread. Ported: cityThreat's near (CityState.threatNear / citystate_threat_near, City.aiThreatNear / city_ai_near)."
   status: READ
   cases:
+    - recording: h1_duelw1103
+      turn: 46
+      value: "Hattusa \"Canceling current build\" with its centre whole and no war footing"
+    - recording: h1_duelw1123
+      turn: 215
+      value: "player 62's Combat Desire uncapped t203-t212, capped at 2.0 t213-t215 with Chen still Free: the cap lifts on the Free City's threat"
     - recording: h1_duelw1121
       turn: 13
       value: "Hunza: its Attack Barb Camp's target 10:2 three from the city, the barbarian Quadrireme at 11:2 starts City Defense"
@@ -169,6 +185,8 @@
     - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
     - "C-60: the Free Cities Raid — READ (the start 0x274ea0, the record 0x277470, the signals 0x276d90 / 0x276e70 / 0x276ff0, the record's clear in 0x274010), the signal 0x276a40's event unread, ported"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
+    - "C-96: the Free Cities' city build AI, threat and Combat Desire"
+    - "C-96: the city under threat and a pillaged district's repair"
   context:
     - "...m the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights; logged by 0x5cdd70: Food Adv. / Prod. Adv. are adv..."
   review: reviewed
@@ -237,9 +255,12 @@
   final: 0x3e1150
   kind: function
   name: the improvement event
-  semantics: "the improvement event (slot 3): with its slot free (+0xb88's element 3 -1) and the city's event handle 3 (+0xb18 +0x18) live (its first byte not the none byte @0xe36190), the pick +0x648 (-1 none), its best plot 0x5d1cb0(city, pick, -1, 0) and the pick's value there 0x5d4ae0 above 0: the tree (\"City %s\" named, made 0x7ff9a0, seeded 0x7cb230, not ticked), its trigger the pick and the plot, its id in slot 3 (+0xb30)."
+  semantics: "the improvement event (slot 3): with its slot free (+0xb88's element 3 -1) and the city's event handle 3 (+0xb18 +0x18) live (its first byte not the none byte @0xe36190), the pick +0x648 (-1 none), its best plot 0x5d1cb0(city, pick, -1, 0) and the pick's value there 0x5d4ae0 above 0: the tree (\"City %s\" named, made 0x7ff9a0, seeded 0x7cb230, not ticked), its trigger the pick and the plot, its id in slot 3 (+0xb30). It starts no tree for a pick no Builder lays (the Mountain Tunnel's adjacent-plot row on a bare mountain): where in it or the tree's seed the Tunnel stops is unread (a LAB; improvementEvent)."
   status: READ
   cases:
+    - recording: h1_duely1127
+      turn: 250
+      value: Hattusa t220-t250 and Muscat t221-t250 m_bestImprovementToMake 46, no tree, no Builder contract
     - recording: h1_duely1124
       turn: 47
       value: "Granada t47-t71: slot 3 -1 with the pick FARM on an x-41 plot"
@@ -253,6 +274,7 @@
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
     - "C-99: an upgraded unit out of the tactical pass — READ (records), both twins"
+    - "C-99: an upgraded unit out of the tactical pass"
   context:
     - "...ent 0x5cc910 (its \"City Build District Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"Build City Improvement\"), 0x5cd4e0; last, with the build queue empty (city +0x2350 0..."
     - "...ng them) with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: the contract..."
@@ -328,8 +350,11 @@
 - addr: 0x5cdae0
   final: 0x3e1da0
   kind: function
-  semantics: "THE CITY AI'S FOOD FOCUS (the city update's call before its events, an AI player's city only): the growth object's Food surplus (0x1b5620) below 1.0 with its Housing (0x1b5840) above the population (+0x588): Food not favored (0x1962a0 on +0x1ba8) is set favored; otherwise a favored Food is cleared — each through the SET_FOCUS command (0x975550), a full re-place."
-  status: PARTLY
+  semantics: "THE CITY AI'S FOOD FOCUS (the city update's call before its events, an AI player's city only): the growth object's Food surplus (0x1b5620) below 1.0 with its Housing (0x1b5840) above the population (+0x588): Food not favored (0x1962a0 on +0x1ba8) is set favored; otherwise a favored Food is cleared — each through the SET_FOCUS command (0x975550), a full re-place. The one builder of the SET_FOCUS command (0x975920) in the DLL beside the Lua setters."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      value: with a CityFocusChanged row of the city's player in the turn record t+1 holds the re-placed set in 74 of 99
   impl:
     - cpu/core/cityStates.ts:minorFoodFocus
     - cpu/core/minorCityAi.ts:minorAiTurn
@@ -341,6 +366,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the citizen manager's placement and the yield flags — READ"
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
+    - "C-112: the citizen manager has no turn of its own"
   context:
     - "...ned with no wait, \"H-1: why a seed does not replay\"). Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150 (tree \"Build City..."
   review: reviewed
@@ -348,9 +374,12 @@
   final: 0x3e1f10
   kind: function
   name: the city under threat
-  semantics: true where the player AI's +0x12a0 +0x4b8 (war footing) is set, or CityBuildAI +0x1b8 (the threat) is above -1 and either the centre's GetDamage(0x5e97d629, its hit points) is above 0 or CityBuildAI +0x218 is set; +0x218's writer unread
-  status: PARTLY
+  semantics: "true where the player AI's +0x12a0 +0x4b8 (war footing) is set, or CityBuildAI +0x1b8 (the threat) is above -1 and either the centre's GetDamage(0x5e97d629, its hit points) is above 0 or CityBuildAI +0x218 is set. A threat alone is not enough. +0x218 is the watched bool CityBuildAI +0x1c0's value, its one writer the threat 0x5cbd10. Readers: the contract eligibility 0x5f6050 (at 0x5f60c0, 0x5f62a1, 0x5f64a6) and the Default Specialization's defensive pick; the defensive cancel 0x5d7640 opens with the same test inline (0x5d766a..0x5d76ac). Ported: minorUnderThreat / _minor_under_threat, the contracts' underThreat, the pick's defense."
+  status: READ
   cases:
+    - recording: h1_duelw1127
+      turn: 165
+      value: "Muscat t160-t165, its centre damaged (38, 18, 43, 23, 3): no builds at all each turn (Walls, Castle and Star Fort held), PROJECT_REPAIR_OUTER_DEFENSES at t166 once healed"
     - recording: h1_duelw1124
       turn: 43
       value: "Granada's City Defense started t42 (threat above -1) with its centre whole: its Harbor contract kept, complete t45 (Gold 6 -> 10)"
@@ -373,6 +402,7 @@
     - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-96: the city under threat and a pillaged district's repair"
   review: reviewed
 - addr: 0x5cdce0
   final: 0x3e1fa0
@@ -421,7 +451,7 @@
   final: 0x3e2750
   kind: function
   name: the city's second hook
-  semantics: "the city's second hook: on an empty queue (queue +0x1e0 / +0x1d0) runs the Default Specialization pick 0x5d4d70 again (a second NO BUILDS line a turn), then walks 0x5d2810's items through 0x68be60."
+  semantics: "the city's second hook: on an empty queue (queue +0x1e0 / +0x1d0) runs the Default Specialization pick 0x5d4d70 again (a second NO BUILDS line a turn), then walks 0x5d2810's items through 0x68be60. At 0x5ce613: asks the purchase pick 0x5d2810 for any domain (edx -1 here and at 0x5ce651)."
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -437,6 +467,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
+    - "C-126: the purchase list's buildable test and the upgrade's furthest rung"
   context:
     - ...+0x2350 0 or +0x2340 null), the Default Specialization pick 0x5d4d70. A second hook (0x5ce5b0) runs the same pick on an empty queue (queue +0x1e0 / +0x1d0) and then walks 0x5d2810's...
     - "...ity was nuked?)\" for any other. The log line is the pick and its value; the second hook 0x5ce5b0 runs it again (two NO BUILDS lines a turn). MEASURED (`cityBuildLab.ts`, the five verbo..."
@@ -445,8 +476,12 @@
   final: 0x3e2820
   kind: function
   name: the city update
-  semantics: "the city's AI turn (from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, the City Analysis job 0x5ce3f0. Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150, the district event 0x5cc910, the improvement event 0x5ccc10, 0x5cd4e0; last, with the build queue empty (city +0x2350 0 or +0x2340 null), the Default Specialization pick 0x5d4d70."
+  semantics: "the city's AI turn (from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, the City Analysis job 0x5ce3f0. Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150, the district event 0x5cc910, the improvement event 0x5ccc10, 0x5cd4e0; last, with the build queue empty (city +0x2350 0 or +0x2340 null), the Default Specialization pick 0x5d4d70. At 0x5ce8f0: the update's Default Specialization on the empty queue: at a city's founding the pick reads the founding analysis (the Production before the Palace); the turn's own analysis, at the full Production, feeds the next turn's research. Ported: the founding pick in minorAiTurn / _minor_ai_turn."
   status: PARTLY
+  cases:
+    - recording: h1_duely1124
+      turn: 2
+      value: "every city-state founding of the five duely duels picks the game's item at its value: Antananarivo and Muscat the Slinger at 8.3, 1124 Bologna 30.2; Bologna t2 Archery 142.3 on the turn's own analysis"
   impl:
     - cpu/core/aiCityTrees.ts:buildingEvent
     - cpu/core/aiCityTrees.ts:freeSlots
@@ -459,6 +494,7 @@
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
+    - "C-96: the unit value's unit count and the founding Production"
   context:
     - "- The city's turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5ca..."
     - "...cancellation 0x5d7640 (\"Canceling current build\"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970."
@@ -483,9 +519,15 @@
 - addr: 0x5ce970
   final: 0x3e2aa0
   kind: function
-  semantics: "a plot evaluation's tables (BUILDINGS +0x28, PROJECTS +0x38, UNITS +0x40). A building other than a wonder is valued on the city centre only: T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0) + 10 while the city builds something else (city +0x2350 set and the current item not this one) + each missing prerequisite building's turns; value = 0x7a4d40(building, T, no plot, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot with valueHorizons[2]. T beyond the horizon values FX(-9999). The building loop (0x5cfb10..0x5cfca5) values a row CanConstruct (0x170450 on the queue +0x2170) does not refuse for good (its result's second byte [rbp-0x1f]): a pillaged building the city holds is valued as unbuilt. The city build AI's PROJECTS table gates: MaxPlayerInstances (+0x30 / +0x34) above the player's completions and the other cities' builds (0x179650); UnlocksFromEffect (+0xe8 bit 2, or Projects_XP2 +0x60 bit 0) the player's unlock (0x468260); the civic (+0x120), tech (+0x150), district in the city (+0x128, 0x1aea60), RequiredBuilding (+0x158) held; its ProjectPrereqs (+0x130) each completed. T = the build turns (0x17b890), H valueHorizons[1]; x1.5 (@0xd2f32c) where the player's list +0x6e8 holds it."
+  semantics: "a plot evaluation's tables (BUILDINGS +0x28, PROJECTS +0x38, UNITS +0x40). A building other than a wonder is valued on the city centre only: T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0) + 10 while the city builds something else (city +0x2350 set and the current item not this one) + each missing prerequisite building's turns; value = 0x7a4d40(building, T, no plot, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot with valueHorizons[2]. T beyond the horizon values FX(-9999). The building loop (0x5cfb10..0x5cfca5) values a row CanConstruct (0x170450 on the queue +0x2170) does not refuse for good (its result's second byte [rbp-0x1f]): a pillaged building the city holds is valued as unbuilt. The city build AI's PROJECTS table gates: MaxPlayerInstances (+0x30 / +0x34) above the player's completions and the other cities' builds (0x179650); UnlocksFromEffect (+0xe8 bit 2, or Projects_XP2 +0x60 bit 0) the player's unlock (0x468260); the civic (+0x120), tech (+0x150), district in the city (+0x128, 0x1aea60), RequiredBuilding (+0x158) held; its ProjectPrereqs (+0x130) each completed. T = the build turns (0x17b890), H valueHorizons[1]; x1.5 (@0xd2f32c) where the player's list +0x6e8 holds it. At 0x5cf2b0: the plot is in the unit's sight (a ranged spot beyond 1 needs it). At 0x5ceac1: the plot analysis's owner test (to 0x5cecc0): +0x5a the plot's owner (plot vt +0x30, byte +0x1c) the player's; +0x57 (an unowned plot beside one of the player's) the walk of the six adjacent plots 0x5ceb67 where +0x5a is clear. At 0x5ceba7: an owner other than none (0xff) — another player's, or the player's in another city (the plot's city id +0xc against the city's +0xf8) — clears +0x57 and +0x55, fills the district, improvement and building rows with FX(-9999), clears +0x54 / +0x56 and leaves the plot (0x5d023b): no district is chosen on another player's plot. Ported: minorPlotEvals / _minor_plot_evals (such a plot stands unanalysed). At 0x5cede6: +0x55 (to 0x5cee82): per district row, the row past its gates — +0xe1 bit 4 clear, the verdict 0x5d2ae0 not -1, 0x406c00 on the player's districts (+0x1308), then the plot's own district of the row (0x5cee3f: its repair) or the placement test 0x35f2d0 — sets +0x55 before the row is valued; a district valued 0.0 stands chosen like any other (0x5d0c20). Ported: minorPlotEvals' districtOk / _minor_plot_evals' district_ok."
   status: PARTLY
   cases:
+    - recording: h1_duely1128
+      turn: 66
+      value: "Nazca's pillaged Holy Site: Build City District contracts 125 (t49) and 157 (t66) at VALUE 0.0"
+    - recording: h1_duely1124
+      turn: 188
+      value: Cardiff's Purchase Plot contract on 10:12 ends t187 (the plot another player's), the t188 district tree on 13:13
     - recording: h1_duelv1124
       turn: 73
       value: Granada's pillaged Lighthouse valued 76.11-162.61 t73-t78 (491 / 491 Lighthouse rows)
@@ -534,6 +576,8 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
     - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
+    - "C-95: the planning's spots and the combat prediction"
+    - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...== f2f988?) & cond -> +5.0. Initial best FX(-9999). CITY ANALYSIS job vtable d59af0 -> 0x5ce910 -> 0x5ce970 (per PLOT eval): +0x20 districts, +0x28 buildings, +0x30 improvements, +0x38 projects, +0x40 units...."
   context:
@@ -545,9 +589,12 @@
   final: 0x3e4710
   kind: function
   name: bestBuilding
-  semantics: "the best building of a plot evaluation's BUILDINGS table (+0x28): starts at FX(-9999), takes a strictly higher value, the first in table order on a tie; with the pick's flags (plain / defensive) as in 0x5d4d70."
+  semantics: "the best building of a plot evaluation's BUILDINGS table (+0x28): starts at FX(-9999), takes a strictly higher value, the first in table order on a tie; with the pick's flags (plain / defensive) as in 0x5d4d70. With flags 0, 0 (the event building's reasons) a prerequisite building pillaged stands for none. Ported: minorPickFacts / the Free Cities' reasonsClear, event_building. It checks CanConstruct's result where its third argument is set ([rbp+0x40], the plain pick's 1)."
   status: PARTLY
   cases:
+    - recording: h1_duely1127
+      turn: 156
+      value: "Muscat, its Market pillaged under repair: the Build City Building event takes the Pike and Shot at 3.0 where the Bank values 21.23"
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
@@ -567,6 +614,8 @@
     - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
+    - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...in gnames.json (value = string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick building if bv>=uv &&..."
   context:
@@ -576,7 +625,7 @@
   final: 0x3e4a50
   kind: function
   name: City Build District Choice
-  semantics: "City Build District Choice: over the evaluations with +0x55 and +0x5a or +0x57 (an adjacent plot of the player's, 0x5ceb67), the district valued above the plot's reservation; an equal value draws 2 and a 1 takes it. The majors' cities draw first."
+  semantics: "City Build District Choice: over the evaluations with +0x55 and +0x5a or +0x57 (an adjacent plot of the player's, 0x5ceb67), the district valued above the plot's reservation; an equal value draws 2 and a 1 takes it. The majors' cities draw first. Takes a value above the plot's reservation, FX(-9999) unreserved: a district valued 0.0 stands chosen."
   status: READ
   cases:
     - recording: h1_duelw1127
@@ -593,6 +642,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type — READ (0x5ceba7, 0x7f5112 -> 0x1aec20 / 0x1ad720), both twins"
+    - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type"
   context:
     - "...ity Building\"), the district event 0x5cc910 (its \"City Build District Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"Build City Improvement\"), 0x5cd4e0; last, with the b..."
   review: reviewed
@@ -649,7 +699,7 @@
 - addr: 0x5d2600
   kind: function
   name: bestUnit
-  semantics: "the best unit of a plot evaluation's UNITS table (+0x40): starts at FX(-9999), strictly higher wins, the first in table order on a tie; the plain / defensive admission of 0x5d4d70."
+  semantics: "the best unit of a plot evaluation's UNITS table (+0x40): starts at FX(-9999), strictly higher wins, the first in table order on a tie; the plain / defensive admission of 0x5d4d70. Calls CanTrain with its sixth argument clear (0x5d2760)."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -668,6 +718,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
+    - "C-96: CanTrain's obsolescence and the contract purchase's refusal"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...e previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick building if bv>=uv && bv>=pv; else unit if uv>=pv; else project..."
   context:
@@ -770,11 +821,12 @@
 - addr: 0x5d4030
   final: 0x3e75e0
   kind: function
-  semantics: logs the plot evaluations (the PLOT ANALYSIS LOG).
+  semantics: logs the plot evaluations (the PLOT ANALYSIS LOG). Printed in the city's update (the City Analysis), before the turn's savings purchases.
   status: PARTLY
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
+    - "C-96: the unit value's unit count and the founding Production"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t; no direct caller) read by the improvement pick 0x5c9a00 (CityBuildAI +0x648; the log 0x5d4030 prints the same evaluations), the events: defence 0x5cced0 (slot 5), building or unit..."
@@ -861,14 +913,16 @@
 - addr: 0x5d4a20
   final: 0x3e7f40
   kind: function
+  semantics: a district's table value at its plot (the defensive cancel's old value of a queued district).
   status: PARTLY
   impl: [cpu/core/aiContracts.ts:ContractCity]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
+    - "C-96 / C-60: the defensive cancel"
   context:
     - ...tween), EFFECT_ADJUST_ALL_DISTRICTS_PRODUCTION 0x6a9e80 (CityBuildAI's district value 0x5d4a20 per district it reserves a plot for), EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR 0x...
-  review: imported
+  review: reviewed
 - addr: 0x5d4ae0
   final: 0x3e8000
   kind: function
@@ -888,13 +942,15 @@
   review: reviewed
 - addr: 0x5d4c30
   kind: function
+  semantics: a project's table value (the defensive cancel's old value of a queued project).
   status: PARTLY
   readings:
     - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
+    - "C-96 / C-60: the defensive cancel"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...onder, Buildings +0x158 bit 64, 0), a district's at its plot (0x5d4a20), a project's (0x5d4c30). An empty queue (+0x2350 == 0) returns.
-  review: imported
+  review: reviewed
 - addr: 0x5d4cd0
   kind: function
   semantics: the best value in the city centre's UNITS table over a list of units.
@@ -990,10 +1046,12 @@
 - addr: 0x5d7640
   kind: function
   name: the defensive cancel
-  semantics: |
-    the City Defense event's opening (0x5cced0): under 0x5cdc50's test, the item in hand (the contract in hand +0x398, else the queue's head) not defensive (a unit with Combat +0x48 0 or Bombard +0x40, a building with no DefenseModifier +0x28, a district without hit points, any project), or a listed ACCEPTED contract valued at OLD + max(OLD, AI_CURRENT_TASK_BIAS) or above, or the plain pick's best building (0x5d0860) at that bar, or the defensive pick's best unit (0x5d2600) above it: the contract in hand FAILED, "Canceling current build, OLD VALUE", the production cleared. OLD the contract's value raised to the head's table value (a queued unit with no contract, PseudoYieldType none or PSEUDOYIELD_UNIT_COMBAT, keeps its task; a wonder 0); an empty queue keeps its task
+  semantics: "the City Defense event's opening (0x5cced0): under 0x5cdc50's test, the item in hand (the contract in hand +0x398, else the queue's head) not defensive (a unit with Combat +0x48 0 or Bombard +0x40, a building with no DefenseModifier +0x28, a district without hit points, any project), or a listed ACCEPTED contract valued at OLD + max(OLD, AI_CURRENT_TASK_BIAS) or above, or the plain pick's best building (0x5d0860) at that bar, or the defensive pick's best unit (0x5d2600) above it: the contract in hand FAILED, \"Canceling current build, OLD VALUE\", the production cleared. OLD the contract's value raised to the head's table value (a queued unit with no contract, PseudoYieldType none or PSEUDOYIELD_UNIT_COMBAT, keeps its task; a wonder 0); an empty queue keeps its task. The old value: a building's (a wonder, Buildings +0x158 bit 64, 0), a district's at its plot (0x5d4a20), a project's (0x5d4c30); an empty queue (+0x2350 == 0) returns. The bar's AI_CURRENT_TASK_BIAS is GlobalParameters' 80 (read at 0x00f28c80 + 0xc); the contract it lists stands ACCEPTED (3); the plain pick is 0x5d0860 (flags 1, 0), the defensive one 0x5d2600 (flags 1, 1); the contract in hand FAILED (4). Ported: defensiveCancel (cpu/core/aiCityTrees.ts), minorAiTurn, freeCityBuild; _defensive_cancel, _minor_defensive_cancel, _free_defensive_cancel (gpu/core/sim_minorai.py)."
   status: READ
   cases:
+    - recording: h1_duelw1105
+      turn: 69
+      value: "Bandar Brunei t63-t69: its Walls contract FAILED and re-picked each turn (OLD VALUE 468.4, 495.9, ...)"
     - recording: h1_duelw1105
       turn: 63
       value: Bandar Brunei's Walls contract FAILED, OLD VALUE 468.4, re-picked each turn to t69
@@ -1011,6 +1069,7 @@
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
     - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
+    - "C-96 / C-60: the defensive cancel"
   context:
     - "...e queued line 0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancellation 0x5d7640 (\"Canceling current build\"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970."
   review: reviewed

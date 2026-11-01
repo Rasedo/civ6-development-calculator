@@ -5,13 +5,15 @@
 # set `review: reviewed`.
 - addr: 0x57580
   kind: function
+  semantics: the city on a plot (MakeTradeRoute's origin and destination).
   status: PARTLY
   readings:
     - "C-108: a trade route's term and its end — READ (the MakeTradeRoute operation's check, the term), both twins"
+    - "C-108: a trade route's term and its end"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- 0x960f40: the route's origin and destination cities (0x57580 on the operation's plots); with the route still held (0x553210) and the Trader standi..."
-  review: imported
+  review: reviewed
 - addr: 0x57960
   final: 0x132c90
   kind: function

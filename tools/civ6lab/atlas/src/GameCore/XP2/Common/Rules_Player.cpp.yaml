@@ -6,7 +6,7 @@
 - addr: 0x534950
   final: 0x37ba80
   kind: function
-  semantics: "Also names its territory (0xa36ff0, 0xa36400): one draw over the names left. A plot first revealed: names its rivers (0xa29730)."
+  semantics: "Also names its territory (0xa36ff0, 0xa36400): one draw over the names left. A plot first revealed: names its rivers (0xa29730). A FULL_CIV player's plot first revealed (from the sight update 0x58aa90): where the plot's +0x37 is above 0, 0xa29730(the river manager, the plot, the player)."
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -25,6 +25,7 @@
     - "C-100: the rivers' names and the flood cut — READ (0x534950's river call, 0xa29730, the plot-to-rivers map), MEASURED (the naming sight)"
     - "H-1: draws the AI takes, draws the engines lack"
     - "H-1: the flood's river walk — READ"
+    - "C-100: the rivers' names and the flood cut"
   notes:
     - "a FULL_CIV player's plot first revealed: territory naming, then where plot +0x37 > 0 the rivers' (0xa29730)"
   context:

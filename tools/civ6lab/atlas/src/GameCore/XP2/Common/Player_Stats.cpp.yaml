@@ -91,8 +91,8 @@
   final: 0x32bb70
   kind: function
   name: PlayerStats per-domain strength
-  semantics: "PlayerStats' strength in a domain (-1 every one): +0x210 - +0x390, m_iMilitaryStrength less m_iMilitaryStrengthFromGold as stored at the turn start (0x4bb1e0)."
-  status: PARTLY
+  semantics: "PlayerStats' strength in a domain (the domain index of 0xadd590: sea 0, air 1, land 2): domain 2 +0x2d0, 0 +0x330, 1 +0x270; any other (-1, every domain) +0x210 less +0x390 (m_iMilitaryStrength less m_iMilitaryStrengthFromGold as stored at the turn start, 0x4bb1e0), +0x210 bare where its third argument (r8b) is set."
+  status: READ
   cases:
     - recording: h1_duelw1104
       value: "the field's writer is unread — the port counts   the seat's military units of the domain (runs/h1_duelw1104: Rome 43+ land   units to Qin's 8, Trajan's Standing Army -6 at 106 = the meeting + 30)."
@@ -110,7 +110,6 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130 / C-112: the domain strength's treasury carry and the city's turn's citizen re-place — READ, both twins"
   context:
-    - "..._STRENGTH_LEAD (0xb548f0): the same lead test on the player stats' per-domain strength (0x4bd0d0: LAND +0x330, SEA +0x270, AIR +0x2d0), the ratio a float; the field's writer is unread..."
     - "...h, -10 where +0x6780 names p, + (20 - T in mode 1) where the owner's military strength (0x4bd0d0(-1): PlayerStats +0x210) is above twice p's or its era (player +0x1358 +0xf8, the Eras..."
   review: reviewed
 - addr: 0x4bd370

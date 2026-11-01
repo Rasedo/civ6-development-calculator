@@ -352,9 +352,12 @@
 - addr: 0x24b960
   final: 0x191f10
   kind: function
-  semantics: "a district's strike stands: its outer damage (+0x8d8) below its outer maximum."
+  semantics: "a district's strike stands: its outer damage (+0x8d8) below its outer maximum. A breached perimeter pays no walls' term."
   status: READ
   cases:
+    - recording: h1_duel1108
+      turn: 111
+      value: Xi'an's strength 3 lower t97-111 with its perimeter breached
     - recording: 1108
       turn: 97
       value: "- The walls' term: each wall building's OuterDefenseStrength (+0x44) and   the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the   district's outer damage (+0x8d8) below its outer "
@@ -362,6 +365,7 @@
   readings:
     - "C-94: the wounded law and the garrison — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-94: the wounded law and the garrison"
   context:
     - "...OuterDefenseStrength (+0x44) and the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the district's outer damage (+0x8d8) below its outer maximum — a breached peri..."
   review: reviewed
@@ -422,10 +426,12 @@
 - addr: 0x24c3b0
   final: 0x192920
   kind: function
+  semantics: a district test the city's district count (0x1ae8f0) takes as its fifth flag.
   status: PARTLY
   readings:
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e count 0x1ae8f0(skip +0xe1 bit 2, complete only, RequiresPopulation only, the 5th flag 0x24c3b0, not pillaged) — 0x7aaf80 calls it (1, 0, 1, 0, 0): the city's districts that require..."
-  review: imported
+  review: reviewed

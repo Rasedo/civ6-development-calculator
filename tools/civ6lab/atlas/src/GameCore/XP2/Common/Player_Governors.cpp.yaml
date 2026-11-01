@@ -6,11 +6,12 @@
 - addr: 0x430590
   final: 0x2dcfb0
   kind: function
+  semantics: "Appoint: stores the governor type as passed ([+4]), so a hash-keyed record misses every index-keyed read."
   status: PARTLY
   readings: ["B-24r: the governor operations"]
   context:
     - "- APPOINT_GOVERNOR (0x48c219 -> CanAppoint 0x430fa0 -> Appoint 0x430590): the PARAM_GOVERNOR_TYPE value is looked up by 0x28a940, which takes an INDEX when i..."
-  review: imported
+  review: reviewed
 - addr: 0x430ee0
   final: 0x2dd760
   kind: function
@@ -25,11 +26,12 @@
   final: 0x2dd820
   kind: function
   name: CanAppoint
+  semantics: CanAppoint (APPOINT_GOVERNOR's test).
   status: PARTLY
   readings: ["B-24r: the governor operations"]
   context:
     - "- APPOINT_GOVERNOR (0x48c219 -> CanAppoint 0x430fa0 -> Appoint 0x430590): the PARAM_GOVERNOR_TYPE value is looked up by 0x28a940, which tak..."
-  review: imported
+  review: reviewed
 - addr: 0x431400
   final: 0x2ddbb0
   kind: function

@@ -6,7 +6,7 @@
 - addr: 0x1fb680
   final: 0x14efa0
   kind: function
-  semantics: "war weariness per side of a combat, the attacker logged \"Attacking\": loc = 1 in lands allied to the unit (GP +0x76c), else 2 (+0x770), +3 killed (+0x774), +10 a WMD (+0x778); base = WAR_WEARINESS_WARMONGER_BASE 16 (+0x780) + Eras.WarmongerPoints of the era row (+0x30) x X / 100, X = min(the war's DiplomaticActions WarmongerPercent, the player's cap +0x1a48) (0x3d1450); amount = loc x base x (100 + the player's +0x18c8 + the foe's +0x1808 [+ +0x1868 in allied land]) / 100."
+  semantics: "war weariness per side of a combat, the attacker logged \"Attacking\": loc = 1 in lands allied to the unit (GP +0x76c), else 2 (+0x770), +3 killed (+0x774), +10 a WMD (+0x778); base = WAR_WEARINESS_WARMONGER_BASE 16 (+0x780) + Eras.WarmongerPoints of the era row (+0x30) x X / 100, X = min(the war's DiplomaticActions WarmongerPercent, the player's cap +0x1a48) (0x3d1450); amount = loc x base x (100 + the player's +0x18c8 + the foe's +0x1808 [+ +0x1868 in allied land]) / 100. It reads only the struct's [+0] and [+8] and the combat's location: the interceptor and the anti-air unit never enter it."
   status: PARTLY
   cases:
     - recording: h1_duelw1119
@@ -60,18 +60,21 @@
 - addr: 0x202440
   final: 0x1541a0
   kind: function
+  semantics: the air strike's resolution; calls 0x203cb0 with the interceptor (+0x10) and the anti-air cover (+0x18), null in the simulation.
   status: READ
   cases:
     - recording: AI_UnitEfficiency.csv
       value: "the unit-efficiency job's simulated combats: 20,736 of 20,736 entries at the printed 0.01"
   readings:
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
   context:
     - "...s 17 on a land defender, a land unit's ranged blow 17 on a naval one. THE AIR STRIKE (0x202440 -> 0x203cb0, the interceptor +0x10 and the anti-air cover +0x18 null): on an air target..."
   review: reviewed
 - addr: 0x203cb0
   final: 0x155510
   kind: function
+  semantics: "its struct: [+0] the plane, [+8] the target, [+0x10] the interceptor, [+0x18] the anti-air unit; it computes the interception, then the anti-air answer, then the strike, with no test of the plane's health between them: the cover answers a bomber the interception downed, and a burst that downs a bomber does not stop its strike (the strike at the accumulated damage's wound term). The interceptor's XP is 0x5197e0 with the MELEE / UNIT_VS_UNIT types, the kill flag 0 and the interceptor as the defender; the plane earns nothing from the interception; the anti-air gun's XP the ranged defender formula on the plane's Ranged column (0 against a Bomber). The air strike's blow: on an air target the dogfight at Combat (MELEE), else at RangedCombat or Bombard, whichever is larger (0x204451); the target defends at its AntiAirCombat where it holds one and is no fighter (PROMOTION_CLASS_AIR_FIGHTER, 0x203d3f), else at Combat; the plane takes damage only from a fighter or an anti-air target ([rsp+0x68], 0x2047f2). At 0x204451: the air strike's combat type: BOMBARD where the plane's Bombard exceeds its Ranged."
   status: PARTLY
   impl:
     - cpu/core/combat.ts:xpStrength
@@ -83,11 +86,13 @@
     - "B-89 tail: an air strike's XP — READ, one term open"
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
+    - "B-89 tail: an air strike's XP"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "Rules_Combat 0x5197e0 (called by every resolver; the air strike 0x203cb0 picks the combat type 0x204451: BOMBARD when the plane's Bombard > its Ranged). Check: `d..."
     - "- The air resolver 0x203cb0 (struct: [+0] the plane, [+8] the target, [+0x10] the interceptor, [+0x18] the anti-air..."
-  review: imported
+  review: reviewed
 - addr: 0x204b10
   final: 0x156120
   kind: function
@@ -105,7 +110,7 @@
 - addr: 0x205720
   final: 0x156ae0
   kind: function
-  semantics: "a combat simulation off the map (the efficiencies' two per pair): the damage each side takes (+0x7c / +0xc4 words). 0x205720(combat, 1, 1) resolves by the combat's kind (0x206f40 the melee one) on the units as they stand — their damage, promotions and fortification untouched by a forward result: the blow back reads the unit's own fortification."
+  semantics: "a combat simulation off the map (the efficiencies' two per pair): the damage each side takes (+0x7c / +0xc4 words). 0x205720(combat, 1, 1) resolves by the combat's kind (0x206f40 the melee one) on the units as they stand — their damage, promotions and fortification untouched by a forward result: the blow back reads the unit's own fortification. The combat's kind (0x209550): an air attacker's COMBAT_AIR; else RANGED where RangedCombat tops Bombard and Combat, BOMBARD where Bombard tops both, else MELEE (the Giant Death Robot's 120 under its 130 Combat fights melee). Each side's strength its base (0x56dc90 / 0x56e3e0 / 0x56daa0) plus the strength terms (0x51c810 attacking, 0x51f070 defending)."
   status: PARTLY
   cases:
     - recording: h1_duelw1117
@@ -119,6 +124,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-95: Attack Units — READ, ported"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
   context:
     - "...ombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both..."
   review: reviewed
@@ -157,7 +163,7 @@
 - addr: 0x206960
   final: 0x157510
   kind: function
-  semantics: "the melee result (Combat_Manager): the defender's damage drawn first (0x51a240); the counter (the attacker's damage) is never drawn where the defender is embarked (0x8be30, byte +0x6b0) and does not fight embarked (+0x18c3, m_bFightWhileEmbarked). Both totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is left at max - 1 damage (1 HP) — the attacker on a tie (0x206d01: jle). The experience reads the result after it (0x1975e0 at 0x206e98 / 0x206ee2)."
+  semantics: "the melee result (Combat_Manager): the defender's damage drawn first (0x51a240); the counter (the attacker's damage) is never drawn where the defender is embarked (0x8be30, byte +0x6b0) and does not fight embarked (+0x18c3, m_bFightWhileEmbarked). Both totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is left at max - 1 damage (1 HP) — the attacker on a tie (0x206d01: jle). The experience reads the result after it (0x1975e0 at 0x206e98 / 0x206ee2). A defender of formation 2 takes nothing either way (0x206a1f); one of formation 1 (the support class) takes its whole hit points after the law (0x206bf0): the Anti-Air Gun and Mobile SAM at 165 a pair (100 + 65), their attacker 2."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -180,6 +186,7 @@
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the at..."
   review: reviewed
@@ -199,7 +206,7 @@
 - addr: 0x207080
   final: 0x157bb0
   kind: function
-  semantics: a city's strike (-> 0x249ee0).
+  semantics: "a city's strike (-> 0x249ee0). The district attack: the struck unit's strength through 0x520270."
   status: READ
   cases:
     - recording: 1120
@@ -229,12 +236,14 @@
 - addr: 0x207a80
   final: 0x158320
   kind: function
+  semantics: "the ranged result (Combat_Manager): the attacker takes no damage."
   status: READ
   cases:
     - recording: AI_UnitEfficiency.csv
       value: "the unit-efficiency job's simulated combats: 20,736 of 20,736 entries at the printed 0.01"
   readings:
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
   context:
     - "...100 leaves the attacker at 99 (the overshoots equal, 0x206d01 `jle`). The ranged result 0x207a80: the attacker takes none. The domain term (0x51c810, \"H-1: the melee result, a ranged..."
   review: reviewed
@@ -290,6 +299,7 @@
 - addr: 0x209550
   final: 0x159b60
   kind: function
+  semantics: "the combat type of a unit pair: COMBAT_AIR for an air attacker; RANGED where RangedCombat tops Bombard and Combat; BOMBARD where Bombard tops both; else MELEE."
   status: READ
   cases:
     - recording: AI_UnitEfficiency.csv
@@ -297,6 +307,7 @@
   impl: [cpu/core/aiUnitEfficiency.ts:combatType]
   readings:
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-98: the unit efficiencies"
   context:
     - "- THE SIMULATION'S COMBAT (0x205720 -> the type of 0x209550): an air attacker's COMBAT_AIR; else RANGED where RangedCombat tops Bombard and Comba..."
   review: reviewed
@@ -388,7 +399,7 @@
   review: reviewed
 - addr: 0x20d280
   kind: function
-  semantics: "the combat log: after its CombatLog.csv line raises game signal +0x4c8 and player signal +0x78 of the defender's owner (0x20d7e5: the unit's +0x2e0) with the attacking unit (0x20d7f8)."
+  semantics: "the combat log: after its CombatLog.csv line raises game signal +0x4c8 and player signal +0x78 of the defender's owner (0x20d7e5: the unit's +0x2e0) with the attacking unit (0x20d7f8). Calls war weariness (0x1fb680)."
   status: PARTLY
   impl: [cpu/core/units.ts:recordAttacker]
   readings:

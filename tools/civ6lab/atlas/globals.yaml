@@ -5,15 +5,18 @@
 # set `review: reviewed`.
 - addr: 0xcf47b0
   kind: global
+  semantics: the IAT slot of sqrtf (the standing army's quota on the population).
   status: PARTLY
   readings:
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
+    - "C-96: the standing army and the Combat Desire's city terms"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...MY_NUMBER, 1.0, the owner) times fx(sqrtf(the city's population +0x588)) (the IAT slot @0xcf47b0 is sqrtf), whole (sar 8). Then over the owner's units (player +0x12e8 +0xd8): a unit of..."
-  review: imported
+  review: reviewed
 - addr: 0xcfc9f8
   kind: global
+  semantics: the constant 1.0f.
   status: READ
   cases:
     - recording: h1_duelv1121
@@ -25,9 +28,10 @@
   readings:
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   context:
     - "...(1 + 0.01 x the city's +0x1e00 at the plot's terrain +0x2c, 0x4a9ff0; @0xd136f0 0.01, @0xcfc9f8 1.0) from T to H; the count passed is its whole part (`sar 8`). The plot's own improv..."
-  review: imported
+  review: reviewed
 - addr: 0xd02108
   kind: global
   semantics: the generic CvAStar's base vtable (Pathfinder_Instance.cpp).
@@ -39,6 +43,7 @@
   review: reviewed
 - addr: 0xd136f0
   kind: global
+  semantics: the constant 0.01f (the accumulation percent's scale).
   status: READ
   cases:
     - recording: h1_duelv1121
@@ -49,9 +54,10 @@
       value: the plotValueLab's Pastures 451 -> 453 exact on 1121 (the lab imports the   record, which holds no minor's stockpile, so its t20+ rows read 0 held).
   readings:
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   context:
     - "...onRate (+0x24) x (1 + 0.01 x the city's +0x1e00 at the plot's terrain +0x2c, 0x4a9ff0; @0xd136f0 0.01, @0xcfc9f8 1.0) from T to H; the count passed is its whole part (`sar 8`). The plo..."
-  review: imported
+  review: reviewed
 - addr: 0xd136f4
   kind: global
   semantics: "-1.0: the pseudo-yield weight's floor."
@@ -271,6 +277,7 @@
   review: imported
 - addr: 0xd62e78
   kind: global
+  semantics: the EFFECT_ADJUST_IMPROVEMENT_HOUSING analyzer's vtable (slot 1 0x6ad2b0).
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -279,9 +286,10 @@
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing"
   context:
     - "..._IMPROVEMENT_HOUSING, READ (registry 0x6c9640: the name's object @0xf03ef8, its vtable @0xd62e78, slot 1 0x6ad2b0): with the modifier's arguments (r8) and the context's player (+0x80)..."
-  review: imported
+  review: reviewed
 - addr: 0xd630b8
   kind: global
   status: PARTLY
@@ -735,10 +743,13 @@
   review: reviewed
 - addr: 0xf02c70
   kind: global
-  semantics: the 3d6 counts table.
+  semantics: the 3d6 counts table. The 3d6 counts per total 3..18 (of 216).
   status: PARTLY
   impl: [cpu/core/espionage.ts:DICE_COUNTS, gpu/core/sim_init.py:__init__]
-  readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
+  readings:
+    - "C-16: the counterspy and the escape"
+    - "C-16: the espionage roll's bands — READ"
+    - "C-16: the espionage roll's bands"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...pe 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_escape.py`."
@@ -778,6 +789,7 @@
   review: reviewed
 - addr: 0xf03ef8
   kind: global
+  semantics: the EFFECT_ADJUST_IMPROVEMENT_HOUSING name's analyzer object (vtable @0xd62e78).
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -786,9 +798,10 @@
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
+    - "C-127: the improvement loop's housing"
   context:
     - "- EFFECT_ADJUST_IMPROVEMENT_HOUSING, READ (registry 0x6c9640: the name's object @0xf03ef8, its vtable @0xd62e78, slot 1 0x6ad2b0): with the modifier's arguments (r8) and the con..."
-  review: imported
+  review: reviewed
 - addr: 0xf04278
   kind: global
   semantics: EFFECT_MOUNTAIN_PORTAL's static analyzer (vtable 0xd632c8).

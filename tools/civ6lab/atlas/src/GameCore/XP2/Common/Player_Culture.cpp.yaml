@@ -640,7 +640,7 @@
   final: 0x2844e0
   kind: function
   name: PlayerCulture
-  semantics: "PlayerCulture: sets the player's progress on a civic."
+  semantics: "PlayerCulture: sets the player's progress on a civic. Lifetime culture grows by every gain of civic progress, a boost's share included, and not by culture held with no civic chosen; the engines' cultureTotal / civ_culture sum the culture yield (AUDIT C-94)."
   status: READ
   cases:
     - recording: h1_duelw1121

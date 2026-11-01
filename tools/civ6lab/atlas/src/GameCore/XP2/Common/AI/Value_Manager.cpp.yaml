@@ -131,7 +131,7 @@
   final: 0x528700
   kind: function
   name: resourceValue
-  semantics: "(out, player, resource, count, &rate, T, H): no resource 0. BONUS 0. LUXURY: v = PSEUDOYIELD_RESOURCE_LUXURY of 1.0 from T to H (0x7a2140); where the player holds it (0x4abfe0) and count > 0, 0; else for a full civilization or a city-state the amenities a copy gives (0x527a50), the player's cities with their amenities less those required (0x5275a0) sorted (0x79ea80), the first min(cities, amenities) each one Amenity more from T to H (0x79f7c0), at least v; at most 200.0. STRATEGIC: the need, the most of ResourceCost + 10 x ResourceMaintenanceAmount over the resource's units in the military AI's production table (0x79d340); have = 0x4a93c0(r, 1); where have is below twice the need, T = H (or H = 0) and count not positive, FX(-9999); a positive count held to twice the need less have; with a unit asking it each copy worth the era's chronology x 25.0 over the need (x2 with none had), discounted to T, times the copies; at most 800.0. The stockpile terms (0x7a2850..0x7a2d61): where Player_Resources +0x350 (0x4aa700) less +0x12e8 +0x1168 (0x4ab270) is below 0 and 0.5 x the need is above have, the need at least the shortfall's whole part; at T = H a positive count held to the cap (0x4aabe0) less the stock less its reservations; a resource with a +0xd0 list adds 50.0. ARTIFACT and LEY_LINE 0."
+  semantics: "(out, player, resource, count, &rate, T, H): no resource 0. BONUS 0. LUXURY: v = PSEUDOYIELD_RESOURCE_LUXURY of 1.0 from T to H (0x7a2140); where the player holds it (0x4abfe0) and count > 0, 0; else for a full civilization or a city-state the amenities a copy gives (0x527a50), the player's cities with their amenities less those required (0x5275a0) sorted (0x79ea80), the first min(cities, amenities) each one Amenity more from T to H (0x79f7c0), at least v; at most 200.0. STRATEGIC: the need, the most of ResourceCost + 10 x ResourceMaintenanceAmount over the resource's units in the military AI's production table (0x79d340); have = 0x4a93c0(r, 1); where have is below twice the need, T = H (or H = 0) and count not positive, FX(-9999); a positive count held to twice the need less have; with a unit asking it each copy worth the era's chronology x 25.0 over the need (x2 with none had), discounted to T, times the copies; at most 800.0. The stockpile terms (0x7a2850..0x7a2d61): where Player_Resources +0x350 (0x4aa700) less +0x12e8 +0x1168 (0x4ab270) is below 0 and 0.5 x the need is above have, the need at least the shortfall's whole part; at T = H a positive count held to the cap (0x4aabe0) less the stock less its reservations; a resource with a +0xd0 list adds 50.0. ARTIFACT and LEY_LINE 0. Have is 0x4a93c0(r, 1) (0x7a228f / 0x7a28e7); the strategic flag [rsp+0x40] (set where T != H and H != 0) skips both the FX(-9999) exit and the cap clamp (0x4aabe0 less 0x4aa790), so the count is held to 2 x need - have alone. A city-state's have is its stockpile (minorResourceFacts, _rai_resources; CityState.stockpile / citystate_stockpile)."
   status: PARTLY
   impl:
     - cpu/core/aiResearch.ts:researchAnalysis
@@ -151,6 +151,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb3/NOTES.md: ...odifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pick/events/contracts, swap. CHECKS: tsc OK, vitest green (after..."
@@ -407,9 +408,12 @@
   final: 0x52a440
   kind: function
   name: valueDistrictAtPlot
-  semantics: "a district's value at a plot (out, district, &rate, T, H, plot, city, ...; from 0x5ce970's district loop 0x5ced80..0x5cefed: the verdict 0x5d2ae0 -1 writes FX(-9999) first, 1 takes the value x1.5 0xd2f32c; T = 0x17b5a0 + max(tech, civic turns)): T past H FX(-9999). A plot without an owner pays its price (0x1b1cb0, city +0x1688; -1 beyond GlobalParameters +0x124 or no plot beside it the city owner's) at the yield value with no player, discounted T, taken off. A feature the district does not keep (0x17cb00) and may not clear: 0; else 0x7a3010. A resource seen with no harvest row: 0; else 0x7a37d0. An unpillaged improvement: its yields (0x7b1320) and the resource's value at count -1 off. The plot's own district pillaged: the repair, +12500.0 at the city centre, the whole x2. Then 0x7aaf80. The district's feature (0x7a5335..0x7a5412): one the city keeps under the district (0x17cb00 over the city's pairs +0x2170 +0x378, or the district row's list +0x218) is left; else a Removable one (Features +0xc1 bit 7) is cleared (0x7a3010), a ValidDistrictPlacement one (Features_XP2 +0x28 bit 2) stood on, any other values the plot 0 (0x7a540a)."
+  semantics: "a district's value at a plot (out, district, &rate, T, H, plot, city, ...; from 0x5ce970's district loop 0x5ced80..0x5cefed: the verdict 0x5d2ae0 -1 writes FX(-9999) first, 1 takes the value x1.5 0xd2f32c; T = 0x17b5a0 + max(tech, civic turns)): T past H FX(-9999). A plot without an owner pays its price (0x1b1cb0, city +0x1688; -1 beyond GlobalParameters +0x124 or no plot beside it the city owner's) at the yield value with no player, discounted T, taken off. A feature the district does not keep (0x17cb00) and may not clear: 0; else 0x7a3010. A resource seen with no harvest row: 0; else 0x7a37d0. An unpillaged improvement: its yields (0x7b1320) and the resource's value at count -1 off. The plot's own district pillaged: the repair, +12500.0 at the city centre, the whole x2. Then 0x7aaf80. The district's feature (0x7a5335..0x7a5412): one the city keeps under the district (0x17cb00 over the city's pairs +0x2170 +0x378, or the district row's list +0x218) is left; else a Removable one (Features +0xc1 bit 7) is cleared (0x7a3010), a ValidDistrictPlacement one (Features_XP2 +0x28 bit 2) stood on, any other values the plot 0 (0x7a540a). The own-district term (the repair x2, +12500.0 at the centre) is reached on the plot holding the city's own pillaged district, which values that row alone; the repair resumes at 100 - PILLAGE_BUILDING_REPAIR_PERCENT 25 of the district's cost. PARTLY READ: the repair's T, two repairs in one step (minorRepairsDistrictAt / _minor_repairs_district_at)."
   status: READ
   cases:
+    - recording: h1_duelw1127
+      turn: 168
+      value: Muscat's Commercial Hub pillaged t160, Build City District at 5469.0; queued t167 (CONTRACT 660), the Hub at 85 of 114 at t168
     - recording: h1_duely1124
       turn: 85
       value: "Bologna: the Harbor's choice 30:7 over 29:8 (a Reef), 463.37 against 466.77"
@@ -426,15 +430,19 @@
     - "C-96: the city under threat and a pillaged district's repair — the test READ but +0x218, the repair PARTLY READ"
     - "C-96: the city under threat and a pillaged district's repair — the test READ, the repair PARTLY READ"
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+    - "C-96: the city under threat and a pillaged district's repair"
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
   review: reviewed
 - addr: 0x7a58f0
   final: 0x52a8c0
   kind: function
   name: valueImprovementAtPlot
-  semantics: "an improvement's value at a plot (impr, rate, T, horizon, plot, city; from 0x5ce970: FX(-9999) where 0x35ede0 refuses the player or 0x35fd60 the plot, T = max(0x7610e0 to PrereqTech +0x160, 0x621920 to PrereqCivic +0x158)): T at or past the horizon FX(-9999); the build unit 0x7a2e20, none FX(-9999); the charge = current cost / (+0x7b0[u] + 3), whole, at the Production DefaultValue, discounted T. The plot's own improvement: 0 unpillaged, its repair pillaged. Another (unpillaged) improvement: 0x7b1320 of it and 0x7a21e0 of -1 copy off. A resource the improvement does not list: its harvest 0x7a37d0 where Resource_Harvests has rows, else 0; one it lists keeps the feature where MustRemoveFeature is false. A feature it neither keeps nor lists: 0x7a3010, or 0 where not Removable. Then - the charge + 0x7b1320 + the resource value 0x7a21e0 (1 copy)."
+  semantics: "an improvement's value at a plot (impr, rate, T, horizon, plot, city; from 0x5ce970: FX(-9999) where 0x35ede0 refuses the player or 0x35fd60 the plot, T = max(0x7610e0 to PrereqTech +0x160, 0x621920 to PrereqCivic +0x158)): T at or past the horizon FX(-9999); the build unit 0x7a2e20, none FX(-9999); the charge = current cost / (+0x7b0[u] + 3), whole, at the Production DefaultValue, discounted T. The plot's own improvement: 0 unpillaged, its repair pillaged. Another (unpillaged) improvement: 0x7b1320 of it and 0x7a21e0 of -1 copy off. A resource the improvement does not list: its harvest 0x7a37d0 where Resource_Harvests has rows, else 0; one it lists keeps the feature where MustRemoveFeature is false. A feature it neither keeps nor lists: 0x7a3010, or 0 where not Removable. Then - the charge + 0x7b1320 + the resource value 0x7a21e0 (1 copy). At 0x7a5c00: the copies (to 0x7a6022): an improvement that works the plot's resource (Improvements +0x1e8, its Improvement_ValidResources) values it at count = 1.0 raw, replaced where its Resource_Consumption row (0x28a940 on Resources +0x1c) is Accumulate (+0x48 bit 0) by valueBetween (0x7a2140) of its ImprovedExtractionRate (+0x24) x (1 + 0.01 x the city's +0x1e00 at the plot's terrain +0x2c, 0x4a9ff0; @0xd136f0 0.01, @0xcfc9f8 1.0) from T to H, its whole part (sar 8). The plot's own improvement (its repair) passes 1, the replaced one -1. Ported: resourceCopies (cpu/core/aiPlotValue.ts), _cv_resource_copies (gpu/core/sim_cityvalue.py)."
   status: READ
   cases:
+    - recording: h1_duelv1121
+      turn: 19
+      value: Hunza's Pasture on Horses at (12,5) and (10,5) 171.45 (the yields 71.45 + 40 copies x 2.5); t20 118.95, t21 116.45
     - recording: h1_duelv1127
       turn: 2
       value: a 25 Builder's charge 8
@@ -455,6 +463,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
+    - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count"
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
   review: reviewed
 - addr: 0x7a60d0
@@ -560,9 +569,12 @@
     discounted to start where min(start + 30, horizon) is start, else
     PV(K, end) - PV(K, start); plus the eras' points (0x2c4470) through
     PSEUDOYIELD_GOLDENAGE_POINT; x4. The unit value 0x7b62c0 passes
-    start = horizon = T.
+    start = horizon = T. Arguments: out rcx, player rdx, &rate r8, start r9d, horizon [rsp+0x28], extra [rsp+0x30]; a null player 0; the trade units counted over player +0x12e8 +0xd8 (Units row +0xa0); the capacity 0x4d9320 on player +0x12e0; K the knowledge base's (0x786160 on player +0x12b8) +0x6d8; end = min(start + 30, horizon); start == end: discounted(K, rate, start) (0x7a1240), else PV(K, rate, end) - PV(K, rate, start) (0x7a16e0 twice); plus 0x2c4470(the eras 0x2c3660, player id +0x128) x 256 through PSEUDOYIELD_GOLDENAGE_POINT (0x7a60d0); the sum (sign-extended) << 10 >> 8. EFFECT_ADJUST_TRADE_ROUTE_CAPACITY (0x6c0ff0) passes its own start and horizon. Ported: traderValue (cpu/core/aiValue.ts), _cv_trader_value (gpu/core/sim_cityvalue.py).
   status: READ
   cases:
+    - recording: h1_duelv1117
+      turn: 17
+      value: p2's UNIT_TRADER row 19.95 as logged (243.64 with the horizon passed)
     - recording: h1_duelv1121
       turn: 14
       value: player 4 UNIT_TRADER logged 22.02, ours 22.12 (T 22; K the turn before's AI_Knowledge.csv)
@@ -585,6 +597,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+    - "C-96: the Trader's value"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...pseudoYieldValue(UNIT_COMBAT...), minus maintenance gold if [r15+0x908]<3, then PV diff. trade -> 0x7a7110; religious etc. CONCLUSION so far: full value port needs military AI (0x79ca90), yield-weight parts..."
     - ".claude/scratchpad/cb4/NOTES.md: ...ANY_IMPROVEMENT. - aiValue.ts: AiPlotView, view.cityOwnedPlots/traders/tradeKnowledge; traderValue (0x7a7110). - majorView.ts: cityYield for a city-state (minorCity), cityOwnedPlots, traders, tradeKnowledge n..."
@@ -685,9 +698,12 @@
   final: 0x52d500
   kind: function
   name: the district value body
-  semantics: "the district value body: T at or past H FX(-9999); a Coast row on a lake FX(-9999); a flood (unless Districts_XP2 PreventsFloods) or an eruption sooner cuts H. A turn: PSEUDOYIELD_DISTRICT 1.0; per yield the whole adjacency 0x366df0 -> 0x365720, 0 at a plot without an owner; the district's own rows and, where a district the player may build, the city lacks and the plot takes (0x406c00, 0x1aec20, 0x35f2d0) earns more by its rows, that best off (not an Aqueduct, +0xe0 bit 2); HitPoints (+0x58 / +0x5c) x 0.02 x ((d - d f) / d + 1) of PSEUDOYIELD_CITY_DEFENSES; 0.5 x the era's ChronologyIndex x the district pseudo-yield while the city may add a district (not RequiresPopulation +0xe1 bit 6, or 0x1ae8a0 above 0x1ae8f0); a regional reach (the largest RegionalRange of its buildings, +0x130) x (the player's other cities within it holding no such district + 1) x 0.5; Appeal x 0.5 Food beside a district with Housing; its domain (0xadd590: sea 0, air 1, land 2) where 0x1c77c0 says the city does not train it PSEUDOYIELD_UNIT_NAVAL / AIR_COMBAT 5.0, twice where no city of the player's does, then the domain's units' values (0x5d4cd0) once where none does; Maintenance Gold off; District_GreatPersonPoints. PV(H) - PV(T) plus the units' lump; Housing (an Aqueduct's 2, globals +0x13c) plus the AppealHousingChanges band (0x1b4450) at 0x7a3d70; the claimed plots (0x39dd20 -> 0x7a10c0); a Dam (Districts_XP2 +0x28 bit 3) 100.0 an improved and 300.0 a districted plot of the owner's along its rivers (0xa2bf20); a Canal (bit 0) 100.0 x 0x4d9320; its projects (+0x1d0) each 0x7b28c0 x 0.1, x3.0 a favoured one (0x7a48d0), shared by (0x408b60 all + 1); the modifiers (0x7a4b20); at the top level the neighbours (0x79f280). Shifts each adjacency row's integer back to fixed point and applies the adjacency percent per row (0x7a6690) before adding it; calls 0x365ae0 per row itself."
+  semantics: "the district value body: T at or past H FX(-9999); a Coast row on a lake FX(-9999); a flood (unless Districts_XP2 PreventsFloods) or an eruption sooner cuts H. A turn: PSEUDOYIELD_DISTRICT 1.0; per yield the whole adjacency 0x366df0 -> 0x365720, 0 at a plot without an owner; the district's own rows and, where a district the player may build, the city lacks and the plot takes (0x406c00, 0x1aec20, 0x35f2d0) earns more by its rows, that best off (not an Aqueduct, +0xe0 bit 2); HitPoints (+0x58 / +0x5c) x 0.02 x ((d - d f) / d + 1) of PSEUDOYIELD_CITY_DEFENSES; 0.5 x the era's ChronologyIndex x the district pseudo-yield while the city may add a district (not RequiresPopulation +0xe1 bit 6, or 0x1ae8a0 above 0x1ae8f0); a regional reach (the largest RegionalRange of its buildings, +0x130) x (the player's other cities within it holding no such district + 1) x 0.5; Appeal x 0.5 Food beside a district with Housing; its domain (0xadd590: sea 0, air 1, land 2) where 0x1c77c0 says the city does not train it PSEUDOYIELD_UNIT_NAVAL / AIR_COMBAT 5.0, twice where no city of the player's does, then the domain's units' values (0x5d4cd0) once where none does; Maintenance Gold off; District_GreatPersonPoints. PV(H) - PV(T) plus the units' lump; Housing (an Aqueduct's 2, globals +0x13c) plus the AppealHousingChanges band (0x1b4450) at 0x7a3d70; the claimed plots (0x39dd20 -> 0x7a10c0); a Dam (Districts_XP2 +0x28 bit 3) 100.0 an improved and 300.0 a districted plot of the owner's along its rivers (0xa2bf20); a Canal (bit 0) 100.0 x 0x4d9320; its projects (+0x1d0) each 0x7b28c0 x 0.1, x3.0 a favoured one (0x7a48d0), shared by (0x408b60 all + 1); the modifiers (0x7a4b20); at the top level the neighbours (0x79f280). Shifts each adjacency row's integer back to fixed point and applies the adjacency percent per row (0x7a6690) before adding it; calls 0x365ae0 per row itself. Every logged DISTRICTS row stands above these terms by the most the city's analysis values a building of the district (max, not the sum, where two are valued), within the body (a flood cutting the horizon leaves both 0) — a LAB: the reader is unfound (0x7a51f0, 0x7aaf80 and 0x5ce970's district loop call no building value; the centre's BUILDINGS' one accessor 0x5d4920 is the contract evaluation's). Ported as districtBodyValue (buildingsValue) / _cv_district_body (buildings_value). At 0x7ab8f5: the envoys' term (to 0x7abac8), per yield with an adjacency above 0: over the city-states (player manager +0x1650), each whose district list's verdict on the district is 1 (0x5d2ae0 on its +0x1290 +0x1f8): 6 or more tokens received from the player (0x44c860) +2.0 of the yield at the player's value, the player its suzerain (0x44c850) +4.0 more; none at a minor (a city-state receives no tokens). Not ported (the majors' district value). At 0x7ab294: the golden-age term (to 0x7ab2db): a turn's PSEUDOYIELD_GOLDENAGE_POINT of 0x2c41d0 (the era manager 0x2c3660, player +0x128). Not ported. At 0x7adc10: the modifiers' sum 0x7a4b20 over the list GlobalAI +0x39a8 indexed by the district (0x675e40)."
   status: PARTLY
   cases:
+    - recording: h1_duelv1128
+      turn: 30
+      value: "Bologna's Campus each its Library's value: 4.37 at t13 and t16, 7.04 at t24, 13.77 at t30"
     - recording: h1_duelv1127
       turn: 2
       value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
@@ -697,6 +713,7 @@
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
+    - "C-96: the district value's remaining terms"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...h reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
@@ -780,9 +797,11 @@
   final: 0x530690
   kind: function
   name: the improvement yields value
-  semantics: "the improvement yields value (impr, T, H, plot, ...): T >= H FX(-9999); a drought hitting it 0; the river manager (0xa2cbf0 / 0xa2af70) and the feature manager (0xa1cc70: a volcano beside) cut H to their turns, H <= T 0. A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges and its adjacency (each Improvement_Adjacencies row +0x110..+0x118 handed to 0x365ae0 on its own, the rows summed), YieldFromAppeal at the plot's Appeal x the percent, each at the player's value (0x7a6690, 0x7a60d0); the tourism 0x7b19a0; min(max(n, 1), DefenseModifier) + min(n, GrantFortification), n = 0x3dfae0; the Barbarian Clans traps' properties; x3 where a build unit spends no charge. PV(H) - PV(T); the Housing over TilesRequired at 0x7a3d70; where the civics' list +0x1380 holds the improvement (0x39de20) the claimed plots 0x7a10c0; its ImprovementModifiers (0x7a4b20 at 0x7b23d8) in a context of the player (+0x80), the plot's city (+0x70), T (+0x64), H (+0x68), the rate (+0x6c); at the top level (the context's plot list +0x10 empty) its ring's neighbours revalued (0x6b1b0, functor @0xd71be8 -> 0x79ed40). At 0x7b19a0: the improvement's tourism: per Improvement_Tourism row (+0x168) of source 6 (TOURISMSOURCE_APPEAL) the plot's Appeal x ScalingFactor / 100 (0x1aba40), x (1 + the city's +0x1b20 percent); a turn's PSEUDOYIELD_TOURISM of it x fx(1 - max(5 - era, 0) x 0.1f) (@0xd2f320, @0xcfc9f8 1.0; 0x467eb0)."
+  semantics: "the improvement yields value (impr, T, H, plot, ...): T >= H FX(-9999); a drought hitting it 0; the river manager (0xa2cbf0 / 0xa2af70) and the feature manager (0xa1cc70: a volcano beside) cut H to their turns, H <= T 0. A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges and its adjacency (each Improvement_Adjacencies row +0x110..+0x118 handed to 0x365ae0 on its own, the rows summed), YieldFromAppeal at the plot's Appeal x the percent, each at the player's value (0x7a6690, 0x7a60d0); the tourism 0x7b19a0; min(max(n, 1), DefenseModifier) + min(n, GrantFortification), n = 0x3dfae0; the Barbarian Clans traps' properties; x3 where a build unit spends no charge. PV(H) - PV(T); the Housing over TilesRequired at 0x7a3d70; where the civics' list +0x1380 holds the improvement (0x39de20) the claimed plots 0x7a10c0; its ImprovementModifiers (0x7a4b20 at 0x7b23d8) in a context of the player (+0x80), the plot's city (+0x70), T (+0x64), H (+0x68), the rate (+0x6c); at the top level (the context's plot list +0x10 empty) its ring's neighbours revalued (0x6b1b0, functor @0xd71be8 -> 0x79ed40). At 0x7b19a0: the improvement's tourism: per Improvement_Tourism row (+0x168) of source 6 (TOURISMSOURCE_APPEAL) the plot's Appeal x ScalingFactor / 100 (0x1aba40), x (1 + the city's +0x1b20 percent); a turn's PSEUDOYIELD_TOURISM of it x fx(1 - max(5 - era, 0) x 0.1f) (@0xd2f320, @0xcfc9f8 1.0; 0x467eb0). The adjacency term counts Farms_MedievalAdjacency / Farms_MechanizedAdjacency like any Improvement_Adjacencies row (0x365ae0): the Farm's Food per group of live Farms beside the plot itself (improvementAdjacency)."
   status: PARTLY
   cases:
+    - recording: h1_duelv1127
+      value: the Forts over a Farm exact 3,952 -> 4,969 with the Farm adjacency counted
     - recording: h1_duelv1124
       value: Ski Resort rows exact 153 of 315
     - recording: h1_duelv1124
@@ -806,6 +825,7 @@
     - "C-96: the district value's remaining terms — READ (the envoys' term, the golden-age term's reader, the modifiers' list, the neighbours' functor), a LAB (the district's buildings), and the Farm's adjacency in the plot values"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
+    - "C-96: the district value's remaining terms"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...litary AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
   context:
@@ -838,9 +858,15 @@
   final: 0x531290
   kind: function
   name: valueProject
-  semantics: "the project value (out, project, &rate, T, H, player, city, ...): FX(-9999) at T at or past H or a MaxPlayerInstances project completed (0x4be7b0). The projects it opens (+0xf0..+0xf8) each valued recursively at T plus its build turns (0x17b890), at least 200.0, summed; a weapon one (+0x148, written by 0xa99160) adds PSEUDOYIELD_NUCLEAR_WEAPON 250.0 (@0xd71c24). SpaceRace (+0xe8 bit 1): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared (functor vt 0xd71b28 +0x10 -> 0x79f030) and 1.0 per space-race project completed. Project_GreatPersonPoints (+0x108..+0x110): each class's pseudo-yield of its Points escalated by 0x5267a0 type 1 at PointProgressionParam1, x4. OuterDefenseRepair (+0xe8 bit 0), where 0x197ff0 > 0: that damage x the population (+0x588) x 0x1ae8f0 x 10.0. A diplomatic-victory row (+0xe8 bit 4, or Projects_XP2 +0x60 bit 1, with 0x25afc0): PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT of the era's points. The sum paid once, discounted to T (0x7a1240); then the Projects_XP2 row's +0x1c x the population from T to H where the city's +0x2a78 check is negative; the CreateBuilding through 0x7a7590 less each consumed building (Project_BuildingCosts); the project's modifiers (GlobalAI +0x3a38) through 0x7a4b20."
+  semantics: "the project value (out, project, &rate, T, H, player, city, ...): FX(-9999) at T at or past H or a MaxPlayerInstances project completed (0x4be7b0). The projects it opens (+0xf0..+0xf8) each valued recursively at T plus its build turns (0x17b890), at least 200.0, summed; a weapon one (+0x148, written by 0xa99160) adds PSEUDOYIELD_NUCLEAR_WEAPON 250.0 (@0xd71c24). SpaceRace (+0xe8 bit 1): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared (functor vt 0xd71b28 +0x10 -> 0x79f030) and 1.0 per space-race project completed. Project_GreatPersonPoints (+0x108..+0x110): each class's pseudo-yield of its Points escalated by 0x5267a0 type 1 at PointProgressionParam1, x4. OuterDefenseRepair (+0xe8 bit 0), where 0x197ff0 > 0: that damage x the population (+0x588) x 0x1ae8f0 x 10.0. A diplomatic-victory row (+0xe8 bit 4, or Projects_XP2 +0x60 bit 1, with 0x25afc0): PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT of the era's points. The sum paid once, discounted to T (0x7a1240); then the Projects_XP2 row's +0x1c x the population from T to H where the city's +0x2a78 check is negative; the CreateBuilding through 0x7a7590 less each consumed building (Project_BuildingCosts); the project's modifiers (GlobalAI +0x3a38) through 0x7a4b20. The OuterDefenseRepair count +0x1880 is the outer defences' hit points down (the centre's own damage aside), x population x districts (the centre counted) x 10.0, discounted to T. Ported: minorProjectFacts (defenceRepairs), GPU _MinorFacts.defence_repairs. At 0x7b2aee: the weapon test: per project the row opens, the nuclear weapon terms where the opened project's info +0x148 is set — a qword, the PrereqResource reference 0xa99160 writes (\"SELECT T1.rowid from Resources ... T2.PrereqResource\"), not the WMD column: the Nuclear and Thermonuclear Devices (Uranium), not Operation Ivy. Ported: AiProjectRow.prereqResource (tools/install/ai_tables.py), projectValue, _cv_project, techUnlocks."
   status: PARTLY
   cases:
+    - recording: h1_duelv1124
+      turn: 234
+      value: Bologna's Manhattan Project t204-t234 exact to the PROJECTS rows (200 + 200 + 6250.0, x 0.5155)
+    - recording: h1_duely1124
+      turn: 127
+      value: "AI_CityBuild.csv: Cardiff t89 42 x 8 x 1 = 3255.0; Granada t127 108 x 7 x 3 = 21971.3, t163 97 x 8 x 3 = 22552.5 (its centre's 18 damage not counted)"
     - recording: h1_duelv1124
       turn: 89
       value: "Cardiff's Repair Outer Defenses 42 x 8 x 1 x 10 discounted a turn: 3255.0 as logged"
@@ -860,6 +886,8 @@
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
     - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
+    - "C-126 / C-128: the outer defences' repair, a city-state's centre and a unit made anew"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns"
   notes:
     - ".claude/scratchpad/cb3/NOTES.md: ...ase +0x6d8), plot-yield modifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pick/events/contracts, swap. CHECKS: ts..."
     - ".claude/scratchpad/cb5/NOTES.md: ...f0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhattan), resource value 0x7a21e0, GPU twin, swap...."
@@ -916,14 +944,18 @@
 - addr: 0x7b5d70
   final: 0x532f00
   kind: function
-  semantics: "the best promotion for a unit (\"Promote\")."
-  status: PARTLY
+  semantics: "the best promotion for a unit (\"Promote\"). Past the horizon -9999, 0 where the unit cannot earn it; else a = the military AI's unit value of the type (0x79ca90) x min(unit +0xcf0, global +0x328) / its max hit points, PV(horizon) - PV(start), plus max(the modifiers' sum 0x7a4b20, 5 x the row's +0x24 (its Level)); a is the same for every row of a unit, so the pick is the first row with the greatest max(modifiers, 5 x Level). The promotion modifiers' analyzers unported (AUDIT C-96)."
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: every city-state pick of h1_duelw1117-1128 the first row of the highest Level it may take (melee Battlecry then Commando, ranged Volley, siege Grape Shot)
   impl: [cpu/core/promotions.ts:aiPromotionPick]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, ported for the city-states (the modifiers' term unread)"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x716b90 with the target), \"Operation Protect Units, Move\"; then the hurt: a promotion (0x7b5d70, \"Promote\"), a plunder, a safe plot afloat."
@@ -932,9 +964,12 @@
   final: 0x533190
   kind: function
   name: valueUnit
-  semantics: "a unit's value (out, unit, &rate, T, H, player, city). Exits FX(-9999): T >= H; a unit not the player's version (player +0x12e8 +0x1c0); a domain the city cannot train (0x17d660); a player neither CIVILIZATION_LEVEL_FULL_CIV (0x469db0) nor _TRIBE (0x469ce0), at peace (0x3dcf50) with more than five units (player +0x12e8 +0xc0); a Spy (Units +0x1ba bit 2) for a non-full player. By the pseudo-yield (Units +0x290, PSEUDOYIELD_UNIT_COMBAT where none): COMBAT / NAVAL / AIR the military AI's unit production value 0x79ca90, x3.0 where the entry's obsolete flag (0x79d2d0) is set, + fx(0.5 x the player's cities (player +0x12f0 +0xc0)) where Combat (+0x48) exceeds 0x4d9320 on player +0x1330 (PlayerStats +0xf0, the strongest melee trained); AIR + 30.0 where its PrereqDistrict (+0x278) in the city holds no aircraft, else 5.0 a free slot; NAVAL FX(-9999) at a city with no water (0x82a10) and no Harbor (0xcbecc739) for a unit of no RangedCombat (+0x6c). TRADE (0x7b6525..0x7b6582): 0x7a7110(out, player, &rate, T, T, 0) — T both start and horizon, so one turn's K discounted to T (0x7a1240), x4 — through PSEUDOYIELD_UNIT_TRADE. RELIGIOUS: ReligiousStrength (+0x78) x 0.01, SpreadCharges (+0x7c) or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0), and PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 TourismBomb). ARCHAEOLOGIST: min(artifacts / 56, 10) and the eras' points. EXPLORER / SETTLER / SPY: 1.0 + the eras' points (0x2c43b0) as PSEUDOYIELD_GOLDENAGE_POINT. The tail (0x7b709f): WMDCapable (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON; x (the city's extra copies + 1, 0x179dd0); x the promotion class weight 0x723bb0; a StrategicResource (+0x2c8) the player holds none of (0x4aa790 ownerships 0 and 1) and no city counts near (CityBuildAI +0x978, 0x5d45c0) -> 0 outright; through the pseudo-yield (0x7a60d0); below handicap 3 (player +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0) as Gold at the unweighted DefaultValue (0x7b729e..0x7b72de); then PV(H) - PV(T); a FoundCity unit's 0x6fe2b0 + 0x17a600 turns; ParkCharges' tourism (0 where the culture AI +0x6f8 > 0); a Units_XP2 ResourceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50)."
+  semantics: "a unit's value (out, unit, &rate, T, H, player, city). Exits FX(-9999): T >= H; a unit not the player's version (player +0x12e8 +0x1c0); a domain the city cannot train (0x17d660); a player neither CIVILIZATION_LEVEL_FULL_CIV (0x469db0) nor _TRIBE (0x469ce0), at peace (0x3dcf50) with more than five units (player +0x12e8 +0xc0); a Spy (Units +0x1ba bit 2) for a non-full player. By the pseudo-yield (Units +0x290, PSEUDOYIELD_UNIT_COMBAT where none): COMBAT / NAVAL / AIR the military AI's unit production value 0x79ca90, x3.0 where the entry's obsolete flag (0x79d2d0) is set, + fx(0.5 x the player's cities (player +0x12f0 +0xc0)) where Combat (+0x48) exceeds 0x4d9320 on player +0x1330 (PlayerStats +0xf0, the strongest melee trained); AIR + 30.0 where its PrereqDistrict (+0x278) in the city holds no aircraft, else 5.0 a free slot; NAVAL FX(-9999) at a city with no water (0x82a10) and no Harbor (0xcbecc739) for a unit of no RangedCombat (+0x6c). TRADE (0x7b6525..0x7b6582): 0x7a7110(out, player, &rate, T, T, 0) — T both start and horizon, so one turn's K discounted to T (0x7a1240), x4 — through PSEUDOYIELD_UNIT_TRADE. RELIGIOUS: ReligiousStrength (+0x78) x 0.01, SpreadCharges (+0x7c) or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0), and PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 TourismBomb). ARCHAEOLOGIST: min(artifacts / 56, 10) and the eras' points. EXPLORER / SETTLER / SPY: 1.0 + the eras' points (0x2c43b0) as PSEUDOYIELD_GOLDENAGE_POINT. The tail (0x7b709f): WMDCapable (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON; x (the city's extra copies + 1, 0x179dd0); x the promotion class weight 0x723bb0; a StrategicResource (+0x2c8) the player holds none of (0x4aa790 ownerships 0 and 1) and no city counts near (CityBuildAI +0x978, 0x5d45c0) -> 0 outright; through the pseudo-yield (0x7a60d0); below handicap 3 (player +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0) as Gold at the unweighted DefaultValue (0x7b729e..0x7b72de); then PV(H) - PV(T); a FoundCity unit's 0x6fe2b0 + 0x17a600 turns; ParkCharges' tourism (0 where the culture AI +0x6f8 > 0); a Units_XP2 ResourceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50). At 0x7b63aa: the unit count of the cut is player +0x12e8 +0xc0, Player_Units' unit pool count (0x4ed94a), every unit of the player, civilians and traders included. The City Analysis holding the cut runs before the turn's savings purchases (0x687bf0's contract purchases). Ported: minorPhase counts the minor's units before minorMilitaryTurn (minorBuildFacts' unitCount), GPU _minor_ai_turn(s, units) -> _MinorFacts.units_before."
   status: PARTLY
   cases:
+    - recording: h1_duely1124
+      turn: 19
+      value: "Bologna: Archery 267.5, Wheel 330, Horseback Riding 312.9, Engineering 377.8 as logged on the t18 table counted before its purchase; the six-unit table cut them"
     - recording: h1_duelv1121
       turn: 17
       value: Hunza's Heavy Chariot (Combat 28) its table's 1.16 + 0.5 -> 7.35 as logged
@@ -965,6 +1000,7 @@
     - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
     - "C-96: the unit value's Maintenance at the player's Gold weight — READ (0x7b62c0 at 0x7b729e..0x7b72de), both twins"
+    - "C-96: the unit value's unit count and the founding Production"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...req buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) ->..."
     - ".claude/scratchpad/cb/notes.txt: ...turns). regional (+0x2c) via 0x79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x..."
