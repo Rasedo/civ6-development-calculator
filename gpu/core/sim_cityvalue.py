@@ -864,10 +864,22 @@ class SimCityValue:
             if f.full_civ():
                 read = read & False
             v = torch.full_like(like, _FX)
+        elif pseudo == "PSEUDOYIELD_UNIT_RELIGIOUS":
+            # its religious term counts only in a city of the player's own
+            # founded religion (0x4681c0 +0x1c0), which a city-state and the
+            # Free Cities never hold; the culture AI's park term reads 0 at
+            # them; then the tourism bomb, TourismBomb + 10 where
+            # TourismBombPossible, as PSEUDOYIELD_TOURISM
+            if f.full_civ():
+                read = read & False
+            bomb = (u["tourismBomb"] + (10 if u["tourismBombPossible"] else 0)) * _FX
+            v = self._cv_pseudo(torch.full_like(like, bomb), "PSEUDOYIELD_TOURISM", f.pseudo_w("PSEUDOYIELD_TOURISM"))
         else:
             read = read & False
             v = torch.zeros_like(like)
-        if u["wmd"] or u["maintenanceResource"] or u["parkCharges"] > 0:
+        # a park-charged unit's own tourism (the culture AI's park term)
+        # reads 0 at a city-state and the Free Cities
+        if u["wmd"] or u["maintenanceResource"] or (u["parkCharges"] > 0 and f.full_civ()):
             read = read & False
         v = _fmul(v, (_t(f.extra_copies(unit), like) + 1) * _FX)
         v = _fmul(v, _t(f.promotion_weight(u["promotionClass"]), like))
@@ -918,6 +930,13 @@ class SimCityValue:
             # religion enables
             if u["religion"]:
                 t = torch.where(_t(f.belief_enables(u["type"]), like).bool(), t, torch.full_like(t, -1))
+            # and, past its prerequisites, a unit of ReligiousStrength in a
+            # city following no religion, and a RequiresInquisition unit for
+            # a player that has launched no inquisition (none of these has)
+            if u["religiousStrength"] > 0:
+                t = torch.where(_t(f.follows_religion(), like).bool(), t, torch.full_like(t, -1))
+            if u["requiresInquisition"]:
+                t = torch.full_like(t, -1)
             if bool(((t >= hz) | (t < 0)).all()):
                 out.append((torch.full_like(t, _FX_MIN), torch.ones_like(t, dtype=torch.bool)))
                 continue
@@ -1788,6 +1807,10 @@ class _MinorFacts:
 
     def _followed(self):
         return self.sim._minor_followed()[:, self.s]
+
+    def follows_religion(self):
+        """`followsReligion`: the city follows a religion (city +0x1910)"""
+        return self._followed() >= 0
 
     def belief_enables(self, u):
         """`beliefEnables`: a belief of the city's majority religion enables

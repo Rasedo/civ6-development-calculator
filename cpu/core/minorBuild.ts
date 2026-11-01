@@ -1653,6 +1653,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       const rel = majorityReligionOf(state, cityState.seat);
       return u === 'UNIT_WARRIOR_MONK' && rel >= 0 && seatOf(state, rel)?.religion.follower === 'WARRIOR_MONKS';
     },
+    followsReligion: majorityReligionOf(state, cityState.seat) >= 0,
     fullCiv: false,
     tribe: false,
     unitCount,

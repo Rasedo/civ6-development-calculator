@@ -373,6 +373,9 @@ class City:
     def belief_enables(self, u):
         return 0
 
+    def follows_religion(self):
+        return 0
+
     def has_building(self, b):
         return 0
 

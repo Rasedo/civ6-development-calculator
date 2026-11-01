@@ -111,9 +111,14 @@
     - recording: 1124
       turn: 28
       value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  impl:
+    - cpu/core/aiCityBuild.ts:unitValue
+    - gpu/core/sim_cityvalue.py:_cv_unit
+    - cpu/core/aiCityBuild.ts:v
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-98: a religious unit's value at the city-states — READ (0x7b62c0's religious branch, CanTrain's religion and inquisition refusals), both twins"
   context:
     - ...es (+0x7c), ReligiousHealCharges (+0x74), nothing where the player's majority religion (0x4681c0 +0x1c0) is -1, then PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 tourism)...
     - "...or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 TourismBomb). ARC..."

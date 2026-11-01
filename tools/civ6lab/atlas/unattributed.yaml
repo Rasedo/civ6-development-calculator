@@ -6823,6 +6823,19 @@
   status: PARTLY
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
   review: imported
+- addr: 0xad67b0
+  final: 0x7d1c40
+  kind: function
+  name: Units_XP2
+  semantics: "the Units_XP2 table (rows by UnitType hash, 0x28a940; loader 0xa70430): +0x20 ResourceCost, +0x24 ResourceMaintenanceAmount, +0x28 TourismBomb, +0x48 bits CanCauseDisasters 1, CanEarnExperience 2, CanFormMilitaryFormation 4, CanSacrificeUnits 8, MajorCivOnly 16, TourismBombPossible 32, +0x50 ResourceMaintenanceType."
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      value: "Rock Band's TourismBombPossible: every minor's Rock Band row 10.0 a turn (74 of 74 as logged on 1121, 116 of 116 on 1127)"
+  impl: [tools/install/ai_tables.py:tourismBombPossible]
+  readings:
+    - "C-98: a religious unit's value at the city-states — READ (0x7b62c0's religious branch, CanTrain's religion and inquisition refusals), both twins"
+  review: reviewed
 - addr: 0xad6850
   final: 0x7d1ce0
   kind: function

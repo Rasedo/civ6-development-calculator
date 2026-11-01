@@ -6051,3 +6051,41 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   -39406.50), valid at t134: a bankrupt disband's units stay in the count
   (player +0x12e8 +0xc0) a turn, where `bankruptcy` removes them at the
   economy step.
+
+## C-98: a religious unit's value at the city-states — READ (0x7b62c0's religious branch, CanTrain's religion and inquisition refusals), both twins
+
+`unitValue` / `unitTable` (`cpu/core/aiCityBuild.ts`), `_cv_unit` /
+`_cv_unit_table` (`gpu/core/sim_cityvalue.py`); the Units rows'
+`requiresInquisition`, `tourismBomb`, `tourismBombPossible`
+(`tools/install/ai_tables.py`).
+
+- THE BRANCH (PSEUDOYIELD_UNIT_RELIGIOUS, 0x7b6593..0x7b6a87): the religious
+  term (ReligiousStrength x 0.01 by its charges, x the eras' points) counts
+  only where the player's own founded religion (0x4681c0 +0x1c0) is the
+  city's: -1 at a city-state and the Free Cities, so 0 (runs/h1_duelv1127:
+  a minor's Missionary 0.00 on its turns following religion 11). The
+  culture AI's park term (0x6239a0 x ParkCharges) and the park tail
+  (0x7b7456) read 0 at these players (every valid Naturalist row of the
+  five verbose duels 0.00). Then the tourism bomb, Units_XP2 (0xad67b0)
+  TourismBomb (+0x28) + 10 where TourismBombPossible (+0x48 bit 32), as
+  PSEUDOYIELD_TOURISM (0x7b6a3e) at the city-states' weight 0 (the
+  MinorCivPseudoYields -200 does not reach it), then the tail: Rock Band
+  10.0 a turn from T to H.
+- CANTRAIN (0x172820, past the prerequisites the table's call skips): a
+  unit of ReligiousStrength in a city following no religion (0x172d88), and
+  a RequiresInquisition unit for a player with no inquisition launched
+  (0x497a30, which a city-state and the Free Cities never launch).
+- Rock Band's T is Cold War's civic turns + 5 (MustPurchase: no train turns,
+  no +10); its FX(-9999) the exits: T >= H, or more than five units at
+  peace. Confirmed: every minor's Rock Band row of runs/h1_duelv1117 /
+  1121 / 1124 / 1127 / 1128 at 10.0 a turn (165.30 at T 5 with Cold War
+  held .. 2.28 at T 49); runs/lab2_cw1121 Antioch (player 4) FX(-9999) to
+  t195 on six units (five from the record of t195), then T 46 .. 40 at
+  t196-202 (6.13 / 8.49 / 6.62 / 10.11 / 12.17 / 15.91 / 17.80: the present
+  value's cubic is not monotone at T 44-46); player 3 T >= 50 to t197, then
+  T 49 / 48 / 47 / 45 / 44 (2.28 .. 6.62); on runs/h1_duely1121 t191-205
+  under aimem every civicScore.minor row of players 3 and 4 as logged.
+- Open: the full civilizations' religious term (the heal counts 0x4be880,
+  the Evangelize and evict terms, the inquisition's points); the +0x2a78
+  row (keyed by Units +0x24, +0x1c x 100 tourism) unnamed, no row for a
+  city-state's unit in these games.

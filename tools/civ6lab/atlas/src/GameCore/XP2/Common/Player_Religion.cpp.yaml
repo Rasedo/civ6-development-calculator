@@ -152,6 +152,19 @@
   context:
     - "...value. GOVERNMENTBONUS_FAITH_PURCHASES (0xc25143f9): where the player's religion entry (0x4979f0: the religion manager's +0xa0 entry of the player's +0x128 holding more than 0) — 0.1 x..."
   review: reviewed
+- addr: 0x497a30
+  final: 0x3158f0
+  kind: function
+  name: HasLaunchedInquisition
+  semantics: the player's religion has launched its inquisition; CanTrain refuses a RequiresInquisition unit without it, the unit value zeroes such a unit's religious term.
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1121
+      value: every minor's Inquisitor row FX(-9999) on the five verbose duels
+  impl: [cpu/core/aiCityBuild.ts:unitTable, gpu/core/sim_cityvalue.py:_cv_unit_table]
+  readings:
+    - "C-98: a religious unit's value at the city-states — READ (0x7b62c0's religious branch, CanTrain's religion and inquisition refusals), both twins"
+  review: reviewed
 - addr: 0x497cc0
   final: 0x315b30
   kind: function

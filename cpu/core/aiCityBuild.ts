@@ -194,6 +194,8 @@ export interface CityBuildFacts {
   /** a belief of the city's majority religion enables the unit
    *  (CanTrain's EnabledByReligion test, 0x172cdf..0x172f33) */
   beliefEnables(unit: string): boolean;
+  /** the city follows a religion (city +0x1910, its majority religion) */
+  followsReligion: boolean;
   hasBuilding(building: string): boolean;
   /** the city holds the building pillaged */
   buildingPillaged(building: string): boolean;
@@ -607,7 +609,12 @@ export interface AiUnitRow {
   spreadCharges: number;
   healCharges: number;
   parkCharges: number;
+  requiresInquisition: boolean;
   canTrain: boolean;
+  /** Units_XP2 TourismBomb */
+  tourismBomb: number;
+  /** Units_XP2 TourismBombPossible */
+  tourismBombPossible: boolean;
   /** Units_XP2 */
   majorOnly: boolean;
   maintenanceResource: string | null;
@@ -638,12 +645,14 @@ export function unitTurns(f: CityBuildFacts, u: AiUnitRow): number {
  *  has trained (PlayerStats +0xf0, 0x4d9320); an explorer, settler or spy 1.0 plus the
  *  eras' points as PSEUDOYIELD_GOLDENAGE_POINT; a Trader its worth
  *  (`traderValue` with start and horizon both `t`: one turn's route value
- *  discounted to `t`) through PSEUDOYIELD_UNIT_TRADE — then x (the city's extra
- *  copies + 1) x the promotion class weight, 0 outright for a strategic
- *  resource the player cannot reach, through its pseudo-yield, less its
- *  Maintenance as Gold below handicap 3, paid from `t` to `h`. Null where a
- *  term it needs is not read (a religious unit, an Archaeologist, a WMD,
- *  an air unit, a unit with a Units_XP2 maintenance resource, ParkCharges). */
+ *  discounted to `t`) through PSEUDOYIELD_UNIT_TRADE; a religious unit
+ *  (PSEUDOYIELD_UNIT_RELIGIOUS) its tourism bomb as PSEUDOYIELD_TOURISM — then
+ *  x (the city's extra copies + 1) x the promotion class weight, 0 outright
+ *  for a strategic resource the player cannot reach, through its
+ *  pseudo-yield, less its Maintenance as Gold below handicap 3, paid from
+ *  `t` to `h`. Null where a term it needs is not read (an Archaeologist, a
+ *  WMD, an air unit, a unit with a Units_XP2 maintenance resource; a full
+ *  civilization's religious or park-charged unit). */
 export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VALUE_HORIZON): number | null {
   const exit = unitValueExit(f, u.type, t, h);
   if (exit !== null) return exit;
@@ -665,10 +674,25 @@ export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VAL
     // the eras record (a city-state)
     if (f.fullCiv) return null;
     v = FX;
+  } else if (pseudo === 'PSEUDOYIELD_UNIT_RELIGIOUS') {
+    // its religious term (ReligiousStrength x 0.01 by its charges, x the
+    // eras' points) counts only in a city of the player's own founded
+    // religion (0x4681c0 +0x1c0, 0x7b67a4..0x7b68f5) — a city-state and the
+    // Free Cities found none, so it is 0 (runs/h1_duelv1127: a minor's
+    // Missionary 0.00 on its turns following religion 11). The culture
+    // AI's park term (0x6239a0 x ParkCharges) reads 0 at these players
+    // (every valid Naturalist row of the five verbose duels 0.00). Then
+    // the tourism bomb, TourismBomb + 10 where TourismBombPossible
+    // (Units_XP2 +0x28 / +0x48 bit 32, 0x7b6a3e), as PSEUDOYIELD_TOURISM
+    // (runs/h1_duelv1121: every Rock Band row 10.0 a turn from T to H)
+    if (f.fullCiv) return null;
+    v = pseudoYieldValue(f.view, f.seat, (u.tourismBomb + (u.tourismBombPossible ? 10 : 0)) * FX, 'PSEUDOYIELD_TOURISM');
   } else {
     return null;
   }
-  if (u.wmd || u.maintenanceResource || u.parkCharges > 0) return null;
+  // a park-charged unit's own tourism (0x7b7456: the culture AI's park
+  // term) reads 0 at a city-state and the Free Cities, as above
+  if (u.wmd || u.maintenanceResource || (u.parkCharges > 0 && f.fullCiv)) return null;
   v = fmul(v, (f.extraCopies(u.type) + 1) * FX);
   v = fmul(v, f.promotionWeight(u.promotionClass));
   if (u.resource && !f.resourceAccess(u.resource)) return 0;
@@ -689,6 +713,14 @@ export function unitTable(f: CityBuildFacts): (number | null)[] {
     // EnabledByReligion unit no belief of the city's majority religion
     // enables (runs/h1_duelv1128: every minor's Warrior Monk FX(-9999))
     if (u.religion && !f.beliefEnables(u.type)) return FX_MIN;
+    // and, past its prerequisites, a unit of ReligiousStrength in a city
+    // following no religion (0x172d88..0x172d9d: runs/h1_duelv1127 a
+    // minor's Missionary, Apostle and Guru valued only on its turns
+    // following one) and a RequiresInquisition unit for a player that has
+    // launched no inquisition (0x172da3, 0x497a30) — a city-state and the
+    // Free Cities launch none (every minor's Inquisitor FX(-9999))
+    if (u.religiousStrength > 0 && !f.followsReligion) return FX_MIN;
+    if (u.requiresInquisition) return FX_MIN;
     const t = unitTurns(f, u);
     return t < 0 ? FX_MIN : unitValue(f, u, t);
   });

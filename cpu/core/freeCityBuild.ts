@@ -170,6 +170,7 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
       const rel = city.followedReligion ?? -1;
       return u === 'UNIT_WARRIOR_MONK' && rel >= 0 && seatOf(state, rel)?.religion.follower === 'WARRIOR_MONKS';
     },
+    followsReligion: (city.followedReligion ?? -1) >= 0,
     hasBuilding: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !!id && has.has(id);
