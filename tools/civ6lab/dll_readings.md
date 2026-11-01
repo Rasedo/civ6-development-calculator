@@ -12834,3 +12834,14 @@ City_BuildQueue.csv).
 - Confirmed: runs/h1_duely1128 Bologna t154-155, the game's new trees hold its four units (no tactical row; 2228224 444 -> 357, 1179650 on 399); the copy's plots now 3 of 4 the record's, where its units wandered.
 - Open: the game's AI memory names no tree member at the log site those turns, so the score reads the rows "(no row)" against ours "Upgrade Units".
 - Open: City Defense's recruits, runs/h1_duely1121 t31 city-state 2. The recruit rule matches; the operation's enemy strength does not (the game's "Enemy Str: 30 / 25.0", ours 55: the knowledge base's Quadrireme within 3 of 11:5 a turn early, C-129), so ours recruits a fourth Warrior, 589826.
+
+## C-127: a Trader keeps none of its player's units out — ported (0x585eb0 -> 0x585d90), both twins
+
+- The stacking test of a unit's walk (0x585d90) counts no unit with
+  MakeTradeRoute (Units +0x1b9 bit 64) or Spy (+0x1ba bit 2): a Builder ends
+  on its player's Trader's plot. Ported: `stackedAt` (cpu/core/tactical.ts),
+  `_tac_move_to`'s own-civilian test (gpu/core/sim_tactics.py).
+- CONFIRMED: runs/h1_duely1124 Cardiff's Farm on 582 (10:13) under its
+  Trader, laid t95 and t113 as recorded (both missed before).
+- Open: the stacking classes themselves (vtable +0xb8) unread; the engines
+  keep the domain (military / civilian / support).

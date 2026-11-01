@@ -35,10 +35,18 @@
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
-  impl: [cpu/core/tactical.ts:minor, gpu/core/sim_tactics.py:_tac_search]
+    - recording: h1_duely1124
+      turn: 113
+      value: "a Trader (MakeTradeRoute) keeps none of its player's units out: Cardiff's Builder onto 582 under its Trader, the Farm laid t113 (and t95)"
+  impl:
+    - cpu/core/tactical.ts:minor
+    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:stackedAt
+    - gpu/core/sim_tactics.py:_tac_move_to
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-127: a Trader keeps none of its player's units out — ported (0x585eb0 -> 0x585d90), both twins"
   context:
     - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
   review: imported
@@ -79,6 +87,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
+    - "C-127: a Trader keeps none of its player's units out — ported (0x585eb0 -> 0x585d90), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...hin 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220)..."
   context:

@@ -673,10 +673,13 @@ export function swapUnits(state: GameState, pass: Pass, unit: Unit, tile: number
 }
 
 /** a unit of the unit's player on the plot that stacks with it, the unit
- *  itself counted (0x585eb0) */
+ *  itself counted (0x585eb0 -> 0x585d90): none with MakeTradeRoute or Spy
+ *  keeps it out (runs/h1_duely1124 Cardiff t113: its Builder onto 582 under
+ *  its Trader, the Farm laid that turn) */
 export function stackedAt(state: GameState, unit: Unit, tile: number): boolean {
   const dom = unitDomain(unit.type);
-  return state.units.some((u) => u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom);
+  return state.units.some((u) => u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom
+    && !UNITS[u.type]?.trader && dom !== 'spy');
 }
 
 /** the hex distance between two plots */

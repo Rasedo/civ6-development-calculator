@@ -1141,7 +1141,11 @@ class SimTactics:
         civ_u = self._type_civilian.take(ut).unsqueeze(1)
         sup_u = self._type_support.take(ut).unsqueeze(1)
         own_mil = own_at(self.military_at[rows]) | own_at(self.embarked_at[rows])
-        own_same = torch.where(civ_u, own_at(self.civilian_at[rows]),
+        # a Trader (MakeTradeRoute) keeps none of its player's units out
+        # (0x585d90)
+        civ_pl = self.civilian_at[rows]
+        civ_trader = (civ_pl >= 0) & (self.unit_type[rows].gather(1, civ_pl.clamp(min=0)) == self._trader_idx)
+        own_same = torch.where(civ_u, own_at(civ_pl) & ~civ_trader,
                                torch.where(sup_u, own_at(self.support_at[rows]), own_mil))
         no_end = own_same | self._tac_foreign(seat)[rows]
         # how far its Movement carries it
