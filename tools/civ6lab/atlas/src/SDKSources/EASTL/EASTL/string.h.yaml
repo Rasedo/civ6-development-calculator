@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x186460
+  final: 0x106510
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...lier — the queue's m_axProjectProductionMultiplier [project] (+0x2f0, named by the dump 0x186460), times the district-type multiplier 0x178c50 of the project's district where it has on..."
+  review: imported
 - addr: 0x1baa90
   kind: function
   status: READ

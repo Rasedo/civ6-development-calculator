@@ -149,7 +149,10 @@ export interface AiProjectRow {
   prereqs: readonly string[];
   outerDefenseRepair: boolean;
   spaceRace: boolean;
-  wmd: boolean;
+  /** PrereqResource set (the project info's +0x148 reference, 0xa99160):
+   *  the weapon projects the AI's values count, the nuclear and
+   *  thermonuclear devices */
+  prereqResource: boolean;
   /** the projects whose prerequisite it is (ProjectPrereqs) */
   unlocks: readonly string[];
   /** Project_GreatPersonPoints: [the class's PseudoYieldType, Points,

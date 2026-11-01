@@ -5173,7 +5173,9 @@ Manhattan Project and the nuclear device.
   the player has completed (0x4be7b0): FX(-9999).
 - The projects it opens (+0xf0..+0xf8, the ProjectPrereqs naming it):
   each valued recursively at T plus its build turns (0x17b890), at least
-  200.0, summed; a WMD one (+0x148) adds PSEUDOYIELD_NUCLEAR_WEAPON 250.0
+  200.0, summed; a weapon one (+0x148, its PrereqResource reference, which
+  0xa99160 writes: the Nuclear and Thermonuclear Devices, not the WMD
+  column's Manhattan Project or Operation Ivy) adds PSEUDOYIELD_NUCLEAR_WEAPON 250.0
   (@0xd71c24) at the player's value and 1000.0's at the player's less at
   none.
 - SpaceRace (+0xe8 bit 1): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared
@@ -6152,7 +6154,7 @@ Contract %d").
   from landing above the engines' none, 178.7 at 3 turns, 196.5 at 1;
   Satellites 40.0, 679.2 at 4 turns .. 785.7 at 1; 1128 t225 Satellites
   785.7; Nanotechnology 90, Smart Materials 160 at their landings), +
-  NUCLEAR_WEAPON of 1.0 for a weapon (+0x148), each paid
+  NUCLEAR_WEAPON of 1.0 for a weapon (+0x148, a PrereqResource), each paid
   from landing; per improvement the resources near the cities (0x5d45c0 -> 0x7a21e0);
   the governments' (+0x130, 0x7b26b0); x1.5 (0x7b5b22..0x7b5b7f: fx(1.5)
   times the value so far, >> 8) where the row is the military AI's
@@ -12620,3 +12622,51 @@ rows and Trader plots t70-152).
   read the game era where the expiry finds the Trader home
   (`tradeRouteExpiry` / `_expire_seat_routes`); the route keeps its start
   turn only.
+
+## C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins
+
+- THE WEAPON TEST (0x7b28c0 at 0x7b2aee): per project the row opens, the
+  nuclear weapon terms where the opened project's info +0x148 is set — a
+  qword, the PrereqResource reference the Projects loader's relation getter
+  0xa99160 writes ("SELECT T1.rowid from Resources ... T2.PrereqResource"),
+  not the WMD column: the Nuclear and Thermonuclear Devices (Uranium), not
+  Operation Ivy. Ported (`AiProjectRow.prereqResource`, written by
+  tools/install/ai_tables.py; `projectValue`, `_cv_project`, and the research
+  value's weapon count `techUnlocks`): runs/h1_duelv1124 Bologna's Manhattan
+  Project t204-t234 exact to the log's PROJECTS rows on the turn whose
+  Production the analysis read (200 + 200 + 6250.0 for 200 + 6250 + 200 +
+  6250 before, x 0.5155).
+- THE BUILD TURNS' RATE (0x17b890): GetYield(Production) times 0x17a8c0's
+  multiplier — the queue's m_axProjectProductionMultiplier [project] (+0x2f0,
+  named by the dump 0x186460), times the district-type multiplier 0x178c50
+  of the project's district where it has one — times (1 + the caller's
+  percent): no term a city-state's Manhattan Project lacks. The cityBuildLab
+  pairs a turn's analysis with the next record's Production (Bologna's
+  18.5 / 15.0 alternating, the log's values one turn's off ours on that
+  lab only).
+- CanConstruct's RESULT (0x170450, exit 0x17143f): the result byte [rsi]
+  (set 1 at 0x1705c2, cleared by each refusal) and the reason +0x18 clear;
+  +0x1 set refuses too. The prerequisite-district test at 0x17071d runs where
+  the city holds the district complete (+0xb08, IsComplete) and 0x406c00
+  holds (the player's own version of the district type, its table +0x430);
+  then 0x1ad720 (pillaged) refuses with +0x2a. The pick 0x5d0860 checks the
+  result where its third argument is set ([rbp+0x40], the plain pick's 1).
+  So a pillaged Holy Site's Shrine is refused at the pick (runs/h1_duely1128
+  Nazca t32 below: the Horseman at 33.68 over the Shrine at 60.34), and
+  runs/h1_duelv1128 Nazca t26-t31's NO BUILDS AT ALL under the log's
+  tables' Shrine at 30.4 is the next item's refusal at the queue, not the
+  Shrine's. The engines still keep the building at the pick: refusing it
+  alone turns the NO BUILDS turns into unit picks (1128 cityState.build
+  708 -> 707), the queue's unit refusal unported (below).
+- NAZCA t32 (runs/h1_duely1128): no blow on its centre t28-t33 (CombatLog:
+  every defender a unit), and the aimem records within two plots of 32:11
+  at t31 / t32 (start, log, endlook) one or two barbarian Warriors (1900561
+  at age 0-1, 1835032 at age 6-7): +0x218's three-unit count unmet, the war
+  footing clear — the city is not under threat by the reading, and the
+  game's Horseman at 33.68 over the Shrine at 60.34 is the plain pick with
+  the Shrine refused (above). Its build t32-t33 took 117.6 Production (the
+  idle store of the NO BUILDS turns), t37 52.8: a fit, the Horseman the
+  pick's item each turn and queued only on the turns the queue takes it
+  (Units_XP2 ResourceCost 20 Horses against the city-state's stock; the
+  stock is not in the record).
+

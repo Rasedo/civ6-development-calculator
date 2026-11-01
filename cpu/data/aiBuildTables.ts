@@ -18475,7 +18475,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": true,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -18494,7 +18494,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": true,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [
    "PROJECT_LAUNCH_MOON_LANDING"
   ],
@@ -18524,7 +18524,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   ],
   "outerDefenseRepair": false,
   "spaceRace": true,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [
    "PROJECT_LAUNCH_MARS_BASE"
   ],
@@ -18556,7 +18556,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": true,
+  "prereqResource": false,
   "unlocks": [
    "PROJECT_BUILD_NUCLEAR_DEVICE",
    "PROJECT_OPERATION_IVY"
@@ -18580,7 +18580,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   ],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": true,
+  "prereqResource": false,
   "unlocks": [
    "PROJECT_BUILD_THERMONUCLEAR_DEVICE"
   ],
@@ -18603,7 +18603,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   ],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": true,
+  "prereqResource": true,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -18634,7 +18634,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   ],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": true,
+  "prereqResource": true,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -18663,7 +18663,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [
    [
@@ -18708,7 +18708,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [
    [
@@ -18733,7 +18733,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [
    [
@@ -18758,7 +18758,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [
    [
@@ -18783,7 +18783,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [
    [
@@ -18808,7 +18808,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [
    [
@@ -18833,7 +18833,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [
    [
@@ -18858,7 +18858,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [
    [
@@ -18893,7 +18893,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [
    [
@@ -18938,7 +18938,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 1.0,
@@ -18966,7 +18966,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 1.0,
@@ -18994,7 +18994,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19013,7 +19013,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19049,7 +19049,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19071,7 +19071,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19093,7 +19093,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19117,7 +19117,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   ],
   "outerDefenseRepair": false,
   "spaceRace": true,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [
    "PROJECT_LAUNCH_EXOPLANET_EXPEDITION"
   ],
@@ -19140,7 +19140,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   ],
   "outerDefenseRepair": false,
   "spaceRace": true,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [
    "PROJECT_ORBITAL_LASER",
    "PROJECT_TERRESTRIAL_LASER"
@@ -19173,7 +19173,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   ],
   "outerDefenseRepair": false,
   "spaceRace": true,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19203,7 +19203,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   ],
   "outerDefenseRepair": false,
   "spaceRace": true,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19249,7 +19249,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19287,7 +19287,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19306,7 +19306,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19325,7 +19325,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19351,7 +19351,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19372,7 +19372,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19393,7 +19393,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19414,7 +19414,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19433,7 +19433,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,
@@ -19452,7 +19452,7 @@ export const AI_PROJECTS: readonly AiProjectRow[] = [
   "prereqs": [],
   "outerDefenseRepair": false,
   "spaceRace": false,
-  "wmd": false,
+  "prereqResource": false,
   "unlocks": [],
   "gpp": [],
   "identityPerCitizen": 0.0,

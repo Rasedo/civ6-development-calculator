@@ -220,7 +220,7 @@ const UNLOCKS = new Map(Object.values(TECHS).map((t) => {
     wonders: b.filter((x) => x.wonder).length,
     districts: t.effects.filter((e) => e.kind === 'unlockDistrict').length,
     projects: p.length,
-    weapons: p.filter((x) => x.wmd).length,
+    weapons: p.filter((x) => x.prereqResource).length,
     space: AI_PROJECTS.filter((x) => x.tech === type && x.spaceRace).map((x) => projectChain(x.type)),
   }];
 }));

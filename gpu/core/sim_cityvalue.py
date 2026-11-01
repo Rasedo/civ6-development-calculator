@@ -629,7 +629,8 @@ class SimCityValue:
         v = torch.zeros_like(like)
         for nxt in row["unlocks"]:
             v = v + torch.maximum(self._cv_project(f, nxt, t + _t(f.build_turns(nxt), like), h), torch.full_like(v, 200 * _FX))
-            if T["proj"].get(nxt, {}).get("wmd"):
+            # a weapon one (a PrereqResource) adds its nuclear weapon
+            if T["proj"].get(nxt, {}).get("prereqResource"):
                 w = f.pseudo_w("PSEUDOYIELD_NUCLEAR_WEAPON")
                 v = v + self._cv_pseudo(torch.full_like(like, _NUCLEAR_OWN * _FX), "PSEUDOYIELD_NUCLEAR_WEAPON", w)
                 v = v + self._cv_pseudo(torch.full_like(like, _NUCLEAR_SPREAD * _FX), "PSEUDOYIELD_NUCLEAR_WEAPON", w) \

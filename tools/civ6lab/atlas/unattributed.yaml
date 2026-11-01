@@ -5843,6 +5843,23 @@
   context:
     - "...CE arm 0x184ae0 walks the project's Project_YieldConversions rows (Project +0x168, loader 0xa98af0): for each, amount = min(the Production passed in, the item's full cost (0x179510)) x (Pe..."
   review: imported
+- addr: 0xa99160
+  final: 0x7945f0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 204
+      value: ", , and the research   value's weapon count ): runs/h1_duelv1124 Bologna's Manhattan   Project t204-t234 exact to the log's PROJECTS rows on the turn whose   Production the analysis read (200 + 200 + "
+  impl: [cpu/core/aiCityBuild.ts:AiProjectRow]
+  readings:
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
+  context:
+    - "...0), at least 200.0, summed; a weapon one (+0x148, its PrereqResource reference, which 0xa99160 writes: the Nuclear and Thermonuclear Devices, not the WMD column's Manhattan Project o..."
+    - "...n test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
+    - "...is set — a qword, the PrereqResource reference the Projects loader's relation getter 0xa99160 writes (\"SELECT T1.rowid from Resources ... T2.PrereqResource\"), not the WMD column: th..."
+  review: imported
 - addr: 0xabaaf0
   final: 0x7b5eb0
   kind: function

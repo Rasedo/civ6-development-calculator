@@ -162,6 +162,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
   notes: ["label: CanConstruct(city.buildQueue,...)"]
   context:
     - "...lain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not MustPurchase (Buildings +0x159 bi..."
@@ -294,6 +295,7 @@
       value: "Every space project counts whether the   city may build it: China's Space Initiative 66 at t28 of   runs/h1_duelw1117 on the replayed state, the log's 111 under its   science-victory weight)."
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
   context:
     - "...roject's modifier 0x17a8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x17a680 (OuterDefenseRepair's own; else the cost progression model: game..."
   review: imported
@@ -414,6 +416,7 @@
       value: "Every space project counts whether the   city may build it: China's Space Initiative 66 at t28 of   runs/h1_duelw1117 on the replayed state, the log's 111 under its   science-victory weight)."
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
   context:
     - "...o 1.0 fixed point, 30 being +11.7%, over the city's Production x the project's modifier 0x17a8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x1..."
   review: imported
@@ -475,6 +478,7 @@
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+    - "C-96: the project value's weapon test, CanConstruct's district gates and Nazca's early turns — READ (0x7b2aee -> +0x148, 0xa99160; 0x170450's exit 0x17143f, 0x406c00 / +0xb08), a fit for the rest, both twins"
   review: reviewed
 - addr: 0x17bb40
   kind: function

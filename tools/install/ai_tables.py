@@ -728,7 +728,7 @@ def build_city(rows, modifier) -> str:
                 "maxPlayerInstances": num(c, "MaxPlayerInstances", -1),
                 "unlocksFromEffect": pflag(c, "UnlocksFromEffect") or pflag(p_xp2.get(pt, {}), "UnlocksFromEffect"),
                 "requiredBuilding": c.get("RequiredBuilding"), "prereqs": sorted(p_prereqs[pt]),
-                "outerDefenseRepair": pflag(c, "OuterDefenseRepair"), "spaceRace": pflag(c, "SpaceRace"), "wmd": pflag(c, "WMD"),
+                "outerDefenseRepair": pflag(c, "OuterDefenseRepair"), "spaceRace": pflag(c, "SpaceRace"), "prereqResource": bool(c.get("PrereqResource")),
                 "unlocks": sorted(p_unlocks[pt]),
                 "gpp": [[gpc.get(r["GreatPersonClassType"]), num(r, "Points"), num(r, "PointProgressionParam1")] for r in p_gpp[pt]],
                 "identityPerCitizen": float(p_xp1.get(pt, {}).get("IdentityPerCitizenChange") or 0),

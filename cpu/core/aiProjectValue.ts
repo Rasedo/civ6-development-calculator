@@ -57,8 +57,8 @@ export function projectChain(project: string): number {
   return 1 + Math.max(0, ...(row?.prereqs ?? []).map(projectChain));
 }
 
-/** PSEUDOYIELD_NUCLEAR_WEAPON's amounts a WMD project opens: 250.0 at the
- *  player's value (@0xd71c24), and 1000.0 at the player's less at none */
+/** PSEUDOYIELD_NUCLEAR_WEAPON's amounts a weapon project opens: 250.0 at
+ *  the player's value (@0xd71c24), and 1000.0 at the player's less at none */
 const NUCLEAR_OWN = 250;
 const NUCLEAR_SPREAD = 1000;
 
@@ -69,11 +69,13 @@ export function projectValue(f: ProjectValueFacts, project: string, t: number, h
   if (!row) return FX_MIN;
   if (row.maxPlayerInstances >= 0 && row.maxPlayerInstances <= f.advanced(project)) return FX_MIN;
   let v = 0;
-  // the projects it opens, each at least 200.0 at its own landing; a WMD
-  // one's nuclear weapon
+  // the projects it opens, each at least 200.0 at its own landing; a
+  // weapon one's nuclear weapon (a PrereqResource, 0x7b2aee: the Manhattan
+  // Project's Nuclear Device, not its Operation Ivy — runs/h1_duelv1124
+  // Bologna t204-234 as logged)
   for (const next of row.unlocks) {
     v += Math.max(projectValue(f, next, t + f.buildTurns(next), h), 200 * FX);
-    if (PROJECT.get(next)?.wmd) {
+    if (PROJECT.get(next)?.prereqResource) {
       v += pseudoYieldValue(f.view, f.seat, NUCLEAR_OWN * FX, 'PSEUDOYIELD_NUCLEAR_WEAPON');
       v += pseudoYieldValue(f.view, f.seat, NUCLEAR_SPREAD * FX, 'PSEUDOYIELD_NUCLEAR_WEAPON')
         - pseudoYieldValue(null, null, NUCLEAR_SPREAD * FX, 'PSEUDOYIELD_NUCLEAR_WEAPON');
