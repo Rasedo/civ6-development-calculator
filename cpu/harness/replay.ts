@@ -91,14 +91,14 @@ import { PROMOTE_HEAL, aiPromotionPick, attacksPerTurn, promoCount, takePromotio
 import { fireFeature } from '../data/disasters';
 import { nameRivers } from '../core/disasters';
 import { civicAgendas, setupAgendas } from '../core/agendas';
-import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorUnitPrice, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, holdMinorStart, minorCombatDesire, minorResearch, minorSetItem, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemCost, minorItemInHand, minorItemKey, minorBuildingPrice, minorUnitPrice, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible, traceMinorLays, traceMinorPolicyScores, traceMinorPurchases } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
 import { holdMinorClears, minorAiTurn, minorContractPurchases, minorGreatPersonClass, minorMilitaryTurn, minorSecondHook, traceMinorAi } from '../core/minorCityAi';
 import { UPGRADE_MOVE, cityStateMilitary, holdSecondHook, traceMinorOps, unupgradedDeleted, upgradeMayGo } from '../core/minorOps';
 import { barbSpawnChange, holdBarbCaptures, traceBarbOps } from '../core/barbarianOps';
-import { opsOf } from '../core/operations/manager';
+import { newOpsAi, opsOf } from '../core/operations/manager';
 import { opUnits } from '../core/operations/operation';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, purchaseSpend, savingsTurn, upgradePurchase, type EconomicMemory } from '../core/aiEconomic';
@@ -4663,12 +4663,38 @@ function importGameKnowledge(ctx: Ctx, world: GameState, imp: Imported, turn: nu
     const w = { names: ctx.cat, W: ctx.W, unitOf: (gameId: number) => ctx.units.get(`${pid}:${gameId}`)?.id, turnShift: s === world.barbSeat ? 1 : 0 };
     const cityState = world.cityStates.includes(s as CityState);
     const nodes = Object.values(read.trees ?? {}).some((t) => t.nodes?.[0]?.[4]);
+    // a seat the game holds operations of opens its manager for them (a
+    // window's first turn, before the engine's turn has run one)
+    if (nodes && read.ops?.length) s.ops ??= newOpsAi(s.seat);
     const ops = nodes && s.ops ? importOps(s.ops, read, w, turn, cityState).ids : new Map<number, number>();
     if (cityState && nodes) importCityAi(s as CityState, read, w, ops);
     else syncContracts(ctx.gameMemory!, ctx.cat, s, pid!, turn, ctx.W);
     if (s === world.barbSeat) spawns.push(...gameSpawnChanges(read, ops));
   }
   return spawns;
+}
+
+/** THE GAME'S OWN MEMORY at the end of `turn` onto `world`: the knowledge
+ *  bases' camps the game's logs hold whole (`--memory log`); each minor's
+ *  and the barbarians' knowledge base — the army records and the camps —,
+ *  operations and city AI as its end look left them (`--memory aimem`,
+ *  `<stem>.aimem.jsonl`), and the spawn changes its raids' trees executed,
+ *  on the tribe each raid runs for (`gameSpawnChanges`) */
+function takeGameMemory(ctx: Ctx, world: GameState, imp: Imported, turn: number, fromLog: boolean, fromAimem: boolean): void {
+  if (fromLog) {
+    for (const s of [...world.cityStates, ...(world.freeSeat ? [world.freeSeat] : []), world.barbSeat]) {
+      const pid = imp.playerOfSeat.get(s.seat);
+      const camps = pid === undefined ? undefined : ctx.memoryLogs.camps.get(`${turn}:${pid}`);
+      const plots = (camps ?? []).map((xy) => { const [x, y] = xy.split(':').map(Number); return y * ctx.W + x; });
+      if (plots.length) s.campsKnown = plots;
+      else delete s.campsKnown;
+    }
+  }
+  const spawns = fromAimem && ctx.gameMemory ? importGameKnowledge(ctx, world, imp, turn) : [];
+  for (const sp of spawns) {
+    const k = (world.barbTribes ?? []).findIndex((tr) => tr.op?.id === sp.op);
+    if (k >= 0) barbSpawnChange(world, k, sp.rate, sp.raiding);
+  }
 }
 
 function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, fromLog: boolean, fromAimem: boolean): void {
@@ -4753,33 +4779,52 @@ function perTurnWorld(ctx: Ctx, a: TurnRecord, imp: Imported, history: History, 
     for (const u of world.units) if (u.freeCity !== undefined && idOf.has(u.freeCity)) u.freeCity = idOf.get(u.freeCity)!;
     seatPair(state.freeSeat, free, true);
   }
-  // the memory the game's logs hold whole taken from them instead: the
-  // knowledge bases' camps as the turn before ended (`--memory log`)
-  if (fromLog) {
-    for (const s of [...world.cityStates, ...(world.freeSeat ? [world.freeSeat] : []), world.barbSeat]) {
-      const pid = imp.playerOfSeat.get(s.seat);
-      const camps = pid === undefined ? undefined : ctx.memoryLogs.camps.get(`${a.turn - 1}:${pid}`);
-      const plots = (camps ?? []).map((xy) => { const [x, y] = xy.split(':').map(Number); return y * ctx.W + x; });
-      if (plots.length) s.campsKnown = plots;
-      else delete s.campsKnown;
-    }
-  }
-  // the game's own memory instead (`--memory aimem`): each minor's and the
-  // barbarians' knowledge base — the army records and the camps — as its
-  // end look of the turn before left them (`<stem>.aimem.jsonl`)
-  const spawns = fromAimem && ctx.gameMemory ? importGameKnowledge(ctx, world, imp, a.turn - 1) : [];
   carryFields(state, world, [...GAME_MEMORY, ...GAME_STORES]);
-  // ...and the spawn changes its raids' trees executed, on the tribe each
-  // raid runs for (`gameSpawnChanges`)
-  for (const sp of spawns) {
-    const k = (world.barbTribes ?? []).findIndex((tr) => tr.op?.id === sp.op);
-    if (k >= 0) barbSpawnChange(world, k, sp.rate, sp.raiding);
-  }
+  takeGameMemory(ctx, world, imp, a.turn - 1, fromLog, fromAimem);
   for (const key of Object.keys(state)) if (!(key in world)) delete (state as unknown as Record<string, unknown>)[key];
   Object.assign(state, world);
   ctx.roadTiersWas = state.map.tiles.map((t) => (t.road ? (t.roadTier ?? 0) : -1));
   importedWorld(state, imp, a, history);
   ctx.retained = new Map();
+}
+
+/** A CITY-STATE'S SAVINGS over a record before the window (`savings`, by
+ *  seat): its economic AI's turn on the record's treasury (`savingsTurn`),
+ *  then the turn's purchases the record's actions make (`decisions`), each
+ *  spent as its rule spends it — a unit's and a building's from the UNITS
+ *  slot then the SLUSH slot (`purchaseSpend`; the city's threat is the
+ *  engine's memory, which the import holds none of: every purchase as an
+ *  unthreatened city's), an upgrade's through the upgrade purchase
+ *  (`upgradePurchase`), each at the engine's price on the record's world. */
+function foldSavings(savings: Map<number, EconomicMemory>, imp: Imported, decisions: readonly Decision[], cat: Catalog): void {
+  const { state } = imp;
+  const great = minorGreatPersonClass(state);
+  for (const cs of state.cityStates) {
+    if (cs.centerIndex < 0) continue;
+    const eco = savings.get(cs.seat) ?? newEconomicMemory();
+    savings.set(cs.seat, eco);
+    savingsTurn(eco, Math.trunc(cs.treasury * FX), great);
+  }
+  const minorAt = (player: number, plot: number) => {
+    const seat = imp.seatOfPlayer.get(player);
+    return state.cityStates.find((c) => c.seat === seat && c.centerIndex === plot);
+  };
+  for (const d of decisions) {
+    if (d.kind === 'buyUnit' && d.currency === 'gold') {
+      const cs = minorAt(d.player, d.city);
+      const id = engineRowOf(cat, 'unit', d.type);
+      const eco = cs && savings.get(cs.seat);
+      if (cs && id && eco) purchaseSpend(eco, minorUnitPrice(state, cs, id, 'gold') * FX, false);
+    } else if (d.kind === 'buyBuilding' && d.currency === 'gold') {
+      const cs = minorAt(d.player, d.city);
+      const id = engineRowOf(cat, 'building', d.building);
+      const eco = cs && savings.get(cs.seat);
+      if (cs && id && eco) purchaseSpend(eco, minorBuildingPrice(state, cs, id) * FX, false);
+    } else if (d.kind === 'upgrade') {
+      const eco = savings.get(imp.seatOfPlayer.get(d.player) ?? NO_SEAT);
+      if (eco) upgradePurchase(eco, MINOR_UPGRADE_GOLD * FX);
+    }
+  }
 }
 
 export function runReplay(dumpPath: string, opts: { from?: number; to?: number; source?: ActionSource;
@@ -4794,15 +4839,33 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   memoryFromAimem?: boolean;
   /** called after each pair is compared, with the engine state and record t+1 */
   onPair?: (state: GameState, b: TurnRecord, decisions: Decision[]) => void } = {}): ReplayReport {
-  const { cat, recs } = loadRecords(dumpPath, opts.from ?? -Infinity, opts.to ?? Infinity);
+  const { cat, recs: all } = loadRecords(dumpPath, -Infinity, opts.to ?? Infinity);
+  // the window: the records from `from` on; those before it are folded into
+  // the history alone (`skipped`)
+  const start = all.findIndex((r) => r.turn >= (opts.from ?? -Infinity));
+  const recs = start < 0 ? [] : all.slice(start);
+  const skipped = start < 0 ? all : all.slice(0, start);
   const source = opts.source ?? (recs.some((r) => Array.isArray((r as { actions?: unknown }).actions)) ? new RecordedActions() : new InferredActions());
   const history: History = newHistory();
   // the game's own draw log, where the recording kept it
   const logPath = randLogPath(dumpPath);
   if (logPath) {
-    history.randLog = loadRandLog(logPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
+    history.randLog = loadRandLog(logPath, all.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
   }
-  history.replay = replayEvents(recs, cat, history.randLog);
+  history.replay = replayEvents(all, cat, history.randLog);
+  // a window started past the first record takes the history every record
+  // before it leaves (the game era and its countdown, the eras' ages, the
+  // boosts parked, the districts' prices, the levies, the trained bests...),
+  // each folded and imported as a run from the first record folds it
+  // ...and the city-states' savings each of those turns left (`foldSavings`)
+  const savings = new Map<number, EconomicMemory>();
+  const folding = opts.source ?? (source instanceof RecordedActions ? new RecordedActions() : new InferredActions());
+  skipped.forEach((r, i) => {
+    advanceHistory(history, r, cat);
+    const imp = importTurn(r, cat, history);
+    const next = skipped[i + 1] ?? recs[0];
+    if (next) foldSavings(savings, imp, folding.decisions(r, next, cat), cat);
+  });
   // the game's combat log, where the recording kept it: each record carries
   // the battles of the turns its event log covers (`RecordedActions`)
   const combat = loadCombatLog(dumpPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
@@ -4840,14 +4903,19 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const state = first.state;
   importedWorld(state, first, recs[0], history);
   // the city-states' city AI ran on the game's turns before the import's:
-  // its first look ran no events (none contracted), its savings took the
-  // treasury; it stands as that turn left it
+  // its first look ran no events (none contracted); its savings those turns'
+  // (`foldSavings`), else, with no record before, the treasury taken whole;
+  // it stands as that turn left it
   if (state.turn > 1) {
     for (const cs of state.cityStates) {
       if (cs.centerIndex < 0) continue;
       cs.cityAi = newCityAi();
-      cs.economy = newEconomicMemory();
-      savingsTurn(cs.economy, Math.trunc(cs.treasury * FX), minorGreatPersonClass(state));
+      const folded = savings.get(cs.seat);
+      if (folded) cs.economy = folded;
+      else {
+        cs.economy = newEconomicMemory();
+        savingsTurn(cs.economy, Math.trunc(cs.treasury * FX), minorGreatPersonClass(state));
+      }
     }
   }
   // their knowledge bases hold the look of the import's turn, which their
@@ -4931,6 +4999,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (!first.seatOfPlayer.has(u.owner) || !engineRowOf(cat, 'unit', u.type)) continue;
     ctx.units.set(`${u.owner}:${u.id}`, state.units[k++]);
   }
+  // a window started past the first turn opens on the game's memory of the
+  // turn before, as every later pair does (`perTurnWorld`)
+  if (opts.aiScore && recs[0].turn > 1) takeGameMemory(ctx, state, first, recs[0].turn - 1, opts.memoryFromLog ?? false, opts.memoryFromAimem ?? false);
   for (const [pid, cs] of first.minorOfPlayer) {
     if (cs.centerIndex >= 0) continue;
     ctx.pendingMinors.set(pid, cs);

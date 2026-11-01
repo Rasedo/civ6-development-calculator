@@ -563,10 +563,12 @@ describe('civ CS trade routes', () => {
     expect(civ.tradeRoutes?.length).toBe(1);
     const course = tradeCourse(tradeReach(state, civ.seat, civCity.centerIndex), cityState.centerIndex)!;
     expect([course[0], course[course.length - 1]]).toEqual([civCity.centerIndex, cityState.centerIndex]);
+    expect(course.length).toBeGreaterThan(2);
+    // the Trader takes its first plot the turn the route starts
     expect(civ.tradeRoutes![0]).toEqual({
       from: civCity.id, to: -1, toCs: cityState.id,
       createdTurn: state.turn,
-      walkTile: civCity.centerIndex, walkLeg: 0, course,
+      walkTile: course[1], walkLeg: 0, course,
     });
     const y1 = computeCityStats(state, civCity).total;
     // cityStateRouteYields: the city-state centre's +3 gold (tier-scaled; a
