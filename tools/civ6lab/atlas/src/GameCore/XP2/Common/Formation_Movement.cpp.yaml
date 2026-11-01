@@ -84,6 +84,7 @@
     - cpu/core/tactical.ts:price
     - gpu/core/sim_tactics.py:price6
     - cpu/core/tactical.ts:moves
+    - cpu/core/tactical.ts:PathDanger
   readings:
     - "C-95: a river crossing's Movement — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -136,6 +137,7 @@
   status: PARTLY
   readings:
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   review: reviewed
 - addr: 0x26f1d0
   final: 0x1a76a0
@@ -158,7 +160,7 @@
     - recording: h1_duelw1128
       turn: 7
       value: "runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from   39:20 beside China's Warrior and Scout, the planning's refusal shuts it   in (875 / 963 in the Warrior's zone), the path takes it ho"
-  impl: [cpu/core/tactical.ts:search]
+  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
@@ -210,6 +212,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"
     - "C-99: the carry under a zone of control — READ (0x26e920), both twins"
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   context:
     - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."
     - "- THE ZONE OF CONTROL'S TEST (Rules_Movement 0x530f50, READ; through 0x26f980(finder, from, to, the path's destination) from the path cost 0x26e920, the move's step..."
@@ -238,6 +241,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - DLL rules the engines contradict
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."
@@ -283,6 +287,7 @@
     - cpu/core/tactical.ts:price
     - cpu/core/tactical.ts:seen
     - gpu/core/sim_tactics.py:price6
+    - cpu/core/tactical.ts:PathDanger
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
@@ -373,6 +378,8 @@
     - cpu/core/tactical.ts:planningSearch
     - cpu/core/tactical.ts:from
     - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:search
+    - gpu/core/sim_tactics.py:update_parents
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -381,6 +388,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   context:
     - "- THE PATH'S TURN ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whethe..."
     - "- A plot the player never revealed is the reach's leaf (READ): the validity 0x2720a0 under the search's flag 1 (0x115) refuses a step whose parent is not revealed (node +0x..."
@@ -389,10 +397,16 @@
 - addr: 0x2726b0
   final: 0x1aa510
   kind: function
-  status: PARTLY
+  name: the formation's path to a plot
+  semantics: the unit's own plot 0; a visible goal (0x20a3c0) where a member may not be placed (0x586900, flags 0) 0; else the A* (0x272aa0 -> 0x26ef40), the goal node's (+0x638 [0]) turns
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 160
+      value: Builder 4522014 for 2:19 (water) and Line Infantry 4128797 for 3:19 on 9:12 stay
   readings:
     - "C-99: Move Unit's no-Location execution, the swap's partner and the move order's first turn — READ, ported; the swap's path tests and 0x56e760 unread"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   context:
     - "...cost (plot vt +0x18) << 8 needs 0x56e760 clear), and the destinations valid both ways (0x2726b0 flag 4). Start (0x972a50): the unit's formation to the target (flags | 4), then the p..."
   review: imported

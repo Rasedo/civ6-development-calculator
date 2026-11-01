@@ -687,7 +687,7 @@
 - addr: 0xeff730
   kind: global
   status: PARTLY
-  impl: [cpu/core/tactical.ts:search]
+  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
   readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:

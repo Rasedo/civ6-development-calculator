@@ -321,9 +321,18 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
  * its own stacking units holds. With laterTurns (the path's flag 0x1000) a
  * path's turn may end on a plot its own stacking unit holds after its first.
  */
+/** a move order's danger flags over the player's danger map (`dangerPlane`):
+ *  `any` its flag 8, every plot of danger; `water` its flag 0x8000, a water
+ *  plot of danger */
+export interface PathDanger {
+  plane: ArrayLike<number>;
+  any: boolean;
+  water: boolean;
+}
+
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false,
-  laterTurns = false, fromFull = false, explore = true): void {
+  laterTurns = false, fromFull = false, explore = true, danger?: PathDanger): void {
   const { map } = state;
   const ground = groundOf(state, unit, !zoc, !zoc, standToAttack);
   const held = heldCostsOf(state, unit);
@@ -397,6 +406,11 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // from a plot the unit may stand on, its own or one none of its own
       // stacking units holds
       if (attack && standToAttack && best !== start && ground.full(best.tile)) continue;
+      // a move order's danger flags (the path validity 0x2720a0 at
+      // 0x272590..0x272612): from a node of the path's first turn, under
+      // flag 8 no child of danger (the player's danger map 0x716a90 above
+      // 0), under flag 0x8000 no water child of danger
+      if (danger && best.turns <= 1 && danger.plane[to.index] > 0 && (danger.any || (danger.water && isWater(to)))) continue;
       const s = price(best, to, di, attack);
       if (s.turns > maxTurns) continue;
       // a path's turn may not end on a plot its own stacking unit holds (the
@@ -553,13 +567,14 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number): number 
 
 /** the plots from the unit's to `dest`, the unit's own left out, by the
  *  pathfinder's path (its parents once `dest` closes); empty where none */
-export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false, explore = true): number[] {
+export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false, explore = true,
+  danger?: PathDanger): number[] {
   let found = null as PNode | null;
   search(state, unit, Infinity, true, (n) => {
     if (n.tile !== dest) return false;
     found = n;
     return true;
-  }, undefined, false, laterTurns, false, explore);
+  }, undefined, false, laterTurns, false, explore, danger);
   // under flag 0x1000 the path's first turn may not end on the destination
   // its own stacking unit holds
   if (laterTurns && found && (found as PNode).turns <= 1 && stackedAt(state, unit, dest)) return [];
@@ -577,10 +592,11 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
  *  `laterTurns` (the order's path flag 0x1000) the path's turns after its
  *  first may end on a plot its own stacking unit holds, its first not; with
  *  no `explore` (its flag 1) the path leaves no plot the player never
- *  revealed. */
+ *  revealed; with `danger` (its flags 8 / 0x8000) its first turn steps
+ *  onto no plot of danger. */
 export function moveTo(state: GameState, unit: Unit, dest: number, strike = true, avoid?: (tile: number) => boolean,
-  laterTurns = false, explore = true): void {
-  let path = pathTo(state, unit, dest, laterTurns, explore);
+  laterTurns = false, explore = true, danger?: PathDanger): void {
+  let path = pathTo(state, unit, dest, laterTurns, explore, danger);
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
   const last = path.length ? path[path.length - 1] : -1;
@@ -2908,10 +2924,19 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * the radius of the goal (the ring walk 0x6aef0, the test 0x815d50) one in
  * the goal's region before one outside, then the nearest it, its own plot or
  * one with none of its own and a path to it; none, the goal with the attack
- * flag.
+ * flag. The order's danger flags (0x816e70..0x816e85, 0x817839..0x8178b1):
+ * where the operation is weaker than its target (op +0x4b0 below +0x510,
+ * `weak`) flag 8 for a unit with no combat (0x56dc90) or one in a formation
+ * holding a civilian (0x266950(2): Make Formation's pair, `formed`), else
+ * for a unit with no combat in no formation; flag 0x8000 for a land unit
+ * (+0x650 2) in no formation with a ship (0x266950(3)) — runs/h1_duely1121
+ * t158-t160: Builder Capture's Builder 4522014 and Line Infantry 4128797 on
+ * 9:12 (strength 62-65 to 66) stay, every first step a plot of danger; t162,
+ * the operation stronger (63 to 51), the Line Infantry steps on.
  */
 export function passMoveExec(state: GameState, pass: Pass, members: readonly number[], goal: number, range: number,
-  arrived: boolean, ready: boolean, zero: (u: Unit) => boolean = () => false, leaderNamed = false): { unit: Unit; from: number; dest: number }[] {
+  arrived: boolean, ready: boolean, zero: (u: Unit) => boolean = () => false, leaderNamed = false, weak = false,
+  formed: (u: Unit) => boolean = () => false): { unit: Unit; from: number; dest: number }[] {
   const out: { unit: Unit; from: number; dest: number }[] = [];
   if (arrived && ready && !leaderNamed) return out;
   const region = state.map.tiles[goal].region ?? -1;
@@ -2956,7 +2981,11 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     }
     finish(pass, u, 'Operation', dest);
     out.push({ unit: u, from: u.tileIndex, dest });
-    moveTo(state, u, dest, strike, undefined, true, false);
+    const combat = (UNITS[u.type]?.combat ?? 0) > 0;
+    const paired = formed(u);
+    const danger: PathDanger = { plane: pass.danger, any: weak ? !combat || paired : !combat && !paired,
+      water: !UNITS[u.type]?.naval && unitDomain(u.type) !== 'air' };
+    moveTo(state, u, dest, strike, undefined, true, false, danger);
   }
   return out;
 }

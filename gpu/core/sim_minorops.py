@@ -2346,7 +2346,8 @@ def _x_move(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         u = sim._mops_units(s)
         mem = sim._mops_member_mask(s, k, ti) & u["own"]
         sim._op_move_exec(g, mem, sim._mops_member_rank(s, k, ti), goal, rng, arrived, ready, c.view["done"], op["rowof"], op["res"],
-                          sim._mops_pre(s), sim._mops_seat(s))
+                          sim._mops_pre(s), sim._mops_seat(s), danger=op["danger"],
+                          weak=sim.mops_str[:, s, k] < sim.mops_estr[:, s, k])
 
 
 def _u_operation_attack(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:

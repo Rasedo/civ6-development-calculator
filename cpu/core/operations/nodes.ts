@@ -82,10 +82,13 @@ export interface OpsContext {
   /** OPERATION MOVE's execution for a team (0x816cb0): range: the radius
    *  cap, the node's Unit distance; zero: a unit whose
    *  radius is 0 (a formation's, the Leader Tag's), leaderNamed: the node
-   *  names a Leader Tag — each mover's type, its plot before, the plot it
-   *  went for and the plot it stands on */
+   *  names a Leader Tag; weak: the operation's strength below its target's
+   *  (the order's danger flags); formed: a unit in a formation — each
+   *  mover's type, its plot before, the plot it went for and the plot it
+   *  stands on */
   moveExec(members: readonly number[], goal: number, range: number, arrived: boolean, ready: boolean,
-    zero: (id: number, type: string) => boolean, leaderNamed: boolean): readonly { type: string; from: number; dest: number; after: number }[];
+    zero: (id: number, type: string) => boolean, leaderNamed: boolean, weak: boolean,
+    formed: (id: number) => boolean): readonly { type: string; from: number; dest: number; after: number }[];
   /** Operation Defend Units' orders, where the seat's units' turn gives
    *  them; none, the node moves no unit */
   defend?: DefendOrders;
@@ -628,7 +631,8 @@ const operationMove: BtHandler<OpsContext> = {
       const goal = t.goals[slot] ?? NO_PLOT;
       if (goal === NO_PLOT) continue;
       const v = ctx.view();
-      const moved = ctx.moveExec(t.members, goal, range, arrived, ready, (id, type) => paired.has(id) || (!!leader && hasAiType(type, leader)), !!leader);
+      const moved = ctx.moveExec(t.members, goal, range, arrived, ready, (id, type) => paired.has(id) || (!!leader && hasAiType(type, leader)), !!leader,
+        ctx.op.strength < ctx.op.enemyStrength, (id) => paired.has(id));
       for (const x of moved) ctx.log(`${ctx.op.def}, Operation Move, ${x.type}, ${xy(v, x.from)}, ${xy(v, x.dest)}, ${xy(ctx.view(), x.after)}`);
     }
   },

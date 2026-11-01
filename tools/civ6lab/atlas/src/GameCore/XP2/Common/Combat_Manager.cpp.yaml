@@ -20,7 +20,9 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/combat.ts:spendAttack]
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- An attack ends the attacker's fortification: 0x1fbae0 sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0)...."
@@ -289,6 +291,19 @@
     - "...Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a MilitaryFormation argument (+0x90), compa..."
     - ...'s units from the last to the first; for each one not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's player is at w...
   review: imported
+- addr: 0x209e30
+  final: 0x15a310
+  kind: function
+  name: a defender at a plot
+  semantics: "of the plot's units (+0x50, count +0x60) one alive, another player's at war with the unit's (0x469cd0), that may defend (0x209dd0), seen (0x20a2a0 0x101), the best (0x523d60): true but an air unit of one type; else a hostile district there (0x209b10) a city centre (0x24c250), or with a defence (+0xb08) unpillaged"
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 161
+      value: Builder Capture 983046 steps from 9:12 to 8:13, no defender there
+  readings:
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+  review: reviewed
 - addr: 0x20a3c0
   final: 0x15a8a0
   kind: function
@@ -297,7 +312,9 @@
     - recording: h1_duelw1128
       turn: 7
       value: "runs/h1_duelw1128 t7-t11: tribe 0's Scout reports Rome 42:20 from   39:20 beside China's Warrior and Scout, the planning's refusal shuts it   in (875 / 963 in the Warrior's zone), the path takes it ho"
-  readings: ["C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
+  readings:
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   context:
     - "...s): the unit's own plot 0; a plot off the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0x398, bit 8 where the..."
   review: imported
@@ -334,6 +351,16 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
   context:
     - "...player's +0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian on China's Missionary b..."
+  review: imported
+- addr: 0x211f80
+  final: 0x161b50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...goal first) reached this turn (+4 at most 1): under the attack flag 0x10 the battle (0x211f80, 0x1fbae0); else a visible defender at war or a hostile district with defence unpillage..."
   review: imported
 - addr: 0x212500
   kind: function

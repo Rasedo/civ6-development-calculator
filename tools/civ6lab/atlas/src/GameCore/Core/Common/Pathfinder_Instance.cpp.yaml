@@ -17,7 +17,7 @@
   kind: function
   name: GeneratePath
   status: PARTLY
-  impl: [cpu/core/tactical.ts:search]
+  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
   readings:
     - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
     - "H-1: the trade path's search, its score and the Canal — READ"
@@ -61,7 +61,7 @@
   kind: function
   name: SearchStep
   status: PARTLY
-  impl: [cpu/core/tactical.ts:search]
+  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -75,7 +75,7 @@
   kind: function
   name: UpdateOpenNode
   status: PARTLY
-  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:reparent]
+  impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:reparent, cpu/core/tactical.ts:PathDanger]
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -93,6 +93,7 @@
     - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:from
     - gpu/core/sim_tactics.py:update_parents
+    - cpu/core/tactical.ts:PathDanger
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"

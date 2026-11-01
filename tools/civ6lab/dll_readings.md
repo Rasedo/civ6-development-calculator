@@ -5237,3 +5237,63 @@ runs/h1_duely1128 Hong Kong t106, Bologna t109 (`CityState.armyCounted`,
   at the log site from the look): the unit production table's
   `armyCounted` already matches, its Warrior contract the game's in both
   modes.
+
+## C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins
+
+`passMoveExec`'s `PathDanger` through `moveTo` / `pathTo` / `search`
+(cpu/core/tactical.ts; `weak` / `formed` from `operationMove`,
+cpu/core/operations/nodes.ts); `_op_move_exec`'s `danger` / `weak` /
+`formed` through `_tac_move_to` / `_tac_search` (gpu/core/sim_tactics.py;
+the captures' `bcap_str` / `bcap_estr` / `zero`, the minors' `mops_str` /
+`mops_estr`), the pass's danger map read on the plots within 2 of the
+planning's first turn (`_tac_danger_need`).
+
+- THE ORDER'S DANGER FLAGS (0x816cb0): at 0x816e70..0x816e85 the operation's
+  m_opStrength (op +0x4b0, the autovariable at +0x458) against its
+  m_targetStrength (+0x510, at +0x4b8): `strong` = op >= target. At
+  0x817839..0x8178b1, per mover: not strong, flag 8 for a unit with no
+  combat (0x56dc90 0) or one whose formation (+0x1fb8) holds a CIVILIAN
+  (0x266950(2), Make Formation's pair); strong, flag 8 for a unit with no
+  combat in no formation (+0x738 == 1); flag 0x8000 for a land unit (+0x650
+  2) whose formation holds no NAVAL member (0x266950(3)). The path validity
+  (0x2720a0 at 0x272590..0x272612, `[rbp+0x2c]` the parent's turn against
+  1): under flag 8 (or the finder's +0x1f7 byte, unread) a child of danger
+  (the player's influence map +0x12d8, 0x716a90 above 0) is refused from a
+  parent of turn 1 or less; under 0x8000 a water child of danger likewise.
+  So a weak operation's escorted civilian and its escort take no first-turn
+  step onto danger, and with no such path stay.
+- CONFIRMED (the strengths at the aimem tactical site, the game's AI_Operation
+  rows): runs/h1_duely1121 Builder Capture 983046 (Builder 4522014, Line
+  Infantry 4128797 on 9:12, every plot beside it on the barbarians' danger
+  map): t158-t160 strength 62 / 65 / 64 below 66, "Operation Move ... 9:12,
+  4:19, 9:12" — the engines hold both; t161 (64 to 86) a path free of danger
+  opens and both step to 8:13; t162 (63 to 51) the Line Infantry steps to
+  8:12; t164 (63 to 55) 7:13 -> 6:15; t170-t173 (60-62 below 67-83) the
+  team on 5:16 holds — each as recorded.
+- THE MOVETO EXECUTION (0x962380, Unit_Operations_MoveTo.cpp): a request of
+  this turn (+0x20) cancels the formation's other members' operations; the
+  formation's path 0x2726b0: the unit's own plot 0; a visible goal (the
+  player's visibility count, 0x20a3c0) where a member may not be placed
+  (0x586900 -> 0x586360, flags 0) 0; else the A* (0x272aa0 -> 0x26ef40), its
+  goal node's (+0x638 [0]) turns the answer. None: the order done, no move.
+  The first step (0x266690: the node before the start, the path stored goal
+  first) reached this turn (+4 at most 1): under the attack flag 0x10 the
+  battle (0x211f80, 0x1fbae0); else a visible defender at war or a hostile
+  district with defence unpillaged there (0x209e30) ends the order unmoved.
+  Then a unit not of the air (+0x650 != 1) whose formation moved into a zone
+  of control this turn (m_bHasMovedIntoZOC, formation +0x518, the
+  autovariable +0x4c0: set by the move 0x26fe20 from 0x26f980 on its new
+  plot, cleared each turn by Player_Units' DoTurn 0x4e4560 -> 0x2673f0)
+  waits (+0x11), else it moves (0x26fe20). Ended (+0x10), a unit whose plot
+  is not valid for it (0x585d90 over the stacking limit, or 0x586360) is
+  placed (0x586d40 flag 1) at the order's stored plot (+8; its setters
+  unread).
+- M_BLOCKEDTURNS (op +0x378, the autovariable +0x320): written only by the
+  backup's naming 0x73e610 — 0 where the target stays valid (0x73abf0 with
+  1), else one more — and read by 0x73abf0 (at 3 the target is invalid); the
+  start (0x73a120) sets it 0. runs/h1_duely1121 983046 holds 1 from its t156
+  Change Target (INVALID, the backup 3:19) on: it gates no move.
+- OPEN: the finder's +0x1f7 byte's setters; 0x962380's visible-goal and
+  first-step tests and the zone-of-control wait are not in the engines (no
+  recorded case named); runs/h1_duely1128 t171 (strong, 0 to 0) 9:3 -> 9:4
+  for 14:16, the engines' 10:3: a path choice, not these flags.

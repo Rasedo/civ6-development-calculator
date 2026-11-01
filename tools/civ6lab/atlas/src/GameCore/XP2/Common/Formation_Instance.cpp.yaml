@@ -97,6 +97,16 @@
   context:
     - "...+0x1bc, read by the step cost 0x26e920 for the start) to GetMaxMoves (0x56e130, through 0x266660 on the formation) << 8 — the unit's full Movement, not its Movement left. The \"unmove..."
   review: imported
+- addr: 0x266690
+  final: 0x1a3f50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...al node's (+0x638 [0]) turns the answer. None: the order done, no move. The first step (0x266690: the node before the start, the path stored goal first) reached this turn (+4 at most 1..."
+  review: imported
 - addr: 0x266720
   final: 0x1a3fe0
   kind: function
@@ -127,9 +137,11 @@
     - recording: 1128
       turn: 251
       value: "A minor's   pass walks its military units alone, so the support half finds none (1128   t251: its Supply Convoy, alone beside the Spec Ops, ends its turn)."
+  impl: [cpu/core/tactical.ts:passMoveExec]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   context:
     - "...f its domain (+0x650), with Combat (0x56dc90), whose formation holds none of its class (0x266950): of those its planning reaches within two turns (0x791300) the strongest, else the n..."
   review: imported
@@ -147,4 +159,14 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   context:
     - "...(0, finder, plot, flags): the unit's own plot 0; a plot off the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0..."
+  review: imported
+- addr: 0x2673f0
+  final: 0x1a4940
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...20 from 0x26f980 on its new plot, cleared each turn by Player_Units' DoTurn 0x4e4560 -> 0x2673f0) waits (+0x11), else it moves (0x26fe20). Ended (+0x10), a unit whose plot is not val...
   review: imported

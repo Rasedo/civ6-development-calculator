@@ -496,7 +496,7 @@ class SimTactics:
     def _tac_search(self, rows: torch.Tensor, slots: torch.Tensor, seat: int, max_turns: int, zoc: bool,
                     dest: torch.Tensor | None = None, pre: str = "barb", plan: dict | None = None,
                     full: bool = False, stand: bool = False, later_turns: bool = False,
-                    from_full: bool = False, explore: bool = True) -> dict:
+                    from_full: bool = False, explore: bool = True, danger: tuple | None = None) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
         the open nodes by (cost, tie) — a node inserted where its cost lies
@@ -522,7 +522,10 @@ class SimTactics:
         `from_full` (the planning's, `search`'s fromFull) each unit sets out on
         its full Movement, unmoved by its Movement left. With no `explore`
         (a move order's path flag 1) no step leaves a plot the player never
-        revealed but the unit's own."""
+        revealed but the unit's own. With `danger` (a move order's flags 8 /
+        0x8000: the danger map [N, T], flag 8 [N], flag 0x8000 [N]) no node
+        of the path's first turn links a child of danger (any child under
+        flag 8, a water child under flag 0x8000)."""
         dev = self.device
         N, T = rows.shape[0], self.T
         NONE = _KEY_NONE
@@ -829,6 +832,13 @@ class SimTactics:
                 ok = ok & ~(a6 & full_n.gather(1, b1) & (best != start).unsqueeze(1))
             if cliff6 is not None:
                 ok = ok & ~cliff6
+            if danger is not None:
+                # a move order's danger flags (0x2720a0 at 0x272590..
+                # 0x272612): from a node of the path's first turn, under flag
+                # 8 no child of danger, under flag 0x8000 no water child of it
+                d_pl, d_any, d_wat = danger
+                hot = (d_pl.gather(1, nbc) > 0) & (d_any.unsqueeze(1) | (d_wat.unsqueeze(1) & water_n.gather(1, nbc)))
+                ok = ok & ~(hot & (bt <= 1))
             if link is not None:
                 link(nbc, best, turns, moves, ok)
             linked6[ar, best] = torch.where(act.unsqueeze(1), ok, linked6[ar, best])
@@ -1074,7 +1084,7 @@ class SimTactics:
 
     def _tac_move_to(self, mask: torch.Tensor, us: torch.Tensor, dest: torch.Tensor, pre: str = "barb",
                      seat: int = BARB_SEAT, strike: bool = True, avoid: torch.Tensor | None = None,
-                     later_turns: bool = False, explore: bool = True) -> None:
+                     later_turns: bool = False, explore: bool = True, danger: tuple | None = None) -> None:
         """`moveTo` for the unit at local slot `us` [B] of pool `pre` (its
         player `seat`) in the games of `mask`: the pathfinder's path to `dest`
         with zones of control, walked as far as its Movement carries it this
@@ -1085,7 +1095,9 @@ class SimTactics:
         whose end `avoid` [B, T] names stays put. With `later_turns` (the
         order's path flag 0x1000) the path's turns after its first may end on
         a plot its own stacking unit holds, its first not; with no `explore`
-        (its flag 1) the path leaves no plot the player never revealed."""
+        (its flag 1) the path leaves no plot the player never revealed; with
+        `danger` (the danger map [B, T], the order's flag 8 [B] and flag
+        0x8000 [B]) its first turn steps onto no plot of danger."""
         if not bool(mask.count_nonzero()):
             return
         dev = self.device
@@ -1093,7 +1105,9 @@ class SimTactics:
         rows = mask.nonzero(as_tuple=True)[0]
         sr = us[rows]
         dr = dest[rows].clamp(min=0)
-        res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre, later_turns=later_turns, explore=explore)
+        dg = None if danger is None else tuple(x[rows] for x in danger)
+        res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre, later_turns=later_turns, explore=explore,
+                               danger=dg)
         par = res["parent"]
         start = res["start"]
         R = rows.shape[0]
@@ -2667,7 +2681,8 @@ class SimTactics:
     def _op_move_exec(self, on: torch.Tensor, mem: torch.Tensor, rank: torch.Tensor, goal: torch.Tensor, rng: int,
                       arrived: torch.Tensor, ready: torch.Tensor, done: torch.Tensor, rowof: torch.Tensor, res: dict, pre: str = "barb",
                       seat: int = BARB_SEAT, zero: torch.Tensor | None = None,
-                      leader: bool = False) -> list:
+                      leader: bool = False, danger: torch.Tensor | None = None, weak: torch.Tensor | None = None,
+                      formed: torch.Tensor | None = None) -> list:
         """`passMoveExec` for an operation's team in the games `on`: nothing
         where the operation is `ready` [B], the team arrived and the node names
         no Leader Tag (`leader`); else each living member `mem` [B, P] with
@@ -2676,9 +2691,12 @@ class SimTactics:
         node's Unit distance `rng` and its Range, `_tac_range`: 0 in melee; 0 for a ship or
         a unit of `zero` [B, P]; at least 1 where the goal is barred to a
         member off it, and with a Leader Tag named), its plot (its planning's at the radius in the goal's
-        region, else the ring walk's), its turn done, its move order. The
-        moves: per mover [B] its slot (-1 none), its plot before, its plot
-        after."""
+        region, else the ring walk's), its turn done, its move order — over
+        the pass's danger map `danger` [B, T] its flag 8 where the operation
+        is `weak` [B] (its strength below its target's) for a unit with no
+        combat or one of a formation `formed` [B, P], else for a unit with no
+        combat in none; its flag 0x8000 for a land unit. The moves: per mover
+        [B] its slot (-1 none), its plot before, its plot after."""
         skip = arrived & ready if not leader else torch.zeros_like(arrived)
         go = on & ~skip
         moves: list = []
@@ -2769,8 +2787,18 @@ class SimTactics:
             ms = torch.zeros(B, dtype=torch.bool, device=dev)
             ms[rows] = True
             before = torch.where(ms, tile_p[bidx, us], torch.full_like(us, -1))
-            self._tac_move_to(ms & ~hit, us, full, pre, seat, strike=False, later_turns=True, explore=False)
-            self._tac_move_to(ms & hit, us, full, pre, seat, strike=True, later_turns=True, explore=False)
+            dg = None
+            if danger is not None:
+                comb = self._type_combat.take(ut) > 0
+                paired = formed[rows, ur] if formed is not None else torch.zeros_like(comb)
+                wk = weak[rows] if weak is not None else torch.zeros_like(comb)
+                f8 = torch.zeros(B, dtype=torch.bool, device=dev)
+                f8[rows] = torch.where(wk, ~comb | paired, ~comb & ~paired)
+                f80 = torch.zeros(B, dtype=torch.bool, device=dev)
+                f80[rows] = ~naval & (self._type_air.take(ut) == 0)
+                dg = (danger, f8, f80)
+            self._tac_move_to(ms & ~hit, us, full, pre, seat, strike=False, later_turns=True, explore=False, danger=dg)
+            self._tac_move_to(ms & hit, us, full, pre, seat, strike=True, later_turns=True, explore=False, danger=dg)
             moves.append((torch.where(ms, us, torch.full_like(us, -1)), before, torch.where(ms, full, torch.full_like(us, -1))))
         return moves
 
@@ -3626,7 +3654,9 @@ class SimTactics:
 
     def _tac_danger_need(self, units: torch.Tensor, pre: str, rowof: torch.Tensor, res: dict) -> torch.Tensor:
         """[B, T] bool — the plots a pass reads the danger map on: its units'
-        own and the plots of this turn of their planning reach"""
+        own, the plots of this turn of their planning reach and those within 2
+        of them (a move order's first turn steps onto them, past a plot it
+        only passes: its danger flags)"""
         B, T, dev = self.B, self.T, self.device
         need = torch.zeros(B, T, dtype=torch.bool, device=dev)
         b_i, s_i = units.nonzero(as_tuple=True)
@@ -3638,6 +3668,7 @@ class SimTactics:
                 r1 = torch.zeros(B, T, dtype=torch.float32, device=dev)
                 r1.index_add_(0, b_i[on], (res["turns"][rr[on]] == 1).float())
                 need |= r1 > 0
+            need |= (need.float() @ (self.pair_dist <= 2).float()) > 0
         return need
 
     def _tac_flees(self, pre: str, seat: int, danger: torch.Tensor, rowof: torch.Tensor, res: dict,

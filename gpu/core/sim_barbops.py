@@ -481,12 +481,17 @@ class SimBarbOps:
         zero[bidx[formed & civ_ok], csc[formed & civ_ok]] = True
         zero[bidx[formed & esc_ok], esc_[formed & esc_ok]] = True
         ex6 = mv_on & ~no_goal & ((c6 == 1) | (c6 == 2))
+        # the move orders' danger flags read the operation's strength below
+        # its target's, and its formation (`passMoveExec`)
+        below = self.bcap_str[:, c] < self.bcap_estr[:, c]
         if bool(ex6.any()):
-            self._op_move_exec(ex6, mem, self._bcap_rank(c), goal, sp6, ar6, self.bcap_ready[:, c], done, rowof, res, zero=zero)
+            self._op_move_exec(ex6, mem, self._bcap_rank(c), goal, sp6, ar6, self.bcap_ready[:, c], done, rowof, res, zero=zero,
+                               danger=ctx["danger"], weak=below, formed=zero)
         self.bcap_form[:, c] &= ~seq7
         ex8 = on8 & ~no_goal & ((c8 == 1) | (c8 == 2))
         if bool(ex8.any()):
-            self._op_move_exec(ex8, mem, self._bcap_rank(c), goal, sp8, ar8, self.bcap_ready[:, c], done, rowof, res)
+            self._op_move_exec(ex8, mem, self._bcap_rank(c), goal, sp8, ar8, self.bcap_ready[:, c], done, rowof, res,
+                               danger=ctx["danger"], weak=below)
         end = root_ok | root_fail
         self.bcap_id[:, c] = torch.where(end, torch.full_like(self.bcap_id[:, c], -1), self.bcap_id[:, c])
         self.bcap_civ[:, c] = torch.where(end, torch.full_like(cs, -1), self.bcap_civ[:, c])
@@ -996,7 +1001,10 @@ class SimBarbOps:
         the games `on`: nothing where its team is ready and arrived"""
         if not bool(on.any()):
             return
-        self._op_move_exec(on, self._bop_members(k), self.barb_unit_join, goal, rng, arrived, ready, ctx["done"], ctx["rowof"], ctx["res"])
+        # its members in no formation: a move order's flag 8 for a unit with
+        # no combat whatever the strengths
+        self._op_move_exec(on, self._bop_members(k), self.barb_unit_join, goal, rng, arrived, ready, ctx["done"], ctx["rowof"], ctx["res"],
+                           danger=ctx["danger"])
 
     def _bop_recruit(self, act: torch.Tensor, k: int, raiding: bool) -> torch.Tensor:
         """BARBARIAN RECRUIT (0x7c7580) for tribe `k`'s operation in the games
