@@ -6153,3 +6153,38 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   logged there): no queue row, map change, combat or building explains it.
   The Builder's lump (Nazca t22: the Granary's second row 9.0, overflow 8.5)
   is not in the lab, which reads no feature removal (t22-23 a turn off).
+
+## C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open
+
+`storedTable` in `choiceOrder` (cpu/core/operations/unitChoice.ts);
+`_mops_choice_order`'s stable pre-sort (gpu/core/sim_minorops.py).
+
+- THE STORED ORDER: the unit production table (0x7989e0) ends with
+  std::stable_sort (0x797980: a buffer of (n + 1) / 2 entries, 0x797870
+  halving down to the insertion sort at 32 elements and merging) under
+  0x79d3a0 — buildable (+0x0e), the at-war sum (+0x2c), the every-player sum
+  (+0x30), the strength (+0x18), each greater first, no per-player term. The
+  choice (0x79bd30) copies that stored order (0x6f83a0 per entry) and sorts
+  the copy with std::sort under 0x79d3e0. Ported: the entries, in the Units'
+  order, are stable-sorted first, then `stdSort`.
+- THE REBUILD: 0x6fff90 binds the military AI's handlers on the player
+  signals: 0x6fa950 on +0x1e0 clears the table's built flag (0x79d800,
+  +0x28), and Game::Processor::BeginTurn fires +0x1e0 for every live player
+  (0x7d980 -> 0x4e44d0 -> 0x6070b0); 0x6fae70 on +0x258 rebuilds the table
+  while the flag is clear or the table empty (0x79d320), and the AI's job
+  passes 0x608580 (Player::Processor::Update) fire +0x258. So the table
+  stands fresh every turn; no staleness explains the cases below.
+- THE ORIENTATION: the choice's sums run the efficiency table with the
+  entry's row (the engines' table equals AI_UnitEfficiency.csv on all
+  20,736 cells). runs/h1_duely1121, aimem, t1-t222: the row way names 152 of
+  the game's 293 "Contract for" lines; the column way 0.
+- OPEN: the remaining misses all name a unit the game never names for these
+  city-states — the Caravel (110), the Privateer (25), the Cavalry (5), the
+  Field Cannon (1); the game names the Warrior Monk, the Trebuchet or Pike
+  and Shot. Under the game's own table no column puts the Warrior Monk's row
+  above the Caravel's, so in the game the Caravel is not a standing entry
+  of city-state 3's table at t90-t221 (nor of Hunza's at t218), while the
+  Nuclear Submarine is at t241. The walk (0x79bd30), the team update's
+  need and full lists (0x73fba0) and the entry's buildable flag (0x4cb590,
+  0x39d490, 0x4aa790) read as the engines take them; the AI-type bitfield
+  the walk tests (global @0xf28c78 +0x408, +0x400 per unit) is unread.

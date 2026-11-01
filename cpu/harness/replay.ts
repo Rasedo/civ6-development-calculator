@@ -266,6 +266,8 @@ interface Ctx {
   upgradeInto: Set<string>;
   /** this pair's upgrade orders, the new unit's record key to the old's */
   upgradedFrom: Map<string, string>;
+  /** this pair's levy returns, the city-state's new record key to the major's */
+  levyFrom: Map<string, string>;
   /** each plot's ground at the pair's first record — its road tier (-1 no
    *  road), feature, improvement and pillage: the one its minors plan on */
   groundWas?: GroundWas[];
@@ -1218,9 +1220,13 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // t76: city-state 4's Warrior 589828, the Man-at-Arms 1048577 its
     // knowledge base holds from then)
     const old = key ? ctx.upgradedFrom.get(key) : undefined;
-    const first = old !== undefined && !was.has(key!) ? old : key;
+    // ...and a unit home from a levy at its minor's start stands where the
+    // first record holds the major's (runs/h1_duely1121 t215: China's
+    // Ironclad 6553622 on 38:22, city-state 3's 1376259 from then)
+    const home = key && !was.has(key) ? ctx.levyFrom.get(key) : undefined;
+    const first = home ?? (old !== undefined && !was.has(key!) ? old : key);
     const at = first ? was.get(first) : undefined;
-    if (first !== key) {
+    if (first !== key && !home) {
       upgraded.add(c);
       const r = b.units.find((x) => `${x.owner}:${x.id}` === key);
       const into = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
@@ -1266,7 +1272,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // health)
     const f0 = fortWas.get(first!);
     if (f0 !== undefined) c.fortifyTurns = f0;
-    c.slot = Number(first!.split(':')[1]) & 0xffff;
+    c.slot = Number((home ? key : first)!.split(':')[1]) & 0xffff;
     c.attacksLeft = attacksPerTurn(c);
     mine.push(c);
   }
@@ -4948,7 +4954,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -5077,6 +5083,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const ds = source.decisions(a, b, cat);
     ctx.upgradeInto = new Set(ds.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
     ctx.upgradedFrom = new Map(ds.flatMap((d) => (d.kind === 'upgrade' ? [[d.into, d.unit] as const] : [])));
+    ctx.levyFrom = new Map(ds.flatMap((d) => (d.kind === 'levyEnd' ? d.units.map(([f, t]) => [t, f] as const) : [])));
     stream.actions(a.turn);
     syncDedications(ctx, new Set([seatOfP(ctx, activePlayer(a))]));
     applyPhase(ctx, ds, 'before', b, a);
@@ -5311,6 +5318,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       // plot China's in China's start, teleported to 9:8 before Hunza's look);
       // an addition's own teleport is the unit's birth
       const teleports: { ord: number; key: string; owner: number; plot: number }[] = [];
+      // ...a levied unit's removal at its levy's end is its return, made anew
+      // under its minor (runs/h1_duely1121 t215: China's levied Ironclad
+      // 6553622 removed, city-state 3's 1376259 added on 38:22 and recruited
+      // into its Naval Superiority)
+      const homeKeys = new Set(ds.flatMap((d) => (d.kind === 'levyEnd' ? d.units.map(([f]) => f) : [])));
       for (let j = 0; j < acts.length; j++) {
         const x = acts[j];
         const key = `${x[3]}:${x[4]}`;
@@ -5320,7 +5332,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         }
         if (x[2] === 'PlayerTurnActivated' && !opens.has(x[3] as number)) opens.set(x[3] as number, x[0] as number);
         if (x[2] === 'UnitMoved' || x[2] === 'UnitTeleported') lastPlot.set(key, (x[6] as number) * ctx.W + (x[5] as number));
-        if (x[2] !== 'UnitRemovedFromMap' || heldAfter.has(key)) continue;
+        if (x[2] !== 'UnitRemovedFromMap' || heldAfter.has(key) || homeKeys.has(key)) continue;
         const at = lastPlot.get(key);
         const remade = acts.slice(j + 1).some((y) => y[2] === 'UnitAddedToMap' && (y[6] as number) * ctx.W + (y[5] as number) === at
           && (y[3] === x[3] || (ctx.units.has(key) && ctx.units.get(`${y[3]}:${y[4]}`) === ctx.units.get(key))));
@@ -5332,6 +5344,14 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const ended = (player: number): void => {
         const seat = ctx.seatOfPlayer.get(player);
         ctx.minorUnits.push(...state.units.filter((u) => u.seat === seat).map((u) => structuredClone(u)));
+        // ...its levied units home under the ids the game gives them
+        for (const d of ds) {
+          if (d.kind !== 'levyEnd' || d.player !== player) continue;
+          for (const [from, to] of d.units) {
+            const u = unitOf(ctx, from);
+            if (u && u.seat === seat) ctx.units.set(to, u);
+          }
+        }
         // ...its units its turn made among them, the record's (runs/h1_duely1124
         // t201: city-state 3's Builder trained on 41:12 steps to 42:12, out of
         // Granada's look)
@@ -5384,6 +5404,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         }
         // ...and without a major's unit no record unit is (`unbornUnits`)
         for (const u of unbornUnits(ctx, b)) {
+          // ...one an earlier city-state's turn made is born (a levy's
+          // return at that minor's start: runs/h1_duely1121 t215, city-state
+          // 3's Ironclad home before city-state 4's turn opens)
+          const owner = ctx.playerOfSeat.get(u.seat);
+          if (owner !== undefined && owner < before && minorAiSeat(u.seat)) continue;
           const i = state.units.indexOf(u);
           if (i < 0) continue;
           fallen.push([u, i]);

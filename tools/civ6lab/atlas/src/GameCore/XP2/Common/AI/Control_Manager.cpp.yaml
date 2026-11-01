@@ -24,6 +24,7 @@
   impl: [cpu/core/operations/manager.ts:CITY_AI_PASS, cpu/core/operations/manager.ts:operationsRun]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs the +0x388 list from 4 down to 0, each pass again until every job answers tru...

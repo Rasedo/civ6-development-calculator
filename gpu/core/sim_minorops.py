@@ -597,12 +597,14 @@ class SimMinorOps:
 
     def _mops_choice_order(self, rows: dict) -> torch.Tensor:
         """`choiceOrder` against no player: [B, NU] the AI unit rows in the
-        order the choice walks — the entries, in the table's order, sorted
-        by the game's std::sort (`std_sort`) under 0x79d3e0 (buildable
-        first, then the at-war sum, the every-player sum, the strength, each
-        greater first), the rows not in the table after them. The sort is
-        unstable, so each batch row's order is the host sort over its keys'
-        dense ranks, one sort per distinct rank pattern (memoised)."""
+        order the choice walks — the stored table (the entries in the Units'
+        order, stable-sorted under 0x79d3a0) sorted again by the game's
+        std::sort (`std_sort`) under 0x79d3e0; both comparators read
+        buildable first, then the at-war sum, the every-player sum, the
+        strength, each greater first; the rows not in the table after them.
+        The second sort is unstable, so each batch row's order is the host
+        sort over its keys' dense ranks, one sort per distinct rank pattern
+        (memoised)."""
         B, dev = self.B, self.device
         entry = rows["entry"]
         nu = entry.shape[1]
@@ -619,7 +621,7 @@ class SimMinorOps:
             key = tuple(p)
             got = memo.get(key)
             if got is None:
-                idx = [k for k in range(nu) if p[k] >= 0]
+                idx = sorted((k for k in range(nu) if p[k] >= 0), key=lambda k: -p[k])
                 std_sort(idx, lambda a, b: p[a] > p[b])
                 got = memo[key] = idx + [k for k in range(nu) if p[k] < 0]
             out.append(got)

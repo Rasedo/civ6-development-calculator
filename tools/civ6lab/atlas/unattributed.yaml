@@ -1819,6 +1819,16 @@
   context:
     - ...0x4e02e0 banks +0x1b8 into the balance; a balance below 0 runs the shortfall (0x4dd270, 0x4e1300).
   review: imported
+- addr: 0x4e44d0
+  final: 0x3449a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...+0x28), and Game::Processor::BeginTurn fires +0x1e0 for every live player (0x7d980 -> 0x4e44d0 -> 0x6070b0); 0x6fae70 on +0x258 rebuilds the table while the flag is clear or the tabl...
+  review: imported
 - addr: 0x4e4ad0
   final: 0x344fc0
   kind: function
@@ -2790,6 +2800,19 @@
   context:
     - ...ugh the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8 holds weak handles, and 0x5d4d70's head skips an emptied one wit...
   review: reviewed
+- addr: 0x6070b0
+  final: 0x4005b0
+  kind: function
+  semantics: fires player signal +0x1e0 (0x6080c0, argument -1) at the turn's start (0x4e44d0 from Game::Processor::BeginTurn's player walk 0x7d980).
+  status: READ
+  cases:
+    - recording: 1121
+      value: "runs/h1_duely1121 aimem t1-t222: the stored order then std::sort; \"Contract for\" lines matched as before (no line moved), the order the game's"
+  readings:
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+  context:
+    - ...d Game::Processor::BeginTurn fires +0x1e0 for every live player (0x7d980 -> 0x4e44d0 -> 0x6070b0); 0x6fae70 on +0x258 rebuilds the table while the flag is clear or the table empty (0x7...
+  review: reviewed
 - addr: 0x6072d0
   final: 0x4007d0
   kind: function
@@ -3612,6 +3635,29 @@
   context:
     - ...of its region in plot order (0x6fd510) and sorts them best first, a stable merge sort (0x6f5fb0); a region holds a site where one scores above 0. The best region top other than a give...
   review: reviewed
+- addr: 0x6f83a0
+  final: 0x4af2c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...each greater first, no per-player term. The choice (0x79bd30) copies that stored order (0x6f83a0 per entry) and sorts the copy with std::sort under 0x79d3e0. Ported: the entries, in th..."
+  review: imported
+- addr: 0x6fa950
+  final: 0x4b0e90
+  kind: function
+  semantics: "the military AI's handler on player signal +0x1e0 (bound by 0x6fff90): clears the unit production table's built flag (0x79d800) and the grand strategy's +0xf0 and per-entry +0x161; Game::Processor::BeginTurn fires +0x1e0 for every live player (0x7d980 -> 0x4e44d0 -> 0x6070b0)."
+  status: READ
+  cases:
+    - recording: 1121
+      value: "runs/h1_duely1121 aimem t1-t222: the stored order then std::sort; \"Contract for\" lines matched as before (no line moved), the order the game's"
+  readings:
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+  context:
+    - "- THE REBUILD: 0x6fff90 binds the military AI's handlers on the player signals: 0x6fa950 on +0x1e0 clears the table's built flag (0x79d800, +0x28), and Game::Processor::BeginTu..."
+  review: reviewed
 - addr: 0x6fad50
   final: 0x4b12d0
   kind: function
@@ -3630,7 +3676,7 @@
 - addr: 0x6fae70
   final: 0x4b13f0
   kind: function
-  semantics: the player AI's turn step that builds the unit production table 0x7989e0 while 0x79d320 is clear.
+  semantics: "the military AI's handler on player signal +0x258 (bound by 0x6fff90; the AI job passes 0x608580 fire it every turn): builds the unit production table 0x7989e0 while 0x79d320 is clear (the built flag, cleared at each turn's start by 0x6fa950)."
   status: READ
   cases:
     - recording: AI_Knowledge.csv
@@ -3638,6 +3684,7 @@
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
   context:
     - ...(0x45cf70), Governor Analyzer (0x4a79b0), Victory Conditions + Settle City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), Tech Tree Analysis (0x4f87e0). Spawned and waited at once...
     - "- THE UNIT PRODUCTION TABLE 0x7989e0 (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in..."
@@ -3702,7 +3749,9 @@
   kind: function
   semantics: the handlers writing GrandStrategic's pseudo-yield weights.
   status: PARTLY
-  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
   context:
     - "...udoYields.DefaultValue x ((1 + w) + q): w = 0x700810 (GrandStrategic +0x7e8, written by 0x6fff90's handlers; PlayerAI +0x620; the +0x748 / +0x760 and +0x768 / +0x780 lists; at least..."
   review: reviewed
@@ -4470,6 +4519,36 @@
   context:
     - "...urce, +0x2c the at-war players' sum, +0x30 every player's, +0x38 per player), sorted (0x7976f0, comparator 0x79d3e0): buildable first, then against the player its per-player sum, the..."
   review: reviewed
+- addr: 0x797870
+  final: 0x5215b0
+  kind: function
+  semantics: "the stable sort's body (MSVC _Stable_sort_unchecked1): 32 or fewer entries insertion-sorted (0x796070), else the two halves sorted (recursing, or 0x795160 into the buffer) and merged."
+  status: READ
+  cases:
+    - recording: 1121
+      value: "runs/h1_duely1121 aimem t1-t222: the stored order then std::sort; \"Contract for\" lines matched as before (no line moved), the order the game's"
+  impl: [cpu/core/operations/unitChoice.ts:storedTable, gpu/core/sim_minorops.py:_mops_choice_order]
+  readings:
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+  context:
+    - "...table (0x7989e0) ends with std::stable_sort (0x797980: a buffer of (n + 1) / 2 entries, 0x797870 halving down to the insertion sort at 32 elements and merging) under 0x79d3a0 — build..."
+  review: reviewed
+- addr: 0x797980
+  final: 0x5216c0
+  kind: function
+  name: std::stable_sort
+  semantics: "std::stable_sort (MSVC _Stable_sort_unchecked) over the unit production table's 0x168-byte entries: a buffer of (n + 1) / 2 entries, the body 0x797870; called at the table build's end (0x7989e0) with the comparator 0x79d3a0."
+  status: READ
+  cases:
+    - recording: 1121
+      value: "runs/h1_duely1121 aimem t1-t222: the stored order then std::sort; \"Contract for\" lines matched as before (no line moved), the order the game's"
+  impl: [cpu/core/operations/unitChoice.ts:storedTable]
+  readings:
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+  context:
+    - "...walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+    - "- THE STORED ORDER: the unit production table (0x7989e0) ends with std::stable_sort (0x797980: a buffer of (n + 1) / 2 entries, 0x797870 halving down to the insertion sort at 32 ele..."
+  review: reviewed
 - addr: 0x797bf0
   final: 0x521930
   kind: function
@@ -4511,6 +4590,7 @@
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
   context:
     - "...TABLE 0x7989e0 (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in the Units' order, for each unit the pla..."
   review: reviewed
@@ -4539,13 +4619,18 @@
       value: "Hattusa (player 3), threatened at 5, its list by the sums Horseman 21.2, Galley 15.6: the game bought the Galley (393216)"
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
-  impl: [cpu/core/minorCityAi.ts:purchaseEntries, gpu/core/sim_minorai.py:_minor_purchase_rows]
+  impl:
+    - cpu/core/minorCityAi.ts:purchaseEntries
+    - gpu/core/sim_minorai.py:_minor_purchase_rows
+    - cpu/core/operations/unitChoice.ts:storedTable
+    - gpu/core/sim_minorops.py:_mops_choice_order
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung"
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers"
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
   context:
     - ...nance resource scales it; the player's units of each type counted into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The value 0x799b9d computes from the player's counts (...
   review: reviewed
@@ -4561,8 +4646,22 @@
   readings:
     - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
     - "C-126: a city-state centre's envoy term is the most envoys one player holds there, and the unit choice walks the game's unstable std::sort — 0x24a180's envoy arm and 0x7976f0 READ, both twins"
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
   context:
     - "...war players' sum, +0x30 every player's, +0x38 per player), sorted (0x7976f0, comparator 0x79d3e0): buildable first, then against the player its per-player sum, the at-war sum, the all-..."
+  review: reviewed
+- addr: 0x79d800
+  final: 0x525800
+  kind: function
+  semantics: the unit production table's built flag (+0x28) cleared.
+  status: READ
+  cases:
+    - recording: 1121
+      value: "runs/h1_duely1121 aimem t1-t222: the stored order then std::sort; \"Contract for\" lines matched as before (no line moved), the order the game's"
+  readings:
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+  context:
+    - "...AI's handlers on the player signals: 0x6fa950 on +0x1e0 clears the table's built flag (0x79d800, +0x28), and Game::Processor::BeginTurn fires +0x1e0 for every live player (0x7d980 -..."
   review: reviewed
 - addr: 0x79e140
   final: 0x526040

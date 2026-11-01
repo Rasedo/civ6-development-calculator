@@ -840,6 +840,15 @@
   context:
     - "...0x691f0 is the ring walk: from the plot's cube coordinates, the six steps of the table at 0xf0bf40 — (0, 1), (-1, 0), (1, -1), (0, -1), (1, 0), (-1, 1) in (x - y // 2, y) — this grid's SOU..."
   review: reviewed
+- addr: 0xf28c78
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ..., 0x4aa790) read as the engines take them; the AI-type bitfield the walk tests (global @0xf28c78 +0x408, +0x400 per unit) is unread.
+  review: imported
 - addr: 0xf28c80
   kind: global
   status: PARTLY

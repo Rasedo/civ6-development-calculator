@@ -488,5 +488,6 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: an operation's enemy strength — READ (0x73eb60), ported"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

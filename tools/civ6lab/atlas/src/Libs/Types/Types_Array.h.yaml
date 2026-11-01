@@ -3,6 +3,15 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x7d980
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...(0x79d800, +0x28), and Game::Processor::BeginTurn fires +0x1e0 for every live player (0x7d980 -> 0x4e44d0 -> 0x6070b0); 0x6fae70 on +0x258 rebuilds the table while the flag is clear...
+  review: imported
 - addr: 0x3ffdd0
   final: 0x2bf270
   kind: function
