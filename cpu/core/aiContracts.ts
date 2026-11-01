@@ -71,6 +71,9 @@ export interface AiContract extends ContractItem {
    *  lists it at its submission, the Default Specialization's head drops
    *  it from the list); none while no line has named it */
   shown?: number;
+  /** released by every holder but its city's list, whose handle keeps it
+   *  until the Default Specialization's head drops it */
+  released?: boolean;
 }
 
 /** One city of the seat as the contracts read it */
@@ -247,8 +250,8 @@ export function submitContract(book: ContractBook, c: AiContract, cities: readon
  *  runs/h1_duelw1124 Bologna t19, its Library queued the turn its Campus
  *  completed); then each contract the city lists, in order — an ACCEPTED one
  *  it may still take is valued (vt +0x68) and the one in hand becomes the
- *  higher valued; any other logs its line and leaves the list, one no holder
- *  keeps any more leaves it without a line. The contract in hand after. */
+ *  higher valued; any other logs its line and leaves the list, a released
+ *  one (`reapContracts`) without a line. The contract in hand after. */
 export function cityContracts(book: ContractBook, city: ContractCity, line: (c: AiContract) => void): AiContract | null {
   book.inHand[city.id] = -1;
   const ids = book.city[city.id] ?? [];
@@ -263,6 +266,7 @@ export function cityContracts(book: ContractBook, city: ContractCity, line: (c: 
       kept.push(id);
       continue;
     }
+    if (c.released) continue;
     c.shown = c.progress;
     line(c);
   }
@@ -346,15 +350,28 @@ export function contractBuilt(book: ContractBook, cityId: number, item: Contract
   }
 }
 
-/** the contracts no holder keeps: a contract lives while a tree holds it or a
- *  city has it in hand; the cities' lists hold it weakly (0x5d4d70 skips an
- *  emptied handle without a line), so one its tree releases leaves them
- *  silently */
+/** the contracts no holder keeps: a contract lives while a tree holds it, a
+ *  city has it in hand or a city lists it. One only a city's list keeps is
+ *  released: an open one CANCELLED (runs/h1_duely1117 Valletta's Builder
+ *  contract 47, bought at t22, its Build City Improvement tree gone that
+ *  turn: CANCELLED, refs 1, on the city's list to its t32 pick), off the
+ *  purchase list, its expected unit still counted (0x5d4750 walks the list),
+ *  and its line never printed (0x5f4cd0 prints none for a contract whose
+ *  owner control is gone, 0x609060 at 0x5f4d59) */
 export function reapContracts(book: ContractBook, held: ReadonlySet<number>): number[] {
   const keep = new Set(held);
   for (const id of Object.values(book.inHand)) keep.add(id);
-  const gone = book.contracts.filter((c) => !keep.has(c.id)).map((c) => c.id);
-  book.contracts = book.contracts.filter((c) => keep.has(c.id));
+  const listed = new Set(Object.values(book.city).flat());
+  for (const c of book.contracts) {
+    if (keep.has(c.id) || !listed.has(c.id) || c.released) continue;
+    c.released = true;
+    delete c.queued;
+    if (c.progress === CP_CLAIMED || c.progress === CP_SUBMITTED || c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS) {
+      c.progress = CP_CANCELLED;
+    }
+  }
+  const gone = book.contracts.filter((c) => !keep.has(c.id) && !listed.has(c.id)).map((c) => c.id);
+  book.contracts = book.contracts.filter((c) => keep.has(c.id) || listed.has(c.id));
   // the purchase list's handles empty with them
   book.purchase = book.purchase.filter((id) => keep.has(id));
   return gone;

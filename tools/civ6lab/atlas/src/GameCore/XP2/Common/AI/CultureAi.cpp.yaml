@@ -134,6 +134,7 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
   context:
     - ...ents it unlocks, each max(v - v(the current), v / 2) of the government values [+0xb38] (0x621eb0 -> 0x7b26b0, unread); then a civic of an era at or before the game's ([player+0x1358]...
     - "- The policy job (0x621eb0): score -1.0; a card that is not a Dark Age card needs its PrereqCivic held (0x39d1f0)..."

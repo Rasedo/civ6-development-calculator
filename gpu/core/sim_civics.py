@@ -323,15 +323,17 @@ class SimCivics:
                torch.where(v, self.citystate_cai_owned[:, s], fresh[4]))
         self._cai_take(s, self._cai_choice(s, fire, ent, done))
 
-    def _cai_turn(self, s: int, alive: torch.Tensor, cul: torch.Tensor) -> None:
+    def _cai_turn(self, s: int, alive: torch.Tensor, cul: torch.Tensor, military) -> None:
         """the AI's turn (0x620110): the analysis on the government values
         and cards its last turn wrote, kept for the next completion; then the
-        policy jobs on the civics this analysis lists, the best card per
-        civic of their scores (`civicPolicyBest`, 0x623b90) and the
-        government values (`governmentValues`) on the best card per slot
-        type of the last turn's jobs, kept for the next analysis, with this
-        turn's best per slot type for the next turn's values; with nothing in
-        hand the choice"""
+        policy jobs on the civics this analysis lists (on the Combat Desire
+        of the turn before), the seat's military AI's strengths (`military`),
+        the best card per civic of the jobs' scores (`civicPolicyBest`,
+        0x623b90) and the government values (`governmentValues`, on the
+        turn's own Combat Desire) on the best card per slot type of the last
+        turn's jobs, kept for the next analysis, with this turn's best per
+        slot type for the next turn's values; with nothing in hand the
+        choice"""
         ent = self._cai_analysis(s, cul)
         turns, nxt, base, score, owned = ent
         m = alive.unsqueeze(1)
@@ -343,6 +345,7 @@ class SimCivics:
         self.citystate_cai_valid[:, s] = self.citystate_cai_valid[:, s] | alive
         ctx = self._pol_ctx(s)
         sc = self._pol_scores(s, ctx)
+        military()
         slots = self._pol_tables()["slots"]
         was = {st: self.citystate_slot_best[:, s, k] for k, st in enumerate(slots)}
         gov = self._pol_gov_values(s, self._pol_ctx(s, forecast_now=True), was)

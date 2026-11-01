@@ -19,7 +19,9 @@ class SimMinors:
         # strategic resources' income (`_seat_accrue_stockpile`, a major's body
         # over its own bank) and its units' fuel after its city's turn; then growth and borders on the city as
         # it stands after that (its city presses a religion it follows on the
-        # founder's turn); its military AI's Combat Desire; its savings and
+        # founder's turn); its research and civics AIs' turns, its military
+        # AI's Combat Desire between their policy jobs and government values;
+        # its savings and
         # military AI's turn (`_minor_military_turn`); its knowledge
         # base's look; its contract purchases; then its actions — the
         # upgrades a completion triggers, its city AI's turn (`_minor_ai_turn`:
@@ -53,9 +55,13 @@ class SimMinors:
             now = torch.where((seen[:, 5] > 0).unsqueeze(-1), seen[:, :5], now)
             self.citystate_ai_growth[:, s] = torch.where(alive.unsqueeze(-1), now, self.citystate_ai_growth[:, s])
             self._minor_growth(s)
-            self._minor_research_ai(s)
-            self._minor_combat_desire(s)
-            self._military_fav_tech(s, alive)
+            # its research and civics AIs' turns, its military AI's strengths
+            # (the Combat Desire, the favoured technology) between the policy
+            # jobs and the government values
+            def military(s=s, alive=alive) -> None:
+                self._minor_combat_desire(s)
+                self._military_fav_tech(s, alive)
+            self._minor_research_ai(s, military)
             # the units its City Analysis counts: those standing before its
             # savings turn's purchases
             units = (self.major_unit_alive & (self.major_unit_seat == 100 + s)).sum(dim=1)
@@ -1253,31 +1259,35 @@ class SimMinors:
             # each annex re-places every citizen (AnnexPlot 0x1a8b70 -> 0x196320)
             self._minor_replace_citizens(s, took)
 
-    def _minor_research(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> torch.Tensor:
+    def _minor_research(self, s: int, sci: torch.Tensor, cul: torch.Tensor, military) -> torch.Tensor:
         """`minorResearch` for research row `s` — the Free Cities' (`FR`, every
         game every turn) — the bank (`_minor_research_bank`) and the AIs' turns
-        (`_minor_research_turn`) at once. Returns [B] long, how many trees
-        completed a row."""
+        (`_minor_research_turn`, `military` the seat's military AI's
+        strengths) at once. Returns [B] long, how many trees completed a
+        row."""
         techs, civics = self._minor_research_bank(s, sci, cul)
-        self._minor_research_turn(s, sci, cul)
+        self._minor_research_turn(s, sci, cul, military)
         return techs + civics
 
-    def _minor_research_turn(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> None:
+    def _minor_research_turn(self, s: int, sci: torch.Tensor, cul: torch.Tensor, military) -> None:
         """`minorResearchTurn` for research row `s`: the research AI analyses
         the tree on the Science `sci` [B] and makes its turn's choice
         (`_rai_turn`); the civics AI analyses its tree on the Culture `cul`
-        and, with nothing in hand, chooses (`_cai_turn`)"""
+        and, with nothing in hand, chooses (`_cai_turn`), the seat's military
+        AI's strengths (`military`) between its policy jobs and its
+        government values"""
         alive = (torch.ones(self.B, dtype=torch.bool, device=self.device) if s == self.FR
                  else self.citystate_alive[:, s])
         self._rai_turn(s, alive, sci)
-        self._cai_turn(s, alive, cul)
+        self._cai_turn(s, alive, cul, military)
 
-    def _minor_research_ai(self, s: int) -> None:
+    def _minor_research_ai(self, s: int, military) -> None:
         """`minorResearchAi`: city-state `s`'s research and civics AIs' turns on
-        its city as its production and growth left it"""
+        its city as its production and growth left it, `military` its
+        military AI's strengths"""
         keep = self.citystate_alive[:, s].double()
         tot = self._seat_city_stats(self._CITY_MINOR0 + s, record=False)[0][:, 0]
-        self._minor_research_turn(s, tot[:, 3] * keep, tot[:, 4] * keep)
+        self._minor_research_turn(s, tot[:, 3] * keep, tot[:, 4] * keep, military)
 
     def _minor_research_bank(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`minorResearchBank` for research row `s` — a city-state's, or the

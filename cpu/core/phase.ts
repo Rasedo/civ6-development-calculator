@@ -1031,7 +1031,8 @@ function joinFromFreeCity(state: GameState, city: City): void {
 /** The FREE CITIES player's turn, after every major's and city-state's,
  *  every turn of the game: its research is a city-state's (`minorResearch`:
  *  the catch-up, its cities' Science and Culture, the research and civics
- *  AIs), with no city on no yield. Each Free City's
+ *  AIs, its Combat Desire between their policy jobs and government values,
+ *  `freeDesire`), with no city on no yield. Each Free City's
  *  amenities are the ordinary composer's over the Free Cities seat — the full
  *  need of its population, the supply of what that seat holds (its own
  *  luxuries, buildings and districts; no government, policy or governor) —
@@ -1039,8 +1040,8 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  research and again after a completion. Its
  *  treasury banks the Gold those same stats make, in array order, then pays
  *  its units' upkeep and meets the `bankruptcy` that may force. Its military
- *  AI's turn follows, with or without a city (`freeMilitaryTurn`: the Combat
- *  Desire, the knowledge base's ageing look). Then each
+ *  AI's turn follows, with or without a city (`freeMilitaryTurn`: the
+ *  favoured technology, the knowledge base's ageing look). Then each
  *  city takes its grant when one falls due,
  *  puts the same stats' Production into its item, its city AI stores its
  *  threat and picks the next on an empty queue (`freeCityBuild`),
@@ -1056,7 +1057,7 @@ export function freeCitiesPhase(state: GameState): void {
   const urban = () => urbanDefensesFit(state, FREE_SEAT);
   storeUnitStrength(state, FREE_SEAT);
   if (free.cities.length === 0) {
-    minorResearch(state, free.research, FREE_SEAT, 0, 0, () => undefined, urban, []);
+    minorResearch(state, free.research, FREE_SEAT, 0, 0, () => undefined, urban, [], () => freeDesire(state));
     freeMilitaryTurn(state);
     freeKnowledge(state, false);
     return;
@@ -1075,7 +1076,7 @@ export function freeCitiesPhase(state: GameState): void {
     science += s.total.science;
     culture += s.total.culture;
   }
-  if (minorResearch(state, free.research, FREE_SEAT, science, culture, () => undefined, urban, []) > 0) {
+  if (minorResearch(state, free.research, FREE_SEAT, science, culture, () => undefined, urban, [], () => freeDesire(state)) > 0) {
     luxMap = luxuryAmenities(state, FREE_SEAT);
     mods = getModifiers(state, FREE_SEAT);
     free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, luxMap, mods); });
@@ -1115,14 +1116,19 @@ export function freeCitiesPhase(state: GameState): void {
   for (const city of joiners) joinFromFreeCity(state, city);
 }
 
-/** THE FREE CITIES' MILITARY AI'S TURN, with or without a city: the Combat
- *  Desire on the records as their last update aged them (`freeCombatDesire`)
- *  and the favoured technology on the same records (`militaryFavTech`), then
- *  their knowledge base ages and looks (`freeKnowledge`) and keeps its route
- *  value (`freeTradeValue`) */
+/** THE FREE CITIES' COMBAT DESIRE on the records as their last update aged
+ *  them (`freeCombatDesire`), between their civics AI's policy jobs and its
+ *  government values (`minorResearchTurn`) */
+function freeDesire(state: GameState): void {
+  freeSeatOf(state).combatDesire = freeCombatDesire(state, state.turn - 1).desire;
+}
+
+/** THE FREE CITIES' MILITARY AI'S TURN, with or without a city: the
+ *  favoured technology on the records as their last update aged them
+ *  (`militaryFavTech`), then their knowledge base ages and looks
+ *  (`freeKnowledge`) and keeps its route value (`freeTradeValue`) */
 function freeMilitaryTurn(state: GameState): void {
   const free = freeSeatOf(state);
-  free.combatDesire = freeCombatDesire(state, state.turn - 1).desire;
   // the counts its unit production table reads are every unit of each
   // major — the players it met at the start — whatever its records hold
   // (runs/h1_duely1127: no ARMY record, its Fav Tech as logged on 58 of the

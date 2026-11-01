@@ -885,6 +885,9 @@
     - recording: h1_duely1121
       turn: 23
       value: Hunza's Ilkum 1.0 at t23 / t24 / t26 on Builder contract 57 of priority 2 (0.8984375), as logged
+    - recording: h1_duely1117
+      turn: 23
+      value: Valletta's Ilkum 1 at t23-t32 on Builder contract 47 CANCELLED (its tree gone t22) and still listed; Caguana's t44-t51 on contract 104, as logged
     - recording: h1_duelw1117
       turn: 16
       value: Valletta's Ilkum 1 while its Builder contract 47 stays listed, t16-24
@@ -897,10 +900,12 @@
     - gpu/core/sim_cityvalue.py:unit_expected
     - cpu/core/minorBuild.ts:expectedOfPriority
     - gpu/core/sim_cityvalue.py:_expected_of_priority
+    - cpu/core/aiContracts.ts:reapContracts
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
     - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
+    - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected count 0x5d4750 x its Production [+0x1008], bare, from the start to start + the train turns), EFFECT_AD...
@@ -1009,6 +1014,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...f04cb0 = 0xffd8f100).  LOG: AI_CityBuild.csv lines: DS '%d, %d, %s, , , %s, %s, , , Value %3.1f' at 0x5d4d70 (DS chooser).  advantage line 0x5cdd70: Food Adv = adv[YIELD_FOOD], Prod Adv = adv[YIELD_PRODUCTION..."
     - ".claude/scratchpad/cb/notes.txt: ...oader 0x5bbf80, mapping in gnames.json (value = string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick..."

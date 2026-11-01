@@ -792,12 +792,12 @@ class SimPhase:
 
     def _free_military_turn(self, act: torch.Tensor) -> None:
         """`freeMilitaryTurn` — THE FREE CITIES' MILITARY AI'S TURN in the
-        games of `act`, with or without a city: the Combat Desire on the
-        records as their last update aged them (`_free_combat_desire`) and
-        the favoured technology (`_military_fav_tech`), then their knowledge
-        base ages and looks (`_free_knowledge`) and keeps its route value
-        (`_free_trade_value`)"""
-        self._free_combat_desire(act)
+        games of `act`, with or without a city: the favoured technology
+        (`_military_fav_tech`) on the records as their last update aged them,
+        then their knowledge base ages and looks (`_free_knowledge`) and
+        keeps its route value (`_free_trade_value`); their Combat Desire
+        (`_free_combat_desire`) is taken in their civics AI's turn
+        (`_minor_research`)"""
         self._military_fav_tech(self.FR, act)
         self._free_knowledge(act, True)
         self._free_trade_value(act)
@@ -841,7 +841,7 @@ class SimPhase:
         ones = torch.ones(self.B, dtype=torch.bool, device=self.device)
         if not bool(alive.count_nonzero()):
             zero = torch.zeros(self.B, dtype=torch.float64, device=self.device)
-            self._minor_research(self.FR, zero, zero)
+            self._minor_research(self.FR, zero, zero, lambda: self._free_combat_desire(ones))
             self._free_military_turn(ones)
             self._free_knowledge(ones, False)
             return
@@ -864,7 +864,7 @@ class SimPhase:
         for j in range(self.RC):
             sci = sci + walk[:, j, 3].double()
             cul = cul + walk[:, j, 4].double()
-        gained = self._minor_research(self.FR, sci, cul) > 0
+        gained = self._minor_research(self.FR, sci, cul, lambda: self._free_combat_desire(ones)) > 0
         if bool(gained.count_nonzero()):
             _yf_r = self._seat_amenity(row)[2]
             walk_r = self._seat_city_walk(row, amen_yf=_yf_r, maint=self._seat_housing(row)[0])

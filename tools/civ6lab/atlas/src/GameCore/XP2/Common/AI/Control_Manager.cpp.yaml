@@ -16,15 +16,34 @@
   context:
     - "...the first offer (the units in no job, not done, alive) player signal +0x1c8 is raised (0x6075b0) with the recruit's priority (the tree's +0x5a8, else its operation's 0x723b90: the roo..."
   review: reviewed
+- addr: 0x6078f0
+  kind: function
+  semantics: "fires a player signal (its slot, e.g. player signals +0x258 from 0x608580): each bound handler called, the result a byte."
+  status: PARTLY
+  cases:
+    - recording: h1_duely1121
+      turn: 11
+      value: signal +0x258's handler 0x7271d0 writes Antioch's desire 1.3 that the turn's government values read
+  readings:
+    - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
+  review: reviewed
 - addr: 0x608580
   final: 0x401050
   kind: function
-  semantics: runs the +0x388 job list from pass 4 down to 0, each pass again until every job answers true, then the +0x3a0 list, then the next pass.
+  semantics: "the player AI's update (from Player::Processor::Update): with the player's +0x7e8 clear (and +0x1b8 clear) it fires player signal +0x258 (0x6078f0 at 0x6085d0; the military AI's handler 0x7271d0) and returns; else the turn start 0x608870 (the +0x370 list), then runs the +0x388 job list from pass 4 down to 0, each pass again until every job answers true, then the +0x3a0 list, then the next pass."
   status: PARTLY
-  impl: [cpu/core/operations/manager.ts:CITY_AI_PASS, cpu/core/operations/manager.ts:operationsRun]
+  cases:
+    - recording: h1_duely1121
+      turn: 12
+      value: Antioch's government values on the desire its +0x258 handler wrote that turn (Autocracy 13 on 0.1), its policy jobs on the turn before's (Agoge 1 on 1.3)
+  impl:
+    - cpu/core/operations/manager.ts:CITY_AI_PASS
+    - cpu/core/operations/manager.ts:operationsRun
+    - cpu/core/minorBuild.ts:minorResearchTurn
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-126: the unit choice walks the stored table, stable-sorted at its build, and the table is rebuilt every turn — 0x797980 / 0x79d3a0 and the build's signals READ, both twins; the sea entries' absence open"
+    - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs the +0x388 list from 4 down to 0, each pass again until every job answers tru...
@@ -37,6 +56,7 @@
   impl: [cpu/core/operations/manager.ts:CITY_AI_PASS]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...its watched setter 0x731d10 on +0x220) and acts only in its own pass: the turn start 0x608870 sets the pass to 4 and runs the whole +0x370 list at 4, 3, 2, 1, 0; 0x608580 then runs..."
@@ -50,9 +70,11 @@
     - recording: 1117
       turn: 11
       value: "MEASURED: every CONTRACT line of   t11-t20 whose contract still stands at that turn's end look carries the   line's id, item and value (seed 1117: 8 SUBMITTED lines ACCEPTED by then, 1   CANCELLED)."
+  impl: [cpu/core/aiContracts.ts:reapContracts]
   readings:
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
   context:
     - "...trol: +0 its id, +4 its kind, +0x10 its object; a free entry holds the next free index; 0x609060 (FinalRelease 0x4019f0) the lookup by id). A contract's watched fields (vtable, owner,..."
   review: reviewed

@@ -42,13 +42,21 @@
 - addr: 0x5f4cd0
   final: 0x3f97e0
   kind: function
-  semantics: "the CONTRACT log line: the contract's status name (0x600800), its owner tree's name, its value (m_extraPresentValue)."
+  semantics: "the CONTRACT log line: none where the contract's owner control (+0x2e0) is gone (0x609060 at 0x5f4d59 returns none); else the contract's status name (0x600800), its owner tree's name, its value (m_extraPresentValue)."
   status: PARTLY
-  impl: [cpu/core/aiContracts.ts:contractLine, cpu/harness/cityBuildLog.ts:BuildLine]
+  cases:
+    - recording: h1_duely1117
+      turn: 32
+      value: "Valletta's pick: contract 49 COMPLETED logged, contract 47 (CANCELLED, its Build City Improvement tree gone t22) dropped from the list with no line"
+  impl:
+    - cpu/core/aiContracts.ts:contractLine
+    - cpu/harness/cityBuildLog.ts:BuildLine
+    - cpu/core/aiContracts.ts:reapContracts
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
+    - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...od Adv = adv[YIELD_PRODUCTION] (0x5d83c0 per yield), weights printed from r14+0x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCHASE 0x5f3ee0; queued '... CONTRACT %d' 0x5f3710. YIELD globals: f2f9..."
   context:

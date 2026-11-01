@@ -6253,3 +6253,52 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
 - Open: 1121 t56-t58 the same raid's units, Not Ready, end one or two plots
   away from the goal (14:13 -> 15:13, 15:14 -> 16:16, 16:15 -> 17:16) where
   our move order walks the path west; MoveTo 0x962380 below the order unread.
+
+## C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins
+
+`minorResearchTurn`'s `military` (cpu/core/minorBuild.ts; `minorPhase`,
+`freeDesire` in cpu/core/phase.ts), `reapContracts` / `cityContracts` and
+`AiContract.released` (cpu/core/aiContracts.ts); `_cai_turn`'s `military`
+(gpu/core/sim_civics.py; `_minor_research_turn`, `_minor_research_ai`,
+`_minor_research` in gpu/core/sim_minors.py), `reap_contracts` /
+`city_contracts` and `c_released` (gpu/core/sim_citytrees.py).
+
+- THE SIGNAL: the player AI's update 0x608580 fires player signal +0x258
+  (0x6078f0 at 0x6085d0) on the update where the player's +0x7e8 is clear,
+  and on the others runs the turn start 0x608870 (the +0x370 job list) and
+  the +0x388 passes. 0x724280 binds 0x7271d0 to that signal (0x724a97);
+  0x7271d0 runs the military AI's strengths 0x71fb80 (the Combat Desire and
+  the favoured technology, AI_Military.csv's row) at 0x72725a, then the
+  operation candidates 0x722d70.
+- THE TURN AS THE RECORDS ORDER IT: the civics AI's policy jobs (0x621eb0)
+  read the Combat Desire of the turn before, its government values
+  (0x7b0330) the turn's own; the engines take the military AI's strengths
+  between the two, the research AI's analysis (the favoured technology of
+  the turn before) and the civic analysis (on the government values of the
+  turn before) ahead of both. runs/h1_duely1121 Antioch (player 4): desire
+  0.0 / 1.3 / 0.1 at t10-12 (AI_Military.csv); Agoge 1 at t12, unlogged at
+  t11; Autocracy's flat bonus 14 / 13 at t11 / t12 and Political
+  Philosophy 483.0 / 498.0 at t12 / t13 as logged; civicScore.minor and
+  policyScore.minor of seed 1121 to t30 under aimem with no miss. The Free
+  Cities take theirs alike (`freeDesire`, `_free_combat_desire` through
+  `_minor_research`).
+- A RELEASED CONTRACT: a contract its tree ends with (no tree, hand,
+  research or culture AI holding it) stays alive on its city's list
+  (CityBuildAI +0x3a8): runs/h1_duely1117 Valletta's Builder contract 47
+  (Build City Improvement, bought t22, the tree gone at the t22 end look):
+  CANCELLED with refs 2 (the economic list's and the city list's) from the t22
+  end look, refs 1 from t23's end look to t32, on the list [47, 49] until the
+  t32 pick; Caguana's Builder contract 104 CANCELLED t43-t51 on its list
+  until its t52 pick. The expected unit count 0x5d4750 walks the list, so
+  Ilkum (EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350) holds 1.0 while it is
+  listed: p2 t23-t32 and p3 t44-t51 as logged. The pick's walk (0x5d4d70)
+  passes it to the line 0x5f4cd0, which prints none where the owner control
+  is gone (0x609060 at 0x5f4d59 returns none): no line for contract 47 at
+  the t32 pick beside contract 49's COMPLETED. The engines release such a
+  contract (an open one CANCELLED, off the purchase list and its tree) and
+  drop it at the city's pick without a line; the aimem import takes a
+  contract the city's list alone holds as released.
+- Open: a contract a live tree drops from its own list (Recruit Units'
+  replacement) is released by the engines, where 0x5f4cd0 would print its
+  line; the status the release writes on a COMPLETED or FAILED contract
+  (kept).

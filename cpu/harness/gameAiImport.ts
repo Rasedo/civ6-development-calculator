@@ -388,11 +388,14 @@ export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld
   }
   const goalHeld = new Set([...(read.holders?.research ?? []), ...(read.holders?.culture ?? [])]);
   for (const c of goalHeld) if (!holder.has(c)) holder.set(c, -1);
-  const contracts = read.contracts.filter((c) => idOf.has(c.owner) || holder.has(c.id)).map((c) => {
+  // and every one its city's list alone keeps, released (`reapContracts`)
+  const listed = new Set(read.holders?.cities[0]?.list ?? []);
+  const contracts = read.contracts.filter((c) => idOf.has(c.owner) || holder.has(c.id) || listed.has(c.id)).map((c) => {
     const x = contractOf(w, c, read.trees!);
-    x.tree = idOf.get(c.owner) ?? holder.get(c.id)!;
+    x.tree = idOf.get(c.owner) ?? holder.get(c.id) ?? -1;
     if (!idOf.has(c.owner)) x.treeName = trees.find((t) => t.id === x.tree)?.name ?? '-';
     if (goalHeld.has(c.id)) x.goalHeld = true;
+    if (!idOf.has(c.owner) && !holder.has(c.id)) x.released = true;
     return x;
   });
   ai.trees = trees;

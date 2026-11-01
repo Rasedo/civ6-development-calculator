@@ -254,6 +254,8 @@ class CityAi:
         self.c_shown = torch.full((B, S, C), -1, dtype=L, device=dev)
         # the research or culture AI holds the goal contract (`AiContract.goalHeld`)
         self.c_goal_held = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
+        # released by every holder but the city's list (`AiContract.released`)
+        self.c_released = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
         # the economic AI's purchase list holds it (`ContractBook.purchase`;
         # its order the contracts' ids)
         self.c_purchase = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
@@ -323,7 +325,7 @@ def new_contract(ai: CityAi, s: int, mask: torch.Tensor, **f) -> torch.Tensor:
     for k, d in defaults.items():
         v = f.get(k, d)
         _cset(getattr(ai, "c_" + k), s, j, _l(v, cid), mask)
-    for k in ("assign", "queued", "in_tree", "listed", "purchase", "goal_held"):
+    for k in ("assign", "queued", "in_tree", "listed", "purchase", "goal_held", "released"):
         _cset(getattr(ai, "c_" + k), s, j, _b(f.get(k, False), mask), mask)
     return j
 
@@ -422,7 +424,8 @@ def submit_contract(ai: CityAi, s: int, j: torch.Tensor, w, turn: int, mask: tor
 def city_contracts(ai: CityAi, s: int, w, mask: torch.Tensor) -> torch.Tensor:
     """`cityContracts` where `mask`: the hand released first; each contract
     the city lists, in arrival order — an ACCEPTED one it may still take
-    valued and the one in hand the higher valued; any other leaves the list.
+    valued and the one in hand the higher valued; any other leaves the list,
+    its line printed (`c_shown`) unless released.
     [B] the slot of the contract in hand after, -1 none"""
     ai.in_hand[:, s] = torch.where(mask, torch.full_like(ai.in_hand[:, s], -1), ai.in_hand[:, s])
     order = torch.where(ai.c_listed[:, s] & (ai.c_id[:, s] >= 0), ai.c_id[:, s], torch.full_like(ai.c_id[:, s], 1 << 40))
@@ -437,7 +440,7 @@ def city_contracts(ai: CityAi, s: int, w, mask: torch.Tensor) -> torch.Tensor:
         held = contract_at(ai, s, ai.in_hand[:, s])
         better = take & ((held < 0) | (_cget(ai.c_value, s, held) < _cget(ai.c_value, s, j)))
         ai.in_hand[:, s] = torch.where(better, _cget(ai.c_id, s, j), ai.in_hand[:, s])
-        _cset(ai.c_shown, s, j, _cget(ai.c_progress, s, j), on & ~take)
+        _cset(ai.c_shown, s, j, _cget(ai.c_progress, s, j), on & ~take & ~_cget(ai.c_released, s, j))
         _cset(ai.c_listed, s, j, False, on & ~take)
     return torch.where(mask, contract_at(ai, s, ai.in_hand[:, s]), torch.full_like(ai.in_hand[:, s], -1))
 
@@ -530,15 +533,28 @@ def _tree_take_unit(ai: CityAi, s: int, k: torch.Tensor, uid: torch.Tensor, mask
 def reap_contracts(ai: CityAi, s: int, w) -> None:
     """`reapContracts`: a contract lives while its tree — a city tree's, an
     operation's (`w.operation_live`) — runs and holds it, or the city has it
-    in hand, or the research or culture AI holds it (`c_goal_held`)"""
+    in hand, or the research or culture AI holds it (`c_goal_held`), or the
+    city lists it; one the list alone keeps is released (`c_released`: an
+    open one CANCELLED, off the purchase list, its line never printed)"""
     in_tree = ai.c_in_tree[:, s] & (tree_live(ai, s, ai.c_tree[:, s]) | _b(w.operation_live(ai.c_tree[:, s]), ai.c_in_tree[:, s]))
     keep = in_tree | ai.c_goal_held[:, s] | (ai.c_id[:, s] == ai.in_hand[:, s].unsqueeze(1))
-    gone = (ai.c_id[:, s] >= 0) & ~keep
+    live = ai.c_id[:, s] >= 0
+    rel = live & ~keep & ai.c_listed[:, s] & ~ai.c_released[:, s]
+    prog = ai.c_progress[:, s]
+    open_ = (prog == CP_CLAIMED) | (prog == CP_SUBMITTED) | (prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS)
+    ai.c_progress[:, s] = torch.where(rel & open_, torch.full_like(prog, CP_CANCELLED), prog)
+    ai.c_released[:, s] |= rel
+    held = live & ~keep & ai.c_listed[:, s]
+    ai.c_purchase[:, s] &= ~held
+    ai.c_in_tree[:, s] &= ~held
+    ai.c_queued[:, s] &= ~held
+    gone = live & ~keep & ~ai.c_listed[:, s]
     ai.c_id[:, s] = torch.where(gone, torch.full_like(ai.c_id[:, s], -1), ai.c_id[:, s])
     ai.c_listed[:, s] &= ~gone
     ai.c_purchase[:, s] &= ~gone
     ai.c_in_tree[:, s] &= ~gone
     ai.c_queued[:, s] &= ~gone
+    ai.c_released[:, s] &= ~gone
 
 
 def goals_reached(ai: CityAi, s: int, w, mask: torch.Tensor) -> None:

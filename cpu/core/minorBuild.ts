@@ -91,8 +91,9 @@ import { militaryFavTech } from './operations/unitRows';
  *  makes now, its strategic resources' income and its units' fuel, then growth and borders on the city as it stands after that
  *  (`minorGrowth`) — its city presses a religion it follows on that
  *  religion's founder's turn (`spreadReligiousPressure`) — then its research
- *  and civics AIs' turns on the city so grown (`minorResearchAi`), its military
- *  AI's Combat Desire (`minorCombatDesire`), its savings and military AI's
+ *  and civics AIs' turns on the city so grown (`minorResearchAi`), its
+ *  military AI's Combat Desire (`minorCombatDesire`) taken between their
+ *  policy jobs and their government values, its savings and military AI's
  *  turn (`minorMilitaryTurn`), then its knowledge base's look
  *  (`minorKnowledge`), its contract purchases (`minorContractPurchases`),
  *  then its actions: a research
@@ -130,13 +131,16 @@ export function minorPhase(state: GameState): void {
     // own the first turn
     cityState.aiGrowth = cityState.aiGrowthSeen ?? minorCityGrowth(state, cityState);
     minorGrowth(state, cityState);
-    minorResearchAi(state, cityState);
-    // its military AI's turn: the Combat Desire and the favoured technology
-    // on the records as its last update aged them
-    cityState.combatDesire = minorCombatDesire(state, cityState, state.turn - 1).desire;
-    const wars = seatOf(state, cityState.seat)?.wars ?? [];
-    cityState.research.favTech = militaryFavTech(state, cityState.seat, cityState.armyKnown ?? [],
-      (p) => p === BARB_SEAT || wars.includes(p));    const fresh = !cityState.cityAi;
+    // its research and civics AIs' turns, its military AI's strengths — the
+    // Combat Desire and the favoured technology on the records as its last
+    // update aged them — between the policy jobs and the government values
+    minorResearchAi(state, cityState, () => {
+      cityState.combatDesire = minorCombatDesire(state, cityState, state.turn - 1).desire;
+      const wars = seatOf(state, cityState.seat)?.wars ?? [];
+      cityState.research.favTech = militaryFavTech(state, cityState.seat, cityState.armyKnown ?? [],
+        (p) => p === BARB_SEAT || wars.includes(p));
+    });
+    const fresh = !cityState.cityAi;
     // the units its City Analysis counts: those standing before its savings
     // turn's purchases
     const units = state.units.filter((u) => u.seat === cityState.seat).length;
@@ -290,11 +294,12 @@ function minorCityTerms(state: GameState, cityState: CityState): ReturnType<type
 }
 
 /** the minor's research and civics AIs' turns (`minorResearchTurn`) on its
- *  city as its production and growth left it */
-export function minorResearchAi(state: GameState, cityState: CityState): void {
+ *  city as its production and growth left it, `military` its military AI's
+ *  strengths */
+export function minorResearchAi(state: GameState, cityState: CityState, military: () => void): void {
   const y = computeCityStats(state, minorCity(cityState)).total;
   minorResearchTurn(state, cityState.research, cityState.seat, y.science, y.culture,
-    () => minorCityTerms(state, cityState), minorTechContracts(cityState));
+    () => minorCityTerms(state, cityState), minorTechContracts(cityState), military);
 }
 
 /**
@@ -367,14 +372,15 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
  * completion's choice at the bank (`minorResearchBank`), then the AIs' turns
  * (`minorResearchTurn`); a pick resumes the progress kept on it
  * (`selectResearch`). The Free Cities run both at once. Returns how many
- * trees completed a row this turn — the upgrade trigger's count. `stood`
- * false: a city-state's turn before its city stood (`minorResearchTurn`).
+ * trees completed a row this turn — the upgrade trigger's count. `military`
+ * the seat's military AI's strengths, `stood` false: a city-state's turn
+ * before its city stood (`minorResearchTurn`).
  */
 export function minorResearch(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
   terms: () => ReturnType<typeof minorResearchTerms> | undefined, urban: () => void,
-  contracts: readonly TechContract[], stood = true): number {
+  contracts: readonly TechContract[], military: () => void, stood = true): number {
   const gained = minorResearchBank(state, r, seat, science, culture, terms, urban, contracts);
-  minorResearchTurn(state, r, seat, science, culture, terms, contracts, stood);
+  minorResearchTurn(state, r, seat, science, culture, terms, contracts, military, stood);
   return gained.techs + gained.civics;
 }
 
@@ -433,7 +439,9 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
  * government values and cards its last turn wrote, keeps this turn's (`governmentValues`
  * on the last turn's best card per slot type, `civicPolicyBest` on the
  * policy scores of the civics this analysis lists) for the next and, with
- * nothing in hand, chooses (0x620110). runs/h1_duelw1124 t5 Granada: grown
+ * nothing in hand, chooses (0x620110); the seat's military AI's strengths
+ * (`military`) run between its policy jobs and its government values.
+ * runs/h1_duelw1124 t5 Granada: grown
  * to two citizens that turn, every row at 3.0 Science (Animal Husbandry 4
  * turns where 2.5 gives 5). A city-state's turn before its city stood
  * (`stood` false: its founding turn's) scores no card — no Policies row at
@@ -441,7 +449,8 @@ export function minorResearchBank(state: GameState, r: ResearchState, seat: numb
  * turns on all five runs/h1_duely duels.
  */
 export function minorResearchTurn(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
-  terms: () => ReturnType<typeof minorResearchTerms> | undefined, contracts: readonly TechContract[], stood = true): void {
+  terms: () => ReturnType<typeof minorResearchTerms> | undefined, contracts: readonly TechContract[],
+  military: () => void, stood = true): void {
   let held: ReturnType<typeof minorResearchTerms> | undefined | null = null;
   const city = () => (held === null ? (held = terms()) : held);
   r.aiEntries = researchAnalysis(state, seat, science, city()?.tech, contracts);
@@ -463,6 +472,13 @@ export function minorResearchTurn(state: GameState, r: ResearchState, seat: numb
   const view = aiView(state);
   const scores: ReadonlyMap<string, number> = stood ? policyScores(view, seat) : new Map();
   policyTracer?.(seat, scores);
+  // the military AI's strengths land between the policy jobs, which read
+  // the Combat Desire of the turn before (runs/h1_duely1121 Antioch's Agoge
+  // 1 at t12 on the t11 desire 1.3, unlogged at t11 on t10's 0.0), and the
+  // government values, which read the turn's own (Autocracy's flat bonus 14
+  // / 13 at t11 / t12 on the desire 1.3 / 0.1: the next turns' Political
+  // Philosophy 483.0 / 498.0 at t12 / t13 as logged)
+  military();
   // the government values' housing on the forecast of the city's growth as
   // it stands, the policy jobs' on its city AI's last (runs/h1_duely1121
   // Hunza t55: Monarchy's walls housing 12 in the game's Divine Right, the

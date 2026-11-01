@@ -734,6 +734,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-130 / C-96: a contract's priority in the expected unit count, the strength's treasury flag — READ, both twins"
+    - "C-130: the Combat Desire between the policy jobs and the government values; a released contract on its city's list — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- PARTLY (their inputs unported): EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (per city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected..."
