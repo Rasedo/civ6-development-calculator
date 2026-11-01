@@ -12693,3 +12693,34 @@ rows and Trader plots t70-152).
   Chase Target. Whether the game's map leaves the Archer's reach short
   (its one-turn search's zones of control, flags 0x311) is unread; 29
   Wander // Heal rows on the five seeds.
+
+## C-98: a goal contract the research or culture AI holds — the end looks' holders read, both twins and the import
+
+- The research and culture AIs hold a goal contract (Add Goal Tech's)
+  while it is accepted or in progress, past its tree, and drop it on their
+  turn once it is neither: a contract its tree's Contract Manager FAILED
+  stays in their list to that turn. Recorded (aimem end looks, holders
+  research): runs/h1_duely1121 p2 tech contract 8 on Masonry, its Build
+  City Building tree 262147 made t2 and gone t8, FAILED in the research
+  list at the t8 end look and the t9 log, gone by the t9 end look; contract
+  9 on Currency the same at t11 / t12. A tree's end CANCELS the open Tech
+  Contracts it made (owned by the tree): p4 contract 60 on Currency IN
+  PROGRESS, its Build City District tree 1179655 gone t33, CANCELLED in
+  the research list at the t33 end look and the t34 log, gone by the t34
+  end look; a Civic Contract stays ACCEPTED (runs/h1_duely1117 Antananarivo
+  contract 65, owned by none). The research value skips a FAILED or CANCELLED
+  one it holds (Masonry 142.0 at t9, p4 Currency 114.5 at t34 as logged). Ported:
+  `AiContract.goalHeld` / `c_goal_held`, set by Add Goal Tech and by
+  `goalsReached` / `goals_reached`, kept by the reap (the culture AI's
+  holder folded in), a tree's end cancelling its open Tech Contracts;
+  `minorTechContracts` / `minorCivicContracts`,
+  `_rai_contracts` / `_cai_contracts` skip a FAILED or CANCELLED one; the import marks a
+  contract in the end look's research or culture list held and keeps it
+  past its tree; the memory compare names an ended tree's goal contract
+  "-" as the game.
+- 1121 p2 t10-t15's Masonry +9.0 (carried only; aimem exact): our Build
+  City Building event at t9 takes the Walls (9.96) over the Warrior (7.95)
+  and its tree's Add Goal Tech makes a Masonry contract at 9.0; the game's
+  event takes the Warrior (CONTRACT 25, VALUE 10.0) — the carried unit
+  table's Warrior below the game's, not a contract rule.
+

@@ -289,12 +289,10 @@ function contractTree(end: { trees?: Record<string, GameTree> }, c: GameContract
 }
 
 /** the tree holding one of our contracts: its tree's name while that tree
- *  runs, else none (a Civic Contract the culture AI holds past its tree, as
- *  the game reads it) */
+ *  runs, else none (a goal contract the research or culture AI holds past
+ *  its tree, as the game reads it) */
 function ourTree(c: AiContract, ai: CityAi): string {
-  const goal = ai.techContracts[c.id];
-  const civic = goal !== undefined && (goal.startsWith('CIVIC_') || goal in CIVICS);
-  return !civic || ai.trees.some((t) => t.id === c.tree) ? c.treeName : '-';
+  return ai.techContracts[c.id] === undefined || ai.trees.some((t) => t.id === c.tree) ? c.treeName : '-';
 }
 
 function ourItem(c: AiContract, ai: CityAi, W: number): string {

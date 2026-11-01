@@ -1194,7 +1194,8 @@ def _minor_upgrading(sim, b: int, s: int) -> list[int]:
 def _ai_contracts(sim, b: int, s: int) -> list[int]:
     """the contracts by id: [id, tree, unit, building, district rows, goal
     kind, goal, plot, value, city, most turns, turns, progress, assign,
-    queued, held by its tree, listed, the progress its last log line printed]"""
+    queued, held by its tree, listed, the progress its last log line printed,
+    held by the research or culture AI]"""
     rows = []
     for j in range(sim.cai_c_id.shape[2]):
         cid = int(sim.cai_c_id[b, s, j])
@@ -1208,7 +1209,7 @@ def _ai_contracts(sim, b: int, s: int) -> list[int]:
                      int(sim.cai_c_value[b, s, j]), int(sim.cai_c_city[b, s, j]), int(sim.cai_c_max_turns[b, s, j]),
                      int(sim.cai_c_turns[b, s, j]), int(sim.cai_c_progress[b, s, j]), int(bool(sim.cai_c_assign[b, s, j])),
                      int(bool(sim.cai_c_queued[b, s, j])), int(bool(sim.cai_c_in_tree[b, s, j]) and live),
-                     int(bool(sim.cai_c_listed[b, s, j])), int(sim.cai_c_shown[b, s, j])])
+                     int(bool(sim.cai_c_listed[b, s, j])), int(sim.cai_c_shown[b, s, j]), int(bool(sim.cai_c_goal_held[b, s, j]))])
     return [x for r in sorted(rows) for x in r]
 
 

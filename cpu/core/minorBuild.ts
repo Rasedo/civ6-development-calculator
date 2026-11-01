@@ -41,7 +41,7 @@ import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats, withPercent256 } from './city';
 import { researchCost, selectResearch } from './economy';
-import { CP_ACCEPTED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
+import { CP_ACCEPTED, CP_CANCELLED, CP_FAILED, CP_IN_PROGRESS, contractById, newContractBook } from './aiContracts';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchInHandLeft, type ResearchChoice, type TechContract } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw, type CivicContract } from './aiCivics';
 import { minorCity, minorPlaceCitizens, minorReplaceCitizens, suzerainOf } from './cityStates';
@@ -230,28 +230,30 @@ export function minorPower(state: GameState, cityState: CityState): void {
 }
 
 /** the minor's Tech Contracts (its city AI's Add Goal Tech contracts): each
- *  goal technology, the contract's value, live while accepted or in progress */
+ *  goal technology, the contract's value, live while accepted or in
+ *  progress; a FAILED or CANCELLED one the research AI still holds none (runs/h1_duely1121
+ *  p2 t9: Masonry 142.0 as logged, contract 8 on it FAILED at t8) */
 function minorTechContracts(cityState: CityState): TechContract[] {
   const ai = cityState.cityAi;
   if (!ai) return [];
   const out: TechContract[] = [];
   for (const c of ai.contracts) {
     const goal = ai.techContracts[c.id];
-    const tech = goal === undefined ? null : engineId('tech', goal, 'TECH_', TECHS);
+    const tech = goal === undefined || c.progress === CP_FAILED || c.progress === CP_CANCELLED ? null : engineId('tech', goal, 'TECH_', TECHS);
     if (tech) out.push({ tech, value: c.value, live: c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS });
   }
   return out;
 }
 
 /** the minor's Civic Contracts (its city AI's Add Goal Tech contracts on a
- *  civic): each goal civic and the contract's value */
+ *  civic): each goal civic and the contract's value; a FAILED or CANCELLED one none */
 function minorCivicContracts(cityState: CityState): CivicContract[] {
   const ai = cityState.cityAi;
   if (!ai) return [];
   const out: CivicContract[] = [];
   for (const c of ai.contracts) {
     const goal = ai.techContracts[c.id];
-    const civic = goal === undefined ? null : engineId('civic', goal, 'CIVIC_', CIVICS);
+    const civic = goal === undefined || c.progress === CP_FAILED || c.progress === CP_CANCELLED ? null : engineId('civic', goal, 'CIVIC_', CIVICS);
     if (civic) out.push({ civic, value: c.value });
   }
   return out;

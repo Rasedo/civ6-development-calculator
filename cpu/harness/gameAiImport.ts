@@ -376,19 +376,23 @@ export function importCityAi(cs: CityState, read: GameMemoryRead, w: ImportWorld
   }
   // every contract of a tree taken — the city trees' and the operations':
   // its owner's, else the taken tree whose list holds it — and every one
-  // the culture AI holds (a civic goal's contract is owned by none:
-  // runs/h1_duely1117 Antananarivo, civic contract 65 owner -1, in Build City
-  // District's list at the t23 end look, the culture AI's alone at t35)
+  // the research or culture AI holds (a civic goal's contract is owned by
+  // none: runs/h1_duely1117 Antananarivo, civic contract 65 owner -1, in
+  // Build City District's list at the t23 end look, the culture AI's alone
+  // at t35; runs/h1_duely1121 p2 tech contract 8 FAILED in the research
+  // list alone at the t8 end look), marked held by it
   const holder = new Map<number, number>();
   for (const [id, g] of Object.entries(read.trees)) {
     const t = idOf.get(Number(id));
     if (t !== undefined) for (const c of g.contracts ?? []) if (!holder.has(c)) holder.set(c, t);
   }
-  for (const c of read.holders?.culture ?? []) if (!holder.has(c)) holder.set(c, -1);
+  const goalHeld = new Set([...(read.holders?.research ?? []), ...(read.holders?.culture ?? [])]);
+  for (const c of goalHeld) if (!holder.has(c)) holder.set(c, -1);
   const contracts = read.contracts.filter((c) => idOf.has(c.owner) || holder.has(c.id)).map((c) => {
     const x = contractOf(w, c, read.trees!);
     x.tree = idOf.get(c.owner) ?? holder.get(c.id)!;
     if (!idOf.has(c.owner)) x.treeName = trees.find((t) => t.id === x.tree)?.name ?? '-';
+    if (goalHeld.has(c.id)) x.goalHeld = true;
     return x;
   });
   ai.trees = trees;

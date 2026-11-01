@@ -56,7 +56,7 @@ import {
   buildingEvent, defenseEvent, defensiveCancel, districtEvent, freeSlots, goalsReached, improvementEvent, newCityAi, pickImprovement, tickCityTrees,
   type CityAi, type CityTreeCity, type CityTreeWorld, type PlotEval, type TreeUnit,
 } from './aiCityTrees';
-import { CP_ACCEPTED, CP_IN_PROGRESS, cityContracts, contractBuilt, inHandCheck, queueContract, takesTurn, type AiContract, type ContractItem } from './aiContracts';
+import { cityContracts, contractBuilt, inHandCheck, queueContract, takesTurn, type AiContract, type ContractItem } from './aiContracts';
 import { newEconomicMemory, purchaseContracts, purchaseTurn, purchasePick, savingsTurn, type BuildingPurchaseCity, type PurchaseCity, type PurchaseEntry } from './aiEconomic';
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat, type CityThreat } from './operations/cityThreat';
@@ -648,23 +648,11 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     unitAlive: (u) => !!unitOf(u) && !spent.has(u),
     startOperation: (name, plot) => minorOpsStart(state, cs, name, plot),
     operationLive: (id) => minorOpLive(cs, id),
-    heldContracts: () => [...minorOpContracts(cs), ...minorCultureContracts(cs)],
+    heldContracts: () => minorOpContracts(cs),
     trace: tracer ? (t, root, ups) => tracer?.(`t${state.turn} ${cs.name} tick ${t.id}:${t.name} root ${root} builders [${state.units
       .filter((u) => u.seat === cs.seat && (u.charges ?? 0) > 0).map((u) => `${u.id}@${u.tileIndex}/${u.movesLeft}/${u.charges ?? 0}`)
       .join(' ')}] ${ups.join(' ')}`) : undefined,
   };
-}
-
-/** the Civic Contracts the minor's culture AI holds past their tree (its
- *  holders' culture list): each accepted or in progress, until its civic
- *  completes it (runs/h1_duely1117 Antananarivo, aimem: civic contract 65 on
- *  Drama and Poetry held from t23 to t44, past the Build City District tree
- *  that made it, released the turn the civic completed) */
-function minorCultureContracts(cs: CityState): number[] {
-  const ai = cs.cityAi;
-  if (!ai) return [];
-  return ai.contracts.filter((c) => (c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS)
-    && ai.techContracts[c.id] !== undefined && engineId('civic', ai.techContracts[c.id], 'CIVIC_', CIVICS_KNOWN) !== null).map((c) => c.id);
 }
 
 /** the minor's city as the contracts its operations submit read it */

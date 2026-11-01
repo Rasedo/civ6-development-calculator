@@ -116,14 +116,14 @@ class SimCivics:
     def _cai_contracts(self, s: int, score: torch.Tensor) -> torch.Tensor:
         """the seat's Civic Contracts (its city AI's Add Goal Tech contracts on
         a civic): per row the values of the contracts on it, a row's whose
-        score past the propagation is not negative (0x623bd0); the Free
-        Cities hold none"""
-        from .sim_citytrees import GOAL_CIVIC  # sim_citytrees imports this module
+        score past the propagation is not negative (0x623bd0), a FAILED or CANCELLED one
+        never; the Free Cities hold none"""
+        from .sim_citytrees import CP_CANCELLED, CP_FAILED, GOAL_CIVIC  # sim_citytrees imports this module
         add = torch.zeros_like(score)
         ai = self.cityai
         if s >= ai.S:
             return add
-        on = (ai.c_id[:, s] >= 0) & (ai.c_goal_kind[:, s] == GOAL_CIVIC) & (ai.c_goal[:, s] >= 0)
+        on = (ai.c_id[:, s] >= 0) & (ai.c_goal_kind[:, s] == GOAL_CIVIC) & (ai.c_goal[:, s] >= 0) & (ai.c_progress[:, s] != CP_FAILED) & (ai.c_progress[:, s] != CP_CANCELLED)
         if not bool(on.count_nonzero()):
             return add
         add.scatter_add_(1, ai.c_goal[:, s].clamp(min=0, max=score.shape[1] - 1),

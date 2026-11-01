@@ -335,13 +335,14 @@ class SimResearch:
         """the seat's Tech Contracts (its city AI's Add Goal Tech contracts):
         per row the values of the contracts on it, an unowned row's whose
         score `base` is not negative (0x761980); `live` only the accepted or
-        in-progress ones (a completion's, 0x762d60); the Free Cities hold none"""
-        from .sim_citytrees import CP_ACCEPTED, CP_IN_PROGRESS, GOAL_TECH  # sim_citytrees imports this module
+        in-progress ones (a completion's, 0x762d60), a FAILED or CANCELLED one never; the
+        Free Cities hold none"""
+        from .sim_citytrees import CP_ACCEPTED, CP_CANCELLED, CP_FAILED, CP_IN_PROGRESS, GOAL_TECH  # sim_citytrees imports this module
         add = torch.zeros_like(base)
         ai = self.cityai
         if s >= ai.S:
             return add
-        on = (ai.c_id[:, s] >= 0) & (ai.c_goal_kind[:, s] == GOAL_TECH) & (ai.c_goal[:, s] >= 0)
+        on = (ai.c_id[:, s] >= 0) & (ai.c_goal_kind[:, s] == GOAL_TECH) & (ai.c_goal[:, s] >= 0) & (ai.c_progress[:, s] != CP_FAILED) & (ai.c_progress[:, s] != CP_CANCELLED)
         if live:
             prog = ai.c_progress[:, s]
             on = on & ((prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS))

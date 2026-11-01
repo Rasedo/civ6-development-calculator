@@ -95,15 +95,24 @@ export const newCityAi = (): CityAi => ({
  *  the one under research IN PROGRESS (ACCEPTED again when the research moves
  *  off it: the research AI's check 0x5f5940), and the plot contracts whose
  *  plot it now owns COMPLETED (the research and civics AIs' and the Economic
- *  AI's turns, before the cities') */
+ *  AI's turns, before the cities'). The research and culture AIs hold a
+ *  goal contract while it is accepted or in progress and drop it on their
+ *  turn once it is neither: a contract its tree FAILED stays held to that
+ *  turn (runs/h1_duely1121 p2 tech contract 8 on Masonry, its Build City
+ *  Building tree gone t8, FAILED in the research list at the t8 end look,
+ *  gone by t9's; civic contract 65 of runs/h1_duely1117 Antananarivo held
+ *  ACCEPTED t23-t44 past its tree) */
 export function goalsReached(
   ai: CityAi, held: (goal: string) => boolean, researching: (goal: string) => boolean, owns: (plot: number) => boolean,
 ): void {
   for (const c of ai.contracts) {
     const goal = ai.techContracts[c.id];
-    if (goal !== undefined && (c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS)) {
-      if (held(goal)) c.progress = CP_COMPLETED;
-      else c.progress = researching(goal) ? CP_IN_PROGRESS : CP_ACCEPTED;
+    if (goal !== undefined) {
+      if (c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS) {
+        if (held(goal)) c.progress = CP_COMPLETED;
+        else c.progress = researching(goal) ? CP_IN_PROGRESS : CP_ACCEPTED;
+      }
+      c.goalHeld = c.progress === CP_ACCEPTED || c.progress === CP_IN_PROGRESS;
       continue;
     }
     if (c.progress !== CP_CLAIMED && c.progress !== CP_ACCEPTED) continue;
@@ -655,6 +664,7 @@ const addGoalTech: BtHandler<Ctx> = {
     const c: AiContract = {
       id: ctx.w.newContractId(), tree: ctx.tree.id, treeName: ctx.tree.name, unit: null, building: null, district: null, plot: -1,
       value: (Number(tagOf(run, node, 'Tech Value')) || 0) * FX, city: -1, maxTurns: 0, turns: -1, progress: CP_ACCEPTED, assign: false,
+      goalHeld: true,
     };
     ctx.ai.contracts.push(c);
     ctx.ai.techContracts[c.id] = goal;
@@ -1012,7 +1022,18 @@ export function tickCityTrees(ai: CityAi, w: CityTreeWorld): void {
   }
   ai.reservations = ai.reservations.filter((r) => live(ai, r.tree));
   ai.trees = ai.trees.filter((t) => !t.done);
-  for (const id of reapContracts(ai, new Set([...ai.trees.flatMap((t) => t.contracts), ...w.heldContracts()]))) {
+  // a tree's end CANCELS the open Tech Contracts it made (runs/h1_duely1121
+  // p4 contract 60 on Currency IN PROGRESS, its Build City District tree
+  // gone t33, CANCELLED in the research list at the t33 end look, gone by
+  // t34's); a Civic Contract stays (the culture AI's, owned by none)
+  for (const c of ai.contracts) {
+    const goal = ai.techContracts[c.id];
+    if (goal === undefined || !goal.startsWith('TECH_') || !c.goalHeld) continue;
+    if (c.progress !== CP_ACCEPTED && c.progress !== CP_IN_PROGRESS) continue;
+    if (!ai.trees.some((t) => t.id === c.tree)) c.progress = CP_CANCELLED;
+  }
+  const goals = ai.contracts.filter((c) => c.goalHeld).map((c) => c.id);
+  for (const id of reapContracts(ai, new Set([...ai.trees.flatMap((t) => t.contracts), ...goals, ...w.heldContracts()]))) {
     delete ai.techContracts[id];
     delete ai.plotContracts[id];
   }

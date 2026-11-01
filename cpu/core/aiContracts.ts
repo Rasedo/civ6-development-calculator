@@ -61,6 +61,9 @@ export interface AiContract extends ContractItem {
   assign: boolean;
   /** a city queued it: the item's completion signal is connected */
   queued?: boolean;
+  /** a goal contract (Add Goal Tech's) the research or culture AI holds
+   *  (its holders' research / culture list), past its tree */
+  goalHeld?: boolean;
   /** the progress its last AI_CityBuild.csv CONTRACT line printed (a city
    *  lists it at its submission, the Default Specialization's head drops
    *  it from the list); none while no line has named it */

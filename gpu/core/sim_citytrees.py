@@ -248,6 +248,8 @@ class CityAi:
         self.c_listed = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
         # the progress its last CONTRACT line printed (`AiContract.shown`), -1 none
         self.c_shown = torch.full((B, S, C), -1, dtype=L, device=dev)
+        # the research or culture AI holds the goal contract (`AiContract.goalHeld`)
+        self.c_goal_held = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
         # the economic AI's purchase list holds it (`ContractBook.purchase`;
         # its order the contracts' ids)
         self.c_purchase = torch.zeros(B, S, C, dtype=torch.bool, device=dev)
@@ -317,7 +319,7 @@ def new_contract(ai: CityAi, s: int, mask: torch.Tensor, **f) -> torch.Tensor:
     for k, d in defaults.items():
         v = f.get(k, d)
         _cset(getattr(ai, "c_" + k), s, j, _l(v, cid), mask)
-    for k in ("assign", "queued", "in_tree", "listed", "purchase"):
+    for k in ("assign", "queued", "in_tree", "listed", "purchase", "goal_held"):
         _cset(getattr(ai, "c_" + k), s, j, _b(f.get(k, False), mask), mask)
     return j
 
@@ -524,12 +526,9 @@ def _tree_take_unit(ai: CityAi, s: int, k: torch.Tensor, uid: torch.Tensor, mask
 def reap_contracts(ai: CityAi, s: int, w) -> None:
     """`reapContracts`: a contract lives while its tree — a city tree's, an
     operation's (`w.operation_live`) — runs and holds it, or the city has it
-    in hand, or it is a Civic Contract accepted or in progress, which the
-    culture AI holds past its tree (`minorCultureContracts`)"""
+    in hand, or the research or culture AI holds it (`c_goal_held`)"""
     in_tree = ai.c_in_tree[:, s] & (tree_live(ai, s, ai.c_tree[:, s]) | _b(w.operation_live(ai.c_tree[:, s]), ai.c_in_tree[:, s]))
-    prog = ai.c_progress[:, s]
-    culture = (ai.c_goal_kind[:, s] == GOAL_CIVIC) & (ai.c_goal[:, s] >= 0) & ((prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS))
-    keep = in_tree | culture | (ai.c_id[:, s] == ai.in_hand[:, s].unsqueeze(1))
+    keep = in_tree | ai.c_goal_held[:, s] | (ai.c_id[:, s] == ai.in_hand[:, s].unsqueeze(1))
     gone = (ai.c_id[:, s] >= 0) & ~keep
     ai.c_id[:, s] = torch.where(gone, torch.full_like(ai.c_id[:, s], -1), ai.c_id[:, s])
     ai.c_listed[:, s] &= ~gone
@@ -541,7 +540,9 @@ def reap_contracts(ai: CityAi, s: int, w) -> None:
 def goals_reached(ai: CityAi, s: int, w, mask: torch.Tensor) -> None:
     """`goalsReached` where `mask`: the tech and civic contracts whose goal
     the seat holds COMPLETED, the one under research IN PROGRESS (ACCEPTED
-    again off it), the plot contracts whose plot it owns COMPLETED"""
+    again off it), the plot contracts whose plot it owns COMPLETED; the
+    research and culture AIs hold a goal contract while it is accepted or in
+    progress (`c_goal_held`)"""
     m = mask.unsqueeze(1) & (ai.c_id[:, s] >= 0)
     prog = ai.c_progress[:, s]
     kind = ai.c_goal_kind[:, s]
@@ -551,6 +552,8 @@ def goals_reached(ai: CityAi, s: int, w, mask: torch.Tensor) -> None:
     tc = m & ((kind == GOAL_TECH) | (kind == GOAL_CIVIC)) & ((prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS))
     new = torch.where(held, CP_COMPLETED, torch.where(res, CP_IN_PROGRESS, CP_ACCEPTED))
     prog = torch.where(tc, new, prog)
+    gk = m & ((kind == GOAL_TECH) | (kind == GOAL_CIVIC))
+    ai.c_goal_held[:, s] = torch.where(gk, (prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS), ai.c_goal_held[:, s])
     pc = m & (kind == GOAL_PLOT) & ((prog == CP_CLAIMED) | (prog == CP_ACCEPTED)) & _b(w.owns(ai.c_plot[:, s]), goal)
     ai.c_progress[:, s] = torch.where(pc, torch.full_like(prog, CP_COMPLETED), prog)
 
@@ -940,7 +943,7 @@ def _x_add_goal_tech(c: _Ctx, i: int, at: torch.Tensor) -> None:
     val = torch.where(val == NONE, 0, val) * _FX
     kind = torch.where(tech != NONE, GOAL_TECH, GOAL_CIVIC)
     goal = torch.where(tech != NONE, tech, civic)
-    j = new_contract(c.ai, c.s, go, tree=c.ref, goal_kind=kind, goal=goal, value=val, progress=CP_ACCEPTED, in_tree=True)
+    j = new_contract(c.ai, c.s, go, tree=c.ref, goal_kind=kind, goal=goal, value=val, progress=CP_ACCEPTED, in_tree=True, goal_held=True)
     c.set_tag(i, "Contract ID", _cget(c.ai.c_id, c.s, j), go)
 
 
@@ -1591,4 +1594,9 @@ def tick_city_trees(ai: CityAi, s: int, w, turn: int, mask: torch.Tensor) -> Non
     ai.r_plot[:, s] = torch.where(dead, -1, ai.r_plot[:, s])
     ai.r_tree[:, s] = torch.where(dead, -1, ai.r_tree[:, s])
     ai.tr_id[:, s] = torch.where(ai.tr_alive[:, s], ai.tr_id[:, s], torch.full_like(ai.tr_id[:, s], -1))
+    # a tree's end CANCELS the open Tech Contracts it made; a Civic Contract stays
+    prog = ai.c_progress[:, s]
+    tc = mask.unsqueeze(1) & (ai.c_id[:, s] >= 0) & ai.c_goal_held[:, s] & (ai.c_goal_kind[:, s] == GOAL_TECH) \
+        & ((prog == CP_ACCEPTED) | (prog == CP_IN_PROGRESS)) & ~tree_live(ai, s, ai.c_tree[:, s])
+    ai.c_progress[:, s] = torch.where(tc, torch.full_like(prog, CP_CANCELLED), prog)
     reap_contracts(ai, s, w)
