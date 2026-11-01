@@ -284,6 +284,12 @@ export interface AiValueView {
   /** the Tourism a turn the seat's cities make, each city's both halves
    *  (0x1ab750 on City +0x1ac8: `cityTourism`), summed */
   citiesTourism(seat: number): number;
+  /** the luxury or strategic plots at the destination of each route out of
+   *  the seat's city (`cityRouteDestPlots`) */
+  cityRouteDestPlots(seat: number, cityId: number, category: 'luxury' | 'strategic'): readonly number[];
+  /** the Tourism a turn toward each major a trade route joins the seat to
+   *  (0x552fb0, then 0x394830: `tourismTowardRaw`), raw */
+  routeTourism(seat: number): readonly number[];
   /** the Mountain Portal analyzer's walk of a plot's ring (0x6b1b0 with
    *  0x6c8fb0): its neighbours with a route; null where a neighbour without
    *  one holds a portal (0x88680) or none is a mountain */

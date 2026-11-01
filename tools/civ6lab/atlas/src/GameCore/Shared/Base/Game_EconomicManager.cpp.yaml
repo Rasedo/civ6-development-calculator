@@ -9,6 +9,7 @@
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   context:
     - ...s +0x6e4 + open borders (0x3dab70) +0x6dc + the governments' tier difference x +0x6cc + 0x8f1530 / 0x8f3700 / 0x8f2910 (unread) - the target's +0xf90, at least -100) / 100. Its input...
   review: imported
@@ -18,6 +19,7 @@
   status: UNREAD
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   context:
     - ...(0x3dab70) +0x6dc + the governments' tier difference x +0x6cc + 0x8f1530 / 0x8f3700 / 0x8f2910 (unread) - the target's +0xf90, at least -100) / 100. Its inputs for a city-state (grea...
   review: imported

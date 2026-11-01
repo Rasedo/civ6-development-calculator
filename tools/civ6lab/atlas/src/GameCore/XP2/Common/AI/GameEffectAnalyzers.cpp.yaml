@@ -38,16 +38,40 @@
   context:
     - ...building's value 0x7a7590 from the start to the horizon. EFFECT_ADJUST_DISTRICT_AMENITY 0x6a1170 (0x79f7c0), _DISTRICT_HOUSING 0x6a5d20 and _BUILDING_HOUSING 0x6c0490 (0x7a3d70, CityBu...
   review: reviewed
+- addr: 0x6a1240
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER parser
+  semantics: "EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER's parser (vtable 0xd62818 slot 0): Amount (0xc7dc60) whole; when not 0, an object (vtable 0xd63a90) holding it whole at +8."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 209
+      value: "Online Communities' 50 read whole: Bologna's 10 Tourism +25% worth 4, as logged"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_analyze]
+  readings:
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
+  review: reviewed
 - addr: 0x6a1380
   kind: function
   name: EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER
-  semantics: per player a trade route joins to the player (0x552fb0), the tourism toward it (0x394830) x Amount x 0.01 as PSEUDOYIELD_TOURISM discounted to the start (0x7a1240), whole, summed; registry object @f04068, vtable 0xd62818
-  status: PARTLY
+  semantics: "per player of the list @f28c78 +0x3f8 (+0xb50..+0xb58; the majors: a route between two city-states counts nothing) a trade route joins to the context's player (0x552fb0), the tourism toward it (0x394830 on the context player's +0x1310) x the parser's Amount (+8, whole, 24.8) x fx(0.01f) (@d136f0, 2 raw) as PSEUDOYIELD_TOURISM (0x7a60d0), discounted to the start (+0xb4) at the rate (+0xbc) (0x7a1240), its whole part added to +0xc0; registry object @f04068, vtable 0xd62818 slot 1"
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 209
+      value: "Bologna's 10 Tourism toward player 1 (Monarchy, +25%) 4, toward its Digital Democracy (+5%) 4 at t219-229, its 21 Tourism 8 at t248, as logged"
+    - recording: h1_duely1121
+      turn: 233
+      value: "Antioch joined to player 0 and to Ayutthaya: the major's 3 alone; Ayutthaya, joined only to Antioch, logs none (t228-249)"
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiView.ts:aiView
+    - gpu/core/sim_policy.py:_pol_analyze
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
     - "C-130: the Free Cities' city subjects and space race projects on the GPU — both twins"
-  notes: ["not ported: 0x394830 for a city-state unread"]
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   review: reviewed
 - addr: 0x6a1700
   final: 0x478a20
@@ -797,10 +821,21 @@
 - addr: 0x6b2aa0
   kind: function
   name: EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL
-  semantics: "on the context's city (+0x70) and yield filter (+0x64): a walk over the city's trade set (+0x1ee0) with a functor (vtable 0xd64048) unread; registry object @f03d60, vtable 0xd63130"
-  status: PARTLY
+  semantics: "on the context's city (+0x70; none: nothing) where the context's yield (+0x64) is -1 or the parser's (+8): the routes out of the city (0x6c8660 copies its trade set +0x1ee0, 0x1fa000 walks the trade manager's routes from its vertex) through the functor (vtable 0xd64048, call 0x6c8fa0 -> 0x6c89b0); registry object @f03d60, vtable 0xd63130 (parser 0x6b21c0: YieldType +8, Amount +0xc whole)"
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 229
+      value: Bologna's Market Economy 88 (two route yields 58, the luxury and strategic plots at its routes' destinations 30) at t229-249, 84 at t223-228, as logged
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/trade.ts:cityRouteDestPlots
+    - gpu/core/sim_policy.py:_pol_analyze
+    - gpu/core/sim_seats.py:_route_dest_plots
+    - gpu/core/sim_policy.py:full
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
   review: reviewed
 - addr: 0x6b2b70
   final: 0x464ba0
@@ -816,10 +851,21 @@
 - addr: 0x6b44d0
   kind: function
   name: EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_STRATEGIC_RESOURCE_FOR_INTERNATIONAL
-  semantics: the strategic twin of 0x6b2aa0; registry object @f03d68, vtable 0xd631f0
-  status: PARTLY
+  semantics: the strategic twin of 0x6b2aa0 (its functor vtable 0xd64078, call 0x6c8f80 -> 0x6c87a0); registry object @f03d68, vtable 0xd631f0
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 229
+      value: Bologna's Market Economy 88 (two route yields 58, the luxury and strategic plots at its routes' destinations 30) at t229-249, 84 at t223-228, as logged
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/trade.ts:cityRouteDestPlots
+    - gpu/core/sim_policy.py:_pol_analyze
+    - gpu/core/sim_seats.py:_route_dest_plots
+    - gpu/core/sim_policy.py:full
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
   review: reviewed
 - addr: 0x6b45a0
   final: 0x466290

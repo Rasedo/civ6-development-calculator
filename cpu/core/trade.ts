@@ -115,16 +115,44 @@ export function routeDestLuxuryGold(state: GameState, seat: number, destSeat: nu
   centre: number): number {
   const n = suzerainEffectCount(state, seat, 'routeLuxuryGold');
   if (!n) return 0;
-  const c = state.map.tiles[centre];
-  let lux = 0;
-  for (const t of tilesWithin(state.map, c.col, c.row, DEST_LUXURY_RINGS)) {
-    if (t.ownerSeat !== destSeat || (destCity !== null && t.ownerCity !== destCity) || !t.resource) continue;
-    if (RESOURCES[t.resource]?.category === 'luxury') lux += 1;
-  }
-  return AMSTERDAM_DEST_LUXURY_GOLD * n * lux;
+  return AMSTERDAM_DEST_LUXURY_GOLD * n * cityResourcePlots(state, destSeat, destCity, centre, 'luxury');
 }
 /** the rings City_Resources 0x1f71b0 walks: 1 + 6 + 12 plots and 18 more */
 const DEST_LUXURY_RINGS = 3;
+
+/** City_Resources 0x1f71b0: the plots within 3 rings of a city's `centre`
+ *  that the city owns (`destCity` null: a city-state's one city, every tile
+ *  its seat owns) carrying a resource of `category` its owner `destSeat`
+ *  sees (0x4ab4b0 on the owner's +0x1320), a copy counting again */
+export function cityResourcePlots(state: GameState, destSeat: number, destCity: number | null, centre: number,
+  category: 'luxury' | 'strategic'): number {
+  const hidden = hiddenResourcesFor(state, destSeat);
+  const c = state.map.tiles[centre];
+  let n = 0;
+  for (const t of tilesWithin(state.map, c.col, c.row, DEST_LUXURY_RINGS)) {
+    if (t.ownerSeat !== destSeat || (destCity !== null && t.ownerCity !== destCity) || !t.resource || hidden.has(t.resource)) continue;
+    if (RESOURCES[t.resource]?.category === category) n += 1;
+  }
+  return n;
+}
+
+/** the resource plots (`cityResourcePlots`) at the destination of each
+ *  route out of `seat`'s city `cityId` (Trade_Manager 0x542bd0 from the
+ *  city's vertex, 0x1fa000) */
+export function cityRouteDestPlots(state: GameState, seat: number, cityId: number, category: 'luxury' | 'strategic'): number[] {
+  const owner = seatOf(state, seat);
+  if (!owner) return [];
+  return (owner.tradeRoutes ?? []).filter((r) => r.from === cityId).map((r) => {
+    if (r.toCs !== undefined) {
+      const cs = state.cityStates.find((c) => c.id === r.toCs);
+      return cs && cs.centerIndex >= 0 ? cityResourcePlots(state, cs.seat, null, cs.centerIndex, category) : 0;
+    }
+    const destSeat = r.toSeatCity !== undefined ? r.toSeat ?? NO_SEAT : seat;
+    const destCity = r.toSeatCity ?? r.to ?? -1;
+    const city = routeCities(state, destSeat).find((c) => c.id === destCity);
+    return city ? cityResourcePlots(state, destSeat, isCityStateSeat(destSeat) ? null : city.id, city.centerIndex, category) : 0;
+  });
+}
 
 /** CIV6 (John Rockefeller, MODIFIER_PLAYER_CITIES_ADJUST_TRADE_ROUTE_YIELD_PER_
  *  DESTINATION_STRATEGIC_FOR_DOMESTIC / _FOR_INTERNATIONAL): the strategic

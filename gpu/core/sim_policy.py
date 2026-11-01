@@ -37,6 +37,9 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT", "EFFECT_ADJUST_PLAYER_TOURISM",
     "EFFECT_ADJUST_CITY_YIELD_PER_POPULATION", "EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT",
     "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION",
+    "EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER",
+    "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL",
+    "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_STRATEGIC_RESOURCE_FOR_INTERNATIONAL",
 }
 # worth 0 in a minor's policy context: the Influence a minor may not give,
 # its tributaries and placed envoys (none)
@@ -432,6 +435,37 @@ class SimPolicy:
             p = "PSEUDOYIELD_TOURISM"
             ct = self._ai_cities_tourism(ctx["row"]) * _FX
             return between(self._cv_pseudo(_fmul(full(_fx_const(_f32(amount * _f32(0.01)))), ct), p, f0.pseudo_w(p))) >> 8
+        if eff in ("EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL",
+                   "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_STRATEGIC_RESOURCE_FOR_INTERNATIONAL"):
+            # 0x6b2aa0 / 0x6b44d0: on the subject city, per route out of it
+            # Amount x the luxury / strategic plots at its destination
+            # (0x1f71b0) of the yield at the player's weight, between, each
+            # whole
+            if not city:
+                return zero
+            f = sub["f"]
+            cid = None if f.row < self.FREE_ROW else self.city_id[:, f.row, getattr(f, "j", 0)]
+            cat = 3 if "LUXURY" in eff else 2
+            n = self._route_dest_plots(f.row, cat, cid)
+            out = zero
+            for k in range(n.shape[1]):
+                out = out + (between(self._cv_yield(n[:, k] * (amount * _FX), y, f0.yield_w(y))) >> 8)
+            return out
+        if eff == "EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER":
+            # 0x6a1380: per major a route joins the row to, the Tourism toward
+            # it (0x394830: the cities' Tourism through the percent the row
+            # sends there, at least -100) x Amount x fx(0.01f) as
+            # PSEUDOYIELD_TOURISM, discounted to the start, each whole
+            p = "PSEUDOYIELD_TOURISM"
+            row = ctx["row"]
+            ct = self._ai_cities_tourism(row) * _FX
+            out = zero
+            for o in range(self.n_majors):
+                pct = self._tourism_intl_pct(row, o).clamp(min=-100)
+                x = torch.where(ct > 0, torch.div((100 + pct) * ct, 100, rounding_mode="trunc"), zero)
+                v = self._cv_pseudo(_fmul(full(_fx_const(0.01)), _fmul(full(amount * _FX), x)), p, f0.pseudo_w(p))
+                out = out + torch.where(self._routes_join(row, o), _discounted(v, r, t0) >> 8, zero)
+            return out
         if eff in ("EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT", "EFFECT_ADJUST_CITY_YIELD_PER_POPULATION"):
             # 0x6b4e80 / 0x6b6460: the subject city (the context's, +0x70) —
             # its finished specialty districts, or its citizens — x Amount of

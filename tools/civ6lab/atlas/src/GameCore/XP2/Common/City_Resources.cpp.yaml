@@ -7,14 +7,23 @@
   final: 0x14c400
   kind: function
   name: City_Resources
-  semantics: "City_Resources: the count of a resource class on the city's plots (its first 0x5cbc0(2) + 18 that it owns, known to the owner 0x4ab4b0)."
-  status: PARTLY
+  semantics: "City_Resources: the count of a resource class (hash: 0xa3fcd07b bonus, 0xa9f06a65 luxury, 0xc163880a strategic, 0x438194d8 artifact) on the city's plots (its first 0x5cbc0(2) + 18, the plot's city +0xf8 the city's), the resource known to the CITY'S OWNER (city +0x1b8, its +0x1320, 0x4ab4b0)."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 229
+      value: Bologna's Market Economy 88 (two route yields 58, the luxury and strategic plots at its routes' destinations 30) at t229-249, 84 at t223-228, as logged
   impl:
+    - cpu/core/trade.ts:cityResourcePlots
     - cpu/core/trade.ts:routeDestLuxuryGold
     - cpu/core/trade.ts:routeDestStrategicPlots
+    - gpu/core/sim_seats.py:_route_dest_plots
     - gpu/core/sim_seats.py:_city_lux_plots
     - gpu/core/sim_seats.py:_city_strat_plots
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - gpu/core/sim_policy.py:full
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

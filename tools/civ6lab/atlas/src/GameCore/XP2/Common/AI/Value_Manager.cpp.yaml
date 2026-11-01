@@ -61,6 +61,7 @@
     - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   context:
     - "...7, k = rate/100, a perpetuity a/k past nk >= 10; the horizon itself one discounted turn 0x7a1240, (1-k)^n with -0.16667). Then: per unlocked unit the player's version, 10 x the cities'..."
     - ...yer AI, as PSEUDOYIELD_INFLUENCE @0xf2e240 with the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's poin...
@@ -123,6 +124,7 @@
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
+    - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
   context:
     - "...NonFoodYieldModifier change on the city's yield, at least 1.0, from T to the horizon (0x7a2140) — the Arena; a city-state's gold per turn counts its city's Gold (the Economic boost;..."
     - "...part to context +0xc0; \"span\" is PV(horizon) - PV(start) by two 0x7a16e0 calls, \"between\" 0x7a2140; \"weighted\" a yield through 0x7a6690 with the player, \"bare\" without):"
@@ -496,6 +498,7 @@
     - "C-96: the Trader's value — READ (0x7a7110, its call from 0x7b62c0)"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   notes: ["label: pseudoYieldValue(out,&amt,pseudo,playerAI,..)"]
   context:
     - ...ds' +0x638, +0x7a8, the +0x6b0 list or +0x6c8); per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 fo...
@@ -533,6 +536,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-96: the unit value's Maintenance at the player's Gold weight — READ (0x7b62c0 at 0x7b729e..0x7b72de), both twins"
+    - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - "label: yieldValue(out,&amt,yield,playerAI): amt*Yields.col1c*(1+min(w[yield],9))"

@@ -5502,25 +5502,38 @@ class SimSeats:
         modifiers affect the output to each individual civilization.
         International Modifiers are SUMMED (not compounded) and calculated per
         each foreign civilization." +25% Open Borders, +25% an international
-        Trade Route, +50% more with Online Communities, and the
-        different-government penalty (nothing when the two run the same one).
-        `tourismIntlPct`'s twin."""
+        Trade Route joining the two (0x552fb0), +50% more with Online
+        Communities, and the different-government penalty (nothing when the
+        two run the same one or either runs none). `tourismIntlPct`'s twin,
+        for any two rows (Open Borders only between majors)."""
         B, dev = self.B, self.device
         pct = torch.zeros(B, dtype=torch.long, device=dev)
-        ob = self.seat_borders_turns[:, to, frm] > 0
-        pct = pct + ob.long() * int(self.rules.seats["tourismOpenBordersPct"])
-        routed = (self.seat_route_dseat[:, frm] == to).any(dim=1)
+        if frm < self.n_majors and to < self.n_majors:
+            ob = self.seat_borders_turns[:, to, frm] > 0
+            pct = pct + ob.long() * int(self.rules.seats["tourismOpenBordersPct"])
+        routed = self._routes_join(frm, to)
         extra = self._gov_mods(frm)[12]["tourroute"]
         # CIV6 (Sarah Breedlove): "+25% Tourism from Trade Routes", the card's channel
         extra = extra + self._gp_perm(frm, "tourismRouteBonus").long()
         pct = pct + routed.long() * (int(self.rules.seats["tourismRoutePct"]) + extra)
         ga, ha = self._adopted_gov(frm)
         gb, hb = self._adopted_gov(to)
-        same = (ha & hb & (ga == gb)) | (~ha & ~hb)
-        ia = torch.where(ha, self._gov_intol.take(ga), torch.zeros_like(pct))
-        ib = torch.where(hb, self._gov_intol.take(gb), torch.zeros_like(pct))
-        pen = (ia + ib) * int(self.rules.seats["tourismGovMult"])
-        return pct - torch.where(same, torch.zeros_like(pen), pen)
+        differ = ha & hb & (ga != gb)
+        pen = (self._gov_intol.take(ga) + self._gov_intol.take(gb)) * int(self.rules.seats["tourismGovMult"])
+        return pct - torch.where(differ, pen, torch.zeros_like(pen))
+
+    def _routes_join(self, a: int, b: int) -> torch.Tensor:
+        """[B] bool — `tradeRoutesJoin` (0x552fb0): a route of row `a`'s ends
+        in a city of row `b`'s (a city-state's by its code), else one of
+        `b`'s in `a`'s"""
+        def into(x: int, y: int) -> torch.Tensor:
+            hit = self.seat_route_dseat[:, x] == y
+            if self._CITY_MINOR0 <= y < self._CITY_MINOR0 + self.S:
+                hit = hit | (self.seat_routes[:, x, :, 1] == -(2 + y - self._CITY_MINOR0))
+            return hit.any(dim=1)
+        if a == b:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        return into(a, b) | into(b, a)
 
     def _cs_resolve_suzerain(self) -> None:
         """Refresh the STORED suzerain from the envoy record (`resolveSuzerain`
@@ -5740,6 +5753,51 @@ class SimSeats:
             ctr = self.city_center[:, r, :RC].gather(1, slc).clamp(min=0)    # [B, T]
             near = self.pair_dist[ctr, tix.expand_as(ctr)] <= 3
             out[:, r].scatter_add_(1, slc, (has & (sl >= 0) & near).long())
+        return out
+
+    def _route_dest_plots(self, row: int, cat: int, city_id: torch.Tensor | None) -> torch.Tensor:
+        """[B, K] long — `cityRouteDestPlots`: per route of row `row` out of
+        its city `city_id` ([B]; None a city-state's one city), the plots of
+        resource category `cat` (2 strategic, 3 luxury) at its destination
+        that `cityResourcePlots` counts — within 3 rings of the destination's
+        centre, the destination city's own (a city-state's: its seat's),
+        seen by the destination's owner. 0 for a free slot."""
+        B, dev = self.B, self.device
+        rr = self.seat_routes[:, row]
+        K = rr.shape[1]
+        act = rr[:, :, 0] >= 0
+        if city_id is not None:
+            act = act & (rr[:, :, 0] == city_id.unsqueeze(1))
+        out = torch.zeros(B, K, dtype=torch.long, device=dev)
+        if not bool(act.count_nonzero()):
+            return out
+        RCw = self.city_id.shape[2]
+        code, dcity = rr[:, :, 1], self.seat_route_dcity[:, row]
+        cs = code <= -2
+        intl = (dcity >= 0) & ~cs
+        drow = torch.where(cs, self._CITY_MINOR0 + (-code - 2), torch.where(intl, self.seat_route_dseat[:, row], torch.full_like(code, row)))
+        did = torch.where(intl, dcity, code)
+        live = self._res_live() & (self.res_cat == cat)
+        tix = torch.arange(self.T, device=dev)
+        for d in torch.unique(drow[act]).tolist():
+            on = act & (drow == d)
+            have = live & ~self._res_hidden(d)
+            cnt = torch.zeros(B, RCw, dtype=torch.long, device=dev)
+            if self._CITY_MINOR0 <= d < self._CITY_MINOR0 + self.S:
+                ctr = self.citystate_center[:, d - self._CITY_MINOR0].clamp(min=0)
+                near = self.pair_dist[ctr.unsqueeze(1), tix.unsqueeze(0)] <= 3
+                cnt[:, 0] = (have & near & (self.tile_seat == int(self._ROW_SEAT[d]))).sum(dim=1)
+                col = torch.zeros_like(code)
+            else:
+                sl = self.city_slot_at(d)
+                slc = sl.clamp(min=0)
+                ctr = self.city_center[:, d, :self.RC].gather(1, slc).clamp(min=0)
+                near = self.pair_dist[ctr, tix.expand_as(ctr)] <= 3
+                cnt.scatter_add_(1, slc, (have & (sl >= 0) & near).long())
+                hit = (self.city_id[:, d].unsqueeze(1) == did.unsqueeze(2)) & self.city_alive[:, d].unsqueeze(1)
+                on = on & hit.any(dim=2)
+                col = hit.long().argmax(dim=2)
+            out = torch.where(on, cnt.gather(1, col), out)
         return out
 
     def _route_length_gold(self, crs: torch.Tensor) -> torch.Tensor:

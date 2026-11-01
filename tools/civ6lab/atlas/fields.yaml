@@ -3306,6 +3306,16 @@
   review: reviewed
 - kind: field
   owner: PlayerCulture
+  offset: 0xe70
+  name: cachedAllianceTourismBonus
+  type: fx
+  semantics: "the value of the tracked m_axCachedAllianceTourismBonus (the tracked object at +0xe18, named in the constructor 0x388ee0 at 0x38ae1a); 0x394830 adds it to the tourism toward every player, the tooltip 0x39b8c0 prints it as TOURIST_TOOLTIP_ALLIANCES. A city-state holds no alliance: 0."
+  status: PARTLY
+  readings:
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
+  review: reviewed
+- kind: field
+  owner: PlayerCulture
   offset: 0x1050
   name: lifetimeCulture
   type: fx

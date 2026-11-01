@@ -307,10 +307,20 @@
   kind: function
   name: a trade route joins two players
   semantics: "(trade manager, a, b): 0x54ff90's route count a to b above 0, else b to a above 0"
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 209
+      value: "Bologna (a city-state) joined to player 1 by player 1's route into it: Online Communities 4 as logged"
+  impl:
+    - cpu/core/seats.ts:tradeRoutesJoin
+    - gpu/core/sim_seats.py:_routes_join
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/city.ts:tourismIntlPct
+    - gpu/core/sim_seats.py:_tourism_intl_pct
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
-  notes: [no port, no confirming case]
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   review: reviewed
 - addr: 0x553210
   final: 0x38fbb0

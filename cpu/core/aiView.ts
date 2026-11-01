@@ -14,7 +14,7 @@ import { isExplored } from './fog';
 import { CITY_STRIKE_RANGE, plotPressureLead } from './phase';
 import { governorSum } from './governors';
 import { CITY_STATE_SUZERAIN_BONUS, MINOR_UPGRADE_GOLD, govInfluence } from '../data/cityStates';
-import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf, warsOf } from './seats';
+import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, tradeRoutesJoin, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf, warsOf } from './seats';
 import { aiDefenderOf, aiFormed, aiRanged, aiStrengths, districtHealth, planUnit, reachPlots, tacticalTargets, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
@@ -47,9 +47,9 @@ import { minorItemTurns, minorKnownUnits, minorUpgradeVisible, minorResourceFact
 import { majorItemTurns, majorTraits, majorUnitExpected, majorUnitVersion, seatResearchTurns } from './freeCityBuild';
 import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
-import { tradeCapacity } from './trade';
+import { cityRouteDestPlots, tradeCapacity } from './trade';
 import { buildingVariantAdjacency, cityPower, effectiveAdjacency } from './yields';
-import { cityTourism, civEraIndex, computeCityStats } from './city';
+import { cityTourism, civEraIndex, computeCityStats, tourismTowardRaw } from './city';
 import { PROJECTS } from '../data/projects';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
@@ -361,6 +361,15 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
     // is not read
     tradeKnowledge: (i) => (isCityStateSeat(i) || i === FREE_SEAT ? seatOf(state, i)?.tradeValue ?? 0 : null),
     citiesTourism: (i) => seatCities(i).reduce((s, c) => s + cityTourism(state, c), 0),
+    cityRouteDestPlots: (i, id, category) => cityRouteDestPlots(state, i, id, category),
+    // over the major civilizations, those a route joins the seat to: a
+    // route between two city-states counts nothing (runs/h1_duely1121
+    // t228-249, a city-state joined only to another logs no Online
+    // Communities; its partner joined to both logs the major's 3)
+    routeTourism: (i) => {
+      const t = seatCities(i).reduce((s, c) => s + cityTourism(state, c), 0) * FX;
+      return state.seats.filter((o) => tradeRoutesJoin(state, i, o.seat)).map((o) => tourismTowardRaw(state, i, o.seat, t));
+    },
     portalRoutes: (p) => {
       let routes = 0;
       let mountain = false;

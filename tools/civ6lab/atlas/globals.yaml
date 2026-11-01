@@ -254,8 +254,10 @@
 - addr: 0xd62818
   kind: global
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   context:
     - "...ommunities' EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER 0x6a1380 (@f04068, vtable 0xd62818): per player of the game's list that a trade route joins to the player either way (0x55..."
   review: imported
@@ -355,6 +357,7 @@
 - addr: 0xd63130
   kind: global
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:

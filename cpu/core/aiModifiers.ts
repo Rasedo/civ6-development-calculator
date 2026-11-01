@@ -353,6 +353,20 @@ function adjacencyValue(t: ValueTerms, args: Readonly<Record<string, string>>, s
 }
 /** PV(horizon) - PV(start), the two 0x7a16e0 calls most analyzers make */
 const span = (t: ValueTerms, v: number): number => presentValue(v, t.rate, t.horizon) - presentValue(v, t.rate, t.start);
+
+/** the per-destination-resource route analyzers' sum over the context
+ *  city's routes */
+function destPlotsValue(t: ValueTerms, args: Readonly<Record<string, string>>, category: 'luxury' | 'strategic'): number {
+  const c = ownerCity(t);
+  if (!c || c.kind !== 'city') return 0;
+  const amount = Number(args.Amount ?? 0) | 0;
+  let sum = 0;
+  for (const n of t.view.cityRouteDestPlots(c.seat, c.id, category)) {
+    const v = yieldValue(t.view, t.seat, amount * n * FX, args.YieldType ?? '');
+    sum += whole(valueBetween(v, t.start, t.horizon, t.rate));
+  }
+  return sum;
+}
 /** a bool argument as the analyzer's parser reads it (0xc7a1c0), with its
  *  default */
 const flag = (args: Readonly<Record<string, string>>, name: string, dflt: boolean): boolean =>
@@ -905,6 +919,28 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const x = fmul(fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(0.01))), t.view.citiesTourism(t.seat) * FX);
     return whole(valueBetween(pseudoYieldValue(t.view, t.seat, x, 'PSEUDOYIELD_TOURISM'), t.start, t.horizon, t.rate));
   },
+  // 0x6a1380 (@f04068, vtable 0xd62818; its parser 0x6a1240 stores the
+  // Amount whole at +8): per player a trade route joins the player to, the
+  // Tourism toward it (0x394830) x Amount x fx(0.01f) as PSEUDOYIELD_TOURISM,
+  // discounted to the start, each whole (runs/h1_duely1124 Bologna's 10
+  // Tourism toward a Monarchy, +25%, 4; toward a Digital Democracy, +5%, 4;
+  // its 21, 8)
+  EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER: (t, args) => {
+    const amount = (Number(args.Amount ?? 0) | 0) * FX;
+    let sum = 0;
+    for (const x of t.view.routeTourism(t.seat)) {
+      const v = pseudoYieldValue(t.view, t.seat, fmul(fxConst(0.01), fmul(amount, x)), 'PSEUDOYIELD_TOURISM');
+      sum += whole(discounted(v, t.rate, t.start));
+    }
+    return sum;
+  },
+  // 0x6b2aa0 / 0x6b44d0 (vtables 0xd63130 / ..., the functors 0x6c89b0 /
+  // 0x6c87a0): on the context's city (+0x70), per route out of it (0x1fa000)
+  // Amount x the luxury / strategic plots at its destination (0x1f71b0) of
+  // the yield, at the player's weight, from the start to the horizon, each
+  // whole
+  EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL: (t, args) => destPlotsValue(t, args, 'luxury'),
+  EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_STRATEGIC_RESOURCE_FOR_INTERNATIONAL: (t, args) => destPlotsValue(t, args, 'strategic'),
   EFFECT_ADJUST_TRADE_ROUTE_CAPACITY: (t, args) =>
     whole(traderValue(t.view, t.seat, Number(args.Amount ?? 0) | 0, t.start, t.horizon, 0, t.rate) ?? 0),
   // 0x6afa10: a plot subject that is not impassable; half of the amount's

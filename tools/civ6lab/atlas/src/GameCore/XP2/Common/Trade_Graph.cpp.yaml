@@ -37,8 +37,10 @@
 - addr: 0x542bd0
   kind: function
   status: PARTLY
+  impl: [cpu/core/trade.ts:cityRouteDestPlots]
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
   context:
     - "...et (+0x1ee0, 0x6c8660 -> 0x1fa000: the trade manager's routes out of the city's vertex, 0x542bd0) with a functor (vtable 0xd64048, its call 0x6c8fa0 -> 0x6c89b0, READ): per route its d..."
   review: imported

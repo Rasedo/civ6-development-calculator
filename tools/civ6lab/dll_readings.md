@@ -8063,3 +8063,83 @@ the mover's hull (`_tac_hull`), `_tac_stacked_other`, `_tac_move_to`'s
   fortified garrison leaves the garrison on a plot beside it by the next
   record (runs/h1_duely1124 t21 Granada: Warrior 327681 to 40:12 as Warrior
   393218 is made, no AI_Tactical row). Which code moves it is unread.
+
+## C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins
+
+`ANALYZERS.EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER`,
+`AiValueView.routeTourism`, `tourismTowardRaw`, `tourismIntlPct`,
+`tradeRoutesJoin` (cpu/core/aiModifiers.ts, aiView.ts, city.ts, seats.ts);
+GPU `_pol_analyze`'s EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER
+(sim_policy.py), `_tourism_intl_pct`, `_routes_join` (sim_seats.py).
+
+- POLICY_ONLINE_COMMUNITIES holds ONLINECOMMUNITIES_TOURISM,
+  MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_TOURISM_MODIFIER (COLLECTION_OWNER,
+  EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER), Amount 50. The parser
+  0x6a1240 (vtable 0xd62818 slot 0) stores the Amount whole at +8.
+- THE ANALYZER 0x6a1380 (slot 1): for each player of the list @f28c78
+  +0x3f8 (+0xb50..+0xb58) that a trade route joins to the context's player
+  (0x552fb0: a route either way), the tourism toward it (0x394830 on the
+  context player's +0x1310) x Amount x fx(0.01f) (2 raw), as
+  PSEUDOYIELD_TOURISM (0x7a60d0), discounted to the start at the rate
+  (0x7a1240), each whole part added. A route between two city-states
+  counts nothing: the list is read as the majors.
+- THE TOURISM TOWARD A PLAYER (0x394830): the source's cities' Tourism
+  (0x1ab5f0 + 0x1ab2a0, the city's both halves), raw; where it is above 0,
+  x (100 + the modifiers, at least -100) / 100, truncated (0x394e5f), then
+  + PlayerCulture +0xe70 (the cached alliance tourism). The modifiers: the
+  source's route tourism bonus (+0x1248) + TOURISM_TRADE_ROUTE_BONUS (+0x6e4)
+  where a route joins the two; Open Borders (0x3dab70) +0x6dc; where the two
+  governments (PlayerCulture +0x158) differ and both hold one, their
+  intolerance x +0x6cc; less the target's +0xf90. A city-state and the Free
+  Cities found no religion and hold no alliance, so their cities' Tourism is
+  neither cut nor raised beyond these.
+- Confirmed (one-seed aimem traces, 145 of 149 rows): runs/h1_duely1124
+  Bologna's 10 Tourism toward player 1, Monarchy +25% (12.5) 4, Digital
+  Democracy +5% (10.5) 4, its 21 Tourism 8 (t248); Cardiff's 9 toward a
+  Synthetic Technocracy 3, toward a Theocracy 4 (t241-244). runs/h1_duely1117
+  Caguana's 5 toward a Fascism 2, its 12 toward a Digital Democracy 4.
+  runs/h1_duely1121 Antioch joined to player 0 and to Ayutthaya logs
+  the major's 3 alone; Ayutthaya, joined only to Antioch, logs none
+  (t228-249). runs/h1_duely1127 Hattusa joined to player 1 and to
+  Muscat logs 2.
+- The majors' tourism bank reads the same modifiers (`bankTourismPerRival`
+  through `tourismIntlPct`): a route either way, no government term where
+  either holds none.
+- Open: the record's routes are gone on a turn the game logs no Online
+  Communities (1124 t240 Cardiff, t246 Bologna; 1121 t235 Bologna to player
+  0; 1117 t240) while the engines keep the route; the culture defence
+  (+0xf30, +0xf90) and 0x8f1530 / 0x8f3700 / 0x8f2910's terms unread (0 in
+  every case above).
+
+## C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins
+
+`ANALYZERS.EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_RESOURCE_FOR_INTERNATIONAL`
+and `..._STRATEGIC_RESOURCE_FOR_INTERNATIONAL` (`destPlotsValue`),
+`AiValueView.cityRouteDestPlots`, `cityRouteDestPlots`, `cityResourcePlots`
+(cpu/core/aiModifiers.ts, aiView.ts, trade.ts); GPU `_pol_analyze`'s two
+effects (sim_policy.py), `_route_dest_plots` (sim_seats.py).
+
+- POLICY_MARKET_ECONOMY: two EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL
+  (Culture, Science 2) and, on COLLECTION_PLAYER_CITIES, Gold 1 per luxury
+  and per strategic resource at the destination.
+- THE ANALYZERS 0x6b2aa0 / 0x6b44d0: on the context's city (+0x70; a
+  subject without one gives nothing) where the context's yield filter (+0x64)
+  is -1 or the effect's, the routes out of the city (0x6c8660 copies the
+  city's trade set +0x1ee0; 0x1fa000 walks the trade manager's routes from
+  its vertex, 0x542bd0) each through the functor 0x6c89b0 / 0x6c87a0: the
+  route's destination city (+0x18), its luxury / strategic plots
+  (0x1f71b0), x Amount, at the player's yield weight (0x7a6690), between the
+  start and the horizon (0x7a2140), each route's whole part added.
+- CITY_RESOURCES 0x1f71b0: the city's first 37 plots (0x5cbc0(2) + 18, its
+  three rings) that are the city's own, carrying a resource of the class its
+  OWNER sees (city +0x1b8's +0x1320, 0x4ab4b0), a copy counting again.
+- Confirmed (one-seed aimem traces): runs/h1_duely1128 Bologna's Market
+  Economy 84 at t223-228, 88 at t229-249 as logged (two route yields 58);
+  runs/h1_duely1121 Antioch 116 / 130 / 139 at t205-229, Capitalism through
+  it (the civic's best card) 170.5 .. 216.7 at t206-218 as logged;
+  runs/h1_duely1117 25 of 27 logged rows t180-231.
+- Open: runs/h1_duely1124 Cardiff t228-231 logs 85 / 83 against 80, Granada
+  t245-249 137 / 144 against 140 / 147 (its luxury plots 2 at 12 each, the
+  game 21). `routeDestStrategicPlots` (Rockefeller's route Gold) still reads
+  the route owner's visibility where 0x1f71b0 reads the destination
+  owner's.

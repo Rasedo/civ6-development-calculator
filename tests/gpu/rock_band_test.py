@@ -161,6 +161,15 @@ def test_intl_pct(rules) -> None:
     if not bool(ha[0]) or int(ga[0]) != g_hi:
         print("  intl pct OK (the catalog picks a different government here)")
         return
+    # a rival holding no government charges no term
+    assert int(sim._tourism_intl_pct(0, 1)[0]) == base
+    civ_lo = int(sim._gov_unlock_civic[g_lo])
+    if civ_lo >= 0:
+        sim.civ_civics[0, 1, civ_lo] = True
+    gb, hb = sim._adopted_gov(1)
+    if not bool(hb[0]) or int(intol[int(gb[0])]) != 0:
+        print("  intl pct OK (the rival's catalog government is not a tolerant one)")
+        return
     want = -(int(intol[g_hi]) + 0) * int(sim.rules.seats.get("tourismGovMult", 1))
     assert int(sim._tourism_intl_pct(0, 1)[0]) == base + want, (
         f"a disagreeing pair should charge {want}: {int(sim._tourism_intl_pct(0, 1)[0])}")

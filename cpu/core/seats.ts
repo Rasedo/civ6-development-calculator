@@ -568,6 +568,16 @@ export function hasRouteToSeat(state: GameState, a: number, b: number): boolean 
   return (seatOf(state, a)?.tradeRoutes ?? []).some((r) => r.toSeat === b);
 }
 
+/** 0x552fb0: a trade route joins `a` and `b` — one of `a`'s routes ends in
+ *  a city of `b`'s (a city-state's by its id), else one of `b`'s in `a`'s */
+export function tradeRoutesJoin(state: GameState, a: number, b: number): boolean {
+  const into = (x: number, y: number): boolean => {
+    const csId = state.cityStates.find((c) => c.seat === y)?.id;
+    return (seatOf(state, x)?.tradeRoutes ?? []).some((r) => r.toSeat === y || (csId !== undefined && r.toCs === csId));
+  };
+  return a !== b && (into(a, b) || into(b, a));
+}
+
 /** CIV6 (Diplomatic Visibility and Gossip): "Performing the Listening Post
  *  mission in another civilization's city increases visibility by one level",
  *  two once the spy is a Secret Agent — and only while the mission RUNS, which

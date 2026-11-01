@@ -210,6 +210,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
   context:
     - "...a city-state; COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD 0x6afa10 (a plot not impassable: ha..."
   review: reviewed
@@ -3623,16 +3624,39 @@
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
   context:
     - ...filter (+0x64, -1 or the Amount's yield +8), a walk over the city's trade set (+0x1ee0, 0x6c8660 -> 0x1fa000) with a functor (vtable 0xd64048) whose body is unread.
   review: reviewed
+- addr: 0x6c87a0
+  final: 0x4885d0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
+    - "...e trade manager's routes from its vertex, 0x542bd0) each through the functor 0x6c89b0 / 0x6c87a0: the route's destination city (+0x18), its luxury / strategic plots (0x1f71b0), x Amo..."
+  review: imported
 - addr: 0x6c89b0
   final: 0x4887e0
   kind: function
-  semantics: "Market Economy's route functor (vtable 0xd64048, call 0x6c8fa0): per route its destination city (0x57960), the count of the class's resources on it (0x1f71b0) x Amount at the player's weight, between, whole."
-  status: PARTLY
+  semantics: "Market Economy's luxury route functor (vtable 0xd64048, call 0x6c8fa0): per route its destination city (+0x18 player, +0x1a, +0x1c city, 0x57960), its RESOURCECLASS_LUXURY plots (0x1f71b0, hash 0xa9f06a65) x the parser's Amount (+0xc) shifted to 24.8, yieldValue (0x7a6690) of the parser's yield (+8) at the context's player, between the start (+0xb4) and the horizon (+0xb8) at the rate (+0xbc) (0x7a2140), its whole part added to +0xc0. 0x6c87a0 is its strategic twin (hash 0xc163880a)."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 229
+      value: Bologna's Market Economy 88 (two route yields 58, the luxury and strategic plots at its routes' destinations 30) at t229-249, 84 at t223-228, as logged
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/trade.ts:cityRouteDestPlots
+    - gpu/core/sim_policy.py:_pol_analyze
+    - gpu/core/sim_seats.py:_route_dest_plots
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Market Economy's per-destination-resource route analyzers — READ (0x6b2aa0, 0x6b44d0, 0x6c89b0, 0x6c87a0, 0x1f71b0's viewer), both twins"
   context:
     - "...of the city's vertex, 0x542bd0) with a functor (vtable 0xd64048, its call 0x6c8fa0 -> 0x6c89b0, READ): per route its destination city (+0x18 player, +0x1a city, 0x57960), the count o..."
   review: reviewed
@@ -6307,6 +6331,7 @@
   status: UNREAD
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   context:
     - ...open borders (0x3dab70) +0x6dc + the governments' tier difference x +0x6cc + 0x8f1530 / 0x8f3700 / 0x8f2910 (unread) - the target's +0xf90, at least -100) / 100. Its inputs for a cit...
   review: imported
@@ -7760,7 +7785,7 @@
   final: 0x950900
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:span]
+  impl: [cpu/core/aiModifiers.ts:span, cpu/core/aiModifiers.ts:destPlotsValue]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0xc7a880

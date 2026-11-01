@@ -34,7 +34,7 @@ import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resource
 import { FEATURES, isFloodplains } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, UNASSIGNED_CITIZEN_GOLD, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
 import { hiddenResourcesFor, onHomeContinent } from './seats';
-import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat } from './seats';
+import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat, tradeRoutesJoin } from './seats';
 import { warWearinessLosses } from './weariness';
 import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, cityGarrisons } from './units';
 import { floodBarrierScale } from './climate';
@@ -1537,23 +1537,35 @@ export function seatTourismReligious(state: GameState, seat: number): number {
  * affect the output to each individual civilization. International Modifiers
  * are SUMMED (not compounded) and calculated per each foreign civilization."
  *
- * The percent `from` sends toward `to`: +25% Open Borders, +25% for an
- * international Trade Route, +50% more for a route with Online Communities,
- * and the different-government penalty (0 when the two run the same one).
- * The religious half adds its own two halvings at the accrual site.
+ * The percent `from` sends toward `to` (0x394830's modifiers): +25% Open
+ * Borders, +25% for a Trade Route joining the two, +50% more for a route
+ * with Online Communities, and the different-government penalty (0 when the
+ * two run the same one or either runs none). The religious half adds its
+ * own two halvings at the accrual site.
  */
 export function tourismIntlPct(state: GameState, from: number, to: number): number {
   let pct = 0;
   if (borderTurnsFrom(state, to, from) > 0) pct += TOURISM_OPEN_BORDERS_PCT;
-  const routed = (seatOf(state, from)?.tradeRoutes ?? []).some((r) => r.toSeat === to);
+  // a route either way joins the two (0x552fb0 in 0x394830)
   // CIV6 (Sarah Breedlove): "+25% Tourism from Trade Routes", the card's channel
-  if (routed) pct += TOURISM_ROUTE_PCT + getModifiers(state, from).tourismRouteBonus + gpPermOf(seatOf(state, from), 'tourismRouteBonus');
+  if (tradeRoutesJoin(state, from, to)) pct += TOURISM_ROUTE_PCT + getModifiers(state, from).tourismRouteBonus + gpPermOf(seatOf(state, from), 'tourismRouteBonus');
+  // the governments' term where the two hold different ones (0x394830
+  // passes a player holding none: the Free Cities, a seat in Anarchy)
   const ga = seatGovernment(state, from);
   const gb = seatGovernment(state, to);
-  if (ga !== gb) {
-    pct -= ((GOV_INTOLERANCE[ga ?? ''] ?? 0) + (GOV_INTOLERANCE[gb ?? ''] ?? 0)) * TOURISM_GOV_MULT;
+  if (ga !== null && gb !== null && ga !== gb) {
+    pct -= ((GOV_INTOLERANCE[ga] ?? 0) + (GOV_INTOLERANCE[gb] ?? 0)) * TOURISM_GOV_MULT;
   }
   return pct;
+}
+
+/** 0x394830 for a seat holding no religion and no alliance (a city-state,
+ *  the Free Cities): the Tourism its cities make, `tourism` raw, toward
+ *  `to` through the percent it sends there (`tourismIntlPct`, at least
+ *  -100), raw and truncated; nothing where the cities make none */
+export function tourismTowardRaw(state: GameState, from: number, to: number, tourism: number): number {
+  if (tourism <= 0) return 0;
+  return Math.trunc((100 + Math.max(-100, tourismIntlPct(state, from, to))) * tourism / 100);
 }
 
 export function computeCityStats(

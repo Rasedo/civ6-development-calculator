@@ -99,7 +99,10 @@ describe('the per-rival international percent', () => {
 
     const late = newGame(1);
     govern(late, 0, 'SUFFRAGE'); // DEMOCRACY, intolerance 20
-    // the rival is still on the tolerant starting government: 20 + 0
+    // a rival holding no government yet charges no term
+    expect(tourismIntlPct(late, 0, 1)).toBe(0);
+    // the rival on a tolerant Classical government: 20 + 0
+    govern(late, 1, 'POLITICAL_PHILOSOPHY');
     expect(tourismIntlPct(late, 0, 1)).toBe(-20 * TOURISM_GOV_MULT);
 
     const both = newGame(1);

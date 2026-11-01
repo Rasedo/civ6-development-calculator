@@ -210,6 +210,7 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   context:
     - "...READ: per city of the player (+0x12f0 +0xd8) its tourism (city +0x1ac8: 0x1ab5f0, then 0x1ab2a0 added), the first part cut by the target's culture defence percent (+0x1310 +0xf30, u..."
   review: imported
@@ -238,6 +239,7 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
   context:
     - "...player), PARTLY READ: per city of the player (+0x12f0 +0xd8) its tourism (city +0x1ac8: 0x1ab5f0, then 0x1ab2a0 added), the first part cut by the target's culture defence percent (+0x1..."
   review: imported

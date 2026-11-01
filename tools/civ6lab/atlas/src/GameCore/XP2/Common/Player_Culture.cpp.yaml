@@ -141,11 +141,24 @@
   kind: function
   semantics: "Player_Culture's tourism toward a player: per city (+0x12f0 +0xd8) its tourism (city +0x1ac8: 0x1ab5f0, then 0x1ab2a0 added), the first part cut by the target's culture defence percent and by GlobalParameters +0x6d4 where the majority religions differ, raised by the city's +0x1b1c percent under its era bonus; the sum x (100 + +0x1248 + trade route +0x6e4 + open borders (0x3dab70) +0x6dc + the governments' tier difference x +0x6cc + 0x8f1530 / 0x8f3700 / 0x8f2910 - the target's +0xf90, at least -100) / 100."
   status: PARTLY
+  cases:
+    - recording: h1_duely1124
+      turn: 219
+      value: "a city-state's Tourism toward a major it is joined to by a route: +25% for the route less the two governments' intolerance where they differ (Chiefdom 0, Digital Democracy 20: +5%) — Bologna's 10 Tourism 10.5, Online Communities 4 as logged"
+  impl:
+    - cpu/core/city.ts:tourismTowardRaw
+    - cpu/core/city.ts:tourismIntlPct
+    - gpu/core/sim_seats.py:_tourism_intl_pct
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - gpu/core/sim_policy.py:full
   readings:
     - "C-94: trade posts and cultural dominance — READ"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-130: Online Communities' route tourism, the tourism toward a player — READ (0x6a1380, 0x6a1240, 0x394830's modifiers, 0x552fb0), both twins"
+  notes:
+    - "the sum: (100 + the modifiers) x the cities' raw / 100, truncated (0x394e5f), then + PlayerCulture +0xe70 (the cached alliance tourism); nothing where the cities' sum is 0 but +0xe70. Unread: the culture defence +0xf30 / +0xf90 writers, 0x8f1530 / 0x8f3700 / 0x8f2910"
   context:
     - ...l one is), then per other player it has met (0x3daaf0) the tourism toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refreshed (0x39f610), then 0x393af0 the dominance,...
   review: reviewed
