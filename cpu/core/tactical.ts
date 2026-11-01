@@ -166,8 +166,11 @@ interface Ground {
   crowded: (i: number) => boolean;
   /** the plot lies in a zone of control the player sees: a hostile unit of
    *  the mover's domain that exerts one beside it, or for a land mover a
-   *  hostile city or Encampment, on a plot the player sees now, none across a
-   *  river (the planning validity's 0x26f980 -> Rules_Movement 0x530f50) */
+   *  hostile city or Encampment, on a plot the player sees now; a unit across
+   *  a river none but from a city centre, a city or Encampment across one
+   *  all the same (the planning validity's 0x26f980 -> Rules_Movement
+   *  0x530f50: 0x24c2f0 before the river bit, IsCity after it; runs/
+   *  h1_duely1121 t97-103: China's city 6:12 zones 5:13 across the river) */
   seenZoc: (i: number) => boolean;
   /** the unit embarked, and the best of the other players' units on the
    *  plot embarked too (0x586360 under flag 1 at 0x586542..0x5865a1: the
@@ -204,6 +207,12 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     const st = aiStrengths(state, u);
     if (planning && (st.melee > 0 || st.ranged > 0 || st.bombard > 0)) fighters.add(u.tileIndex);
   }
+  // the planning's search (0x26e570): a plot of a unit at war that does not
+  // fight (a civilian) is a plain step, neither barred nor attacked into
+  // (runs/h1_duely1121 t97-99: the raid's Man-At-Arms on 6:14 lists China's
+  // Great Scientist's 5:12 at (2/1); h1_duely1128 t35: the barbarian Warrior
+  // on 15:13 lists player 1's Settler's 16:13 at (1/1), AI_Planning.csv)
+  const plainCivilians = planning && !anyGround;
   const enters = new Map<number, boolean>();
   const zocs = new Map<number, boolean>();
   const seenZocs = new Map<number, boolean>();
@@ -284,9 +293,11 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
         const sn = seenNow;
         const t = state.map.tiles[i];
         for (const n of neighbors(state.map, t)) {
-          if (!sn[n.index] || crossesRiver(state.map, t, n)) continue;
+          if (!sn[n.index]) continue;
+          const river = crossesRiver(state.map, t, n);
           // a hostile city or Encampment exerts one on the land beside it
           if (!naval && (n.district === 'CITY_CENTER' || encampmentIntact(n)) && unitsHostile(state, unit, { seat: tileSeat(n) })) { v = true; break; }
+          if (river && n.district !== 'CITY_CENTER') continue;
           if (state.units.some((x) => x.tileIndex === n.index && onMap(x) && !unitReligious(x.type) && unitExertsZoc(x)
             && !!UNITS[x.type]?.naval === naval && unitsHostile(state, x, unit))) { v = true; break; }
         }
@@ -298,7 +309,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     enter: (t) => {
       let v = enters.get(t.index);
       if (v === undefined) {
-        enters.set(t.index, (v = enterable(state, unit, t, foes, embarks)
+        enters.set(t.index, (v = enterable(state, unit, t, plainCivilians ? fighters : foes, embarks)
           && !(minor && closedToMinor(state, unit.seat, t))));
       }
       return v;
@@ -326,7 +337,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       // ground in the danger map's (`anyGround`: a land unit's strike onto a
       // ship's water as a ship's onto the shore, runs/h1_duelw1117 t73)
       if ((fighters.has(t.index) && (anyGround || isWater(t) === naval || (embarks && isWater(t))))
-        || (foes.has(t.index) && isWater(t) === naval)) return true;
+        || (!plainCivilians && foes.has(t.index) && isWater(t) === naval)) return true;
       const owner = tileSeat(t);
       if (t.district === 'CITY_CENTER' && owner !== unit.seat && unitsHostile(state, unit, { seat: owner })) return true;
       return !naval && encampmentBlocks(state, t, unit);
@@ -2136,9 +2147,12 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
     // UNITOPERATION_SWAP_UNITS first (0x972880): with the unit of its own
     // holding the spot beside it; then, short of the spot, the move
     // (UNITOPERATION_MOVE_TO, 0x962030) where no unit at war (0x5862e0) nor
-    // of its own stacking with it (0x585eb0) holds the spot
+    // of its own stacking with it (0x585eb0) holds the spot; the order (its
+    // flags 0, no attack) moves no unit for a spot it would attack into, a
+    // hostile city or Encampment (runs/h1_duely1121 t97-103: the raid's
+    // Man-At-Arms 2883594 on 6:14 holds for China's city 6:12)
     swapUnits(state, pass, u, a.move);
-    if (state.units.includes(u) && u.tileIndex !== a.move && !enemyAt(state, u, a.move) && !stackedAt(state, u, a.move)) {
+    if (state.units.includes(u) && u.tileIndex !== a.move && !attackPlot(state, u, a.move) && !stackedAt(state, u, a.move)) {
       moveTo(state, u, a.move);
     }
   }

@@ -7118,3 +7118,38 @@ is ported.
   1117 t80-103 / 1127 t27-126 Attack Civilian and Rampage moves the game
   makes none of (1117 t80 Warrior 3670030 holding on 32:16 for 31:13). Open:
   the kept path's drop, and what keeps those moves unmade in the game.
+
+## C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins
+
+`groundOf`'s `plainCivilians` (enter / attack, cpu/core/tactical.ts) and its
+`seenZoc`; `inEnemyZoc` (cpu/core/units.ts); `carryOut`'s move. GPU
+`_tac_fighters`, `_tac_enter(plain_civ)`, `_tac_attack_planes`, `_tac_zoc`,
+`_tac_carry_out` (gpu/core/sim_tactics.py).
+
+- THE PLANNING'S STEP ONTO A CIVILIAN (0x26e570): the attack test is a
+  district at war with hit points or a unit at war that fights (0x209dd0);
+  a civilian at war is neither, so the planning's search (not a move
+  order's path, not the danger map's) steps onto its plot as onto any
+  other — Movement left on it, the search going on past it, and from a plot
+  in a seen zone of control (0x26e83e) no such step. Over the five duels
+  t1-140 the planning rows of a unit beside or reaching a hostile
+  civilian's plot read 475 equal / 51 differ as plain steps, 357 / 167 as
+  attacks (the 51 a step cost apart). runs/h1_duely1128 t35: the barbarian
+  Warrior on 15:13 lists player 1's Settler's 16:13 at (1/1).
+- THE ZONE ACROSS A RIVER (0x530f50): the plot entered and its six
+  neighbours in turn; a district at war that exerts one (0x24c2f0) zones
+  before the river is read; a unit (at war, alive, of the mover's domain,
+  exerting, seen) only where the neighbour's river bit toward the plot
+  (+0x38 by 0x2133b0) is clear or the neighbour is a city (IsCity).
+- THE ATTACK'S MOVE ONTO A CITY (0x771f80 at 0x772121): the move of an
+  assignment off its spot is a MoveTo order with flags 0 (0x962030); for a
+  spot the unit would attack into (a hostile city or Encampment, no unit on
+  it so 0x5862e0 clear) it takes the unit nowhere.
+- runs/h1_duely1121 t97-103: the raid's Man-At-Arms 2883594 on 6:14 lists
+  China's Great Scientist's 5:12 at (2/1), linked from the city 6:12 (its
+  attack goes on), none from 5:13, which the city zones across the river;
+  the civilian's first spot 6:12 (turn 2), the order onto the city, the
+  unit on 6:14 each turn, as logged.
+- OPEN: a city's or Encampment's zone in a move's cost (`inEnemyZoc`
+  counts units alone); the MoveTo order's own refusal of the city (the
+  operation's start) is read on the recording, not in the order's code.

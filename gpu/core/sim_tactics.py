@@ -314,19 +314,23 @@ class SimTactics:
             return ex | ~ex.any(dim=1, keepdim=True)
         return None
 
-    def _tac_enter(self, seat: int, revealed_only: bool = True, foes: bool = True) -> tuple[torch.Tensor, torch.Tensor]:
+    def _tac_enter(self, seat: int, revealed_only: bool = True, foes: bool = True,
+                   plain_civ: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat` may
         enter (`enterable`): its domain's ground, no unit of a player at war
-        with it (another player's unit it passes), no city centre but its
-        own (a hull's passage, `_hull_pass`, the NAVAL plane's too), no live
-        enemy Encampment, no major's or city-state's ground closed to a
-        city-state (`_tac_closed`), with `revealed_only` (the lists', not a
-        path's) none it never revealed (`_tac_known`). With no `foes` the
-        location test alone (`groundOf`'s fits): no unit and no closed ground
-        counted. The NAVAL plane is the water an embarking land unit takes too."""
+        with it (another player's unit it passes; with `plain_civ`, the
+        planning's search, none but one that fights, `_tac_fighters`), no
+        city centre but its own (a hull's passage, `_hull_pass`, the NAVAL
+        plane's too), no live enemy Encampment, no major's or city-state's
+        ground closed to a city-state (`_tac_closed`), with `revealed_only`
+        (the lists', not a path's) none it never revealed (`_tac_known`).
+        With no `foes` the location test alone (`groundOf`'s fits): no unit
+        and no closed ground counted. The NAVAL plane is the water an
+        embarking land unit takes too."""
         block = self._centre_plane() & (self.tile_seat != seat)
         if foes:
-            block = block | self._tac_hostile(seat) | self._tac_closed(seat)
+            hostile = self._tac_fighters(seat) if plain_civ else self._tac_hostile(seat)
+            block = block | hostile | self._tac_closed(seat)
         if self._encamp_didx >= 0:
             block = block | self._encamp_block_plane(seat)
         known = self._tac_known(seat) if revealed_only else None
@@ -337,25 +341,36 @@ class SimTactics:
         naval = ((self.wpass & (~self.ocean_tile | cart.unsqueeze(1))) | self._hull_pass()) & ~block
         return land, naval
 
+    def _tac_fighters(self, seat: int) -> torch.Tensor:
+        """[B, T] bool — a unit of a player at war with `seat` that fights
+        (0x209dd0: a Combat, Ranged or Bombard strength) holds the plot (an
+        aircraft or a spy holds none)"""
+        fight = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+            pc = pl.clamp(min=0)
+            ut = self.unit_type.gather(1, pc).clamp(min=0, max=self.NU - 1)
+            st = (self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0) | (self._type_bombard.take(ut) > 0)
+            s = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, -1))
+            fight |= (pl >= 0) & st & self._seats_hostile(seat, s)
+        return fight
+
     def _tac_attack_planes(self, seat: int, revealed_only: bool = True, planning: bool = True,
                            any_ground: bool = True) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """[B, T] bool three times — the plots a LAND and a NAVAL unit of
         `seat` attacks into (`groundOf`'s attack): in the planning
         (`planning`) a unit of a player at war with it that fights (0x26e570
         -> 0x209dd0), on the mover's own ground, on any with `any_ground` (the
-        danger map's); any such unit on ground of the mover's domain, a city
-        centre of such a player, an Encampment that blocks a land mover — on
-        plots it revealed, a move order's path (not `planning`) on plots it
-        sees now; and the fighters' water a land unit its player may embark
-        attacks into too."""
+        danger map's); a city centre of such a player, an Encampment that
+        blocks a land mover; out of the planning's search (a move order's
+        path, the danger map's) any unit at war on ground of the mover's
+        domain too — on plots it revealed, a move order's path (not
+        `planning`) on plots it sees now; and the fighters' water a land unit
+        its player may embark attacks into too."""
         foe = self._tac_hostile(seat)
-        fight = torch.zeros_like(foe)
-        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at) if planning else ():
-            pc = pl.clamp(min=0)
-            ut = self.unit_type.gather(1, pc).clamp(min=0, max=self.NU - 1)
-            st = (self._type_combat.take(ut) > 0) | (self._type_ranged_strength.take(ut) > 0) | (self._type_bombard.take(ut) > 0)
-            s = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, -1))
-            fight |= (pl >= 0) & st & self._seats_hostile(seat, s)
+        if planning and not any_ground:
+            # the planning's search: a civilian at war is a plain step
+            foe = torch.zeros_like(foe)
+        fight = self._tac_fighters(seat) if planning else torch.zeros_like(foe)
         fight &= self.passable | self.wpass
         ctr = self._centre_plane() & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
         land = self.passable & ((foe & ~self.water) | ctr)
@@ -379,10 +394,12 @@ class SimTactics:
         plot: a military unit hostile to it beside the plot that exerts a zone
         (no Ranged or Siege class without SUPPRESSION, none embarked, none of a
         chassis that exerts none), of the mover's domain (`naval`: a ship's
-        or a land unit's), none across a river. With `seen` [B, T]
+        or a land unit's), none across a river but from a city centre's plot
+        (Rules_Movement 0x530f50 at 0x5311a0..0x5311c9). With `seen` [B, T]
         (`groundOf`'s seenZoc) only an exerter on a plot it sees, and for a
-        land mover a hostile city or Encampment too. The mover's own ignoring
-        is the caller's."""
+        land mover a hostile city or Encampment too, across a river or not
+        (0x24c2f0 tested before the river). The mover's own ignoring is the
+        caller's."""
         mil = self.military_at
         here = mil >= 0
         ms = mil.clamp(min=0)
@@ -396,6 +413,7 @@ class SimTactics:
         ex = ex & self._seats_hostile(seat, mseat)
         if naval is not None:
             ex = ex & (self.unit_naval.take(mtype) == naval)
+        town = torch.zeros_like(ex)
         if seen is not None:
             ex = ex & seen
             if not naval:
@@ -403,11 +421,13 @@ class SimTactics:
                 town = self._centre_plane() & self._seats_hostile(seat, self.tile_seat)
                 if self._encamp_didx >= 0:
                     town = town | self._encamp_block_plane(seat)
-                ex = ex | (town & seen)
+                town = town & seen
         nb = self.neigh.clamp(min=0)
         bits = torch.arange(6, device=self.device).view(1, 1, 6)
         riv = (self.river_mask.unsqueeze(2) >> bits) & 1
-        return ((self.neigh >= 0).unsqueeze(0) & (riv == 0) & ex[:, nb]).any(dim=2)
+        on = (self.neigh >= 0).unsqueeze(0)
+        unit_z = on & ((riv == 0) | self._centre_plane()[:, nb]) & ex[:, nb]
+        return (unit_z | (on & town[:, nb])).any(dim=2)
 
     def _tac_zoc_ignored(self, utype: torch.Tensor) -> torch.Tensor:
         """bool — the chassis ignores zones of control (a naval raider, the
@@ -575,7 +595,8 @@ class SimTactics:
             # 0x26dcd0 -> 0x26eea0: GetMaxMoves), unmoved by its Movement left
             unmoved = getattr(self, f"{pre}_unit_mp")[rows, slots] >= granted
             mp = self._tac_full_now(pre)[rows, slots]
-        land, wat = self._tac_enter(seat, False)
+        # the planning's search passes a civilian at war (`plainCivilians`)
+        land, wat = self._tac_enter(seat, False, plain_civ=not zoc and not stand)
         # the plots the player revealed (`groundOf`'s known; a path reads
         # every plot as revealed): one it never revealed is entered, and no
         # step leaves it but the unit's own
@@ -2669,8 +2690,13 @@ class SimTactics:
                 self.military_at[bidx[back], mc[back]] = occ[back]
             mil = self.military_at[bidx, mc]
             own = (mil >= 0) & (self.unit_seat[bidx, mil.clamp(min=0)] == seat)
+            # the order (flags 0, no attack) moves no unit for a spot it would
+            # attack into: a hostile city centre or Encampment (`attackPlot`)
+            into = self._centre_plane() & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
+            if self._encamp_didx >= 0:
+                into = into | self._encamp_block_plane(seat)
             again = (go & getattr(self, f"{pre}_unit_alive")[bidx, u_b] & (getattr(self, f"{pre}_unit_tile")[bidx, u_b] != move[:, r])
-                     & ~self._tac_foreign(seat)[bidx, mc] & ~own)
+                     & ~self._tac_foreign(seat)[bidx, mc] & ~own & ~into[bidx, mc])
             self._tac_move_to(again, u_b, move[:, r], pre, seat)
 
         def can_act(r: int) -> torch.Tensor:

@@ -1,0 +1,14 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x2133b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...omain, exerting, seen) only where the neighbour's river bit toward the plot (+0x38 by 0x2133b0) is clear or the neighbour is a city (IsCity).
+  review: imported

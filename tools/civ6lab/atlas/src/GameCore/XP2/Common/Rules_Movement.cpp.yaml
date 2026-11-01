@@ -127,6 +127,9 @@
   semantics: "Rules_Movement's zone of control test (via 0x26f980 from the path cost 0x26e920, the step cost 0x270980 and the walk 0x26fe20 at 0x270800, the answer stored on the formation +0x518): the plot entered (x, y, the formation's layer 0x2665b0, 3 religious) is in a zone where the functor 0x52f710 over its ring (0x6aef0) finds one, else a neighbour holds a district of a player at war that exerts one (0x24c2f0) or a unit not the mover's player's, of a player at war (religious layer: another religion +0x1ce4), alive, of the mover's domain (0x266720), exerting (0x56d6c0) and seen by the mover's player (0x5033a0). An exerter on the path's destination answers no zone unless the plot's stacking count is at its limit (0x585eb0 against +0x58c). The costs then take max(cost, Movement left) (0x26eb7c, 0x270a2d) unless the path flags hold 0x800."
   status: READ
   cases:
+    - recording: h1_duely1121
+      turn: 97-103
+      value: "the plot entered and its six neighbours (0x5310c8, ebx -1 the plot itself): a district at war that exerts one (0x24c2f0) zones before any river test, so China's city 6:12 zones 5:13 across the river; a unit only where the neighbour's river bit toward the plot (+0x38, 0x2133b0) is clear or the neighbour is a city (IsCity, 0x5311c2)"
     - recording: h1_duelw1117
       turn: 8
       value: city-state 2's Warrior 196610 steps beside the camp's Spearman and still attacks
@@ -141,7 +144,9 @@
     - cpu/core/units.ts:inEnemyZoc
     - gpu/core/sim_tactics.py:_tac_zoc
     - cpu/core/units.ts:relMover
+    - cpu/core/units.ts:navalMover
   readings:
+    - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
   context:

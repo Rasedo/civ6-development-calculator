@@ -72,6 +72,9 @@
   semantics: "the planning search's valid wrapper. Attack test: a district at war with hit points (DistrictInfo +0x58 / +0x5c) on the plot, else (search flag +0x398 & 0x200 clear) any unit on the plot (0x75c50) of a player at war that fights (0x209dd0), no domain test; the attack's cost adds the Movement left (0x1d0 += 0x1d4) and nothing is linked from it (0x26e5cd: a parent with node flag +0x51 & 0x40 refused). At 0x26e83e..0x26e8ae, flag 0x200 clear, a step whose parent is not the unit's own plot and lies in the unit's enemy zone of control (0x26f980 -> 0x530f50) is refused unless it is an attack."
   status: READ
   cases:
+    - recording: h1_duely1121
+      turn: 97-103
+      value: "the raid's Man-At-Arms 2883594 on 6:14 lists China's Great Scientist's 5:12 at (2/1), a plain step from the city 6:12, none from 5:13 in the city's zone; its spot 6:12 as logged (civilian plots in the five duels' planning rows, t1-140: 475 equal / 51 differ as plain steps, 357 / 167 as attacks)"
     - recording: h1_duelv1121
       turn: 4
       value: city-state 4's Warrior at 32:22 lists the Scout's 33:23 across the river (2/0)
@@ -92,7 +95,9 @@
     - cpu/core/tactical.ts:turnsToPlot
     - cpu/core/tactical.ts:v
     - gpu/core/sim_tactics.py:by_layer
+    - cpu/core/tactical.ts:groundOf
   readings:
+    - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"

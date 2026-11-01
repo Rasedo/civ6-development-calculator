@@ -36,13 +36,13 @@ def fresh(rules, path, turns=30):
 def scalar_search(sim, b, slot, max_turns, zoc, dest=-1, link=None):
     """`search` (cpu/core/tactical.ts) for one unit, plot by plot; `link`
     sees each priced link (plot, from, turns, moves), the start first"""
-    land, wat = sim._tac_enter(BARB_SEAT, not zoc)
+    land, wat = sim._tac_enter(BARB_SEAT, not zoc, plain_civ=not zoc)
     cost = sim._tac_step_cost()[b].tolist()
     ut = int(sim.barb_unit_type[b, slot])
     naval = bool(sim.unit_naval[ut])
     zp = sim._tac_zoc(BARB_SEAT, naval=naval)[b].tolist() if zoc else None
     ent = (wat if naval else land)[b].tolist()
-    a_land, a_nav = sim._tac_attack_planes(BARB_SEAT, not zoc)
+    a_land, a_nav, _ = sim._tac_attack_planes(BARB_SEAT, not zoc, not zoc, False)
     fights = int(sim._type_combat[ut]) > 0
     atk = [bool(x) and fights and not e for x, e in zip((a_nav if naval else a_land)[b].tolist(), ent)]
     zign = bool(sim._tac_zoc_ignored(torch.tensor([ut]))[0])

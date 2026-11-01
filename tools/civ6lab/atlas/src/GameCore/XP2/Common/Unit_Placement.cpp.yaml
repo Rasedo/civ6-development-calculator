@@ -196,6 +196,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: Attack Units — READ, ported"
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
+    - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...its planning reach   the plots of turn 1 within 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60,..."
   context:

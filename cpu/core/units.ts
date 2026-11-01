@@ -571,9 +571,10 @@ export function inEnemyZoc(
   // zones no ship, a ship no land unit, embarked or not
   const navalMover = mover.type !== undefined && !!UNITS[mover.type]?.naval;
   for (const n of neighbors(state.map, tile)) {
-    // CIV6 (Zone of Control): rivers block ZOC — an exerter across a river
-    // from the entered tile halts nothing.
-    if (crossesRiver(state.map, tile, n)) continue;
+    // an exerter across a river from the entered tile halts nothing, but
+    // one standing in a city centre (Rules_Movement 0x530f50 at
+    // 0x5311a0..0x5311c9: the river bit, then IsCity on the neighbour)
+    if (crossesRiver(state.map, tile, n) && n.district !== 'CITY_CENTER') continue;
     for (const u of unitsAt(state, n.index)) {
       const relU = unitReligious(u.type);
       if (relU !== relMover) continue;

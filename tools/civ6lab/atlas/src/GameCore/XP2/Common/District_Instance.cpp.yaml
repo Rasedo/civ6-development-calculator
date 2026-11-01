@@ -397,10 +397,15 @@
     - recording: 1124
       turn: 201
       value: "a   Neighborhood, an Aqueduct none: 1124 t201, the Ironclads pass the   Neighborhood at 17:15 for the Campus at 17:14), complete (+0xb08) and not   pillaged (0x24c3a0);"
-  impl: [cpu/core/fog.ts:eyeHeight, gpu/core/sim_masks.py:_eye_height]
+  impl:
+    - cpu/core/fog.ts:eyeHeight
+    - gpu/core/sim_masks.py:_eye_height
+    - cpu/core/tactical.ts:Ground
+    - gpu/core/sim_tactics.py:_tac_zoc
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "H-1: the sight rule — READ (the walk 0x58b1d0, emulated); a city's look — READ"
+    - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
   context:
     - "...IENDLY_CITY; a player's at war (0x469cd0) a COMBAT_DISTRICT where the district defends (0x24c2f0: a City Center, an Encampment) — and then nothing else of the plot — and a PASSIVE_DIST..."
   review: reviewed

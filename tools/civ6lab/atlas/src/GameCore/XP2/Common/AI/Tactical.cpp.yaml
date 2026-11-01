@@ -182,6 +182,9 @@
     - recording: h1_duelw1121
       turn: 15
       value: the Horse Archer 983054 on 34:11 holds the Horseman 720906's spot, which stays on 31:9; the Horse Archer 1048591 ends on 34:10 as recorded
+    - recording: h1_duely1121
+      turn: 97-103
+      value: "the raid's Man-At-Arms 2883594 on 6:14, its spot China's city 6:12 (no unit on it, 0x5862e0 clear), stays on 6:14 every turn: the MoveTo order (0x962030, flags 0 at 0x77212e) takes it nowhere toward a plot it would attack into"
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
@@ -196,6 +199,7 @@
     - cpu/core/tactical.ts:passAttack
     - cpu/core/tactical.ts:passNavalPillage
   readings:
+    - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: Attack Units — READ, ported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
