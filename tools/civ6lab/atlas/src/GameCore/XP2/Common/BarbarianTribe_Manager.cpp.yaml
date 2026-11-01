@@ -289,16 +289,26 @@
 - addr: 0x1540b0
   final: 0xe52f0
   kind: function
-  status: PARTLY
-  impl: [cpu/core/barbarians.ts:barbBattleBoldness]
+  name: barbBattleDead
+  semantics: "a battle of two units (either side null skips — a city's or a district's shot) books its dead on the barbarian side's tribe (+0x11d0) through 0x148e90; the defender at full damage first, else the attacker"
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 36
+      value: "China's Scout 262146 kills tribe 2's Warrior 2490396 (UnitKilledInCombat names the Scout): the tribe's count -3 at t89, its seventh-turn raises t89-166 with their rolls, none after 166"
+    - recording: h1_duely1124
+      turn: 114
+      value: "Rome's centre kills tribe 3's Crossbowman 4915219 (UnitKilledInCombat's killer -1): its count stays 5 and its t122 strike raises nothing, no roll"
+  impl:
+    - cpu/core/barbarians.ts:barbBattleBoldness
+    - cpu/core/barbarians.ts:barbBattleDeath
+    - cpu/harness/replay.ts:barbFought
   readings:
     - "H-1: the raids — READ"
-    - "H-1: the raids — READ"
     - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e +0x20): +BARBARIAN_BOLDNESS_PER_TURN (2) each tribe turn (0x148ca3); a battle's dead (0x1540b0 -> 0x148e90: the defender dead, else the attacker): an enemy a tribe's unit killed +PER..."
-  review: imported
+  review: reviewed
 - addr: 0x154220
   final: 0xe5440
   kind: function
@@ -376,7 +386,10 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/barbarianOps.ts:taken]
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e70); the units it finds join, success; else the missing units go to the tribe's queue (0x155b50 -> 0x149750, +0x90) and it runs again next turn. Success or the limiter's end: Spawn Ch..."

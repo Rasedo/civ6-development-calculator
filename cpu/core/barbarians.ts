@@ -526,32 +526,35 @@ export function barbScoutLook(state: GameState, unit: Unit): void {
 }
 
 
-/** THE BARBARIANS' OWN BATTLES HELD: the action replay lands the record's
- *  battles before the barbarians' turn, where the game fights a barbarian's
- *  attack after their rules (each tribe's turn); it takes such a battle's
- *  boldness and counts (true) to land after `barbarianRules`
- *  (runs/h1_duely1128 t141: tribe 1's Warrior and Man-at-Arms die on
- *  China's Courser after its strike found five, so it raises none). Null
- *  outside a replay. */
-let battlesHeld: ((land: () => void) => boolean) | null = null;
-export function holdBarbBattles(held: typeof battlesHeld): void {
-  battlesHeld = held;
+/** THE RECORD BOOKS THE BATTLE: while the action replay fights a recorded
+ *  battle (the engine's combat on the game's draws), its dead are the
+ *  record's to book (`barbBattleDeath` on the record's kill), not the
+ *  engine's result's. False outside a replay's battle. */
+let recordBooks = false;
+export function barbBattlesFromRecord(on: boolean): void {
+  recordBooks = on;
+}
+
+/** A BATTLE'S DEAD (0x1540b0): the defender dead, else the attacker
+ *  (`barbBattleDeath`) */
+export function barbBattleBoldness(state: GameState, attacker: Unit, defender: Unit, aDied: boolean, dDied: boolean): void {
+  if ((!dDied && !aDied) || recordBooks) return;
+  const [killer, victim] = dDied ? [attacker, defender] : [defender, attacker];
+  barbBattleDeath(state, killer, victim);
 }
 
 /**
- * A BATTLE'S DEAD MOVE A TRIBE'S BOLDNESS (0x1540b0 / 0x148e90): the
- * defender dead, else the attacker — an enemy a tribe's unit killed
- * BARBARIAN_BOLDNESS_PER_KILL, a tribe's unit lost
- * BARBARIAN_BOLDNESS_PER_UNIT_LOST, its scout BARBARIAN_BOLDNESS_PER_SCOUT_LOST.
- * A tribe's units its camp's defender among them, which no raise counts but
- * whose death lowers the count (runs/h1_duely1128 t121: tribe 3's Spearman
- * on 4:1 dies attacking a Man-at-Arms, its five Quadriremes standing, and
- * the tribe raises a sixth at its t123 strike).
+ * A UNIT BATTLE'S DEAD MOVE A TRIBE'S BOLDNESS AND COUNTS (0x1540b0 ->
+ * 0x148e90; both sides units, so a city's or a district's shot books
+ * nothing): an enemy a tribe's unit killed BARBARIAN_BOLDNESS_PER_KILL, a
+ * tribe's unit lost BARBARIAN_BOLDNESS_PER_UNIT_LOST, its scout
+ * BARBARIAN_BOLDNESS_PER_SCOUT_LOST. A tribe's units its camp's defender
+ * among them, which no raise counts but whose death lowers the count
+ * (runs/h1_duely1128 t121: tribe 3's Spearman on 4:1 dies attacking a
+ * Man-at-Arms, its five Quadriremes standing, and the tribe raises a sixth
+ * at its t123 strike).
  */
-export function barbBattleBoldness(state: GameState, attacker: Unit, defender: Unit, aDied: boolean, dDied: boolean): void {
-  if (!dDied && !aDied) return;
-  if (isBarbSeat(attacker.seat) && battlesHeld?.(() => barbBattleBoldness(state, attacker, defender, aDied, dDied))) return;
-  const [killer, victim] = dDied ? [attacker, defender] : [defender, attacker];
+export function barbBattleDeath(state: GameState, killer: Unit, victim: Unit): void {
   if (isBarbSeat(killer.seat) && !isBarbSeat(victim.seat)) {
     const tr = tribeOf(state, killer.id);
     if (tr) tr.boldness = (tr.boldness ?? 0) + BARB_BOLD_KILL;

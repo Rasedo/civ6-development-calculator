@@ -593,6 +593,18 @@
   context:
     - "- A city's yield (Lua City:GetYield 0x981dd0 -> 0xaa060 -> GameAttribute value 0xaa740): ONE fixed-point modifier per attribute, clamped to (..."
   review: imported
+- addr: 0xf03b0
+  kind: function
+  name: string vector assign
+  semantics: clears the destination's strings and copies the source's (operator=); the tribe queue's setter 0x149750 (+0x90) takes Barbarian Recruit's missing list through it, replacing the queue
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 9
+      value: "camp (40,21): the queue's raises t9 W, t10 W, t11 S, t12 S, the StandardRaid's missing list, no roll among them"
+  impl: [cpu/core/barbarianOps.ts:hooksOf]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
 - addr: 0x116f80
   final: 0x2af30
   kind: function
@@ -643,7 +655,10 @@
   final: 0xdd1a0
   kind: function
   status: PARTLY
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...its it finds join, success; else the missing units go to the tribe's queue (0x155b50 -> 0x149750, +0x90) and it runs again next turn. Success or the limiter's end: Spawn Change back to..."
@@ -700,14 +715,16 @@
     - "...(+0x58), no raid running: boldness >= RaidingBoldness starts it; either pops its list. 0x149980 / 0x1497d0 refuse while either operation runs."
   review: imported
 - addr: 0x14c930
-  final: 0xdfe20
   kind: function
-  status: PARTLY
+  name: tribe copy
+  semantics: a tribe's move into the tribe list's grown block (called from 0x1554e0); copies +0xa8..+0xb4 among the rest
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 166
+      value: "a copy only: the pending class counts keep their 0 (tribe 2's raises t89-166 on the capped rule)"
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
-  context:
-    - .../ inc / mov of +0xa8..+0xb4 in 0x140000..0x160000 or 0x7c0000..0x7d0000 but the copies 0x14c930 / 0x142650 / 0x142e90 / 0x7ca670 and the decrements). runs/h1_duely1128 tribe 2 raise...
-  review: imported
+  review: reviewed
 - addr: 0x1a7710
   final: 0x11a290
   kind: function
@@ -4155,7 +4172,9 @@
       turn: 35
       value: The recruit's request (0x7c7580 -> 0x60a8c0, the unit evaluator +0x12d0) walks the player's units (+0x12e8 -> +0xd8) unassigned (+0x7d0 -1), alive, and the operation's units it took are then listed (0
   impl: [cpu/core/barbarianOps.ts:inOps, gpu/core/sim_barbops.py:_bop_recruit]
-  readings: ["H-1: the raids — READ"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
   context:
     - "...Warrior 2162693, slot 5, taken before 1835024, slot 16, the older). The tribe's request (0x7c62f0, its vtable @d72bb8) walks that list: a unit of the tribe (+0x11d0) of each class (0x8c28..."
   review: imported

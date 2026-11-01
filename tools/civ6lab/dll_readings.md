@@ -1711,6 +1711,36 @@ clans' 0x8e1bf0 (no clans in these games).
   The engines: `BarbTribe.unitCount` / `scoutCount` (`tribeTurn`,
   `raiseCamp`, `barbBattleBoldness`; the replay's `adoptByTribe` counts a
   recorded raise) / `tribe_unitn` / `tribe_scoutn`.
+  THE BATTLE'S SIDES (0x1540b0, READ): it books only a battle of two units
+  (either pointer null — a city's or a district's shot, an attack on a
+  city — skips), the side at full damage (0x56e0d0) the dead, the
+  defender's first; the tribe the barbarian side's (+0x11d0). The game's
+  own kill events tell it: UnitKilledInCombat names the killer's unit
+  (-1 for a centre's or an Encampment's shot). The replay books a recorded
+  battle's dead from that event, the engine's blow being drift
+  (`barbBattleDeath`, `barbBattlesFromRecord`; runs/h1_duely1128 t36:
+  China's Scout 262146 kills tribe 2's Warrior 2490396 where the engine's
+  blow kills the Scout, and t64 the Swordsman 3604488; h1_duely1124 t114:
+  Rome's centre kills tribe 3's Crossbowman 4915219 where the engine's
+  Trebuchet does, and the game's tribe raises none at its t122 strike).
+  THE PENDING CLASS COUNTS (+0xa8 / +0xac / +0xb0 / +0xb4, READ): the spawn
+  turn raises a melee, ranged, siege, support unit for each one above 0
+  before the capped roll (0x148b18..0x148bbb, each decremented on a
+  raise), but nothing in the binary writes them except the tribe's load
+  (0x1433b0: zero below save version 3, else read; written by 0x143d80)
+  and its copy (0x14c930, called from the tribe list's growth) —
+  a scan of every function for a write at those displacements (any base,
+  indexed or not, and every `lea` of +0xa8) finds no other. They stand at
+  0: tribe 2 of h1_duely1128 raises every seventh turn t89-166 on the
+  capped rule (each one with its "Barbarian Ranged unit roll"), its count
+  -3 at t89 (nine counted raises, twelve unit battles' dead: the queue's
+  raises uncounted, their deaths counted), 4 before its t166 raise, 5
+  after it, and no raise after; its t103-167 dead are an Encampment's or
+  a centre's shots, which lower nothing. THE QUEUE (+0x90): Barbarian
+  Recruit's failure (0x7c7ae9 -> 0x155b50 -> 0x149750 -> 0x0f03b0)
+  ASSIGNS the request's missing list (0x7c62f0 fills it once, +0x28 empty
+  at +0x38: per class, melee, ranged, the third and fourth lists, the
+  count less the units held), it does not append.
 - Raids: "H-1: the raids" below.
 
 - THE MOST CAMPS (+0x110, READ): an AutoVariable (+0xb8, its value at

@@ -113,7 +113,7 @@ export type Decision = Base & (
   | { kind: 'seize'; player: number; unit: string; from: number; plot: number; victim: string; into?: string }
   /** a unit killed in combat (`UnitKilledInCombat`): the killer's player and
    *  type (-1 a city's shot or unknown), the victim's player and type */
-  | { kind: 'kill'; player: number; killerType: number; victim: number; victimType: number; victimUnit: string }
+  | { kind: 'kill'; player: number; killerType: number; killerUnit: string; victim: number; victimType: number; victimUnit: string }
   /** a promotion the player picked (`UnitPromoted`): the unit, the catalog's
    *  `unitPromotions` index, the experience the unit held at record t;
    *  `formed` one the unit carries over from a formation (logged right after
@@ -719,7 +719,7 @@ export class RecordedActions implements ActionSource {
           return u ? num(u.type) : -1;
         };
         // after the engine's turn, which may have fought the same battle
-        out0.push({ kind: 'kill', phase: 'after', player: n(r, 2), killerType: typeOf(n(r, 2), n(r, 3)),
+        out0.push({ kind: 'kill', phase: 'after', player: n(r, 2), killerType: typeOf(n(r, 2), n(r, 3)), killerUnit: `${n(r, 2)}:${n(r, 3)}`,
           victim: n(r, 0), victimType: typeOf(n(r, 0), n(r, 1)), victimUnit: `${n(r, 0)}:${n(r, 1)}` });
       } else if (name === 'PantheonFounded') {
         put('pantheon', `${n(r, 0)}:${n(r, 1)}`, { kind: 'pantheon', phase: phaseOf(n(r, 0)), player: n(r, 0), belief: n(r, 1) });

@@ -12,15 +12,30 @@
   context:
     - ...0xb4 in 0x140000..0x160000 or 0x7c0000..0x7d0000 but the copies 0x14c930 / 0x142650 / 0x142e90 / 0x7ca670 and the decrements). runs/h1_duely1128 tribe 2 raises each clock t89-166 at...
   review: imported
+- addr: 0x1433b0
+  final: 0xd8b30
+  kind: function
+  name: tribe read
+  semantics: the tribe's load; the pending class counts +0xa8..+0xb4 zero below save version 3, else read (0x143766); with the copy 0x14c930 their only writers
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 166
+      value: "tribe 2's seventh-turn raises t89-166 each take the ranged roll (the capped rule), its count 4 before t166 and 5 after, none raised after: no pending count raises"
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: reviewed
 - addr: 0x143d80
   final: 0xd9500
   kind: function
-  status: PARTLY
+  name: tribe write
+  semantics: the tribe's save; +0x88 then the pending class counts +0xa8, +0xac, ... (4 bytes each)
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 166
+      value: "the pending counts saved as they stand: 0 (tribe 2's raises t89-166 on the capped rule)"
   readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
-  context:
-    - "...a support unit (formation class 1) +0x34 by one (no other write to +0x28 or +0x34 in 0x144000..0x156000). A unit gone any other way — disbanded, converted or captured — still counts..."
-  review: imported
+  review: reviewed
 - addr: 0x144260
   final: 0xd98c0
   kind: function
@@ -254,7 +269,7 @@
   kind: function
   status: PARTLY
   impl:
-    - cpu/core/barbarians.ts:barbBattleBoldness
+    - cpu/core/barbarians.ts:barbBattleDeath
     - cpu/data/barbarians.ts:BARB_BOLD_TURN
     - gpu/core/sim_barb.py:_barb_battle_boldness
     - cpu/core/barbarians.ts:barbUnitLost
