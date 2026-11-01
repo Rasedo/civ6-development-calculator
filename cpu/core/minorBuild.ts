@@ -63,6 +63,7 @@ import { hasRiver } from '../../world/query';
 import { aliases, engineId, gameTypeOf } from '../data/aliases';
 import { DISTRICTS } from '../data/districts';
 import { AI_BUILDINGS, AI_PROJECTS, AI_PROMOTION_CLASS_LISTS, AI_UNITS } from '../data/aiBuildTables';
+import { AI_GP_CLASS_PSEUDOYIELD, AI_GREAT_PERSON_CLASSES } from '../data/aiTables';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { TECH_IMPROVEMENT_RESOURCES, resourceValue, type ResourceFacts } from './aiResource';
 import { RESOURCES, extractsResource } from '../../world/resources';
@@ -330,8 +331,11 @@ export function minorResearchAi(state: GameState, cityState: CityState): () => v
  * (`minorResearchBank`); then, off the city as that research left it, its Gold
  * banks and pays its units' upkeep — each unit's own Maintenance, a minor
  * carrying no government or policy that cuts it — and meets the
- * `bankruptcy` every seat meets, and its Faith banks. Returns how many
- * technologies it completed, the upgrade trigger's count.
+ * `bankruptcy` every seat meets, and its Faith banks: the city's, and the
+ * Great Person points a turn of every class it cannot earn (GetFaithYield
+ * 0x496fd0 -> 0x494090 -> 0x43c9a0 over the store +0x168), a city-state's
+ * every class (`CityState.gpPoints`). Returns how many technologies it
+ * completed, the upgrade trigger's count.
  */
 export function minorEconomy(state: GameState, cityState: CityState): number {
   let y = computeCityStats(state, minorCity(cityState)).total;
@@ -345,6 +349,7 @@ export function minorEconomy(state: GameState, cityState: CityState): number {
   cityState.netIncome = y.gold - upkeep;
   bankruptcy(state, cityState, (u) => unitMaintenance(u));
   cityState.faith += y.faith;
+  for (const v of Object.values(cityState.gpPoints ?? {})) cityState.faith += v;
   return gained.techs;
 }
 
@@ -946,8 +951,9 @@ export function minorItemKey(item: MinorItem): string {
  * The walls' repair restores the walls, the city's and its Encampment's, at
  * the HP it puts back (`projectCost`); a district project converts the row's
  * `yieldPct` of what the step paid in (never above its cost) into its yield,
- * which the city's yields read until the next step (`CityState.projectYield`;
- * a city-state earns no Great People, so its points go nowhere). The step
+ * which the city's yields read until the next step (`CityState.projectYield`),
+ * and its completion adds its Great Person points to the minor's store
+ * (`projectGreatPersonPoints`, `CityState.gpPoints`). The step
  * clears the last conversion first. A PILLAGED building is queued after the
  * item the minor was working on when it fell (`CityState.repairWait`) and
  * then comes first, or at once with nothing in hand: it resumes at
@@ -2003,11 +2009,40 @@ export function minorBuyBuilding(state: GameState, cityState: CityState, id: str
   return true;
 }
 
+/** a district project's Project_GreatPersonPoints rows: per row its class
+ *  (the first GREAT_PERSON_CLASS_* whose pseudo-yield the row names), its
+ *  Points and its PointProgressionParam1 */
+export function projectGreatPersonRows(project: string): { cls: string; points: number; param: number }[] {
+  const row = AI_PROJECTS.find((p) => p.type === project);
+  const out: { cls: string; points: number; param: number }[] = [];
+  for (const [pseudo, points, param] of row?.gpp ?? []) {
+    const cls = AI_GREAT_PERSON_CLASSES.find((c) => AI_GP_CLASS_PSEUDOYIELD[c] === pseudo);
+    if (cls) out.push({ cls, points, param });
+  }
+  return out;
+}
+
+/**
+ * A DISTRICT PROJECT'S GREAT PERSON POINTS as its completion grants them
+ * (0x43d510): each row's Points escalated on the game's progress `pct`
+ * (COST_PROGRESSION_GAME_PROGRESS, 0x5267a0 type 1: Points + (Points x
+ * Param1 / 100 - Points) x pct / 100, truncated). runs/h1_duely1124
+ * Bologna's Campus Research Grants at t35 (9%) 16 and t40 (11%) 17 Great
+ * Scientist points, its Faith a turn 16 / 33 in the records after.
+ */
+export function projectGreatPersonPoints(project: string, pct: number): { cls: string; points: number }[] {
+  return projectGreatPersonRows(project).map((g) => ({
+    cls: g.cls, points: g.points + Math.trunc((Math.trunc((g.points * g.param) / 100) - g.points) * pct / 100),
+  }));
+}
+
 /** THE MINOR'S ITEM COMPLETES: the unit stands on the centre, beside the
  *  minor's own units there (`spawnUnit`'s 'stack'), with the city's training
  *  grants (none where no plot takes it: the item waits), the
- *  building rises, the district is laid, the project or the repair lands;
- *  the item in hand is done. Returns whether it completed. */
+ *  building rises, the district is laid, the project or the repair lands —
+ *  a district project's Great Person points into the minor's store
+ *  (`CityState.gpPoints`); the item in hand is done. Returns whether it
+ *  completed. */
 function minorFinish(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): boolean {
   const city = minorCity(cityState);
   let built = -1;
@@ -2045,6 +2080,10 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
     if (PROJECTS[item.project].repair) {
       cityState.outerHp = wallsMax(state, city);
       fitEncampOuter(state, city);
+    }
+    const r = cityState.research;
+    for (const g of projectGreatPersonPoints(installType('project', item.project, 'PROJECT_'), gameProgressPct(r.techs.length, r.civics.length))) {
+      (cityState.gpPoints ??= {})[g.cls] = (cityState.gpPoints[g.cls] ?? 0) + g.points;
     }
   } else {
     repairBuilding(cityState, item.repair);

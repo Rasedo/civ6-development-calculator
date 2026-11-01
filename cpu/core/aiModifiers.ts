@@ -814,8 +814,12 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // whole with the wonder's). COMBAT_EXPERIENCE (0xc819e0a3): its units x
   // PSEUDOYIELD_UNIT_COMBAT of the Amount / 10.0, likewise, then GREAT_PEOPLE's
   // term (0xf8705d00, which the branch runs on into): per class its points a
-  // turn x the Amount as the class's pseudo-yield, likewise — a city-state's
-  // none (its player list holds no city), the Free Cities' not read.
+  // turn (the player's store +0x1360 +0x168) x the Amount as the class's
+  // pseudo-yield, likewise — a city-state's the points its district
+  // projects added (runs/h1_duely1124 Bologna t36-44: Political
+  // Philosophy +71 / +147 on Campus Research Grants' 16 / 33 Great
+  // Scientist points, the three governments' terms), the Free Cities' not
+  // read.
   // OVERALL_PRODUCTION (0xc1a005d2): its cities' Production x the Amount at
   // its weight, likewise; UNIT_PRODUCTION (0x3d5ff1a2): the cities' with a
   // unit at their queue's head (0x179860), x the Amount x PSEUDOYIELD_UNIT_
@@ -1065,8 +1069,11 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // damage below its maximum, 0x24ae50 / 0x24b290 on 0x6da56a3d): Amount, raw
   EFFECT_ADJUST_CITY_OUTER_DEFENSE: (t, args, s) =>
     s.kind === 'city' && t.view.cityOuterStands(s.seat, s.id) ? Number(args.Amount ?? 0) | 0 : 0,
-  // 0x6a69c0: a city subject whose centre's strike (0x249ee0) has a whole
-  // part above 0: that whole part x Amount / 100, truncated, raw
+  // 0x6a69c0: a city subject whose centre's strike (0x249ee0, none where
+  // 0x24b960 finds no outer defence standing) has a whole part above 0:
+  // that whole part x Amount / 100, truncated, raw (runs/h1_duely1117
+  // city-state 2's Bastions unlogged t47-56 on an Archer's 25 and no walls,
+  // 7.0 from t57)
   EFFECT_ADJUST_CITY_RANGED_STRIKE: (t, args, s) => {
     if (s.kind !== 'city') return 0;
     const strike = t.view.cityStrike(s.seat, s.id);

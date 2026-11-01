@@ -521,12 +521,17 @@ class SimPolicy:
             pool = torch.minimum(self.city_outer_hp[:, row, sub["j"]].long(), walls)
             return torch.where(pool > 0, full(amount), zero)
         if eff == "EFFECT_ADJUST_CITY_RANGED_STRIKE":
-            # the centre's strike (0x249ee0), its whole part x Amount / 100
+            # the centre's strike (0x249ee0), its whole part x Amount / 100;
+            # none where its outer defence does not stand (0x24b960: the
+            # walls' pool, `cityStrike`)
             if not city:
                 return zero
+            row = ctx["row"]
             col = torch.full((B,), sub["j"], dtype=torch.long, device=dev)
-            strike = torch.trunc(self._strike_strength(ctx["row"], col)).long()
-            return torch.where(strike > 0, torch.div(strike * amount, 100, rounding_mode="trunc"), zero)
+            walls = self._walls_max_at(torch.full_like(col, row), col).long()
+            pool = torch.minimum(self.city_outer_hp[:, row, sub["j"]].long(), walls)
+            strike = torch.trunc(self._strike_strength(row, col)).long()
+            return torch.where((pool > 0) & (strike > 0), torch.div(strike * amount, 100, rounding_mode="trunc"), zero)
         if eff == "EFFECT_ADJUST_POLICY_AMENITY":
             # the Amount's Amenities more in the city subject (0x79f7c0)
             if not city:
@@ -549,7 +554,10 @@ class SimPolicy:
             # the best city Production x PSEUDOYIELD_WONDER of the Amount
             # (WONDER_CONSTRUCTION), running on into the units x
             # PSEUDOYIELD_UNIT_COMBAT of the Amount / 10 (COMBAT_EXPERIENCE),
-            # then the GREAT_PEOPLE term (a minor's Great Person points none)
+            # then the GREAT_PEOPLE term: per class the points a turn of the
+            # store its district projects filled (`citystate_gp_points`) x
+            # the Amount as the class's pseudo-yield (the Free Cities' not
+            # read)
             bonus = a.get("BonusType")
             pct = _fx_const(_f32(amount * _f32(0.01)))
             if bonus == "GOVERNMENTBONUS_ENVOYS":
@@ -558,7 +566,7 @@ class SimPolicy:
                 pts = int(self.rules.civic_ai["cityStateInfluencePoints"]) * _FX
                 p = "PSEUDOYIELD_INFLUENCE"
                 return between(self._cv_pseudo(full((pct * pts) // _FX), p, f0.pseudo_w(p))) >> 8
-            if bonus in ("GOVERNMENTBONUS_WONDER_CONSTRUCTION", "GOVERNMENTBONUS_COMBAT_EXPERIENCE"):
+            if bonus in ("GOVERNMENTBONUS_WONDER_CONSTRUCTION", "GOVERNMENTBONUS_COMBAT_EXPERIENCE", "GOVERNMENTBONUS_GREAT_PEOPLE"):
                 acc = zero
                 if bonus == "GOVERNMENTBONUS_WONDER_CONSTRUCTION":
                     best = zero
@@ -568,14 +576,24 @@ class SimPolicy:
                     p = "PSEUDOYIELD_WONDER"
                     pv = self._cv_pseudo(full(pct), p, f0.pseudo_w(p))
                     acc = between(_fmul(best, pv))
-                # the wonder's term runs on into COMBAT_EXPERIENCE's, summed
-                # before the whole
-                pre = "barb" if ctx["s"] == self.FR else "major"
-                n = (getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == ctx["seat"])).long().sum(dim=1)
-                p = "PSEUDOYIELD_UNIT_COMBAT"
-                pv = self._cv_pseudo(full(pct), p, f0.pseudo_w(p))
-                x = torch.div(n * _FX * pv, _FX, rounding_mode="floor")
-                return (acc + between(_fdiv(x, torch.full_like(x, 10 * _FX)))) >> 8
+                # the wonder's term runs on into COMBAT_EXPERIENCE's and that
+                # into GREAT_PEOPLE's, summed before the whole
+                if bonus != "GOVERNMENTBONUS_GREAT_PEOPLE":
+                    pre = "barb" if ctx["s"] == self.FR else "major"
+                    n = (getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == ctx["seat"])).long().sum(dim=1)
+                    p = "PSEUDOYIELD_UNIT_COMBAT"
+                    pv = self._cv_pseudo(full(pct), p, f0.pseudo_w(p))
+                    x = torch.div(n * _FX * pv, _FX, rounding_mode="floor")
+                    acc = acc + between(_fdiv(x, torch.full_like(x, 10 * _FX)))
+                if ctx["s"] != self.FR:
+                    pseudo_of = self.rules.civic_ai["gpClassPseudo"]
+                    for c, cls in enumerate(self.rules.civic_ai["gpClassTypes"]):
+                        p = pseudo_of.get(cls)
+                        if not p:
+                            continue
+                        pts = torch.floor(self.citystate_gp_points[:, ctx["s"], c] * _FX + 0.5).long()
+                        acc = acc + between(self._cv_pseudo(_fmul(full(pct), pts), p, f0.pseudo_w(p)))
+                return acc >> 8
             if bonus in ("GOVERNMENTBONUS_OVERALL_PRODUCTION", "GOVERNMENTBONUS_UNIT_PRODUCTION", "GOVERNMENTBONUS_GOLD_PURCHASES"):
                 # the Free Cities' not read
                 if ctx["s"] == self.FR:

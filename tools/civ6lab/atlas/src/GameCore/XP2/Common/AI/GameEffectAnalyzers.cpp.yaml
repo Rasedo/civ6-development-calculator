@@ -223,21 +223,22 @@
   final: 0x47d360
   kind: function
   name: EFFECT_ADJUST_CITY_RANGED_STRIKE
-  semantics: "EFFECT_ADJUST_CITY_RANGED_STRIKE (@f03d20, vtable 0xd62ad0): the centre's strike 0x249ee0, its whole part above 0, x Amount / 100 truncated, raw."
+  semantics: "EFFECT_ADJUST_CITY_RANGED_STRIKE (@f03d20, vtable 0xd62ad0): with the context's city (+0x70), its centre (0x1cb400)'s strike 0x249ee0 with the flag clear — 0 unless 0x24b960 holds (the outer defence standing) — its whole part above 0, x Amount / 100 truncated, added raw into the sum +0xc0."
   status: READ
   cases:
-    - recording: h1_duelw1121
-      turn: 40
-      value: "LAB: a city-state's centre reads its outer defence standing with   or without walls — every minor's Bastions reads its +6 before any walls   (runs/h1_duelw1121 Ayutthaya t40-58, walls at t59;"
-    - recording: 1117
-      turn: 40
-      value: "Hunza t40, walls t41),   7 / 8 / 9 with the strike's term — while in combat a wall-less city-state's   centre has no outer pool (CombatLog: 1117 t13 a Warrior's 18 on Valletta,   1116 t8-9, 1127 t22-2"
-    - recording: 1121
-      turn: 40
-      value: every minor turn the game lists Bastions equal (1121 t40-75, 1117 t32-75).
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+    - recording: h1_duely1117
+      turn: 47
+      value: "city-states 2 and 4: Bastions unlogged t47-56 / t48-63 with no walls on a trained ranged strike of 20 or more, 7.0 from their walls (t57 / t64)"
+    - recording: h1_duely1128
+      turn: 37
+      value: city-state 4's Bastions unlogged t37-39 with no walls
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiView.ts:aiView
+    - gpu/core/sim_policy.py:_pol_analyze
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
   context:
     - "...(0x24b290 -> City +0x1880, 0x198310) adds Amount raw. EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 (@f03d20, vtable 0xd62ad0): the centre's strike 0x249ee0, its whole part above 0, x A..."
   review: reviewed
@@ -1483,6 +1484,9 @@
     - recording: lab3_gov1121
       turn: 11
       value: "Antioch (player 4), the parts live (govlog.py sites 5-10, FinalRelease 0x47634e..0x476580): Autocracy's Amount 0.0977, best Production 3.5 (city 65536), PSEUDOYIELD_WONDER 0.1953, wonder term 13.734 over 0..50 at t8-14; COMBAT_EXPERIENCE PSEUDOYIELD_UNIT_COMBAT 0.0977 / 0.0977 / 0.0977 / 0.2266 / 0.1055 / 0.1055 / 0.0977 at t8-14 (x (1 + the Combat Desire AI_Military.csv logs that turn: 0.0 / 0.0 / 0.0 / 1.3 / 0.1 / 0.1 / 0.0), units 1 / 1 / 1 / 1 / 1 / 2 / 2, term 0.152 / 0.152 / 0.152 / 0.383 / 0.152 / 0.383 / 0.383; the flat bonus whole(13.734 + that) 13 / 13 / 13 / 14 / 13 / 14 / 14; no great people term"
+    - recording: h1_duely1124
+      turn: 36
+      value: "Bologna (player 4): the GREAT_PEOPLE class loop on the store player +0x1360 +0x168 (Campus Research Grants' 16 / 33 Great Scientist points from t35 / t40): Political Philosophy and its dependants +71 at t36-41, +147 at t42-44, as logged"
   impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_analyze]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -1491,6 +1495,7 @@
     - "C-130: the flat bonus's wonder term runs on into the combat experience term — READ, both twins"
     - "C-130: Antioch's government values read the Combat Desire of their own turn (live) — READ"
     - "C-130: a city-state's government values on the city its update left; the boosts its city's turn earns land at once — READ, both twins"
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EFFECT_ADJUST_FLAT_BONUS 0x6c5700 (@f03ea0, vtable 0xd626c8; its parser 0x6c4e40: fx(Amount x 0.01f) +8, the BonusType's..."

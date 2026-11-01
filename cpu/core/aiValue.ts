@@ -302,7 +302,8 @@ export interface AiValueView {
   /** a city centre's outer defence stands (0x24b290 on 0x6da56a3d above its
    *  damage, district +0x8d8): its walls' pool above 0 */
   cityOuterStands(seat: number, cityId: number): boolean;
-  /** a city centre's strike strength (0x249ee0), its whole part */
+  /** a city centre's strike strength (0x249ee0), its whole part; 0 where
+   *  its strike does not stand (0x24b960: its walls' pool spent or none) */
   cityStrike(seat: number, cityId: number): number;
   /** the turns a city builds a UnitType, BuildingType or DistrictType in
    *  (0x17bb40, 0x17b1e0, 0x17b5a0) at its Production times 1 + its percent
@@ -348,7 +349,7 @@ export interface AiValueView {
    *  its CityBuildAI's growth forecast), raw */
   cityHousingValue(seat: number, cityId: number, housing: number, t: number, h: number): number;
   /** the seat's Great Person points a turn toward a class
-   *  (GREAT_PERSON_CLASS_*) */
+   *  (GREAT_PERSON_CLASS_*); a city-state's its district projects' store */
   greatPersonPointsPerTurn(seat: number, cls: string): number;
   /** the seat's diplomatic victory points, and the points a victory takes
    *  (DIPLOMATIC_VICTORY_POINTS_REQUIRED) */

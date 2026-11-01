@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x439b30
+  final: 0x2e2740
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0x168) holds a fixed-point value per Great Person class. The turn 0x43c190 rewrites it (0x439b30 per class, then 0x43b1c0 adds it to the total) only where CanEarnGreatPeople (0x43a980)...
+  review: imported
 - addr: 0x43a980
   final: 0x2e2dc0
   kind: function
@@ -10,9 +20,33 @@
   semantics: the civilization level's CanEarnGreatPeople.
   status: PARTLY
   impl: [cpu/core/aiPolicyValue.ts:policyObsolete]
-  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
   context:
     - "...nClass the player cannot earn, 0x2f1ed0: its civilization level's CanEarnGreatPeople (0x43a980; a city-state's and the Free Cities' levels lack it — no city-state of the five duels l..."
+  review: reviewed
+- addr: 0x43b1c0
+  final: 0x2e3250
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...t value per Great Person class. The turn 0x43c190 rewrites it (0x439b30 per class, then 0x43b1c0 adds it to the total) only where CanEarnGreatPeople (0x43a980) holds; a city-state ne...
+  review: imported
+- addr: 0x43c190
+  kind: function
+  semantics: "The player's Great Person turn: only where CanEarnGreatPeople (0x43a980) holds, per class the store +0x110 (data +0x168) is set to the class's points a turn (0x439b30) and those added to the total (0x43b1c0). A city-state never runs it, so its store keeps every grant."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 36
+      value: Bologna's store keeps Campus Research Grants' 16 Great Scientist points t36-t40 (its Faith a turn 16 in every record)
+  impl: [cpu/core/types.ts:CityState]
+  readings:
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
   review: reviewed
 - addr: 0x43c340
   kind: function
@@ -32,6 +66,22 @@
   readings:
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
   review: reviewed
+- addr: 0x43c9a0
+  final: 0x2e3920
+  kind: function
+  semantics: "The store +0x168 summed (fixed point) over the Great Person classes the player cannot earn (0x2f1ed0 false); GetFaithYield's (0x494090) Faith term — a city-state's every class."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 41
+      value: Bologna's faithYield 16 from t36, 33 from t41 (two Campus Research Grants at 16 and 17 points)
+    - recording: h1_duely1121
+      turn: 78
+      value: Hunza's faithYield 26 from t69, 56 from t78 (Commercial Hub Investment at t68 and t77)
+  impl: [cpu/core/minorBuild.ts:minorEconomy, gpu/core/sim_minors.py:_minor_economy]
+  readings:
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
+  review: reviewed
 - addr: 0x43d1e0
   kind: function
   semantics: the yield's patronage is barred.
@@ -40,4 +90,24 @@
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
   context:
     - "...not passed on it (+0x10), the purse holds the price, the yield's patronage not barred (0x43d1e0) — `patronizeGreatPerson`'s checks."
+  review: reviewed
+- addr: 0x43d510
+  final: 0x2e3de0
+  kind: function
+  semantics: "A district project's Great Person grant (project, city): per Project_GreatPersonPoints row (project +0x108..+0x110) its Points (0 for a class on the player's +0x628 list) x (100 + the district's buildings x the player's property 0x27be6039) / 100, through the progression 0x5267a0 (type 1, the row's +0x1c param, the game's progress) where the row's model (+0x18) is set; added << 8 into the store +0x110[class] (data +0x168) and into the total (0x43b1c0)."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 35
+      value: "Bologna's Campus Research Grants at 9% (16 points) and t40 at 11% (17): Points 10, Param1 800"
+    - recording: h1_duely1128
+      turn: 68
+      value: "Nazca's Harbor Shipping at t68: 23 Great Admiral points, its faithYield 23 from t69"
+  impl:
+    - cpu/core/minorBuild.ts:projectGreatPersonPoints
+    - cpu/core/minorBuild.ts:projectGreatPersonRows
+    - gpu/core/sim_minors.py:_minor_finish
+    - cpu/core/types.ts:CityState
+  readings:
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
   review: reviewed

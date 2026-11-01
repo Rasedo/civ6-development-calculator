@@ -37,7 +37,7 @@
  * the browser build
 imports this.
  */
-import { AI_AGENDAS, AI_GOVERNMENTS, AI_SLOT_TYPES } from '../data/aiTables';
+import { AI_AGENDAS, AI_GOVERNMENTS, AI_GREAT_PERSON_CLASSES, AI_SLOT_TYPES } from '../data/aiTables';
 import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { installType } from './minorBuild';
@@ -1037,6 +1037,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorNextPlot: overCityStates((cityState) => cityState.nextPlot ?? -1),
   minorTilesAcquired: overCityStates((cityState) => cityState.tilesAcquired ?? 0),
   minorFaith: overCityStates((cityState) => cityState.faith),
+  minorGpPoints: overCityStates((cityState) => AI_GREAT_PERSON_CLASSES.map((c) => cityState.gpPoints?.[c] ?? 0)),
   minorBuildingsPillaged: overCityStates((cityState) => (cityState.pillagedBuildings ?? []).map((x) => idx(BUILDING_IDX, x)).sort((a, b) => a - b)),
   minorBuildings: overCityStates((cityState) => (cityState.buildings ?? []).map((x) => idx(BUILDING_IDX, x)).sort((a, b) => a - b)),
   minorDistricts: overCityStates((cityState) => PLACEABLE_DISTRICTS.map((d) => cityState.districts?.find((x) => x.type === d)?.tileIndex ?? -1)),

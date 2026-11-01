@@ -6642,3 +6642,51 @@ members (cpu/harness/gameAiImport.ts). GPU `mops_rel`, `_mops_jobs`
   its Protect Units safe plot after the re-recruit (t88 / 92 / 94 / 96: the
   game's 28:17, ours 29:15); t129 Move to safety from 27:15 (our danger map
   0 there, the game's 30).
+
+## C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins
+
+`projectGreatPersonRows` / `projectGreatPersonPoints`, `minorFinish`,
+`minorEconomy`, `CityState.gpPoints` (cpu/core/minorBuild.ts), the view's
+`greatPersonPointsPerTurn` and `cityStrike` (cpu/core/aiView.ts),
+`EFFECT_ADJUST_FLAT_BONUS` / `EFFECT_ADJUST_CITY_RANGED_STRIKE` (cpu/core/
+aiModifiers.ts), the replay's `MINOR_STORES`; GPU `citystate_gp_points`,
+`_minor_finish`, `_minor_economy` (gpu/core/sim_minors.py), `_pol_analyze`
+(gpu/core/sim_policy.py), the rules' project column `mgp` and
+`civic_ai.gpClassTypes`.
+
+- THE STORE (Player_GreatPeoplePoints, player +0x1360): the synced array at
+  +0x110 (its data +0x168) holds a fixed-point value per Great Person class.
+  The turn 0x43c190 rewrites it (0x439b30 per class, then 0x43b1c0 adds it
+  to the total) only where CanEarnGreatPeople (0x43a980) holds; a city-state
+  never passes, so nothing rewrites it.
+- THE GRANT 0x43d510 (project, city): per Project_GreatPersonPoints row its
+  Points (0 for a class on the player's +0x628 list) x (100 + a bonus
+  percent from the district's buildings) / 100, through the progression
+  0x5267a0 (type 1, the row's PointProgressionParam1, the game's progress)
+  where the row's model is set, added << 8 into the store's class and into
+  the total. Ported for a city-state's district project: Points + (Points x
+  Param1 / 100 - Points) x pct / 100, the bonus 0 (no city-state building
+  carries one).
+- THE FAITH: GetFaithYield 0x496fd0 -> 0x494090 adds 0x43c9a0, the store
+  summed over the classes the player cannot earn (0x2f1ed0) — a city-state's
+  every class. Confirmed on the records' faithYield: runs/h1_duely1124
+  Bologna's Campus Research Grants t35 (9%) 16, t40 (11%) 17: 16 / 33 from
+  records t36 / t41; runs/h1_duely1121 Hunza's Commercial Hub Investment t68 /
+  t77: 26 / 56; runs/h1_duely1128 Nazca's Harbor Shipping t68: 23 — the
+  engines' store the same.
+- THE FLAT BONUS'S GREAT_PEOPLE TERM (0x6c5e45) reads the store per class x
+  the Amount as the class's pseudo-yield, between: for a city-state the
+  points its district projects added. runs/h1_duely1124 Bologna (player 4):
+  Political Philosophy and its five dependants +71 at t36-41 and +147 at
+  t42-44 above the store-less value (Autocracy's, Oligarchy's and Classical
+  Republic's terms on 16 / 33 Great Scientist points), as logged.
+- BASTIONS' STRIKE: EFFECT_ADJUST_CITY_RANGED_STRIKE 0x6a69c0 calls 0x249ee0
+  with its flag clear, which returns 0 unless 0x24b960 holds (the district's
+  outer damage +0x8d8 below its outer maximum 0x198310: walls standing). So a
+  wall-less centre's strike term is 0: runs/h1_duely1117 city-states 2 and 4
+  unlogged Bastions t47-56 / t48-63 on a trained ranged strike of 20 or more, 7.0 from their
+  walls; runs/h1_duely1128 city-state 4 t37-39.
+- Open: the grant's bonus percent (the player property 0x27be6039 times the
+  district's buildings, 0x43d5f9) and the +0x628 class list are not ported
+  (no city-state recording reads them); a major's store between its turns
+  (the flat bonus reads it, the engines read `greatPersonPointsPerTurn`).

@@ -2595,6 +2595,17 @@
           ]
         },
         {
+          "name": "minorGpPoints",
+          "compare": "exact",
+          "covers": [
+            "CityState.gpPoints"
+          ],
+          "planes": [
+            "citystate_gp_points"
+          ],
+          "note": "the Great Person points a turn its district projects stored, per AI_GREAT_PERSON_CLASSES class — its Faith a turn and its flat bonus read them"
+        },
+        {
           "name": "minorBuildingsPillaged",
           "compare": "exact",
           "covers": [

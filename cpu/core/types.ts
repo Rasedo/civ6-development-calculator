@@ -1346,6 +1346,12 @@ export interface CityState extends Seat {
    *  first */
   netIncome?: number;
   faith: number;
+  /** the Great Person points a turn per class (GREAT_PERSON_CLASS_*), the
+   *  player's store at +0x1360 +0x168: each completed district project adds
+   *  its Project_GreatPersonPoints (0x43d510) and, the minor earning no Great
+   *  People, no turn rewrites it (0x43c190); its Faith a turn and its AI's
+   *  flat bonus read it */
+  gpPoints?: Record<string, number>;
   /** CIV6 (City-state): the install has ONE city rule, so a minor's city
    *  grows on its FOOD BOX and claims tiles on its CULTURE BOX exactly as a
    *  major's does. Before a minor's city grew and claimed, these were hardcoded 0 in `minorCity` and the

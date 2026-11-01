@@ -23,6 +23,19 @@
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (gp +0x600, 125..."
     - ...ls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 with the capture flag 1), a 1 or a 2 leaves it be. The mover then completes its step.
   review: reviewed
+- addr: 0x494090
+  final: 0x313390
+  kind: function
+  semantics: "The player's Faith a turn as GetFaithYield (0x496fd0) sums it: its cities' Faith (City::GetYield) and others, with 0x43c9a0 — the Great Person points store of the classes the player cannot earn."
+  status: PARTLY
+  cases:
+    - recording: h1_duely1124
+      turn: 36
+      value: Bologna's faithYield 16 with no Faith in its city (Campus Research Grants' 16 Great Scientist points)
+  impl: [cpu/core/minorBuild.ts:minorEconomy, gpu/core/sim_minors.py:_minor_economy]
+  readings:
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
+  review: reviewed
 - addr: 0x495860
   final: 0x314710
   kind: function
@@ -78,9 +91,11 @@
   kind: function
   semantics: the player's faith per turn.
   status: PARTLY
+  impl: [cpu/core/minorBuild.ts:minorEconomy]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...(player +0x1340 +0x100) passes its faith cost and -0.25 more once the faith per turn (0x496fd0) passes half of it.

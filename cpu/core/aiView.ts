@@ -516,7 +516,11 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
       const cs = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
       return housingValue(g, growthForecast(opts.forecastNow ? g : cs?.aiGrowth ?? g), housing, t, h);
     },
-    greatPersonPointsPerTurn: (i, cls) => greatPersonPointsPerTurn(state, i)[cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass] ?? 0,
+    // a city-state's its store (`CityState.gpPoints`, +0x1360 +0x168), which
+    // only its district projects fill
+    greatPersonPointsPerTurn: (i, cls) => isCityStateSeat(i)
+      ? (seatOf(state, i) as CityState | undefined)?.gpPoints?.[cls] ?? 0
+      : greatPersonPointsPerTurn(state, i)[cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass] ?? 0,
     diplomaticPoints: (i) => seat(i).diplomaticPoints ?? 0,
     diplomaticVictoryPoints: DIPLO_VICTORY_POINTS,
     competitionLeads: (i) => {
@@ -572,9 +576,11 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
       const city = cityOf(i, id);
       return !!city && outerPool(state, city) > 0;
     },
+    // 0x249ee0 with its flag clear: none where the centre's strike does not
+    // stand (0x24b960, its walls' pool spent or none)
     cityStrike: (i, id) => {
       const city = cityOf(i, id);
-      return city ? Math.trunc(cityStrikeStrength(state, city)) : 0;
+      return city && outerPool(state, city) > 0 ? Math.trunc(cityStrikeStrength(state, city)) : 0;
     },
     // a city-state's train turns and expected count as its city's update
     // reads them (`minorItemTurns`), any other city's its queue's

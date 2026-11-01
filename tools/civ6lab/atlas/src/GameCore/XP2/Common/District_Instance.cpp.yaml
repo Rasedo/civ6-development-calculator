@@ -88,6 +88,7 @@
     - cpu/core/aiValue.ts:AiValueView
     - cpu/core/tactical.ts:dangerDistricts
     - gpu/core/sim_policy.py:_pol_analyze
+    - cpu/core/aiView.ts:centres
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -95,6 +96,7 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
   notes:
     - ".claude/scratchpad/st1/reading.md: .... Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player'..."
   context:
@@ -361,11 +363,17 @@
     - recording: 1108
       turn: 97
       value: "- The walls' term: each wall building's OuterDefenseStrength (+0x44) and   the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the   district's outer damage (+0x8d8) below its outer "
-  impl: [cpu/core/tactical.ts:dangerDistricts]
+  impl:
+    - cpu/core/tactical.ts:dangerDistricts
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/aiView.ts:centres
+    - gpu/core/sim_policy.py:full
   readings:
     - "C-94: the wounded law and the garrison — READ"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-94: the wounded law and the garrison"
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
   context:
     - "...OuterDefenseStrength (+0x44) and the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the district's outer damage (+0x8d8) below its outer maximum — a breached peri..."
   review: reviewed

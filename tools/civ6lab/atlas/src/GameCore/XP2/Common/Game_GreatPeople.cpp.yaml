@@ -11,6 +11,7 @@
   readings:
     - "H-1: the city-states' quests — READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-130: a city-state's Great Person points store, its Faith and its flat bonus; Bastions' strike on standing walls — READ, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Recruit Great Person Class (0x84ab50): a class the actor can earn (0x2f1ed0: on offer, not barred by its civilization's or leader's trait — ExcludedGreatPersonCl..."

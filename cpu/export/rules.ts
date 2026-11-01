@@ -329,7 +329,7 @@ const installTypeOf = (kind: string, id: string, prefix: string, known: object):
 const namesOf = (kind: string, id: string, prefix: string, known: object): string[] =>
   [...new Set([installTypeOf(kind, id, prefix, known), gameTypeOf(kind, id, prefix)])];
 import { AI_MODIFIER_READS, unitEraIndex } from '../core/aiModifiers';
-import { promotionWeight } from '../core/minorBuild';
+import { installType, projectGreatPersonRows, promotionWeight } from '../core/minorBuild';
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS, AI_CITY_EVENT_TYPES, AI_CITY_TREES } from '../data/aiCityTrees';
 import { AI_MINOR_TRIGGERS, AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_TEAMS, AI_TEAM_REQS, AI_TREES, AI_TRIGGERED_TREES, AI_UNIT_AI, AI_UNIT_AI_PRIORITY } from '../data/aiOperations';
 import { MINOR_OP_DEFS } from '../core/minorOps';
@@ -1185,6 +1185,9 @@ export function buildRules() {
       // EFFECT_ADJUST_FLAT_BONUS's envoys term)
       cityStateInfluencePoints: govInfluence(CITY_STATE_GOVERNMENT).points,
       gpClassPseudo: AI_GP_CLASS_PSEUDOYIELD,
+      // the Great Person classes in their AI order (a city-state's store's
+      // index, `citystate_gp_points`)
+      gpClassTypes: AI_GREAT_PERSON_CLASSES,
     },
     cityState: {
       government: CITY_STATE_GOVERNMENT,
@@ -1816,6 +1819,11 @@ export function buildRules() {
         // for index stability; the GPU reads `gs`/`gf` and falls back to `g`.
         gs: gpClassesOf(p).map((c) => GP_CLASSES.indexOf(c)),
         gf: gppFractionOf(p),
+        // a city-state's completion grant (`projectGreatPersonRows`): per
+        // Project_GreatPersonPoints row [its class's index in
+        // AI_GREAT_PERSON_CLASSES, Points, PointProgressionParam1]
+        mgp: projectGreatPersonRows(installType('project', p.id, 'PROJECT_'))
+          .map((g) => [AI_GREAT_PERSON_CLASSES.indexOf(g.cls), g.points, g.param]),
         one: p.once ? 1 : 0,
         spc: isSpaceProject(p.id) ? 1 : 0,
         wmd: p.wmd ?? 0,

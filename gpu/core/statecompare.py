@@ -1020,6 +1020,7 @@ CITY_STATE = {
     "minorNextPlot": lambda sim, b, rows: [int(sim.city_next_plot[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "minorTilesAcquired": lambda sim, b, rows: [int(sim.city_acquired[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "minorFaith": lambda sim, b, rows: [float(sim.citystate_faith[b, s]) for s in rows],
+    "minorGpPoints": lambda sim, b, rows: [[int(x) for x in sim.citystate_gp_points[b, s].tolist()] for s in rows],
     "minorBuildingsPillaged": lambda sim, b, rows: [
         [i for i, on in enumerate(sim.city_bldg_pillaged[b, sim._CITY_MINOR0 + s, 0].tolist()) if on] for s in rows],
     "minorBuildings": lambda sim, b, rows: [

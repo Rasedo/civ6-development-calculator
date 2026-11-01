@@ -1124,7 +1124,7 @@ class SimMinors:
         it, Gold banks into `citystate_treasury` and pays the minor's units'
         upkeep — each unit's own Maintenance, a minor carrying no card that
         cuts it — and meets the `_bankruptcy` every seat meets, and Faith
-        banks into `citystate_faith`. Returns [B] long, the technologies completed (the upgrade trigger's
+        banks into `citystate_faith`, the store `citystate_gp_points` with it. Returns [B] long, the technologies completed (the upgrade trigger's
         count)."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
@@ -1145,7 +1145,9 @@ class SimMinors:
         self.citystate_net_income[:, s] = torch.where(alive, tot[:, 2] - upkeep, self.citystate_net_income[:, s])
         maint = self._unit_maintenance(self.unit_type, self.unit_formation, self.unit_levied).double()
         self.citystate_treasury[:, s] = self._bankruptcy(row, paid, alive, maint)
-        self.citystate_faith[:, s] += tot[:, 5] * keep
+        # the city's Faith and the Great Person points a turn of every class
+        # it cannot earn (GetFaithYield 0x494090 -> 0x43c9a0 over the store)
+        self.citystate_faith[:, s] += (tot[:, 5] + self.citystate_gp_points[:, s].sum(dim=1)) * keep
         return techs
 
     def _minor_production(self, s: int) -> torch.Tensor:
@@ -2180,6 +2182,20 @@ class SimMinors:
                 full = self._walls_tier_hp[self._minor_walls_tier(s)]
                 self.city_outer_hp[rr, row, 0] = full[rr]
                 self._fit_encamp_outer(rr, row, torch.zeros_like(rr), full[rr])
+            # a district project's Great Person points into the minor's store
+            # (`projectGreatPersonPoints`, 0x43d510): each row's Points
+            # escalated on the game's progress
+            pi = item - self._mk_p0
+            pct = None
+            for k, prow in enumerate(self._proj_rows):
+                mk = m & (pi == k)
+                if not prow.get("mgp") or not bool(mk.any()):
+                    continue
+                if pct is None:
+                    pct = self._progress_pct(row)
+                for c, pts, param in prow["mgp"]:
+                    esc = pts + torch.div((pts * param // 100 - pts) * pct, 100, rounding_mode="trunc")
+                    self.citystate_gp_points[:, s, int(c)] += torch.where(mk, esc.double(), torch.zeros_like(esc.double()))
             fin = fin | m
         m = done & is_r
         if bool(m.any()):

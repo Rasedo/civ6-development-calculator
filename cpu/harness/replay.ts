@@ -4589,11 +4589,13 @@ const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext']
  *  from t89),
  *  its fuel shortfall, its strategic stockpile and the queue front's
  *  reservation on it (the importer reads a minor's none), the trade routes the record's routes laid (the
- *  importer reads a city-state's none), the turn its city was founded */
+ *  importer reads a city-state's none), the turn its city was founded, its
+ *  district projects' Great Person points (the record shows their sum alone,
+ *  its Faith a turn) */
 const GAME_STORES = ['warTurns'] as const;
 const SEAT_STORES = ['barbKills'] as const;
 const RESEARCH_STORES = ['techOverflow', 'civicOverflow'] as const;
-const MINOR_STORES = ['prodOverflow', 'prodRetained', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved'] as const;
+const MINOR_STORES = ['prodOverflow', 'prodRetained', 'repairWait', 'lastHitTurn', 'fuelShort', 'tradeRoutes', 'foundedTurn', 'stockpile', 'prodReserved', 'gpPoints'] as const;
 
 /** the named fields of `from` onto `to`, a field `from` lacks dropped */
 function carryFields(from: object, to: object, keys: readonly string[]): void {
