@@ -18,7 +18,7 @@ import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious, waterWalks,
+  canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo,
   waterEnterable, formationCS, setRecordFormation,
 } from './units';
@@ -147,9 +147,14 @@ interface Ground {
   /** the player revealed the plot (node +0x51 bit 0), whatever the search */
   revealed: (i: number) => boolean;
   stand: (i: number) => boolean;
-  /** a unit of its own that stacks with it holds the plot (0x585eb0, the
-   *  unit itself not counted: the path node's +0x54) */
+  /** a unit of its own that stacks with it holds the plot (the unit itself
+   *  not counted) */
   full: (i: number) => boolean;
+  /** the path node's count +0x54 reaches the stacking limit (0x585eb0 ->
+   *  0x585d90, the units of the mover's map layer not at war with it): one
+   *  of its own that stacks with it, or on a plot the player sees now
+   *  another player's unit but a Trader or a Spy */
+  crowded: (i: number) => boolean;
   /** the plot lies in a zone of control the player sees: a hostile unit of
    *  the mover's domain that exerts one beside it, or for a land mover a
    *  hostile city or Encampment, on a plot the player sees now, none across a
@@ -221,6 +226,20 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     }
     return v;
   };
+  // on a plot the player sees now (node +0x50 & 2, the visibility count
+  // +0x290) a unit of another player not at war with it, of the mover's map
+  // layer, but a Trader (0x585d90 counts none with MakeTradeRoute or Spy: the
+  // node's +0x54)
+  const peaces = new Map<number, boolean>();
+  const peaceHeld = (i: number): boolean => {
+    let v = peaces.get(i);
+    if (v === undefined) {
+      seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+      peaces.set(i, (v = seenNow[i] === 1 && state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x)
+        && !UNITS[x.type]?.trader && !unitsHostile(state, unit, x))));
+    }
+    return v;
+  };
   return {
     known,
     revealed,
@@ -229,21 +248,17 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     stand: (i) => {
       if (!held.has(i)) return true;
       if (!planning || boarded(i)) return false;
-      // the planning's list (0x26d890): on a plot the player sees now (node
-      // +0x50 & 2, the visibility count +0x290) a unit of another player
-      // not at war with it but a Trader (0x585d90 counts none with
-      // MakeTradeRoute or Spy: node +0x54) keeps the unit out; a plot it
+      // the planning's list (0x26d890): another player's unit at peace on
+      // a plot the player sees now (`peaceHeld`) keeps the unit out; a plot it
       // does not see now passes 0x586900 alone, whose flag 1 lets any unit
       // there stand (runs/h1_duely1117 t2: Valletta's Warrior lists 13:12,
       // the barbarian Scout's, out of its sight; h1_duely1127 t10: city-state
       // 4's Warrior leaves 3:12 out, city-state 3's Builder on it in sight;
       // t45: it lists 7:10, city-state 3's Trader on it, AI_Planning.csv)
-      seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
-      if (seenNow[i] !== 1) return true;
-      return !state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x) && !UNITS[x.type]?.trader
-        && !unitsHostile(state, unit, x));
+      return !peaceHeld(i);
     },
     full: (i) => own.has(i),
+    crowded: (i) => own.has(i) || (held.has(i) && peaceHeld(i)),
     foughtOn: (i) => {
       if (!fighters.has(i)) return false;
       seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
@@ -466,10 +481,14 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       if (danger?.war && tileSeat(to) !== NO_SEAT && tileSeat(to) !== unit.seat && unitsHostile(state, unit, { seat: tileSeat(to) })) continue;
       const s = price(best, to, di, attack);
       if (s.turns > maxTurns) continue;
-      // a path's turn may not end on a plot its own stacking unit holds (the
-      // path validity 0x2720a0: each node where the next starts a turn,
-      // against the stacking limit; under flag 0x1000 its first turn alone)
-      if (zoc && s.turns > best.turns && ground.full(best.tile) && (!laterTurns || best.turns <= 1)) continue;
+      // a path's turn may not end on a plot its own stacking unit holds, nor
+      // one another player's unit at peace holds in its sight (the path
+      // validity 0x2720a0: each node where the next starts a turn, its count
+      // +0x54 against the stacking limit; under flag 0x1000 its first turn
+      // alone) (runs/h1_duely1121 t81: city-state 4's embarked Man-At-Arms on
+      // 36:19, player 0's Warriors on the shore's 36:18 and 35:19, sails to
+      // 38:18 for its centre 32:21)
+      if (zoc && s.turns > best.turns && ground.crowded(best.tile) && (!laterTurns || best.turns <= 1)) continue;
       onLink?.(to.index, best.tile, s.turns, s.moves, attack);
       const c = nodes.get(to.index);
       if (!c) {
@@ -524,7 +543,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
     // the domain's, a FreeEmbark district's crossing too; runs/h1_duely1128
     // t88: Nazca's Horseman 31:6 (1/4) embarks onto 31:5 (1/1) carrying 2,
     // 32:4 beyond it (2/0), AI_Planning.csv)
-    const cross = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
+    const cross = shoreCrossing(unit.type, from, to);
     const maxTo = isWater(to) ? fullSea : fullLand;
     let carry = cross && pm > maxTo ? pm - maxTo : 0;
     let moves = pm - cost;
@@ -689,11 +708,10 @@ function walk(state: GameState, unit: Unit, path: number[], mates: readonly Unit
   // a shore crossing's Movement past the new domain's full, paid by the next
   // step (the pathfinder's `carry`)
   let carry = 0;
-  const naval = !!UNITS[unit.type]?.naval;
   for (const p of path) {
     const cost = stepCost(state, unit, tiles[from], tiles[p]) + carry;
     if (mp < cost && mp < full) break;
-    const cross = !naval && !waterWalks(unit.type) && isWater(tiles[from]) !== isWater(tiles[p]);
+    const cross = shoreCrossing(unit.type, tiles[from], tiles[p]);
     const maxTo = domainPool(state, unit, isWater(tiles[p])) * MP_SCALE;
     carry = cross && mp > maxTo ? mp - maxTo : 0;
     mp = Math.max(0, mp - cost);
@@ -765,6 +783,19 @@ export function stackedAt(state: GameState, unit: Unit, tile: number): boolean {
   const dom = unitDomain(unit.type);
   return state.units.some((u) => u.tileIndex === tile && u.seat === unit.seat && unitDomain(u.type) === dom
     && !UNITS[u.type]?.trader && dom !== 'spy');
+}
+
+/** a unit on the plot keeps the unit out (0x585eb0 -> 0x585d90 over the
+ *  plot's units of the unit's map layer, none at war with it): one of its
+ *  own that stacks with it (`stackedAt`), or another player's but a Trader
+ *  or a Spy, seen or not (runs/h1_duely1117 t176: city-state 2's Line
+ *  Infantry wanders over 28 of its 34 plots within 5 of its centre, player
+ *  0's Warriors on the other six, RandCalls.csv) */
+function keptOut(state: GameState, unit: Unit, tile: number): boolean {
+  if (stackedAt(state, unit, tile)) return true;
+  const layer = unitReligious(unit.type);
+  return state.units.some((x) => x.tileIndex === tile && x.seat !== unit.seat && onMap(x) && unitReligious(x.type) === layer
+    && !UNITS[x.type]?.trader && !unitsHostile(state, unit, x));
 }
 
 /** the hex distance between two plots */
@@ -2189,8 +2220,8 @@ function chaseTarget(state: GameState, pass: Pass): void {
  * WANDER NEAR CAMP (0x77b9a0): each unit of AI type above EXPLORE whose
  * camp stands — the plot the player's signals answer for its group
  * (0x771250, `homeOf`: a barbarian tribe's camp): of its planning reach, the
- * plots of this turn with no unit at war with it (0x5862e0), none of its own
- * stacking with it (0x585eb0), within 5 of the camp and, where the camp's
+ * plots of this turn with no unit at war with it (0x5862e0), none that keeps
+ * it out (0x585eb0, `keptOut`), within 5 of the camp and, where the camp's
  * plot is a city's, of that city's; ONE "Random Direction" draw over their
  * count picks the plot it moves to ("Wander"); with none it heads for its
  * camp ("Wander Back to Camp"). Its turn is done.
@@ -2203,7 +2234,7 @@ function wanderNearCamp(state: GameState, pass: Pass, homeOf: (u: Unit) => numbe
     const camp = state.map.tiles[home];
     const campCity = tileSeat(camp) === NO_SEAT ? -1 : tileCity(camp);
     const cands = (pass.reach.get(u.id) ?? []).filter((e) => {
-      if (e.turns !== 1 || enemyAt(state, u, e.tile) || stackedAt(state, u, e.tile)) return false;
+      if (e.turns !== 1 || enemyAt(state, u, e.tile) || keptOut(state, u, e.tile)) return false;
       if (plotDistance(state, home, e.tile) > WANDER_CAMP_RANGE) return false;
       const t = state.map.tiles[e.tile];
       return campCity === -1 || (tileSeat(t) === tileSeat(camp) && tileCity(t) === campCity);
@@ -2602,7 +2633,7 @@ const WANDER_BACK_RANGE = 3;
  * city-state): each unit left of AI type EXPLORE or above with Movement
  * left (+0xdb0), in pool order: of its planning reach, the plots of this
  * turn within 5 of the player's capital (`home`) with no unit at war with it
- * (0x5862e0) and none of its own stacking with it (0x585eb0); ONE "Random
+ * (0x5862e0) and none that keeps it out (0x585eb0, `keptOut`); ONE "Random
  * Direction" draw over their count picks the plot it moves to ("Wander") —
  * the weights the loop builds are never read. With none it moves to the
  * plot `alternateLocation` finds round the capital ("Wander Back to City",
@@ -2612,7 +2643,7 @@ function wanderNearCity(state: GameState, pass: Pass, home: number): void {
   for (const u of pass.units) {
     if (!live(state, pass, u) || (pass.ai.get(u.id) ?? -1) < AI_EXPLORE || u.movesLeft <= 0) continue;
     const cands = (pass.reach.get(u.id) ?? []).filter((e) => e.turns === 1
-      && plotDistance(state, home, e.tile) <= WANDER_CITY_RANGE && !enemyAt(state, u, e.tile) && !stackedAt(state, u, e.tile));
+      && plotDistance(state, home, e.tile) <= WANDER_CITY_RANGE && !enemyAt(state, u, e.tile) && !keptOut(state, u, e.tile));
     if (cands.length) {
       drawing = u;
       const to = cands[randRange(state, cands.length, 'Random Direction')].tile;
@@ -2622,7 +2653,7 @@ function wanderNearCity(state: GameState, pass: Pass, home: number): void {
       continue;
     }
     const to = alternateLocation(state, u, home, WANDER_BACK_RANGE);
-    if (to >= 0) moveTo(state, u, to, pass.strike);
+    if (to >= 0) moveTo(state, u, to, pass.strike, true);
     finish(pass, u, 'Wander Back to City', home);
   }
 }

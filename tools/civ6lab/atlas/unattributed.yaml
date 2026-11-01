@@ -554,10 +554,12 @@
   kind: function
   semantics: "a district's info word (+0x14) bit test: argument 0 the water bit (1), argument 2 the land bit (4). Argument 1 tests bit 2. Who writes word +0x14 is unread."
   status: PARTLY
+  impl: [cpu/core/units.ts:shoreCrossing]
   readings:
     - "C-20 tail: the trade path's land and water tests and the switch — READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks; the standing-army count in its own section below)"
     - "C-20 tail: the trade path's land and water tests and the switch"
+    - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...rtual +0x40 holds (a district stands there), they read the plot info's word +0x14 through 0x81240 — argument 0 tests bit 1, 1 bit 2, 2 bit 4: land = bit 4 and not bit 1, water = bit 1 and..."
@@ -1980,6 +1982,7 @@
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
+    - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
   context:
     - "...that keep it out (0x585d90: its own of its class, vtable +0xb8; another player's where 0x518f40 refuses the pair), none with MakeTradeRoute (+0x1b9 bit 64) or Spy (+0x1ba bit 2). Th..."
   review: reviewed
@@ -6268,6 +6271,16 @@
   context:
     - "...the upgrade's PrereqTech and PrereqCivic held, the upgrade the actor's own), its era (0x93e6c0: the later of its PrereqTech's and PrereqCivic's, none for a unit with neither) the a..."
   review: reviewed
+- addr: 0x93f090
+  final: 0x64ec60
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x518f40 lets share a plot (owners apart, both +0x1ce0 above 0, their +0x1ce4 apart, 0x93f090 false: none on the five duels). 0x585eb0 takes the most over the formation's members."
+  review: imported
 - addr: 0x9576d0
   final: 0x663280
   kind: function

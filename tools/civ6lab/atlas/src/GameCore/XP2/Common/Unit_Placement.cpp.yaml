@@ -31,8 +31,8 @@
 - addr: 0x585d90
   final: 0x3b0370
   kind: function
-  semantics: "a plot's unit keeps the mover out: its own of its class (vtable +0xb8); another player's where 0x518f40 refuses the pair."
-  status: PARTLY
+  semantics: "the count of a plot's units (its list of the mover's map layer) that keep the mover out: none at war with it (IsAtWarWith 0x3dcec0); one of its player where its type stacks with the mover's (vtable +0xb8); one of another player but a unit whose info holds MakeTradeRoute (+0x1b9 bit 0x40) or Spy (+0x1ba bit 2), and but a pair 0x518f40 lets share a plot."
+  status: READ
   cases:
     - recording: 1124
       turn: 17
@@ -40,6 +40,9 @@
     - recording: h1_duely1124
       turn: 113
       value: "a Trader (MakeTradeRoute) keeps none of its player's units out: Cardiff's Builder onto 582 under its Trader, the Farm laid t113 (and t95)"
+    - recording: h1_duely1117
+      turn: 176
+      value: city-state 2's Line Infantry 1179654 draws Random Direction over 28 of its 34 plots within 5 of Valletta, player 0's Warriors on the other six (RandCalls.csv; t181 23, t198 17)
   impl:
     - cpu/core/tactical.ts:minor
     - gpu/core/sim_tactics.py:_tac_search
@@ -48,6 +51,11 @@
     - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:v
     - cpu/core/tactical.ts:stackedWith
+    - cpu/core/tactical.ts:Ground
+    - cpu/core/tactical.ts:peaces
+    - cpu/core/tactical.ts:keptOut
+    - cpu/core/tactical.ts:peaceHeld
+    - gpu/core/sim_tactics.py:_tac_peaceful
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -56,13 +64,15 @@
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
+    - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
+    - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
   context:
     - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
   review: reviewed
 - addr: 0x585eb0
   final: 0x3b0490
   kind: function
-  semantics: the plot holds a unit of the mover's own stacking class.
+  semantics: "the most 0x585d90 counts over the formation's members (+0x728, count +0x738): its own stacking units and another player's at peace but a Trader or a Spy."
   status: READ
   cases:
     - recording: AI_Tactical.csv
@@ -79,6 +89,9 @@
     - recording: h1_duely1127
       turn: 85
       value: "runs/h1_duely1127 t80-91: city-state 3's Swordsman 589829 plans 4:10, player 1's Missionary 1572870 on it in sight (a religious unit on a layer of its own), AI_Planning.csv."
+    - recording: h1_duely1117
+      turn: 176
+      value: city-state 2's Line Infantry 1179654 draws Random Direction over 28 of its 34 plots within 5 of Valletta, player 0's Warriors on the other six (RandCalls.csv; t181 23, t198 17)
   impl:
     - cpu/core/units.ts:tileFreeForUnit
     - gpu/core/sim_masks.py:_spot_free
@@ -99,6 +112,8 @@
     - cpu/core/tactical.ts:stackedWith
     - gpu/core/sim_tactics.py:own_at
     - cpu/core/tactical.ts:layer
+    - cpu/core/tactical.ts:keptOut
+    - cpu/core/tactical.ts:crowded
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -113,6 +128,8 @@
     - "C-123: Protect Units' plunder at the barbarians' turn open and Operation Move's formation bar — READ (0x80d790 at 0x80de60..0x80e7dc, 0x816cb0 at 0x81794d..0x817985 -> 0x585eb0), both twins and the replay's copy"
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
     - "C-99: the planning list's map layer and closed ground, a siege unit in Attack Units — READ (0x2665b0 -> 0x585eb0, 0x26d890's 0x586900 under 9 -> 0x586360 at 0x586624, 0x80ceb0 at 0x80d015 / 0x80d1cf), both twins"
+    - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
+    - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...hin 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220)..."
   context:

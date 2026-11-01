@@ -6884,3 +6884,51 @@ takes the entry's +8. GPU `citystate_kb_form` (gpu/core/sim_minors.py
   upgraded member leaves its operation (runs/h1_duely1117 city-state 4
   t93-94: 0.2 / 0.1 against the logged 0.0); the Free Cities' garrison in
   the GPU twin (`_x_garrison` reads the minors' pool).
+
+## C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins
+
+`groundOf`'s `crowded` and `peaceHeld`, the turn-end test in `search`,
+`keptOut` in `wanderNearCity` / `wanderNearCamp`, Wander Back to City's
+move under flag 0x1000 (cpu/core/tactical.ts); `shoreCrossing` in
+`stepCost`, the search's and the walk's carry (cpu/core/units.ts,
+tactical.ts). GPU `crowd_n` in `_tac_search`, the Wander candidates over
+`_tac_peaceful`, `_harbor_exit` in `price6` / `_tac_step` / the walk
+(gpu/core/sim_tactics.py), the step's dock in gpu/core/sim_seats.py.
+
+- THE COUNT (0x585d90, over a plot's unit list of the mover's map layer):
+  a unit at war with the mover counts none (IsAtWarWith 0x3dcec0); one of
+  the mover's player counts where its type stacks with the mover's (vtable
+  +0xb8); one of another player counts but a unit whose info holds
+  MakeTradeRoute (+0x1b9 bit 0x40) or Spy (+0x1ba bit 2), and but a pair
+  0x518f40 lets share a plot (owners apart, both +0x1ce0 above 0, their
+  +0x1ce4 apart, 0x93f090 false: none on the five duels). 0x585eb0 takes
+  the most over the formation's members.
+- THE PATH'S TURN END (0x2720a0's walk over the parents, the node's +0x54
+  from 0x585eb0 at its first visit 0x271be0): a node after which a turn
+  begins, on a plot the player sees now, refused where the count reaches
+  the stacking limit — another player's unit at peace in sight as its own
+  stacking unit; flag 0x1000 tests the first turn alone, the planning
+  (flags & 4) none.
+- THE WANDERS (Wander Near City 0x77bf50 at 0x77c2e5, Wander Near Camp
+  0x77b9a0): a reach plot of turn 1 is a candidate only where 0x585eb0 over
+  its list (0x75c50 on the mover's layer) counts none — another player's
+  unit at peace keeps it out whether the player sees it or not. Wander Back
+  to City moves to the alternate plot with flag 0x1000 (0x77c505).
+- A HARBOR'S WATER (0x530240 at 0x530289..0x5302c8): a step off a water
+  plot whose district takes the formation (the plot's district word,
+  0x81240 on the formation's +0x278) is no disembark: no embark cost, no
+  Movement carried. Read as the Harbor (its replacements map onto it).
+- CONFIRMED (one-seed aimem traces to t200, runs/h1_duely1117 and 1121,
+  no other kind moved): 1121 t81 city-state 4's embarked Man-At-Arms
+  1048577 on 36:19, player 0's Warriors on the landings 36:18 / 35:19,
+  sails to 38:18; 1117 t176 / 181 / 198 city-state 2's Line Infantry
+  1179654 draws over 28 / 23 / 17 plots (RandCalls.csv), player 0's Warriors
+  on the others; t176 its planning from its Harbor 14:7: 14:8 (1/4), 14:9
+  (1/3) as AI_Planning.csv; 1121 city-state 4's Musketman 1310726 t113-125
+  and Line Infantry 1703943 t145-188 Wander as logged.
+- OPEN: a disembark onto an improved plot paid as a land step (runs/
+  h1_duely1117 city-state 3's embarked Bombard 1769477 on 42:14 t185 plans
+  41:14's Farm (1/2) and 41:15's Mine (1/0); 1121 / 1124 the same onto
+  Farms, Pastures, an Alcazar; 0x530240's plot test at 0x530297 on the
+  FROM plot only, unexplained); 1121 4:1048577 t82-98 the sail east past
+  the north landings (our path lands at 39:16).

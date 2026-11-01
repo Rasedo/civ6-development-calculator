@@ -13541,8 +13541,11 @@ class SimSeats:
                 self._mp_scale + terr)
             # `stepCost`'s waiver (0x530420 / 0x530240): a FreeEmbark district
             # (a city's centre, a city-state's included, or a Harbor) at the
-            # FROM or TO plot, the FROM plot's district complete
-            easy_dock = self._embark_waived(hc.unsqueeze(1), dc1).squeeze(1)
+            # FROM or TO plot, the FROM plot's district complete; a step off a
+            # Harbor's water is no shore crossing (`shoreCrossing`)
+            hc1 = hc.unsqueeze(1)
+            easy_dock = self._embark_waived(hc1, dc1).squeeze(1) | (
+                self.wpass.gather(1, hc1).squeeze(1) & (self.district.gather(1, hc1).squeeze(1) == self._harbor_didx))
             cost = torch.where(
                 transition,
                 # CIV6 (EFFECT_ADJUST_UNIT_IGNORE_SHORES): the Knarr's units, the

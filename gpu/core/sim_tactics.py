@@ -683,6 +683,13 @@ class SimTactics:
 
                 form = own_f(self.civilian_at) | own_f(self.military_at) | own_f(self.embarked_at)
                 full_n = torch.where((mate >= 0).unsqueeze(1), form, full_n)
+        # the path node's count +0x54 against the stacking limit at a turn's
+        # end (`groundOf`'s crowded): its own stacking unit, or on a plot the
+        # player sees now another player's unit at peace but a Trader
+        crowd_n = None
+        if zoc:
+            sn_c = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
+            crowd_n = full_n | (by_layer(lambda r: self._tac_peaceful(seat, r)) & sn_c)
         tseat = self.tile_seat
         g = torch.full((N, T), NONE, dtype=torch.long, device=dev)
         tie = torch.zeros(N, T, dtype=torch.long, device=dev)
@@ -734,6 +741,8 @@ class SimTactics:
             nbc = nb.clamp(min=0)
             cst = (self._tac_cost_rows(rows, best, waive) if any_hf else cost_b[rows, best])[:, cols]
             fw = water_n.gather(1, b1)  # [N, 1]
+            # a step off a Harbor's water is no shore crossing (`shoreCrossing`)
+            hx = self._harbor_exit(rows, best).unsqueeze(1)
             cliff6 = None
             if any_embark:
                 # an embarked step costs one Movement; a land/water step
@@ -742,7 +751,7 @@ class SimTactics:
                 # one Movement at most into a city
                 tw = water_n.gather(1, nbc)
                 tr = (fw != tw) & (nb >= 0)
-                dock = self._embark_waived(best.unsqueeze(1).expand(-1, 6), nbc, rows)
+                dock = self._embark_waived(best.unsqueeze(1).expand(-1, 6), nbc, rows) | hx
                 tcost = torch.where(tw, torch.full_like(cst, self._mp_scale), entry_n.gather(1, nbc))
                 tcost = tcost + torch.where(dock | ign_shore.unsqueeze(1), 0, self._embark_transition_mp)
                 tcost = torch.where(ctr_n.gather(1, nbc), tcost.clamp(max=self._mp_scale), tcost)
@@ -763,7 +772,7 @@ class SimTactics:
             # (0x530420 / 0x530240)
             cst = cst + cr.gather(1, b1)
             tw6 = water_n.gather(1, nbc)
-            cross = (fw != tw6) & (nb >= 0) & ~naval.unsqueeze(1) & ~ww_n.unsqueeze(1)
+            cross = (fw != tw6) & (nb >= 0) & ~naval.unsqueeze(1) & ~ww_n.unsqueeze(1) & ~hx
             max_to = torch.where(tw6, full_s.unsqueeze(1), full_l.unsqueeze(1))
             carry6 = torch.where(cross & (pm > max_to), pm - max_to, torch.zeros_like(pm))
             moves = pm - cst
@@ -874,7 +883,7 @@ class SimTactics:
             nb, nbc, a6, turns, moves, gn, cliff6, bt, carry6 = price6(best)
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6) & (turns <= max_turns)
             if zoc:
-                stacked = full_n.gather(1, b1) & (turns > bt)
+                stacked = crowd_n.gather(1, b1) & (turns > bt)
                 if later_turns:
                     stacked = stacked & (bt <= 1)
                 ok = ok & ~stacked
@@ -1150,7 +1159,8 @@ class SimTactics:
         mp1 = torch.full_like(frm, self._mp_scale)
         land = self._tac_cost_rows(rows, frm, waive).gather(1, dcol.unsqueeze(1)).squeeze(1)
         ctr = self._centre_plane()
-        dock = self._embark_waived(frm.unsqueeze(1), to.unsqueeze(1), rows).squeeze(1)
+        # a step off a Harbor's water is no shore crossing (`shoreCrossing`)
+        dock = self._embark_waived(frm.unsqueeze(1), to.unsqueeze(1), rows).squeeze(1) | self._harbor_exit(rows, frm)
         entry = self._tac_entry()[rows, to]
         for c in sorted(set(waive.tolist()) - {0}):
             entry = entry - (waive == c).long() * self._tac_waived(c)[rows, to]
@@ -1160,6 +1170,12 @@ class SimTactics:
         trans = torch.where(ctr[rows, to], trans.clamp(max=self._mp_scale), trans)
         cost = torch.where(fw & tw, mp1, torch.where(fw != tw, trans, land))
         return torch.where(naval, mp1, cost)
+
+    def _harbor_exit(self, rows: torch.Tensor, frm: torch.Tensor) -> torch.Tensor:
+        """[R] bool — `shoreCrossing`'s exception: the step leaves a Harbor's
+        water (the disembark rule passes a plot whose district takes the
+        formation, 0x530297..0x5302c8)"""
+        return self.water[rows, frm] & (self.district[rows, frm] == self._harbor_didx)
 
     def _move_unit_danger(self, plane: torch.Tensor) -> tuple:
         """`moveUnitDanger`: Move Unit's order without Allow Danger (0x7eeba0's
@@ -1281,7 +1297,7 @@ class SimTactics:
             c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, waive) + carry
             on = on & ~((mp < c) & (mp < full))
             tw = self.water[rows, pc]
-            cross = (self.water[rows, frm] != tw) & ~naval & ~ww
+            cross = (self.water[rows, frm] != tw) & ~naval & ~ww & ~self._harbor_exit(rows, frm)
             max_to = torch.where(tw, fs_w, fl_w)
             carry = torch.where(on & cross & (mp > max_to), mp - max_to, torch.zeros_like(carry))
             mp = torch.where(on, (mp - c).clamp(min=0), mp)
@@ -4189,7 +4205,8 @@ class SimTactics:
             if not bool(ok.count_nonzero()):
                 continue
             rt, rk = self._seat_reach_turns(op, u_b)
-            cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat)
+            # none at war with it, none that keeps it out (`keptOut`)
+            cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat) & ~self._tac_peaceful(seat)
                     & (self.pair_dist[home].to(torch.long) <= _WANDER_CITY_RANGE))
             count = cand.sum(dim=1)
             wander = ok & (count > 0)
@@ -4205,7 +4222,8 @@ class SimTactics:
                 ent = torch.where(nav_b.unsqueeze(1), wat_ent,
                                   land_ent | (wat_ent & emb_b.unsqueeze(1)))
                 alt = self._tac_alternate(back, u_b, home, pre, seat, ent)
-                self._tac_move_to(back & (alt >= 0), u_b, alt, pre, seat, False)
+                # the move under the order's path flag 0x1000
+                self._tac_move_to(back & (alt >= 0), u_b, alt, pre, seat, False, later_turns=True)
             done[bidx[ok], u_b[ok]] = True
         # THE HOMELAND: Move to Safety over every unit; the rest end their turn
         self._tac_move_to_safety(live_all, done, order, npass, op["rowof"], op["res"], danger, pre, seat, True)
@@ -4283,7 +4301,7 @@ class SimTactics:
                 ccity = self.tile_city[bidx, camp]
                 bound = (cseat != NO_SEAT) & (ccity != -1)
                 same = (self.tile_seat == cseat.unsqueeze(1)) & (self.tile_city == ccity.unsqueeze(1))
-                cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat)
+                cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat) & ~self._tac_peaceful(seat)
                         & (self.pair_dist[camp].to(torch.long) <= _WANDER_CAMP_RANGE)
                         & (~bound.unsqueeze(1) | same))
                 count = cand.sum(dim=1)

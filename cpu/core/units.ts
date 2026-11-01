@@ -975,12 +975,23 @@ export function embarkTechMoves(state: GameState, seat: number): number {
  * differ — candidate sets, occupancy tests, stop conditions — and those stay
  * injected at the call site rather than flagged in here.
  */
+/** a land unit's step across the shore under the embark and disembark rules
+ *  (0x530420 / 0x530240): a step off a Harbor's water is none — the
+ *  disembark rule passes a plot whose district takes the formation
+ *  (0x530297..0x5302c8: the plot's district word, 0x81240), so it pays no
+ *  embark cost and carries no Movement (runs/h1_duely1117 t176: city-state
+ *  2's embarked Line Infantry on its Harbor 14:7 plans its centre 14:8
+ *  (1/4) and 14:9 beyond it (1/3), AI_Planning.csv) */
+export function shoreCrossing(type: string, from: Tile, to: Tile): boolean {
+  if (UNITS[type]?.naval || waterWalks(type) || isWater(from) === isWater(to)) return false;
+  return !(isWater(from) && from.district === 'HARBOR');
+}
+
 /** What one step from `from` into its neighbour `to` costs this unit, in
  *  MP_SCALE units: the tile's own cost plus a river crossing, or, crossing
  *  the shore, the embark penalty in place of the river. */
 export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number; alpine?: boolean }, from: Tile, to: Tile): number {
-  const naval = !!UNITS[unit.type]?.naval;
-  const transition = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
+  const transition = shoreCrossing(unit.type, from, to);
   let cost: number;
   if (!transition) cost = moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
   else {
