@@ -281,6 +281,7 @@
   impl: [cpu/core/tactical.ts:zocMoved, gpu/core/sim_tactics.py:_tac_zoc_moved_of]
   readings:
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+    - "C-99: the zone-of-control wait's test names no destination — READ (0x26fe20 at 0x2707f4..0x270813, 0x26f980, 0x530f50 at 0x53118a / 0x53129f), both twins"
   review: reviewed
 - addr: 0x267650
   kind: function

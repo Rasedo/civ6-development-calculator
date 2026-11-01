@@ -164,6 +164,7 @@
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+    - "C-99: the zone-of-control wait's test names no destination — READ (0x26fe20 at 0x2707f4..0x270813, 0x26f980, 0x530f50 at 0x53118a / 0x53129f), both twins"
   context:
     - ...nit's own plot and lies in the unit's enemy zone of control (0x26f980 -> Rules_Movement 0x530f50, the mover's owner, its stacking count 0x585eb0) is refused unless it is an attack (r14...
     - "...mpments exert the zone of control on the land beside them (Civ 6's rule; Rules_Movement 0x530f50 unread). runs/h1_duelw1124 t7-t52: city-state 4's city at 32:8 — the barbarian Scouts b..."

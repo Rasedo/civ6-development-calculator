@@ -852,8 +852,9 @@ function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   const from = unit.tileIndex;
   const refused = walk(state, unit, path, dest, mates);
   if (zocMoved && unit.tileIndex !== from) {
-    const at = unit.tileIndex;
-    const zoned = inEnemyZoc(state, at, unit, dest, stackedWith(state, unit, mates, at) || foreignAt(state, unit, at));
+    // the zone test on the plot it stands on, no destination (0x270800:
+    // 0x26f980's fourth argument null), so no exerter's plot is waived
+    const zoned = inEnemyZoc(state, unit.tileIndex, unit);
     for (const m of [unit, ...mates]) {
       if (zoned) zocMoved.add(m);
       else zocMoved.delete(m);

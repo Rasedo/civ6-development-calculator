@@ -168,6 +168,7 @@
     - "C-99: a shore crossing's carried Movement"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
+    - "C-99: the zone-of-control wait's test names no destination — READ (0x26fe20 at 0x2707f4..0x270813, 0x26f980, 0x530f50 at 0x53118a / 0x53129f), both twins"
   review: reviewed
 - addr: 0x26ee80
   final: 0x1a74c0
@@ -321,6 +322,7 @@
     - cpu/core/units.ts:inEnemyZoc
     - gpu/core/sim_tactics.py:_tac_zoc_path
     - cpu/core/tactical.ts:zocMoved
+    - cpu/core/tactical.ts:zoned
   readings:
     - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -331,6 +333,7 @@
     - "C-99: the carry under a zone of control"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-99: a move order carried on as the turn ends, the zone-of-control wait, the embark rule's TO plot — READ (0x962380, 0x52f50, 0x26fe20, 0x2675e0, 0x2673f0, 0x530420, 0x267650), both twins"
+    - "C-99: the zone-of-control wait's test names no destination — READ (0x26fe20 at 0x2707f4..0x270813, 0x26f980, 0x530f50 at 0x53118a / 0x53129f), both twins"
   context:
     - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."
     - "- THE ZONE OF CONTROL'S TEST (Rules_Movement 0x530f50, READ; through 0x26f980(finder, from, to, the path's destination) from the path cost 0x26e920, the move's step..."
@@ -369,6 +372,7 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-99: the zone-of-control wait's test names no destination — READ (0x26fe20 at 0x2707f4..0x270813, 0x26f980, 0x530f50 at 0x53118a / 0x53129f), both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."

@@ -1499,12 +1499,13 @@ class SimTactics:
             under = torch.where(moved, torch.where(occ >= 0, occ, torch.full_like(occ, -1)), under)
             under_emb = torch.where(moved, emb_to, under_emb)
             going = moved & (mp_p[rows, sr] > 0)
-        # the formation's last step in a zone of control or not (`zocMoved`)
+        # the formation's last step in a zone of control or not (`zocMoved`):
+        # the zone test on the plot it stands on, no destination waived
         now = tile_p[rows, sr]
         if zm is not None:
             stepped = now != start
             if bool(stepped.count_nonzero()):
-                zoned = halts[ar, now.clamp(min=0)]
+                zoned = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(ut), None, no_end)[ar, now.clamp(min=0)]
                 rs, ss = rows[stepped], sr[stepped]
                 zm[rs, ss] = zoned[stepped]
                 if mr is not None:

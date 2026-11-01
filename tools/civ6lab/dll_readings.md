@@ -7673,3 +7673,22 @@ replay's `minorShots` landed in `minorAi`; GPU `_minor_pass`.
   test (0x2720a0 at 0x27228b) refuses them, while the game walks on: the
   count 0x585d90 (its own units by the stacking test 0x9406e0 vt +0xb8, the
   pair test 0x518f40) is the open reading.
+
+## C-99: the zone-of-control wait's test names no destination — READ (0x26fe20 at 0x2707f4..0x270813, 0x26f980, 0x530f50 at 0x53118a / 0x53129f), both twins
+
+`orderOnce`'s zone test (cpu/core/tactical.ts); `_tac_move_to`'s `zocMoved`
+update (gpu/core/sim_tactics.py).
+
+- THE CALL (0x2707f4..0x270800): after each step the walk 0x26fe20 calls
+  0x26f980(formation, plot, plot, 0): the formation's plot (+0x158 through
+  the map's vt +0x50) as both the from and the to plot, and r9 = 0 for the
+  path's destination, which 0x26f980 passes on as 0x530f50's sixth argument
+  ([rsp+0x98], the r9 home slot). 0x530f50 waives a zone only where the
+  exerter's plot r14 equals that destination (0x53118a / 0x53129f), so with
+  none every exerter beside the plot zones it and the stacking flag
+  (0x585eb0, [rsp+0x30]) decides nothing. Its answer, against +0x518, goes to
+  0x2675e0 where it differs (0x270805..0x270813).
+- PORTED: the wait's test is `inEnemyZoc(state, plot, unit)` with no
+  destination, `_tac_zoc_path(..., None, ...)` on the plot the unit stands on
+  after the walk; the walk's own halt (the path cost 0x26e920 through
+  0x26f980 with the path's destination) keeps the destination waiver.
