@@ -497,6 +497,7 @@
     - cpu/core/minorCityAi.ts:eventBuilding
     - gpu/core/sim_cityvalue.py:_cv_bests
     - gpu/core/sim_minorai.py:event_building
+    - cpu/core/minorBuild.ts:pickDistrictPillaged
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-60: the defensive cancel — READ (0x5d7640), ported for the city-states and the Free Cities"

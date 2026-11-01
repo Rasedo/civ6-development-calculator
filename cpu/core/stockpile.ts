@@ -290,6 +290,14 @@ export function canPayStockpile(state: GameState, seat: number, resourceId: stri
   return k < 0 || stockOf(state, seat, resourceId) >= n;
 }
 
+/** A unit's strategic cost before its formation: its Units_XP2
+ *  ResourceCost through the game speed (Player_Units 0x4f2df0 / 0x4f31f0
+ *  fill +0x430 with 0x5254d0 of the row's ResourceCost; online 20 -> 10),
+ *  at least 1 (City_BuildQueue 0x17c2e0's floor) */
+export function unitBaseResourceCost(def: { resourceCost?: number }): number {
+  return Math.max(1, scaleByGameSpeed(def.resourceCost ?? UNIT_RESOURCE_COST));
+}
+
 /**
  * CIV6 (GS): a unit that asks for a strategic resource pays it "at the moment
  * you start production (or the moment you purchase it)". A city only takes a
@@ -301,7 +309,7 @@ export function unitResourceCost(unitType: string, formation = 0): { id: string;
   return def?.requiresResource
     ? {
       id: def.requiresResource,
-      n: (def.resourceCost ?? UNIT_RESOURCE_COST) * (FORMATION_RESOURCE_MULT[formation] ?? 1),
+      n: unitBaseResourceCost(def) * (FORMATION_RESOURCE_MULT[formation] ?? 1),
     }
     : undefined;
 }

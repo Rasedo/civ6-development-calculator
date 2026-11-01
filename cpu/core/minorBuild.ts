@@ -785,15 +785,23 @@ function minorWorship(state: GameState, cityState: CityState): string | undefine
 
 /** May the minor run district project `id` now? Its district stands complete
  *  and clean in its city (`availableProjects`' district clause). */
+/** the plot a minor's project runs on: its centre for a City Center
+ *  project, else its complete district of the project's type */
+function minorProjectHome(state: GameState, cityState: CityState, id: string): Tile | undefined {
+  const def = PROJECTS[id];
+  if (!def) return undefined;
+  return def.district === 'CITY_CENTER' ? state.map.tiles[cityState.centerIndex]
+    : (cityState.districts ?? []).map((d) => state.map.tiles[d.tileIndex])
+      .find((t) => t.district === def.district && t.districtComplete);
+}
+
 function minorProjectOk(state: GameState, cityState: CityState, id: string): boolean {
   const def = PROJECTS[id];
   if (!def) return false;
   // a City Center project runs in the centre, which the minor's district
   // list leaves out (runs/h1_duely1124 Bologna t214: its Manhattan Project
   // at 1558.6 as logged, its progress 24 -> 496 by t242)
-  const home = def.district === 'CITY_CENTER' ? state.map.tiles[cityState.centerIndex]
-    : (cityState.districts ?? []).map((d) => state.map.tiles[d.tileIndex])
-      .find((t) => t.district === def.district && t.districtComplete);
+  const home = minorProjectHome(state, cityState, id);
   return !!home && !irradiated(home);
 }
 
@@ -1029,6 +1037,11 @@ export function minorQueueOk(state: GameState, cityState: CityState, item: Exclu
   if ('unit' in item) return minorCanTrain(state, cityState, item.unit);
   if ('project' in item) {
     if (PROJECTS[item.project]?.repair) return repairAvailable(state, minorCity(cityState));
+    // the queue refuses a district project whose district stands pillaged,
+    // which the pick's CanProduce lets through (runs/h1_duely1128 Nazca
+    // t26-31 / t33-35, its Holy Site pillaged at t23: Prayers the pick's
+    // best, NO BUILDS AT ALL, the Horseman picked at t32 / t36 above it)
+    if (PROJECTS[item.project]?.district !== 'CITY_CENTER' && minorProjectHome(state, cityState, item.project)?.districtPillaged) return false;
     return minorProjectOk(state, cityState, item.project);
   }
   if ('repair' in item) return minorRepairable(state, cityState, item.repair);
@@ -1693,6 +1706,21 @@ export function minorTables(state: GameState, cityState: CityState, known: (unit
   };
 }
 
+/** CanConstruct's district test (0x170450 at 0x17071d): the building's
+ *  district held complete and pillaged (0x1ad720) refuses it, the reason
+ *  +0x2a — the pick's CanConstruct (0x5d0860 with its third argument set):
+ *  runs/h1_duely1128 Nazca t32, its Holy Site pillaged, the Shrine refused
+ *  and the Horseman picked at 33.7. A building the city holds pillaged is
+ *  not refused here (a fit: runs/h1_duely1117 Valletta t134-141, its
+ *  pillaged Lighthouse picked under its pillaged Harbor, the queue refusing
+ *  it, NO BUILDS AT ALL). `district` the install type */
+function pickDistrictPillaged(state: GameState, districts: readonly { type: string; tileIndex: number }[], district: string | null | undefined): boolean {
+  if (!district) return false;
+  const id = engineId('district', district, 'DISTRICT_', DISTRICTS);
+  if (!id || id === 'CITY_CENTER') return false;
+  return districts.some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete && !!state.map.tiles[x.tileIndex].districtPillaged);
+}
+
 /** What the Default Specialization pick (`defaultSpecialization`) reads of
  *  a minor's city: the building held or in hand, CanConstruct (`constructibleNow`
  *  on the city build facts), CanTrain (its research unlocks the unit, no
@@ -1713,7 +1741,10 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
       return !!id && (cityState.prodItem === `building:${id}` || cityState.prodItem === `repair:${id}`);
     },
-    canConstruct: (b) => constructibleNow(facts, AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]),
+    canConstruct: (b) => {
+      const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
+      return constructibleNow(facts, row) && (facts.hasBuilding(b) || !pickDistrictPillaged(state, cityState.districts ?? [], row.district));
+    },
     // a pillaged prerequisite stands for none (runs/h1_duely1127 Muscat
     // t156: its Market pillaged and under repair, the event's Pike and Shot
     // at 3.0 where the Bank values 21.23; the Bank's contract t163, the
@@ -2124,7 +2155,9 @@ export function freeCityPickFacts(state: GameState, city: City, facts: CityBuild
     buildingHeld: (b) => inHand === b,
     canConstruct: (b) => {
       const id = engineId('building', b, 'BUILDING_', BUILDINGS);
-      return !!id && freeCityBuildingOk(state, city, id, unlocks) && constructibleNow(facts, AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]);
+      const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
+      return !!id && freeCityBuildingOk(state, city, id, unlocks) && constructibleNow(facts, row)
+        && (facts.hasBuilding(b) || !pickDistrictPillaged(state, city.districts ?? [], row.district));
     },
     // a pillaged prerequisite stands for none (runs/h1_duely1127 Muscat
     // t156: its Market pillaged and under repair, the event's Pike and Shot

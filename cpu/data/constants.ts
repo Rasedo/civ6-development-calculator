@@ -605,14 +605,11 @@ export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING =
     pedia: 'the GS Resources page ("increase your maximum stockpile by 10 per building")',
   });
 
-/** CIV6 (GS): every unit in this roster that asks for a strategic resource
- *  asks for 20 of it, paid "at the moment you start production (or the moment
- *  you purchase it)" — Horseman, Swordsman, Knight, Musketman and Bombard each
- *  say so on their own page. */
-export const UNIT_RESOURCE_COST = srcConst('constants.UNIT_RESOURCE_COST', 20, {
-  pedia: 'the GS unit pages (Horseman, Swordsman, Knight, Musketman, Bombard each ask 20 of their '
-    + 'strategic resource at the moment production starts)',
-});
+/** Units_XP2 ResourceCost of every unit in this roster that asks for a
+ *  production strategic resource (Horseman, Swordsman, Knight, Musketman,
+ *  Bombard ...), before the game speed (`unitResourceCost`) */
+export const UNIT_RESOURCE_COST = srcConst('constants.UNIT_RESOURCE_COST', 20,
+  xml('Units_XP2', 'UnitType=UNIT_HORSEMAN', 'ResourceCost'));
 
 /** CIV6 (Resource, GS): a unit whose seat could not meet its fuel bill this
  *  turn fights at "-20 Insufficient <resource>" (the combat preview's line) —

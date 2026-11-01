@@ -12778,3 +12778,42 @@ rows and Trader plots t70-152).
   GPU `_cv_counted`: the records numbered before the look,
   `citystate_kb_seq`, read by `_cv_known`).
 
+## C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins
+
+Player_Units / City_BuildQueue. Check: runs/h1_duely1128 Nazca t15-t47
+(AI_GovtPolicies.csv's Equestrian Orders, AI_CityBuild.csv,
+City_BuildQueue.csv).
+
+- THE COST (City_BuildQueue 0x17c2e0, the queue's reservation and the
+  completion's charge): for a unit with a Units_XP2 row (+0x198) and a
+  StrategicResource (+0x1a0), 0x4f2cc0(the player's units +0x12e8, unit,
+  formation) — the per-unit array at +0x430 (the vector object +0x3d8, its
+  count +0x440), doubled for a Corps (formation 1), tripled for an Army (2)
+  — less the city's discounts (+0x390 [unit] for formations 1 / 2, then the
+  percent +0x3b0 [unit]), at least 1. 0x4f2df0 / 0x4f31f0 (from 0x4f2f40)
+  fill the array per Units row with 0x5254d0(the Units_XP2 row +0x20):
+  ResourceCost (the row reader 0xad41e0 writes the sixth column, after the
+  five flags, at +0x20, ResourceMaintenanceAmount at +0x24) through the game
+  speed's CostMultiplier — online 20 -> 10.
+- CONFIRMED (runs/h1_duely1128 Nazca, no other source of Horses than its
+  Holy Site on 33:10, pillaged at t23): Equestrian Orders 25.0 (20 Horses)
+  through t31, 50.0 at t32 (the Horseman's era, 2.5 a Horse), 25.0 from t33
+  (10 Horses) after its first Horseman trained at t33; the second, picked at
+  t36 at 47.1, trained at t37 on the other 10. Both twins:
+  `unitBaseResourceCost` (`resCost` in rules.json). Open: the floor of 1 is
+  applied before the formation multiple in the engines (`resCost` x mult),
+  after it in the game — a Corps or Army of a 1-cost unit (the Ironclad's
+  fleet, the Infantry's corps) pays 2 / 3 in the engines, 1 in the game.
+- THE PICK'S PILLAGED DISTRICT: the building pick's CanConstruct refuses a
+  building whose district the city holds complete and pillaged (0x170450 at
+  0x17071d, 0x1ad720, the section above); a building the city holds
+  pillaged is let through (a fit: runs/h1_duely1117 Valletta t134-141, its
+  pillaged Lighthouse picked under its pillaged Harbor and refused at the
+  queue, NO BUILDS AT ALL). Both twins: `pickDistrictPillaged` /
+  `_pick_district_pillaged`, the minors' and the Free Cities' picks.
+- THE QUEUE'S PILLAGED PROJECT (a fit; the CanProduce reading open): the
+  pick lets a district project through with its district pillaged, the
+  queue refuses it — runs/h1_duely1128 Nazca t26-31 and t33-35, Prayers the
+  pick's best over its pillaged Holy Site, NO BUILDS AT ALL, the Horseman
+  picked above it at t32 (33.7) and t36 (47.1). Both twins: `minorQueueOk`
+  / `_minor_queue_ok`.

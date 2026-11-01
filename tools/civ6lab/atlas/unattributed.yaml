@@ -5920,6 +5920,16 @@
   context:
     - "...), the value 0x7a58f0(impr, rate, T, horizon, plot, city). The Improvements row (loader 0xac6bb0, its SELECT alphabetical): AirSlots +0x2c, Appeal +0x30, DefenseModifier +0x34, Dispe..."
   review: reviewed
+- addr: 0xad41e0
+  final: 0x7cf550
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: a unit's strategic cost through the game speed, the pick's pillaged district and the queue's pillaged project — READ (0x17c2e0, 0x4f2cc0, 0x4f2df0 / 0x4f31f0), a fit for the project, both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...rray per Units row with 0x5254d0(the Units_XP2 row +0x20): ResourceCost (the row reader 0xad41e0 writes the sixth column, after the five flags, at +0x20, ResourceMaintenanceAmount at +..."
+  review: imported
 - addr: 0xad5010
   final: 0x7d04a0
   kind: function

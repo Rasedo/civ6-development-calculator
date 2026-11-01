@@ -1784,7 +1784,8 @@ class SimMinors:
                     continue
                 t = self.city_dist_tile[:, row, 0, d]
                 t0 = t.clamp(min=0).unsqueeze(1)
-                ok = ok | (m & (t >= 0) & self.district_complete.gather(1, t0).squeeze(1) & ~self._fallout().gather(1, t0).squeeze(1))
+                ok = ok | (m & (t >= 0) & self.district_complete.gather(1, t0).squeeze(1)
+                           & ~self.district_pillaged.gather(1, t0).squeeze(1) & ~self._fallout().gather(1, t0).squeeze(1))
         return ok
 
     def _trainable_in(self, techs: torch.Tensor, civics: torch.Tensor, any_res: bool,

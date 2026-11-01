@@ -119,9 +119,9 @@ export interface UnitDef {
   requiresTech?: string;
   requiresCivic?: string;
   requiresResource?: string;
-  /** GS: what ONE of this unit takes out of the seat's stockpile when its
-   *  production starts. A PRODUCTION resource (Horses, Iron, Niter) charges
-   *  `UNIT_RESOURCE_COST`; a FUEL one charges 1 and then bills `resourceUpkeep`
+  /** GS: the Units_XP2 ResourceCost of ONE of this unit, before the game
+   *  speed (`unitResourceCost`). A PRODUCTION resource (Horses, Iron, Niter)
+   *  asks `UNIT_RESOURCE_COST`; a FUEL one 1, then bills `resourceUpkeep`
    *  every turn the unit lives. */
   resourceCost?: number;
   resourceUpkeep?: number;

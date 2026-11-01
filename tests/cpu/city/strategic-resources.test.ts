@@ -100,8 +100,8 @@ describe('build/purchase gating', () => {
 
   it('every gated chassis charges on the side its resource belongs to', () => {
     // CIV6 (Resource, GS) splits the strategic resources by USE: Horses, Iron
-    // and Niter are "used for unit production" and cost a flat 20 at the
-    // start; Coal, Oil, Uranium and Aluminum are "used as fuel for units",
+    // and Niter are "used for unit production" and cost a flat 20 (10 at
+    // the online speed) at the start; Coal, Oil, Uranium and Aluminum are "used as fuel for units",
     // whose "upfront cost will be greatly reduced" to 1 and which then bill
     // per turn. No chassis may sit on the wrong side of that line.
     const PRODUCTION = new Set(['HORSES', 'IRON', 'NITER']);
@@ -112,7 +112,7 @@ describe('build/purchase gating', () => {
       const res = u.requiresResource!;
       expect(PRODUCTION.has(res) || FUEL.has(res)).toBe(true);
       if (PRODUCTION.has(res)) {
-        expect(unitResourceCost(u.id)!.n).toBe(20);
+        expect(unitResourceCost(u.id)!.n).toBe(10);
         expect(u.resourceUpkeep ?? 0).toBe(0);
       } else {
         expect(unitResourceCost(u.id)!.n).toBe(1);
@@ -214,13 +214,13 @@ describe('stockpiles', () => {
     expect(stockpileCap(state, 0)).toBe(STOCKPILE_CAP_BASE + 2 * STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING);
   });
 
-  it('a unit charges its 20 when it enters production, and is refused without it', () => {
+  it('a unit charges its 10 when it enters production, and is refused without it', () => {
     const { state, city } = resState('IRON', 'MINE', 'IRON_WORKING');
     const bank = seatOf(state, 0)!.stockpile!;
     const k = STRATEGIC_IDS.indexOf('IRON');
-    bank[k] = 19;
+    bank[k] = 9;
     expect(ids(trainableUnits(state, 0, city))).not.toContain('SWORDSMAN');
-    bank[k] = 20;
+    bank[k] = 10;
     expect(ids(trainableUnits(state, 0, city))).toContain('SWORDSMAN');
     commitProduction(state, 0, city, { kind: 'unit', unit: 'SWORDSMAN', progress: 0 });
     expect(bank[k]).toBe(0);
