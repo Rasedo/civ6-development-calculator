@@ -182,7 +182,7 @@ describe('route duration', () => {
     expect(state.seats[0].tradeRoutes![0].createdTurn).toBe(7);
   });
 
-  it('the walker follows the stored course out and home, one plot a turn', () => {
+  it('the walker takes its first plot at the start, then follows the stored course out and home, one plot a turn', () => {
     const { state, origin, dest } = twoCitySandbox();
     state.turn = 1;
     addTradeRoute(state, origin.id, dest.id, 0);
@@ -190,12 +190,12 @@ describe('route duration', () => {
     const course = r.course!;
     expect([course[0], course[course.length - 1]]).toEqual([origin.centerIndex, dest.centerIndex]);
     const seen: number[] = [r.walkTile!];
-    for (let k = 0; k < 2 * (course.length - 1); k++) {
+    for (let k = 0; k < 2 * (course.length - 1) - 1; k++) {
       seatPhase(state);
       seen.push(r.walkTile!);
     }
     // out along the course, then back along the same plots
-    expect(seen).toEqual([...course, ...course.slice(0, -1).reverse()]);
+    expect(seen).toEqual([...course.slice(1), ...course.slice(0, -1).reverse()]);
     for (const i of course) expect(state.map.tiles[i].road).toBe(true);
   });
 

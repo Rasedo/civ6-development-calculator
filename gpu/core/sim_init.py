@@ -452,6 +452,9 @@ class SimInit:
         # units' upkeep, spent on its purchases and upgrades (the TS
         # `CityState.treasury` / `.faith` twins)
         self.citystate_treasury = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        # the net Gold its last gold step banked (PlayerTreasury
+        # m_xCachedNetIncome, player +0x13a0 +0x1b8; `CityState.netIncome`)
+        self.citystate_net_income = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_faith = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_suz_code = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # the IMPROVEMENT this minor's suzerain may build, by roster index

@@ -39,7 +39,7 @@ from .sim_citytrees import (
     improvement_event, in_hand_check, pick_improvement, queue_contract, takes_turn, tick_city_trees, _cget, _cset,
     gold_purchasable, CP_ACCEPTED, CP_COMPLETED,
 )
-from .sim_cityvalue import _FX_MIN, _SLOT_SLUSH, _SLOT_UNITS, _MinorFacts, _t
+from .sim_cityvalue import _FX_MIN, _SLOT_SLUSH, _SLOT_UNITS, _MinorFacts, _gold_boost_of, _t
 from .sim_research import _FX, _discounted, _fmul, _fx_const, _present_value
 from .sim_minorops import _ARMY_READ_AGE
 
@@ -109,9 +109,9 @@ class SimMinorAi:
                                          self._minor_gp_class())
         self.citystate_savings[:, s] = torch.where(alive.unsqueeze(1), sav, self.citystate_savings[:, s])
         self.citystate_balance[:, s] = torch.where(alive, bal, self.citystate_balance[:, s])
-        # its Gold boost, which its Gold weight reads until its next turn
-        # (`economicGoldBoost`)
-        boost = self._cv_minor_facts(s).live_gold_boost()
+        # its Gold boost on the net income its gold step banked, which its
+        # Gold weight reads until its next turn (`economicGoldBoost`)
+        boost = _gold_boost_of(self.citystate_net_income[:, s])
         self.citystate_gold_boost[:, s] = torch.where(alive, boost, self.citystate_gold_boost[:, s])
         # its contract purchases, in its city on the threat its last update stored
         self._minor_contract_purchases(s, alive)

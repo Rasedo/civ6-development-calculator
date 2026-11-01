@@ -1131,7 +1131,8 @@ export function addTradeRoute(state: GameState, from: number, to: number, seat: 
   return { ok: true };
 }
 
-/** Spend the Trader, stamp the walk fields and push the route — the one
+/** Spend the Trader, stamp the walk fields, push the route and take its
+ * Trader's first plot — the one
  * committer all three route kinds share. */
 function commitRoute(state: GameState, seat: number, originCenter: number, destCenter: number, route: TradeRoute): void {
   if (state.unitsMode) {
@@ -1147,7 +1148,13 @@ function commitRoute(state: GameState, seat: number, originCenter: number, destC
   route.walkLeg = 0;
   // the walker lays road on every LAND tile it stands on; the origin is turn 0
   if (!isWater(state.map.tiles[originCenter])) layRoad(state, seat, state.map.tiles[originCenter]);
-  (seatOf(state, seat)!.tradeRoutes ??= []).push(route);
+  const owner = seatOf(state, seat)!;
+  (owner.tradeRoutes ??= []).push(route);
+  // the Trader takes its first plot the turn the route starts (every
+  // route's first record finds it a plot out: runs/h1_duely1121 Hunza's at
+  // 275 from its centre 231 on t48 / t68 / t88, China's at 405 or 448 from
+  // its centre 449 on t100 / t124 / t178)
+  tradeRouteStep(state, owner, route);
   if (route.toCs !== undefined) questRouteStarted(state, seat, route.toCs);
   // CIV6 (Ortoo): "Starting a Trade Route immediately creates a Trading Post
   // in the destination city" — the post the ordinary route only plants when
@@ -1226,6 +1233,30 @@ export function addIntlTradeRoute(state: GameState, from: number, toSeat: number
   return { ok: true };
 }
 
+/** one route's Trader takes its plot of the walk (`tradeRouteWalk`) */
+function tradeRouteStep(state: GameState, actor: Seat, r: TradeRoute): void {
+  const course = r.course ?? [];
+  if ((r.walkLeg ?? -1) < 0 || r.walkTile === undefined || course.length < 2) return;
+  if (routeOriginCenter(state, actor, r) < 0 || routeDestCenter(state, actor, r) < 0) return;
+  const at = course.indexOf(r.walkTile);
+  if (at < 0) return;
+  const i = r.walkLeg === 0 ? at + 1 : at - 1;
+  const next = course[i];
+  r.walkTile = next;
+  // roads go on passable LAND only — a sea leg lays nothing, and
+  // neither does a portal's mountain
+  if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) layRoad(state, actor.seat, state.map.tiles[next]);
+  claimTileEnRoute(state, actor.seat, next);
+  // the Trader is a unit on the map and looks from the plot it reaches, as
+  // a unit's step does (a major's fog and meetings, a city-state's revealed
+  // plots and meetings: runs/h1_duely1127 t41-t50 Hattusa's Trader on its
+  // route, one plot a turn)
+  const trader = { type: 'TRADER', seat: actor.seat };
+  revealAround(state, actor.seat, next, unitSight(trader, state), { seeThrough: unitSeesThrough(trader) });
+  if (r.walkLeg === 0 && i === course.length - 1) r.walkLeg = 1;
+  else if (r.walkLeg === 1 && i === 0) r.walkLeg = 0;
+}
+
 /**
  * THE WALK and PLUNDER of one holder's routes — a major's or a city-state's.
  *
@@ -1241,28 +1272,7 @@ export function addIntlTradeRoute(state: GameState, from: number, toSeat: number
  */
 export function tradeRouteWalk(state: GameState, actor: Seat): void {
   const routes = (actor.tradeRoutes ??= []);
-  for (const r of routes) {
-    const course = r.course ?? [];
-    if ((r.walkLeg ?? -1) < 0 || r.walkTile === undefined || course.length < 2) continue;
-    if (routeOriginCenter(state, actor, r) < 0 || routeDestCenter(state, actor, r) < 0) continue;
-    const at = course.indexOf(r.walkTile);
-    if (at < 0) continue;
-    const i = r.walkLeg === 0 ? at + 1 : at - 1;
-    const next = course[i];
-    r.walkTile = next;
-    // roads go on passable LAND only — a sea leg lays nothing, and
-    // neither does a portal's mountain
-    if (!isWater(state.map.tiles[next]) && !isImpassable(state.map.tiles[next])) layRoad(state, actor.seat, state.map.tiles[next]);
-    claimTileEnRoute(state, actor.seat, next);
-    // the Trader is a unit on the map and looks from the plot it reaches, as
-    // a unit's step does (a major's fog and meetings, a city-state's revealed
-    // plots and meetings: runs/h1_duely1127 t41-t50 Hattusa's Trader on its
-    // route, one plot a turn)
-    const trader = { type: 'TRADER', seat: actor.seat };
-    revealAround(state, actor.seat, next, unitSight(trader, state), { seeThrough: unitSeesThrough(trader) });
-    if (r.walkLeg === 0 && i === course.length - 1) r.walkLeg = 1;
-    else if (r.walkLeg === 1 && i === 0) r.walkLeg = 0;
-  }
+  for (const r of routes) tradeRouteStep(state, actor, r);
   const plundered = new Set<TradeRoute>();
   for (const r of routes) {
     const raider = r.walkTile === undefined ? null : routePlunderer(state, r.walkTile, actor.seat);

@@ -16329,8 +16329,21 @@ class SimSeats:
         w[2] = 1.0
         return (y * w).sum(dim=1)
 
-    def _trade_walk_tick(self, row: int, active: torch.Tensor) -> None:
+    def _trade_first_step(self, row: int, rows: torch.Tensor, slot: torch.Tensor) -> None:
+        """A route just committed in `slot` of games `rows`: its Trader takes
+        its first plot the turn the route starts (`commitRoute`'s
+        `tradeRouteStep`; every route's first record finds it a plot out)"""
+        only = torch.zeros(self.B, self.seat_route_walk.shape[2], dtype=torch.bool, device=self.device)
+        only[rows, slot] = True
+        active = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        active[rows] = True
+        self._trade_walk_tick(row, active, only)
+
+    def _trade_walk_tick(self, row: int, active: torch.Tensor, only: torch.Tensor | None = None) -> None:
         """The Trader's WALK, then PLUNDER — phase.ts's trade-block head.
+        With `only` [B, K], the walk of those route slots alone and no
+        plunder: a route's first plot the turn it starts (`commitRoute`'s
+        `tradeRouteStep`).
 
         WALK: every route's walker takes one plot along the route's stored
         course (`seat_route_course`) toward its leg's end (dest out, origin
@@ -16350,6 +16363,8 @@ class SimSeats:
         act = self.seat_routes[:, row, :, 0] >= 0  # [B, K]
         leg = self.seat_route_leg[:, row]
         walking = act & (leg >= 0) & active.unsqueeze(1)
+        if only is not None:
+            walking = walking & only
         if bool(walking.count_nonzero()):
             oc, dc = self._route_centres(row)
             live = walking & (oc >= 0) & (dc >= 0)
@@ -16385,6 +16400,8 @@ class SimSeats:
                         rb = bb[m]
                         self._unit_look(rb, torch.full_like(rb, seat_v), nxt[m],
                                         torch.full_like(rb, self._trader_idx), torch.zeros_like(rb))
+        if only is not None:
+            return
         wt = self.seat_route_walk[:, row]
         chk = act & (wt >= 0) & active.unsqueeze(1)
         if row < self.n_majors:
@@ -16598,6 +16615,7 @@ class SimSeats:
         lr = rows[~self.water[rows, o_ct[rows]]]
         if len(lr) > 0:
             self._lay_road(lr, o_ct[lr], row)
+        self._trade_first_step(row, rows, slot)
         # CIV6 (Ortoo): "Starting a Trade Route immediately creates a Trading
         # Post in the destination city" — the post an ordinary route only
         # plants when it COMPLETES (`IMMEDIATE_POST_ROWS`)

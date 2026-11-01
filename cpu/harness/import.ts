@@ -43,7 +43,7 @@ import { isWater } from '../../world/query';
 import { FEATURE_ID, TERRAIN_BASE } from '../data/aliases';
 import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
-import { envoysReceived, envoysWith } from '../core/cityStates';
+import { envoysReceived, envoysWith, minorCity } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOVERNOR_PROMOTIONS, promotionBit, promotionBitValue } from '../data/governors';
 import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { BOOSTS } from '../data/boosts';
@@ -2735,6 +2735,14 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     const c = dumpOfCity.get(city)!;
     const col = importProjectYield(state, ctx.cat, c, prevCities.get(key), !!b2 && !late.has(c.owner), city);
     if (col >= 0) projectYieldUnread.set(key, col);
+  }
+  // a minor's city as its last production step left it, by the same rule:
+  // its next gold step banks the conversion
+  for (const [minor, c] of dumpOfMinor) {
+    const city = { ...minorCity(minor), projectYield: undefined };
+    importProjectYield(state, ctx.cat, c, prevCities.get(`${c.owner}:${c.id}`), !!b2 && !late.has(c.owner), city);
+    if (city.projectYield) minor.projectYield = city.projectYield;
+    else delete minor.projectYield;
   }
   const readBack = history?.floods ? importFloods(state, history.floods) : importFloodCounts(rec, state, cityByKey.values());
   // the columns this record's readings placed an event's draws from

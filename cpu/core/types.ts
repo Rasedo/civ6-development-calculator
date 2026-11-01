@@ -1336,6 +1336,11 @@ export interface CityState extends Seat {
    *  own fields, declared here so the census compares them for a minor
    *  (`minorTreasury` / `minorFaith`). */
   treasury: number;
+  /** the net Gold its last gold step banked (PlayerTreasury
+   *  m_xCachedNetIncome, player +0x13a0 +0x1b8: the city's Gold less the
+   *  units' Maintenance, written as the treasury banks it); 0 before the
+   *  first */
+  netIncome?: number;
   faith: number;
   /** CIV6 (City-state): the install has ONE city rule, so a minor's city
    *  grows on its FOOD BOX and claims tiles on its CULTURE BOX exactly as a

@@ -917,7 +917,8 @@ class SimMinors:
         (`_trade_walk_tick`); a free Trader under its capacity takes the
         scorer's destination (`_minor_route_candidate`) and is spent on it —
         the commit `commitRoute` makes: the term, the stored course, the
-        walker at the centre on leg 0, road on the centre; then the round
+        walker at the centre on leg 0, road on the centre, its first plot
+        taken at once (`_trade_first_step`); then the round
         trips that are done end (`_expire_seat_routes`)."""
         row = self._CITY_MINOR0 + s
         alive = self.citystate_alive[:, s]
@@ -944,6 +945,7 @@ class SimMinors:
                     lr = rows[~self.water[rows, o_ct[rows]]]
                     if len(lr) > 0:
                         self._lay_road(lr, o_ct[lr], row)
+                    self._trade_first_step(row, rows, slot)
                     self.major_unit_alive[rows, t_slot[rows]] = False
                     self._occ_clear(rows, t_tile[rows], t_slot[rows] + self.POOL_LO["major"])
         self._expire_seat_routes(row)
@@ -1134,6 +1136,9 @@ class SimMinors:
                                          self.major_unit_levied).double() * mine.double()).sum(dim=1)
         tre = self.citystate_treasury[:, s] + tot[:, 2] * keep
         paid = torch.where(alive, tre - upkeep, tre)
+        # the net income the treasury banks (m_xCachedNetIncome), which the
+        # Economic AI's Gold boost reads
+        self.citystate_net_income[:, s] = torch.where(alive, tot[:, 2] - upkeep, self.citystate_net_income[:, s])
         maint = self._unit_maintenance(self.unit_type, self.unit_formation, self.unit_levied).double()
         self.citystate_treasury[:, s] = self._bankruptcy(row, paid, alive, maint)
         self.citystate_faith[:, s] += tot[:, 5] * keep

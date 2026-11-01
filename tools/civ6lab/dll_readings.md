@@ -5358,3 +5358,48 @@ Move's danger flags ...") set no flag 2.
   upgrade only if the minors read China's plots through their own revealed
   route types, which neither twin models. So the majors stay at the turn's
   change.
+
+## C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins
+
+`economicGoldBoost` (cpu/core/aiWeights.ts) on `CityState.netIncome`
+(written in `minorEconomy`, cpu/core/minorBuild.ts); `_gold_boost_of`
+(gpu/core/sim_cityvalue.py) on `citystate_net_income` (written in
+`_minor_economy`, gpu/core/sim_minors.py).
+
+- The player's treasury (player +0x13a0) holds its named members at
+  descriptor + 0x58: m_xGoldBalance +0xa0 (data +0xf8), m_xGoldRateChange
+  +0x100 (+0x158), m_xCachedNetIncome +0x160 (+0x1b8), m_xGoldInterestPercent
+  +0x1c0, m_xCachedNetIncomeExcludingTrade +0x220 (+0x278) — the aimem
+  dump's PlayerTreasury names and the setter 0x731d10's targets agree.
+- +0x1b8's writers: the reset 0x4e11b0 (0), the load 0x4dcd20, and the
+  treasury's turn 0x4e08f0, the first call of the player's DoTurn 0x4e4560
+  (0x4e45ee), before the culture, the resources and the cities' turns:
+  +0x1b8 = GetGoldYield (0x4ddc70 -> GameAttribute::Value) less 0x4dd3b0's
+  sum less the total Maintenance (0x4df2d0); then 0x4deb70 stores the
+  income excluding trade (+0x278) and 0x4e02e0 banks +0x1b8 into the
+  balance; a balance below 0 runs the shortfall (0x4dd270, 0x4e1300).
+- So the Economic AI's turn (0x687bf0 at 0x687d46) reads the net income the
+  same turn's gold step banked, not a live yield. Ported: the minor's gold
+  step stores the city's Gold less its units' Maintenance as it banks it,
+  and its savings turn's boost is -0.2 x that while negative. The Free
+  Cities and the majors keep the live gold per turn.
+- CONFIRMED (aimem, one-seed traces): runs/h1_duely1121 Hunza t73-t92, the
+  stat (mem PlayerTreasury m_xCachedNetIncome) equals the engine's banked
+  net on every turn but t85 (below); its Civil Prestige / Retainers /
+  Caravansaries rows at t79 / t84 / t87 / t88 as logged. The stat's Gold
+  holds the city's district-project conversion (Hunza's project 11, 2.85
+  Gold at t72): the importer now carries a minor's `projectYield` from the
+  record before, as a major's. runs/h1_duely1124 p4 t225 Builder bought as
+  recorded, aimem and carried.
+- With it: a route's Trader takes its first plot the turn the route starts
+  (every route's first record holds its Trader a plot from its origin:
+  runs/h1_duely1121 Hunza 275 from 231 at t48 / t68 / t88, China 405 / 448
+  from 449), `commitRoute`'s `tradeRouteStep` / `_trade_first_step`; so the
+  Trader is home and its route ends the turn the game's ends, the next gold
+  step banks no route Gold, and the next route's pick reads that boost:
+  runs/h1_duely1121 Hunza t88 Taiyuan, runs/h1_duely1127 Mexico City t150
+  Hattusa, as recorded.
+- Open: 0x4dd3b0's sum (city GetYield 0x1cb8b0 terms, read as 0 for a
+  city-state); a district project that starts on a record's 0 progress takes
+  an overflow no record holds (1121 Hunza t85: the stat -1.73, the
+  importer's -4.40).

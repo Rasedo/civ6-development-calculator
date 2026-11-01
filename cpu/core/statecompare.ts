@@ -1013,6 +1013,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorCampsKnown: overCityStates((cityState) => [...(cityState.campsKnown ?? [])]),
   minorProjectYield: overCityStates((cityState) => projectYieldCols(cityState.projectYield)),
   minorTreasury: overCityStates((cityState) => cityState.treasury),
+  minorNetIncome: overCityStates((cityState) => cityState.netIncome ?? 0),
   minorShortfall: overCityStates((cityState) => cityState.goldShortfall),
   minorPop: overCityStates((cityState) => cityState.population),
   minorFoodBox: overCityStates((cityState) => cityState.foodBox ?? 0),

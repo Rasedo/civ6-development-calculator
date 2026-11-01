@@ -3,6 +3,70 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x4dcd20
+  final: 0x340bc0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- +0x1b8's writers: the reset 0x4e11b0 (0), the load 0x4dcd20, and the treasury's turn 0x4e08f0, the first call of the player's DoTurn 0x4e4560 (0x..."
+  review: imported
+- addr: 0x4dd270
+  final: 0x340fc0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...x278) and 0x4e02e0 banks +0x1b8 into the balance; a balance below 0 runs the shortfall (0x4dd270, 0x4e1300).
+  review: imported
+- addr: 0x4dd3b0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 85
+      value: "a district project that starts on a record's 0 progress takes   an overflow no record holds (1121 Hunza t85: the stat -1.73, the   importer's -4.40)."
+  readings:
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+  context:
+    - "...es and the cities' turns: +0x1b8 = GetGoldYield (0x4ddc70 -> GameAttribute::Value) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); then 0x4deb70 stores the income excludin..."
+    - "- Open: 0x4dd3b0's sum (city GetYield 0x1cb8b0 terms, read as 0 for a city-state); a district project th..."
+  review: imported
+- addr: 0x4ddc70
+  final: 0x341600
+  kind: function
+  name: GetGoldYield
+  status: PARTLY
+  readings:
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e45ee), before the culture, the resources and the cities' turns: +0x1b8 = GetGoldYield (0x4ddc70 -> GameAttribute::Value) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); the..."
+  review: imported
+- addr: 0x4deb70
+  final: 0x3421d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...> GameAttribute::Value) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); then 0x4deb70 stores the income excluding trade (+0x278) and 0x4e02e0 banks +0x1b8 into the balance...
+  review: imported
+- addr: 0x4df2d0
+  final: 0x342620
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ield (0x4ddc70 -> GameAttribute::Value) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); then 0x4deb70 stores the income excluding trade (+0x278) and 0x4e02e0 banks +0x1b8 in...
+  review: imported
 - addr: 0x4e02e0
   final: 0x3432e0
   kind: function
@@ -11,7 +75,36 @@
     - recording: 1108
       turn: 159
       value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
-  readings: ["H-1: the annex, the purchase and the stored next plot — READ"]
+  readings:
+    - "H-1: the annex, the purchase and the stored next plot — READ"
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
   context:
     - "...ader's tiles en route (0x558510) and the Gold purchase (0x977aa0: the price spent through 0x4e02e0, then the annex). A purchase made after the turn's culture step so leaves the city with n..."
   review: imported
+- addr: 0x4e08f0
+  final: 0x343780
+  kind: function
+  name: treasuryTurn
+  semantics: "The treasury's turn, the first call of the player's DoTurn (0x4e45ee): m_xCachedNetIncome (+0x160, data +0x1b8) = GetGoldYield (0x4ddc70) less 0x4dd3b0's sum less the total Maintenance (0x4df2d0); 0x4deb70 stores the income excluding trade (+0x220, data +0x278); 0x4e02e0 banks +0x1b8 into the balance (+0xf8); a balance below 0 runs 0x4dd270 / 0x4e1300."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 80
+      value: Hunza's m_xCachedNetIncome -1126 (-4.398) = the record t79's Gold 9.60 less Maintenance 14, the balance's change t79 -> t80; the engine's banked net equal t73-t92 but t85
+  impl: [cpu/core/minorBuild.ts:minorEconomy, gpu/core/sim_minors.py:_minor_economy]
+  readings:
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+  review: reviewed
+- addr: 0x4e11b0
+  final: 0x343be0
+  kind: function
+  name: treasuryReset
+  semantics: "The treasury's reset: the balance, the rate change, the income excluding trade, m_xCachedNetIncome (+0x160) and the interest percent to 0, the per-improvement and dispersal arrays cleared."
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 2
+      value: every city-state's m_xCachedNetIncome 0 before its first gold step (the engine's netIncome absent, boost 0)
+  readings:
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+  review: reviewed

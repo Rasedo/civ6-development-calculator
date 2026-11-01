@@ -40,6 +40,14 @@ def _t(x, like: torch.Tensor) -> torch.Tensor:
     return torch.full_like(like, int(x))
 
 
+def _gold_boost_of(net: torch.Tensor) -> torch.Tensor:
+    """`economicGoldBoost` (0x687bf0, AI::Economic +0x528) on the net income
+    `net` [B] f64 (m_xCachedNetIncome, player +0x13a0 +0x1b8): -0.2 x it
+    while it is negative, else 0, raw"""
+    return torch.where(net < 0, _fmul(torch.full_like(net, _fx_const(-0.2), dtype=torch.long), _fx_const_t(net)),
+                       torch.zeros_like(net, dtype=torch.long))
+
+
 def _fx_float(x: float) -> int:
     """a float's 24.8 raw as the DLL converts it (`fxOfFloat`): the floor's
     whole part, the fraction's 256ths truncated"""
@@ -1637,9 +1645,7 @@ class _MinorFacts:
             sim = self.sim
             mine = self._mine()
             up = (sim._unit_maintenance(sim.major_unit_type, sim.major_unit_formation, sim.major_unit_levied).double() * mine.double()).sum(dim=1)
-            gpt = self._total(2) - up
-            return torch.where(gpt < 0, _fmul(torch.full_like(gpt, _fx_const(-0.2), dtype=torch.long), _fx_const_t(gpt)),
-                               torch.zeros_like(gpt, dtype=torch.long))
+            return _gold_boost_of(self._total(2) - up)
         return self._get("gold_w", build)
 
     def yield_w(self, y):

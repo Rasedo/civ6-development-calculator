@@ -308,6 +308,7 @@ export function minorEconomy(state: GameState, cityState: CityState): number {
   for (const u of state.units) if (u.seat === cityState.seat) upkeep += unitMaintenance(u);
   cityState.treasury += y.gold;
   cityState.treasury -= upkeep;
+  cityState.netIncome = y.gold - upkeep;
   bankruptcy(state, cityState, (u) => unitMaintenance(u));
   cityState.faith += y.faith;
   return gained.techs;

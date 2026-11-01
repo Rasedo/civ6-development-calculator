@@ -859,7 +859,7 @@ export function minorMilitaryTurn(state: GameState, cs: CityState): void {
   // at t210, as logged)
   savingsTurn(eco, Math.trunc(cs.treasury * FX), minorGreatPersonClass(state));
   // its Gold boost, which its Gold weight reads until its next turn
-  eco.goldBoost = economicGoldBoost(state, cs.seat);
+  eco.goldBoost = economicGoldBoost(cs.netIncome ?? 0);
   // its contract purchases, in its city on the threat its last update stored
   if (cs.cityAi) {
     const pcity = minorPurchaseCity(state, cs, cs.threat ?? -1);

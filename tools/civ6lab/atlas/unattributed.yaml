@@ -1591,6 +1591,16 @@
   context:
     - "...8) x the Amount as Gold weighted, discounted from the start, plus 0.5 x the Gold yield (0x4e0bf0, the player's gross: cities, tributaries, deals, interest ...) x the Amount, between —..."
   review: imported
+- addr: 0x4e1300
+  final: 0x343d30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0x4e02e0 banks +0x1b8 into the balance; a balance below 0 runs the shortfall (0x4dd270, 0x4e1300).
+  review: imported
 - addr: 0x4e4ad0
   final: 0x344fc0
   kind: function
@@ -3592,6 +3602,7 @@
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
+    - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ct Manager's check 0x7f2220 sets FAILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8...

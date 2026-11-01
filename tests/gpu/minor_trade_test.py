@@ -80,9 +80,9 @@ def main() -> int:
     k = live[0]
     assert int(rr[k, 0]) == 0, "the origin is the minor's one city, coded 0"
     assert int(rr[k, 1]) == int(code[B0]) and int(sim.seat_route_dseat[B0, row, k]) == int(dseat[B0])
-    assert int(sim.seat_route_walk[B0, row, k]) == int(sim.citystate_center[B0, s]), "the walker starts home"
     assert int(sim.seat_route_exp[B0, row, k]) == int(sim.turn) + int(sim._trade_min_duration()[B0])
     crs = [int(x) for x in sim.seat_route_course[B0, row, k] if int(x) >= 0]
+    assert int(sim.seat_route_walk[B0, row, k]) == crs[1], "the walker takes its first plot out at the start"
     assert crs and crs[0] == int(sim.citystate_center[B0, s]) and crs[-1] == int(dct[B0]), \
         f"the stored course {crs} does not run from the minor's centre to its destination"
     assert traders(sim, s) == t0 - 1, "the Trader was not spent"

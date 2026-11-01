@@ -2496,6 +2496,17 @@
           "note": "the minor city's Gold: its yield walk pays it, its units' upkeep and its purchases and upgrades spend it"
         },
         {
+          "name": "minorNetIncome",
+          "compare": "milli",
+          "covers": [
+            "CityState.netIncome"
+          ],
+          "planes": [
+            "citystate_net_income"
+          ],
+          "note": "the net Gold its last gold step banked (PlayerTreasury m_xCachedNetIncome, player +0x13a0 +0x1b8), which its Economic AI's Gold boost reads"
+        },
+        {
           "name": "minorShortfall",
           "compare": "exact",
           "covers": [],

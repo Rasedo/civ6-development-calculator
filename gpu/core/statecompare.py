@@ -997,6 +997,7 @@ CITY_STATE = {
         for s in rows
     ],
     "minorTreasury": lambda sim, b, rows: [float(sim.citystate_treasury[b, s]) for s in rows],
+    "minorNetIncome": lambda sim, b, rows: [float(sim.citystate_net_income[b, s]) for s in rows],
     "minorShortfall": lambda sim, b, rows: [int(sim.seat_shortfall[b, sim._CITY_MINOR0 + s]) for s in rows],
     # a minor's row is a row of the CITY BLOCK, so its population and its
     # three boxes are read straight off it — no second name for one fact
