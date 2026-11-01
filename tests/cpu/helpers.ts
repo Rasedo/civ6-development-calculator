@@ -27,6 +27,8 @@ import { ENCAMPMENT_HP } from '../../cpu/data/units';
 import { RESOURCES } from '../../world/resources';
 import { loadWorld } from '../../cpu/world/load';
 import { buildWorld } from '../../seeder/build';
+import { drawResearchTree } from '../../cpu/core/researchTree';
+import { randRange } from '../../cpu/core/rand';
 import { WORLD_PRESETS } from '../../seeder/presets';
 
 export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND', wrapX = false): GameMap {
@@ -64,6 +66,14 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
   return { width, height, wrapX, seed: 0, tiles };
 }
 
+/** the Future tree the game's set-up draws (`drawResearchTree`), on a
+ *  generator of its own at the fixture's seed, so the fixture's stream stays
+ *  at 42 */
+function setupTree(): GameState['researchTree'] {
+  const gen = { rngState: 42 } as GameState;
+  return drawResearchTree((n, label) => randRange(gen, n, label));
+}
+
 export function makeState(map: GameMap = makeMap()): GameState {
   // The same stamps `createGameFromMap` makes, so a test state answers the
   // climate the way a real one does.
@@ -90,7 +100,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
     units: [],
     nextUnitId: 0,
     rngState: 42,
-    researchTree: { prereqs: {}, baseCost: {} },
+    researchTree: setupTree(),
     disasters: false,
     fogOfWar: false,
     eventLog: [],
