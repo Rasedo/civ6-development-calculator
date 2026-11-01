@@ -23,7 +23,7 @@ import { TRADE_COURSE_MAX, scaleByGameSpeed } from '../data/constants';
 import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, minorCity, suzerainEffect, suzerainEffectCount } from './cityStates';
-import { completedDistrictCount } from './yields';
+import { completedDistrictCount, darkBuildings } from './yields';
 import { CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_PATH_TILE_GOLD_FX, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
 import { congressCsRouteFactor, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
@@ -465,12 +465,19 @@ export function cancelRoutesBetween(state: GameState, a: number, b: number): voi
   cancelRoutes(state, b, (r) => r.toSeat === a);
 }
 
+/** THE SEAT'S TRADE ROUTE CAPACITY (0x4d9320): Foreign Trade's one, a
+ *  city's standing Market or Lighthouse one — a dark one (pillaged, or on a
+ *  pillaged district) none (runs/h1_duely1124 Granada t75-89: its Lighthouse
+ *  pillaged, Trade Confederation's two route yields 28 at one route, 58 again
+ *  from its repair) — its complete Colossus or Great Zimbabwe one, and the
+ *  suzerainties, Congress, Great People, roster rows and Golden Ages */
 export function tradeCapacity(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
   let cap = 0;
   if (s?.research.civics.includes('FOREIGN_TRADE')) cap += 1;
   for (const c of routeCities(state, seat)) {
-    if (c.buildings.includes('MARKET') || c.buildings.includes('LIGHTHOUSE')) cap += 1;
+    const dark = darkBuildings(state.map, c);
+    if ((c.buildings.includes('MARKET') && !dark.has('MARKET')) || (c.buildings.includes('LIGHTHOUSE') && !dark.has('LIGHTHOUSE'))) cap += 1;
     for (const w of c.wonders ?? []) {
       if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
       if (w.id === 'COLOSSUS' || w.id === 'GREAT_ZIMBABWE') cap += 1;

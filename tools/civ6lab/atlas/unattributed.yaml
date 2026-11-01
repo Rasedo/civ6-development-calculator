@@ -3442,11 +3442,13 @@
   impl:
     - cpu/core/aiModifiers.ts:PLAYER_CITIES_WALK
     - cpu/core/aiModifiers.ts:subjects
+    - cpu/core/aiModifiers.ts:onSubject
     - gpu/core/sim_cityvalue.py:_cv_subjects
     - gpu/core/sim_policy.py:_pol_subjects
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
   context:
     - "...gistry's object @f03bb8: begin 0x69e9e0 clears +0x70 and the counters +0xd0 / +0xd4; next 0x69ea00 sets +0x70 to each of the player's cities, +0x12f0 +0xa0, counting +0xd4; past the last c..."
   review: reviewed
@@ -3644,6 +3646,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, tourism and modifiers, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20, EFFECT_ADJUST_CITY_FREE_POWER), PARTLY READ (the hazards' turns, 0x7b1320's defence, claimed plots and neighbours terms)"
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
     - "C-127: the improvement loop's housing"
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66 requirements; the effects the policies and gover..."

@@ -896,6 +896,15 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN: (t, args) => whole(span(t, pseudoYieldValue(t.view, t.seat, amountOf(args), 'PSEUDOYIELD_DIPLOMATIC_FAVOR'))),
   // 0x6c0ff0: a Trader's worth (0x7a7110) with the amount's capacity more,
   // from the start to the horizon; 0 where the route value is not read
+  // 0x6b0700 (@f04258, vtable 0xd63028; its parser 0x6b0430 stores
+  // fx(Amount x 0.01f) at +8): the Tourism a turn the player's cities make
+  // (0x1ab750 each) times it as PSEUDOYIELD_TOURISM, between the start and
+  // the horizon (runs/h1_duely1117 t229-231: Environmentalism's 25% on
+  // Antananarivo's 7 Tourism 33 at 2 turns, 35 at 1; on Caguana's 12, 57)
+  EFFECT_ADJUST_PLAYER_TOURISM: (t, args) => {
+    const x = fmul(fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(0.01))), t.view.citiesTourism(t.seat) * FX);
+    return whole(valueBetween(pseudoYieldValue(t.view, t.seat, x, 'PSEUDOYIELD_TOURISM'), t.start, t.horizon, t.rate));
+  },
   EFFECT_ADJUST_TRADE_ROUTE_CAPACITY: (t, args) =>
     whole(traderValue(t.view, t.seat, Number(args.Amount ?? 0) | 0, t.start, t.horizon, 0, t.rate) ?? 0),
   // 0x6afa10: a plot subject that is not impassable; half of the amount's
@@ -1174,10 +1183,13 @@ const NONE_ANALYZERS: Readonly<Record<string, (t: ValueTerms, args: Readonly<Rec
   },
 };
 
-/** the context a subject leaves for an analysis nested on it (0x142650's
- *  copy): a city subject is the city the nested analysis is of (+0x70), the
- *  empty city leaves it none, a unit subject its unit (+0x90); any
- *  other leaves the city as it stood */
+/** the context a subject leaves for its analyzer and for an analysis nested
+ *  on it (0x142650's copy): a city subject is the context's city (+0x70, as
+ *  the cities' walks 0x69ea00 / 0x69f340 set it — runs/h1_duely1124 t218-221
+ *  Digital Democracy's 2 Culture per district on each city-state's one
+ *  district or two: 40 / 80), the empty city leaves it none, a unit subject
+ *  its unit (+0x90), a player subject its other player (+0x40); any other
+ *  leaves the city as it stood */
 const onSubject = (t: ValueTerms, s: Subject): ValueTerms =>
   s.kind === 'city' ? { ...t, owner: { cityId: s.id, capital: s.capital, seat: s.seat } }
     : s.kind === 'nocity' ? { ...t, owner: undefined }
@@ -1223,9 +1235,7 @@ function analysis(t: ValueTerms, m: AiModifier, depth: number): number | null {
     if (ok === null) return 0;
     if (!ok) continue;
     passed = true;
-    const ctx = s.kind === 'player' && s.other !== undefined ? { ...t, other: s.other } : s.kind === 'unit' ? { ...t, unit: s }
-      : s.kind === 'nocity' ? { ...t, owner: undefined } : t;
-    sum = (SETS[m.effect] ?? ((acc: number, v: number) => acc + v))(sum, an(ctx, m.args, s));
+    sum = (SETS[m.effect] ?? ((acc: number, v: number) => acc + v))(sum, an(onSubject(t, s), m.args, s));
   }
   // no subject passed: the analyzer's slot 2
   if (!passed) sum += NONE_ANALYZERS[m.effect]?.(t, m.args) ?? 0;

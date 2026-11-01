@@ -209,6 +209,7 @@
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
   context:
     - "...READ: per city of the player (+0x12f0 +0xd8) its tourism (city +0x1ac8: 0x1ab5f0, then 0x1ab2a0 added), the first part cut by the target's culture defence percent (+0x1310 +0xf30, u..."
   review: imported
@@ -236,9 +237,28 @@
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
   context:
     - "...player), PARTLY READ: per city of the player (+0x12f0 +0xd8) its tourism (city +0x1ac8: 0x1ab5f0, then 0x1ab2a0 added), the first part cut by the target's culture defence percent (+0x1..."
   review: imported
+- addr: 0x1ab750
+  final: 0x11ca70
+  kind: function
+  name: City_Culture GetTourism
+  semantics: "a city's Tourism a turn (City_Culture, City +0x1ac8): 0x1ab2a0 (works, buildings, wonders, plots, raised by the player's percent) + 0x1ab5f0 (the religious half)."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 230
+      value: Valletta 7, Caguana 12, Antananarivo 7 as the records' city tourism (Conservation's walls and Arena), the analyzer's sum
+  impl:
+    - cpu/core/city.ts:cityTourism
+    - gpu/core/sim_economy.py:_ai_cities_tourism
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+  readings:
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
+  review: reviewed
 - addr: 0x1aba40
   final: 0x11cc40
   kind: function

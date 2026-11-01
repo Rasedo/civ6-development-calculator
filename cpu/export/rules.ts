@@ -3204,24 +3204,24 @@ export function buildRules() {
 }
 
 /** the TechnologyModifiers the research AI's value reads of a technology, as
- *  the GPU twin takes them: the spies' and the sea movement's Amounts; a
+ *  the GPU twin takes them: the spies', the sea movement's and the tourism's Amounts; a
  *  diplomatic victory points row is worth none there (no other player in the
  *  context), any other effect the TS analyses is refused */
-function techAiModifiers(id: string): { aiSpies: number; aiSeaMoves: number } {
+function techAiModifiers(id: string): { aiSpies: number; aiSeaMoves: number; aiTourism: number } {
   const mods = AI_TECH_MODIFIERS[gameTypeOf('tech', id, 'TECH_')] ?? [];
   const read = new Set(AI_MODIFIER_READS.analyzers);
   for (const m of mods) {
-    if (read.has(m.effect) && !['EFFECT_GRANT_SPY', 'EFFECT_ADJUST_UNIT_SEA_MOVEMENT', 'EFFECT_ADJUST_PLAYER_DIPLOMATIC_VICTORY_POINTS'].includes(m.effect)) {
+    if (read.has(m.effect) && !['EFFECT_GRANT_SPY', 'EFFECT_ADJUST_UNIT_SEA_MOVEMENT', 'EFFECT_ADJUST_PLAYER_TOURISM', 'EFFECT_ADJUST_PLAYER_DIPLOMATIC_VICTORY_POINTS'].includes(m.effect)) {
       throw new Error(`tech ${id}: modifier ${m.id} (${m.effect}) analysed in TS, not exported to the GPU`);
     }
   }
   const sum = (effect: string): number => mods.filter((m) => m.effect === effect).reduce((n, m) => n + (Number(m.args.Amount ?? 0) | 0), 0);
-  return { aiSpies: sum('EFFECT_GRANT_SPY'), aiSeaMoves: sum('EFFECT_ADJUST_UNIT_SEA_MOVEMENT') };
+  return { aiSpies: sum('EFFECT_GRANT_SPY'), aiSeaMoves: sum('EFFECT_ADJUST_UNIT_SEA_MOVEMENT'), aiTourism: sum('EFFECT_ADJUST_PLAYER_TOURISM') };
 }
 
 /** the CivicModifiers the civics AI's value reads of a civic, as the GPU twin
  *  takes them: each effect's Amount (Enable as 1) */
-function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAdjacency: number; aiTradeCapacity: number } {
+function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAdjacency: number; aiTradeCapacity: number; aiTourism: number } {
   const mods = AI_CIVIC_MODIFIERS[gameTypeOf('civic', id, 'CIVIC_')] ?? [];
   const sum = (effect: string, arg: string): number => mods.filter((m) => m.effect === effect)
     .reduce((n, m) => n + (arg === 'Enable' ? (m.args.Enable === 'true' ? 1 : 0) : Number(m.args[arg] ?? 0) | 0), 0);
@@ -3230,5 +3230,6 @@ function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAd
     aiSpies: sum('EFFECT_GRANT_SPY', 'Amount'),
     aiAdjacency: sum('EFFECT_GRANT_COMBAT_ADJACENCY', 'Enable'),
     aiTradeCapacity: sum('EFFECT_ADJUST_TRADE_ROUTE_CAPACITY', 'Amount'),
+    aiTourism: sum('EFFECT_ADJUST_PLAYER_TOURISM', 'Amount'),
   };
 }

@@ -49,7 +49,7 @@ import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, minorCity, suzera
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
 import { buildingVariantAdjacency, cityPower, effectiveAdjacency } from './yields';
-import { civEraIndex, computeCityStats } from './city';
+import { cityTourism, civEraIndex, computeCityStats } from './city';
 import { PROJECTS } from '../data/projects';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
@@ -360,6 +360,7 @@ export function aiView(state: GameState, opts: { forecastNow?: boolean } = {}): 
     // (`minorTradeValue`, `freeTradeValue`); a major's
     // is not read
     tradeKnowledge: (i) => (isCityStateSeat(i) || i === FREE_SEAT ? seatOf(state, i)?.tradeValue ?? 0 : null),
+    citiesTourism: (i) => seatCities(i).reduce((s, c) => s + cityTourism(state, c), 0),
     portalRoutes: (p) => {
       let routes = 0;
       let mountain = false;

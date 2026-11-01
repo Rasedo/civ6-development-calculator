@@ -281,6 +281,9 @@ export interface AiValueView {
   /** the trade AI's expected route value (the knowledge base's +0x6d8,
    *  AI_Knowledge.csv's TRADE VAL), raw; null where it is not read */
   tradeKnowledge(seat: number): number | null;
+  /** the Tourism a turn the seat's cities make, each city's both halves
+   *  (0x1ab750 on City +0x1ac8: `cityTourism`), summed */
+  citiesTourism(seat: number): number;
   /** the Mountain Portal analyzer's walk of a plot's ring (0x6b1b0 with
    *  0x6c8fb0): its neighbours with a route; null where a neighbour without
    *  one holds a portal (0x88680) or none is a mountain */

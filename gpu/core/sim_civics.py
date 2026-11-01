@@ -125,7 +125,8 @@ class SimCivics:
         (their points as PSEUDOYIELD_INFLUENCE discounted from landing), the
         spies (PSEUDOYIELD_UNIT_SPY) and the combat adjacency (the minor's
         strength, `_cai_strength`) from landing to the horizon, and the trade
-        capacity's Trader worth on its route value K (`traderValue`). At the
+        capacity's Trader worth on its route value K (`traderValue`), and the
+        tourism percent's on its cities' Tourism (`_rai_tourism`). At the
         horizon or past it -9999"""
         T = self._cai_tables()
         B, NC = turns.shape
@@ -184,7 +185,8 @@ class SimCivics:
             full = traders.unsqueeze(1) >= capacity.unsqueeze(1) + cap_n
             trade = torch.where(full | (cap_n == 0), torch.zeros_like(v), ((v * 4) >> 8) * _FX)
         val = (own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * district
-               + m[:, :, 3] * formation.unsqueeze(1) + cards + tokens + spies + adjacency + trade)
+               + m[:, :, 3] * formation.unsqueeze(1) + cards + tokens + spies + adjacency + trade
+               + self._rai_tourism(s, T["mods"][:, 5], nn))
         return torch.where(turns >= T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
 
     def _cai_gov_term(self, s: int, B: int, NC: int) -> torch.Tensor:

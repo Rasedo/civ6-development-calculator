@@ -6780,14 +6780,13 @@ class SimEconomy:
 
     def _seat_tourism_pct(self, row: int) -> torch.Tensor:
         """[B] long — CIV6 (MODIFIER_PLAYER_ADJUST_TOURISM): the percent the
-        row's research adds to every city's Tourism (`seatTourismPct`)."""
+        row's research adds to every city's Tourism (`seatTourismPct`), a
+        minor's and the Free row's their own research record's."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        if row >= self.n_majors:
-            return out
         for kind, idx, pct in self._tour_pct_rows:
             if idx < 0:
                 continue
-            has = self.civ_techs[:, row, idx] if kind == 0 else self.civ_civics[:, row, idx]
+            has = self._seat_techs(row)[:, idx] if kind == 0 else self._seat_civics(row)[:, idx]
             out = out + has.long() * pct
         return out
 
@@ -6854,6 +6853,36 @@ class SimEconomy:
         (`seatTourismReligious`)."""
         return self._raised_tourism(self._city_religious_tourism(row), self._seat_tourism_pct(row)).sum(dim=1)
 
+    def _ai_cities_tourism(self, row: int) -> torch.Tensor:
+        """[B] long — the AI view's `citiesTourism` for a minor's row or the
+        Free row: each living city's Tourism a turn, both halves raised by
+        the row's percent and floored (`cityTourism`, 0x1ab750) — its works,
+        buildings, wonders and plots (a minor's one city on every plot of its
+        seat, a Free City on its own), no Great Person's, governor's,
+        dedication's or civilization's term (a minor and the Free row hold
+        none) — summed"""
+        cols = self.RC
+        tv, cv = self._seat_techs(row), self._seat_civics(row)
+        printing = tv[:, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None
+        gw = self._gw_tourism_general(row, printing, self._congress_gw_kmult())
+        era = self._civ_era(tv, cv)
+        resort = self._seat_wonder_mult(row, self._wond_resorttour) if self._wond_n else None
+        pct = self._seat_tourism_pct(row)
+        rel = self._raised_tourism(self._city_religious_tourism(row), pct)
+        alive = self.city_alive[:, row, :cols]
+        seat = int(self._ROW_SEAT[row])
+        minor = self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S
+        slot = None if minor else self.city_slot_at(row)
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for j in alive.any(dim=0).nonzero().flatten().tolist():
+            one = torch.zeros(self.B, cols, dtype=torch.bool, device=self.device)
+            one[:, j] = alive[:, j]
+            own_j = ((self.tile_seat == seat) if minor else (slot == j)) & alive[:, j].unsqueeze(1)
+            t = self._tourism_of(gw, one, own_j, era, resort_mult=resort,
+                                 suz_tour=self._suzerain_tourism(row, own_j) + self._building_tourism(row, one))
+            out = out + self._raised_tourism(t, pct) + rel[:, j]
+        return out
+
     def _building_tourism(self, row: int, col_mask: torch.Tensor | None = None) -> torch.Tensor:
         """[B] long — `buildingTourism`: a building's flat Tourism on its own
         district (Ferris Wheel, Shopping Mall), and once the seat holds a
@@ -6863,8 +6892,8 @@ class SimEconomy:
         the border holds a Geothermal Fissure. A dark building pays nothing.
         `col_mask` [B, RC] narrows the sum to some of the row's cities."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        if row >= self.n_majors or (not self._b_tour_any and not self._b_civic_tour_any
-                                    and not self._bvar_tour_feat and not self._bvar_tour_with_feat):
+        if (not self._b_tour_any and not self._b_civic_tour_any
+                and not self._bvar_tour_feat and not self._bvar_tour_with_feat):
             return out
         cols = self.RC
         dreg = self.city_dist_tile[:, row, :cols]
@@ -6878,13 +6907,13 @@ class SimEconomy:
             out = out + (held.long() * self._b_tourism).sum(dim=(1, 2))
         if self._b_civic_tour_any:
             cv = self._b_civic_tour[:, 0]
-            has = self.civ_civics[:, row].gather(1, cv.clamp(min=0).unsqueeze(0).expand(self.B, -1)) & (cv >= 0)
+            has = self._seat_civics(row).gather(1, cv.clamp(min=0).unsqueeze(0).expand(self.B, -1)) & (cv >= 0)
             out = out + (held.long() * (has.long() * self._b_civic_tour[:, 1]).unsqueeze(1)).sum(dim=(1, 2))
         feat_cnt = None
         for (bi, c), (amt, tech) in self._bvar_tour_feat.items():
             w = self._row_plays_idx(row, c)
             if tech >= 0:
-                w = w & self.civ_techs[:, row, tech]
+                w = w & self._seat_techs(row)[:, tech]
             if not bool(w.count_nonzero()):
                 continue
             if feat_cnt is None:
@@ -6912,7 +6941,7 @@ class SimEconomy:
             if yi < 0:
                 continue
             tt = self._imp_tour_tech[k]
-            got = (self.civ_techs[:, row, tt] if tt >= 0
+            got = (self._seat_techs(row)[:, tt] if tt >= 0
                    else torch.ones(self.B, dtype=torch.bool, device=self.device))
             live = (self.improvement == k) & ~self.pillaged & own
             if not bool(live.count_nonzero()):

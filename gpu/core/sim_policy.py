@@ -34,12 +34,13 @@ _POL_ANALYZERS = {
     "EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER", "EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT",
     "EFFECT_ADJUST_PLAYER_OPEN_BORDERS_FROM_INFLUENCE", "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
     "EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT", "EFFECT_ADJUST_FLAT_BONUS",
-    "EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT",
-}
-# worth 0 in a minor's policy context: the context's own city (none), the
-# Influence a minor may not give, its tributaries and placed envoys (none)
-_POL_ZERO = {
+    "EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT", "EFFECT_ADJUST_PLAYER_TOURISM",
     "EFFECT_ADJUST_CITY_YIELD_PER_POPULATION", "EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT",
+}
+# worth 0 in a minor's policy context: the space race projects (a minor's
+# city builds none), the Influence a minor may not give, its tributaries and
+# placed envoys (none)
+_POL_ZERO = {
     "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION", "EFFECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN",
     "EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_TRIBUTARY", "EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_USED_INFLUENCE_TOKEN",
 }
@@ -425,6 +426,25 @@ class SimPolicy:
         if eff == "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN":
             p = "PSEUDOYIELD_DIPLOMATIC_FAVOR"
             return span(self._cv_pseudo(full(amount * _FX), p, f0.pseudo_w(p))) >> 8
+        if eff == "EFFECT_ADJUST_PLAYER_TOURISM":
+            # 0x6b0700: fx(Amount x 0.01f) of the Tourism a turn the player's
+            # cities make as PSEUDOYIELD_TOURISM, between
+            p = "PSEUDOYIELD_TOURISM"
+            ct = self._ai_cities_tourism(ctx["row"]) * _FX
+            return between(self._cv_pseudo(_fmul(full(_fx_const(_f32(amount * _f32(0.01)))), ct), p, f0.pseudo_w(p))) >> 8
+        if eff in ("EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT", "EFFECT_ADJUST_CITY_YIELD_PER_POPULATION"):
+            # 0x6b4e80 / 0x6b6460: the subject city (the context's, +0x70) —
+            # its finished specialty districts, or its citizens — x Amount of
+            # the yield, unweighted, span
+            if not city:
+                return zero
+            f = sub["f"]
+            if eff == "EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT":
+                tl = self.city_dist_tile[:, f.row, getattr(f, "j", 0)]
+                n = ((tl >= 0) & self.district_complete.gather(1, tl.clamp(min=0)) & self._is_specialty).sum(dim=1)
+            else:
+                n = f.population()
+            return span(self._cv_yield(n.long() * (amount * _FX), y)) >> 8
         if eff in ("EFFECT_ADJUST_TRADE_ROUTE_YIELD", "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL",
                    "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC"):
             cap = torch.as_tensor(f0.trade_capacity(), device=dev).long().expand(B)
@@ -457,13 +477,14 @@ class SimPolicy:
                 return zero
             return _present_value(self._cv_pseudo(full(amount * _FX), p, f0.pseudo_w(p)), r, hh) >> 8
         if eff == "EFFECT_ADJUST_UNIT_PRODUCTION":
-            # per city of the minor (0x6b2350, `_cv_unit_prod_value`)
+            # per city of the minor, a city subject's own alone (0x6b2350,
+            # `_cv_unit_prod_value`)
             unit = a.get("UnitType")
             if not unit:
                 return zero
             pct = _fx_const(_f32(amount * _f32(0.01)))
             acc = zero
-            for f, alive, _cap in ctx["cities"]:
+            for f, alive, _cap in ([(sub["f"], sub["mask"], None)] if city else ctx["cities"]):
                 v = self._cv_unit_prod_value(f, unit, pct, t0, hh)
                 acc = acc + torch.where(alive, v, zero)
             return acc

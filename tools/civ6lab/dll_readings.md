@@ -7744,3 +7744,43 @@ update (gpu/core/sim_tactics.py).
   move 0x80e8ab, no goal) takes 33:10 where ours takes the empty centre
   32:11 (a fort by 0x716b90 at 0x716de5..0x716e19, its Walls done at t40),
   the exclusion unread.
+
+## C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins
+
+`ANALYZERS.EFFECT_ADJUST_PLAYER_TOURISM`, `AiValueView.citiesTourism`,
+`cityTourism`, `onSubject`, `tradeCapacity` (`cpu/core/aiModifiers.ts`,
+`aiView.ts`, `city.ts`, `trade.ts`); GPU `_ai_cities_tourism`
+(sim_economy.py), `_rai_tourism` (sim_research.py, the civic and the
+technology values), `_pol_analyze`'s EFFECT_ADJUST_PLAYER_TOURISM and
+EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT / _PER_POPULATION (sim_policy.py),
+`_trade_capacity` (sim_seats.py).
+
+- EFFECT_ADJUST_PLAYER_TOURISM (the registry 0x6c9640 names it at 0x6caac8;
+  its object @f04258, vtable 0xd63028): the parser, slot 0 0x6b0430, stores
+  fx(Amount x 0.01f) at +8; the analyzer, slot 1 0x6b0700, sums 0x1ab750
+  (City +0x1ac8: 0x1ab2a0 + 0x1ab5f0, the city's Tourism, both halves) over
+  the player's cities (+0x12f0 +0xd8), multiplies it by +8 (0x16e7d0), values
+  it as PSEUDOYIELD_TOURISM (0x7a60d0) between the start and the horizon
+  (0x7a2140) and adds the whole part. Environmentalism's 25%, Computers' 25%
+  and Synthetic Technocracy's -10% read it.
+- Confirmed: runs/h1_duely1117 t229-231, Antananarivo's 7 Tourism (the
+  record's) 33 at two turns, 35 at one; Caguana's 12, 57 at two turns —
+  Environmentalism 155.6 / 386.1 and Near Future Governance 342 / 564.6 as
+  logged; Information Warfare and Cultural Hegemony 342 through them.
+- THE CITY SUBJECT IS THE CONTEXT'S CITY: COLLECTION_PLAYER_CITIES' next
+  (0x69ea00) and COLLECTION_ALL_CITIES' (0x69f340 at 0x69f418) write each city
+  to +0x70, which the analyzers that read the context's city read
+  (EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT 0x6b4e80 at 0x6b4ea2). Confirmed:
+  runs/h1_duely1124 t218-222, Digital Democracy's 2 Culture per specialty
+  district in the government value: Cardiff's and Bologna's one district 40,
+  Granada's two 80 — the civic 1146.1 / 790.1 / 890.6 as logged.
+- THE CAPACITY (FIT): a dark Market or Lighthouse (pillaged, or on a pillaged
+  district) adds no trade route capacity. runs/h1_duely1124 Granada: its
+  Lighthouse pillaged in the records t73-90, Trade Confederation (two route
+  yields, 0x6a49e0 on the capacity) logged 28 at t75-89 and 58 from t90;
+  Mercenaries and Exploration 183.8 / 222 at t76 through it.
+- Open: the Free Cities' city-value subjects (`_cv_subjects`) read every
+  city on the evaluated city's facts, and `_POL_ZERO` the Free Cities' space
+  race projects on a city subject; Online Communities'
+  EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER (0x6a1380 on 0x394830,
+  a city-state's tourism toward a player) is not ported (C-130).

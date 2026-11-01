@@ -283,9 +283,13 @@
   kind: function
   semantics: COLLECTION_ALL_CITIES' second slot (the knowledge base's cities).
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:ValueTerms, cpu/core/aiModifiers.ts:subjects]
+  impl:
+    - cpu/core/aiModifiers.ts:ValueTerms
+    - cpu/core/aiModifiers.ts:subjects
+    - cpu/core/aiModifiers.ts:onSubject
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
   context:
     - "- The collections: COLLECTION_ALL_CITIES 0x69f320 / 0x69f340 walks the player's KNOWLEDGE BASE's cities (player +0x12b8, its entries, setting +0x7..."
   review: reviewed

@@ -16041,8 +16041,9 @@ class SimSeats:
         self._expire_seat_routes(row)
 
     def _trade_capacity(self, row: int) -> torch.Tensor:
-        """tradeCapacity: FOREIGN_TRADE civic +1, Market-OR-Lighthouse per
-        living city +1 (non-cumulative), each COMPLETED Colossus/Great
+        """tradeCapacity: FOREIGN_TRADE civic +1, a standing (not dark,
+        `_bldg_dark`) Market-OR-Lighthouse per living city +1
+        (non-cumulative), each COMPLETED Colossus/Great
         Zimbabwe in a city's wonder REGISTRY +1 (`c.wonders`, not a tile
         scan), one per trade-type city-state this seat is Suzerain of, and the
         one TRADE POLICY outcome A hands the seat it names. A city-state's
@@ -16054,14 +16055,14 @@ class SimSeats:
         cap = torch.zeros(B, dtype=torch.long, device=dev)
         if self._trade_ftc >= 0:
             cap = cap + self._seat_civics(row)[:, self._trade_ftc].long()
+        bldg = self.city_bldg[:, row, :RC] & ~self._bldg_dark(self.city_dist_tile[:, row, :RC], self.city_bldg_pillaged[:, row, :RC])
         if self._CITY_MINOR0 <= row < self.FREE_ROW:
             mk = torch.zeros(B, dtype=torch.bool, device=dev)
             if self._trade_mkt >= 0:
-                mk = mk | self.city_bldg[:, row, 0, self._trade_mkt]
+                mk = mk | bldg[:, 0, self._trade_mkt]
             if self._trade_lgh >= 0:
-                mk = mk | self.city_bldg[:, row, 0, self._trade_lgh]
+                mk = mk | bldg[:, 0, self._trade_lgh]
             return cap + (mk & alive[:, 0]).long()
-        bldg = self.city_bldg[:, row]
         mkt = torch.zeros(B, RC, dtype=torch.bool, device=dev)
         if self._trade_mkt >= 0:
             mkt = mkt | bldg[:, :, self._trade_mkt]

@@ -696,7 +696,7 @@ class SimResearch:
         from landing to the horizon; the sea movement (0x6b85d0) per naval
         unit of the minor's first 51 with Movement, Amount x (its cost x
         0.5f) over its Movement in float, as Production discounted to landing,
-        each whole"""
+        the tourism percent on its cities' Tourism (`_rai_tourism`), each whole"""
         T = self._rai_tables()
         mods = T["mods"]
         out = torch.zeros_like(nn)
@@ -705,6 +705,7 @@ class SimResearch:
             spy = self._cai_grants()["spy"]
             v = self._rai_from_landing(spies.unsqueeze(0).expand_as(nn) * spy, nn)
             out = out + torch.div(v, _FX, rounding_mode="floor") * _FX
+        out = out + self._rai_tourism(s, mods[:, 2], nn)
         cols = (mods[:, 1] != 0).nonzero(as_tuple=True)[0].tolist()
         if not cols:
             return out
@@ -731,6 +732,23 @@ class SimResearch:
                 d = torch.div(_discounted(y, r, nn[:, c]), _FX, rounding_mode="floor")
                 out[:, c] = out[:, c] + torch.where(has & sea & (mv > 0), d * _FX, torch.zeros_like(d))
         return out
+
+    def _rai_tourism(self, s: int, amounts: torch.Tensor, nn: torch.Tensor) -> torch.Tensor:
+        """EFFECT_ADJUST_PLAYER_TOURISM (0x6b0700) [B, N] for minor `s` (the
+        Free Cities at `FR`), a row's `amounts` [N] its Amounts, landing in
+        `nn` turns: fx(Amount x 0.01f) of the Tourism a turn its cities make
+        (`_ai_cities_tourism`) as PSEUDOYIELD_TOURISM from landing to the
+        horizon, whole"""
+        out = torch.zeros_like(nn)
+        if not bool((amounts != 0).any()):
+            return out
+        f = amounts.cpu().to(torch.float32) * torch.tensor(0.01, dtype=torch.float32)
+        pct = torch.tensor([_fx_const(float(x)) for x in f.tolist()], dtype=torch.long, device=self.device)
+        row = self.FREE_ROW if s == self.FR else self._CITY_MINOR0 + s
+        ct = self._ai_cities_tourism(row) * _FX
+        x = _fmul(pct.unsqueeze(0).expand_as(nn), ct.unsqueeze(1).expand_as(nn))
+        v = self._rai_from_landing(self._cv_pseudo(x, "PSEUDOYIELD_TOURISM"), nn)
+        return torch.where(amounts.unsqueeze(0) != 0, torch.div(v, _FX, rounding_mode="floor") * _FX, out)
 
     def _rai_upstream(self, have: torch.Tensor, base: torch.Tensor, turns: torch.Tensor) -> torch.Tensor:
         """`propagate`'s sum: per row in reach, its unowned prerequisites' own

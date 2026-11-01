@@ -45,6 +45,7 @@
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
   notes: ["not ported: 0x394830 for a city-state unread"]
   review: reviewed
 - addr: 0x6a1700
@@ -200,6 +201,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL and _FOR_DOMESTIC 0x6a49e0: the capacity x Amount, weighted, span."
@@ -644,6 +646,41 @@
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
+- addr: 0x6b0430
+  final: 0x4861b0
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_TOURISM parser
+  semantics: "EFFECT_ADJUST_PLAYER_TOURISM's parser (vtable 0xd63028 slot 0): Amount (0xc7dc60) whole; when not 0, an object (vtable 0xd63a90) holding fx(Amount x 0.01f) at +8 (@0xd136f0 0.01)."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 230
+      value: "Environmentalism's 25 read as 0.25 — Antananarivo's 7 Tourism worth 35 at one turn, as logged"
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - gpu/core/sim_research.py:_rai_tourism
+    - gpu/core/sim_policy.py:_pol_analyze
+  readings:
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
+  review: reviewed
+- addr: 0x6b0700
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_TOURISM
+  semantics: "EFFECT_ADJUST_PLAYER_TOURISM's analyzer (registry 0x6c9640 at 0x6caac8, object @f04258, vtable 0xd63028 slot 1): the context's player's cities (+0x12f0 +0xd8) summed by 0x1ab750 (City +0x1ac8), shifted to 24.8, times the parser's +8 (0x16e7d0), as PSEUDOYIELD_TOURISM (0x7a60d0, @f2e2bc) between the start (+0xb4) and the horizon (+0xb8) at the rate (+0xbc) (0x7a2140), its whole part added to +0xc0."
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 229
+      value: Environmentalism 155.6 / 386.1 (Antananarivo 7 Tourism 33 at two turns, Caguana 12 Tourism 57), Near Future Governance 342 / 564.6 through it, as logged
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiView.ts:aiView
+    - gpu/core/sim_economy.py:_ai_cities_tourism
+    - gpu/core/sim_research.py:_rai_tourism
+    - gpu/core/sim_policy.py:_pol_analyze
+  readings:
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
+  review: reviewed
 - addr: 0x6b0840
   kind: function
   name: EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT
@@ -825,9 +862,13 @@
     - recording: h1_duelw1117
       turn: 112
       value: Bishop 91 = two districts x 45.6 (the log's 95 with the pressure term)
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+    - recording: h1_duely1124
+      turn: 218
+      value: "Digital Democracy's 2 Culture on the subject city (+0x70) in the government value, 40 a district — the civic 1146.1 / 790.1 / 890.6 as logged"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_analyze]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings — READ (0x6b0700, 0x6b0430, 0x69ea00's +0x70), a FIT (the capacity), both twins"
   context:
     - "...citizens +0x588 of the yield, unweighted, span), EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT 0x6b4e80 (Amount x 0x1ae8f0(1, 1, 1, 0, 0): the city's districts not InternalOnly (+0xe1 bit 2),..."
   review: reviewed
@@ -917,7 +958,7 @@
     - recording: h1_duelw1117
       turn: 28
       value: Connoisseur / Researcher 160 at Xi'an's 7 citizens
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, gpu/core/sim_policy.py:_pol_analyze]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
