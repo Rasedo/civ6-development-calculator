@@ -32,6 +32,7 @@
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
     - "H-1: the military AI's favoured technology — READ (the pick, its use), PARTLY READ (the Free Cities' counts)"
     - "C-96 / C-129: a city-state's unit production table counts the records before its turn's look — the aimem sites read, both twins"
+    - "C-96 / C-129: a city-state's unit production table counts the records its look's ageing keeps, none its sightings add — the aimem sites read, both twins"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 on PrereqTech/Civic turns), maintenance as plain Gold..."
   context:

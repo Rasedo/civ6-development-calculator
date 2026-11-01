@@ -12751,11 +12751,11 @@ rows and Trader plots t70-152).
   event takes the Warrior (CONTRACT 25, VALUE 10.0) — the carried unit
   table's Warrior below the game's, not a contract rule.
 
-## C-96 / C-129: a city-state's unit production table counts the records before its turn's look — the aimem sites read, both twins
+## C-96 / C-129: a city-state's unit production table counts the records its look's ageing keeps, none its sightings add — the aimem sites read, both twins
 
 - A city-state's city AI turn reads the military AI's unit production
-  table (0x7989e0) as that AI's turn left it: on the knowledge base's
-  army records before the turn's look, not those the look adds. Recorded
+  table (0x7989e0) on the knowledge base's army records its tactical
+  turn's ageing keeps, not those its look adds. Recorded
   (aimem sites, runs/h1_duely1121 p2 Hunza t9): the tactical site holds
   its own units and a barbarian Spearman, the log site adds the
   barbarian Quadrireme the look met; on the tactical site's records the
@@ -12765,9 +12765,16 @@ rows and Trader plots t70-152).
   site's (the Quadrireme counted, 0.738) the engines' 7.95 took the Walls
   and a Masonry Tech Contract at 9.0 (p2 Masonry +9.0 t10-t15). The
   aimem import is on the same records, so the miss was both modes'.
-  Ported: `CityState.armyCounted` (the records' counts at the military
-  AI's turn, read by `minorKnownUnits` until the city AI's turn ends;
-  GPU `_cv_counted`, read by `_cv_known`). Its five-duel gain is the
-  research scores' city terms on the same tables (1117 +70, 1121 +38
-  carried).
+  The ageing's drops are not counted either: runs/h1_duely1128 Hong Kong
+  t106, Bologna's two Crossbowman records at age 21 at the tactical site
+  gone at the log site (no sighting added), the game's Warrior where the
+  records before the look (the Crossbowmen counted) gave our Crossbowman;
+  Bologna t109 the same (a Crossbowman record aged out), its Pikeman. So
+  the table is on the records the tactical turn's ageing keeps, before
+  the look's sightings (the knowledge look 0x785f30: the ageing, then the
+  sighting walk 0x7877e0; the table between). Ported:
+  `CityState.armyCounted` (the look's kept records, those it refreshed
+  among them, read by `minorKnownUnits` until the city AI's turn ends;
+  GPU `_cv_counted`: the records numbered before the look,
+  `citystate_kb_seq`, read by `_cv_known`).
 

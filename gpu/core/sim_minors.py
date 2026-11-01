@@ -57,11 +57,12 @@ class SimMinors:
             # savings turn's purchases
             units = (self.major_unit_alive & (self.major_unit_seat == 100 + s)).sum(dim=1)
             self._minor_military_turn(s)
-            # its city AI's turn reads the military AI's unit production
-            # table as that turn left it, on the records before the look
-            # (`CityState.armyCounted`)
-            self._cv_counted[s] = self._cv_known(s)
+            # its city AI's turn reads the unit production table on the
+            # records the look's ageing keeps, none its sightings add
+            # (`CityState.armyCounted`: those numbered before the look)
+            before = self.citystate_kb_next[:, s].clone()
             self._minor_knowledge(s, True)
+            self._cv_counted[s] = self._cv_known(s, before)
             # its "Upgrade Units" trees' trigger: a technology gained
             # (`minorTurn`: a civic gained alone starts none)
             self.mops_upg_trig[:, s] |= alive & (self.citystate_techs[:, s].sum(dim=1) > techs_was)

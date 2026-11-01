@@ -1200,11 +1200,12 @@ class SimCityValue:
         w = torch.where(calm, w.clamp(max=2 * _FX), w)
         return regional, enemy, other, w + _t(standing, best)
 
-    def _cv_known(self, s: int) -> torch.Tensor:
+    def _cv_known(self, s: int, before: torch.Tensor | None = None) -> torch.Tensor:
         """`minorKnownUnits`: minor `s`'s knowledge base's army records by
         AI_UNITS row ([B, NU_ai]; a record of an engine unit with no row not
-        counted) — during its city AI's turn those its military AI's turn
-        counted, before the look (`_cv_counted`)"""
+        counted) — during its city AI's turn those its look's ageing kept
+        and its sightings did not add (`_cv_counted`); `before` [B], only
+        the records numbered below it"""
         if s in self._cv_counted:
             return self._cv_counted[s]
         T = self._cv_tables()
@@ -1213,6 +1214,8 @@ class SimCityValue:
         rows = T["engine_row"].to(typ.device)
         row = torch.where(typ >= 0, rows[typ.clamp(min=0)], torch.full_like(typ, -1))
         live = (slot != -2) & (row >= 0)
+        if before is not None:
+            live = live & (self.citystate_kb_seq[:, s].long() < before.unsqueeze(1))
         out = torch.zeros(slot.shape[0], len(T["unit_rows"]) + 1, dtype=torch.long, device=typ.device)
         out.scatter_add_(1, torch.where(live, row, torch.full_like(row, out.shape[1] - 1)), live.long())
         return out[:, :-1]

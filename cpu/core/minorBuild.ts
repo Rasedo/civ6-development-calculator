@@ -16,7 +16,7 @@
  * researched unlock, a legal plot, an intact perimeter below a higher wall,
  * a free tile beside the centre for a unit — is the same rule a major pays.
  */
-import type { City, CityState, DistrictId, GameState, QueueItem, ResearchState, Tile, Unit, YieldKey } from './types';
+import type { ArmyRecord, City, CityState, DistrictId, GameState, QueueItem, ResearchState, Tile, Unit, YieldKey } from './types';
 import { BUILDINGS } from '../data/buildings';
 import { ERAS, TECHS, type Era } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -133,14 +133,15 @@ export function minorPhase(state: GameState): void {
     // turn's purchases
     const units = state.units.filter((u) => u.seat === cityState.seat).length;
     minorMilitaryTurn(state, cityState);
-    // its city AI's turn reads the military AI's unit production table as
-    // that turn left it, on the records before the look (runs/h1_duely1121
-    // Hunza t9: the barbarian Quadrireme the look records not counted, its
-    // Warrior 10.1 over the Walls' 9.96, the game's Build City Building on
-    // the Warrior at 10.0; aimem's log site holds the Quadrireme, its
-    // tactical site not)
-    cityState.armyCounted = minorArmyCounts(cityState);
+    // its city AI's turn reads the unit production table on the records the
+    // look's ageing keeps, none its sightings add (runs/h1_duely1121 Hunza
+    // t9: the barbarian Quadrireme the look records not counted, its Warrior
+    // 10.1 over the Walls' 9.96, the game's Build City Building on the
+    // Warrior at 10.0; runs/h1_duely1128 Hong Kong t106: Bologna's two
+    // Crossbowmen aged out uncounted, the game's Warrior)
+    const before = new Set(cityState.armyKnown ?? []);
     minorKnowledge(state, cityState, true);
+    cityState.armyCounted = minorArmyCounts((cityState.armyKnown ?? []).filter((r) => before.has(r)));
     // its "Upgrade Units" trees' trigger: a technology gained
     // (TRIGGER_TECH_UPGRADE, AI_EVENT_GAIN_TECH). A civic gained alone starts
     // none, its TRIGGER_CIVIC_UPGRADE row (AI_EVENT_GAIN_CIVIC) notwithstanding:
@@ -1497,14 +1498,14 @@ function minorResearchResources(state: GameState, cityState: CityState, counts: 
 /** A minor's knowledge base's unit counts (0x5eb650 over every player): its
  *  army records by type */
 export function minorKnownUnits(cityState: CityState): (unit: string) => number {
-  const n = cityState.armyCounted ?? minorArmyCounts(cityState);
+  const n = cityState.armyCounted ?? minorArmyCounts(cityState.armyKnown ?? []);
   return (unit) => n[unit] ?? 0;
 }
 
-/** a city-state's knowledge base's army records by install unit type */
-function minorArmyCounts(cityState: CityState): Record<string, number> {
+/** army records by install unit type */
+function minorArmyCounts(records: readonly ArmyRecord[]): Record<string, number> {
   const n: Record<string, number> = {};
-  for (const r of cityState.armyKnown ?? []) {
+  for (const r of records) {
     const t = installType('unit', r.type, 'UNIT_');
     n[t] = (n[t] ?? 0) + 1;
   }
