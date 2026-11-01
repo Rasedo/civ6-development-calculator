@@ -7,7 +7,7 @@
   final: 0x51bd50
   kind: function
   name: planSpot
-  semantics: "the planning's cost callback on each link: lays a target's spots (melee: the attack's parent, the next-turn plot beside, the own plot; ranged: within range, sight beyond 1), six a target, the first link wins. Melee — the plot an attack on the target's plot is linked from (the attack's turn), a plot beside the target no other player's unit holds that the step ends on with no Movement (the next turn) or that is the unit's own plot (this turn); ranged (+0x19f8 the range) — any linked plot within the range (in sight beyond 1, 0x5cf2b0), its turn the step's, the next where it ends with no Movement or (0x791021..0x79103c) where it is not the unit's own plot and the context's +0x28 (0x56dc40, may shoot after moving) is clear; a civilian's plot taken from the plot it is linked from; a land unit's spot (and a melee one's target) never water. Ported: planUnit (cpu/core/tactical.ts), _tac_plan."
+  semantics: "the planning's cost callback on each link: lays a target's spots (melee: the attack's parent, the next-turn plot beside, the own plot; ranged: within range, sight beyond 1), six a target, the first link wins. Melee — the plot an attack on the target's plot is linked from (the attack's turn), and (0x790fc9..0x791016: 0x75c50 on the TARGET's plot, its unit list +0x50 / +0x60, every unit's owner word against the planning's player +0x20) only where no other player's unit stands on the target's plot — a COMBAT_DISTRICT nobody holds, never a unit target — a plot beside it that the step ends on with no Movement (the next turn) or that is the unit's own plot (this turn); with such a unit the distance stays 1 and the range test (0x791044) drops the plot; ranged (+0x19f8 the range) — any linked plot within the range (in sight beyond 1, 0x5cf2b0), its turn the step's, the next where it ends with no Movement or (0x791021..0x79103c) where it is not the unit's own plot and the context's +0x28 (0x56dc40, may shoot after moving) is clear; a civilian's plot taken from the plot it is linked from; a land unit's spot (and a melee one's target) never water. Ported: planUnit (cpu/core/tactical.ts), _tac_plan."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -18,17 +18,24 @@
     - recording: h1_duely1117
       turn: 89
       value: "city-state 4's City Defense Catapult on 33:8 strikes 34:8 from where it stands, as logged (the five duels' Operation Attack Units rows: Catapult 10 strike in place, 3 move only, none move and strike; Trebuchet 17 in place)"
+    - recording: h1_duely1128
+      turn: 47
+      value: city-state 2's Swordsman 589827 on 12:5 against the barbarian Scout on 14:4 lays the attack parents in the reach's closing order 13:4, 13:5, 13:3 (all turn 2, value 30) and takes 13:4 (189) as logged; Swordsman 720898 on 12:6 lays no three-turn spot beside the Scout and takes 13:7 (321) against the Swordsman on 14:6 as logged
   impl:
     - cpu/core/tactical.ts:planUnit
     - gpu/core/sim_tactics.py:_tac_spot_link
+    - gpu/core/sim_tactics.py:_tac_plan
+    - cpu/core/tactical.ts:foreignAt
     - cpu/core/tactical.ts:Spot
     - cpu/core/tactical.ts:shoots
+    - cpu/core/tactical.ts:foreign
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
     - "C-95: the planning's spots and the combat prediction"
     - "C-99: a siege unit's planning spots — READ (0x790c60 at 0x791021..0x79103c, 0x793400, 0x56dc40), both twins"
+    - "C-125: a melee unit's spot beside its target — READ (0x790c60 at 0x790faa..0x79103c, 0x776140's claim loop, 0x7702b0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...t again keeps its place and takes the fewer turns, or at equal turns the more Movement (0x790c60). The planning runs once for every unit at the start of the AI's turn. Flag 0x800 skips...

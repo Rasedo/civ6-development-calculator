@@ -7,12 +7,15 @@
   final: 0x5024e0
   kind: function
   name: attackGain
-  semantics: "an attack claim's gain: dealt / turns, a kill +100, an overkill, a barbarian target x 0.8, less what the unit holds"
+  semantics: "an attack claim's gain: dealt / turns, a kill +100, an overkill, a barbarian target x 0.8, less what the unit holds. Per claim of the unit on the spot (0x14 each: unit, target, dealt +8, turns +0xc, value +0x10): a target that holds the unit (its list +0x28 / +0x38) returns dealt / turns, +100 where its damage +0x14 reaches its health +0x10; else the value health - damage + 100 where the damage reaches the health, dealt / turns otherwise, x @0xd5aff4 (0.8, truncated) where the target's +0x1f (a barbarian) is set, the claim's value kept, the best returned. No blow back enters it."
   status: READ
   cases:
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+    - recording: h1_duely1128
+      turn: 47
+      value: "city-state 2's Swordsman 589827's spots 13:4 / 13:5 / 13:3 against the barbarian Scout on 14:4 all weigh trunc(76 / 2) x 0.8 = 30 whatever their blow back (10 / 13 / 10): the tie goes to the first spot, 13:4, as logged"
   impl:
     - cpu/core/tactical.ts:ATTACK_HEALTH_256
     - cpu/core/tactical.ts:ATTACK_KILL
@@ -22,6 +25,7 @@
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
+    - "C-125: a melee unit's spot beside its target — READ (0x790c60 at 0x790faa..0x79103c, 0x776140's claim loop, 0x7702b0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...alizedAssignmentProblem.cpp) runs ONE pass over the spots: per spot each unit's gain (λ 0x7702b0: the best of its entries there, dealt / turns, a kill +100 where the target's damage re..."
@@ -446,12 +450,15 @@
 - addr: 0x776140
   kind: function
   name: assignAttacks
-  semantics: "the claims (unit, target, spot), the MEDIUM / LOW exchange filter, one Generalized Assignment pass, the merge-sorted results The filters (0x776780..0x7767fa), per spot i of a claim unless the target is HIGH or the unit info's +0x1ba bit 0x20 (UseMaxMeleeTrainedStrength) is set: with the fifth argument, dropped where taken + back taken (+0x7c, +0x94) tops dealt + back dealt (+0x64, +0xac); with the sixth (Operation Attack Units passes it always, 0x80d63a), dropped where taken + back taken tops the unit's health (0x56e0d0 less +0xcf0). A target's health is floor(100 x 281 / 256) less its damage (1.1 in 24.8). A unit that moved with turns 1 takes only its own plot. The stacking block (0x776890..0x776909): a unit on the spot not the target, of the mover's formation class, blocks unless it is the player's, in the mover's job (unit +0x7d0: the pass's, an operation's) with Movement left (+0xdb0); a unit raised this turn, in no job, blocks. Claims in target, unit, spot order (the outer loop 0x776244..0x7766f3 walks the targets, 0x28 each, the inner the units); ONE pass of 0x8b5bf0; the results sorted by 0x7704e0 through EASTL's merge sort (halves n / 2)."
+  semantics: "the claims (unit, target, spot), the MEDIUM / LOW exchange filter, one Generalized Assignment pass, the merge-sorted results The filters (0x776780..0x7767fa), per spot i of a claim unless the target is HIGH or the unit info's +0x1ba bit 0x20 (UseMaxMeleeTrainedStrength) is set: with the fifth argument, dropped where taken + back taken (+0x7c, +0x94) tops dealt + back dealt (+0x64, +0xac); with the sixth (Operation Attack Units passes it always, 0x80d63a), dropped where taken + back taken tops the unit's health (0x56e0d0 less +0xcf0). A target's health is floor(100 x 281 / 256) less its damage (1.1 in 24.8). A unit that moved with turns 1 takes only its own plot. The stacking block (0x776890..0x776909): a unit on the spot not the target, of the mover's formation class, blocks unless it is the player's, in the mover's job (unit +0x7d0: the pass's, an operation's) with Movement left (+0xdb0); a unit raised this turn, in no job, blocks. Claims in target, unit, spot order (the outer loop 0x776244..0x7766f3 walks the targets, 0x28 each, the inner the units; the innermost 0x776780..0x7769cb the unit's planning entry's spots in their laid order, entry +0x18 the count, +0x1c the plots, +0x4c / +0x64 / +0x7c / +0x94 / +0xac the per-spot turns, dealt, taken, back taken, back dealt); a spot's place is its first claim's (0x77695a: the spot list searched by plot, a new one appended at 0x776a0c); ONE pass of 0x8b5bf0; the results sorted by 0x7704e0 through EASTL's merge sort (halves n / 2)."
   status: READ
   cases:
     - recording: h1_duelw1124
       turn: 11
       value: the camp at 40:21's new Slinger on 41:22 keeps the Warrior at 41:21 off its spot
+    - recording: h1_duely1128
+      turn: 47
+      value: city-state 2's Swordsman 589827's three tied spots against the barbarian Scout on 14:4 (13:4, 13:5, 13:3, value 30 each) claimed in its planning's order, the first 13:4 (189) kept as logged
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
@@ -475,6 +482,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: the standing army and the Combat Desire's city terms — READ (0x5ca7e0, the watched setter 0x731d10, 0x79b9c0), the unit table's orientation READ"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-125: a melee unit's spot beside its target — READ (0x790c60 at 0x790faa..0x79103c, 0x776140's claim loop, 0x7702b0), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."

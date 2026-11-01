@@ -7044,3 +7044,37 @@ orders before the minor's PlayerTurnActivated, and lands the record's.
   game none before its turn opens (its tree upgrades it after), under the
   game's AI memory too — the savings' order against the military AI's job
   unread; the Free Cities' upgrade (no recording holds one).
+
+## C-125: a melee unit's spot beside its target — READ (0x790c60 at 0x790faa..0x79103c, 0x776140's claim loop, 0x7702b0), both twins
+
+`planUnit`'s `foreign` (cpu/core/tactical.ts, `foreignAt` on each entry's
+plot); GPU `_tac_plan`'s "foreign" [N, E] (`_tac_foreign` gathered at the
+entries' plots) read by `_tac_spot_link` (gpu/core/sim_tactics.py).
+
+- THE SPOT BESIDE THE TARGET (0x790c60, melee, the link's plot one from the
+  target's): with Movement left only the unit's own plot goes on; then
+  0x75c50 fetches the TARGET's plot and walks its unit list (+0x50, count
+  +0x60): a unit whose owner word is not the planning's player (+0x20) sends
+  the link to the turn test with the distance still 1, and the range test
+  (0x791044, distance above +0xc) drops it. So the next-turn / own-plot spot
+  beside a target is laid only where no other player's unit stands on the
+  target's plot (a COMBAT_DISTRICT nobody holds); against a unit target a
+  melee unit's spots are the parents of its attack links alone, in the order
+  the search prices them (the closing order of the parents), at the
+  attack's turn. A plot one from the target reached with no Movement on the
+  search's last turn lays none: its attack would fall on the third turn,
+  past the search.
+- THE CLAIMS (0x776140, 0x776780..0x7769cb): per target, per unit, the
+  unit's planning entry's spots in their laid order; a spot's place in the
+  assignment is its first claim's (0x77695a). The gain (0x7702b0) is dealt /
+  turns (a kill +100, an overkill's health - damage + 100, a barbarian
+  target x 0.8) — no blow back enters it, so tied spots go to the first.
+- runs/h1_duely1128 t47 city-state 2: Swordsman 589827 on 12:5 against the
+  barbarian Scout on 14:4 lays 13:4, 13:5, 13:3 (the parents of its attacks,
+  turn 2, value 30 each) and takes 13:4 (189); Swordsman 720898 on 12:6 lays
+  no spot against the Scout (13:5 / 13:3 reached at (2/0)) and takes 13:7
+  (321, the parent of its attack on the Swordsman on 14:6), as logged
+  (AI_Tactical.csv "Move 13 4" / "Move 13 7", AI_Planning.csv).
+- OPEN: runs/h1_duely1124 t119 the barbarian Man-At-Arms 4521989 on 39:20
+  moves for 37:17 ((2/0) in its planning) against player 1's Missionary
+  3080203; the target entry's plot at the barbarians' turn is unread.

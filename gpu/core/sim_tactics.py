@@ -1115,7 +1115,7 @@ class SimTactics:
         # [N, 1, 1] it may shoot after moving (`movesAndShoots`): else a spot
         # off its own plot takes the next turn (0x790c60 at 0x791021..0x79103c)
         shoots = plan["shoots"].view(-1, 1, 1)
-        foreign = plan["foreign"][rows]      # [N, T] another player's fighter holds the plot
+        foreign = plan["foreign"]            # [N, E] another player's unit stands on the entry's plot
         N, E = tp.shape
         tpc = tp.clamp(min=0)
         water = self.water[rows]
@@ -1140,7 +1140,7 @@ class SimTactics:
             own = (P == start.unsqueeze(1)).unsqueeze(2)
             Rk, civk, tpk = R.unsqueeze(1), civ.unsqueeze(1), tp.unsqueeze(1)
             taken = torch.where(Rk != 0, civk & (d == 0), d == 0)
-            adj = ~taken & (Rk == 0) & (d == 1) & (m0 | own) & ~foreign.gather(1, P).unsqueeze(2)
+            adj = ~taken & (Rk == 0) & (d == 1) & (m0 | own) & ~foreign.unsqueeze(1)
             fixed = taken | (adj & ~m0)
             dd = torch.where(adj, torch.zeros_like(d), d)
             sp = torch.where(taken, par.view(N, 1, 1).expand(N, K, E), P.unsqueeze(2).expand(N, K, E))
@@ -1698,12 +1698,8 @@ class SimTactics:
         tpc = tp.clamp(min=0)
         tec = te.clamp(min=0)
         civ = other & (uk.gather(1, tec) == 7)
-        mil = self.military_at
-        ms = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0)), torch.full_like(mil, seat))
-        emb = self.embarked_at
-        es = torch.where(emb >= 0, self.unit_seat.gather(1, emb.clamp(min=0)), torch.full_like(emb, seat))
-        et = self.unit_type.gather(1, emb.clamp(min=0)).clamp(min=0, max=self.NU - 1)
-        foreign = (ms != seat) | ((es != seat) & self._type_dom_mil.take(et))
+        # [N, E] another player's unit, of any class, stands on the entry's plot
+        foreign = self._tac_foreign(seat)[rows].gather(1, tpc) & has
         plan = {"tp": tp, "civ": civ, "rng": rng, "fights": self._tac_can_fight(pre)[rows, slots], "foreign": foreign,
                 "shoots": self._moves_and_shoots(pre)[rows, slots]}
         res = self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre, plan=plan, from_full=True, listed=True)

@@ -1168,10 +1168,12 @@ export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at
  *    step's, the next where it ends with no Movement or, for a unit that may
  *    not shoot after moving (`movesAndShoots`), where it is not the unit's
  *    own plot; in melee the plot an
- *    attack on the target's plot is linked from, of the attack's turn, and a
- *    plot beside the target no other player's unit holds that the step ends
- *    on with no Movement (the next turn) or that is the unit's own (this
- *    turn); a civilian's plot taken from the plot it is linked from;
+ *    attack on the target's plot is linked from, of the attack's turn, and —
+ *    where no other player's unit stands on the target's plot (0x790fc9..
+ *    0x791016: a COMBAT_DISTRICT nobody holds, never a unit) — a plot beside it
+ *    that the step ends on with no Movement (the next turn) or that is the
+ *    unit's own (this turn); a civilian's plot taken from the plot it is
+ *    linked from;
  *  - per target with a spot the predicted blow from where it stands
  *    (`predictBlow`; a civilian taken 150), copied to every spot, and per
  *    spot of a fighter the fighter's blow back on it standing there; a blow
@@ -1192,10 +1194,9 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
   }
   const { tiles } = state.map;
   const water = (p: number) => isWater(tiles[p]);
-  const foreignAt = (p: number) => {
-    const dom = unitDomain(unit.type);
-    return state.units.some((x) => x.tileIndex === p && x.seat !== unit.seat && onMap(x) && unitDomain(x.type) === dom);
-  };
+  // the targets' plots another player's unit stands on, of any class (the
+  // target plot's unit list, 0x790fc9..0x791016)
+  const foreign = new Set(entries.filter((E) => foreignAt(state, unit, E.target.tile)).map((E) => E.target.tile));
   const reach: Reach[] = [];
   const onLink =(P: number, parent: number, T: number, M: number) => {
     for (const E of entries) {
@@ -1209,7 +1210,7 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
       let fixed = false;
       let taken = false;
       if (R !== 0 ? ty === 'CIVILIAN' && d === 0 : d === 0) taken = true;
-      else if (R === 0 && d === 1 && (M === 0 || P === unit.tileIndex) && !foreignAt(P)) {
+      else if (R === 0 && d === 1 && (M === 0 || P === unit.tileIndex) && !foreign.has(TP)) {
         dd = 0;
         fixed = M !== 0;
       }
