@@ -11940,3 +11940,41 @@ ROUTE_LEVEL, Modifiers.xml) raises; its one modifier is Persia's
 TRAIT_SATRAPIES_IMPROVED_ROUTE_LEVEL (Macedonia_Persia_GameplayData.xml,
 ImprovedRouteLevel 1: its plots' roads a rung above its era's). The
 engines' roster carries no Persia, so the term is 0 for every player.
+
+## C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins
+
+- THE PURCHASE LIST'S AT-WAR SUMS (+0x2c, 0x79d3a0's second key): the
+  barbarians count as a player at war (0x469cd0), as for the favoured
+  technology. 0x5d2810 walks the list in that order (the first entry it
+  may train, the walk stopping at an entry ranked below the best).
+  CONFIRMED: runs/h1_duely1124 Granada (player 3) t72, threatened at 1,
+  its Heavy Chariot 983044 on the centre: every player's sums Catapult
+  5668, Quadrireme 4457, at war Quadrireme 854, Catapult 811 — the game
+  bought the Quadrireme (the engines had picked the Catapult, the centre
+  refusing it, nothing bought); runs/h1_duely1117 Caguana t111 Crossbowman
+  3388 over Trebuchet 3350 at war (5077 against 5090 all): the game's
+  Crossbowman. `purchaseEntries` (minorCityAi.ts), `_minor_purchase_rows`.
+  The operations' unit choice reads the same sums with the barbarians at
+  war (`seatUnitRows` from minorOps / freeOps, `_mops_unit_rows`).
+- GARRISON CITY (0x810d30): each unit it takes has its turn done
+  (0x570b40, dl 1) and keeps its Movement; the moves end (0x56d6f0) only
+  for a candidate it moves onto the city with no RangedCombat (0x56e3e0,
+  0x811110), and, with no stronger candidate (0x811133..0x811149), for a
+  garrison of no Range (0x56e3d0) it fortifies (0x95eae0) where every
+  team's +0x98 less +0x94 is at most 10 (0x810f80..0x810fac; the team
+  update's attack and enemy strengths, unported: taken as held). With no
+  garrison of the operation's, a unit of the seat on the city of formation
+  class 0 or 3 takes the garrison's branch (0x81100a -> 0x811129) at no
+  strength, so a stronger candidate moves beside it.
+- OPERATION MOVE'S MOVERS (0x816cb0 at 0x81705b..0x81706f): each team
+  member alive (+0x770) with Movement left (+0xdb0), its turn done or not;
+  a member on the goal skips the barred test (0x817905..0x817921), so a
+  melee one goes for its own plot. CONFIRMED: runs/h1_duely1117
+  Antananarivo t85 / t89, its garrisoned Catapult 917509 (Range 2)
+  32:5 -> 32:6 before the city's purchase of a Catapult (the engines had
+  held it there: the purchase barred); city-state 3's Crossbowman, Trebuchet,
+  Field Cannon on 42:13 -> 41:13 t112-t179; runs/h1_duely1121 t31-t32
+  city-state 3's Warrior on 42:18 logged 42:18 -> 42:18; runs/h1_dueldA1117
+  t24 Antananarivo's garrisoned Warrior (fortified, Movement 0) no row.
+  `garrisonExecute` (operations/assault.ts, `endTurn` / `endMoves`),
+  `passMoveExec` (tactical.ts); `_x_garrison`, `_op_move_exec`.

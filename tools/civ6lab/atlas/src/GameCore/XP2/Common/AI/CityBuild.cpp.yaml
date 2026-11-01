@@ -591,6 +591,9 @@
   name: the city's purchase unit pick
   status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 72
+      value: "Granada's list by the at-war sums (the barbarians at war): Quadrireme 854 over Catapult 811, the game's Quadrireme bought; 1117 t111 Caguana Crossbowman 3388 over Trebuchet 3350, the game's Crossbowman"
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
@@ -600,6 +603,7 @@
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96: CanTrain's obsolescence and the contract purchase's refusal — READ (0x172820's prerequisite block, 0x538460, the callers' sixth argument), ported both twins"
     - "C-126: the purchase list's buildable test and the upgrade's furthest rung — READ, both twins"
+    - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...bv>=pv; else unit if uv>=pv; else project. CanConstruct checks 0x5c9ea0/0x5ca5a0/0x5ca450;  fail -> 0x5d2810 fallback ('Generic Offense' / 'NO BUILDS AT ALL').  bestBuilding: value table plotEval(cityCenter)+..."
   context:

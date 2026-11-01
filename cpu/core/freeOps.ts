@@ -36,7 +36,7 @@ import { newOpsAi, operationsRun, opsOf, startOperationAt, type OpsAi, type OpsE
 import { NO_PLOT, opUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi, type CityAi } from './aiCityTrees';
-import { FREE_SEAT, freeSeatOf, isCiv, seatOf } from './seats';
+import { BARB_SEAT, FREE_SEAT, freeSeatOf, isCiv, seatOf } from './seats';
 import { freeCityTactics, passFinish, passPillage, plotDistance, type Pass } from './tactical';
 import { installType } from './minorBuild';
 import type { AiUnitView, AiView } from './aiViewTypes';
@@ -118,7 +118,7 @@ function freeEnv(state: GameState, pass: Pass | null): OpsEnv {
         by.set(k, (by.get(k) ?? 0) + 1);
       }
       const v = fresh();
-      return seatUnitRows(state, FREE_SEAT, (u, p) => by.get(`${u}|${p}`) ?? 0, v.players(), (p) => v.atWar(FREE_SEAT, p));
+      return seatUnitRows(state, FREE_SEAT, (u, p) => by.get(`${u}|${p}`) ?? 0, v.players(), (p) => p === BARB_SEAT || v.atWar(FREE_SEAT, p));
     },
     // a unit action row of theirs: a pillage where the unit stands
     act: (rows) => {

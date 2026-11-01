@@ -2633,11 +2633,12 @@ class SimTactics:
                       leader: bool = False) -> list:
         """`passMoveExec` for an operation's team in the games `on`: nothing
         where the operation is `ready` [B], the team arrived and the node names
-        no Leader Tag (`leader`); else each living member `mem` [B, P] that
-        can act, nearest the goal first: its radius (the smaller of the
+        no Leader Tag (`leader`); else each living member `mem` [B, P] with
+        Movement left (its turn done or not; one whose moves an order ended
+        has none), nearest the goal first: its radius (the smaller of the
         node's Unit distance `rng` and its Range, `_tac_range`: 0 in melee; 0 for a ship or
-        a unit of `zero` [B, P]; at least 1 where the goal is barred (a member on the goal too), and with a Leader
-        Tag named), its plot (its planning's at the radius in the goal's
+        a unit of `zero` [B, P]; at least 1 where the goal is barred to a
+        member off it, and with a Leader Tag named), its plot (its planning's at the radius in the goal's
         region, else the ring walk's), its turn done, its move order. The
         moves: per mover [B] its slot (-1 none), its plot before, its plot
         after."""
@@ -2655,7 +2656,7 @@ class SimTactics:
         mp_p = getattr(self, f"{pre}_unit_mp")
         tile_p = getattr(self, f"{pre}_unit_tile")
         type_p = getattr(self, f"{pre}_unit_type")
-        can = mem & ~done & (mp_p > 0) & go.unsqueeze(1)
+        can = mem & alive_p & (mp_p > 0) & go.unsqueeze(1)
         order = torch.where(can, key, torch.full_like(key, big)).argsort(dim=1, stable=True)
         nm = can.sum(dim=1)
         region = self.tile_region.gather(1, goal.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -2670,7 +2671,7 @@ class SimTactics:
         ring = self._barb_ring[goal.clamp(min=0)]                                   # [B, 37]
         for j in range(int(nm.max()) if B else 0):
             us = order[:, j]
-            act = (j < nm) & alive_p[bidx, us] & ~done[bidx, us] & (mp_p[bidx, us] > 0)
+            act = (j < nm) & alive_p[bidx, us] & (mp_p[bidx, us] > 0)
             if not bool(act.count_nonzero()):
                 continue
             rows = act.nonzero(as_tuple=True)[0]
@@ -2684,7 +2685,7 @@ class SimTactics:
             path = self._tac_search(rows, ur, seat, 1 << 30, True, pre=pre)["closed"] >= 0    # [N, T]
             own = self._tac_own_mil(seat)[rows]
             barred = ((~path.gather(1, gr.unsqueeze(1)).squeeze(1)) | atk[rows, gr] | own[torch.arange(rows.numel(), device=dev), gr]
-                      | foreign[rows, gr])
+                      | foreign[rows, gr]) & (here != gr)
             r = torch.where(barred, r.clamp(min=1), r)
             if leader:
                 r = torch.where(~barred & (rng > 0) & ~z, r.clamp(min=1), r)

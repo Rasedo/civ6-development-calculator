@@ -68,7 +68,7 @@ import { ARMY_READ_AGE } from './operations/knowledge';
 import { joinBuilt } from './operations/manager';
 import { unitBuildable } from './operations/unitRows';
 import { minorCity, minorFoodFocus } from './cityStates';
-import { FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor, isCiv, seatOf, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, campTiles, civOf, freeSeatOf, hiddenResourcesFor, isCiv, seatOf, tileSeat } from './seats';
 import { cityAppealResolver } from './governors';
 import { adjacentPlotTargetOk, canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
 import { borderCandidates, computeCityStats } from './city';
@@ -647,7 +647,10 @@ export function minorContractCity(state: GameState, cs: CityState): CityTreeCity
  *  prerequisites held, its StrategicResource stocked, so a city-state that
  *  trains a Horseman without Horses still lists it after every unit it
  *  holds the means of), then by the at-war
- *  players' sums, every player's sums and the strength, each the larger
+ *  players' sums (the barbarians at war with it, as for the favoured
+ *  technology: runs/h1_duely1124 Granada t72 the Quadrireme over the
+ *  Catapult, every player's sums 4457 against 5668, the at-war 854 against
+ *  811), every player's sums and the strength, each the larger
  *  first (equal entries in database order) */
 function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
   const r = cs.research;
@@ -675,7 +678,7 @@ function purchaseEntries(state: GameState, cs: CityState): PurchaseEntry[] {
     known: (u) => known.get(u) ?? 0,
     knownBy: (u, p) => by.get(`${u}:${p}`) ?? 0,
     players,
-    atWar: (p) => wars.includes(p),
+    atWar: (p) => p === BARB_SEAT || wars.includes(p),
     buildable: (u) => unitBuildable(state, cs.seat, holds, u),
   });
   const order = rows.map((x, i) => [x, i] as const).sort(([a, i], [b, j]) =>

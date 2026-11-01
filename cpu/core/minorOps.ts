@@ -34,7 +34,7 @@ import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
 import { installType, minorCanUpgrade, minorSetItem, minorUpgradeType, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
 import { minorContractCity, minorSecondHook } from './minorCityAi';
-import { campTiles, tileSeat } from './seats';
+import { BARB_SEAT, campTiles, tileSeat } from './seats';
 import { disbandUnit } from './units';
 import { goldAffordable } from './game';
 import { FX } from './aiValue';
@@ -149,7 +149,9 @@ function minorEnv(state: GameState, cs: CityState, pass: Pass | null): OpsEnv {
         by.set(k, (by.get(k) ?? 0) + 1);
       }
       const v = fresh();
-      return seatUnitRows(state, cs.seat, (u, p) => by.get(`${u}|${p}`) ?? 0, v.players(), (p) => v.atWar(cs.seat, p));
+      // the at-war sums count the barbarians, at war with every player
+      // (0x469cd0), as the favoured technology's do
+      return seatUnitRows(state, cs.seat, (u, p) => by.get(`${u}|${p}`) ?? 0, v.players(), (p) => p === BARB_SEAT || v.atWar(cs.seat, p));
     })()),
     act: () => {
       throw new Error('a city-state\'s operations give their units move and attack orders alone');

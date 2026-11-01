@@ -220,11 +220,20 @@ const garrisonCity: BtHandler<OpsContext> = {
  *  best so far and the garrison's, else a Bombard less 5 above the best with
  *  the garrison holding no ranged strength, else (none chosen, the garrison
  *  no ranged strength, no ranged best) a Combat above the best and the
- *  garrison's. With no garrison of the operation's and no military unit of
- *  the seat on the city, the candidate moves in. With a garrison and a
- *  stronger candidate, the candidate moves beside the city (the swap
- *  command 0x972880 into it is unported). The garrison's turn ends, a
- *  military unit's of the seat on the city, the candidate's (0x570b40). The
+ *  garrison's. With no garrison of the operation's, a military unit of the
+ *  seat on the city takes the garrison's branch at no strength (0x81100a ->
+ *  0x811129); with neither, the candidate moves in, its moves ended
+ *  (0x56d6f0) where it stands on the city with no RangedCombat. In the
+ *  garrison's branch a stronger candidate moves beside the city (the swap
+ *  command 0x972880 into it is unported), else a garrison of no Range
+ *  fortifies, its moves ended (0x95eae0, 0x56d6f0; where every team's
+ *  +0x98 less +0x94 is at most 10, those sums unported and the test taken
+ *  as held). Each unit the execution takes has its turn done (0x570b40)
+ *  and keeps its Movement otherwise: Operation Move moves a ranged
+ *  garrison on (runs/h1_duely1117 Antananarivo t85 / t89, its Catapult
+ *  32:5 -> 32:6 before the city's purchase; city-state 3's Crossbowman
+ *  42:13 -> 41:13 t112-t121), a melee one stays (runs/h1_dueldA1117
+ *  Antananarivo t24's Warrior on 32:5, no Operation Move row). The
  *  fortify commands are none in the action rows. */
 function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], _run: unknown, ctx: OpsContext): void {
   const view = ctx.view();
@@ -266,28 +275,26 @@ function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], 
       if (!pick && gRanged === 0 && bestRanged === 0) pick = u;
     }
   }
-  // each unit the execution takes its turn ends (0x570b40, dl 1): the
-  // garrison, a military unit of the seat on the city, the candidate it
-  // moves (runs/h1_dueldA1117 Antananarivo t24: City Defense's Warrior on
-  // 32:5 stands, Operation Move takes only the one on 29:3)
+  // each unit the execution takes has its turn done (0x570b40, dl 1)
+  if (!garrison) garrison = view.units(ctx.seat).find((u) => u.plot === city && u.combat + u.ranged + u.bombard > 0) ?? null;
   if (!garrison) {
-    const standing = view.units(ctx.seat).find((u) => u.plot === city && u.combat + u.ranged + u.bombard > 0);
-    if (standing) {
-      ctx.endTurn?.(standing.id);
-      return;
-    }
-    if (pick) {
-      moveTo(ctx, pick, city);
-      ctx.endTurn?.(pick.id);
-    }
+    if (!pick) return;
+    const p = pick;
+    moveTo(ctx, p, city);
+    ctx.endTurn?.(p.id);
+    const after = unitsById(ctx.view(), ctx.seat).get(p.id);
+    if (after && after.plot === city && after.ranged === 0) ctx.endMoves?.(p.id);
     return;
   }
   ctx.endTurn?.(garrison.id);
   const stronger = gRanged < bestRanged || (gRanged <= 0 && gCombat < bestCombat);
-  if (!stronger || !pick) return;
-  const spot = view.planSpot(pick.id, city, 1, true, 1);
-  if (spot >= 0 && spot !== pick.plot) moveTo(ctx, pick, spot);
-  ctx.endTurn?.(pick.id);
+  if (stronger && pick) {
+    const spot = view.planSpot(pick.id, city, 1, true, 1);
+    if (spot >= 0 && spot !== pick.plot) moveTo(ctx, pick, spot);
+    ctx.endTurn?.(pick.id);
+    return;
+  }
+  if (garrison.range === 0) ctx.endMoves?.(garrison.id);
 }
 
 // OPERATION DIPLOMACY (0x819db0 update, 0x8163f0 execution)

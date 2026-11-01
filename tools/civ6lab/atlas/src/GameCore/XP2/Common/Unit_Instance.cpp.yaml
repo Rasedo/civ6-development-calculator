@@ -68,6 +68,10 @@
     - gpu/core/sim_barbops.py:_bop_defend_exec
     - gpu/core/sim_minorops.py:_mops_run
     - gpu/core/sim_minorops.py:_x_defend
+    - cpu/core/operations/assault.ts:garrisonExecute
+    - cpu/core/operations/nodes.ts:OpsContext
+    - gpu/core/sim_minorops.py:_x_garrison
+    - gpu/core/sim_minorops.py:end_moves
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -76,6 +80,7 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.c..."
   context:
@@ -236,6 +241,7 @@
     - "C-95: the planning's spots and the combat prediction — READ, ported"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
+    - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...at   threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an A..."
     - ".claude/scratchpad/st1/reading.md: ...the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd also onto the land plots   beside each reach plot (the ring..."
@@ -258,6 +264,7 @@
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
+    - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(an ally's), in list order, makes each LOW or MEDIUM unit that   threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Move..."
     - ".claude/scratchpad/st1/reading.md: ...(0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the   bombard..."

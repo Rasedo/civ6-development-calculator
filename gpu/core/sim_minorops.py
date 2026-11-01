@@ -521,7 +521,8 @@ class SimMinorOps:
         n_all = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
         n_all.scatter_add_(1, torch.where(live, rec["row"], torch.full_like(rec["row"], nu)), live.long())
         n_all = n_all[:, :nu]
-        war = live & self._mops_fights(s, rec["owner"])
+        # the barbarians at war with every holder (0x469cd0)
+        war = live & (self._mops_fights(s, rec["owner"]) | (rec["owner"] == BARB_SEAT))
         n_war = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
         n_war.scatter_add_(1, torch.where(war, rec["row"], torch.full_like(rec["row"], nu)), war.long())
         n_war = n_war[:, :nu]
@@ -2526,10 +2527,12 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     the player's unit order, the one on the city its garrison; of those whose
     planning reaches
     the city this turn the candidate (the ranged, the bombard, the combat
-    strength above the best and the garrison's); with no garrison and no
-    military unit of the minor on the city the candidate moves in; with a
-    stronger candidate it moves beside the city; the garrison's turn ends, a
-    military unit's of the minor on the city, the candidate's (0x570b40)"""
+    strength above the best and the garrison's); with no garrison a military
+    unit of the minor on the city its garrison at no strength; with neither
+    the candidate moves in, its moves ended (0x56d6f0) on the city with no
+    ranged strength; with a stronger candidate it moves beside the city,
+    else a garrison of no Range fortifies, its moves ended (`garrisonExecute`).
+    Each unit it takes has its turn done (0x570b40), its Movement kept"""
     s, k = c.s, c.k
     view = c.view
     dev = sim.device
@@ -2578,18 +2581,25 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     done, ended, ended_mp = c.view["done"], c.view["ended"], c.view["ended_mp"]
 
     def end_turn(u: torch.Tensor, mask: torch.Tensor) -> None:
-        # its turn done, read with no Movement through the run (its rest kept)
+        # its turn done (0x570b40), its Movement kept
+        r = (mask & (u >= 0)).nonzero(as_tuple=True)[0]
+        if r.numel():
+            done[r, u[r]] = True
+
+    def end_moves(u: torch.Tensor, mask: torch.Tensor) -> None:
+        # its moves ended (0x56d6f0): no Movement through the run (its rest kept)
         r = (mask & (u >= 0)).nonzero(as_tuple=True)[0]
         if not r.numel():
             return
         uc = u[r]
-        done[r, uc] = True
         fresh = ~ended[r, uc]
         ended_mp[r, uc] = torch.where(fresh, sim.major_unit_mp[r, uc], ended_mp[r, uc])
         ended[r, uc] = True
         sim.major_unit_mp[r, uc] = 0
     no_g = g & (gar < 0)
     if bool(no_g.any()):
+        # a military unit of the minor on the city takes the garrison's
+        # branch at no strength
         cc = city.clamp(min=0)
         own = sim.major_unit_alive & (sim.major_unit_seat == seat) & (sim.major_unit_tile == cc.unsqueeze(1))
         ut = sim.major_unit_type.clamp(min=0, max=sim.NU - 1)
@@ -2598,10 +2608,13 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         # the first such unit in the player's unit order (pool order)
         okey = torch.where(own & fights, sim.major_unit_pslot, torch.full_like(sim.major_unit_pslot, 1 << 30))
         standing = okey.argmin(dim=1)
-        end_turn(standing, no_g & held)
+        gar = torch.where(no_g & held, standing, gar)
         go = no_g & ~held & (pick >= 0)
         sim._mops_move(s, pick, city, go)
         end_turn(pick, go)
+        pc = pick.clamp(min=0)
+        pt = sim.major_unit_type[b, pc].clamp(min=0, max=sim.NU - 1)
+        end_moves(pick, go & (sim.major_unit_tile[b, pc] == city) & (sim._type_ranged_strength.take(pt) == 0))
     with_g = g & (gar >= 0)
     end_turn(gar, with_g)
     stronger = (g_r < b_r) | ((g_r <= 0) & (g_c < b_c))
@@ -2611,6 +2624,9 @@ def _x_garrison(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
         here = sim.major_unit_tile[b, pick.clamp(min=0)]
         sim._mops_move(s, pick, spot, m & (spot >= 0) & (spot != here))
     end_turn(pick, m)
+    # else a garrison of no Range fortifies, its moves ended
+    gt = sim.major_unit_type[b, gar.clamp(min=0)].clamp(min=0, max=sim.NU - 1)
+    end_moves(gar, with_g & ~m & (sim._type_ranged_range.take(gt) == 0))
 
 
 def _x_attack_city(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:

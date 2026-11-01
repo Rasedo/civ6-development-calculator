@@ -30,9 +30,12 @@
 - addr: 0x816cb0
   kind: function
   name: opMoveExec
-  semantics: "Operation Move's execution: none where the operation is ready, arrived and the node names no Leader Tag (+0x7c, the tag's AiType, -1 skips); each member nearest first: the radius, barred at least 1, its planning's plot at the radius in the goal's region, else the ring walk, the move order"
+  semantics: "Operation Move's execution: none where the operation is ready, arrived and the node names no Leader Tag (+0x7c, the tag's AiType, -1 skips); each member alive with Movement left (+0x770, +0xdb0; its turn done or not) nearest first: the radius, barred at least 1 off the goal (a member on the goal skips the test), its planning's plot at the radius in the goal's region, else the ring walk, the move order"
   status: READ
   cases:
+    - recording: h1_duely1117
+      turn: 85
+      value: Antananarivo's City Defense Catapult 917509 garrisoned on 32:5 moves to 32:6 (its turn done by Garrison City, its Movement kept) before the city's purchase; city-state 3's Crossbowman 42:13 -> 41:13 t112-t121; 1121 t31-t32 city-state 3's Warrior on its goal 42:18 goes for 42:18
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
@@ -52,6 +55,7 @@
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
   context:
     - ...e Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (...
     - "- Operation Move's destination (0x816cb0): radius = min(Range to goal, the unit's attack Range +0x19f8), 0 for a unit in a forma..."

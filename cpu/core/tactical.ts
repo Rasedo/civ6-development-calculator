@@ -2826,8 +2826,7 @@ export function passMoveUpdate(state: GameState, pass: Pass, members: readonly n
 }
 
 /** the goal barred to the unit (0x586360 under flag 0x40, 0x5862e0,
- *  0x585eb0, the unit itself counted, so a unit standing on its goal finds
- *  it barred): no path to it, a plot it would attack into (a unit at war
+ *  0x585eb0; asked of a unit off its goal): no path to it, a plot it would attack into (a unit at war
  *  with it, a city centre of a player at war with it — flag 0x40 bars that
  *  to every unit —, an Encampment that bars it), or one of its own that
  *  stacks with it */
@@ -2845,15 +2844,18 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * for, in the order they moved. Nothing where the operation is ready
  * (0x73aa60: its units may be built, or every team ready), the update found
  * the team arrived and the node names no Leader Tag (+0x7c, its UnitAiType);
- * else each member left with Movement, nearest the goal first, takes a move
+ * else each member alive with Movement left (+0x770, +0xdb0: its turn done
+ * or not, 0x81705b..0x81706f; a unit whose moves an order ended has none),
+ * nearest the goal first, takes a move
  * order (0x962030): its radius the smaller of `range` (the node's Unit
  * distance) and its Range (GetRange, unit +0x19f8: 0 for a melee unit; 0
  * for a ship) — runs/h1_duelw1121 t73-t74: the raid's Archer (Range 2)
  * under Unit distance 1 goes for 6:13 beside its target 6:12 and stays
- * there —, at least 1 where the goal is barred to it, a member on the goal
- * itself too (runs/h1_duelv1117 t113-122: city-state 3's City Defense
- * Crossbowman, garrisoned on 42:13, moves on to 41:13)
- * (`moveBarred`); the first plot of its planning of two turns at the radius
+ * there —, at least 1 where the goal is barred to it (`moveBarred`; a
+ * member on the goal itself skips the test, 0x817905..0x817921: runs/
+ * h1_duely1121 t31-t32 city-state 3's City Defense Warrior on 42:18 goes
+ * for 42:18, runs/h1_duely1117 t112-t121 its Crossbowman of Range 2 on
+ * 42:13 for 41:13); the first plot of its planning of two turns at the radius
  * (0x791300) where it lies in the goal's region, else of the plots within
  * the radius of the goal (the ring walk 0x6aef0, the test 0x815d50) one in
  * the goal's region before one outside, then the nearest it, its own plot or
@@ -2865,16 +2867,17 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
   const out: { unit: Unit; from: number; dest: number }[] = [];
   if (arrived && ready && !leaderNamed) return out;
   const region = state.map.tiles[goal].region ?? -1;
+  const moves = (u: Unit) => state.units.includes(u) && u.seat === pass.seat && !pass.ended.has(u.id) && u.movesLeft > 0;
   const movers = members.map((id) => memberAtOf(state, pass.seat, id))
-    .filter((u): u is Unit => !!u && canAct(state, pass, u))
+    .filter((u): u is Unit => !!u && moves(u))
     .map((u) => ({ u, d: plotDistance(state, u.tileIndex, goal) }))
     .sort(nearestFirst).map((x) => x.u!);
   for (const u of movers) {
-    if (!canAct(state, pass, u)) continue;
+    if (!moves(u)) continue;
     const z = zero(u);
     let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, rangeOf(u));
     const paths = pathPlots(state, u);
-    if (moveBarred(state, u, goal, paths)) r = Math.max(1, r);
+    if (u.tileIndex !== goal && moveBarred(state, u, goal, paths)) r = Math.max(1, r);
     else if (range > 0 && leaderNamed && !z) r = Math.max(1, r);
     let dest = goal;
     let strike = false;

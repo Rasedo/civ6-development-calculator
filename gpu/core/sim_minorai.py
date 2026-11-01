@@ -1262,7 +1262,8 @@ class SimMinorAi:
         _v, entry = f._production_table()
         obs = f._obsolete()
         known = self._cv_known(s)
-        # the known units' counts by owner at war with the minor
+        # the known units' counts by owner at war with the minor, the
+        # barbarians always so
         slot = self.citystate_kb_slot[:, s]
         typ = self.citystate_kb_type[:, s].long()
         owner = self.citystate_kb_owner[:, s].long()
@@ -1270,7 +1271,7 @@ class SimMinorAi:
         arow = torch.where(typ >= 0, er.take(typ.clamp(min=0, max=er.numel() - 1)), torch.full_like(typ, -1))
         row = self._CITY_MINOR0 + s
         orow = self._seat_row.take(owner.clamp(min=0, max=self._seat_row.numel() - 1))
-        atwar = (owner >= 0) & self.war[:, row].gather(1, orow)
+        atwar = (owner >= 0) & (self.war[:, row].gather(1, orow) | (owner == BARB_SEAT))
         live = (slot != -2) & (arow >= 0) & atwar
         war_n = torch.zeros(B, nu + 1, dtype=torch.long, device=dev)
         war_n.scatter_add_(1, torch.where(live, arow, torch.full_like(arow, nu)), live.long())
