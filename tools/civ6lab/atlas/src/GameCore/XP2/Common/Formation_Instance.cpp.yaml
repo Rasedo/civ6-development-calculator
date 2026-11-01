@@ -16,6 +16,19 @@
   readings:
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
   review: reviewed
+- addr: 0x264d90
+  final: 0x1a2e60
+  kind: function
+  name: the formation's load
+  semantics: "the formation's load: its tracked variables read in turn (the kept path +0x5e0 among them), then the kept-path flag (+0x580, value +0x5d8) set false (0x29fdf0 at 0x264f95), the player looked up"
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 26
+      value: the Galley 720906 at 26:1 for 33:3 re-searched each order (no kept path)
+  readings:
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+  review: reviewed
 - addr: 0x265ac0
   final: 0x1a3460
   kind: function
@@ -140,6 +153,20 @@
   context:
     - "...al node's (+0x638 [0]) turns the answer. None: the order done, no move. The first step (0x266690: the node before the start, the path stored goal first) reached this turn (+4 at most 1..."
   review: imported
+- addr: 0x2666c0
+  final: 0x1a3f80
+  kind: function
+  name: the path's first step
+  semantics: "the plot of the formation path's node after its start (+0x638 at count-2; the goal where one node is kept; 0 with none): the plot the move 0x26fe20 places the formation on"
+  status: READ
+  cases:
+    - recording: h1_duely1121
+      turn: 58
+      value: "the barbarian Scout 131073 \"tertiary regions\" 10:9 steps on the path past China's units out of its sight, one node a step as the engines' walk"
+  impl: [cpu/core/tactical.ts:walk, gpu/core/sim_tactics.py:_tac_move_to]
+  readings:
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+  review: reviewed
 - addr: 0x266720
   final: 0x1a3fe0
   kind: function
@@ -193,8 +220,22 @@
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   context:
     - "...(0, finder, plot, flags): the unit's own plot 0; a plot off the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0..."
+  review: reviewed
+- addr: 0x266a60
+  final: 0x1a4270
+  kind: function
+  name: the formation's reset
+  semantics: "the formation's reset (from 0x429e40): its player (+0x98), the location (+0x100) and +0x6b0 to -9999, the tracked bools +0x280 / +0x2e0 / +0x340 / +0x460 / +0x4c0 / +0x580 false (0x29fdf0) — +0x580's value +0x5d8 is the kept-path flag 0x272aa0 reads, set true nowhere —, its owner (+0x160) and +0x1c0 0"
+  status: READ
+  cases:
+    - recording: h1_duely1117
+      turn: 26
+      value: "the Galley 720906 at 26:1 for 33:3 re-searched each order (no kept path): the engines' fresh search per order"
+  readings:
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   review: reviewed
 - addr: 0x2673f0
   final: 0x1a4940

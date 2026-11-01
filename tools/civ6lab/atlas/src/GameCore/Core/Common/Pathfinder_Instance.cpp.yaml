@@ -25,6 +25,7 @@
     - "H-1: the trade path's search, its score and the Canal — READ"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...f no region, not impassable (byte +0x3a bit 3) and not water seeds a region, and a flood (0x77d10, the visitor 0x886dd0 counting and stamping each plot it closes, m_area its area) takes e...
@@ -53,6 +54,7 @@
   status: PARTLY
   readings:
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"

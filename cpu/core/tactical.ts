@@ -142,6 +142,19 @@ function dropHeldCosts(): void {
  *  none, on a plot the player sees now */
 interface Ground {
   enter: (t: Tile) => boolean;
+  /** `enter` for a move order's path: the step's location test (0x271be0 -> 0x586900 under flag
+   *  1 -> 0x586360 at 0x586542..0x5865a1) refuses no plot for another
+   *  player's unit but an embarked pair (`boarded`), and a hostile unit makes
+   *  the plot an attack only where the player sees it now (+0x51 bits 5 / 6,
+   *  0x5861f0 under +0x50 & 2): one it does not see now is passed as empty
+   *  ground (runs/h1_duely1121 t58-77: the barbarian Scout 131073's
+   *  "tertiary regions" 10:9 past China's units out of its sight). A
+   *  destination holding another player's unit it does not see now has no
+   *  path (`pathTo`; `turnsToPlot` ends on no unit's plot but an attack's)
+   *  (runs/h1_duely1117 t80 / t85 / t88 / t97 / t100 / t103: the
+   *  Attack Civilian movers hold for a civilian out of their sight, t31-t36
+   *  / t68 go for one in it) */
+  pass: (t: Tile) => boolean;
   /** a closed plot the reach lists may hold: a revealed one (the search
    *  entered it by `enter`), else one passing the location test alone (the
    *  list's 0x586900 -> 0x586360: `enterable` with no unit counted), since
@@ -260,6 +273,8 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     }
     return v;
   };
+  const passes = new Map<number, boolean>();
+  let foesSeen: Set<number> | undefined;
   return {
     known,
     revealed,
@@ -310,6 +325,19 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       let v = enters.get(t.index);
       if (v === undefined) {
         enters.set(t.index, (v = enterable(state, unit, t, plainCivilians ? fighters : foes, embarks)
+          && !(minor && closedToMinor(state, unit.seat, t))));
+      }
+      return v;
+    },
+    pass: (t) => {
+      let v = passes.get(t.index);
+      if (v === undefined) {
+        if (!foesSeen) {
+          seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
+          const sn = seenNow;
+          foesSeen = new Set([...foes].filter((i) => sn[i] === 1));
+        }
+        passes.set(t.index, (v = enterable(state, unit, t, foesSeen, embarks)
           && !(minor && closedToMinor(state, unit.seat, t))));
       }
       return v;
@@ -481,7 +509,9 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // between two such plots no movement rule runs (0x26e920)
       const blind = blindStep(best, to);
       if (!blind && cliffBlocksStep(state, from, to, unit)) continue;
-      const attack = ground.revealed(to.index) && !ground.enter(to);
+      // a move order's path passes a unit at war with it out of its sight
+      // (`pass`)
+      const attack = ground.revealed(to.index) && !(zoc ? ground.pass(to) : ground.enter(to));
       if (attack && !ground.attack(to)) continue;
       if (zoned && !attack) continue;
       // the step's validity (0x2720a0 at 0x272372..0x27242e): onto a revealed
@@ -682,6 +712,10 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTur
  *  pathfinder's path (its parents once `dest` closes); empty where none */
 export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false, explore = true,
   danger?: PathDanger, mates: readonly Unit[] = []): number[] {
+  // a destination another player's unit holds out of the player's sight is
+  // no path (`Ground`'s pass), an attack order's too
+  if (dest !== unit.tileIndex && foreignAt(state, unit, dest)
+    && plotsSeenNow(state, new Set([unit.seat]))[dest] !== 1) return [];
   let found = null as PNode | null;
   search(state, unit, Infinity, true, (n) => {
     if (n.tile !== dest) return false;
@@ -701,10 +735,12 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
 /** a move order carried out (the unit's mission 0x962030): the unit walks
  *  its path as far as its Movement carries it this turn (a zone of control
  *  ends it), the engine's step paying each; it walks through its own units
- *  but stops short of a plot of its own unit that stacks with it. A path
+ *  but stops short of a plot of its own unit that stacks with it, and short
+ *  of a unit at war with it its path passed out of its sight. A path
  *  ending on a plot it attacks into stops at its side, and with `strike`
  *  the unit strikes it there. A destination its own stacking unit holds,
- *  reached in the first turn, is no path. With `laterTurns` (the order's
+ *  reached in the first turn, is no path, nor one another player's unit
+ *  holds out of its sight. With `laterTurns` (the order's
  *  path flag 0x1000) the path's turns after its first may end on a plot its
  *  own stacking unit holds, its first not; with no `explore` (its flag 1) the
  *  path leaves no plot the player never revealed; with `danger` (its flags
@@ -795,6 +831,11 @@ function walk(state: GameState, unit: Unit, path: number[], mates: readonly Unit
   // step (the pathfinder's `carry`)
   let carry = 0;
   for (const p of path) {
+    // a plot a unit at war with it holds, passed out of its sight, ends the
+    // walk short of it: the order moves one node at a time on a path found
+    // afresh (0x962380 -> 0x26fe20 to the node after its start), its first
+    // step ending the order unmoved on a defender at war it sees (0x209e30)
+    if (enemyAt(state, unit, p)) break;
     const cost = stepCost(state, unit, tiles[from], tiles[p]) + carry;
     if (mp < cost && mp < full) break;
     const cross = shoreCrossing(unit.type, tiles[from], tiles[p]);

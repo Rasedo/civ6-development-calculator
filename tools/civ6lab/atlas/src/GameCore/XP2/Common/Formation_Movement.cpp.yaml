@@ -62,6 +62,7 @@
   status: PARTLY
   readings:
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "## C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
@@ -97,6 +98,7 @@
     - cpu/core/tactical.ts:v
     - gpu/core/sim_tactics.py:by_layer
     - cpu/core/tactical.ts:groundOf
+    - cpu/core/tactical.ts:foesSeen
   readings:
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -204,6 +206,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   review: reviewed
 - addr: 0x26f1d0
   final: 0x1a76a0
@@ -233,6 +236,7 @@
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   context:
     - "...er_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair is null), so a node's key is its cost. The op..."
     - "...r a unit +0x738 above 1 holding 0x2669d0 2 or 4; then the A* 0x7a630 over the callbacks 0x26f330 sets: the validity 0x2720a0, the cost 0x26e920), its turns the answer. The planning's..."
@@ -309,6 +313,8 @@
     - cpu/core/combat.ts:seizeCivilian
     - cpu/core/combat.ts:seizable
     - cpu/core/game.ts:religiousUnitLost
+    - cpu/core/tactical.ts:walk
+    - cpu/core/tactical.ts:carry
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: a civilian stepped on — READ"
@@ -317,6 +323,7 @@
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   context:
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."
@@ -392,6 +399,23 @@
     - "- The path is the least-cost path within that budget (A*, heuristic 0x271490), not a greedy step, and the range is the budget, not a hex distance between the ends."
     - "...0x79660, a new one opened. The trade path's callbacks (0x557e40): the destination test 0x271490, destination-valid 0x629460 (1), no heuristic (both slots null: the total is the known..."
   review: reviewed
+- addr: 0x2714b0
+  final: 0x1a93c0
+  kind: function
+  name: the path's destination test
+  semantics: "the formation path's destination test (the A* instance's +0x20 / +0x28 pair laid by 0x26f330, called by GeneratePath 0x77d10 at 0x78060 before the search): with search flag 0x4000 a plot the player does not see now passes; else the location test 0x586900 under the order's flags mapped (4 -> 8, 0x10 -> 1, 0x20 -> 2, 0x2000 -> 0x80): an order without the attack flag 0x10 has no path to a plot another player's unit holds, seen or not"
+  status: PARTLY
+  cases:
+    - recording: h1_duely1117
+      turn: 11
+      value: the rampaging Scout 131073 and Warrior 589832 hold for 14:8, a city-state's Warrior on it out of their sight
+    - recording: h1_duely1117
+      turn: 80
+      value: the Attack Civilian movers hold for a civilian out of their sight (t80 Warrior 3670030 for the Settler on 31:13, t85 / t88 / t97 / t100 / t103) and go for one in it (t31-t36, t68); under 0x10 the refusal is the recorded moves', not this test's
+  impl: [cpu/core/tactical.ts:pathTo, gpu/core/sim_tactics.py:_tac_move_to]
+  readings:
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+  review: reviewed
 - addr: 0x2715a0
   final: 0x1a94b0
   kind: function
@@ -450,6 +474,7 @@
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:PNode
+    - cpu/core/tactical.ts:Ground
   readings:
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -460,6 +485,7 @@
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
     - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."

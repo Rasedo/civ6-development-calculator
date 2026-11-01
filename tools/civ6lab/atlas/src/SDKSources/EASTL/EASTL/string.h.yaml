@@ -48,6 +48,7 @@
   readings:
     - "C-96: the Free Cities' city build AI, threat and Combat Desire — the lists READ, the threat and desire's inputs READ off the logs, +0x4b8's writer unread"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
+    - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
   context:
     - ...the only displacement writes are the military AI's constructor 0x71a960 at 0x71b68a and 0x264296); the Free Cities Raid's target as an operation near the city (0x723cf0); the desire's...
   review: imported

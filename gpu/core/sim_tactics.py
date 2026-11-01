@@ -315,7 +315,8 @@ class SimTactics:
         return None
 
     def _tac_enter(self, seat: int, revealed_only: bool = True, foes: bool = True,
-                   plain_civ: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
+                   plain_civ: bool = False,
+                   foes_seen: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat` may
         enter (`enterable`): its domain's ground, no unit of a player at war
         with it (another player's unit it passes; with `plain_civ`, the
@@ -325,11 +326,15 @@ class SimTactics:
         ground closed to a city-state (`_tac_closed`), with `revealed_only`
         (the lists', not a path's) none it never revealed (`_tac_known`).
         With no `foes` the location test alone (`groundOf`'s fits): no unit
-        and no closed ground counted. The NAVAL plane is the water an
-        embarking land unit takes too."""
+        and no closed ground counted. With `foes_seen` (`groundOf`'s pass: a
+        move order's path) a unit of a player at war with it counts on a plot
+        the player sees now alone. The NAVAL plane is the water an embarking
+        land unit takes too."""
         block = self._centre_plane() & (self.tile_seat != seat)
         if foes:
             hostile = self._tac_fighters(seat) if plain_civ else self._tac_hostile(seat)
+            if foes_seen:
+                hostile = hostile & self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
             block = block | hostile | self._tac_closed(seat)
         if self._encamp_didx >= 0:
             block = block | self._encamp_block_plane(seat)
@@ -629,6 +634,11 @@ class SimTactics:
             board_step = boarded_n & rev_b[rows] if rev_b is not None else boarded_n
         embarks = self._tac_embarks(rows, utype, seat)
         ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & embarks.unsqueeze(1)))  # [N, T]
+        if zoc:
+            # a move order's path passes a unit at war with it out of its
+            # sight (`groundOf`'s pass)
+            land_p, wat_p = self._tac_enter(seat, False, foes_seen=True)
+            ent_n = torch.where(naval.unsqueeze(1), wat_p[rows], land_p[rows] | (wat_p[rows] & embarks.unsqueeze(1)))
         water_n = self.water[rows]
         # the plots each unit attacks into (`groundOf`'s attack): an enemy
         # unit's of its own domain (the planning's: one that fights, on its own
@@ -1255,10 +1265,12 @@ class SimTactics:
         with zones of control, walked as far as its Movement carries it this
         turn (a zone of control ends it); it walks through its own units and
         other players' but never ends on another player's unit or its own
-        that stacks with it. A path ending on a plot it attacks into stops at
-        its side, and with `strike` (the barbarians') it strikes there. A
-        destination its own stacking unit holds, reached in the first turn,
-        is no path. With
+        that stacks with it, and stops short of a unit at war with it its
+        path passed out of its sight. A path ending on a plot it attacks into
+        stops at its side, and with `strike` (the barbarians') it strikes
+        there. A destination its own stacking unit holds, reached in the
+        first turn, is no path, nor one another player's unit holds out of
+        its sight. With
         `later_turns` (the order's path flag 0x1000) the path's turns after
         its first may end on a plot its own stacking unit holds, its first
         not; with no `explore` (its flag 1) the path leaves no plot the player
@@ -1266,6 +1278,14 @@ class SimTactics:
         flag 8 [B], flag 0x8000 [B] and flag 2 [B]) its first turn steps onto
         no plot of danger, and under flag 2 no step onto the ground of a
         player at war with it."""
+        if not bool(mask.count_nonzero()):
+            return
+        # a destination another player's unit holds out of the player's sight
+        # is no path (`pathTo`)
+        dc = dest.clamp(min=0).unsqueeze(1)
+        at_u = getattr(self, f"{pre}_unit_tile").gather(1, us.clamp(min=0).unsqueeze(1)).squeeze(1)
+        unseen = ~self._barb_seen("barbarians" if seat == BARB_SEAT else seat).gather(1, dc).squeeze(1)
+        mask = mask & ~(self._tac_foreign(seat).gather(1, dc).squeeze(1) & unseen & (dest != at_u))
         if not bool(mask.count_nonzero()):
             return
         dev = self.device
@@ -1350,12 +1370,16 @@ class SimTactics:
         f_land_w, f_sea_w = self._tac_pool(pre)
         fl_w, fs_w = f_land_w[rows, sr], f_sea_w[rows, sr]
         ww = self.unit_water_walk.take(ut)
+        foe_n = self._tac_hostile(seat)[rows]
         for i in range(L):
             p = path[:, i]
             on = on & (i < plen)
             if not bool(on.count_nonzero()):
                 break
             pc = p.clamp(min=0)
+            # a plot a unit at war with it holds, passed out of its sight,
+            # ends the walk short of it (`walk`)
+            on = on & ~foe_n[ar, pc]
             dcol = (self.neigh[frm] == pc.unsqueeze(1)).long().argmax(dim=1)
             c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore, waive) + carry
             on = on & ~((mp < c) & (mp < full))

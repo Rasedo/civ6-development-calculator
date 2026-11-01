@@ -7271,3 +7271,68 @@ and the cap in `_step_verb` (gpu/core/sim_seats.py).
   32:23 takes 31:23, ours its own 32:22 at danger 0 (the barbarian Warrior on
   33:23 reaches no plot beside it). The safe plot's order (0x716b90) is as
   ported; the game holds danger on those plots the map as ported does not.
+
+## C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins
+
+`Ground.pass` in `search`, `pathTo` and `walk` (cpu/core/tactical.ts);
+`_tac_enter(foes_seen=True)` in `_tac_search`, `_tac_move_to`'s destination
+mask and its walk's `foe_n` (gpu/core/sim_tactics.py).
+
+- THE KEPT PATH IS DEAD CODE: 0x272aa0 takes the formation's kept path
+  (+0x638) only where its byte +0x5d8 is set, the value of the tracked bool
+  at +0x580 (a tracked variable's value lies +0x58 past it: 0x9034b0 /
+  0x7eb220 return or set that slot). Every store to it is false: the
+  constructor 0x263240 at 0x2646ad (r12b 0), the reset 0x266a60 at 0x266b24
+  (0x29fdf0 with 0), the load 0x264d90 at 0x264f75 (0x29fdf0 with 0). No
+  other instruction of the image addresses +0x580 or +0x5d8 of a formation
+  (displacement and immediate scans; the build the game runs the same at its
+  own offsets, its flag written by the constructor, the reset and the load
+  alone). Every move order searches its
+  requested plot afresh (0x272ad7 -> 0x272c5e -> 0x26ef40), as the engines do;
+  the flags 0x26e3a0 sets and the turn-1 end 0x782d0 serve that dead branch
+  and the MoveTo first step's attack test alone.
+- THE MOVE GOES ONE NODE AT A TIME: 0x26fe20 searches the path again and
+  places the formation on the node after its start (0x2666c0: +0x638 at
+  count-2, the goal where one node is kept; an air member takes the goal
+  itself, 0x2669d0(1)), the MoveTo execution 0x962380 running again for the
+  next; its first step ends the order unmoved on a defender at war it sees
+  there (0x209e30). The engines walk one path's first turn: `walk` stops
+  short of a plot a unit at war with it holds (the GPU walk's `foe_n`).
+- THE DESTINATION TEST (0x2714b0, the instance's +0x20 / +0x28 pair laid by
+  0x26f330, called by GeneratePath 0x77d10 at 0x78060 before the search):
+  with search flag 0x4000 a plot the player does not see now passes; else the
+  location test 0x586900 under the order's flags mapped (4 -> 8, 0x10 -> 1,
+  0x20 -> 2, 0x2000 -> 0x80). An order without the attack flag 0x10 has no
+  path to a plot another player's unit holds, seen or not (0x586360's
+  0x208b80 under 0x108: no sight test, 0x20a2a0 under 0x100).
+- A PATH'S OTHER PLAYERS' UNITS: each node's location test (0x271be0 ->
+  0x586900 under flag 1 -> 0x586360 at 0x586542..0x5865a1) refuses no plot
+  for another player's unit, seen or not, but where both the mover and the
+  best of them are embarked; a hostile unit makes an attack node (+0x51 bits
+  5 / 6, 0x5861f0) only on a plot the player sees now (+0x50 & 2). A move
+  order's path passes a unit at war with it on a plot it does not see now as
+  empty ground (`pass`); one it sees is an attack or no step, as before.
+- THE DESTINATION OUT OF SIGHT: a destination another player's unit holds
+  that the player does not see now is no path (`pathTo`; `_tac_move_to`'s
+  mask), the attack-flag orders included. For an order without 0x10 that is
+  0x2714b0's refusal; under 0x10 the recorded moves say so (below) while
+  0x2714b0 passes such a plot under location flag 1: the refusal's place in
+  the DLL is not found.
+- Confirmed (one-seed aimem traces, each against the head without the rule):
+  runs/h1_duely1121 t58-77 the barbarian Scout 131073 "tertiary regions" 10:9
+  past China's units out of its sight; t17-20 city-state 4's Warrior 327680
+  (Operation); t27 / t33 the rampaging Galleys 1114128 / 1245196 holding for
+  a target out of sight; h1_duely1127 t46 / t51 the Galley 262147 "HL:
+  Explore", t30 the Slinger 720905, t113 city-state 3's Galley 393216;
+  h1_duely1117 t11 the rampaging Scout 131073 and Warrior 589832 holding for
+  14:8 (a city-state's Warrior out of their sight), t40-41 the Scout
+  1441799, t48 the Settler 2293774; the Attack Civilian movers of 1117 hold
+  for a civilian out of their sight (t80 Warrior 3670030 for the Settler on
+  31:13, t85 / t88 / t97 / t100 / t103) and go for one in it (t31-t36, t68);
+  h1_duely1124 t15-20 the Scouts 524295 / 131073 "HL: Explore".
+- Open: the place of the destination-out-of-sight refusal under the attack
+  flag; h1_duely1127 t36 the barbarian Warrior 2031626 (Operation, 12:14 for
+  12:7) steps 11:13 on the path past player 1's Archer out of its sight
+  on 11:7, the game 12:13; h1_duely1117 t26 / t32 the Galley 720906's fresh
+  search from 26:1 for 33:3 (no path in the engines; the game walks 25:1 /
+  25:2 / 25:3).
