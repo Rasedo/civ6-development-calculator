@@ -317,6 +317,9 @@ class SimInit:
         # its best card per civic (0x623b90, raw, at least 0), written with them
         # (`ResearchState.civicPolicyBest`)
         self.citystate_civic_pol_best = torch.zeros(B, r_pad, nc_ai, dtype=torch.long, device=device)
+        # its Economic AI's Gold boost (AI::Economic +0x528, raw) as its last
+        # turn wrote it, 0 before the first (`EconomicMemory.goldBoost`)
+        self.citystate_gold_boost = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # its best card per slot type of its policy jobs (raw, the slot types'
         # order), written with them and read by the next turn's government
         # values (`ResearchState.civicSlotBest`); before the first, a job

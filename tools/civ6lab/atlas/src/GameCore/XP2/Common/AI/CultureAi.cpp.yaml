@@ -52,6 +52,7 @@
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   context:
     - "- THE PROPAGATION, 0x61ee30 (the turn 0x620110's first step, on each entry): a row in reach scores its own value and its prerequisites..."
     - "- WHEN: the AI's turn (0x620110) chooses with key -1 only where nothing is in hand (0x399a90 = -1). A COMPLETION fires..."

@@ -1058,7 +1058,8 @@ CITY_STATE = {
     "minorArmyAged": lambda sim, b, rows: [int(sim.citystate_kb_aged[b, s]) for s in rows],
     "minorRevealed": lambda sim, b, rows: [[int(p) for p in sim.mops_revealed[b, s].nonzero(as_tuple=True)[0].tolist()]
                                            for s in rows],
-    "minorSavings": lambda sim, b, rows: [[int(x) for x in sim.citystate_savings[b, s].tolist()] + [int(sim.citystate_balance[b, s])]
+    "minorSavings": lambda sim, b, rows: [[int(x) for x in sim.citystate_savings[b, s].tolist()] + [int(sim.citystate_balance[b, s]),
+                                                                                                     int(sim.citystate_gold_boost[b, s])]
                                           for s in rows],
     "minorAiSlots": lambda sim, b, rows: [[int(x) for x in sim.cai_slots[b, s].tolist()] for s in rows],
     "minorAiTrees": lambda sim, b, rows: [_ai_trees(sim, b, s) for s in rows],

@@ -8418,7 +8418,17 @@ data sits at its descriptor + 0x58.
   (0x496fd0) passes half of it.
 - AI::Economic m_yieldPriorityBoost (player +0x1288, data +0x528): Gold
   only. 0x687bf0 each turn: 0, or fx(-0.2) x the gold per turn (player
-  +0x13a0 +0x1b8) while that is negative.
+  +0x13a0 +0x1b8) while that is negative. A member, not a live read: list B
+  runs the research and civics AIs (0x760980, 0x620110) before the Economic
+  AI, so the policy jobs read the boost its last turn wrote (READ on the
+  logs: the five duely duels' city-states' Triangular Trade, Caravansaries,
+  Civil Prestige, Retainers ... a turn off the logged scores on the live
+  boost, 31,955 -> 32,402 policy rows equal on it (aimem) — 1121 player 3's
+  Triangular Trade 87 / 99 a turn apart, its Gold weight 0.20 on a gold per
+  turn of -1 every third turn). Port: `EconomicMemory.goldBoost`
+  (`economicGoldBoost`, written in `minorMilitaryTurn`),
+  `citystate_gold_boost`. Left: two Trader destinations a turn off on it
+  (runs/h1_duely1121 Hunza t88, 1127 Mexico City t150).
 - The victory manager's Yields (GrandStrategic +0x508, inner +0xd8 = +0x638;
   0x7c05e0 dumps it as "Yields:"): a followed strategy's
   Strategy_YieldPriorities rows add fx(PercentageDelta x 0.01) (0x7bf160 on,

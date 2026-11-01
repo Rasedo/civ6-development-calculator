@@ -154,14 +154,24 @@ function yieldPerTurn(state: GameState, seat: number, y: string): number {
   return 0;
 }
 
+/** THE ECONOMIC AI'S GOLD BOOST (0x687bf0, each turn, AI::Economic +0x528):
+ *  -0.2 x the gold per turn while that is negative, else 0, raw */
+export function economicGoldBoost(state: GameState, seat: number): number {
+  const gpt = goldPerTurn(state, seat);
+  return gpt < 0 ? fmul(fxConst(-0.2), fxConst(gpt)) : 0;
+}
+
 /** THE YIELD WEIGHTS of a seat, raw 24.8 per YieldType (0x702ad0) */
 export function yieldWeights(state: GameState, seat: number): Record<string, number> {
   const s = seatOf(state, seat);
   const w: Record<string, number> = Object.fromEntries(AI_YIELDS.map((y) => [y, 0]));
   if (!s) return w;
-  // the Economic AI's gold boost (0x687bf0)
-  const gpt = goldPerTurn(state, seat);
-  if (gpt < 0) w.YIELD_GOLD += fmul(fxConst(-0.2), fxConst(gpt));
+  // the Economic AI's gold boost (0x687bf0): a city-state's as its
+  // Economic AI's last turn stored it — list B runs the research and civics
+  // AIs before the Economic AI, list A the cities after it — any other
+  // seat's on its gold per turn now
+  const cs = state.cityStates.find((x) => x.seat === seat);
+  w.YIELD_GOLD += cs ? cs.economy?.goldBoost ?? 0 : economicGoldBoost(state, seat);
   // the Yields lists
   for (const [y, v] of listSum(seat, s, 'Yields')) if (y in w) w[y] += v;
   // the sensitivity boost

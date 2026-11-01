@@ -61,6 +61,7 @@ import { newEconomicMemory, purchaseContracts, purchaseTurn, purchasePick, savin
 import { unitProductionEntries } from './aiUnitProduction';
 import { cityThreat, type CityThreat } from './operations/cityThreat';
 import { aiView } from './aiView';
+import { economicGoldBoost } from './aiWeights';
 import { AI_GREAT_PERSON_CLASSES } from '../data/aiTables';
 import { minorJobUnits, minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart } from './minorOps';
 import { freeOpNear } from './freeOps';
@@ -852,6 +853,8 @@ export function minorMilitaryTurn(state: GameState, cs: CityState): void {
   // folded slot's savings passing from t16; 1127 p4's Builder at t46, p2's
   // at t210, as logged)
   savingsTurn(eco, Math.trunc(cs.treasury * FX), minorGreatPersonClass(state));
+  // its Gold boost, which its Gold weight reads until its next turn
+  eco.goldBoost = economicGoldBoost(state, cs.seat);
   // its contract purchases, in its city on the threat its last update stored
   if (cs.cityAi) {
     const pcity = minorPurchaseCity(state, cs, cs.threat ?? -1);

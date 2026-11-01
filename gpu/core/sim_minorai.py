@@ -109,6 +109,10 @@ class SimMinorAi:
                                          self._minor_gp_class())
         self.citystate_savings[:, s] = torch.where(alive.unsqueeze(1), sav, self.citystate_savings[:, s])
         self.citystate_balance[:, s] = torch.where(alive, bal, self.citystate_balance[:, s])
+        # its Gold boost, which its Gold weight reads until its next turn
+        # (`economicGoldBoost`)
+        boost = self._cv_minor_facts(s).live_gold_boost()
+        self.citystate_gold_boost[:, s] = torch.where(alive, boost, self.citystate_gold_boost[:, s])
         # its contract purchases, in its city on the threat its last update stored
         self._minor_contract_purchases(s, alive)
         self._mops_evaluate(s)

@@ -47,6 +47,10 @@ const SHARE = AI_DEFAULT_SAVINGS.map((s) => Math.floor((s.weight / TOTAL_WEIGHT)
 export interface EconomicMemory {
   savings: number[];
   balance: number;
+  /** its Gold boost (m_yieldPriorityBoost, AI::Economic +0x528, raw) as its
+   *  last turn wrote it (`economicGoldBoost`), which the player's Gold
+   *  weight reads until the next; 0 before the first */
+  goldBoost?: number;
 }
 
 export const newEconomicMemory = (): EconomicMemory => ({ savings: AI_DEFAULT_SAVINGS.map(() => 0), balance: 0 });

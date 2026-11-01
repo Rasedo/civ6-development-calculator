@@ -2998,9 +2998,10 @@
           ],
           "planes": [
             "citystate_savings",
-            "citystate_balance"
+            "citystate_balance",
+            "citystate_gold_boost"
           ],
-          "note": "the Economic AI's savings slots and its last balance, raw 24.8 (AI::Economic +0x540, +0x1b8)"
+          "note": "the Economic AI's savings slots, its last balance and its Gold boost, raw 24.8 (AI::Economic +0x540, +0x1b8, +0x528)"
         },
         {
           "name": "minorAiSlots",
