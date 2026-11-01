@@ -37,11 +37,12 @@ import { lumpFood } from './seatTurn';
  *  against the game era (`TECH_COST_*_ERA_PCT` / `CIVIC_COST_*_ERA_PCT`, an
  *  item of a later era dearer, an earlier one cheaper) and by the speed, then
  *  floored once (runs/h1_duelw1121: Pottery 10 of the Standard 25 in the
- *  Classical game era, Recorded History 87 of 175). */
-export function researchCost(state: GameState, id: string, civic: boolean, seat?: number): number {
+ *  Classical game era, Recorded History 87 of 175). `gameEra` prices it in
+ *  that game era instead of the seat's. */
+export function researchCost(state: GameState, id: string, civic: boolean, seat?: number, gameEra?: number): number {
   const def = civic ? CIVICS[id] : TECHS[id];
   const era = ERAS.indexOf(def.era);
-  const game = (seat !== undefined ? eraHold?.get(seat) : undefined) ?? state.gameEra ?? 0;
+  const game = gameEra ?? (seat !== undefined ? eraHold?.get(seat) : undefined) ?? state.gameEra ?? 0;
   const pct = era > game ? (civic ? CIVIC_COST_AFTER_ERA_PCT : TECH_COST_AFTER_ERA_PCT)
     : era < game ? (civic ? CIVIC_COST_BEFORE_ERA_PCT : TECH_COST_BEFORE_ERA_PCT) : 0;
   return Math.floor((def.baseCost * COST_MULTIPLIER_PCT * (100 + pct)) / 10000);

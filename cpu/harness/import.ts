@@ -618,6 +618,10 @@ export interface History {
    *  a civic not yet held (PlayerCulture 0x3a1fb0) — and the culture held */
   culture: Map<number, number>;
   cultureHeld: Map<number, number>;
+  /** the boost each seat parked on an item neither held nor current, by
+   *  `seat:item`: the boost's share of the item's price at the first record
+   *  that showed it boosted (the price of that record's game era) */
+  boostParked: Map<string, number>;
   /** each major's tourism banked toward each major it has met, by `p:o`
    *  (`Seat.tourismTo`): the record's tourism through the pair's route and
    *  government terms of `tourismIntlPct` */
@@ -849,7 +853,7 @@ export function newHistory(): History {
   return { firstTurn: -1, last: null, before: null, beforeThat: null, trained: new Map(), levied: new Map(), alpine: new Set(), fionn: new Set(), govSeated: new Map(), growthDrift: new Map(), lastHit: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
-    competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
+    competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), boostParked: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), startPicks: new Map(), seaLevel: 0, people: null, stockpile: new Map(), reservations: new Map() };
 }
 
@@ -2755,14 +2759,28 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   // progress (`markBoost`); the record shows no item's progress but the
   // current one's, so any research parked on it before is unread — a
   // major's, a city-state's and the Free Cities' alike (runs/h1_duelw1121
-  // Ayutthaya t2: Sailing boosted, its 9 parked, 7 turns as logged)
+  // Ayutthaya t2: Sailing boosted, its 9 parked, 7 turns as logged). The
+  // share is of the price the item had where the boost landed — the game
+  // era of the turn before the first record that shows it boosted —, kept
+  // as the era moves on (runs/h1_duely1124 Colonialism, boosted at t101 /
+  // t115 / t116 an era ahead at 480, its 191 parked: 30 / 26 / 38 turns at
+  // t124 as logged, where the price of the era it reached, 400, leaves
+  // 34 / 30 / 44; runs/h1_duely1128 Bologna's Stirrups, boosted the turn
+  // the Medieval era began at t91, at the Classical price)
+  const boostEra = history && history.eraStartTurn === rec.turn ? Math.max(0, history.gameEra - 1) : state.gameEra;
   for (const s of [...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]) {
     const r = s.research;
     for (const id of r.boosted) {
       if (r.techs.includes(id) || r.civics.includes(id) || r.tech === id || r.civic === id || !BOOSTS[id]) continue;
       const civic = !TECHS[id];
-      const cost = civic ? CIVICS[id].cost : TECHS[id].cost;
-      (civic ? r.civicRetained : r.techRetained)[id] = Math.min(cost, boostAmount(cost, BOOSTS[id].pct, boostPoints(state, s.seat, civic)));
+      const key = `${s.seat}:${id}`;
+      let parked = history?.boostParked.get(key);
+      if (parked === undefined) {
+        const cost = researchCost(state, id, civic, s.seat, boostEra);
+        parked = Math.min(cost, boostAmount(cost, BOOSTS[id].pct, boostPoints(state, s.seat, civic)));
+        if (history && history.last === rec) history.boostParked.set(key, parked);
+      }
+      (civic ? r.civicRetained : r.techRetained)[id] = parked;
     }
   }
   // the rivers named so far: the history's, then this record's look — the
