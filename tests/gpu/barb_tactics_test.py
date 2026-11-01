@@ -33,6 +33,36 @@ def fresh(rules, path, turns=30):
     return warm_base((str(path), turns), lambda: opened(rules, path, turns))
 
 
+def scalar_zoc(sim, b, slot, naval, dest=-1):
+    """`inEnemyZoc` (cpu/core/units.ts) on every plot for one unit, on the
+    path's destination `dest`: an exerter beside the plot zones it, but one
+    on `dest` answers no zone for the plot unless the plot is at its
+    stacking limit (`groundOf`'s crowded: its own unit of its stacking class
+    but itself, or another player's unit at peace but a Trader on a plot the
+    player sees now)"""
+    dirs = sim._tac_zoc_dirs(BARB_SEAT, naval=naval)[b].tolist()
+    neigh = sim.neigh.tolist()
+    me = slot + sim.POOL_LO["barb"]
+    ut = int(sim.barb_unit_type[b, slot])
+    if bool(sim._type_civilian[ut]):
+        planes = (sim.civilian_at,)
+    elif bool(sim._type_support[ut]):
+        planes = (sim.support_at,)
+    else:
+        planes = (sim.military_at, sim.embarked_at)
+    seat = sim.unit_seat[b].tolist()
+    own = [any(0 <= (u := int(pl[b, t])) != me and seat[u] == BARB_SEAT for pl in planes) for t in range(sim.T)]
+    peace = (sim._tac_peaceful(BARB_SEAT) & sim._barb_seen("barbarians"))[b].tolist()
+    ign = bool(sim._tac_zoc_ignored(torch.tensor([ut]))[0])
+    out = []
+    for t, z in enumerate(dirs):
+        zoned = any(z) and not ign
+        if zoned and dest >= 0 and not (own[t] or peace[t]):
+            zoned = not any(z[k] and neigh[t][k] == dest for k in range(6))
+        out.append(zoned)
+    return out
+
+
 def scalar_search(sim, b, slot, max_turns, zoc, dest=-1, link=None):
     """`search` (cpu/core/tactical.ts) for one unit, plot by plot; `link`
     sees each priced link (plot, from, turns, moves), the start first"""
@@ -40,7 +70,7 @@ def scalar_search(sim, b, slot, max_turns, zoc, dest=-1, link=None):
     cost = sim._tac_step_cost()[b].tolist()
     ut = int(sim.barb_unit_type[b, slot])
     naval = bool(sim.unit_naval[ut])
-    zp = sim._tac_zoc(BARB_SEAT, naval=naval)[b].tolist() if zoc else None
+    zp = scalar_zoc(sim, b, slot, naval, dest) if zoc else None
     ent = (wat if naval else land)[b].tolist()
     a_land, a_nav, _ = sim._tac_attack_planes(BARB_SEAT, not zoc, not zoc, False)
     fights = int(sim._type_combat[ut]) > 0
