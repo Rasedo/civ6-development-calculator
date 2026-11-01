@@ -567,7 +567,8 @@ class SimTactics:
         turn of every plot the search closed, those it only passes or attacks
         included. With `stand` (the danger map's search) an attack is struck
         only from the unit's own plot or one none of its own stacking units
-        holds, by no unit with a range, and no zone of control is paid (flag
+        holds, a step onto a unit's plot keeps its Movement left (only a
+        district attack spends it), and no zone of control is paid (flag
         0x800). With `later_turns` (the path's flag 0x1000) a path's turn may
         end on a plot its own stacking unit holds after its first. With
         `from_full` (the planning's, `search`'s fromFull) each unit sets out on
@@ -652,10 +653,16 @@ class SimTactics:
         if rv_n is not None:
             # a plot the player never revealed is entered, never attacked into
             atk_n = atk_n & rv_n
+        # the danger map's search (flag 0x200) pays the attack's spend on a
+        # district alone (`search`'s districtAttack: a city centre or an
+        # Encampment of a player at war); a step onto a unit's plot is priced
+        # as any step, the Movement it leaves there kept
+        pay_n = None
         if stand:
-            # the danger map's search: a unit with a range strikes by stepping
-            # onto no plot, its range covers the plots beside its reach
-            atk_n = atk_n & ~(self._type_ranged_strength.take(utype) > 0).unsqueeze(1)
+            dist_atk = self._centre_plane()
+            if self._encamp_didx >= 0:
+                dist_atk = dist_atk | (self.district == self._encamp_didx)
+            pay_n = (dist_atk & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat))[rows]
         cost_b = self._tac_cost()  # [B, T, 6]
         # each unit's terrain waivers (`terrainMp`: hills, Woods)
         waive = self._tac_waive_code(utype, getattr(self, f"{pre}_unit_promos")[rows, slots],
@@ -871,8 +878,10 @@ class SimTactics:
                 cst = torch.where(waits, pm + cr.gather(1, b1), cst)
             # the attack's step priced as any step, then spending the
             # Movement it leaves (`search`), as a planning step onto a
-            # district at war with HitPoints does
-            spend6 = a6 | (fort_n.gather(1, nbc) & (nb >= 0)) if fort_n is not None else a6
+            # district at war with HitPoints does; the danger map's search
+            # pays the attack's spend on a district alone (`pay_n`)
+            pay6 = a6 if pay_n is None else a6 & pay_n.gather(1, nbc)
+            spend6 = pay6 | (fort_n.gather(1, nbc) & (nb >= 0)) if fort_n is not None else pay6
             cst = torch.where(spend6, cst + moves, cst)
             moves = torch.where(spend6, 0, moves)
             # +4 where the step leaves no Movement, +3 more off the unit's

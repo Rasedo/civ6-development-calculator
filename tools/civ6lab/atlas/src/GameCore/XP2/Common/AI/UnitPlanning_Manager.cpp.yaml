@@ -57,6 +57,7 @@
   readings:
     - "C-99: Naval Patrol's explore target — the list and the tests READ, two cases unexplained"
     - "C-95: a ranged unit's danger reach holds only plots with Movement left — READ (0x7921e0, 0x791270, 0x26dab0), both twins"
+    - "C-125: the danger map's search pays the attack's spend on a district alone — READ (0x26e570 at 0x26e6d3, 0x26e5cd), both twins; a new unit stands whole on the replay's copy"
   context:
     - "...dab0): a plot is appended on GetBest's NotifyList 3 (0x781e0, parent argument 0), once (0x791270) — the BFS's closing order; NotifyList 1 / 2 (AddToOpen, GetBest) append nothing. A p..."
   review: reviewed

@@ -416,7 +416,8 @@ function domainPool(state: GameState, unit: Unit, sea: boolean): number {
  * the turn and Movement the step reaches it with, and whether it attacks —
  * the start first, linked from itself. Standing to attack (the danger map's
  * search): an attack is struck only from the unit's own plot or one none of
- * its own stacking units holds, and by no unit with a range. With laterTurns (the path's flag 0x1000) a
+ * its own stacking units holds, and a step onto a unit's plot keeps its
+ * Movement left (only a district attack spends it). With laterTurns (the path's flag 0x1000) a
  * path's turn may end on a plot its own stacking unit holds after its first.
  */
 /** a move order's danger flags over the player's danger map (`dangerPlane`):
@@ -439,6 +440,9 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = []): void {
   const { map } = state;
   const ground = groundOf(state, unit, !zoc, !zoc, standToAttack, mates);
+  // a plot of a district with hit points of a player at war (0x26e570's
+  // district attack: DistrictInfo +0x58 / +0x5c)
+  const districtAttack = (t: Tile) => garrisonDistrict(state, t) && unitsHostile(state, unit, { seat: tileSeat(t) });
   const held = heldCostsOf(state, unit);
   const nodes = new Map<number, PNode>();
   // a later turn starts on the pathfinder's pool of the domain its plot holds
@@ -537,12 +541,8 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       if (isWater(from) === isWater(to) && ground.revealed(to.index) && ground.boarded(to.index)) continue;
       // the danger map's search (0x26df90, flags 0x311): an attack is struck
       // from a plot the unit may stand on, its own or one none of its own
-      // stacking units holds; a unit with a range strikes by stepping onto
-      // no plot, its range covers the plots beside its reach (runs/h1_duely1124
-      // t53: the barbarian Archer on 40:8 reaches 39:8 / 39:9 beside city-state
-      // 4's Warrior on 38:8, so 36:7, three plots from them, holds no danger
-      // and its Warrior 327683 Heals there)
-      if (attack && standToAttack && (rangeOf(unit) > 0 || (best !== start && ground.full(best.tile)))) continue;
+      // stacking units holds
+      if (attack && standToAttack && best !== start && ground.full(best.tile)) continue;
       // a move order's danger flags (the path validity 0x2720a0 at
       // 0x272590..0x272612): from a node of the path's first turn, under
       // flag 8 no child of danger (the player's danger map 0x716a90 above
@@ -633,7 +633,13 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       else if (p.turns === turns) turns += 1;
       else cost = pm > 0 ? pm : FIX;
     }
-    if (attack || fortAtWar(to)) {
+    // the danger map's search (flag 0x200) pays the attack's spend on a
+    // district alone: a step onto a unit's plot is priced as any step, the
+    // Movement it leaves there kept (0x26e570 at 0x26e6d3), no step going on
+    // from it (0x26e5cd) (runs/h1_duely1127 t8: the barbarian Slinger on 5:8
+    // reaches city-state 4's Warrior on 5:9 with Movement left, 6:10 beside
+    // it in its range)
+    if ((attack && !(standToAttack && !districtAttack(to))) || fortAtWar(to)) {
       // the attack's step priced as any step — a river's 2 above the
       // Movement left waits for the next turn (runs/h1_duelv1121 t4: city-state
       // 4's Warrior at 32:22 lists 32:23 (1/1) and the barbarian Scout's

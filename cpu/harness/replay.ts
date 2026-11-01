@@ -1325,6 +1325,9 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     // 131073, 8 damage at the turn's start, takes Heal)
     const r0 = hpWas.get(first!);
     if (r0 !== undefined && !ctx.minorBlows.has(u)) c.hp = r0;
+    // ...a unit its city made in the turn whole (runs/h1_duely1117 t62:
+    // Valletta's new Archer 720902 on 14:8 Wanders to 13:9, no Heal)
+    else if (r0 === undefined && made.has(u) && !ctx.minorBlows.has(u)) c.hp = UNIT_HP;
     // ...and its experience the first record's, the promotion due its
     // Promotion move reads (runs/h1_duelw1117 t23: city-state 3's Warrior
     // 196610, 8 experience at the turn's start, attacks with no promotion due)

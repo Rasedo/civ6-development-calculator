@@ -7373,3 +7373,46 @@ mask and its walk's `foe_n` (gpu/core/sim_tactics.py).
 - OPEN: the original owner unported (the engines keep no unit's first owner;
   `groundOf`'s `embarks` refuses every barbarian land unit): the captured
   civilians' formations path over no water (C-95).
+
+## C-125: the danger map's search pays the attack's spend on a district alone — READ (0x26e570 at 0x26e6d3, 0x26e5cd), both twins; a new unit stands whole on the replay's copy
+
+`search`'s `districtAttack` and `price`'s attack branch, the stand-to-attack
+step test (cpu/core/tactical.ts); `_tac_search`'s `pay_n` / `pay6`, the
+ranged exclusion gone (gpu/core/sim_tactics.py); `minorAi`'s copy health
+(cpu/harness/replay.ts).
+
+- THE ATTACK'S SPEND (0x26e570): the attack test is a district at war with
+  hit points (DistrictInfo +0x58 / +0x5c) on the plot, else — flag 0x200
+  clear only (0x26e6d3) — a unit of a player at war that fights. Only an
+  attack so found adds the Movement left to the step's cost (0x26e77e:
+  +0x1d0 += +0x1d4, +0x1d4 zeroed). The danger map's search runs under
+  0x311 | 0x800 (0x200 set): a step onto a hostile unit's plot is priced as
+  any step and keeps the Movement it leaves; a city centre's or an
+  Encampment's still spends it.
+- NO STEP ON (0x26e5cd, before the attack test, under every flag): a parent
+  node with +0x51 & 0x40 (a seen hostile unit's plot, 0x271be0) links
+  nothing; the danger search still ends at a unit's plot.
+- A UNIT WITH A RANGE: its plot of a hostile unit is a node like any other,
+  listed only with Movement left (the list's ranged flag, 0x791270); its
+  range list walks from there. The earlier fit (a ranged unit links no
+  attack node) is deleted.
+- CONFIRMED: runs/h1_duely1127 t8 the barbarian Slinger on 5:8 reaches
+  city-state 4's Warrior on 5:9 with 1 Movement left, 6:10 in its range:
+  the hurt Warrior's Protect Units takes 4:10 as logged (15 on 6:10 / 5:10 /
+  4:10, the farthest kept); runs/h1_duely1124 t12 city-state 2's Warrior on
+  9:16 takes 9:18 as logged. The majors' logged "Current Danger" (Move to
+  safety rows, the five duels to t150, the danger map of record t at the
+  unit's plot): 515 -> 522 of 644 equal, 1117 player 0 94 / 94, 1128 player
+  0 23 / 23; one-seed aimem t1-100: cityState.move.plot +2, barb.move.plot
+  +3, no kind down.
+- A NEW UNIT ON THE COPY: a unit its city made in the turn (not in the first
+  record) stands whole on the minors' copy (runs/h1_duely1117 t62:
+  Valletta's Archer 720902 on 14:8, carried at 44 health, Wanders to 13:9 as
+  logged, no Heal); one-seed aimem t1-100: cityState.move.plot +2,
+  barb.move.plot +16.
+- OPEN: runs/h1_duely1121 t11 city-state 4's hurt Warrior 131073 on 32:23
+  takes 31:23, ours its own 32:22 (Woods on hills, danger 0 in our map: the
+  barbarian Warrior on 33:23 reaches no plot beside it); runs/h1_duely1117
+  t41 city-state 4's Warrior 30 on 34:7 takes 35:7 (danger 45 in our map)
+  over 33:7 (Woods, 0) and 34:8 (20). Every open case avoids a Woods plot
+  our map holds safe.

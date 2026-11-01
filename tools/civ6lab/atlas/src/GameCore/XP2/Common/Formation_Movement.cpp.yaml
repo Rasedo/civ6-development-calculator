@@ -83,6 +83,9 @@
     - recording: h1_duelv1121
       turn: 4
       value: city-state 4's Warrior at 32:22 lists the Scout's 33:23 across the river (2/0)
+    - recording: h1_duely1127
+      turn: 8
+      value: "the danger map's search (flags 0x311 | 0x800, 0x200 set) pays no unit attack: the barbarian Slinger on 5:8 reaches city-state 4's Warrior on 5:9 with 1 Movement left, its range covering 6:10, and the hurt Warrior's Protect Units takes 4:10 as logged (danger 15 on 6:10 / 5:10 / 4:10, the farthest kept)"
     - recording: 1124
       turn: 9
       value: "AI_Planning.csv lists them (1124 t9:   the barbarian Warrior at 40:22 holds 39:23 (1/0), China's Warrior there);"
@@ -106,10 +109,14 @@
     - cpu/core/tactical.ts:groundOf
     - cpu/core/tactical.ts:foesSeen
     - cpu/core/tactical.ts:startMoves
+    - cpu/core/tactical.ts:districtAttack
+    - cpu/core/tactical.ts:ground
+    - cpu/core/tactical.ts:price
   readings:
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-125: the danger map's search pays the attack's spend on a district alone — READ (0x26e570 at 0x26e6d3, 0x26e5cd), both twins; a new unit stands whole on the replay's copy"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
@@ -494,6 +501,7 @@
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"
     - "C-124: the kept path is never taken; a move order's path passes other players' units out of sight — READ (0x272aa0, 0x2714b0, 0x586360 at 0x586542..0x5865a1, 0x26fe20), both twins"
+    - "C-125: the danger map's search pays the attack's spend on a district alone — READ (0x26e570 at 0x26e6d3, 0x26e5cd), both twins; a new unit stands whole on the replay's copy"
   context:
     - "...N ENDS (0x2720a0, the move order's validity at the end of 0x26e570): each node records (0x271be0) whether its player sees its plot (+0x50 bit 2) and the count of the unit's own stackin..."
     - "- THE PLANNING'S LIST TEST (0x26d890, a node closing, code 3), READ: the node's flags (0x271be0 on its first visit): +0x50 bit 1 the plot seen now (the player's visibility count +0x29..."
