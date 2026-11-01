@@ -2471,7 +2471,7 @@ class _MinorWorld:
             # the plot closes
             one = max_turns == 1
             res = sim._tac_search(rows, u["id"][rows, j] - lo, self.seat, max_turns, not one,
-                                  None if one else plot[rows], pre="major", later_turns=not one)
+                                  None if one else plot[rows], pre="major", later_turns=not one, listed=True)
             ar = torch.arange(rows.shape[0], device=sim.device)
             p = plot[rows]
             t = res["turns"][ar, p]

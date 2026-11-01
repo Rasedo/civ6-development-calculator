@@ -484,7 +484,9 @@ function pickTargets(node: Parameters<BtHandler<OpsContext>['update']>[0], view:
 
 /** per team engaged or with a unit taken in (0x80ceb0: team +0x90, +0x58):
  *  its members with Movement left and in no formation (a siege
- *  unit only against an enemy city), the targets the node picks logged, the
+ *  unit only for a city of the seat's own or of AI type DEFENDER, 0x80d1cf:
+ *  runs/h1_duely1127 t70 city-state 4's City Defense Catapult on 10:10
+ *  strikes the barbarian Swordsman on 11:10), the targets the node picks logged, the
  *  attack assignment over them (`even` where unequal attacks are not allowed
  *  and one unit goes; `survive` always) carried out (the seat's `attack`)
  *  and logged */
@@ -492,7 +494,8 @@ function attackUnitsExecute(node: Parameters<BtHandler<OpsContext>['update']>[0]
   const { op } = ctx;
   const view = ctx.view();
   const P = view.plots();
-  const enemyCity = op.target >= 0 && P[op.target].city && P[op.target].owner !== ctx.seat;
+  // the operation's target a city of the seat's own (0x80d015..0x80d030)
+  const ownCity = op.target >= 0 && P[op.target].city && P[op.target].owner === ctx.seat;
   const allowUnequal = flag(node, 'Allow Unequal Attacks', false);
   for (const t of op.teams) {
     if (!t.engaged && t.joined === 0) continue;
@@ -500,7 +503,7 @@ function attackUnitsExecute(node: Parameters<BtHandler<OpsContext>['update']>[0]
     const units = unitsById(v, ctx.seat);
     const paired = new Set(op.formations.flat());
     const members = t.members.map((id) => units.get(id)).filter((u): u is AiUnitView =>
-      !!u && u.movesLeft > 0 && !paired.has(u.id) && (u.bombard <= 0 || enemyCity));
+      !!u && u.movesLeft > 0 && !paired.has(u.id) && (u.bombard <= 0 || ownCity || u.defender));
     const targets = v.attackTargets(ctx.seat);
     const keep = pickTargets(node, v, ctx.seat, op, t, members, targets);
     const picked = targets.map((_g, k) => k).filter(keep);

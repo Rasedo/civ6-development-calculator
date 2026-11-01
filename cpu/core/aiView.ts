@@ -15,7 +15,7 @@ import { CITY_STRIKE_RANGE, plotPressureLead } from './phase';
 import { governorSum } from './governors';
 import { CITY_STATE_SUZERAIN_BONUS, MINOR_UPGRADE_GOLD, govInfluence } from '../data/cityStates';
 import { BARB_SEAT, FREE_SEAT, campTiles, cityHolders, citiesOf, civsAtWar, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, onHomeContinent, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf, warsOf } from './seats';
-import { aiStrengths, districtHealth, planUnit, reachPlots, tacticalTargets, type Target } from './tactical';
+import { aiDefenderOf, aiStrengths, districtHealth, planUnit, reachPlots, tacticalTargets, type Target } from './tactical';
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
@@ -794,5 +794,5 @@ function unitView(state: GameState, u: Unit): AiUnitView {
     combat: aiStrengths(state, u).melee, ranged: d?.ranged?.strength ?? 0, range: d?.ranged?.range ?? 0, damage: UNIT_HP - u.hp,
     movesLeft: Math.trunc(u.movesLeft * 256 / MP_SCALE),
     baseMoves: u.embarked && !d?.naval ? EMBARK_MOVES + embarkTechMoves(state, u.seat) : d?.moves ?? 0,
-    bombard: d?.bombard ?? 0, domain: d?.air ? 'air' : d?.naval ? 'sea' : 'land' };
+    bombard: d?.bombard ?? 0, domain: d?.air ? 'air' : d?.naval ? 'sea' : 'land', defender: aiDefenderOf(state, u) };
 }

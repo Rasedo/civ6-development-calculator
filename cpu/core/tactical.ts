@@ -162,6 +162,8 @@ interface Ground {
    *  it): the unit may neither end there nor pass (the node's +0x50 bit 0x40
    *  clear) */
   boarded: (i: number) => boolean;
+  /** another player's ground closed to a city-state's unit (`closedToMinor`) */
+  closed: (i: number) => boolean;
 }
 
 function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, anyGround = true,
@@ -202,12 +204,19 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   // and a city-state's do from their Shipbuilding, AI_Planning.csv)
   const embarks = canEmbark(state, unit) && !isBarbSeat(unit.seat);
   const minor = isCityStateSeat(unit.seat);
+  // the planning list's units of the mover's map layer alone (the plot list
+  // of the formation's layer, 0x2665b0 -> 0x75c50 -> 0x585eb0): a religious
+  // unit stands on a layer of its own (runs/h1_duely1127 t80-91: city-state
+  // 3's Swordsman plans 4:10, player 1's Missionary on it in sight,
+  // AI_Planning.csv)
+  const layer = unitReligious(unit.type);
+  const onLayer = (x: Unit) => onMap(x) && unitReligious(x.type) === layer;
   const boards = new Map<number, boolean>();
   const boarded = (i: number): boolean => {
     if (!unit.embarked || !held.has(i)) return false;
     let v = boards.get(i);
     if (v === undefined) {
-      const others = state.units.filter((x) => x.tileIndex === i && x.seat !== unit.seat && onMap(x));
+      const others = state.units.filter((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x));
       boards.set(i, (v = others.some((x) => !!x.embarked) && others.every((x) => !!x.embarked)));
     }
     return v;
@@ -216,6 +225,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     known,
     revealed,
     boarded,
+    closed: (i) => minor && closedToMinor(state, unit.seat, state.map.tiles[i]),
     stand: (i) => {
       if (!held.has(i)) return true;
       if (!planning || boarded(i)) return false;
@@ -230,7 +240,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       // t45: it lists 7:10, city-state 3's Trader on it, AI_Planning.csv)
       seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
       if (seenNow[i] !== 1) return true;
-      return !state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat && onMap(x) && !UNITS[x.type]?.trader
+      return !state.units.some((x) => x.tileIndex === i && x.seat !== unit.seat && onLayer(x) && !UNITS[x.type]?.trader
         && !unitsHostile(state, unit, x));
     },
     full: (i) => own.has(i),
@@ -582,8 +592,8 @@ export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reac
   const out: Reach[] = [];
   search(state, unit, maxTurns, false, (n, ground) => {
     // a plot the unit may not stand on it only passes (`stand`), its own
-    // plot listed whatever holds it
-    if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    // plot listed whatever holds it, none of ground closed to a city-state
+    if (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || ground.stand(n.tile)))) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   });
   return out;
@@ -1149,8 +1159,11 @@ export function planUnit(state: GameState, unit: Unit, targets: readonly Target[
     // a plot the unit may not stand on it only passes (`stand`), its own
     // plot listed whatever holds it (runs/h1_duelv1117 t115: city-state
     // 3's Crossbowman on 41:13 lists 41:13 first, China's Trader on it by the
-    // turn's end)
-    if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    // turn's end); none of ground closed to a city-state, an attack's neither
+    // (0x26d890's 0x586900 under 9 -> 0x586360's territory test; runs/
+    // h1_duely1127 t70-74: city-state 4's Catapult on 10:10 lists none of
+    // 11:10, the barbarian Swordsman's on player 1's ground, AI_Planning.csv)
+    if (n.tile === unit.tileIndex || (!ground.closed(n.tile) && (n.attack || ground.stand(n.tile)))) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   }, entries.length ? onLink : undefined, false, false, true);
   let wins = false;
@@ -2690,6 +2703,13 @@ export function militaryAiTypeOf(u: Unit): number {
   return u.aiDefender ? AI_DEFENDER : ownMilitaryAi(u.type);
 }
 
+/** a unit of AI type DEFENDER (unit +0x1c0 4): a barbarian its tribe's camp
+ *  defender (`aiTypeOf`), another player's its city's standing army's
+ *  (`militaryAiTypeOf`) */
+export function aiDefenderOf(state: GameState, u: Unit): boolean {
+  return (isBarbSeat(u.seat) ? aiTypeOf(state, u) : militaryAiTypeOf(u)) === AI_DEFENDER;
+}
+
 /**
  * A CITY-STATE'S TACTICAL TURN (TacticalAI 0x771530 over Tactics.xml's
  * "Minor Civ Tactical" and "Minor Civ Homeland" lists): its unit pool
@@ -2801,7 +2821,8 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
   for (const u of units) {
     const p = planUnit(state, u, targets);
     plan.set(u.id, p);
-    reach.set(u.id, p.reach);  }
+    reach.set(u.id, p.reach);
+  }
   return { seat, strike: false, units, reach, done: new Set(), ended: new Set(), ai, targets, plan, danger: dangerPlane(state, seat), regions: seenRegions(state, seat) };
 }
 

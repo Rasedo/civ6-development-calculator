@@ -31,6 +31,9 @@
     - recording: h1_duelv1128
       turn: 188
       value: Attack Walled City's Cavalry At 43:12, Move 43:15, Attack 42:15
+    - recording: h1_duely1127
+      turn: 70
+      value: "runs/h1_duely1127 t70: city-state 4's City Defense (its centre 8:10) logs Operation Attack Units, UNIT_CATAPULT, At 10:10, Move 10:10, Attack 11:10 (AI_Operation.csv)."
   impl:
     - cpu/core/operations/assault.ts:attackUnitsExecute
     - cpu/core/operations/assault.ts:pickTargets
@@ -40,12 +43,16 @@
     - gpu/core/sim_minorops.py:_x_attack_units
     - cpu/core/tactical.ts:passAttack
     - gpu/core/sim_tactics.py:_tac_team_order
+    - cpu/core/tactical.ts:aiDefenderOf
+    - gpu/core/sim_minorops.py:_mops_units
+    - cpu/core/operations/assault.ts:P
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: Attack Units — READ, ported"
+    - "C-99: the planning list's map layer and closed ground, a siege unit in Attack Units — READ (0x2665b0 -> 0x585eb0, 0x26d890's 0x586900 under 9 -> 0x586360 at 0x586624, 0x80ceb0 at 0x80d015 / 0x80d1cf), both twins"
   context:
     - "...s of Operation Attack 0x80c180 (Attack Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore..."
   review: reviewed

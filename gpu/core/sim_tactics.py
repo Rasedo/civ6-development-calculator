@@ -233,28 +233,37 @@ class SimTactics:
             out |= s != seat
         return out
 
-    def _tac_peaceful(self, seat: int) -> torch.Tensor:
+    def _tac_layer(self, pl: torch.Tensor, rel: bool) -> torch.Tensor:
+        """[B, T] bool — the plane's unit stands on the map layer of a
+        religious mover (`rel`) or of any other (a religious unit, Units'
+        ReligiousStrength above 0, on a layer of its own: 0x2665b0)"""
+        r = self._rel_strength.take(self.unit_type.gather(1, pl.clamp(min=0)).clamp(min=0)) > 0
+        return (pl >= 0) & (r if rel else ~r)
+
+    def _tac_peaceful(self, seat: int, rel: bool = False) -> torch.Tensor:
         """[B, T] bool — a unit of another player than `seat` not at war with
-        it, a Trader none, holds the plot (an aircraft or a spy holds none)."""
+        it, a Trader none, holds the plot (an aircraft or a spy holds none),
+        on the map layer of a religious mover (`rel`) or of any other."""
         out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
             pc = pl.clamp(min=0)
             s = torch.where(pl >= 0, self.unit_seat.gather(1, pc), torch.full_like(pl, seat))
             trader = self.unit_type.gather(1, pc) == self._trader_idx
-            out |= (s != seat) & ~self._seats_hostile(seat, s) & ~trader
+            out |= (s != seat) & ~self._seats_hostile(seat, s) & ~trader & self._tac_layer(pl, rel)
         return out
 
-    def _tac_boarded(self, seat: int) -> torch.Tensor:
+    def _tac_boarded(self, seat: int, rel: bool = False) -> torch.Tensor:
         """[B, T] bool — `groundOf`'s boarded for an embarked mover of
-        `seat`: another player's passenger holds the plot and no other
+        `seat`, on the map layer of a religious mover (`rel`) or of any
+        other: another player's passenger holds the plot and no other
         player's unit stands there unembarked (0x586360 under flag 1, the
         best defender 0x208b80 under 0x108)."""
         ep = self.embarked_at
         es = torch.where(ep >= 0, self.unit_seat.gather(1, ep.clamp(min=0)), torch.full_like(ep, seat))
-        out = (ep >= 0) & (es != seat)
+        out = (es != seat) & self._tac_layer(ep, rel)
         for pl in (self.military_at, self.civilian_at, self.support_at):
             s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, seat))
-            out &= s == seat
+            out &= (s == seat) | ~self._tac_layer(pl, rel)
         return out
 
     def _tac_hostile(self, seat: int) -> torch.Tensor:
@@ -510,7 +519,7 @@ class SimTactics:
                     dest: torch.Tensor | None = None, pre: str = "barb", plan: dict | None = None,
                     full: bool = False, stand: bool = False, later_turns: bool = False,
                     from_full: bool = False, explore: bool = True, danger: tuple | None = None,
-                    mate: torch.Tensor | None = None) -> dict:
+                    mate: torch.Tensor | None = None, listed: bool = False) -> dict:
         """THE PATHFINDER (`search`) for the units at local `slots` of pool
         `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
         the open nodes by (cost, tie) — a node inserted where its cost lies
@@ -541,7 +550,9 @@ class SimTactics:
         2 [N]) no node of the path's first turn links a child of danger (any
         child under flag 8, a water child under flag 0x8000), and under flag
         2 no node links a child on the ground of a player at war with the
-        unit's."""
+        unit's. With `listed` (the planning's list, `reachPlots` /
+        `planUnit`) no plot of ground closed to a city-state is kept, an
+        attack's neither."""
         dev = self.device
         N, T = rows.shape[0], self.T
         NONE = _KEY_NONE
@@ -573,10 +584,17 @@ class SimTactics:
         # an embarked unit's: the revealed water another player's passenger
         # holds (`groundOf`'s boarded), neither passed nor ended on
         emb_u = getattr(self, f"{pre}_unit_emb")[rows, slots]
+        # the plot lists of each unit's map layer (a religious unit's its own)
+        rel_u = self._rel_strength.take(utype) > 0
+        any_rel = bool(rel_u.count_nonzero())
+
+        def by_layer(f) -> torch.Tensor:
+            out = f(False)[rows]
+            return torch.where(rel_u.unsqueeze(1), f(True)[rows], out) if any_rel else out
         boarded_n = None
         board_step = None
         if bool(emb_u.count_nonzero()):
-            boarded_n = self._tac_boarded(seat)[rows] & emb_u.unsqueeze(1)
+            boarded_n = by_layer(lambda r: self._tac_boarded(seat, r)) & emb_u.unsqueeze(1)
             rev_b = self._tac_known(seat)
             board_step = boarded_n & rev_b[rows] if rev_b is not None else boarded_n
         embarks = self._tac_embarks(rows, utype, seat)
@@ -1016,10 +1034,16 @@ class SimTactics:
         if zoc:
             kept_out = self._tac_foreign(seat)[rows]
         else:
-            kept_out = (self._tac_peaceful(seat) & self._barb_seen("barbarians" if seat == BARB_SEAT else seat))[rows]
+            sn_k = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
+            kept_out = by_layer(lambda r: self._tac_peaceful(seat, r)) & sn_k
             if boarded_n is not None:
                 kept_out = kept_out | boarded_n
-        stand = ~kept_out | atk_n | own
+        stand = ~kept_out | atk_n
+        if listed and not zoc:
+            # the planning's list keeps no plot of ground closed to a
+            # city-state, an attack's neither (0x26d890's 0x586900 under 9)
+            stand = stand & ~self._tac_closed(seat)[rows]
+        stand = stand | own
         closed = rturn
         rank = torch.where(stand, rank, torch.full_like(rank, -1))
         rturn = torch.where(stand, rturn, torch.full_like(rturn, -1))
@@ -1621,7 +1645,7 @@ class SimTactics:
         et = self.unit_type.gather(1, emb.clamp(min=0)).clamp(min=0, max=self.NU - 1)
         foreign = (ms != seat) | ((es != seat) & self._type_dom_mil.take(et))
         plan = {"tp": tp, "civ": civ, "rng": rng, "fights": self._tac_can_fight(pre)[rows, slots], "foreign": foreign}
-        res = self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre, plan=plan, from_full=True)
+        res = self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre, plan=plan, from_full=True, listed=True)
         sn = res["spot_n"]
         dealt = torch.zeros(N, E, dtype=torch.long, device=dev)
         taken = torch.zeros(N, E, dtype=torch.long, device=dev)
@@ -3518,7 +3542,7 @@ class SimTactics:
         if rows.numel():
             rowof[rows, slots] = torch.arange(rows.shape[0], device=dev)
             res = (self._tac_plan(rows, slots, tg, pre, seat) if tg is not None
-                   else self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre, from_full=True))
+                   else self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre, from_full=True, listed=True))
         else:
             empty = torch.full((1, T), -1, dtype=torch.long, device=dev)
             res = {"rank": empty, "turns": empty.clone(), "moves": empty.clone()}

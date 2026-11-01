@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from . import simbase
-from .sim_tactics import _CITY_STRIKE_RANGE
+from .sim_tactics import _AI_DEFENDER, _CITY_STRIKE_RANGE
 
 # the interpreter's statuses
 _S, _R, _F = 1, 2, 3
@@ -1095,7 +1095,8 @@ class SimBarbOps:
         """OPERATION ATTACK UNITS' execution (0x80ceb0, `attackUnitsExecute`)
         for tribe `k`'s team in the games `on`, a team that took units in:
         its living members with Movement left and a planning (a bombard unit
-        only against a city of another player), the list's unit targets near
+        only for a city of the barbarians' own — none — or of AI type
+        DEFENDER, 0x80d1cf: its tribe's camp defender, `_tac_ai`), the list's unit targets near
         them (Attack Nearby Units: not their own, within max(2, a member's
         Movement left) of one; with an enemy named, its units or a civilian),
         the assignment (the exchange filter for a team of one, the survival
@@ -1111,9 +1112,10 @@ class SimBarbOps:
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
         tplot = self.tribe_op_plot[:, k]
         city = self._centre_plane().gather(1, tplot.clamp(min=0).unsqueeze(1)).squeeze(1) & (tplot >= 0)
-        enemy_city = city & (self.tile_seat.gather(1, tplot.clamp(min=0).unsqueeze(1)).squeeze(1) != BARB_SEAT)
+        own_city = city & (self.tile_seat.gather(1, tplot.clamp(min=0).unsqueeze(1)).squeeze(1) == BARB_SEAT)
         bomb = self._type_bombard.take(ut) > 0
-        units = mem & (self.barb_unit_mp > 0) & on.unsqueeze(1) & (~bomb | enemy_city.unsqueeze(1)) & (rowof >= 0)
+        defender = self._tac_ai()[0] == _AI_DEFENDER
+        units = mem & (self.barb_unit_mp > 0) & on.unsqueeze(1) & (~bomb | own_city.unsqueeze(1) | defender) & (rowof >= 0)
         if not bool(units.count_nonzero()):
             return
         reach = torch.where(units, torch.div(self.barb_unit_mp, self._mp_scale, rounding_mode="floor").clamp(min=2),

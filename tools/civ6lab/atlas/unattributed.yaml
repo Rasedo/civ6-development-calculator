@@ -1056,6 +1056,9 @@
       value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
     - recording: 1117
       value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+    - recording: h1_duely1127
+      turn: 70
+      value: "runs/h1_duely1127 t70-74: city-state 4's Catapult on 10:10 lists none of 11:10, the barbarian Swordsman on player 1's closed ground, AI_Planning.csv."
   impl:
     - cpu/core/tactical.ts:reachPlots
     - cpu/core/tactical.ts:Ground
@@ -1063,10 +1066,14 @@
     - gpu/core/sim_tactics.py:_tac_search
     - cpu/core/tactical.ts:boarded
     - cpu/core/tactical.ts:v
+    - cpu/core/tactical.ts:closed
+    - gpu/core/sim_tactics.py:update_parents
+    - cpu/core/tactical.ts:onLink
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
+    - "C-99: the planning list's map layer and closed ground, a siege unit in Attack Units — READ (0x2665b0 -> 0x585eb0, 0x26d890's 0x586900 under 9 -> 0x586360 at 0x586624, 0x80ceb0 at 0x80d015 / 0x80d1cf), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...the player's type flags (+0xb0) take it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes..."
   context:

@@ -308,7 +308,7 @@ class SimMinorOps:
         (its pool slot, an unslotted unit as slot 0, the pool's order among
         equals), its AI unit row, plot, combat, ranged and bombard strengths,
         base range, damage, Movement left (in the pool's scale and whole),
-        base Movement"""
+        base Movement, AI type DEFENDER"""
         seat = self._mops_seat(s)
         pu = lambda n: self._mops_u(s, n)  # noqa: E731
         P = pu("alive").shape[1]
@@ -335,7 +335,7 @@ class SimMinorOps:
             "combat": self._ai_combat(self._mops_pre(s)), "ranged": self._type_ranged_strength.take(ut),
             "bombard": self._type_bombard.take(ut), "range": self._type_ranged_range.take(ut),
             "dmg": hp_max - pu("hp"), "mp": mp, "mp_whole": torch.div(mp, self._mp_scale, rounding_mode="floor"),
-            "base_moves": base,
+            "base_moves": base, "defender": pu("defender"),
         }
 
     def _mops_in_order(self, mask: torch.Tensor, key: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -2113,7 +2113,8 @@ def _u_attack_units(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
 def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """OPERATION ATTACK UNITS' EXECUTION (0x80ceb0): per team engaged or with a unit
     taken in (team +0x90, +0x58) its members alive
-    with Movement left (a bombard unit only against an enemy city), the list's
+    with Movement left (a bombard unit only for a city of the seat's own or
+    of AI type DEFENDER, 0x80d1cf), the list's
     unit targets not its own within max(2, a member's Movement left) of one
     (with an enemy named, its units or a civilian),
     the assignment (the exchange filter where unequal attacks are not allowed
@@ -2131,7 +2132,7 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     B = sim.B
     tgt = sim.mops_target[:, s, k]
     city = sim._centre_plane().gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) & (tgt >= 0)
-    enemy_city = city & (sim.tile_seat.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) != seat)
+    own_city = city & (sim.tile_seat.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) == seat)
     for ti in range(N_TEAMS):
         tm = sim.mops_tm[:, s, k, ti]
         g = on & (tm >= 0) & (sim.mops_eng[:, s, k, ti] | (sim.mops_join[:, s, k, ti] > 0))
@@ -2139,7 +2140,7 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             continue
         u = sim._mops_units(s)
         memm = sim._mops_member_mask(s, k, ti) & u["own"]
-        mem = memm & (u["mp"] > 0) & ((u["bombard"] <= 0) | enemy_city.unsqueeze(1)) & g.unsqueeze(1)
+        mem = memm & (u["mp"] > 0) & ((u["bombard"] <= 0) | own_city.unsqueeze(1) | u["defender"]) & g.unsqueeze(1)
         reach = u["mp_whole"].clamp(min=2)
         near = torch.zeros(B, sim.T, dtype=torch.bool, device=dev)
         for j in mem.any(dim=0).nonzero(as_tuple=True)[0].tolist():

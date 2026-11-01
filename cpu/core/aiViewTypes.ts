@@ -61,6 +61,8 @@ export interface AiUnitView {
   bombard: number;
   /** its domain (Units +0x650): land, sea or air */
   domain: 'land' | 'sea' | 'air';
+  /** of AI type DEFENDER (unit +0x1c0 4: its city's standing army holds it) */
+  defender: boolean;
 }
 
 /** a unit of a player at war with the seat that the seat sees now */

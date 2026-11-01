@@ -5936,3 +5936,44 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   and housing, the religion's pressure 32 -> 34 and its staycationers'
   count (126 -> 138, t194 -> t195); which of the unit value's inputs flips
   the FX(-9999) exit is unread.
+
+## C-99: the planning list's map layer and closed ground, a siege unit in Attack Units — READ (0x2665b0 -> 0x585eb0, 0x26d890's 0x586900 under 9 -> 0x586360 at 0x586624, 0x80ceb0 at 0x80d015 / 0x80d1cf), both twins
+
+- THE PLOT LIST IS THE FORMATION'S LAYER'S: the pathfinder's +0x1a4 (0x2665b0)
+  is the map layer holding the formation's first unit (0x75ae0); every plot
+  list the search reads (0x271be0 -> 0x75c50, 0x585eb0's +0x54 count, the list
+  test 0x26d890's first unit) is that layer's. A religious unit stands on a
+  layer of its own (3), so it keeps no other unit out of the planning's list,
+  nor is it a passenger to an embarked mover. Engines: `groundOf`'s `stand`
+  and `boarded` (`onLayer`), `_tac_layer` / `_tac_peaceful` / `_tac_boarded`
+  by the mover's layer in `_tac_search`. Confirmed: runs/h1_duely1127
+  t80-91 city-state 3's Swordsman 589829 plans 4:10, player 1's Missionary
+  1572870 standing there in sight (records 84-86, AI_Planning.csv); 1127
+  t76-78 city-state 2's 43:15 and t49-51 city-state 4's 8:9 / 10:9 / 11:9
+  match with it too. The 1127 t1-100 aimem trace: planning rows matching 740 -> 773 of
+  773, Wander draws off the game's range 31 -> 4.
+- THE LIST KEEPS NO CLOSED GROUND, AN ATTACK'S NEITHER: 0x26d890 adds a plot
+  only where 0x586900 under 9 answers; 0x586360 (flags & 3 != 3, at
+  0x586624..0x586664) refuses another player's plot at peace the mover may not
+  enter (0x3dab70) where its owner closes it (+0x6c0). `planUnit` and
+  `reachPlots` list no plot `closedToMinor` holds but the unit's own
+  (`_tac_search`'s `listed`). Confirmed: runs/h1_duely1127 t70-74 city-state
+  4's Catapult on 10:10 lists none of 11:10, the barbarian Swordsman 3407872 on
+  player 1's ground; 1117 t83-90 city-state 4's Catapults list the barbarians
+  on unowned 35:7 / 35:8 / 34:7.
+- ATTACK UNITS' SIEGE MEMBERS (0x80ceb0 at 0x80d015..0x80d030 and 0x80d1cf):
+  the flag is set where the operation's target is a city of the seat's OWN
+  (IsCity, its owner == player +0x128); a member with a bombard strength
+  (0x56daa0) joins only under that flag or of AI type DEFENDER (unit +0x1c0
+  4). `attackUnitsExecute`'s `ownCity` and the view's `defender`
+  (`aiDefenderOf`); `_x_attack_units`, `_bop_attack_units`. Confirmed:
+  runs/h1_duely1127 t70 city-state 4's City Defense (target its centre 8:10)
+  logs "Operation Attack Units, UNIT_CATAPULT, At 10:10, Move 10:10, Attack
+  11:10" — the Catapult now stays on 10:10 at t70-74 as recorded; 1117 t88-89
+  city-state 4's City Defense Catapults in Attack Units likewise.
+- OPEN: the layer filter is ported for the list and the passenger alone —
+  `groundOf`'s foes / own / fighters (enter, attack, full) still count a
+  religious unit; 1117 t84-90 city-state 4's Catapults' assignment
+  (t84 4:917509 ours 342 // 252, t88 4:1114113 341 // 252); runs/h1_duely1127
+  city-state 3's Galley 393216 under Naval Superiority (Naval Patrol's explore
+  target, `passPatrol`) t62-97 822 // 866.
