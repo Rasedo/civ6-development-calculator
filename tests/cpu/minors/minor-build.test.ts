@@ -14,7 +14,7 @@ import { minorCity } from '../../../cpu/core/cityStates';
 import { minorBuild, minorPhase } from '../../../cpu/core/minorBuild';
 import { cityPlots, minorPlotEvals } from '../../../cpu/core/minorCityAi';
 import { minorBuildFacts } from '../../../cpu/core/minorBuild';
-import { buildingTable } from '../../../cpu/core/aiCityBuild';
+import { cityBuildingsPass } from '../../../cpu/core/aiCityBuild';
 import { computeCityStats } from '../../../cpu/core/city';
 import { builderCost, spawnUnit } from '../../../cpu/core/units';
 import { projectCost } from '../../../cpu/core/game';
@@ -355,7 +355,7 @@ describe("the minor's city AI", () => {
       expect(hexDistance(state.map, t.col, t.row, 12, 12)).toBeLessThanOrEqual(3);
     }
     const facts = minorBuildFacts(state, cs, () => 0);
-    const evals = minorPlotEvals(state, cs, facts, buildingTable(facts));
+    const evals = minorPlotEvals(state, cs, facts, cityBuildingsPass(facts).districts);
     expect(evals.map((e) => e.plot)).toEqual(plots);
     expect(evals[0].improvable).toBe(false);
     // its own plots beside the centre take a Farm; the unowned ones none

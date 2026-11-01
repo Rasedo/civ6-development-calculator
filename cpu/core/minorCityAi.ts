@@ -44,7 +44,7 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import { RING_DIRS, axialToOffset, hexDistance, inBounds, neighborTile, neighbors, offsetToAxial, wrapCol } from '../../world/hex';
 import { isCoastalLand, isImpassable } from '../../world/query';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingTable, defaultSpecialization, housingValue, specializationBests, unitTable,
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingTable, cityBuildingsPass, defaultSpecialization, housingValue, specializationBests, unitTable,
   type CityBuildFacts, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable } from './aiProjectValue';
 import { improvementValue, type PlotValueFacts } from './aiPlotValue';
@@ -252,9 +252,11 @@ export function minorDistrictVerdict(type: string, district: string): -1 | 0 | 1
  * its technology and civic (the larger), a district's its build turns plus
  * those. A flood's and an eruption's turns as the AI expects them
  * (`floodHazardTurns`, `eruptionHazardTurns`); an inland
- * city-state on a river trains ships (0x1c77c0's sea test unread).
+ * city-state on a river trains ships (0x1c77c0's sea test unread). A
+ * positive district slot carries its district's buildings term
+ * (`districtBuildings`, `cityBuildingsPass`'s; the centre's slots stay 0).
  */
-export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuildFacts, buildings: readonly number[]): PlotEval[] {
+export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuildFacts, districtBuildings: readonly number[]): PlotEval[] {
   const map = state.map;
   const city = minorCity(cs);
   const r = cs.research;
@@ -384,11 +386,6 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       spaceRace: () => false,
       favoured: () => false,
       districtsOf: (d) => (cs.districts ?? []).filter((x) => districtType(x.type) === d).length,
-      buildingsValue: (d) => {
-        let best = FX_MIN;
-        AI_BUILDINGS.forEach((b, i) => { if (b.district === d && buildings[i] > best) best = buildings[i]; });
-        return best;
-      },
     };
     // 0x5ce970's +0x55: a district passes the plot's gates (its own pillaged
     // district's repair among them), whatever its value (runs/h1_duely1128
@@ -403,7 +400,10 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       } else if (!id || (cs.districts ?? []).some((c) => c.type === id) || !placeable(id)) return FX_MIN;
       if (minorDistrictVerdict(cs.type, row.type) < 0) return FX_MIN;
       passed = true;
-      return districtValue(df, row.type, distT[i], AI_VALUE_HORIZON);
+      // the update's pass then adds the district's buildings term into a
+      // positive slot (0x5cb36b..0x5cb44e)
+      const v = districtValue(df, row.type, distT[i], AI_VALUE_HORIZON);
+      return v > 0 ? v + districtBuildings[i] : v;
     });
     out.push({
       plot, owned, nearOwned,
@@ -970,8 +970,9 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
   const known = fresh ? () => 0 : minorKnownUnits(cs);
   const facts = minorBuildFacts(state, cs, known, fresh, units);
   cs.aiGrowthSeen = { ...facts.growth };
+  const pass = cityBuildingsPass(facts);
   const tables: CityBuildTables = {
-    buildings: buildingTable(facts),
+    buildings: pass.buildings,
     units: unitTable(facts).map((v) => v ?? FX_MIN),
     projects: projectTable(minorProjectFacts(state, cs, facts)),
   };
@@ -985,7 +986,7 @@ export function minorAiTurn(state: GameState, cs: CityState, fresh: boolean,
   cs.threatNear = t.near;
   const pf = minorPickFacts(state, cs, facts);
   cs.standingArmyShort = minorStandingArmy(state, cs);
-  const evals = minorPlotEvals(state, cs, facts, tables.buildings);
+  const evals = minorPlotEvals(state, cs, facts, pass.districts);
   const city = minorTreeCity(state, cs, facts, tables, pf, evals, threat);
   const w = minorTreeWorld(state, cs, ai, city);
   const r = cs.research;
@@ -1070,7 +1071,7 @@ export function minorSecondHook(state: GameState, cs: CityState, fresh = false):
       (u) => !AI_UNITS[AI_UNIT_INDEX.get(u)!].mustPurchase, () => null, null), (_c, u) => minorBuyInstall(state, cs, u));
   }
   // the city trees' tick, on the city as the hook left it
-  const trees = minorTreeCity(state, cs, facts, tables, pf, minorPlotEvals(state, cs, facts, tables.buildings), threat);
+  const trees = minorTreeCity(state, cs, facts, tables, pf, minorPlotEvals(state, cs, facts, cityBuildingsPass(facts).districts), threat);
   tickCityTrees(ai, minorTreeWorld(state, cs, ai, trees));
 }
 

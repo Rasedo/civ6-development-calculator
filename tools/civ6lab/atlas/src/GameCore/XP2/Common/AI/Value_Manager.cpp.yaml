@@ -388,7 +388,11 @@
     - recording: h1_duelv1124
       turn: 86
       value: Granada's Lighthouse repair 157.77 / 169.69 / 213.44 / 227.34 t86-t89, 2 x 113.67 at its last
-  impl: [cpu/core/aiCityBuild.ts:buildingTable, gpu/core/sim_cityvalue.py:_cv_building_table]
+  impl:
+    - cpu/core/aiCityBuild.ts:buildingTable
+    - gpu/core/sim_cityvalue.py:_cv_building_table
+    - cpu/core/aiCityBuild.ts:analysisBuildings
+    - gpu/core/sim_cityvalue.py:_cv_analysis_buildings
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
@@ -620,6 +624,7 @@
     - cpu/core/aiCityBuild.ts:value
     - cpu/core/aiCityBuild.ts:v
     - cpu/core/aiCityBuild.ts:buildingTable
+    - cpu/core/aiCityBuild.ts:analysisBuildings
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -669,10 +674,7 @@
     - recording: h1_duelv1127
       turn: 2
       value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
-  impl:
-    - cpu/core/aiDistrictValue.ts:districtBodyValue
-    - gpu/core/sim_cityvalue.py:_cv_district_body
-    - cpu/core/aiDistrictValue.ts:b
+  impl: [cpu/core/aiDistrictValue.ts:districtBodyValue, gpu/core/sim_cityvalue.py:_cv_district_body]
   readings:
     - "H-1: the district adjacency — READ"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"

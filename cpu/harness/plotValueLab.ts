@@ -24,7 +24,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory } from './import';
 import { AI_DISTRICTS, AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
-import { AI_RATE, FX } from '../core/aiValue';
+import { AI_RATE, FX, FX_MIN } from '../core/aiValue';
 import { modifiersValue } from '../core/aiModifiers';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { improvementValue, type PlotValueFacts } from '../core/aiPlotValue';
@@ -37,7 +37,7 @@ import { minorCity } from '../core/cityStates';
 import { civicAnalysis } from '../core/aiCivics';
 import { borderCandidates, computeCityStats } from '../core/city';
 import { resourceValue } from '../core/aiResource';
-import { growthForecast, housingValue } from '../core/aiCityBuild';
+import { AI_BUILDING_INDEX, BUILDING_DEPENDENTS, buildingsPass, growthForecast, housingValue } from '../core/aiCityBuild';
 import { accumulationPct } from '../core/stockpile';
 import { makeYieldCtx } from '../core/effects';
 import { improvementAdjacency } from '../core/yields';
@@ -179,6 +179,22 @@ for (const rec of recs) {
       const next = r.aiEntries?.find((x) => `TECH_${x.tech}` === tech)?.next;
       return t < 500 && now && now[0] !== tech && `TECH_${next}` !== now[0] ? t + left : t;
     };
+    // the districts' buildings terms (`buildingsPass`) over the centre's
+    // logged BUILDINGS row taken back to the analysis's own: the
+    // dependents' adds undone, the last building first (a later dependent
+    // added as the analysis valued it, an earlier one as the pass left it)
+    const centre = (centreRows.get(`${turn}:${player}:${name}`)?.BUILDINGS ?? []).map((v) => Math.round(v * FX));
+    const own = AI_BUILDINGS.map((_, k) => centre[k] ?? FX_MIN);
+    for (let k = AI_BUILDINGS.length - 1; k >= 0; k--) {
+      if (AI_BUILDINGS[k].wonder || own[k] <= FX_MIN) continue;
+      for (const i of BUILDING_DEPENDENTS[k]) {
+        const v = facts.version(AI_BUILDINGS[i].type);
+        const j = v === null ? undefined : AI_BUILDING_INDEX.get(v);
+        const seen = j === undefined ? 0 : j > k ? own[j] : centre[j] ?? FX_MIN;
+        if (seen > 0) own[k] -= seen;
+      }
+    }
+    const passDistricts = buildingsPass(facts, own).districts;
     for (const lp of logged) {
       // a plot the analysis left unvalued keeps its row at 0 (the city centre,
       // a district's plot)
@@ -264,16 +280,12 @@ for (const rec of recs) {
           spaceRace: () => false,
           favoured: () => false,
           districtsOf: (d) => (cs.districts ?? []).filter((x) => typeOfDistrict(x.type) === d).length,
-          // the centre's logged BUILDINGS row
-          buildingsValue: (d) => {
-            const row = centreRows.get(`${turn}:${player}:${name}`)?.BUILDINGS;
-            let best = -9999 * FX;
-            AI_BUILDINGS.forEach((b, i) => {
-              const v = row?.[i];
-              if (b.district === d && v !== undefined && v > -9000) best = Math.max(best, Math.round(v * FX));
-            });
-            return best;
-          },
+        };
+        // a positive slot with the update's pass's buildings term, on the
+        // centre's logged BUILDINGS row
+        const slot = (district: number, t: number): number => {
+          const v = districtValue(df, AI_DISTRICTS[district].type, t, AI_VALUE_HORIZON);
+          return v > 0 ? v + passDistricts[district] : v;
         };
         lp.districts.forEach((lv, i) => {
           if (lv <= -9999) return;
@@ -282,9 +294,9 @@ for (const rec of recs) {
           const inHand = 0;
           const t = facts.buildTurns(row.type) + inHand + Math.max(techTurns(row.tech), facts.civicTurns(row.civic));
           const tparts = `${facts.buildTurns(row.type)}+${inHand}+${techTurns(row.tech)}/${facts.civicTurns(row.civic)}`;
-          const ours = districtValue(df, row.type, t, AI_VALUE_HORIZON) / FX;
+          const ours = slot(i, t) / FX;
           const d = Math.abs(ours - lv);
-          if (rowsOut) console.log(`ROW T=${t} ${[-2, -1, 1, 2].map((dt) => (districtValue(df, row.type, t + dt, AI_VALUE_HORIZON) / FX).toFixed(2)).join(',')} t${turn} p${player} (${lp.x},${lp.y}) ${row.type} log ${lv.toFixed(2)} ours ${ours.toFixed(2)} adj ${['YIELD_SCIENCE', 'YIELD_FAITH', 'YIELD_GOLD', 'YIELD_PRODUCTION', 'YIELD_CULTURE'].map((y) => districtAdj(row.type, y)).join('/')} own=${lp.owned} pc=${df.purchaseCost} feat=${f.feature} res=${f.resource}`);
+          if (rowsOut) console.log(`ROW T=${t} ${[-2, -1, 1, 2].map((dt) => (slot(i, t + dt) / FX).toFixed(2)).join(',')} t${turn} p${player} (${lp.x},${lp.y}) ${row.type} log ${lv.toFixed(2)} ours ${ours.toFixed(2)} adj ${['YIELD_SCIENCE', 'YIELD_FAITH', 'YIELD_GOLD', 'YIELD_PRODUCTION', 'YIELD_CULTURE'].map((y) => districtAdj(row.type, y)).join('/')} own=${lp.owned} pc=${df.purchaseCost} feat=${f.feature} res=${f.resource}`);
           const k = tallyOf(row.type);
           if (d <= 0.01) k.exact++;
           else if (d <= 1) k.close++;
@@ -292,8 +304,8 @@ for (const rec of recs) {
             k.far++;
             if (k.miss.length < show) {
               let fit = -1;
-              for (let x = 0; x < AI_VALUE_HORIZON && fit < 0; x++) if (Math.abs(districtValue(df, row.type, x, AI_VALUE_HORIZON) / FX - lv) <= 0.01) fit = x;
-              const at15 = (districtValue(df, row.type, 15, AI_VALUE_HORIZON) / FX).toFixed(2);
+              for (let x = 0; x < AI_VALUE_HORIZON && fit < 0; x++) if (Math.abs(slot(i, x) / FX - lv) <= 0.01) fit = x;
+              const at15 = (slot(i, 15) / FX).toFixed(2);
               k.miss.push(`t${turn} p${player} (${lp.x},${lp.y}) log ${lv.toFixed(2)} ours ${ours.toFixed(2)} t=${t} tp=${tparts} fitT=${fit} at15=${at15} own=${lp.owned} imp=${f.improvement} res=${f.resource} feat=${f.feature}`);
             }
           }

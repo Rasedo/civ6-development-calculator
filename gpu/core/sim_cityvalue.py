@@ -120,6 +120,8 @@ class SimCityValue:
             "savings": list(cb["savings"]),
             "bld_rows": list(cb["buildings"]),
             "bld": {r["type"]: r for r in cb["buildings"]},
+            # each building's BuildingPrereqs dependents, database order
+            "bld_dependents": [[i for i, d in enumerate(cb["buildings"]) if b["type"] in d["prereqs"]] for b in cb["buildings"]],
             "unit_rows": list(cb["units"]),
             "unit": {r["type"]: r for r in cb["units"]},
             "unit_index": {r["type"]: i for i, r in enumerate(cb["units"])},
@@ -578,10 +580,6 @@ class SimCityValue:
         share = (k > 0) & (not here) & (_t(f.districts_of(district, True), like) <= k)
         div = torch.div(projects * _FX, (_t(f.districts_of(district, False), like) + 1) * _FX, rounding_mode="trunc")
         value = value + torch.where(share, div, torch.zeros_like(div))
-        # the best of its buildings the city values (its centre's BUILDINGS
-        # row; `districtBodyValue`'s LAB)
-        bv = _t(f.buildings_value(district), like)
-        value = value + torch.where(bv > _FX_MIN, bv, torch.zeros_like(bv))
         value = torch.where(dead, torch.zeros_like(value), value)
         return torch.where(bad, torch.full_like(value, _FX_MIN), value)
 
@@ -1077,7 +1075,52 @@ class SimCityValue:
         return torch.where(t >= h, torch.full_like(value, _FX_MIN), value)
 
     def _cv_building_table(self, f) -> list:
-        """THE BUILDINGS TABLE of the city centre"""
+        """THE BUILDINGS TABLE of the city centre as the city update leaves
+        it (`buildingTable`)"""
+        return self._cv_city_buildings_pass(f)[0]
+
+    def _cv_city_buildings_pass(self, f) -> tuple:
+        """`cityBuildingsPass`: `_cv_buildings_pass` over the analysis's table"""
+        return self._cv_buildings_pass(f, self._cv_analysis_buildings(f))
+
+    def _cv_buildings_pass(self, f, analysis: list) -> tuple:
+        """`buildingsPass` (0x5cadc0, the city update's pass after the plot
+        analysis) over the analysis's table `analysis` ([B] per building, in
+        place, database order): a building's positive value into its
+        PrereqDistrict's term where the city holds that district not complete
+        and unpillaged, holds none of its MutuallyExclusiveBuildings and none
+        of them comes earlier; then a non-wonder's BuildingPrereqs dependents'
+        values (the player's version) above 0 into its slot, as the table holds
+        them then. Returns (the buildings table, the districts' terms [B] per
+        district row)"""
+        T = self._cv_tables()
+        rows = T["bld_rows"]
+        index = {b["type"]: k for k, b in enumerate(rows)}
+        drows = [d["type"] for d in self.rules.ai_city_build["districts"]]
+        like = f.like()
+        out = list(analysis)
+        dist = [torch.zeros_like(like) for _ in drows]
+        for k, b in enumerate(rows):
+            d = b["district"]
+            if d in drows and not any(index.get(x, 1 << 30) < k for x in b["exclusive"]):
+                ok = out[k] > 0
+                for x in b["exclusive"]:
+                    ok = ok & ~_t(f.has_building(x), like).bool()
+                whole = _t(f.has_district(d), like).bool() & ~_t(f.holds_pillaged_district(d), like).bool()
+                i = drows.index(d)
+                dist[i] = dist[i] + torch.where(ok & ~whole, out[k], torch.zeros_like(out[k]))
+            if b["wonder"]:
+                continue
+            for i in T["bld_dependents"][k]:
+                v = f.version(rows[i]["type"])
+                j = None if v is None else index.get(v)
+                if j is not None:
+                    out[k] = out[k] + torch.where(out[j] > 0, out[j], torch.zeros_like(out[j]))
+        return out, dist
+
+    def _cv_analysis_buildings(self, f) -> list:
+        """THE BUILDINGS TABLE of the city centre as its analysis values it
+        (0x5ce970's building loop, `analysisBuildings`)"""
         out = []
         like = f.like()
         for b in self._cv_tables()["bld_rows"]:
@@ -1756,10 +1799,20 @@ class _MinorFacts:
             return self._bools(False)
         return self.has_building(b)
 
+    def _district_at(self, dv: int):
+        return self.sim.city_dist_tile[:, self.row, 0, dv]
+
     def _district_done(self, dv: int):
-        sim = self.sim
-        t = sim.city_dist_tile[:, self.row, 0, dv]
-        return (t >= 0) & sim.district_complete.gather(1, t.clamp(min=0).unsqueeze(1)).squeeze(1)
+        t = self._district_at(dv)
+        return (t >= 0) & self.sim.district_complete.gather(1, t.clamp(min=0).unsqueeze(1)).squeeze(1)
+
+    def holds_pillaged_district(self, d):
+        """the city's complete district of the type pillaged (0x1ad720)"""
+        dv = -1 if d == "DISTRICT_CITY_CENTER" else self._didx(d)
+        if dv < 0:
+            return self._bools(False)
+        t = self._district_at(dv).clamp(min=0)
+        return self._district_done(dv) & self.sim.district_pillaged.gather(1, t.unsqueeze(1)).squeeze(1)
 
     def has_district(self, d):
         if d == "DISTRICT_CITY_CENTER":
@@ -2495,10 +2548,8 @@ class _FreeFacts(_MinorFacts):
             return self._bools(False)
         return self.sim.city_bldg_pillaged[:, self.row, self.j, bi]
 
-    def _district_done(self, dv: int):
-        sim = self.sim
-        t = sim.city_dist_tile[:, self.row, self.j, dv]
-        return (t >= 0) & sim.district_complete.gather(1, t.clamp(min=0).unsqueeze(1)).squeeze(1)
+    def _district_at(self, dv: int):
+        return self.sim.city_dist_tile[:, self.row, self.j, dv]
 
     def worship_is(self, b):
         return self.sim._worship_offered(self.row)[:, self.j] == self._building_index(b)

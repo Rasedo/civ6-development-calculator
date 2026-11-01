@@ -5500,6 +5500,9 @@
   readings:
     - "C-95: the clear-terrain start Movement — PARTLY READ, ported"
     - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
+    - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
+  notes:
+    - "a synced variable's mutable access: marks the holder changed (0xccf080) where it is tracked (+0x50), returns the holder + 0x58 (CityBuildAI +0xd10 -> +0xd68, +0xd80 -> +0xdd8)"
   context:
     - ..._CLEAR_TERRAIN; the effect 0xc0a3a0, its unit apply 0xb76b20 adding Amount to the block 0x9034b0 of unit +0x18c8, field +4); GetMaxMoves (0x56e130) adds unit +0x1924 where the unit's...
   review: imported
@@ -5517,6 +5520,15 @@
   context:
     - ...the player holds, the nearest its camp within 16, else the player's nearest within 16 (0x93d570); it moves to the first plot of its reach of this turn within its range (1 at least) of...
   review: reviewed
+- addr: 0x93e050
+  final: 0x64e010
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
+  context:
+    - "...and unpillaged (0x1aea60(d, 1, 1): its complete districts of the type or a related one, 0x93e050; 0x1ad720: true where those of the type are all pillaged). Then a B that is no wonder (..."
+  review: imported
 - addr: 0x93e4e0
   final: 0x64e440
   kind: function

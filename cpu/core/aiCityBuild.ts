@@ -32,7 +32,7 @@
  * (0x7a4b20, `aiModifiers.ts`) over T to the horizon, the building's owner
  * the city.
  */
-import { AI_BUILDINGS, AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
+import { AI_BUILDINGS, AI_DISTRICTS, AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { FX, FX_MIN, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, yieldValue, AI_RATE, type AiValueView } from './aiValue';
 import type { UnitProductionEntry } from './aiUnitProduction';
@@ -197,6 +197,8 @@ export interface CityBuildFacts {
   /** the city holds the district complete (one under construction is not
    *  held: runs/h1_duelv1124 Bologna t16 counts its Campus's turns) */
   hasDistrict(district: string): boolean;
+  /** the city's complete districts of the type are all pillaged (0x1ad720) */
+  districtPillaged(district: string): boolean;
   /** the government tier the player runs (0 with none) */
   governmentTier: number;
   /** the worship building the city's majority religion offers it, or null */
@@ -783,7 +785,7 @@ export function specializationBests(t: CityBuildTables, f: PickFacts): Record<'b
  *  runs/h1_duelv1124 Granada t89 its pillaged Lighthouse 227.34 = 2 x
  *  113.67) — the same doubling for a held walls building under damaged
  *  walls never reaches the table, which refuses a held building */
-export function buildingTable(f: CityBuildFacts): number[] {
+function analysisBuildings(f: CityBuildFacts): number[] {
   return AI_BUILDINGS.map((b) => {
     if (b.wonder || b.placement) return FX_MIN;
     if (f.version(b.type) !== b.type || refused(f, b)) return FX_MIN;
@@ -792,4 +794,62 @@ export function buildingTable(f: CityBuildFacts): number[] {
     const v = buildingValue(f, b, t);
     return f.hasBuilding(b.type) && f.buildingPillaged(b.type) ? fmul(v, 2 * FX) : v;
   });
+}
+
+/** each building's BuildingPrereqs dependents (Buildings +0x198: the rows
+ *  whose PrereqBuilding it is), database order */
+export const BUILDING_DEPENDENTS: readonly (readonly number[])[] = AI_BUILDINGS.map((b) =>
+  AI_BUILDINGS.flatMap((d, i) => (d.prereqs.includes(b.type) ? [i] : [])));
+const DISTRICT_ROW = new Map(AI_DISTRICTS.map((d, i) => [d.type, i] as const));
+
+/** The centre's BUILDINGS table as the city update leaves it, and each
+ *  district's buildings term (AI_DISTRICTS order) */
+export interface CityBuildingsPass {
+  buildings: number[];
+  districts: number[];
+}
+
+/**
+ * THE BUILDINGS' DEPENDENTS AND THE DISTRICTS' BUILDINGS (0x5cadc0, the
+ * city update's pass after the plot analysis, before its log and events),
+ * over the analysis's table in place, the Buildings in database order. A
+ * building B with a positive value, its district not held complete and
+ * unpillaged (0x1aea60 / 0x1ad720), adds that value into its PrereqDistrict's
+ * term — unless the city holds one of its MutuallyExclusiveBuildings
+ * (Buildings +0x1e0) or one of them comes earlier in the table, and unless
+ * B is MustPurchase (+0x159 bit 4; no row of the layered install is). Then
+ * a B that is no wonder takes into its slot each BuildingPrereqs dependent's
+ * value (the player's version of it; one with none adds nothing) where that
+ * is above 0, B's own value untested, as the table holds it then (one table:
+ * an earlier dependent adds as the pass left it; runs/lb1_bv1128 Nazca t56: its Shrine's 27.18
+ * + the Temple's 43.25 = 70.43, as the PLOT ANALYSIS LOG prints it).
+ * `analysis`: the analysis's own table.
+ */
+export function buildingsPass(f: CityBuildFacts, analysis: readonly number[]): CityBuildingsPass {
+  const buildings = [...analysis];
+  const districts = AI_DISTRICTS.map(() => 0);
+  AI_BUILDINGS.forEach((b, k) => {
+    const d = b.district === null ? undefined : DISTRICT_ROW.get(b.district);
+    if (d !== undefined && buildings[k] > 0
+      && !b.exclusive.some((x) => f.hasBuilding(x) || (AI_BUILDING_INDEX.get(x) ?? Infinity) < k)
+      && !(f.hasDistrict(b.district!) && !f.districtPillaged(b.district!))) districts[d] += buildings[k];
+    if (b.wonder) return;
+    for (const i of BUILDING_DEPENDENTS[k]) {
+      const v = f.version(AI_BUILDINGS[i].type);
+      const j = v === null ? undefined : AI_BUILDING_INDEX.get(v);
+      if (j !== undefined && buildings[j] > 0) buildings[k] += buildings[j];
+    }
+  });
+  return { buildings, districts };
+}
+
+/** `buildingsPass` over the city's analysis (0x5ce970's building loop) */
+export function cityBuildingsPass(f: CityBuildFacts): CityBuildingsPass {
+  return buildingsPass(f, analysisBuildings(f));
+}
+
+/** The centre's BUILDINGS table as the city update leaves it
+ *  (`cityBuildingsPass`) */
+export function buildingTable(f: CityBuildFacts): number[] {
+  return cityBuildingsPass(f).buildings;
 }

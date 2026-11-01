@@ -8,8 +8,9 @@
  * Maintenance off) less what the best other district would take of the
  * plot, with its lumps (the units it opens, its Housing, the river plots a
  * Dam guards, a Canal's trade, its space projects). The city's plot
- * analysis writes one per plot and district (AI_CityBuild.csv's DISTRICTS
- * rows), the district choice reads them.
+ * analysis writes one per plot and district, the city update's pass adding
+ * its buildings' term to a positive one (`cityBuildingsPass`):
+ * AI_CityBuild.csv's DISTRICTS rows, which the district choice reads.
  */
 import { AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
 import type { AiDistrictRow } from './aiCityBuild';
@@ -86,9 +87,6 @@ export interface DistrictValueFacts extends PlotValueFacts {
   favoured(project: string): boolean;
   /** the player's districts of a type (0x408b60): all, and complete */
   districtsOf(district: string, complete: boolean): number;
-  /** the most the city's analysis values a building of the district (its
-   *  centre's BUILDINGS row), raw; FX(-9999) where it values none */
-  buildingsValue(district: string): number;
 }
 
 const DISTRICT = new Map(AI_DISTRICTS.map((r) => [r.type, r] as const));
@@ -197,14 +195,6 @@ export function districtBodyValue(f: DistrictValueFacts, row: AiDistrictRow, t: 
   if (k > 0 && f.district !== row.type && f.districtsOf(row.type, true) <= k) {
     value += Math.trunc((projects * FX) / ((f.districtsOf(row.type, false) + 1) * FX));
   }
-  // LAB: the best of its buildings the city values, as the centre's
-  // BUILDINGS row logs it (its reader unread: 0x7aaf80 calls no building
-  // value) — runs/h1_duelv1128 Bologna's Campus rows each its Library's
-  // 4.37 above the rest at t13, 13.77 at t30, and none where a flood cuts
-  // the horizon to the landing; 1121 Hunza's Commercial Hub its Market's
-  // 25.50 at t32; 1128's Holy Site its Shrine's
-  const b = f.buildingsValue(row.type);
-  if (b > FX_MIN) value += b;
   return value;
 }
 

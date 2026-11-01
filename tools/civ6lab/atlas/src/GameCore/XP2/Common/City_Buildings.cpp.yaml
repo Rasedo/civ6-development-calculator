@@ -77,11 +77,13 @@
     - cpu/core/minorCityAi.ts:city
     - cpu/core/minorCityAi.ts:districtWhole
     - cpu/core/aiCityBuild.ts:buildingTable
+    - cpu/core/aiCityBuild.ts:analysisBuildings
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
+    - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...Amount +0x10): a city subject; Amount weighted, x0.5 where the city lacks the building (0x18e9f0), span."
@@ -98,6 +100,7 @@
     - cpu/core/minorCityAi.ts:city
     - cpu/core/minorCityAi.ts:districtWhole
     - cpu/core/aiCityBuild.ts:buildingTable
+    - cpu/core/aiCityBuild.ts:analysisBuildings
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

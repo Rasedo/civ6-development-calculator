@@ -90,18 +90,29 @@
   final: 0x3dfee0
   kind: function
   name: the buildings' dependents and districts' buildings pass
-  semantics: per non-wonder building in database order, each BuildingPrereqs dependent's (Buildings +0x198, the player's version) positive value added into its own slot of the centre's table; per district, its buildings' positive values summed and added into the positive DISTRICTS slots of the plot evaluations
+  semantics: "over the centre's BUILDINGS table in place, the Buildings in database order — a building's positive value into its PrereqDistrict's sum (not MustPurchase +0x159 bit 4, no +0x1e0 exclusive held or earlier, the district not held complete and unpillaged 0x1aea60 / 0x1ad720); then a non-wonder's (+0x159 bit 0x10) BuildingPrereqs dependents' (+0x198, the player's version +0x12f0 +0x230) values above 0 into its slot (+0xd10 -> 0x9034b0 -> +0xd68, the one array); last each district's sum into every positive DISTRICTS slot (+0xd80), the centre's evaluation set to it"
   status: READ
   cases:
     - recording: lb1_bv1128
       turn: 56
       value: Nazca's Shrine slot written 27.18 by the table store, then 70.43 at FinalRelease 0x3e01e2 (data breakpoint) = + the Temple's 43.25, as the PLOT ANALYSIS LOG prints (h1_duelv1128 t51-56 32.75..70.43)
+    - recording: h1_duelv1128
+      turn: 44
+      value: Nazca's Shrine 70.10 = ours 54.88 + the logged Temple 15.22 (t45 74.56 = 57.88 + 16.68); the DISTRICTS rows within 0.01 Holy Site 377 of 402 (196 on the best-building fit), Campus 2544 (2301)
+  impl:
+    - cpu/core/aiCityBuild.ts:buildingsPass
+    - cpu/core/aiCityBuild.ts:cityBuildingsPass
+    - gpu/core/sim_cityvalue.py:_cv_buildings_pass
+    - cpu/core/minorCityAi.ts:minorPlotEvals
+    - gpu/core/sim_minorai.py:_minor_plot_evals
+    - cpu/core/minorCityAi.ts:v
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-127 / C-100: a building's value carries its dependents' (0x5cadc0) — READ, live-confirmed"
+    - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
   context:
     - "...ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights; logged by 0x5cdd70: Food Adv. / Prod. Adv...."
-  review: imported
+  review: reviewed
 - addr: 0x5cb570
   final: 0x3e02c0
   kind: function
@@ -439,6 +450,7 @@
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "C-96: the unit value's unit count and the founding Production — READ, both twins"
+    - "C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins"
   context:
     - "- The city's turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5ca..."
     - "...cancellation 0x5d7640 (\"Canceling current build\"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970."
@@ -498,6 +510,9 @@
     - cpu/core/minorCityAi.ts:districts
     - cpu/core/minorCityAi.ts:foreign
     - cpu/core/minorCityAi.ts:out
+    - cpu/core/aiCityBuild.ts:analysisBuildings
+    - cpu/core/aiCityBuild.ts:cityBuildingsPass
+    - gpu/core/sim_cityvalue.py:_cv_analysis_buildings
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

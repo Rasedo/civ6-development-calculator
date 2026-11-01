@@ -5672,3 +5672,47 @@ nodes.ts), `_op_move_exec`'s `stacks` and `_tac_own_class`
 - Open (C-112): t18's term is the game's after Hunza's citizens moved
   187 / 188 -> 230 / 232 before its civics AI (Animal Husbandry completing
   that turn, Horses on 230 / 232); ours keeps the record's placement to t19.
+
+## C-127 / C-100: the buildings' dependents and the districts' buildings (0x5cadc0) — ported, both twins
+
+- The rule (`buildingsPass` / `cityBuildingsPass` in `cpu/core/aiCityBuild.ts`,
+  `_cv_buildings_pass` in `gpu/core/sim_cityvalue.py`): after the plot
+  analysis, before the improvement pick, the log and the events (0x5ce806),
+  over the centre's BUILDINGS table in place, the Buildings in database
+  order. For a building B: its positive value goes into its PrereqDistrict's
+  (+0x218, the player's version 0x408860) sum, unless B is MustPurchase
+  (+0x159 bit 4; no row of Base / Exp1 / Exp2 is), the city holds one of its
+  +0x1e0 rows' buildings (MutuallyExclusiveBuildings, 0x18e9f0) or one of
+  them comes earlier in the table, or the city holds the district complete
+  and unpillaged (0x1aea60(d, 1, 1): its complete districts of the type or
+  a related one, 0x93e050; 0x1ad720: true where those of the type are all
+  pillaged). Then a B that is no wonder (+0x159 bit 0x10) adds each
+  BuildingPrereqs dependent's value (+0x198, the player's version through
+  +0x12f0 +0x230, -1 skipped) that is above 0 into its own slot; B's own
+  value is not tested. The slot's holder +0xd10 is a synced variable whose
+  data 0x9034b0 returns at +0x58 = +0xd68, the array the dependents are read
+  from: one table, so a dependent earlier in the table adds as the pass has
+  left it. Last (0x5cb36b..0x5cb44e) each district's non-zero sum goes into
+  every plot evaluation's DISTRICTS slot (+0xd80, +0x58 its data, evaluation
+  x Districts + district) that is above 0; the first evaluation's, the
+  centre's, is set to the sum. Every city's update runs it: the minors'
+  (`minorAiTurn`, the second hook's plot analysis read again) and the Free
+  Cities' (`freeCityBuild`). It replaces the district value's best-building
+  fit.
+- Confirmed on runs/h1_duelv1128 (Nazca p4): its logged Shrine less the
+  logged Temple is ours, 54.88 / 57.88 / 60.34 / 60.34 at t44-47 (70.10 -
+  15.22, 74.56 - 16.68, 75.55 - 15.22, 85.79 - 25.45) and 27.18 at t51-56;
+  p2 t50-54 logs its Shrine FX(-9999) + the Temple's (-9985.50 / -9992.05 ..),
+  B's own value untested. The DISTRICTS rows (`plotValueLab.ts --districts`,
+  the logged centre row taken back to the analysis's own) within 0.01 of the
+  log: Holy Site 377 of 402 (196 on the best-building fit), Campus 2544
+  (2301), Neighbourhood 752 (731), Industrial Zone 737 (731).
+- Open: our Temple values FX(-9999) plus its own at a minor with five units
+  or fewer (h1_duelv1128 Nazca t44-57: the log 15.22 .. 43.25, ours
+  FX(-9999) + 13.85 .. 40.81): its Warrior Monk (EnabledByReligion) takes
+  the version exit in ours (`minorUnitVersion`), where the logged Temple
+  stays valid (the game's version of it for a minor, and its value there,
+  unread); with six units all four of its units read FX(-9999) in both
+  (p3 t42 -39986.70); the rest of the Temple's residual (1.0 .. 2.4, T past
+  the horizon at t46 / t51) untraced. So the Shrine's dependent term never
+  lands in ours.

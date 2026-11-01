@@ -178,6 +178,12 @@ function majorBuildFacts(state: GameState, city: City, known: (unit: string) => 
       const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
       return id === 'CITY_CENTER' || (!!id && city.districts.some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete));
     },
+    // its complete districts of the type all pillaged (0x1ad720)
+    districtPillaged: (d) => {
+      const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
+      const done = city.districts.filter((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete);
+      return done.length > 0 && done.every((x) => !!state.map.tiles[x.tileIndex].districtPillaged);
+    },
     governmentTier: GOVERNMENTS[seatGovernment(state, seat) ?? '']?.tier ?? 0,
     worship: worship ? installType('building', worship, 'BUILDING_') : null,
     riverside: hasRiver(centre),

@@ -1614,6 +1614,7 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
       return id === 'CITY_CENTER' || (!!id && (cityState.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete));
     },
+    districtPillaged: (d) => pickDistrictPillaged(state, cityState.districts ?? [], d),
     governmentTier: 0,
     worship: worship ? installType('building', worship, 'BUILDING_') : null,
     riverside: hasRiver(centre),

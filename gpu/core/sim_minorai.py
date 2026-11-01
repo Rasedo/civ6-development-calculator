@@ -232,7 +232,9 @@ class SimMinorAi:
         # a founding turn's first look: the unit production table with no
         # known unit (`minorAiTurn`)
         f.no_known = fresh
-        b_tab, u_tab, p_tab = self._cv_minor_tables(s, f)
+        b_tab, d_tab = self._cv_city_buildings_pass(f)
+        u_tab = [torch.where(read, v, torch.full_like(v, _FX_MIN)) for v, read in self._cv_unit_table(f)]
+        p_tab = self._cv_project_table(f)
         # the tables the research and civics values' city terms read next turn
         self.citystate_unit_values[:, s] = torch.where(alive.unsqueeze(1), torch.stack(u_tab, dim=1),
                                                        self.citystate_unit_values[:, s])
@@ -251,7 +253,7 @@ class SimMinorAi:
         self.citystate_threat_near[:, s] = torch.where(alive, near, self.citystate_threat_near[:, s])
         self.citystate_standing_short[:, s] = torch.where(alive, self._minor_standing_army(s, alive),
                                                          self.citystate_standing_short[:, s])
-        evals = self._minor_plot_evals(s, f, b_tab)
+        evals = self._minor_plot_evals(s, f, d_tab)
         w = _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), evals, threat)
         goals_reached(ai, s, w, alive)
         free_slots(ai, s, w, alive)
@@ -306,7 +308,7 @@ class SimMinorAi:
         if bool(buy.count_nonzero()):
             self._minor_purchases(s, f, threat, buy)
         # the city trees' tick, on the city as the hook left it
-        evals = self._minor_plot_evals(s, f, b_tab)
+        evals = self._minor_plot_evals(s, f, self._cv_city_buildings_pass(f)[1])
         tick_city_trees(ai, s, _MinorWorld(self, s, f, (b_tab, u_tab, p_tab), evals, threat), int(self.turn), alive)
 
     def _minor_empty_pick(self, s: int, idle: torch.Tensor, f, w, tables) -> None:
@@ -1008,7 +1010,7 @@ class SimMinorAi:
                             torch.full_like(tot, -fx_of(1)))
         return torch.where(member.any(dim=1), turns, torch.full_like(turns, -1))
 
-    def _minor_plot_evals(self, s: int, f: _MinorFacts, b_tab: list) -> dict:
+    def _minor_plot_evals(self, s: int, f: _MinorFacts, d_tab: list) -> dict:
         """`minorPlotEvals` — THE PLOT ANALYSIS of minor `s`'s city (0x5ce970
         per plot, the centre first): per plot its flags — the minor owns it,
         an improvement may stand on its ground (research waived) where no
@@ -1023,7 +1025,8 @@ class SimMinorAi:
         and civic (the larger), a district's its build turns plus those. The
         hazards' turns (flood `_minor_flood_turns`, eruption
         `_minor_eruption_turns`); an inland city-state on a
-        river trains ships."""
+        river trains ships. A positive district slot carries its district's
+        buildings term (`d_tab`, `_cv_buildings_pass`'s; the centre's stay 0)."""
         B, dev = self.B, self.device
         T = self._cv_tables()
         E = T["engine"]
@@ -1120,7 +1123,7 @@ class SimMinorAi:
         NF = max(len(PN["feature"]), 1) + 1
         key = ((imp + 1) * NR + (rid + 1)) * NF + (fid + 1)
         key = torch.where(ev, key, torch.full_like(key, -1))
-        ctx = _PlotCtx(self, s, f, plots, owned, b_tab)
+        ctx = _PlotCtx(self, s, f, plots, owned)
         imp_eng = E["improvement"]
         for k in torch.unique(key[ev]).tolist():
             bb, pp = (key == k).nonzero(as_tuple=True)
@@ -1177,6 +1180,10 @@ class SimMinorAi:
                 v = self._cv_district(pf, dname, ti, torch.full_like(bb, hz))
                 dists[bb, pp, i] = torch.where(ok_t[bb], v, torch.full_like(v, _FX_MIN))
         out["district_ok"] = (ev | rep_any) & passed
+        # the update's pass adds each district's buildings term into a
+        # positive slot (0x5cb36b..0x5cb44e)
+        dt = torch.stack(d_tab, dim=1).unsqueeze(1)
+        dists += torch.where(dists > 0, dt, torch.zeros_like(dt))
         return out
 
     # -- the resource value --------------------------------------------------
@@ -1762,10 +1769,8 @@ class _DefenseAs:
 class _PlotCtx:
     """the planes the plot facts of one minor's analysis share"""
 
-    def __init__(self, sim, s: int, f: _MinorFacts, plots: torch.Tensor, owned: torch.Tensor, b_tab: list):
+    def __init__(self, sim, s: int, f: _MinorFacts, plots: torch.Tensor, owned: torch.Tensor):
         self.sim, self.s, self.f = sim, s, f
-        # the city centre's BUILDINGS table, [B] per building row
-        self.b_tab = b_tab
         self.row = sim._CITY_MINOR0 + s
         self.seat = 100 + s
         self.plots = plots
@@ -1951,15 +1956,6 @@ class _PlotFacts:
 
     def resource_value(self, res, count, t, h):
         return self.sim._cv_resource_value(self.s, self.mf, res, count, t, h, self.bb)
-
-    def buildings_value(self, d):
-        """the most the city's analysis values a building of district `d`
-        (its centre's BUILDINGS row), per element; FX(-9999) none"""
-        best = torch.full_like(self.like(), _FX_MIN)
-        for i, b in enumerate(self.sim._cv_tables()["bld_rows"]):
-            if b["district"] == d:
-                best = torch.maximum(best, self.ctx.b_tab[i].take(self.bb))
-        return best
 
     def accumulation_pct(self):
         """the city's percent more accumulation on each plot's terrain
