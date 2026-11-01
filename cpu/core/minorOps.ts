@@ -8,7 +8,8 @@
  * operations' trees taking their ids from the city AI's tree serial. Its
  * turn, as the game's Control Manager runs a player's lists:
  *
- *  - B: the military AI's turn (`minorOpsEvaluate`, from `minorMilitaryTurn`,
+ *  - B: the military AI's turn (`minorOpsEvaluate`, then its upgrade
+ *    `minorMilitaryUpgrade`, from `minorMilitaryTurn`,
  *    before the turn's knowledge base look);
  *  - A: the city's defence event starts City Defense (`minorOpsStart`);
  *  - C: the operations' run in its tactical pass, after each unit's
@@ -32,14 +33,14 @@ import { ARMY_READ_AGE, lookCamps, type KnownUnit } from './operations/knowledge
 import { NO_PLOT, opDef, opJobUnits } from './operations/operation';
 import { seatUnitRows } from './operations/unitRows';
 import { newCityAi } from './aiCityTrees';
-import { installType, minorCanUpgrade, minorSetItem, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
+import { installType, minorCanUpgrade, minorKnownUnits, minorOrdersHeld, minorSetItem, minorUnitProduction, minorUpgradeUnit, minorUpgradeVisible } from './minorBuild';
 import { minorContractCity, minorSecondHook } from './minorCityAi';
 import { BARB_SEAT, campTiles, tileSeat } from './seats';
 import { disbandUnit, promotionsHeld } from './units';
 import { upgradeType } from './stockpile';
 import { goldAffordable } from './game';
 import { FX } from './aiValue';
-import { newEconomicMemory, upgradePurchase } from './aiEconomic';
+import { SLOT_UNITS, canAfford, newEconomicMemory, upgradePurchase } from './aiEconomic';
 import { minorCity } from './cityStates';
 import { isCoastalLand } from '../../world/query';
 import { MINOR_UPGRADE_GOLD } from '../data/cityStates';
@@ -371,6 +372,50 @@ function upgradeMove(state: GameState, pass: Pass, u: Unit, p: number): void {
     return;
   }
   moveTo(state, u, p, false, true, true, moveUnitDanger(pass.danger));
+}
+
+/** the purchase test's reserve (@0xd20458, 0.5): the UNITS slot holds half
+ *  the upgrade's Gold */
+const UPGRADE_RESERVE = FX / 2;
+
+/** the replay's view of the military AI's upgrade (the minor and the unit
+ *  it picked, null none), which under the replay's hold it buys not; null
+ *  off */
+let upgradeTracer: ((cs: CityState, u: Unit | null) => void) | null = null;
+export function traceMinorUpgrade(fn: typeof upgradeTracer): void {
+  upgradeTracer = fn;
+}
+
+/**
+ * THE MILITARY AI'S UPGRADE (0x727db0, from its job 0x722690 after the
+ * operations' evaluation): over the minor's units in its order, each with
+ * an upgrade its research unlocks (0x5909a0), the gain — its unit
+ * production table's value of the upgrade less its own (0x79ca90, 0 for a
+ * type the table lacks); of the gains above 0 the largest (the first of
+ * equals) whose full test passes (0x58fff0 r8 0: `upgradeMayGo`) and whose
+ * Gold the economic AI affords at the UNITS slot (0x6874d0, the reserve
+ * 0.5) is bought (0x68c940, `upgradePurchase`) — one unit a turn, its
+ * turn spent. Under the replay's hold the pick is the tracer's alone.
+ */
+export function minorMilitaryUpgrade(state: GameState, cs: CityState): void {
+  const eco = (cs.economy ??= newEconomicMemory());
+  const table = minorUnitProduction(state, cs, minorKnownUnits(cs));
+  const value = (t: string) => table.get(installType('unit', t, 'UNIT_'))?.value ?? 0;
+  const cost = MINOR_UPGRADE_GOLD * FX;
+  let best = 0;
+  let pick: Unit | null = null;
+  const units = state.units.filter((u) => u.seat === cs.seat && u.tileIndex >= 0).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+  for (const u of units) {
+    const next = upgradeType(state, cs.seat, u.type);
+    if (!next) continue;
+    const gain = value(next) - value(u.type);
+    if (gain <= best || !upgradeMayGo(state, cs, u) || !canAfford(eco, cost, SLOT_UNITS, UPGRADE_RESERVE)) continue;
+    best = gain;
+    pick = u;
+  }
+  upgradeTracer?.(cs, pick);
+  if (!pick || minorOrdersHeld()) return;
+  if (upgradePurchase(eco, cost)) minorUpgradeUnit(state, cs, pick);
 }
 
 /** Upgrade Units' full test (0x58fff0 with r8 0): the research, the minor's

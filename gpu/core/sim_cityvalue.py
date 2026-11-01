@@ -766,6 +766,15 @@ class SimCityValue:
             left = left - take
         return out, torch.where(buy, balance - c, balance), buy
 
+    @staticmethod
+    def _cv_can_afford(savings: torch.Tensor, cost: torch.Tensor, slot: int, frac: int) -> torch.Tensor:
+        """0x6874d0, `canAfford` of `cost` at `slot` with the reserve `frac`
+        (raw 24.8 each): the slot holds the cost x (1 - frac), and the SLUSH
+        slot with it the whole cost"""
+        part = torch.div(cost * (_FX - frac), _FX, rounding_mode="floor")
+        s = savings[..., slot]
+        return (s >= part) & (savings[..., _SLOT_SLUSH] + s >= cost)
+
     def _cv_upgrade_purchase(self, savings: torch.Tensor, balance: torch.Tensor, cost: torch.Tensor):
         """0x68c940, `upgradePurchase` at `cost` (raw 24.8): the UNITS and
         SLUSH slots together at the cost or more spend the UNITS slot then the

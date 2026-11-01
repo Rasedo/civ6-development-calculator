@@ -52,7 +52,7 @@ import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, coastalLowlandCounts, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorTrade, tradeCapacity } from './trade';
 import { BARB_SEAT, FREE_SEAT, freeSeatOf, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitIsMilitary, unitMadeAnew } from './units';
+import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, traderCost, unitFullMoves, unitIsMilitary, unitMadeAnew } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint } from './rand';
 import { knowledgeLook } from './tactical';
@@ -254,15 +254,22 @@ function sendLevyHome(state: GameState, cityState: CityState): void {
   delete cityState.levyEnds;
 }
 
-/** one levied unit home to its minor, made anew there (`sendLevyHome`) */
+/** one levied unit home to its minor, made anew there (`sendLevyHome`) with
+ *  its whole Movement, whatever the major's turn left it (runs/h1_duely1117
+ *  t42: city-state 3's Warrior 720898 home on 32:14 steps to 31:15 in its
+ *  turn; runs/h1_duely1121 t154: city-state 2's Musketman 2424833 home on
+ *  10:6 passes the upgrade's Movement test) */
 function levyUnitHome(state: GameState, cityState: CityState, u: Unit): void {
   const major = u.seat;
   u.seat = cityState.seat;
   delete u.leviedFrom;
   // where the minor may stand (`jumpMadeAnew`); where none, the major's unit
   // is gone and none of the minor's stands
-  if (jumpMadeAnew(state, u)) unitMadeAnew(state, u);
-  else {
+  if (jumpMadeAnew(state, u)) {
+    unitMadeAnew(state, u);
+    u.movesLeft = unitFullMoves(state, u);
+    u.movesFull = u.movesLeft;
+  } else {
     u.seat = major;
     disbandUnit(state, u.id);
   }

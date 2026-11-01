@@ -40,6 +40,7 @@ export const KIND_NOTES: Record<string, string> = {
   'unit.trained': 'a unit a minor\'s city made vs record t+1\'s new units (minorAi:unitNew, minorAi:unit)',
   'unit.bought': 'a unit a minor bought vs the record\'s purchase (minorAi:buy)',
   'unit.promote': 'a minor unit\'s promotion vs the record\'s (minorAi:promote)',
+  'unit.upgrade': 'a minor\'s military AI upgrade (minorMilitaryUpgrade) vs the one its log orders before its turn opens',
   'op.start.cityState': 'the operations a city-state started in its turn vs AI_Operation.csv\'s Started lines',
   'op.start.freeCities': 'the same, the Free Cities',
   'op.start.barbarians': 'the same, the barbarians',

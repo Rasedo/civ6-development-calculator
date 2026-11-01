@@ -106,6 +106,13 @@ export function spend(e: EconomicMemory, amount: number, slot: number): void {
   e.balance -= amount;
 }
 
+/** THE CAN-AFFORD (0x6874d0) of `cost` at `slot` with the reserve `frac`
+ *  (raw 24.8 each): the slot holds the cost x (1 - frac), and the SLUSH
+ *  slot with it the whole cost */
+export function canAfford(e: EconomicMemory, cost: number, slot: number, frac: number): boolean {
+  return e.savings[slot] >= Math.floor((cost * (FX - frac)) / FX) && e.savings[SLOT_SLUSH] + e.savings[slot] >= cost;
+}
+
 /** THE UPGRADE'S PURCHASE (0x68c940) at `cost` (raw 24.8): the UNITS and
  *  SLUSH slots together at the cost or more spend the UNITS slot then the
  *  SLUSH slot; else a balance above the cost takes from each slot in order;

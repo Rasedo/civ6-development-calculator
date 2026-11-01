@@ -471,7 +471,7 @@ class SimMinors:
         the levied army "will return to the city-state after {2_TurnLimit}
         Turns, or if the Suzerain changes". Every unit still standing that the
         levy took from minor `s` (`unit_levy_src`) is the minor's again where
-        it stands, its mark cleared."""
+        it stands, its mark cleared, made anew with its whole Movement."""
         alive = self.citystate_alive[:, s]
         ls = self.citystate_levy_seat[:, s]
         back = alive & (ls >= 0) & ((int(self.turn) >= self.citystate_levy_ends[:, s])
@@ -484,8 +484,13 @@ class SimMinors:
             self.major_unit_levied[m] = False
             self.major_unit_levy_src[m] = -1
             self._gen_ver += 1
-            # where the minor may stand (`jumpMadeAnew`)
+            # where the minor may stand (`jumpMadeAnew`), made anew with its
+            # whole Movement (the aura's none)
             self._jump_made_anew(100 + s, m)
+            home = m & self.major_unit_alive
+            full = self._full_mp("major") - self.major_unit_aura_mp
+            self.major_unit_mp.copy_(torch.where(home, full, self.major_unit_mp))
+            self.major_unit_mp_full.copy_(torch.where(home, full, self.major_unit_mp_full))
             # each unit made anew under the minor (`sendLevyHome`): the
             # record any knowledge base held of the unit before the levy a
             # gone unit's; the minor's own takes it at its tactical look

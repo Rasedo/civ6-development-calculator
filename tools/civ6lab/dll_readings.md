@@ -6999,3 +6999,48 @@ tactical.ts). GPU `crowd_n` in `_tac_search`, the Wander candidates over
   logged); runs/h1_duely1124 city-state 4 t83-91 (its units added anew at
   t83: 0.0 as logged).
 - OPEN: no recording holds a Free City, so their garrison has no case.
+
+## C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins
+
+`minorMilitaryUpgrade` (cpu/core/minorOps.ts) from `minorMilitaryTurn`
+(cpu/core/minorCityAi.ts) after the operations' evaluation; `canAfford`
+(cpu/core/aiEconomic.ts). GPU `_mops_military_upgrade`
+(gpu/core/sim_minorops.py) from `_minor_military_turn`
+(gpu/core/sim_minorai.py), `_cv_can_afford` (gpu/core/sim_cityvalue.py).
+Under the replay's hold the pick is not bought (`traceMinorUpgrade`): the
+replay scores it as `unit.upgrade` against the UNITCOMMAND_UPGRADE the log
+orders before the minor's PlayerTurnActivated, and lands the record's.
+
+- THE WALK (0x727db0, from the military AI's job 0x722690 after 0x727510):
+  the player's units in pool order (+0x12e8 +0xd8), alive and on the map,
+  each with an upgrade type (0x5909a0, `upgradeType`'s furthest rung); the
+  gain 0x79ca90(the unit production table +0x1290 +0x268, the upgrade) less
+  0x79ca90(its own type), 0 for a type the table lacks; a unit is kept where
+  its gain is above the best so far (strict: the first of equals), its full
+  test passes (0x58fff0 r8 0 r9 0, `upgradeMayGo`: the research, the minor's
+  ground, Movement left, the treasury at the 5 Gold) and the economic AI
+  affords the upgrade's Gold (0x590520 << 8) at slot 1 (UNITS) with the
+  reserve 0.5 (@0xd20458; 0x6874d0: the slot at the cost x (1 - 0.5), the
+  SLUSH slot with it at the cost). After the walk the one unit kept, for a
+  player no human drives, is bought (0x68c940, `upgradePurchase`): at most
+  one upgrade a player-turn, before its turn opens.
+- The table's values are N over the sum of count x efficiency on the
+  knowledge base's records (1.0 every entry with none known): no upgrade
+  while the minor's records hold no combat unit.
+- THE LEVIED ARMY HOME is made anew with its whole Movement (`levyUnitHome`;
+  GPU `_minor_levy_return`): runs/h1_duely1117 t42 city-state 3's Warrior
+  720898 home on 32:14 steps to 31:15 in its turn; runs/h1_duely1121 t154
+  city-state 2's Musketman 2424833 home on 10:6 passes the full test.
+- Cases (carried, one seed each): the upgrades the log orders before a
+  city-state's turn opens (at most one a player-turn) against the engine's
+  pick: runs/h1_duely1121 t1-189 40 of 40, also under the game's AI memory
+  (t61-t72 the Warriors, t73-t75 the Swordsmen, t91 the Galley, t96-t98 the
+  Men-at-Arms, t154 the Musketman home from China's levy); runs/h1_duely1127
+  t1-129 20 of 20; runs/h1_duely1128 t1-129 15 of 16; runs/h1_duely1124
+  t1-129 9 of 10; runs/h1_duely1117 t1-59 1 of 1. A unit held in an
+  "Upgrade Units" tree is walked like any other (runs/h1_duely1124 t77-t79).
+- OPEN: runs/h1_duely1124 t47 city-state 2's Warrior 196610 on its ground
+  with its UNITS slot at 2.9 Gold (the test's 2.5): the engine buys it, the
+  game none before its turn opens (its tree upgrades it after), under the
+  game's AI memory too — the savings' order against the military AI's job
+  unread; the Free Cities' upgrade (no recording holds one).

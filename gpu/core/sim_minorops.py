@@ -1375,6 +1375,47 @@ class SimMinorOps:
         if bool(view["ended"].any()):
             self.major_unit_mp.copy_(torch.where(view["ended"], view["ended_mp"], self.major_unit_mp))
 
+    def _mops_military_upgrade(self, s: int, alive: torch.Tensor) -> None:
+        """`minorMilitaryUpgrade` (0x727db0) for minor `s` where `alive` [B]:
+        over its units in pool order, each with an upgrade its research
+        unlocks, the gain — its unit production table's value of the upgrade
+        less its own (0 for a type the table lacks); of the gains above 0 the
+        largest, the first of equals, whose full test passes (the research,
+        its ground, Movement left, the treasury) and whose Gold the economic
+        AI affords at the UNITS slot (the reserve 0.5) is bought
+        (`_cv_upgrade_purchase`), its turn spent"""
+        u = self._mops_units(s)
+        P = u["own"].shape[1]
+        v, _entry = self._cv_minor_facts(s)._production_table()
+        er = self._cv_tables()["engine_row"].to(self.device)
+        nxt = self._minor_upgrade_type(s)[:, :P]
+        ut = self.major_unit_type[:, :P].clamp(min=0, max=self.NU - 1)
+        nu = v.shape[1]
+        vz = torch.cat([v, torch.zeros(self.B, 1, dtype=v.dtype, device=self.device)], dim=1)
+
+        def value(t: torch.Tensor) -> torch.Tensor:
+            r = er.take(t.clamp(min=0, max=self.NU - 1))
+            return vz.gather(1, torch.where(r >= 0, r, torch.full_like(r, nu)))
+        gain = value(nxt) - value(ut)
+        cost = torch.full_like(self.citystate_balance[:, s], int(self._mb_upgrade_gold * _FX))
+        afford = self._cv_can_afford(self.citystate_savings[:, s], cost, 1, _FX // 2)
+        full = (self._minor_can_upgrade(s)[:, :P]
+                & self._afford(self.citystate_treasury[:, s], self._mb_upgrade_gold).unsqueeze(1))
+        ok = u["own"] & (u["tile"] >= 0) & (nxt >= 0) & (gain > 0) & full & (alive & afford).unsqueeze(1)
+        if not bool(ok.any()):
+            return
+        # the largest gain, of equals the first in pool order
+        big = 1 << 40
+        rank = torch.where(ok, gain * big - u["key"], torch.full_like(gain, -(1 << 62)))
+        first = rank.argmax(dim=1)
+        go = ok.any(dim=1)
+        first = torch.where(go, first, torch.full_like(first, -1))
+        sv, bal, bought = self._cv_upgrade_purchase(self.citystate_savings[:, s], self.citystate_balance[:, s], cost)
+        bought &= go
+        self.citystate_savings[:, s] = torch.where(bought.unsqueeze(1), sv, self.citystate_savings[:, s])
+        self.citystate_balance[:, s] = torch.where(bought, bal, self.citystate_balance[:, s])
+        self._minor_upgrade_unit(s, bought, first)
+
     def _mops_upgrade_trees(self, s: int, act: torch.Tensor, op: dict, done: torch.Tensor) -> None:
         """`upgradeTreesTick` for minor `s` where `act` (its pass, `done` its
         units' turns): where a tree runs or the trigger stands — Find

@@ -12,7 +12,15 @@
     - recording: h1_duelv1127
       turn: 62
       value: the missions' can-do at slot 2, frac 0.5
+    - recording: h1_duely1121
+      turn: 61
+      value: "the military AI's upgrade at slot 1 (UNITS), frac 0.5: city-state 2's Warrior 983044 for 5 Gold"
+  impl:
+    - cpu/core/aiEconomic.ts:canAfford
+    - gpu/core/sim_cityvalue.py:_cv_can_afford
+    - cpu/core/minorOps.ts:minorMilitaryUpgrade
   readings:
+    - "C-129: the military AI's upgrade — READ (0x727db0, 0x6874d0), both twins"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

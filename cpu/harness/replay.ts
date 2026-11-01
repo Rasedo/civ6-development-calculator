@@ -96,7 +96,7 @@ import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../cor
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
 import { holdMinorClears, minorAiTurn, minorContractPurchases, minorGreatPersonClass, minorMilitaryTurn, minorSecondHook, traceMinorAi } from '../core/minorCityAi';
-import { UPGRADE_MOVE, cityStateMilitary, holdSecondHook, traceMinorOps, unupgradedDeleted, upgradeMayGo } from '../core/minorOps';
+import { UPGRADE_MOVE, cityStateMilitary, holdSecondHook, traceMinorOps, traceMinorUpgrade, unupgradedDeleted, upgradeMayGo } from '../core/minorOps';
 import { barbSpawnChange, holdBarbCaptures, traceBarbOps } from '../core/barbarianOps';
 import { newOpsAi, opsOf } from '../core/operations/manager';
 import { opUnits } from '../core/operations/operation';
@@ -556,6 +556,9 @@ function score(ctx: Ctx, kind: string, turn: number, player: number | undefined,
 
 /** a record unit key's owner (`owner:id`) */
 const ownerOf = (key: string) => Number(key.split(':')[0]);
+
+/** UnitCommandStarted's hash of UNITCOMMAND_UPGRADE */
+const UNITCOMMAND_UPGRADE = -750032448;
 
 /** the minors' and the barbarians' decisions a count scores (`scoreDecision`):
  *  applied the game's, a fallback another */
@@ -5564,6 +5567,31 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
           restored.push(u);
         }
       });
+      // each minor's military AI's upgrade (`minorMilitaryUpgrade`, held)
+      // beside the game's: the upgrade its log orders before its turn opens
+      // (its PlayerTurnActivated; one after it is its "Upgrade Units"
+      // trees'); a unit its turn's step trained, which no record holds yet,
+      // is the game's where that is no record's either and the chassis
+      // agree; a levied unit home in its turn goes by the id the game gives
+      // it there
+      const homeIds = new Map(ds.flatMap((d) => (d.kind === 'levyEnd' ? d.units.map(([f, t]) => [f, t] as const) : [])));
+      traceMinorUpgrade((cs, u) => {
+        const p = ctx.playerOfSeat.get(cs.seat)!;
+        const open = opens.get(p);
+        const k = acts.findIndex((x) => x[2] === 'UnitCommandStarted' && x[3] === p && x[5] === UNITCOMMAND_UPGRADE
+          && (open === undefined || (x[0] as number) < open));
+        const game = k >= 0 ? `${p}:${acts[k][4]}` : 'none';
+        const up = k >= 0 ? acts.slice(k).find((x) => x[2] === 'UnitUpgraded' && x[3] === p) : undefined;
+        const into = up ? engineRowOf(ctx.cat, 'unit', up[5] as number) : null;
+        const mapped = u ? [...ctx.units].find(([, v]) => v === u)?.[0] : undefined;
+        const key = mapped !== undefined ? homeIds.get(mapped) ?? mapped : undefined;
+        const ours = u ? key ?? `new ${u.type}` : 'none';
+        const equal = ours === game || (!!u && !key && !ctx.units.has(game) && into === upgradeType(state, u.seat, u.type));
+        if (game !== 'none' || ours !== 'none') {
+          score(ctx, 'unit.upgrade', ctx.turn, p, `p${p} upgrade`, equal, u ? `${ours} -> ${upgradeType(state, u.seat, u.type)}` : ours,
+            `${game} -> ${into ?? '?'}`);
+        }
+      });
       try {
         minorTurns(state);
         // ...and the last city-state's, its units where its turn left them and
@@ -5578,6 +5606,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       } finally {
         unrestore();
         holdMinorStart(null);
+        traceMinorUpgrade(null);
         for (const [u, i] of fallen.reverse()) state.units.splice(Math.min(i, state.units.length), 0, u);
       }
       ctx.minorLookTypes = new Map(state.units.map((u) => [u.id, gameTypeOf('unit', u.type, 'UNIT_')]));

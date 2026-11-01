@@ -6,7 +6,8 @@
  * as the game's Control Manager runs a player's lists:
  *
  *  - B: the Economic AI's savings turn (0x687bf0, `savingsTurn`), the
- *    military AI's turn (`minorOpsEvaluate`) — both `minorMilitaryTurn`,
+ *    military AI's turn (`minorOpsEvaluate`, then its upgrade
+ *    `minorMilitaryUpgrade`) — both `minorMilitaryTurn`,
  *    before the knowledge base's look — and after the look its contract
  *    purchases (`minorContractPurchases`);
  *  - A: the city's update (0x5ce680): its threat (0x5cbd10, `cityThreat`
@@ -64,7 +65,7 @@ import { cityThreat, type CityThreat } from './operations/cityThreat';
 import { aiView } from './aiView';
 import { economicGoldBoost } from './aiWeights';
 import { AI_GREAT_PERSON_CLASSES } from '../data/aiTables';
-import { minorJobUnits, minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart } from './minorOps';
+import { minorJobUnits, minorMilitaryUpgrade, minorOpContracts, minorOpLive, minorOpNear, minorOpsEvaluate, minorOpsStart } from './minorOps';
 import { freeOpNear } from './freeOps';
 import { ARMY_READ_AGE } from './operations/knowledge';
 import { joinBuilt } from './operations/manager';
@@ -853,7 +854,8 @@ export function traceMinorAi(fn: ((line: string) => void) | null): void {
 }
 
 /**
- * B: THE MINOR'S SAVINGS AND MILITARY AI'S TURN, on its knowledge base as
+ * B: THE MINOR'S SAVINGS AND MILITARY AI'S TURN (its operations' evaluation,
+ * then its upgrade `minorMilitaryUpgrade`), on its knowledge base as
  * its last look left it: the look of the turn comes after the operations'
  * evaluation (runs/h1_duelv1124 player 2: the camp 8:14 placed in t5, in
  * its knowledge base's t6 log, its candidate from t7; so 1121 player 2's
@@ -872,6 +874,8 @@ export function minorMilitaryTurn(state: GameState, cs: CityState): void {
   // its Gold boost, which its Gold weight reads until its next turn
   eco.goldBoost = economicGoldBoost(cs.netIncome ?? 0);
   minorOpsEvaluate(state, cs);
+  // its one upgrade of the turn (0x722690 -> 0x727db0)
+  minorMilitaryUpgrade(state, cs);
 }
 
 /**
