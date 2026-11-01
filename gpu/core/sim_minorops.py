@@ -1372,6 +1372,11 @@ class SimMinorOps:
         city_hook(_CITY_AI_PASS)
         busy = self._mops_busy(s) & self._mops_u(s, "alive") & (self._mops_u(s, "seat") == self._mops_seat(s))
         done |= busy & on.unsqueeze(1) & (op["rowof"] >= 0)
+        # ...and stay ended through the pass (`Pass.ended`)
+        if self._tac_moves_ended is not None:
+            lo = self.POOL_LO[self._mops_pre(s)]
+            w = min(view["ended"].shape[1], self.POOL_HI[self._mops_pre(s)] - lo)
+            self._tac_moves_ended[:, lo:lo + w] |= view["ended"][:, :w]
         if bool(view["ended"].any()):
             self.major_unit_mp.copy_(torch.where(view["ended"], view["ended_mp"], self.major_unit_mp))
 
@@ -2212,7 +2217,7 @@ def _u_attack_units(sim, c: _OpCtx, i: int, at: torch.Tensor) -> torch.Tensor:
 def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
     """OPERATION ATTACK UNITS' EXECUTION (0x80ceb0): per team engaged or with a unit
     taken in (team +0x90, +0x58) its members alive
-    with Movement left (a bombard unit only for a city of the seat's own or
+    with Movement left in no formation (a bombard unit only for a city of the seat's own or
     of AI type DEFENDER, 0x80d1cf), the list's
     unit targets not its own within max(2, a member's Movement left) of one
     (with an enemy named, its units or a civilian),
@@ -2239,7 +2244,8 @@ def _x_attack_units(sim, c: _OpCtx, i: int, on: torch.Tensor) -> None:
             continue
         u = sim._mops_units(s)
         memm = sim._mops_member_mask(s, k, ti) & u["own"]
-        mem = memm & (u["mp"] > 0) & ((u["bombard"] <= 0) | own_city.unsqueeze(1) | u["defender"]) & g.unsqueeze(1)
+        mem = (memm & (u["mp"] > 0) & ((u["bombard"] <= 0) | own_city.unsqueeze(1) | u["defender"]) & g.unsqueeze(1)
+               & ~sim._tac_formed(pre))
         reach = u["mp_whole"].clamp(min=2)
         near = torch.zeros(B, sim.T, dtype=torch.bool, device=dev)
         for j in mem.any(dim=0).nonzero(as_tuple=True)[0].tolist():

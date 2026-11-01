@@ -512,9 +512,8 @@ function attackUnitsExecute(node: Parameters<BtHandler<OpsContext>['update']>[0]
     if (!t.engaged && t.joined === 0) continue;
     const v = ctx.view();
     const units = unitsById(v, ctx.seat);
-    const paired = new Set(op.formations.flat());
     const members = t.members.map((id) => units.get(id)).filter((u): u is AiUnitView =>
-      !!u && u.movesLeft > 0 && !paired.has(u.id) && (u.bombard <= 0 || ownCity || u.defender));
+      !!u && u.movesLeft > 0 && !u.mates.length && (u.bombard <= 0 || ownCity || u.defender));
     const targets = v.attackTargets(ctx.seat);
     const keep = pickTargets(node, v, ctx.seat, op, t, members, targets);
     const picked = targets.map((_g, k) => k).filter(keep);
@@ -680,7 +679,7 @@ function pillageExecute(node: Parameters<BtHandler<OpsContext>['update']>[0], _r
     for (const t of op.teams) {
       for (const id of t.members) {
         const u = now(id);
-        if (!u || (u.domain === 'sea' && P[g.plot].water) || u.bombard > 0 || op.formations.some((f) => f.includes(id)) || u.movesLeft <= 0) continue;
+        if (!u || (u.domain === 'sea' && P[g.plot].water) || u.bombard > 0 || u.mates.length > 0 || u.movesLeft <= 0) continue;
         if (!goody && u.combat <= 0) continue;
         if (u.plot === g.plot) {
           pillageHere(ctx, id);

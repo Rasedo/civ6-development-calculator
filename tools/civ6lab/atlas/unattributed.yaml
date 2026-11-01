@@ -1085,9 +1085,10 @@
   final: 0x1a5000
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:live]
+  impl: [cpu/core/tactical.ts:live, cpu/core/tactical.ts:movesEnded]
   readings:
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...MovementMovesRemaining (0x56e2b0) whenever a member's order ends its moves (0x56d6f0 -> 0x267b00), each member told the new value (event 0xc50d66d6). The formation's move 0x26fe20 sets...
@@ -2543,6 +2544,7 @@
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
     - "C-99: a unit bought in the turn sits out the operations, a Harbor trains ships — the recruit's turn-done offer READ (0x60a8c0, 0x60a440), 0x1c77c0's district arm READ, the candidates' own strength a FIT, both twins"
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"W..."
   context:
@@ -6378,6 +6380,36 @@
   context:
     - "...0x518f40 lets share a plot (owners apart, both +0x1ce0 above 0, their +0x1ce4 apart, 0x93f090 false: none on the five duels). 0x585eb0 takes the most over the formation's members."
   review: imported
+- addr: 0x94bbe0
+  kind: function
+  name: UNITCOMMAND_ENTER_FORMATION's command
+  semantics: builds the unit command of hash 0xc9903c80 (UNITCOMMAND_ENTER_FORMATION) with the partner unit's id (Make Formation's 0x7eead4)
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 37
+      value: UnitEnterFormation 3014684 with 1114128 at the capture's Make Formation
+  impl:
+    - cpu/core/opsOrders.ts:passOrders
+    - gpu/core/sim_barbops.py:_bop_capture_tick
+    - cpu/core/operations/nodes.ts:OpsContext
+    - cpu/core/opsOrders.ts:unitOf
+  readings:
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
+  review: reviewed
+- addr: 0x94bc70
+  kind: function
+  name: UNITCOMMAND_EXIT_FORMATION's command
+  semantics: builds the unit command of hash 0xfcfe4c4d (UNITCOMMAND_EXIT_FORMATION), no partner (Make Formation's Destroy Formations, 0x7ee7b0)
+  status: PARTLY
+  impl:
+    - cpu/core/opsOrders.ts:passOrders
+    - gpu/core/sim_tactics.py:_tac_formation_exit
+    - cpu/core/operations/nodes.ts:OpsContext
+    - cpu/core/opsOrders.ts:unitOf
+  readings:
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
+  review: reviewed
 - addr: 0x9576d0
   final: 0x663280
   kind: function

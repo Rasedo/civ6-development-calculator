@@ -2381,6 +2381,13 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       buildings.push(id);
       if (pil) pillaged.push(id);
     }
+    // ...and the wonders it placed and builds still, as a placement lists
+    // them (`placeSeatWonder`: runs/h1_duely1128 t34 China's Great Bath on
+    // 16:12, whose plot the barbarians' danger map rings with 1 from t38)
+    for (const q of c.plots) {
+      const w = tiles[q].builtWonder;
+      if (w && !tiles[q].builtWonderComplete && !wonders.some((x) => x.tileIndex === q)) wonders.push({ id: w, tileIndex: q });
+    }
     const districts: City['districts'] = [];
     const lockedDistrictCost = new Map<number, number>();
     let hp = CITY_MAX_HP;

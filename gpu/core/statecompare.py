@@ -1413,6 +1413,7 @@ UNIT = {
     "levied": _unit("unit_levy_src"),
     "formation": _unit("unit_formation"),
         "escorted": _unit("unit_escorted"),
+        "originalOwner": _unit("unit_orig_owner"),
         "aiDefender": _unit("unit_defender"),
         "aiHomed": _unit("unit_homed"),
     "patrol": _unit("unit_patrol"),

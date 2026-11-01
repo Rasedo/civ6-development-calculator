@@ -21,7 +21,7 @@ import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
 import { cityDefenseStrength, cityStrikeStrength, encircled, garrisonTerm, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
 import { outerPool, portalAt, wallsTier } from './rules';
-import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
+import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, formationMates, traderCost, unitFullMoves, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
@@ -792,5 +792,6 @@ function unitView(state: GameState, u: Unit): AiUnitView {
     combat: aiStrengths(state, u).melee, ranged: aiRanged(u), range: d?.ranged?.range ?? 0, damage: UNIT_HP - u.hp,
     movesLeft: Math.trunc(u.movesLeft * 256 / MP_SCALE),
     baseMoves: u.embarked && !d?.naval ? EMBARK_MOVES + embarkTechMoves(state, u.seat) : d?.moves ?? 0,
-    bombard: aiFormed(u, d?.bombard ?? 0), domain: d?.air ? 'air' : d?.naval ? 'sea' : 'land', defender: aiDefenderOf(state, u) };
+    bombard: aiFormed(u, d?.bombard ?? 0), domain: d?.air ? 'air' : d?.naval ? 'sea' : 'land', defender: aiDefenderOf(state, u),
+    mates: formationMates(state, u).map((m) => m.id) };
 }

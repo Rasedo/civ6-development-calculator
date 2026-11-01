@@ -16,7 +16,7 @@ import { aiStrengths, maxMoves, militaryAiTypeOf, moveTo, passAttack, passFinish
   type Pass } from './tactical';
 import type { OpsEnv } from './operations/manager';
 import type { DefendOrders } from './operations/nodes';
-import { unitDomain } from './units';
+import { breakEscort, escortRiders, escortUnit, unitDomain } from './units';
 import { CITY_STRIKE_RANGE } from './phase';
 import { allianceTypeWith, cityAtTile, cityStateOfSeat, civsAtWar, isBarbSeat, isCityStateSeat, tileSeat } from './seats';
 import { NO_SEAT, type City } from './types';
@@ -271,7 +271,7 @@ export function defenderAiType(state: GameState, seat: number, pass: Pass | null
 
 /** the orders of `seat`'s operations in `pass`; `changed` after each */
 export function passOrders(state: GameState, seat: number, pass: Pass, changed: () => void):
-  Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend' | 'endTurn' | 'endMoves' | 'swap' | 'patrol' | 'pillage'> {
+  Pick<OpsEnv, 'move' | 'strike' | 'attack' | 'moveUpdate' | 'moveExec' | 'defend' | 'endTurn' | 'endMoves' | 'swap' | 'patrol' | 'pillage' | 'enterFormation' | 'exitFormation'> {
   const unitOf = (id: number): Unit | undefined => state.units.find((u) => u.id === id && u.seat === seat);
   return {
     move: (id, dest) => {
@@ -296,9 +296,9 @@ export function passOrders(state: GameState, seat: number, pass: Pass, changed: 
       return out.map((a) => ({ unit: a.unit.id, from: a.from, move: a.move, attack: a.attack }));
     },
     moveUpdate: (members, store, goal, target, range, spread) => passMoveUpdate(state, pass, members, store, goal, target, range, spread),
-    moveExec: (members, goal, range, arrived, ready, zero, leaderNamed, weak, mates) => {
+    moveExec: (members, goal, range, arrived, ready, zero, leaderNamed, weak) => {
       const out = passMoveExec(state, pass, members, goal, range, arrived, ready, (u) => zero(u.id, gameTypeOf('unit', u.type, 'UNIT_')), leaderNamed,
-        weak, (u) => mates(u.id).map(unitOf).filter((x): x is Unit => !!x));
+        weak);
       changed();
       return out.map((x) => ({ type: gameTypeOf('unit', x.unit.type, 'UNIT_'), from: x.from, dest: x.dest, after: x.unit.tileIndex }));
     },
@@ -310,6 +310,21 @@ export function passOrders(state: GameState, seat: number, pass: Pass, changed: 
     swap: (id, plot) => {
       const u = unitOf(id);
       if (u) swapUnits(state, pass, u, plot);
+      changed();
+    },
+    // UNITCOMMAND_ENTER_FORMATION (0x94bbe0): the civilian joins the
+    // fighter on its plot, a formation of the units' own
+    enterFormation: (id) => {
+      const u = unitOf(id);
+      if (u) escortUnit(state, u);
+      changed();
+    },
+    // UNITCOMMAND_EXIT_FORMATION (0x94bc70): the unit leaves its formation,
+    // an escort's riders freed with it
+    exitFormation: (id) => {
+      const u = unitOf(id);
+      if (!u) return;
+      for (const r of [u, ...escortRiders(state, u)]) if (r.escorted) breakEscort(r);
       changed();
     },
     endMoves: (id) => {

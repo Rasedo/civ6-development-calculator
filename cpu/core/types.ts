@@ -850,6 +850,10 @@ export interface Unit {
    * slot, so read it through `inEscort`, never inline.
    */
   escorted?: boolean;
+  /** the player a capture took it from (unit +0x340 m_eOriginalOwner: the
+   *  capture 0x212500 makes its new unit with the victim's owner); absent,
+   *  its owner made it */
+  originalOwner?: number;
   /** of AI type DEFENDER (+0x1c0 4): its city's standing army's
    *  (`minorStandingArmy`) or City Defense's garrison (`garrisonExecute`) */
   aiDefender?: boolean;

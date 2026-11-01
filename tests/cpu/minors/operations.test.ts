@@ -30,7 +30,7 @@ function dist(a: number, b: number): number {
 }
 
 const unit = (id: number, plot: number, over: Partial<AiUnitView> = {}): AiUnitView => ({
-  id, type: 'UNIT_WARRIOR', plot, founder: false, combat: 20, ranged: 0, range: 0, damage: 0, movesLeft: 512, baseMoves: 2, bombard: 0, domain: 'land', defender: false, ...over,
+  id, type: 'UNIT_WARRIOR', plot, founder: false, combat: 20, ranged: 0, range: 0, damage: 0, movesLeft: 512, baseMoves: 2, bombard: 0, domain: 'land', defender: false, mates: [], ...over,
 });
 
 function view(over: Partial<AiView>): AiView {

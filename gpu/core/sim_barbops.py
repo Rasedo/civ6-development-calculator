@@ -296,7 +296,6 @@ class SimBarbOps:
             self.bcap_bk_target[r, ci] = -1
             self.bcap_bk_rally[r, ci] = -1
             self.bcap_resume[r, ci] = -1
-            self.bcap_form[r, ci] = False
             self.bcap_ready[r, ci] = False
             self.bcap_str[r, ci] = 0
             # the start's strengths (0x73a120 -> 0x73eb60): the enemy's about
@@ -406,7 +405,9 @@ class SimBarbOps:
         ut = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
         land = self._bop_land_ai.take(ut)
         civ_ai = self._bop_civ_ai.take(ut)
-        pair = (start1 & civ_ok & esc_ok & ~self.bcap_form[:, c]
+        # the captive and its escort each in no formation (`planFormations`)
+        free = (self._tac_mate(bidx, cs, "barb") < 0) & (self._tac_mate(bidx, es, "barb") < 0)
+        pair = (start1 & civ_ok & esc_ok & free
                 & land[bidx, esc_] & (self._type_combat.take(ut)[bidx, esc_] > 0)
                 & civ_ai[bidx, csc] & ~(self._type_combat.take(ut)[bidx, csc] > 0))
         civ_plot = self.barb_unit_tile[bidx, csc]
@@ -457,7 +458,7 @@ class SimBarbOps:
         # Operation Defend Units 5 over the team, the captive then its captor
         cteam = [torch.where(civ_ok, cs, -1), torch.where(esc_ok, es, -1)]
         pct5, rng5 = tr.cap_defend
-        mk5 = self._bop_defend_update(mv_on, cteam, pct5, ctx, formed=self.bcap_form[:, c])
+        mk5 = self._bop_defend_update(mv_on, cteam, pct5, ctx)
         st6, ar6 = self._bcap_move_update(mv_on & ~no_goal, c, 0, mem, goal, rg6, sp6, ctx)
         c6 = torch.where(no_goal, 3, st6)
         c3 = torch.where(rdy_fail, 3, torch.maximum(torch.ones_like(c6), c6))
@@ -476,27 +477,23 @@ class SimBarbOps:
         if bool(ex1.any()):
             move = ex1 & (self.barb_unit_tile[bidx, esc_] != civ_plot)
             self._tac_move_to(move, esc_, civ_plot.clamp(min=0), strike=False)
+            # met there, the captive enters its formation
+            # (UNITCOMMAND_ENTER_FORMATION), which outlives the operation
             meet = ex1 & (self.barb_unit_tile[bidx, esc_] == self.barb_unit_tile[bidx, csc])
-            self.bcap_form[:, c] |= meet
+            self.barb_unit_escorted[bidx[meet], csc[meet]] = True
         # Defend Units 5 (a member released stays in the capture's team)
-        self._bop_defend_exec(mv_on & mk5, cteam, goal, pct5, rng5, ctx, formed=self.bcap_form[:, c])
-        zero = torch.zeros_like(self.barb_unit_alive)
-        formed = self.bcap_form[:, c]
-        zero[bidx[formed & civ_ok], csc[formed & civ_ok]] = True
-        zero[bidx[formed & esc_ok], esc_[formed & esc_ok]] = True
-        # each formed member's formation mate (the formation's Movement)
-        mate = torch.full_like(self.barb_unit_tile, -1)
-        both = formed & civ_ok & esc_ok
-        mate[bidx[both], csc[both]] = esc_[both]
-        mate[bidx[both], esc_[both]] = csc[both]
+        self._bop_defend_exec(mv_on & mk5, cteam, goal, pct5, rng5, ctx)
         ex6 = mv_on & ~no_goal & ((c6 == 1) | (c6 == 2))
         # the move orders' danger flags read the operation's strength below
         # its target's, and its formation (`passMoveExec`)
         below = self.bcap_str[:, c] < self.bcap_estr[:, c]
         if bool(ex6.any()):
-            self._op_move_exec(ex6, mem, self._bcap_rank(c), goal, sp6, ar6, self.bcap_ready[:, c], done, rowof, res, zero=zero,
-                               danger=ctx["danger"], weak=below, formed=zero, mate=mate)
-        self.bcap_form[:, c] &= ~seq7
+            self._op_move_exec(ex6, mem, self._bcap_rank(c), goal, sp6, ar6, self.bcap_ready[:, c], done, rowof, res,
+                               danger=ctx["danger"], weak=below)
+        # Make Formation 7 (Destroy Formations): each member in a formation
+        # leaves it (UNITCOMMAND_EXIT_FORMATION)
+        for us in (torch.where(civ_ok, cs, -1), torch.where(esc_ok, es, -1)):
+            self._tac_formation_exit(seq7 & (us >= 0) & (self._tac_mate(bidx, us, "barb") >= 0), us, "barb")
         ex8 = on8 & ~no_goal & ((c8 == 1) | (c8 == 2))
         if bool(ex8.any()):
             self._op_move_exec(ex8, mem, self._bcap_rank(c), goal, sp8, ar8, self.bcap_ready[:, c], done, rowof, res,
@@ -593,6 +590,9 @@ class SimBarbOps:
                 # a capture a tree's blow took starts its operation at once
                 self._barb_captures()
                 last = torch.where(go, nxt, last)
+        # ...and stay ended through the pass (`Pass.ended`)
+        if self._tac_moves_ended is not None:
+            self._tac_moves_ended[:, self.POOL_LO["barb"]:self.POOL_HI["barb"]] |= ctx["ended"]
         if bool(ctx["ended"].any()):
             self.barb_unit_mp.copy_(torch.where(ctx["ended"], ctx["ended_mp"], self.barb_unit_mp))
         self._bop_free_ended()
@@ -766,8 +766,7 @@ class SimBarbOps:
 
     # -- Operation Defend Units ----------------------------------------------
 
-    def _bop_endangered(self, j: torch.Tensor, on: torch.Tensor, ctx: dict,
-                        formed: torch.Tensor | None = None) -> torch.Tensor:
+    def _bop_endangered(self, j: torch.Tensor, on: torch.Tensor, ctx: dict) -> torch.Tensor:
         """[B] bool — the team update's endangered (`endangered`, 0x738f20)
         for the barbarians' unit at pool slot `j` [B] where `on`: the pass's
         targets within twice its base Movement — a unit of an entry that
@@ -777,8 +776,8 @@ class SimBarbOps:
         strengths); a combat district's city that strikes, the member within
         its range of the centre, its strike — and the member the sum leaves
         with no hit points is endangered; one that does not fight, any blow
-        at all where it stands alone on land (`formed` [B]: its formation of
-        two, 0x739659)"""
+        at all where it stands alone on land (in no formation of two,
+        0x739659: `_tac_mate`)"""
         B, dev = self.B, self.device
         b = self._bidx
         jc = j.clamp(min=0)
@@ -837,7 +836,7 @@ class SimBarbOps:
         dmg_now = hp_max - self.barb_unit_hp[b, jc].long()
         weak = (total > 0) & ~fights
         land = ~self.water[b, plot]
-        alone = ~formed if formed is not None else torch.ones_like(on)
+        alone = self._tac_mate(b, jc, "barb") < 0
         return on & ((weak & land & alone) | (~weak & (dmg_now + total > hp_max)))
 
     def _bop_hurt(self, j: torch.Tensor, pct: int) -> torch.Tensor:
@@ -852,11 +851,10 @@ class SimBarbOps:
         uc = us.clamp(min=0)
         return (us >= 0) & self.barb_unit_alive[self._bidx, uc] & (self.barb_unit_tile[self._bidx, uc] >= 0)
 
-    def _bop_defend_update(self, on: torch.Tensor, team: list, pct: int, ctx: dict,
-                           formed: torch.Tensor | None = None) -> torch.Tensor:
+    def _bop_defend_update(self, on: torch.Tensor, team: list, pct: int, ctx: dict) -> torch.Tensor:
         """OPERATION DEFEND UNITS' update (`flagged`, 0x80ee70) for a team of
         the barbarians' pool slots `team` (each [B], -1 none) in the games
-        `on` (`formed` [B]: the team in a formation of the operation's): [B]
+        `on`: [B]
         the node marked — a member endangered, hurt to `pct` percent, or
         fortified on a plot of danger (the node SUCCEEDS)"""
         b = self._bidx
@@ -871,14 +869,13 @@ class SimBarbOps:
             # a land unit (+0x650 == 2) afloat in danger
             land = ~self.unit_naval.take(self.barb_unit_type[b, uc].clamp(min=0, max=self.NU - 1))
             afloat = land & self.water[b, plot] & (danger.gather(1, plot.unsqueeze(1)).squeeze(1) > 0)
-            marked |= ok & (self._bop_endangered(us, ok, ctx, formed) | self._bop_hurt(us, pct) | afloat)
+            marked |= ok & (self._bop_endangered(us, ok, ctx) | self._bop_hurt(us, pct) | afloat)
         return marked
 
     def _bop_defend_exec(self, g: torch.Tensor, team: list, target: torch.Tensor, pct: int, rng: int,
-                         ctx: dict, formed: torch.Tensor | None = None) -> None:
+                         ctx: dict) -> None:
         """OPERATION DEFEND UNITS' execution (`DefendOrders.execute`, 0x80d790)
-        where `g` (marked) over the team's slots `team` in its order (`formed`
-        [B] the team in a formation of the operation's), the
+        where `g` (marked) over the team's slots `team` in its order, the
         members outside `rng` of `target` (-1: all): the endangered — not
         bombard, with Movement, out of a city centre — to their safe plots
         toward `target` (0x716b90; one with a promotion due and hurt to a
@@ -930,7 +927,7 @@ class SimBarbOps:
             end(us, m & (dest >= 0) & self._bop_live(us) & (self.barb_unit_tile[b, uc] == dest))
 
         # the endangered, listed as the execution opens, in the team's order
-        listed = [self._bop_endangered(us, g & self._bop_live(us), ctx, formed) for us in team]
+        listed = [self._bop_endangered(us, g & self._bop_live(us), ctx) for us in team]
         for us, ok in zip(team, listed):
             ok = ok & self._bop_live(us)
             if not bool(ok.any()):
@@ -1103,8 +1100,8 @@ class SimBarbOps:
     def _bop_attack_units(self, on: torch.Tensor, k: int, ctx: dict) -> None:
         """OPERATION ATTACK UNITS' execution (0x80ceb0, `attackUnitsExecute`)
         for tribe `k`'s team in the games `on`, a team that took units in:
-        its living members with Movement left and a planning (a bombard unit
-        only for a city of the barbarians' own — none — or of AI type
+        its living members with Movement left, in no formation, and a
+        planning (a bombard unit only for a city of the barbarians' own — none — or of AI type
         DEFENDER, 0x80d1cf: its tribe's camp defender, `_tac_ai`), the list's unit targets near
         them (Attack Nearby Units: not their own, within max(2, a member's
         Movement left) of one; with an enemy named, its units or a civilian),
@@ -1124,7 +1121,8 @@ class SimBarbOps:
         own_city = city & (self.tile_seat.gather(1, tplot.clamp(min=0).unsqueeze(1)).squeeze(1) == BARB_SEAT)
         bomb = self._type_bombard.take(ut) > 0
         defender = self._tac_ai()[0] == _AI_DEFENDER
-        units = mem & (self.barb_unit_mp > 0) & on.unsqueeze(1) & (~bomb | own_city.unsqueeze(1) | defender) & (rowof >= 0)
+        units = (mem & (self.barb_unit_mp > 0) & on.unsqueeze(1) & (~bomb | own_city.unsqueeze(1) | defender) & (rowof >= 0)
+                 & ~self._tac_formed("barb"))
         if not bool(units.count_nonzero()):
             return
         reach = torch.where(units, torch.div(self.barb_unit_mp, self._mp_scale, rounding_mode="floor").clamp(min=2),
@@ -1164,8 +1162,8 @@ class SimBarbOps:
         `join`, player `seat`) against the target `tplot` in the games `on`:
         per IMPROVEMENT, PASSIVE_DISTRICT or GOODY entry of the list (each
         kind unless the node's flag says false) in its order on the ground of
-        the target's owner, of the living members with Movement left and no
-        bombard strength (a ship's not for a water plot; a goody hut any,
+        the target's owner, of the living members with Movement left, in no
+        formation and with no bombard strength (a ship's not for a water plot; a goody hut any,
         else one that fights): each on it pillages there; else the nearest
         whose planning reaches it within two turns with Movement left there
         (none of its domain and kind on it) and within twice its Movement (a
@@ -1189,13 +1187,14 @@ class SimBarbOps:
         P = self.barb_unit_op.shape[1]
         naval = self.unit_naval.take(ut)
         water = self.water
+        formed = self._tac_formed("barb")
         for p in (on.unsqueeze(1) & (imp | dis | goody)).any(dim=0).nonzero(as_tuple=True)[0].tolist():
             for kindm, is_goody in ((dis[:, p], False), (imp[:, p], False), (goody[:, p], True)):
                 g = on & kindm
                 if not bool(g.any()):
                     continue
                 el = (mem & self.barb_unit_alive & (self.barb_unit_seat == seat) & (self.barb_unit_mp > 0)
-                      & (self._type_bombard.take(ut) <= 0) & g.unsqueeze(1) & ~(naval & water[:, p].unsqueeze(1)))
+                      & (self._type_bombard.take(ut) <= 0) & g.unsqueeze(1) & ~(naval & water[:, p].unsqueeze(1)) & ~formed)
                 if not is_goody:
                     el &= self._type_combat.take(ut) > 0
                 here = el & (self.barb_unit_tile == p)

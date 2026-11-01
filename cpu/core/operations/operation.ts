@@ -80,9 +80,6 @@ export interface Operation {
   allowUnitConstruction: boolean;
   /** the contracts its tree made (their ids in the seat's book) */
   contracts: number[];
-  /** the formations Make Formation made: a civilian and its escort, which
-   *  move as one */
-  formations: [number, number][];
   /** the members killed that left its teams (the barbarians' operations) */
   killed?: number;
   /** the members Operation Defend Units released (0x73d1f0: their
@@ -186,11 +183,10 @@ export function targetGone(ctx: OpsContext, op: Operation): boolean {
 }
 
 /** a unit's move to a plot (the seat's move order, as far as its Movement
- *  carries it this turn), its formation's other unit with it */
+ *  carries it this turn), its formation with it */
 export function moveTo(ctx: OpsContext, u: AiUnitView, dest: number): void {
   if (u.plot === dest || u.movesLeft <= 0) return;
-  const pair = ctx.op.formations.find((f) => f.includes(u.id));
-  ctx.move(u.id, dest, pair ? (pair[0] === u.id ? pair[1] : pair[0]) : -1);
+  ctx.move(u.id, dest);
 }
 
 /** a plot as the operation logs write it, x:y (-9999:-9999 for none) */

@@ -738,7 +738,7 @@
 - addr: 0x77b9a0
   final: 0x50d830
   kind: function
-  semantics: "the Free Cities' / barbarians' Wander Near Camp: a unit with a group (+0x11d0 >= 0) whose camp the player's signals answer (0x771250)."
+  semantics: "the Free Cities' / barbarians' Wander Near Camp: a unit with a group (+0x11d0 >= 0) whose camp the player's signals answer (0x771250); after its move order its moves end (0x56d6f0 at 0x77bedd: its formation moves no more) and its turn (0x570b40)."
   status: READ
   cases:
     - recording: h1_duelw1114
@@ -757,6 +757,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ngine's candidate count on the   rows the records pin (below). - THE FREE CITIES' Wander Near Camp (0x77b9a0, C-95's reading): a unit with   a group (+0x11d0 >= 0) whose camp the player's signals answer (0x77..."
   context:

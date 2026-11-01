@@ -66,20 +66,22 @@ describe('the escort formation', () => {
     expect(escortUnit(state, bld).ok).toBe(false); // and only once
   });
 
-  it('holds the rider still and lets the break free it', () => {
+  it('steps the rider with its escort and lets the break free it', () => {
     const state = makeState(makeMap(8, 8));
     const [a, b] = twoAdjacent(state);
     const bld = put(state, a, 'BUILDER');
-    put(state, a, 'WARRIOR');
+    const war = put(state, a, 'WARRIOR');
     expect(escortUnit(state, bld).ok).toBe(true);
 
-    expect(stepUnit(state, bld, state.map.tiles[b])).toBe('blocked');
-    expect(bld.tileIndex).toBe(a);
+    expect(stepUnit(state, bld, state.map.tiles[b])).not.toBe('blocked');
+    expect(bld.tileIndex).toBe(b);
+    expect(war.tileIndex).toBe(b);
 
     expect(breakEscort(bld).ok).toBe(true);
     expect(inEscort(state, bld)).toBe(false);
-    expect(stepUnit(state, bld, state.map.tiles[b])).not.toBe('blocked');
-    expect(bld.tileIndex).toBe(b);
+    expect(stepUnit(state, bld, state.map.tiles[a])).not.toBe('blocked');
+    expect(bld.tileIndex).toBe(a);
+    expect(war.tileIndex).toBe(b);
   });
 
   it('drags the rider along, and both pay', () => {

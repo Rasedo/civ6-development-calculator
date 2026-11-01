@@ -19,17 +19,19 @@
 - addr: 0x56c480
   final: 0x3a23e0
   kind: function
-  semantics: "a land unit can embark (the pathfinder pool's embarked Movement on water, 0x56d9f0): domain +0x650 not 0 (sea), and its owner's CanEmbark (0x4ee3f0) of its type (+0x160); else its original owner (+0x340, m_eOriginalOwner, Lua GetOriginalOwner 0x9f38d0) where another player below 0x41 whose slot (+0x2b48) is live, by that player's CanEmbark. Unported: the engines keep no unit's original owner (groundOf's embarks refuses every barbarian land unit)."
+  semantics: "a land unit can embark (the pathfinder pool's embarked Movement on water, 0x56d9f0): domain +0x650 not 0 (sea), and its owner's CanEmbark (0x4ee3f0) of its type (+0x160); else its original owner (+0x340, m_eOriginalOwner, Lua GetOriginalOwner 0x9f38d0) where another player below 0x41 whose slot (+0x2b48) is live, by that player's CanEmbark; the barbarians' own passes none of their land types."
   status: READ
   cases:
     - recording: h1_duely1124
       turn: 134
       value: the barbarians' captured Builder 5111833 stands embarked on 37:10 (t134-137), no barbarian military unit ever does (90 recorded duels)
+  impl: [cpu/core/tactical.ts:naval, cpu/core/units.ts:canEmbark, gpu/core/sim_tactics.py:_tac_embarks]
   readings:
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning — READ, both twins"
     - "C-99: the pathfinder's later-turn pool, Heal's hull, the tactical list's explorers, Move Unit's planning"
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
   context:
     - ...r with it; +0x4c not above 0, taken as no unit on it; its own area unless it embarks (0x56c480), a hull on water; no city centre but its player's); its two counts over its sight (0x5...
   review: reviewed
@@ -100,6 +102,10 @@
     - gpu/core/sim_minorops.py:end_moves
     - cpu/core/operations/assault.ts:stronger
     - cpu/core/tactical.ts:live
+    - cpu/core/tactical.ts:movesEnded
+    - cpu/core/tactical.ts:wanderNearCamp
+    - gpu/core/sim_tactics.py:SimTactics
+    - gpu/core/sim_tactics.py:live
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -111,6 +117,7 @@
     - "C-126 / C-99: the purchase list's at-war sums, Garrison City's turn done and Operation Move's movers — READ, both twins"
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.c..."
   context:

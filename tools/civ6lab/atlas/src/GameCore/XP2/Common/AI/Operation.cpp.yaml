@@ -340,7 +340,9 @@
   semantics: forms a pair of units into a formation.
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:planFormations]
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
   context:
     - ...operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x...
   review: reviewed

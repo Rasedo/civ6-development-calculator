@@ -20,7 +20,7 @@ import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
   canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo,
-  waterEnterable, formationCS, setRecordFormation,
+  waterEnterable, formationCS, setRecordFormation, formationMates, dropLoneRiders,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, campTiles, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
@@ -202,7 +202,7 @@ interface Ground {
 const NO_FOES: ReadonlySet<number> = new Set();
 
 function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, anyGround = true,
-  mates: readonly Unit[] = [], dest = -1): Ground {
+  mates: readonly Unit[] = formationMates(state, unit), dest = -1): Ground {
   const held = new Set<number>();
   const foes = new Set<number>();
   const own = new Set<number>();
@@ -240,10 +240,10 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   const def = UNITS[unit.type];
   const melee = !!def && def.combat > 0;
   const naval = !!def?.naval;
-  // the barbarians' land units plan no water (none of 6,269 of their planning
-  // rows on runs/h1_duelw1117, 1121 and 1124 holds a water plot; a major's
-  // and a city-state's do from their Shipbuilding, AI_Planning.csv)
-  const embarks = canEmbark(state, unit) && !isBarbSeat(unit.seat);
+  // a unit that may embark (`canEmbark`, 0x56c480: the barbarians' land units
+  // plan no water, none of 6,269 of their planning rows on runs/h1_duelw1117,
+  // 1121 and 1124 holds a water plot, their captives by their first owners)
+  const embarks = canEmbark(state, unit);
   const minor = isCityStateSeat(unit.seat);
   // the planning list's units of the mover's map layer alone (the plot list
   // of the formation's layer, 0x2665b0 -> 0x75c50 -> 0x585eb0): a religious
@@ -440,7 +440,7 @@ export const moveUnitDanger = (plane: ArrayLike<number>): PathDanger => ({ plane
 
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false,
-  laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = [], dest = -1): void {
+  laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit), dest = -1): void {
   const { map } = state;
   const ground = groundOf(state, unit, !zoc, !zoc, standToAttack, mates, dest);
   // a plot of a district with hit points of a player at war (0x26e570's
@@ -726,14 +726,14 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTur
     if (n.tile !== dest) return false;
     if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) turns = n.turns;
     return true;
-  }, undefined, false, laterTurns, false, true, undefined, [], dest);
+  }, undefined, false, laterTurns, false, true, undefined, formationMates(state, unit), dest);
   return turns;
 }
 
 /** the plots from the unit's to `dest`, the unit's own left out, by the
  *  pathfinder's path (its parents once `dest` closes); empty where none */
 export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = false, explore = true,
-  danger?: PathDanger, mates: readonly Unit[] = []): number[] {
+  danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit)): number[] {
   // a destination another player's unit holds out of the player's sight is
   // no path, an attack order's too: the move order's request (0x962310)
   // drops the attack flag 0x10 where the owner's visibility count of its
@@ -775,7 +775,7 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
  *  pass a unit whose last step of the turn ended in a zone of control does
  *  not move (`orderOnce`). */
 export function moveTo(state: GameState, unit: Unit, dest: number, strike = true,
-  laterTurns = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = []): void {
+  laterTurns = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = formationMates(state, unit)): void {
   const open = orderOnce(state, unit, dest, strike, laterTurns, explore, danger, mates);
   // an order its walk left short of its destination, Movement left, stays
   // on the unit, carried on as the player's turn ends
@@ -794,6 +794,12 @@ let shortOrders: (() => void)[] | null = null;
  *  of the walk 0x26fe20 at 0x270800 from 0x26f980, cleared at the
  *  formation's turn start 0x2673f0); null outside an AI player's pass */
 let zocMoved: Set<Unit> | null = null;
+
+/** the units of the AI player's pass open whose moves an order ended
+ *  (`Pass.ended`, 0x56d6f0): a formation holding one moves no more (its
+ *  Movement +0x218 the least its members hold, 0x267b00); null outside a
+ *  pass */
+let movesEnded: ReadonlySet<number> | null = null;
 
 /**
  * A player's AI turn with its move orders carried on (`moveTo`): an order
@@ -885,11 +891,12 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
  *  unit or another player's holds at the limit); true where a step was
  *  refused (the placement 0x587ca0 refusing: the order done, 0x26fe20 at
  *  0x270933) */
-function walk(state: GameState, unit: Unit, path: number[], dest: number, mates: readonly Unit[] = []): boolean {
+function walk(state: GameState, unit: Unit, path: number[], dest: number, mates: readonly Unit[]): boolean {
   const { tiles } = state.map;
-  // how far its Movement carries it along the path this turn
+  // how far its Movement carries it along the path this turn: a formation's,
+  // the least its members hold (0x262cd0)
   const full = unit.movesFull ?? unitFullMoves(state, unit);
-  let mp = unit.movesLeft;
+  let mp = Math.min(unit.movesLeft, ...mates.map((m) => (movesEnded?.has(m.id) ? 0 : m.movesLeft)));
   let from = unit.tileIndex;
   let stop = 0;
   // a shore crossing's Movement past the new domain's full, paid by the next
@@ -2430,7 +2437,10 @@ function chaseTarget(state: GameState, pass: Pass): void {
  * it out (0x585eb0, `keptOut`), within 5 of the camp and, where the camp's
  * plot is a city's, of that city's; ONE "Random Direction" draw over their
  * count picks the plot it moves to ("Wander"); with none it heads for its
- * camp ("Wander Back to Camp"). Its turn is done.
+ * camp ("Wander Back to Camp"). Its moves end (0x56d6f0 at 0x77bedd: its
+ * formation moves no more, runs/h1_duely1128 t40 the Warrior 1114128's
+ * Wander leaves its Settler 3014684 one Movement it cannot spend) and its
+ * turn is done.
  */
 function wanderNearCamp(state: GameState, pass: Pass, homeOf: (u: Unit) => number): void {
   for (const u of pass.units) {
@@ -2449,6 +2459,7 @@ function wanderNearCamp(state: GameState, pass: Pass, homeOf: (u: Unit) => numbe
     const to = cands.length ? cands[randRange(state, cands.length, 'Random Direction')].tile : home;
     drawing = null;
     moveTo(state, u, to, pass.strike);
+    pass.ended.add(u.id);
     finish(pass, u, cands.length ? 'Wander' : 'Wander Back to Camp', to);
   }
 }
@@ -2673,7 +2684,7 @@ function exploreOk(state: GameState, u: Unit, p: number, revealed: (i: number) =
   if (state.units.some((x) => x.tileIndex === p && onMap(x))) return false;
   const naval = !!UNITS[u.type]?.naval;
   const here = state.map.tiles[u.tileIndex];
-  if ((t.area ?? -1) !== (here.area ?? -1) && !(canEmbark(state, u) && !isBarbSeat(u.seat)) && (!naval || !isWater(t))) return false;
+  if ((t.area ?? -1) !== (here.area ?? -1) && !canEmbark(state, u) && (!naval || !isWater(t))) return false;
   return !(t.district === 'CITY_CENTER' && owner !== u.seat);
 }
 
@@ -3032,6 +3043,7 @@ export function seatPoolSlots(state: GameState, s: Seat): UnitPool | undefined {
  */
 export function cityStateTactics(state: GameState, cityState: CityState, operations: (pass: Pass) => void, strikes: () => void): void {
   const pool = seatPoolSlots(state, cityState)!;
+  dropLoneRiders(state, cityState.seat);
   costsHeld = new Map();
   try {
     withShortOrders(() => {
@@ -3073,6 +3085,7 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
     });
   } finally {
     costsHeld = null;
+    movesEnded = null;
   }
   poolDying(pool, state.units.filter((u) => u.seat === cityState.seat));
 }
@@ -3090,6 +3103,7 @@ export function freeCityTactics(state: GameState, operations: (pass: Pass) => vo
   const free = state.freeSeat;
   if (!free) return;
   const pool = seatPoolSlots(state, free)!;
+  dropLoneRiders(state, FREE_SEAT);
   costsHeld = new Map();
   try {
     withShortOrders(() => {
@@ -3107,6 +3121,7 @@ export function freeCityTactics(state: GameState, operations: (pass: Pass) => vo
     });
   } finally {
     costsHeld = null;
+    movesEnded = null;
   }
   poolDying(pool, state.units.filter((u) => u.seat === FREE_SEAT));
 }
@@ -3140,7 +3155,9 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
     plan.set(u.id, p);
     reach.set(u.id, p.reach);
   }
-  return { seat, strike: false, units, reach, done: new Set(), ended: new Set(), ai, targets, plan, danger: dangerPlane(state, seat), regions: seenRegions(state, seat) };
+  const ended = new Set<number>();
+  movesEnded = ended;
+  return { seat, strike: false, units, reach, done: new Set(), ended, ai, targets, plan, danger: dangerPlane(state, seat), regions: seenRegions(state, seat) };
 }
 
 /** an operation's member of the player, null for one killed */
@@ -3321,7 +3338,7 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * attack flag. The order's danger flags (0x816e70..0x816e85, 0x817839..0x8178b1):
  * where the operation is weaker than its target (op +0x4b0 below +0x510,
  * `weak`) flag 8 for a unit with no combat (0x56dc90) or one in a formation
- * holding a civilian (0x266950(2): Make Formation's pair, `mates`), else
+ * holding a civilian (0x266950(2): `formationMates`), else
  * for a unit with no combat in no formation; flag 0x8000 for a land unit
  * (+0x650 2) in no formation with a ship (0x266950(3)) — runs/h1_duely1121
  * t158-t160: Builder Capture's Builder 4522014 and Line Infantry 4128797 on
@@ -3329,8 +3346,7 @@ function moveBarred(state: GameState, u: Unit, goal: number, paths: ReadonlySet<
  * the operation stronger (63 to 51), the Line Infantry steps on.
  */
 export function passMoveExec(state: GameState, pass: Pass, members: readonly number[], goal: number, range: number,
-  arrived: boolean, ready: boolean, zero: (u: Unit) => boolean = () => false, leaderNamed = false, weak = false,
-  mates: (u: Unit) => readonly Unit[] = () => []): { unit: Unit; from: number; dest: number }[] {
+  arrived: boolean, ready: boolean, zero: (u: Unit) => boolean = () => false, leaderNamed = false, weak = false): { unit: Unit; from: number; dest: number }[] {
   const out: { unit: Unit; from: number; dest: number }[] = [];
   if (arrived && ready && !leaderNamed) return out;
   const region = state.map.tiles[goal].region ?? -1;
@@ -3347,7 +3363,7 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
     const z = zero(u);
     let r = UNITS[u.type]?.naval || z ? 0 : Math.min(range, rangeOf(u));
     const paths = pathPlots(state, u);
-    const mine = mates(u);
+    const mine = formationMates(state, u);
     if (u.tileIndex !== goal && moveBarred(state, u, goal, paths, mine)) r = Math.max(1, r);
     else if (range > 0 && leaderNamed && !z) r = Math.max(1, r);
     let dest = goal;
@@ -3401,7 +3417,8 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
  * THE BARBARIANS' TACTICAL PASS (TacticalAI 0x771530 over Tactics.xml's
  * "Default Barbarian" and "Default Barbarian HL" lists) for the units that
  * stood before their camps raised this turn's (a unit raised this turn acts
- * from the next): the knowledge base's ageing and look (`knowledgeLook`),
+ * from the next): its riders whose escort fell out of their formations
+ * (`dropLoneRiders`), the knowledge base's ageing and look (`knowledgeLook`),
  * the units in their pool's order (`slot`), each one's
  * planning reach taken before any moves (0x792c90), the operations' trees
  * (`barbarianTrees`), then the moves in the
@@ -3409,11 +3426,13 @@ export function passMoveExec(state: GameState, pass: Pass, members: readonly num
  * turn's end the knowledge base looks again.
  */
 export function barbarianTactics(state: GameState, acting: ReadonlySet<number>): void {
+  dropLoneRiders(state, BARB_SEAT);
   costsHeld = new Map();
   try {
     withShortOrders(() => tacticalPass(state, acting));
   } finally {
     costsHeld = null;
+    movesEnded = null;
   }
   // the turn's end: the turn's captures start their operations on the
   // knowledge base the pass left, then it looks again (player signal +0x228)
@@ -3453,7 +3472,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
     plan.set(u.id, p);
     reach.set(u.id, p.reach);
   }
-  const pass: Pass = { seat: BARB_SEAT, strike: true, units: all, reach, done: new Set(), ended: new Set(), ai, targets, plan,
+  const pass: Pass = { seat: BARB_SEAT, strike: true, units: all, reach, done: new Set(), ended: (movesEnded = new Set<number>()), ai, targets, plan,
     danger: dangerPlane(state, BARB_SEAT), regions: seenRegions(state, BARB_SEAT) };
   // the operations first (their manager's job opens the player's turn);
   // then an operation's units are the operation's

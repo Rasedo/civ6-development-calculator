@@ -102,7 +102,7 @@ export interface OpsEnv {
    *  assignment over its units against the targets `keep` picks of its
    *  tactical target list, carried out (the tactical pass's 0x771f80) */
   act(rows: number[][]): void;
-  move(id: number, dest: number, mate: number): void;
+  move(id: number, dest: number): void;
   strike(id: number, plot: number): void;
   attack(ids: readonly number[], keep: (k: number) => boolean, even: boolean, survive: boolean): readonly AiAttackView[];
   /** Operation Move's update and execution for a team (`OpsContext`) */
@@ -116,6 +116,8 @@ export interface OpsEnv {
   endTurn?: OpsContext['endTurn'];
   endMoves?: OpsContext['endMoves'];
   swap?: OpsContext['swap'];
+  enterFormation?: OpsContext['enterFormation'];
+  exitFormation?: OpsContext['exitFormation'];
   /** Naval Patrol's moves (`OpsContext`), where the seat's units' turn gives them */
   patrol?: OpsContext['patrol'];
   /** Naval Pillage's blows (`OpsContext`), where the seat's units' turn gives them */
@@ -188,7 +190,7 @@ function startOperation(ai: OpsAi, env: OpsEnv, def: AiOpDef, enemy: number, tar
   const op: Operation = {
     id: env.newOpId(), def: def.name, enemy, target, rally, backup: null, teams: newTeams(def, env.view(), target),
     status: nodes.map(() => BT_FRESH), mem: nodes.map(() => ({})), bb: {}, done: false, started: env.turn, enemyStrength: 0, strength: 0,
-    triggerUnits: [], triggerValue: 0, locked: false, allowUnitConstruction: false, contracts: [], formations: [],
+    triggerUnits: [], triggerValue: 0, locked: false, allowUnitConstruction: false, contracts: [],
   };
   for (const t of op.teams) {
     t.goals[0] = rally;
@@ -431,6 +433,8 @@ function context(ai: OpsAi, env: OpsEnv, op: Operation): OpsContext {
     endTurn: env.endTurn,
     endMoves: env.endMoves,
     swap: env.swap,
+    enterFormation: env.enterFormation,
+    exitFormation: env.exitFormation,
     patrol: env.patrol,
     pillage: env.pillage,
     ownAiType: env.ownAiType,

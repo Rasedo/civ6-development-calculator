@@ -6,9 +6,19 @@
 - addr: 0x7ee630
   final: 0x556710
   kind: function
-  semantics: Make Formation's execution.
-  status: PARTLY
+  semantics: "Make Formation's execution: with Destroy Formations each of the operation's units in a formation of more than one (+0x1fb8 +0x738 > 1) takes UNITCOMMAND_EXIT_FORMATION (0x94bc70; CanDo +0x48, Do +0x58; 0x7ee7b0..0x7ee817); else each planned pair (0x73b8a0) walks its escort to the civilian (0x962030) and, met there, the civilian takes UNITCOMMAND_ENTER_FORMATION with its partner (0x94bbe0, 0x7eead4..0x7eeb11): a formation of the units' own that outlives the operation."
+  status: READ
+  cases:
+    - recording: h1_duely1128
+      turn: 37
+      value: UnitEnterFormation 3014684 with 1114128 as the capture's Escort Worker To Camp ticks Make Formation 1; Change Target INVALID ends the operation and the pair moves as one t38-50
+  impl:
+    - cpu/core/operations/nodes.ts:makeFormation
+    - gpu/core/sim_barbops.py:_bop_capture_tick
+    - cpu/core/operations/nodes.ts:formedOf
+    - cpu/core/operations/nodes.ts:execute
   readings:
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
@@ -117,7 +127,7 @@
   kind: function
   semantics: Make Formation's update (execution 0x7ee630).
   status: PARTLY
-  impl: [cpu/core/operations/nodes.ts:planFormations]
+  impl: [cpu/core/operations/nodes.ts:planFormations, cpu/core/operations/nodes.ts:formedOf]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

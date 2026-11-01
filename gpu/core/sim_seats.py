@@ -13500,8 +13500,25 @@ class SimSeats:
 
         The autonomous walkers call this too; what is left of each of them is its
         candidate set and its stop condition, which is exactly what TS says
-        should differ."""
+        should differ.
+
+        A formed rider's step is its formation's: its escort steps and carries
+        it; a flag whose escort is gone is no formation, the unit steps alone
+        and leaves it."""
         hc = here.clamp(min=0)
+        if bool(self.unit_escorted.count_nonzero()):
+            gc = gslot.clamp(min=0).unsqueeze(1)
+            flag = ok & self.unit_escorted.gather(1, gc).squeeze(1)
+            if bool(flag.count_nonzero()):
+                mil = self.military_at.gather(1, hc.unsqueeze(1)).squeeze(1)
+                mc = mil.clamp(min=0).unsqueeze(1)
+                lead = (flag & (mil >= 0) & (mil != gslot)
+                        & (self.unit_seat.gather(1, mc).squeeze(1) == self.unit_seat.gather(1, gc).squeeze(1)))
+                stray = flag & ~lead
+                if bool(stray.count_nonzero()):
+                    sr_ = stray.nonzero(as_tuple=True)[0]
+                    self.unit_escorted[sr_, gslot[sr_]] = False
+                gslot = torch.where(lead, mil, gslot)
         gs1 = gslot.unsqueeze(1)
         u_type = self.unit_type.gather(1, gs1).squeeze(1)
         u_promos = self.unit_promos.gather(1, gs1).squeeze(1)
@@ -14156,6 +14173,9 @@ class SimSeats:
         self.unit_seat[rows, dst] = dst_seat
         self.unit_tile[rows, dst] = tile
         self._carry_capture(rows, src, dst)
+        # its original owner the player it was taken from (0x212500: the new
+        # unit's +0x340 the victim's owner)
+        self.unit_orig_owner[rows, dst] = self.unit_seat[rows, src]
         if pool == "barb":
             self.barb_unit_tribe[rows, nslot] = -1
             self.barb_unit_scout[rows, nslot] = False
@@ -15144,7 +15164,11 @@ class SimSeats:
         splices it to, keeping its promotions, experience and formation."""
         cr = captured.nonzero(as_tuple=True)[0]
         dst = getattr(self, self.POOL_NEXT["major"])[cr] + self.POOL_LO["major"]
+        # its original owner the player it was taken from (0x212500: the new
+        # unit's +0x340 the victim's owner)
+        was = self.unit_seat[cr, d_slot[cr]].clone()
         self._convert_unit(cr, d_slot[cr], atk_row[cr], tile_c[cr])
+        self.unit_orig_owner[cr, dst] = was
         self.unit_hp[cr, dst] = self._captured_hp
         self._gen_ver += 1
 

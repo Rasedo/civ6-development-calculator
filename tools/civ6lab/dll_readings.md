@@ -7784,3 +7784,62 @@ EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT / _PER_POPULATION (sim_policy.py),
   race projects on a city subject; Online Communities'
   EFFECT_ADJUST_PLAYER_TRADE_ROUTE_TOURISM_MODIFIER (0x6a1380 on 0x394830,
   a city-state's tourism toward a player) is not ported (C-130).
+
+## C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins
+
+`makeFormation`, `formationMates`, `stepUnit`, `dropLoneRiders`,
+`canEmbark`, `wanderNearCamp`'s `movesEnded` (cpu/core/operations/nodes.ts,
+cpu/core/units.ts, cpu/core/tactical.ts); `_bop_capture_tick`, `_tac_mate`,
+`_tac_formation_exit`, `_drop_lone_riders`, `_step_verb`, `_tac_embarks`,
+`_tac_moves_ended` (gpu/core/sim_barbops.py, sim_tactics.py, sim_seats.py).
+
+- MAKE FORMATION'S EXECUTION (0x7ee630): with Destroy Formations, each of
+  the operation's units whose formation (unit +0x1fb8) holds more than one
+  (+0x738 > 1) takes the unit command 0x94bc70 builds (hash 0xfcfe4c4d,
+  UNITCOMMAND_EXIT_FORMATION: CanDo +0x48, Do +0x58; 0x7ee7b0..0x7ee817);
+  else each planned pair (0x73b8a0) not on one plot walks the escort to the
+  civilian (MoveTo 0x962030), and met there the civilian takes the command
+  0x94bbe0 builds with its partner's id (hash 0xc9903c80,
+  UNITCOMMAND_ENTER_FORMATION, 0x7eead4..0x7eeb11). The formation is the
+  units' own: the operation's end leaves it standing. The engines' formation
+  is the unit link they already keep (`Unit.escorted`, `unit_escorted`: the
+  civilian carries the flag, the escort is its player's military unit on its
+  plot); the operations' own pair list is gone.
+- A FORMATION MOVES AS ONE: a member's move moves every member
+  (`stepUnit`: a rider's step is its escort's), on the formation's Movement,
+  the least its members hold (0x262cd0; `walk`, `_tac_move_to`), a member
+  whose moves an order ended (0x56d6f0 -> 0x267b00) holding none; each
+  search of a member is its formation's (`groundOf`'s and `_tac_search`'s
+  mates). WANDER NEAR CAMP ends the wanderer's moves before its turn
+  (0x56d6f0 at 0x77bedd, then 0x570b40), so a formation that wandered moves
+  no more that turn. The game's UnitExitFormation falls at a member's death:
+  a rider whose plot holds no escort of its player leaves it as its
+  player's AI turn opens (`dropLoneRiders`), and a flag no escort answers
+  is dropped at the rider's step.
+- CONFIRMED (the records' events, AI_Tactical.csv): runs/h1_duely1128 t37
+  UnitEnterFormation 3014684 with 1114128 (the capture's "Escort Worker To
+  Camp" ticks Make Formation 1, then Change Target INVALID ends it); t38-50
+  each UnitMoved of the Warrior is the Settler's too, its Wander / Move to
+  safety the pair's; t40 / t42 / t44 / t46 the Settler logs HL: Move To
+  Safety and stays (its Warrior's Wander ended the formation's moves);
+  runs/h1_duely1121 t128 UnitExitFormation 2949124 / 3604504 at the
+  Man-At-Arms' death, t124-126 Builder 3604504 with it; 1128 t107 the
+  Swordsman 4456471 falls, its Settler 4718622 walks on alone past the
+  Man-At-Arms on 14:14 (t108 to 15:14 as logged).
+- THE CAPTIVE'S ORIGINAL OWNER (0x212500 at 0x212825..0x2128f3): the
+  capture creates its new unit under the captor with the victim's owner
+  (+0x2e0) as its original owner (the tracked +0x2e8, value +0x340), a
+  civilian's capture and a beaten unit's alike (`seizeCivilian`, the melee
+  capture; `Unit.originalOwner`, `unit_orig_owner`). 0x56c480 embarks a land
+  unit by its owner's CanEmbark (0x4ee3f0; the barbarians' passes none of
+  their land types), else by its original owner's where that is another
+  player still in the game (`canEmbark`, `_tac_embarks`).
+- CONFIRMED (one-seed aimem traces): runs/h1_duely1124 t133-136 Builder
+  5111833 to 37:10 and embarked there as logged; 1128 t136 Settler 4718622
+  to 17:15; 1127 t164 Settler 2097173 to 16:12; 1121 t135-136 Settler
+  4063247 on 13:12.
+- OPEN: a formation's members beyond a pair (the engines' one-rider-per-class
+  link), a military unit stepping onto a lone rider's plot in its own pass
+  (the flag answers it), and an embarked captive's danger from a land unit
+  beside it (1127 t166 player 0's Warrior on 15:12 beside 16:12, 1128 t137;
+  the game's Move To Safety, the engines' danger 0) (C-123).

@@ -1890,6 +1890,9 @@ export function seizeCivilian(state: GameState, victim: Unit, by: { seat: number
   victim.escorted = false;
   if (def?.capturedAs) {
     victim.type = def.capturedAs;
+    // its original owner the player it was taken from (the new unit's
+    // +0x340 the victim's owner, 0x212825..0x2128f3)
+    victim.originalOwner = victim.seat;
     reseatUnit(state, victim, by.seat);
     // the capture's event (AI_EVENT_UNIT_CAPTURED, 0x212500): the captive,
     // then its captor
@@ -2104,7 +2107,9 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     if (defender.hp <= 0) {
       if (captured) {
         // ...and no death for the kill event, the disciples, the dig and the
-        // heal: CIV6 (Mongol Horde) — the loser changes hands where it fell
+        // heal: CIV6 (Mongol Horde) — the loser changes hands where it fell,
+        // its original owner the player it was taken from (0x212500)
+        defender.originalOwner = defender.seat;
         reseatUnit(state, defender, attacker.seat);
         defender.hp = CAPTURED_UNIT_HP;
       } else {

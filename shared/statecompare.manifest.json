@@ -3984,6 +3984,17 @@
           "note": "the civilian half of an escort formation; the escort is whoever holds the tile's military slot."
         },
         {
+          "name": "originalOwner",
+          "compare": "exact",
+          "covers": [
+            "Unit.originalOwner"
+          ],
+          "planes": [
+            "unit_orig_owner"
+          ],
+          "note": "the seat a capture took the unit from (unit +0x340), -1 on a unit its owner made."
+        },
+        {
           "name": "aiDefender",
           "compare": "exact",
           "covers": [
@@ -5057,10 +5068,6 @@
       },
       {
         "plane": "bcap_resume",
-        "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
-      },
-      {
-        "plane": "bcap_form",
         "why": "the barbarians' Builder Capture operations (the Barbarian Builder Capture ones of `barbSeat.ops`, slot-indexed on the GPU and id-keyed in the TS manager): compared through their effect, the captive's and its captor's moves."
       },
       {

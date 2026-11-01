@@ -63,6 +63,8 @@ export interface AiUnitView {
   domain: 'land' | 'sea' | 'air';
   /** of AI type DEFENDER (unit +0x1c0 4: its city's standing army holds it) */
   defender: boolean;
+  /** the other members of its formation (unit +0x1fb8), none outside one */
+  mates: readonly number[];
 }
 
 /** a unit of a player at war with the seat that the seat sees now */

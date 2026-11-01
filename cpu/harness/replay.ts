@@ -1122,6 +1122,14 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   // (the recruit's asks, the spawn interval, the cities a raid's end and a
   // scout's report list, the scouts' trees)
   state.barbSeat.ops = copy.barbSeat.ops;
+  // ...the formations their Make Formation nodes made or undid (unit
+  // +0x1fb8: runs/h1_duely1128 t37 the captured Settler 3014684 enters its
+  // captor Warrior 1114128's)
+  const realOf = new Map(state.units.filter((u) => isBarbSeat(u.seat)).map((u) => [u.id, u] as const));
+  for (const c of copy.units) {
+    const u = isBarbSeat(c.seat) ? realOf.get(c.id) : undefined;
+    if (u) u.escorted = c.escorted;
+  }
   state.barbSeat.opsNext = copy.barbSeat.opsNext;
   state.barbSeat.treeSlots = copy.barbSeat.treeSlots;
   state.barbSeat.treeFree = copy.barbSeat.treeFree;
@@ -4738,7 +4746,7 @@ function turnSeed(rec: TurnRecord): number | undefined {
  * Food focus, trade list and value, the city-states it met, UNITS and BUILDINGS tables, resource counts, economic
  * memory (savings), threat, enemy at the gates, growth forecast, revealed
  * plots, standing army's lack, "Upgrade Units" trees. Per Free City: its threat, enemy at the gates
- * and raid; per major's city its trade list. Per unit: its id, its pool slot, its DEFENDER type. The
+ * and raid; per major's city its trade list. Per unit: its id, its pool slot, its DEFENDER type, its formation, the player a capture took it from. The
  * barbarians' tribes (their clocks, raids, scouts' trees), unit pool, camp
  * step's start and scout throttle. The non-majors' explored plots.
  */
@@ -4748,7 +4756,7 @@ const RESEARCH_MEMORY = ['goal', 'aiEntries', 'civicAiEntries', 'civicGovValues'
 const MINOR_MEMORY = ['prodSetValue', 'favoredFood', 'tradeCities', 'tradeRejected', 'tradeValue', 'metMinors', 'unitValues', 'buildingValues', 'resourceCounts',
   'economy', 'threat', 'threatNear', 'aiGrowth', 'aiGrowthSeen', 'revealed', 'standingArmyShort', 'explored', 'upgrading', 'upgradeTrigger'] as const;
 const CITY_MEMORY = ['aiThreat', 'aiThreatNear', 'freeRaid', 'tradeCities', 'tradeRejected'] as const;
-const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed'] as const;
+const UNIT_MEMORY = ['slot', 'aiDefender', 'aiHomed', 'escorted', 'originalOwner'] as const;
 const GAME_MEMORY = ['barbTribes', 'barbPool', 'barbCampsBegun', 'barbSpotNext'] as const;
 /** THE RULES' STORES NO RECORD SHOWS, carried the same way: the research
  *  and culture overflow a completion left for the next turn's yield

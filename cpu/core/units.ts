@@ -126,15 +126,22 @@ export function ownerHasTech(
   return ownerTechs(state, unit).includes(tech);
 }
 
-/** can this LAND unit embark? Its OWNER needs SAILING (civilians) or
- * SHIPBUILDING (all land units incl. military). Naval units never "embark". */
+/** can this LAND unit embark (0x56c480)? By its owner's CanEmbark (0x4ee3f0):
+ * SAILING (civilians) or SHIPBUILDING (all land units incl. military), the
+ * barbarians' passing none of their land types; failing that, by its
+ * original owner's (+0x340) where that is another player still in the game
+ * (runs/h1_duely1124 t134-137: the barbarians' captured Builder 5111833
+ * embarked on 37:10). Naval units never "embark". */
 export function canEmbark(
   state: GameState,
-  unit: { type: string; seat: number },
+  unit: { type: string; seat: number; originalOwner?: number },
 ): boolean {
   if (UNITS[unit.type]?.naval) return false;
   const tech = unitIsNoncombat(unit.type) ? 'SAILING' : 'SHIPBUILDING';
-  return ownerHasTech(state, unit, tech);
+  const by = (seat: number) => !isBarbSeat(seat) && ownerHasTech(state, { seat }, tech);
+  if (by(unit.seat)) return true;
+  const o = unit.originalOwner;
+  return o !== undefined && o !== unit.seat && seatOf(state, o) !== undefined && by(o);
 }
 
 /** may a mover (naval or embarking land unit) ENTER this water tile
@@ -833,6 +840,24 @@ export function inEscort(state: GameState, unit: Unit): boolean {
   return escortOf(state, unit) !== undefined;
 }
 
+/** each rider of `seat` whose plot holds no escort of its player leaves its
+ *  formation, as the AI player's turn opens: the escort fell since (the
+ *  game's UnitExitFormation at its death; runs/h1_duely1128 t107, the
+ *  Swordsman 4456471 falls in player 1's turn and its Settler 4718622 walks
+ *  on alone, past the Man-At-Arms it meets on 14:14) */
+export function dropLoneRiders(state: GameState, seat: number): void {
+  for (const u of state.units) if (u.seat === seat && u.escorted && !escortOf(state, u)) u.escorted = false;
+}
+
+/** the other members of the unit's formation (unit +0x1fb8): a formed
+ *  civilian's escort and the escort's other riders, an escort's riders;
+ *  none outside one */
+export function formationMates(state: GameState, unit: Unit): Unit[] {
+  const esc = escortOf(state, unit);
+  if (esc) return [esc, ...escortRiders(state, esc).filter((r) => r !== unit)];
+  return escortRiders(state, unit);
+}
+
 export function escortUnit(state: GameState, unit: Unit): RuleResult {
   if (!escortable(unit)) return no('Only a civilian or a passenger joins an escort.');
   if (unit.escorted) return no('Already in a formation.');
@@ -1091,9 +1116,16 @@ export function setBarbStepLook(fn: ((state: GameState, unit: Unit) => void) | n
 
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const seat = unit.seat;
-  // a formed civilian has no step of its own: the formation moves as one, and
-  // Civ 6 asks for it to be broken first.
-  if (inEscort(state, unit)) return 'blocked';
+  // a formed civilian's step is its formation's: the escort steps and carries
+  // it (runs/h1_duely1128 t38-49: the captured Settler 3014684's moves are
+  // its captor Warrior 1114128's, each UnitMoved the Warrior's then the
+  // Settler's)
+  const lead = escortOf(state, unit);
+  if (lead) return stepUnit(state, lead, to);
+  // a flag whose escort is gone is no formation: the unit steps alone and
+  // leaves it (runs/h1_duely1128 t51: the Settler 3014684, its Warrior
+  // killed, walks to 17:13 past the Warrior on 16:13 alone)
+  if (unit.escorted) unit.escorted = false;
   const from = state.map.tiles[unit.tileIndex];
   const naval = !!UNITS[unit.type]?.naval;
   // CIV6 (Movement): the one-step allowance reads "full Movement" as "has

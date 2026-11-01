@@ -23,7 +23,7 @@
  *
  * An operation (`importOps`) becomes ours of the same definition and target
  * (else of the same definition), which keeps its id, slot, backup's rally
- * and enemy, start, formations and build permission: its enemy, target and
+ * and enemy, start and build permission: its enemy, target and
  * rally, its strengths (op +0x220, +0x238), its tree's run, its trigger (the
  * Decode Trigger's units and value), its lock (a Lock Units node that
  * succeeded), its contracts; per team (op +0x150, 0x118 bytes each, in the
@@ -251,7 +251,6 @@ function opOf(w: ImportWorld, g: GameOperation, tree: GameTree | undefined, base
     enemyStrength: g.targetStrength, strength: g.opStrength, triggerUnits, triggerValue, locked,
     allowUnitConstruction: base?.allowUnitConstruction ?? false,
     contracts: (tree.contracts ?? []).filter((c) => c >= 0),
-    formations: base?.formations ?? [],
     ...(base?.killed !== undefined ? { killed: base.killed } : {}),
     ...(released.length ? { released } : {}),
   };

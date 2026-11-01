@@ -1500,6 +1500,9 @@ class SimInit:
             # homed on its city-state's city: set where its standing army
             # takes it, cleared where the army drops it (`Unit.aiHomed`)
             ("homed", torch.bool),
+            # the player a capture took it from (`Unit.originalOwner`, unit
+            # +0x340 m_eOriginalOwner), -1 its owner made it
+            ("orig_owner", torch.long),
             # CIV6 (The Raven King): this unit is a city-state's, held by LEVY
             # — the mark its clauses read (the 75% upgrade discount survives
             # an upgrade); `levy_src` is the minor's seat it returns to
@@ -1544,6 +1547,7 @@ class SimInit:
         self.unit_free_city.fill_(-1)
         self.unit_pslot.fill_(-1)
         self.unit_levy_src.fill_(-1)
+        self.unit_orig_owner.fill_(-1)
         self.unit_spy_mission.fill_(self._spy_idle)
         self.unit_spy_target.fill_(-1)
         self.barb_unit_seat.fill_(BARB_SEAT)
@@ -4275,7 +4279,6 @@ class SimInit:
         self.bcap_bk_target = torch.full((B, _nc), -1, dtype=torch.long, device=device)
         self.bcap_bk_rally = torch.full((B, _nc), -1, dtype=torch.long, device=device)
         self.bcap_resume = torch.full((B, _nc), -1, dtype=torch.long, device=device)
-        self.bcap_form = torch.zeros(B, _nc, dtype=torch.bool, device=device)
         self.bcap_ready = torch.zeros(B, _nc, dtype=torch.bool, device=device)
         self.bcap_str = torch.zeros(B, _nc, dtype=torch.long, device=device)
         self.bcap_estr = torch.zeros(B, _nc, dtype=torch.long, device=device)

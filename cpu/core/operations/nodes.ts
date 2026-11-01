@@ -64,8 +64,8 @@ export interface OpsContext {
   /** carry out the seat's unit action rows now */
   act(rows: number[][]): void;
   /** the unit's move to the plot as far as its Movement carries it this
-   *  turn, `mate` (its formation's other unit, -1 none) stepping with it */
-  move(id: number, dest: number, mate: number): void;
+   *  turn, its formation with it */
+  move(id: number, dest: number): void;
   /** the unit's blow on the plot: from where it stands beside it or in its
    *  range, else along its path, the last step the attack */
   strike(id: number, plot: number): void;
@@ -84,12 +84,17 @@ export interface OpsContext {
    *  cap, the node's Unit distance; zero: a unit whose
    *  radius is 0 (a formation's, the Leader Tag's), leaderNamed: the node
    *  names a Leader Tag; weak: the operation's strength below its target's
-   *  (the order's danger flags); mates: the other members of a unit's
-   *  formation (none outside one) — each mover's type, its plot before, the
+   *  (the order's danger flags) — each mover's type, its plot before, the
    *  plot it went for and the plot it stands on */
   moveExec(members: readonly number[], goal: number, range: number, arrived: boolean, ready: boolean,
-    zero: (id: number, type: string) => boolean, leaderNamed: boolean, weak: boolean,
-    mates: (id: number) => readonly number[]): readonly { type: string; from: number; dest: number; after: number }[];
+    zero: (id: number, type: string) => boolean, leaderNamed: boolean, weak: boolean): readonly { type: string; from: number; dest: number; after: number }[];
+  /** UNITCOMMAND_ENTER_FORMATION (0x94bbe0): the civilian joins the
+   *  fighter on its plot, a formation of the units' own that outlives the
+   *  operation; none outside the seat's units' turn */
+  enterFormation?: (id: number) => void;
+  /** UNITCOMMAND_EXIT_FORMATION (0x94bc70): the unit leaves its formation;
+   *  none outside the seat's units' turn */
+  exitFormation?: (id: number) => void;
   /** Operation Defend Units' orders, where the seat's units' turn gives
    *  them; none, the node moves no unit */
   defend?: DefendOrders;
@@ -527,15 +532,23 @@ const lockUnits: BtHandler<OpsContext> = {
   },
 };
 
-// MAKE FORMATION (0x7efd70): the civilian and its escort move as one
+// MAKE FORMATION (0x7efd70 update, 0x7ee630 execution): the civilian and its
+// escort form a formation of the units' own (unit +0x1fb8), which outlives
+// the operation
+/** the operation's members in a formation */
+const formedOf = (view: AiView, seat: number, op: Operation): number[] => {
+  const units = unitsById(view, seat);
+  return opUnits(op).filter((id) => (units.get(id)?.mates.length ?? 0) > 0);
+};
+
 /** the team's planned pairs (0x73b8a0): each civilian member of the
- *  Civilian Unit type not yet escorted takes, of the free members of the
- *  Combat Unit type that fight, the one whose planning reaches the
- *  civilian's plot in the fewest turns (then the least Movement spent, the
- *  first of equals); they meet on the civilian's plot */
+ *  Civilian Unit type in no formation takes, of the members of the Combat
+ *  Unit type that fight and stand in none, the one whose planning reaches
+ *  the civilian's plot in the fewest turns (then the least Movement spent,
+ *  the first of equals); they meet on the civilian's plot */
 function planFormations(view: AiView, seat: number, op: Operation, civ: string, combat: string): { pairs: [number, number, number][]; near: boolean } {
   const units = unitsById(view, seat);
-  const paired = new Set(op.formations.flat());
+  const paired = new Set(formedOf(view, seat, op));
   const pairs: [number, number, number][] = [];
   let near = true;
   for (const t of op.teams) {
@@ -580,11 +593,18 @@ const makeFormation: BtHandler<OpsContext> = {
     run.mem[node.index].pairs = plan.pairs;
     return plan.near ? BT_SUCCESS : BT_RUNNING;
   },
-  // the escort walks to the civilian's plot; met there, they form
+  // Destroy Formations: each of the operation's units in a formation of
+  // more than one leaves it (UNITCOMMAND_EXIT_FORMATION, 0x7ee7b0..0x7ee817);
+  // else the escort walks to the civilian's plot and, met there, the
+  // civilian enters its formation (UNITCOMMAND_ENTER_FORMATION, 0x7eead4:
+  // runs/h1_duely1128 t37 UnitEnterFormation 3014684 with 1114128, the
+  // capture's tree's Make Formation before its Change Target ends it)
   execute(node, run, ctx) {
     const { op } = ctx;
     if (dataBool(node, 'Destroy Formations')) {
-      op.formations = [];
+      for (const id of formedOf(ctx.view(), ctx.seat, op)) {
+        if (formedOf(ctx.view(), ctx.seat, op).includes(id)) ctx.exitFormation?.(id);
+      }
       return;
     }
     const pairs = (run.mem[node.index].pairs as [number, number, number][] | undefined) ?? [];
@@ -594,7 +614,7 @@ const makeFormation: BtHandler<OpsContext> = {
       const v = ctx.view();
       const a = v.units(ctx.seat).find((u) => u.id === civ);
       const b = v.units(ctx.seat).find((u) => u.id === escort);
-      if (a && b && a.plot === b.plot && !op.formations.some((f) => f.includes(civ) || f.includes(escort))) op.formations.push([civ, escort]);
+      if (a && b && a.plot === b.plot && !a.mates.length && !b.mates.length) ctx.enterFormation?.(civ);
     }
   },
 };
@@ -642,7 +662,7 @@ const operationMove: BtHandler<OpsContext> = {
     const range = dataInt(node, 'Unit distance') ?? 1;
     const leader = dataValue(node, 'Leader Tag');
     const arrived = !!m.arrived;
-    const paired = new Set(ctx.op.formations.flat());
+    const paired = new Set(formedOf(ctx.view(), ctx.seat, ctx.op));
     // the operation ready (0x73aa60): its units may be built, or every team ready
     const ready = ctx.op.allowUnitConstruction || ctx.op.teams.every((t) => t.ready);
     for (const t of ctx.op.teams) {
@@ -650,7 +670,7 @@ const operationMove: BtHandler<OpsContext> = {
       if (goal === NO_PLOT) continue;
       const v = ctx.view();
       const moved = ctx.moveExec(t.members, goal, range, arrived, ready, (id, type) => paired.has(id) || (!!leader && hasAiType(type, leader)), !!leader,
-        ctx.op.strength < ctx.op.enemyStrength, (id) => ctx.op.formations.find((f) => f.includes(id))?.filter((x) => x !== id) ?? []);
+        ctx.op.strength < ctx.op.enemyStrength);
       for (const x of moved) ctx.log(`${ctx.op.def}, Operation Move, ${x.type}, ${xy(v, x.from)}, ${xy(v, x.dest)}, ${xy(ctx.view(), x.after)}`);
     }
   },
@@ -813,7 +833,7 @@ const operationDefendUnits: BtHandler<OpsContext> = {
   update(node, run, ctx) {
     const pct = dataInt(node, 'AutoProtect Percentage') ?? 33;
     const d = ctx.defend;
-    const formed = ctx.op.formations.flat();
+    const formed = formedOf(ctx.view(), ctx.seat, ctx.op);
     run.mem[node.index].marked = !!d && ctx.op.teams.some((t) => d.flagged(t.members, pct, formed));
     return BT_SUCCESS;
   },
@@ -822,7 +842,7 @@ const operationDefendUnits: BtHandler<OpsContext> = {
     if (!d || !run.mem[node.index].marked) return;
     const pct = dataInt(node, 'AutoProtect Percentage') ?? 33;
     const range = dataInt(node, 'Protect Outside Range') ?? -1;
-    const formed = ctx.op.formations.flat();
+    const formed = formedOf(ctx.view(), ctx.seat, ctx.op);
     const { op } = ctx;
     const release = (id: number) => {
       if (!op.released?.includes(id)) (op.released ??= []).push(id);

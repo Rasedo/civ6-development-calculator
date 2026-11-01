@@ -1233,6 +1233,7 @@ const UNIT_G: Record<string, Extractor> = {
   levied: overUnits((u) => u.leviedFrom ?? -1),
   formation: overUnits((u) => u.formation ?? 0),
   escorted: overUnits((u) => (u.escorted ? 1 : 0)),
+  originalOwner: overUnits((u) => u.originalOwner ?? -1),
   aiDefender: overUnits((u) => (u.aiDefender ? 1 : 0)),
   aiHomed: overUnits((u) => (u.aiHomed ? 1 : 0)),
   patrol: overUnits((u) => u.patrol ?? -1),

@@ -39,6 +39,7 @@
     - "C-99: the city-states' Promotion move on the replay's copy, Garrison City's swap — READ, both twins"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-99: an owned water plot no shore, a move order carried on as the turn ends — READ (0x530240, 0x66790, 0x66a90, 0x66680, 0x814e0, 0x81240, 0x7eeba0), both twins"
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...+0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the   move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none:   FindAlternateLocation (0x585940) rou..."
   context:

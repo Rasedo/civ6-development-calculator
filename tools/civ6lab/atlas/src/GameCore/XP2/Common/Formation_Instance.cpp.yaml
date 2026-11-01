@@ -12,9 +12,14 @@
     - recording: h1_duely1121
       turn: 168
       value: the 6:10 team's formation Movement the least of its members'
-  impl: [cpu/core/tactical.ts:passMoveExec, gpu/core/sim_tactics.py:_op_move_exec]
+  impl:
+    - cpu/core/tactical.ts:passMoveExec
+    - gpu/core/sim_tactics.py:_op_move_exec
+    - cpu/core/tactical.ts:full
+    - gpu/core/sim_tactics.py:_tac_move_to
   readings:
     - "C-123: a formation's Movement and its path's stacking — READ (0x2673f0, 0x267650, 0x262cd0, 0x585eb0 in the path validity), both twins"
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
   review: reviewed
 - addr: 0x264d90
   final: 0x1a2e60

@@ -456,7 +456,7 @@
 - addr: 0x212500
   kind: function
   name: Combat_Manager
-  semantics: "a retreat (sets the turn done). A unit info with the +0x1b8 bit 8 (CanRetreatWhenCaptured: the Great People, the Archaeologist, the Naturalist, the Rock Band) retreats to 0x530650's plot and returns 2, or 0 where none is valid; otherwise the type the unit info's UnitCaptures collection names first (+0x208, BecomesUnitType) — or, where the mover may capture combat units, its own type after the \"Unit Capture Chance\" draw — is created under the mover's player on the victim's plot with the victim's build charges (+0xed0, 0x56cb00), damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0. A civilian captured: the payload's units — the captive (r14 +0x100), then the captor (rsi +0x100; where its +0x7d0 is -1 or 0x56ee80 answers) — raised as AI_EVENT_UNIT_CAPTURED (@f2e088) on the player's signals (+0x2b8, 0x200e10); the barbarians' triggered tree (TRIGGER_CAPTURE_BARBARIAN: \"Escort Worker To Camp\", the operation \"Barbarian Builder Capture\") runs it."
+  semantics: "a retreat (sets the turn done). A unit info with the +0x1b8 bit 8 (CanRetreatWhenCaptured: the Great People, the Archaeologist, the Naturalist, the Rock Band) retreats to 0x530650's plot and returns 2, or 0 where none is valid; otherwise the type the unit info's UnitCaptures collection names first (+0x208, BecomesUnitType) — or, where the mover may capture combat units, its own type after the \"Unit Capture Chance\" draw — is created under the mover's player on the victim's plot with the victim's build charges (+0xed0, 0x56cb00), damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0. A civilian captured: the payload's units — the captive (r14 +0x100), then the captor (rsi +0x100; where its +0x7d0 is -1 or 0x56ee80 answers) — raised as AI_EVENT_UNIT_CAPTURED (@f2e088) on the player's signals (+0x2b8, 0x200e10); the barbarians' triggered tree (TRIGGER_CAPTURE_BARBARIAN: \"Escort Worker To Camp\", the operation \"Barbarian Builder Capture\") runs it. The new unit's original owner (the tracked +0x2e8, value +0x340) is the victim's owner (+0x2e0; 0x212825..0x2128f3)."
   status: PARTLY
   cases:
     - recording: h1_duelw1121
@@ -468,11 +468,16 @@
     - cpu/core/combat.ts:def
     - cpu/core/types.ts:GameState
     - gpu/core/sim_barbops.py:_barb_capture_event
+    - cpu/core/combat.ts:captured
+    - cpu/core/types.ts:Unit
+    - gpu/core/sim_seats.py:_capture_unit
+    - gpu/core/sim_seats.py:_capture_beaten
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported on the operation manager (the Defend Units' moves and the rally below unread)"
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
+    - "C-93: Make Formation's formation outlives its operation, a captive embarks by its original owner — READ (0x7ee630, 0x94bbe0, 0x94bc70, 0x212825..0x2128f3, 0x56c480, 0x77b9a0 at 0x77bedd), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e +0x1ba bit 2, and whose player the mover's player is at war with (0x469cd0), it calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 wi...
