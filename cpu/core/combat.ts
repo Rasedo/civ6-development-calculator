@@ -170,15 +170,18 @@ export function chassisAbilityCS(
   state: GameState,
   u: { type: string; seat: number; movesLeft?: number; alpine?: boolean },
   atTile: number,
-  ctx?: { defendingRanged?: boolean; foeType?: string; vsDistrict?: boolean },
+  ctx?: { defendingRanged?: boolean; foeType?: string; vsDistrict?: boolean; combatTile?: number },
 ): number {
   const def = UNITS[u.type];
   if (!def) return 0;
   const tile = state.map.tiles[atTile];
   if (!tile) return 0;
   let out = 0;
-  // CIV6 (ALPINE_TRAINING_COMBAT_HILLS): the ability's Combat Strength on hills
-  if (u.alpine && tile.elevation === 'HILLS') out += ALPINE_HILLS_CS;
+  // CIV6 (ALPINE_TRAINING_COMBAT_HILLS, BALKAN_CAVALRY_PLOT_IS_HILS_REQUIREMENTS):
+  // the ability's Combat Strength where the combat's plot is hills — an
+  // attacker's the target's (runs/h1_duely1124 t111: China's Courser on hills
+  // strikes an Archer on flat ground, none; t112 one on hills, +3)
+  if (u.alpine && state.map.tiles[ctx?.combatTile ?? atTile]?.elevation === 'HILLS') out += ALPINE_HILLS_CS;
   // CIV6 (Khevsureti, Highlander): Combat Strength on named ground.
   if (def.groundCS) {
     const g = def.groundCS;
@@ -1528,7 +1531,7 @@ export function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: numb
     (isCiv(attacker.seat)
       ? religionAttackCS(state, attacker, targetIndex)
       : 0) +
-    chassisAbilityCS(state, attacker, attacker.tileIndex, { vsDistrict: true }) +
+    chassisAbilityCS(state, attacker, attacker.tileIndex, { vsDistrict: true, combatTile: targetIndex }) +
     generalAuraCS(state, attacker, attacker.tileIndex) +
     gdrBeamCS(state, attacker) + // the beam "applies to both melee and ranged attacks"
     congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)
@@ -1942,7 +1945,7 @@ export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex
       tile: from,
     })
     + holdTheLineCS(state, attacker, attacker.tileIndex, defender.type)
-    + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
+    + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type, combatTile: targetIndex }) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
     + classMatchupCS(attacker.type, defender.type)
     + emergencyAttackCS(state, attacker.seat, defender.seat)
     + barbarianCombatCS(state, attacker.seat, defender.seat)
@@ -1958,7 +1961,7 @@ export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex
  *  the hostile seats' strike does not) */
 export function rangedUnitStrengths(state: GameState, attacker: Unit, targetIndex: number, defender: Unit, emergency = true): { atk: number; def: number } {
   const def = UNITS[attacker.type];
-  const atk = (def?.ranged?.strength ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + rangedDomainCS(attacker, defender.type) + (emergency ? emergencyAttackCS(state, attacker.seat, defender.seat) : 0) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker);
+  const atk = (def?.ranged?.strength ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type, combatTile: targetIndex }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + rangedDomainCS(attacker, defender.type) + (emergency ? emergencyAttackCS(state, attacker.seat, defender.seat) : 0) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker);
   return { atk, def: defenderCS(state, defender, targetIndex, { attacker, melee: false }) };
 }
 

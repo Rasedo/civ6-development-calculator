@@ -5804,18 +5804,22 @@ class SimSeats:
                             *, def_ranged: bool = False,
                             foe_type: torch.Tensor | None = None,
                             vs_district: bool = False,
-                            alpine: torch.Tensor | None = None) -> torch.Tensor:
+                            alpine: torch.Tensor | None = None,
+                            combat_tile: torch.Tensor | None = None) -> torch.Tensor:
         """`chassisAbilityCS`'s twin, [B] long — every position-dependent
         unique-unit clause, read at the tile the unit FIGHTS FROM. Each `if` below is one UnitAbilities.xml
         ability; a build whose roster carries none of a clause skips it.
-        `alpine` [B]: the unit holds Alpine Training (`unit_alpine`)."""
+        `alpine` [B]: the unit holds Alpine Training (`unit_alpine`);
+        `combat_tile` [B]: the combat's plot (an attacker's target), else `tiles`."""
         ti = types.clamp(min=0, max=self.NU - 1)
         tl = tiles.clamp(min=0)
         out = torch.zeros_like(tiles)
         live = (seat >= 0) & (types >= 0)
-        # CIV6 (ALPINE_TRAINING_COMBAT_HILLS): the ability's Combat Strength on hills
+        # CIV6 (ALPINE_TRAINING_COMBAT_HILLS, BALKAN_CAVALRY_PLOT_IS_HILS_REQUIREMENTS):
+        # the ability's Combat Strength where the combat's plot is hills
         if alpine is not None:
-            on_hill = live & alpine & self.hills.gather(1, tl.unsqueeze(1)).squeeze(1)
+            ct = (tiles if combat_tile is None else combat_tile).clamp(min=0)
+            on_hill = live & alpine & self.hills.gather(1, ct.unsqueeze(1)).squeeze(1)
             out = out + on_hill.long() * self._alpine_hills_cs
         # CIV6 (Khevsureti, Highlander): Combat Strength on named ground.
         if bool(self._type_ground_cs.count_nonzero()):
@@ -12574,7 +12578,7 @@ class SimSeats:
         if major:
             atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
         atk_e = atk_e + self._chassis_ability_cs(a_seat, at, here, foe_type=d_type,
-                                                 alpine=self.unit_alpine.gather(1, a1).squeeze(1)).to(atk_e.dtype)
+                                                 alpine=self.unit_alpine.gather(1, a1).squeeze(1), combat_tile=tgt).to(atk_e.dtype)
         def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
         def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(
             d_seat, d_type, ttc, foe_type=at, alpine=self.unit_alpine.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype))
@@ -13826,7 +13830,7 @@ class SimSeats:
         if major:
             atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
             atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tc).to(atk_e.dtype)
-            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u]).to(atk_e.dtype)
+            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], combat_tile=tile).to(atk_e.dtype)
             atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], atk_naval).to(atk_e.dtype)
         # the district is a CITY target to the roster's rows, as `assaultAtkCS` reads it
         atk_e = atk_e + self._roster_cs(
@@ -14550,7 +14554,7 @@ class SimSeats:
                  + self._assault_promo_cs(at0, a_promos, a_tile[:, u])
                  - self._atk_pens(at0, a_promos, a_tile[:, u], tgt, a_emb[:, u]))
         atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
-        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u]).to(atk_e.dtype)
+        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], combat_tile=tgt).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT, torch.full_like(a_seat[:, u], -1), a_seat[:, u])
         atk_naval = self.unit_naval[at0] | a_emb[:, u]
         atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
@@ -15161,7 +15165,7 @@ class SimSeats:
         # the attacker's own position clauses — a Varu or Toa beside the
         # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
         atk_e = atk_e + self._chassis_ability_cs(a_seat, at, a_tile, foe_type=d_type,
-                                                 alpine=self.unit_alpine.gather(1, a1).squeeze(1)).to(atk_e.dtype)
+                                                 alpine=self.unit_alpine.gather(1, a1).squeeze(1), combat_tile=tgt).to(atk_e.dtype)
         if not hostile:
             atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
         def_civ_u = torch.where((d_slot >= 0) & ~d_barb, d_seat, neg)
@@ -15505,7 +15509,7 @@ class SimSeats:
             # the attacker's own position clauses — a Varu or Toa beside the
             # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
             atk_e = atk_e + self._chassis_ability_cs(aseat, at0, a_tile[:, u], foe_type=d_type,
-                                                     alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u]).to(atk_e.dtype)
+                                                     alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], combat_tile=tgt).to(atk_e.dtype)
             def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)

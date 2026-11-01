@@ -2659,7 +2659,11 @@ function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnR
   // fixed order (a levied army fights its levier's battles before its minor
   // calls it home: runs/h1_duelw1117 t42); what record t+1 shows of a unit
   // lands after every player's (its loss, its health)
-  const late = (d: Decision) => (d.kind === 'unitGone' && d.why !== 'founded') || d.kind === 'combat' || d.kind === 'hit';
+  // ...and the World Congress's resolutions after every player's blows: the
+  // session opens the next turn (runs/h1_duely1124 t101: Military Advisory
+  // for melee in record t102, the barbarians' Men-at-Arms of t101 strike
+  // without its +5)
+  const late = (d: Decision) => (d.kind === 'unitGone' && d.why !== 'founded') || d.kind === 'combat' || d.kind === 'hit' || d.kind === 'congress';
   // a kill lands after the battle it ended, which a later player may have
   // fought (runs/h1_duelw1127 t30: a barbarian Warrior attacks China's and
   // dies on the counter, the kill China's: counted once, after the blow)
