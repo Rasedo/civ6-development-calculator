@@ -7454,3 +7454,48 @@ ranged exclusion gone (gpu/core/sim_tactics.py); `minorAi`'s copy health
   Improvement tree for a Mine on 210 at once, the game's none (its log's
   trees t44-t46 hold no Build City Improvement), its Builder's Farm on 295
   at t46 then missed.
+
+## C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins
+
+`districtZones` and `inEnemyZoc` (cpu/core/units.ts), `groundOf`'s zoc and
+seenZoc, `search`'s and `walk`'s destination (cpu/core/tactical.ts); GPU
+`_tac_zoc_dirs`, `_tac_zoc_path`, `_tac_search`'s zp, `_tac_move_to`'s halts
+(gpu/core/sim_tactics.py). `cityStateTactics`' strikes, `cityStateMilitary`
+(cpu/core/minorOps.ts), `holdCityStrikes`' landing (cpu/core/phase.ts), the
+replay's `minorShots` landed in `minorAi`; GPU `_minor_pass`.
+
+- THE ZONE (0x530f50): over the six plots beside the plot entered (ebx from
+  0: the -1 branch at 0x5310c8 is not taken), a district of a player at war
+  that exerts one (0x24c2f0: a City Center, an Encampment complete and not
+  pillaged) zones it with no river test and no domain test; else a unit of a
+  player at war of the mover's domain that exerts one, not across a river but
+  from a city. It is the move's path cost's (0x26e920 through 0x26f980 for a
+  formation, 0x26f870 for a unit) and the planning's step refusal's (0x26e570
+  at 0x26e8a0). The step into it spends the Movement left (`price`'s zone
+  branch) and the walk stops there (`walk`); a step leaves the unit's
+  Movement whole otherwise (`stepUnit` holds no zone).
+- THE DESTINATION (0x53118a / 0x53129f): an exerter, district or unit, on
+  the path's destination (0x26f980's sixth argument) answers no zone for the
+  whole plot (0x531302 returns 0) unless the plot entered is at its stacking
+  limit (0x585eb0 over the plot's units against +0x58c, the flag at
+  [rsp+0x30]): `crowded` in the path, its own stacking unit or another
+  player's in the walk.
+- runs/h1_duely1124 t9: the barbarian Scout 524295 on 30:8, its Explore move
+  to 33:11, ends on 30:9, 31:8 beside city-state 4's centre 32:8 in its zone;
+  t32: the Scout 1900552 on 12:15 to 10:13 ends on 12:14 as logged; h1_duely1117
+  t8 the rampaging Scout 131073 ends on 714 as logged.
+- A CITY-STATE'S STRIKES (FIT, on the planning rows): its city's ranged
+  strikes come after its units' planning and its operations' run, before its
+  tactical moves. runs/h1_duely1124 t131: city-state 3's Knight 1310720 on
+  40:11 lists the barbarian Man-At-Arms' 39:9 as an attack (1/0) and nothing
+  past it (71 plots as logged), its Encampment's shot killing the Man-At-Arms
+  in that turn; t87: city-state 2's Men-At-Arms on 11:14 and 9:11 list the
+  barbarian Scout's 11:12 (the centre's shot kills it) as logged, and none of
+  them attacks it (Wander, AI_Tactical.csv); t82 city-state 4's Catapult on
+  32:8 lists 16 plots as logged; t114 city-state 4's operation (Pikeman
+  1048582, Man-At-Arms 1310728, Trebuchet 1376263) moves as logged only with
+  the struck unit standing through it.
+- OPEN: runs/h1_duely1124 t87 city-state 2's Men-At-Arms on 9:12 and 9:14
+  list 11:12 as an attack the player does not see (no zone, the search going
+  on beside it), those on 11:14 and 9:11 as one it sees: the player's sight
+  changes between the units' planning rows.

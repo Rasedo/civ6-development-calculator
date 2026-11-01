@@ -2590,16 +2590,20 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
 
 /** THE ACTION REPLAY'S HOLD on the cities' strikes: a city's shot is its
  *  player's decision, which the replay lands where the record's log fired it
- *  (`cityStrikeAt`). Off outside a replay. */
+ *  (`cityStrikeAt`); under it a city's strikes are `landed` (the replay's
+ *  copy of a minor's turn takes the record's shots there), else none. Off
+ *  outside a replay. */
 let strikeHold = false;
-export function holdCityStrikes(on: boolean): void {
+let landed: ((state: GameState, city: City) => void) | null = null;
+export function holdCityStrikes(on: boolean, land: ((state: GameState, city: City) => void) | null = null): void {
   strikeHold = on;
+  landed = land;
 }
 
 /**
  * ONE city's ranged strikes for the turn, in its owner's turn — the centre's
  * and then the Encampment's. A major's city calls this from `seatPhase`, a
- * city-state's from `minorPhase`, each with the strength its own centre
+ * city-state's from `cityStateMilitary`, each with the strength its own centre
  * fights at. The target is the nearest unit hostile to the city's seat at
  * range 1-2, the lowest tile index on a tie (`cityStrikeAt`).
  */
@@ -2607,7 +2611,10 @@ export function holdCityStrikes(on: boolean): void {
 export const CITY_STRIKE_RANGE = 2;
 
 export function cityStrikes(state: GameState, city: City, strikeCS: number): void {
-  if (strikeHold) return;
+  if (strikeHold) {
+    landed?.(state, city);
+    return;
+  }
   const striker = { seat: city.seat };
   // CIV6: walls give a city its ranged strike, and "if the Outer Defense of
   // a city or defensible district has been completely destroyed, its ranged

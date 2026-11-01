@@ -216,6 +216,9 @@ interface Ctx {
    *  fighting those battles in its pass; each with its record key, which a
    *  unit the pair killed has left the replay's map by */
   minorBlows: Map<Unit, { snap: Unit; key: string }>;
+  /** each shot of a city-state's city the pair fired (by its centre), the
+   *  unit it struck as the shot left it: the copy of its turn takes it there */
+  minorShots: { centre: number; unit: Unit; hp: number; dead: boolean }[];
   /** a city-state's unit the pair's promote order raised, its promotions and
    *  level before it: the copy's pass finds the promotion still due */
   minorPromoted: Map<Unit, { promos: number; level: number }>;
@@ -1539,6 +1542,18 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
       c.tileIndex = u.tileIndex;
     }
   };
+  // a city-state's shots of the pair land in its pass, after its units'
+  // planning: the unit struck as the shot left it
+  holdCityStrikes(true, (st, city) => {
+    if (st !== copy) return;
+    for (const s of ctx.minorShots) {
+      if (s.centre !== city.centerIndex) continue;
+      const c = [...twin].find(([, u]) => u === s.unit)?.[0];
+      if (!c || !copy.units.includes(c)) continue;
+      if (s.dead) copy.units.splice(copy.units.indexOf(c), 1);
+      else c.hp = s.hp;
+    }
+  });
   try {
     for (const cs of [...copy.cityStates].sort((x, y) => playerOf(x.seat) - playerOf(y.seat))) {
       standGame(playerOf(cs.seat));
@@ -1553,6 +1568,7 @@ function minorAi(ctx: Ctx, b: TurnRecord, turn: number, made: ReadonlySet<Unit>,
     for (const [c, p] of ownEnd) c.tileIndex = p;
     copy.turn = clock;
     traceTactics(null);
+    holdCityStrikes(true);
     holdRng(held);
     traceMinorPurchases(ctx.buyTrace);
     traceMinorLays(null);
@@ -2384,6 +2400,11 @@ function strike(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision, s: 
   dugIn(ctx, d, def);
   def.tileIndex = d.at;
   if (!UNITS[def.type]?.naval && !waterWalks(def.type)) def.embarked = isWater(state.map.tiles[def.tileIndex]) || undefined;
+  // a city-state's shot comes after its units' planning (`cityStateTactics`):
+  // the copy of its turn holds the unit it strikes as before the shot, and
+  // the shot lands there (`minorAi`'s `landed`)
+  const minorShot = isCityStateSeat(city.seat);
+  if (minorShot && !ctx.minorBlows.has(def)) ctx.minorBlows.set(def, { snap: structuredClone(def), key: d.defender });
   state.rngState = s0;
   const hp0 = def.hp;
   if (TRACE.has('battleHp')) (globalThis as { __cbLog?: string[] }).__cbLog = [];
@@ -2394,6 +2415,7 @@ function strike(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision, s: 
   if (!ok) { count(ctx, 'battle', 'refused', d.player, 'nothing to strike'); return; }
   ctx.battled.add(d.defender);
   if (!state.units.includes(def)) ctx.engineKilled.add(d.defender);
+  if (minorShot) ctx.minorShots.push({ centre: city.centerIndex, unit: def, hp: def.hp, dead: !state.units.includes(def) });
   count(ctx, 'battle', 'applied');
 }
 
@@ -5162,7 +5184,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), routeSpent: new Map(), paths: new Map(), walked: new Set(), steps: new Map(), barbBlows: new Map(), gone: new Map(), barbSeized: [], minorBlows: new Map(), minorShots: [], minorPromoted: new Map(), minorBuys: [], minorImproves: [], minorClears: [], minorCleared: new Set(), minorClearUnits: [], barbBattles: [], barbFought: new Set(), barbDraws: [], promoteHp: new Map(), minorUnits: [], minorGround: [], buyTrace, lateBlows: [], upgradeInto: new Set(), upgradedFrom: new Map(), levyFrom: new Map(), barbSteps: [], barbPillaged: [], envoys: [], battled: new Set(), fortified: new Map(), undug: new Map(), streams: new Map(), applied: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, agendaCivics: null, researchBefore: new Map(), researchAtTurn: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: govtLog.civics, aiPolicyLog: govtLog.policies,
@@ -5276,6 +5298,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.gone = new Map();
     ctx.barbSeized = [];
     ctx.minorBlows = new Map();
+    ctx.minorShots = [];
     ctx.minorPromoted = new Map();
     ctx.minorBuys = [];
     ctx.minorImproves = [];

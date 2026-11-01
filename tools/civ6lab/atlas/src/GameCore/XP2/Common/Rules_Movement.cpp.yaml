@@ -144,13 +144,22 @@
     - recording: h1_duelw1124
       turn: 7
       value: "runs/h1_duelw1124 t7-t52:   city-state 4's city at 32:8 — the barbarian Scouts beside it list 31:7   and 33:8 at 2/2 past it;"
+    - recording: h1_duely1124
+      turn: 9
+      value: "the move's path: over the six plots beside the plot entered (ebx from 0), Bologna's centre 32:8 zones 31:8 for the barbarian Scout 524295 on 30:8, its Explore move to 33:11 ending on 30:9 as logged; an exerter on the path's destination answers no zone unless the plot entered is at its stacking limit (0x53118a, 0x53129f -> 0x531302)"
   impl:
     - cpu/core/tactical.ts:Ground
     - cpu/core/units.ts:inEnemyZoc
+    - cpu/core/units.ts:districtZones
+    - cpu/core/tactical.ts:walk
     - gpu/core/sim_tactics.py:_tac_zoc
+    - gpu/core/sim_tactics.py:_tac_zoc_dirs
+    - gpu/core/sim_tactics.py:_tac_zoc_path
     - cpu/core/units.ts:relMover
     - cpu/core/units.ts:navalMover
+    - cpu/core/units.ts:zoned
   readings:
+    - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-124: the formation's kept path, and a path's other players' units — READ (0x272aa0, 0x26e3a0, 0x782d0, 0x586360 at 0x586542..0x5865a1), unported"

@@ -36,8 +36,8 @@ import { canPlaceDistrictIn, fitEncampOuter, outerDamage, outerPool, urbanDefens
 import { lumpFood, seatGrowth } from './seatTurn';
 import { freeCityBuildFacts, majorQueueItem, seatResearchTurns } from './freeCityBuild';
 import { freeCityThreat, minorAiTurn, minorContractPurchases, minorItemBuilt, minorMilitaryTurn } from './minorCityAi';
-import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
-import { applyTrainingGrants, cityStrikeStrength } from './combat';
+import { bankruptcy, cityBorderGrowth, cultureAfterGrowth, jumpMadeAnew, paveGround } from './phase';
+import { applyTrainingGrants } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { civEraIndex, computeCityStats, withPercent256 } from './city';
 import { upgradeRoads } from './eras';
@@ -106,8 +106,8 @@ import { opsOf } from './operations/manager';
  *  purchases and trees, the trees' Builders' work), its civics AI's
  *  government values on the city it left, its military AI's upgrade
  *  (`minorMilitaryUpgrade`), its routes' walk and a
- *  free Trader's route, its city's ranged strikes (the majors' own body
- *  fired from the minor's centre strength), its army's walk, and last the
+ *  free Trader's route, its army's walk (`cityStateMilitary`, its city's
+ *  ranged strikes after its units' planning), and last the
  *  boosts the turn earned (`detectBoosts`). */
 export function minorPhase(state: GameState): void {
   for (const cityState of state.cityStates) {
@@ -192,8 +192,6 @@ export function minorPhase(state: GameState): void {
     minorMilitaryUpgrade(state, cityState);
     delete cityState.armyCounted;
     minorTrade(state, cityState, !ordersHeld);
-    const city = minorCity(cityState);
-    cityStrikes(state, city, cityStrikeStrength(state, city));
     if (!ordersHeld) cityStateMilitary(state, cityState);
     // its knowledge base's route value K at its tactical turn, after its
     // city's update (whose builds read the K of the turn before), on the

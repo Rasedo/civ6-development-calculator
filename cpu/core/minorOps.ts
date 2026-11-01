@@ -42,6 +42,8 @@ import { goldAffordable } from './game';
 import { FX } from './aiValue';
 import { SLOT_UNITS, canAfford, newEconomicMemory, upgradePurchase } from './aiEconomic';
 import { minorCity } from './cityStates';
+import { cityStrikes } from './phase';
+import { cityStrikeStrength } from './combat';
 import { isCoastalLand } from '../../world/query';
 import { MINOR_UPGRADE_GOLD } from '../data/cityStates';
 import { AI_MINOR_TRIGGERS, AI_TRIGGERED_TREES } from '../data/aiOperations';
@@ -458,6 +460,7 @@ export function holdSecondHook(fn: typeof hookHeld): void {
 
 /**
  * C: A CITY-STATE'S UNITS' TURN — its tactical pass (`cityStateTactics`),
+ * its city's strikes after its units' planning,
  * its operations run once the pass has its units' planning: each operation
  * unit's turn is its operation's; its city's second hook
  * (`minorSecondHook`) in its pass among the trees.
@@ -485,6 +488,10 @@ export function cityStateMilitary(state: GameState, cs: CityState): void {
       const u = state.units.find((x) => x.id === id && x.seat === cs.seat);
       if (u) passFinish(pass, u, 'Operation', u.tileIndex);
     }
+  }, () => {
+    // its city's ranged strikes, after its units' planning
+    const city = minorCity(cs);
+    cityStrikes(state, city, cityStrikeStrength(state, city));
   });
 }
 

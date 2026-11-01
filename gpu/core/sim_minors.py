@@ -26,11 +26,10 @@ class SimMinors:
         # base's look; its contract purchases; then its actions — the
         # upgrades a completion triggers, its city AI's turn (`_minor_ai_turn`:
         # its builds, purchases and trees, the trees' Builders' work), its
-        # trade routes, its city's ranged strikes (the majors' own body,
-        # `cityStrikes`), its units' tactical turn; its look again; and the
+        # trade routes, its units' tactical turn (its city's ranged strikes in
+        # it, after its units' planning: `_minor_tactics`); its look again; and the
         # boosts the turn earned (`_detect_minor_boosts`); its turn's end
         # holds each stockpile to its cap (`_seat_cap_stockpile`)
-        col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for s in range(self.S):
             alive = self.citystate_alive[:, s]
             if not bool(alive.count_nonzero()):
@@ -94,7 +93,6 @@ class SimMinors:
             self._mops_military_upgrade(s, alive)
             del self._cv_counted[s]
             self._minor_trade(s)
-            self._city_strikes(self._CITY_MINOR0 + s, col0, alive)
             self._minor_tactics(s)
             # its knowledge base's route value K at its tactical turn, on the
             # trade list of the turn before; then the City Analysis job's

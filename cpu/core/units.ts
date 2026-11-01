@@ -553,10 +553,28 @@ export function encampmentBlocks(
   return side !== null && unitsHostile(state, unit, side);
 }
 
+/** a district of a player at war with the mover that exerts a zone of
+ *  control (0x24c2f0: a City Center, an Encampment complete and unpillaged) */
+export function districtZones(state: GameState, tile: Tile, mover: { seat: number }): boolean {
+  if (tile.district !== 'CITY_CENTER' && !encampmentIntact(tile)) return false;
+  const side = tileOwnerSide(tile);
+  return side !== null && side.seat !== mover.seat && unitsHostile(state, mover, side);
+}
+
+/** the plot entered lies in the mover's enemy zone of control (Rules_Movement
+ *  0x530f50, by 0x26f980 from the path's cost): over the six plots beside it,
+ *  a district at war that exerts one (`districtZones`, any domain, across a
+ *  river or not), else a hostile unit of the mover's domain that exerts one,
+ *  not across a river but from a city centre. An exerter on the path's
+ *  destination `dest` answers no zone at all unless the plot entered is at
+ *  its stacking limit (`crowded`: 0x585eb0 against +0x58c): the move onto
+ *  its target keeps its Movement for the blow. */
 export function inEnemyZoc(
   state: GameState,
   tileIndex: number,
   mover: { seat: number; type?: string },
+  dest = -1,
+  crowded = false,
 ): boolean {
   // CIV6: a naval raider "ignores enemy zone of control", and cavalry-class
   // units ignore it too.
@@ -570,20 +588,30 @@ export function inEnemyZoc(
   // exerter's +0x650 against the mover's formation domain): a land unit
   // zones no ship, a ship no land unit, embarked or not
   const navalMover = mover.type !== undefined && !!UNITS[mover.type]?.naval;
+  let zoned = false;
   for (const n of neighbors(state.map, tile)) {
+    // the district before the river (0x24c2f0 at 0x531168)
+    if (districtZones(state, n, mover)) {
+      if (n.index === dest && !crowded) return false;
+      zoned = true;
+      continue;
+    }
     // an exerter across a river from the entered tile halts nothing, but
-    // one standing in a city centre (Rules_Movement 0x530f50 at
-    // 0x5311a0..0x5311c9: the river bit, then IsCity on the neighbour)
+    // one standing in a city centre (0x5311a0..0x5311c9: the river bit,
+    // then IsCity on the neighbour)
     if (crossesRiver(state.map, tile, n) && n.district !== 'CITY_CENTER') continue;
     for (const u of unitsAt(state, n.index)) {
       const relU = unitReligious(u.type);
       if (relU !== relMover) continue;
       if (mover.type !== undefined && !!UNITS[u.type]?.naval !== navalMover) continue;
       const exerts = relU ? !u.embarked : unitExertsZoc(u);
-      if (exerts && unitsHostile(state, u, mover)) return true;
+      if (!exerts || !unitsHostile(state, u, mover)) continue;
+      if (n.index === dest && !crowded) return false;
+      zoned = true;
+      break;
     }
   }
-  return false;
+  return zoned;
 }
 
 /** The pool this unit was GRANTED this turn — `movesFull` where it stands,
@@ -1148,11 +1176,6 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   // a barbarian's step updates its player's sight: a scout looks at the plots
   // it newly sees, in the order the moves are made
   if (isBarbSeat(unit.seat)) barbStepLook?.(state, unit);
-  // the walk ends on a plot of an enemy's zone, the unit's Movement kept for
-  // a blow from there (runs/h1_duelw1117 log t8: city-state 2's Warrior
-  // steps 13:10 -> 12:11 beside the camp's Spearman and melee-attacks it;
-  // 48 of the 161 melee attacks of the log come from 2 plots or more)
-  if (inEnemyZoc(state, unit.tileIndex, unit)) return 'halted';
   return unit.movesLeft > 0 ? 'moved' : 'halted';
 }
 

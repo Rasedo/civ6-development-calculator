@@ -345,6 +345,7 @@
     - gpu/core/sim_tactics.py:_tac_fighters
     - cpu/core/tactical.ts:groundOf
     - cpu/core/tactical.ts:foesSeen
+    - cpu/core/tactical.ts:crowded
   readings:
     - "H-1: the garrison requirement — READ"
     - "H-1: a civilian stepped on — READ"

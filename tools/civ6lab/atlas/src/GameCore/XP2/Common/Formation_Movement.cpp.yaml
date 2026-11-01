@@ -112,6 +112,7 @@
     - cpu/core/tactical.ts:districtAttack
     - cpu/core/tactical.ts:ground
     - cpu/core/tactical.ts:price
+    - cpu/core/tactical.ts:crowded
   readings:
     - "C-125: a civilian at war in the planning's search, a zone of control across a river, the attack's move onto a city — READ (0x26e570, 0x530f50 at 0x5310c8..0x5311c9, 0x771f80 at 0x772121), both twins"
     - "C-95: the planning's valid wrapper on a district at war, and a land unit's embarking by its original owner — READ (0x26e570 at 0x26e5e2..0x26e7f1, 0x56c480), the first both twins"
@@ -120,6 +121,7 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the scout's tree \"Barbarian Found City\" — READ, ported"
     - "C-95: a strike's move order onto a plot out of sight — READ (the strike), FIT (the path's sight test)"
+    - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
   context:
     - "...or 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrapper 0x26e570 refuses a node past the turn limit): the list at planning +0x30 (16-byte entries x, y,..."
     - "...centre, an Encampment) as a node whose step spends the Movement left (the valid wrapper 0x26e570: the attack's cost adds the Movement left, 0x1d0 += 0x1d4) and links nothing from it (a..."
@@ -165,6 +167,7 @@
     - "C-99: the carry under a zone of control — READ (0x26e920), both twins"
     - "C-99: a shore crossing's carried Movement"
     - "C-95: the danger map's search pays no zone of control, a ranged unit strikes from its range; the rampage strike's ring — READ (0x26df90, 0x26e920, 0x771670, 0x691f0, 0x76ecf0), FIT (the ranged unit's strike), both twins"
+    - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
   review: reviewed
 - addr: 0x26ee80
   final: 0x1a74c0
@@ -279,6 +282,19 @@
   context:
     - ...damage at most half its health (0x56e0d0 >> 1), in a later round not still on its way (0x26f830), takes HL Explore (0x70aa40, the region fallbacks on the first round alone) and its ta...
   review: reviewed
+- addr: 0x26f870
+  final: 0x1a7d80
+  kind: function
+  semantics: "the unit's zone of control query from the path cost 0x26e920 (0x26f980 the formation's): none where the finder's +0x1f0 is set, else 0x530f50 on the plot entered (r8 +0x28 / +0x2a, the finder's layer +0x1a4) for the finder's player +0x198, domain +0x1a0 and religion +0x1e8, the path's destination r9 and the plot's stacking count at its limit (0x585eb0 against [0xf28c80]+0x58c, setae at 0x26f907)."
+  status: READ
+  cases:
+    - recording: h1_duely1124
+      turn: 9
+      value: "the barbarian Scout 524295 on 30:8, its Explore move to 33:11: 31:8 beside Bologna's centre 32:8 in its zone, the path through 30:9 where it ends as logged"
+  impl: [cpu/core/units.ts:inEnemyZoc, gpu/core/sim_tactics.py:_tac_zoc_path]
+  readings:
+    - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
+  review: reviewed
 - addr: 0x26f980
   final: 0x1a7e90
   kind: function
@@ -296,8 +312,16 @@
       value: "runs/h1_duelw1124 t1-60 planning rows (the replay's classifier):   855 -> 1,061 of 1,276 equal, the extra plots 609 -> 98, no new miss (65   revealed, 30 unrevealed as before);"
     - recording: 1128
       value: "- LAB: 1128 the Cavalry from 35:7 lists 37:6 and 36:5 (1/1) beside 35:6's   (2/0) (12 rows);"
-  impl: [cpu/core/tactical.ts:Ground, cpu/core/tactical.ts:moves]
+    - recording: h1_duely1124
+      turn: 32
+      value: "its arguments to 0x530f50: the formation's player +0x1b8, domain 0x266720, layer 0x2665b0, the plot entered (r8 +0x28 / +0x2a), the path's destination ([rsp+0x98]) and the plot's stacking count at its limit (0x585eb0 over 0x75c50's units against [0xf28c80]+0x58c, setae at 0x26fa27); the barbarian Scout 1900552 on 12:15, its move to 10:13, ends on 12:14 as logged"
+  impl:
+    - cpu/core/tactical.ts:Ground
+    - cpu/core/tactical.ts:moves
+    - cpu/core/units.ts:inEnemyZoc
+    - gpu/core/sim_tactics.py:_tac_zoc_path
   readings:
+    - "C-125: a district's zone of control in a move's path, waived on the path's destination; a city-state's strikes after its units' planning — READ (0x530f50 at 0x531127..0x531302, 0x26f980, 0x26f870), FIT (the strikes' place), both twins"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-99: a shore crossing's carried Movement — READ (0x26e920, 0x530420, 0x530240), both twins"

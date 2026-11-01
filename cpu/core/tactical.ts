@@ -18,7 +18,7 @@ import { AI_FEATURES, AI_UNITS } from '../data/aiBuildTables';
 import { AI_UNIT_AI } from '../data/aiOperations';
 import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import {
-  canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious,
+  canEmbark, cityAtIndex, crossesRiver, embarkTechMoves, escortUnit, inEscort, cliffBlocksStep, shoreCrossing, districtZones, encampmentBlocks, encampmentIntact, inEnemyZoc, rosterEmbarkMoves, stepCost, stepUnit, unitDomain, unitExertsZoc, unitFullMoves, unitIsNoncombat, unitReligious,
   setBarbStepLook, unitsHostile, unitVisibleTo,
   waterEnterable, formationCS, setRecordFormation,
 } from './units';
@@ -160,6 +160,8 @@ interface Ground {
    *  list's 0x586900 -> 0x586360: `enterable` with no unit counted), since
    *  the search enters a plot the player never revealed whatever it is */
   fits: (i: number) => boolean;
+  /** `inEnemyZoc` on the search's destination, the plot entered's
+   *  `crowded` its stacking limit */
   zoc: (t: Tile) => boolean;
   attack: (t: Tile) => boolean;
   /** a unit at war that fights stands on the plot, on a plot the player
@@ -178,8 +180,8 @@ interface Ground {
    *  another player's unit but a Trader or a Spy */
   crowded: (i: number) => boolean;
   /** the plot lies in a zone of control the player sees: a hostile unit of
-   *  the mover's domain that exerts one beside it, or for a land mover a
-   *  hostile city or Encampment, on a plot the player sees now; a unit across
+   *  the mover's domain that exerts one beside it, or a district at war that
+   *  exerts one (`districtZones`), on a plot the player sees now; a unit across
    *  a river none but from a city centre, a city or Encampment across one
    *  all the same (the planning validity's 0x26f980 -> Rules_Movement
    *  0x530f50: 0x24c2f0 before the river bit, IsCity after it; runs/
@@ -199,7 +201,7 @@ interface Ground {
 const NO_FOES: ReadonlySet<number> = new Set();
 
 function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = true, anyGround = true,
-  mates: readonly Unit[] = []): Ground {
+  mates: readonly Unit[] = [], dest = -1): Ground {
   const held = new Set<number>();
   const foes = new Set<number>();
   const own = new Set<number>();
@@ -275,6 +277,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
   };
   const passes = new Map<number, boolean>();
   let foesSeen: Set<number> | undefined;
+  const crowded = (i: number) => own.has(i) || (held.has(i) && peaceHeld(i));
   return {
     known,
     revealed,
@@ -293,7 +296,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
       return !peaceHeld(i);
     },
     full: (i) => own.has(i),
-    crowded: (i) => own.has(i) || (held.has(i) && peaceHeld(i)),
+    crowded,
     foughtOn: (i) => {
       if (!fighters.has(i)) return false;
       seenNow ??= plotsSeenNow(state, new Set([unit.seat]));
@@ -310,8 +313,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
         for (const n of neighbors(state.map, t)) {
           if (!sn[n.index]) continue;
           const river = crossesRiver(state.map, t, n);
-          // a hostile city or Encampment exerts one on the land beside it
-          if (!naval && (n.district === 'CITY_CENTER' || encampmentIntact(n)) && unitsHostile(state, unit, { seat: tileSeat(n) })) { v = true; break; }
+          if (districtZones(state, n, unit)) { v = true; break; }
           if (river && n.district !== 'CITY_CENTER') continue;
           if (state.units.some((x) => x.tileIndex === n.index && onMap(x) && !unitReligious(x.type) && unitExertsZoc(x)
             && !!UNITS[x.type]?.naval === naval && unitsHostile(state, x, unit))) { v = true; break; }
@@ -372,7 +374,7 @@ function groundOf(state: GameState, unit: Unit, revealedOnly = true, planning = 
     },
     zoc: (t) => {
       let v = zocs.get(t.index);
-      if (v === undefined) zocs.set(t.index, (v = inEnemyZoc(state, t.index, unit)));
+      if (v === undefined) zocs.set(t.index, (v = inEnemyZoc(state, t.index, unit, dest, crowded(t.index))));
       return v;
     },
   };
@@ -437,9 +439,9 @@ export const moveUnitDanger = (plane: ArrayLike<number>): PathDanger => ({ plane
 
 function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
   onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void, standToAttack = false,
-  laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = []): void {
+  laterTurns = false, fromFull = false, explore = true, danger?: PathDanger, mates: readonly Unit[] = [], dest = -1): void {
   const { map } = state;
-  const ground = groundOf(state, unit, !zoc, !zoc, standToAttack, mates);
+  const ground = groundOf(state, unit, !zoc, !zoc, standToAttack, mates, dest);
   // a plot of a district with hit points of a player at war (0x26e570's
   // district attack: DistrictInfo +0x58 / +0x5c)
   const districtAttack = (t: Tile) => garrisonDistrict(state, t) && unitsHostile(state, unit, { seat: tileSeat(t) });
@@ -723,7 +725,7 @@ export function turnsToPlot(state: GameState, unit: Unit, dest: number, laterTur
     if (n.tile !== dest) return false;
     if (n.attack || n.tile === unit.tileIndex || ground.stand(n.tile)) turns = n.turns;
     return true;
-  }, undefined, false, laterTurns);
+  }, undefined, false, laterTurns, false, true, undefined, [], dest);
   return turns;
 }
 
@@ -740,7 +742,7 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
     if (n.tile !== dest) return false;
     found = n;
     return true;
-  }, undefined, false, laterTurns, false, explore, danger, mates);
+  }, undefined, false, laterTurns, false, explore, danger, mates, dest);
   // the path's first turn may not end on the destination its own stacking
   // unit holds, under flag 0x1000 or not (runs/h1_duely1124 t182-t196: the
   // barbarian Ironclad 5701639 on 19:3 holds for China's Water Park 19:8
@@ -819,7 +821,7 @@ function orderOnce(state: GameState, unit: Unit, dest: number, strike: boolean,
   const last = path.length ? path[path.length - 1] : -1;
   const into = last >= 0 && attackPlot(state, unit, last);
   if (into) path = path.slice(0, -1);
-  const cut = walk(state, unit, path, mates);
+  const cut = walk(state, unit, path, dest, mates);
   if (into && strike && unit.movesLeft > 0 && attacksLeftOf(unit) > 0 && state.units.includes(unit)
     && plotDistance(state, unit.tileIndex, last) === 1) {
     meleeAttack(state, unit.id, last, unit.seat);
@@ -837,9 +839,11 @@ function attackPlot(state: GameState, unit: Unit, p: number): boolean {
   return encampmentBlocks(state, t, unit);
 }
 
-/** the walk of a path as far as the unit's Movement carries it this turn;
+/** the walk of a path as far as the unit's Movement carries it this turn, a
+ *  zone of control ending it (`inEnemyZoc` on the order's destination `dest`,
+ *  a plot its own stacking unit or another player's holds at the limit);
  *  true where it stood short of a plot it may not end on */
-function walk(state: GameState, unit: Unit, path: number[], mates: readonly Unit[] = []): boolean {
+function walk(state: GameState, unit: Unit, path: number[], dest: number, mates: readonly Unit[] = []): boolean {
   const { tiles } = state.map;
   // how far its Movement carries it along the path this turn
   const full = unit.movesFull ?? unitFullMoves(state, unit);
@@ -863,7 +867,7 @@ function walk(state: GameState, unit: Unit, path: number[], mates: readonly Unit
     mp = Math.max(0, mp - cost);
     stop += 1;
     from = p;
-    if (mp <= 0 || inEnemyZoc(state, p, unit)) break;
+    if (mp <= 0 || inEnemyZoc(state, p, unit, dest, stackedWith(state, unit, mates, p) || foreignAt(state, unit, p))) break;
   }
   const reached = stop;
   while (stop > 0 && (stackedWith(state, unit, mates, path[stop - 1]) || foreignAt(state, unit, path[stop - 1]))) stop -= 1;
@@ -2956,8 +2960,10 @@ export function seatPoolSlots(state: GameState, s: Seat): UnitPool | undefined {
  * "Minor Civ Tactical" and "Minor Civ Homeland" lists): its unit pool
  * (`poolSlots`, slot 0 its founding Settler's), each unit's planning reach
  * taken before any moves, its tactical target list; its operations' run
- * (`operations`: their units the operations'); then over the tactical
- * list's units (`tacticalUnit`) the moves in the
+ * (`operations`: their units the operations'); its city's ranged strikes
+ * (`strikes`: the planning and the operations read the units they strike
+ * as they stood before them, the moves after read them struck); then over
+ * the tactical list's units (`tacticalUnit`) the moves in the
  * list's order, each walking the units the moves before it left, in pool
  * order — Support Formation, Attack High Priority, Move to Safety, Attack
  * Medium Priority, Promotion, Attack Low Priority, Heal, Chase Target (no
@@ -2966,7 +2972,7 @@ export function seatPoolSlots(state: GameState, s: Seat): UnitPool | undefined {
  * Turn takes the rest (its Promotion finds no unit the tactical one left
  * due).
  */
-export function cityStateTactics(state: GameState, cityState: CityState, operations: (pass: Pass) => void): void {
+export function cityStateTactics(state: GameState, cityState: CityState, operations: (pass: Pass) => void, strikes: () => void): void {
   const pool = seatPoolSlots(state, cityState)!;
   costsHeld = new Map();
   try {
@@ -2979,6 +2985,16 @@ export function cityStateTactics(state: GameState, cityState: CityState, operati
       // logged)
       for (const u of pass.units) if (u.movesLeft <= 0) pass.done.add(u.id);
       operations(pass);
+      // its city's strikes after its units' planning and its operations' run
+      // (runs/h1_duely1124 t131: city-state 3's Knight 1310720 on 40:11 lists
+      // the barbarian Man-At-Arms' 39:9 as an attack (1/0), its Encampment's
+      // shot killing it; t87: city-state 2's Men-At-Arms on 11:14 and 9:11
+      // list the barbarian Scout's 11:12, its centre's shot killing it, and
+      // none of them strikes it, AI_Planning.csv / AI_Tactical.csv; t114:
+      // city-state 4's operation's
+      // Pikeman 1048582, Man-At-Arms 1310728 and Trebuchet 1376263 move as
+      // logged on the unit its centre strikes standing)
+      strikes();
       // the tactical list (`tacticalUnit`): an explorer of AI type EXPLORE is
       // the homeland's (every city-state Scout's row of the five duely duels
       // is HL: End Turn, 165 of 165)

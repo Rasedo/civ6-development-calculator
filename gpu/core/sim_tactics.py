@@ -396,15 +396,21 @@ class SimTactics:
 
     def _tac_zoc(self, seat: int, seen: torch.Tensor | None = None, naval: bool | None = None) -> torch.Tensor:
         """[B, T] bool — `inEnemyZoc` for a military mover of `seat` at every
-        plot: a military unit hostile to it beside the plot that exerts a zone
-        (no Ranged or Siege class without SUPPRESSION, none embarked, none of a
-        chassis that exerts none), of the mover's domain (`naval`: a ship's
-        or a land unit's), none across a river but from a city centre's plot
-        (Rules_Movement 0x530f50 at 0x5311a0..0x5311c9). With `seen` [B, T]
-        (`groundOf`'s seenZoc) only an exerter on a plot it sees, and for a
-        land mover a hostile city or Encampment too, across a river or not
-        (0x24c2f0 tested before the river). The mover's own ignoring is the
-        caller's."""
+        plot, no destination: `_tac_zoc_dirs` over the six plots beside it."""
+        return self._tac_zoc_dirs(seat, seen, naval).any(dim=2)
+
+    def _tac_zoc_dirs(self, seat: int, seen: torch.Tensor | None = None, naval: bool | None = None) -> torch.Tensor:
+        """[B, T, 6] bool — the plot beside each plot in direction k zones it
+        for a military mover of `seat` (Rules_Movement 0x530f50): a district
+        of a player at war that exerts one (`districtZones`: a city centre, a
+        live Encampment; any domain, across a river or not, 0x24c2f0 tested
+        before the river), else a military unit hostile to it that exerts a
+        zone (no Ranged or Siege class without SUPPRESSION, none embarked,
+        none of a chassis that exerts none), of the mover's domain (`naval`: a
+        ship's or a land unit's), none across a river but from a city
+        centre's plot (0x5311a0..0x5311c9). With `seen` [B, T] (`groundOf`'s
+        seenZoc) only an exerter on a plot it sees. The mover's own ignoring
+        is the caller's."""
         mil = self.military_at
         here = mil >= 0
         ms = mil.clamp(min=0)
@@ -418,21 +424,34 @@ class SimTactics:
         ex = ex & self._seats_hostile(seat, mseat)
         if naval is not None:
             ex = ex & (self.unit_naval.take(mtype) == naval)
-        town = torch.zeros_like(ex)
+        centre = self._centre_plane()
+        town = centre & self._seats_hostile(seat, self.tile_seat)
+        if self._encamp_didx >= 0:
+            town = town | self._encamp_block_plane(seat)
         if seen is not None:
             ex = ex & seen
-            if not naval:
-                # a hostile city or Encampment exerts one on the land beside it
-                town = self._centre_plane() & self._seats_hostile(seat, self.tile_seat)
-                if self._encamp_didx >= 0:
-                    town = town | self._encamp_block_plane(seat)
-                town = town & seen
+            town = town & seen
         nb = self.neigh.clamp(min=0)
         bits = torch.arange(6, device=self.device).view(1, 1, 6)
         riv = (self.river_mask.unsqueeze(2) >> bits) & 1
         on = (self.neigh >= 0).unsqueeze(0)
-        unit_z = on & ((riv == 0) | self._centre_plane()[:, nb]) & ex[:, nb]
-        return (unit_z | (on & town[:, nb])).any(dim=2)
+        unit_z = on & ((riv == 0) | centre[:, nb]) & ex[:, nb]
+        return unit_z | (on & town[:, nb])
+
+    def _tac_zoc_path(self, rows: torch.Tensor, seat: int, naval: torch.Tensor, ign: torch.Tensor,
+                      dest: torch.Tensor | None, crowd: torch.Tensor) -> torch.Tensor:
+        """[N, T] bool — `inEnemyZoc` for the movers of the games `rows` [N]
+        (`naval` [N] each one's domain, `ign` [N] its chassis ignoring zones)
+        on each one's path destination `dest` [N] (None: none): an exerter on
+        the destination answers no zone where the plot entered is not at its
+        stacking limit (`crowd` [N, T])."""
+        z = torch.where(naval.view(-1, 1, 1), self._tac_zoc_dirs(seat, naval=True)[rows],
+                        self._tac_zoc_dirs(seat, naval=False)[rows])
+        zoned = z.any(dim=2)
+        if dest is not None:
+            at = (self.neigh.unsqueeze(0) == dest.view(-1, 1, 1)) & (dest >= 0).view(-1, 1, 1) & z
+            zoned = zoned & ~(at.any(dim=2) & ~crowd)
+        return zoned & ~ign.unsqueeze(1)
 
     def _tac_zoc_ignored(self, utype: torch.Tensor) -> torch.Tensor:
         """bool — the chassis ignores zones of control (a naval raider, the
@@ -683,8 +702,6 @@ class SimTactics:
             ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, slots]
             cliffs_b = self._tac_cliffs(seat)
             waive_cliff = self._promo_flag(utype, getattr(self, f"{pre}_unit_promos")[rows, slots], "CLIFFS")
-        zp = (torch.where(naval.unsqueeze(1), self._tac_zoc(seat, naval=True)[rows], self._tac_zoc(seat, naval=False)[rows])
-              & ~self._tac_zoc_ignored(utype).unsqueeze(1)) if zoc else None
         # the planning's search (no flag 0x200: 0x26e570 at 0x26e83e) moves on
         # from no plot of a zone of control the player sees but the unit's
         # own; an attack it strikes from there all the same (`groundOf`'s
@@ -741,6 +758,8 @@ class SimTactics:
         if zoc:
             sn_c = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)[rows]
             crowd_n = full_n | (by_layer(lambda r: self._tac_peaceful(seat, r)) & sn_c)
+        # a zone of control's step on the path's destination (`groundOf`'s zoc)
+        zp = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(utype), dest, crowd_n) if zoc else None
         tseat = self.tile_seat
         g = torch.full((N, T), NONE, dtype=torch.long, device=dev)
         tie = torch.zeros(N, T, dtype=torch.long, device=dev)
@@ -1354,8 +1373,6 @@ class SimTactics:
         ut = ut_pool[rows, sr].clamp(min=0, max=self.NU - 1)
         naval = self.unit_naval.take(ut)
         ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, sr]
-        halts = (torch.where(naval.unsqueeze(1), self._tac_zoc(seat, naval=True)[rows], self._tac_zoc(seat, naval=False)[rows])
-                 & ~self._tac_zoc_ignored(ut).unsqueeze(1))
         # its terrain waivers (`terrainMp`: hills, Woods)
         waive = self._tac_waive_code(ut, getattr(self, f"{pre}_unit_promos")[rows, sr],
                                      getattr(self, f"{pre}_unit_alpine")[rows, sr])
@@ -1383,6 +1400,9 @@ class SimTactics:
                     | (own_at(self.embarked_at[rows]) & not_m(self.embarked_at[rows])))
             own_same = torch.where((mr >= 0).unsqueeze(1), form, own_same)
         no_end = own_same | self._tac_foreign(seat)[rows]
+        # a zone of control ends the walk (`walk`'s inEnemyZoc on the order's
+        # destination, a plot it may not end on at the limit)
+        halts = self._tac_zoc_path(rows, seat, naval, self._tac_zoc_ignored(ut), dr, no_end)
         # how far its Movement carries it
         mp = mp_p[rows, sr].clone()
         full = getattr(self, f"{pre}_unit_mp_full")[rows, sr]
@@ -4170,7 +4190,9 @@ class SimTactics:
         """A CITY-STATE'S TACTICAL TURN (`cityStateTactics`) for minor `s`:
         its unit pool (`_seat_pool_slots`), each unit's planning reach taken
         before any moves, its tactical target list and danger map, its
-        operations' run (`_mops_run`, their units theirs), then Support
+        operations' run (`_mops_run`, their units theirs), its city's ranged
+        strikes (`_city_strikes`: the planning and the operations read the
+        units they strike as they stood before them), then Support
         Formation, Attack High Priority, Move to Safety, Attack Medium and Low
         Priority, Heal,
         Chase Target (no strike) and Wander Near City in pool order (Promotion
@@ -4316,6 +4338,9 @@ class SimTactics:
         # its operations' run once the pass has its units' planning: their
         # units' turns are the operations'
         self._mops_run(s, act, op, done)
+        # its city's ranged strikes, after its units' planning and its
+        # operations' run (`cityStateTactics`' strikes)
+        self._city_strikes(self._CITY_MINOR0 + s, torch.zeros(B, dtype=torch.long, device=dev), act)
         # DEFENDER where its city's standing army holds it, else the type's
         # own (`militaryAiTypeOf`); the tactical list (`tacticalUnit`): an
         # explorer at EXPLORE is the homeland's
