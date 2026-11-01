@@ -5905,3 +5905,34 @@ in `choiceOrder`; `std_sort` (gpu/core/std_sort.py) in `_mops_choice_order`.
   full turn: the zone of control's sight on a move order's path (0x5033a0)
   or the barbarians' revealed plots, no record holding either; the 5:17
   team's t169 / t172 steps over our danger map.
+
+## C-98: Cold War's growing term at the city-states is Rock Band's unit value (live, 0x7a9a10) — READ
+
+- `civlog.py` on seed 1121 replayed (its AI_GovtPolicies.csv identical to
+  runs/h1_duely1121's through its t202 rows): every part of the civic
+  value 0x7a9a10 (FinalRelease 0x52caf0) for CIVIC_COLD_WAR (Civics index
+  43), runs/lab2_cw1121.civlog.jsonl. Antioch (player 4), t175-t202: T 2, H
+  50, rate 4.0; own (PSEUDOYIELD_CIVIC, PV(H) - PV(T)) 96.473; no government;
+  civic era 6 = the game's (no multiplier, no golden-age term); no upgrade,
+  building, wonder, district or formation term (Amundsen-Scott never reaches
+  the wonder present value, FinalRelease 0x52d0a5); the cards 85, 86, 87, 111 score 0 (-1 at
+  t175) against a weakest slotted 0, so the policy floor 20.0; one modifier,
+  EFFECT_GRANT_SPY (CIVIC_GRANT_SPY) 385.0. Value 501.473 at t175-t195.
+- The term that grows is the UNITS term: Rock Band (unit 122), the one unit
+  Cold War unlocks, its value in Antioch's one city through CityBuildAI
+  (FinalRelease 0x3e8150, the city's unit table; the call at 0x52ce06), taken where above 0
+  and averaged over such cities: FX(-9999) at t175-t195 (skipped), then 6.13
+  / 8.49 / 6.62 / 10.11 / 12.17 / 15.91 / 17.80 at t196-t202, the value
+  507.602 .. 519.270, the logged score's steps (1063.0 -> 1069.2 / 1071.5 /
+  1069.7 / 1073.1 / 1075.2 / 1078.9 / 1080.8) to the 0.1. Player 3 the same
+  term from t198: 2.28 / 4.06 / 6.04 / 8.49 / 6.62 at t198-t202; player 2
+  holds FX(-9999) through t202. Player 1 (a major) has it positive from t145
+  (22.29 .. 359.21 at t174, the same in its three cities).
+- So the gap is upstream of the civic value: the city build AI's Rock Band
+  value at a city-state, which the game's table carries above 0 from a turn
+  on (Antioch t196, player 3 t198) where ours reads 0 or FX(-9999)
+  (`minorUnitTerm` takes `CityState.unitValues`'s entry, max 0). Antioch's
+  state t195 -> t196 (runs/h1_lab2cw1121's records) moves only its growth
+  and housing, the religion's pressure 32 -> 34 and its staycationers'
+  count (126 -> 138, t194 -> t195); which of the unit value's inputs flips
+  the FX(-9999) exit is unread.

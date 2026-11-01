@@ -656,12 +656,15 @@
 - addr: 0x7a9a10
   final: 0x52caf0
   kind: function
-  semantics: "the civic value (row, &discount, turns, H, player, policies, governments, ...): at or past H -9999. The own term PSEUDOYIELD_CIVIC of 1.0 (0x7a60d0) paid PV(H) - PV(turns); the governments it unlocks, each max(v - v(the current), v / 2) of the government values (culture AI +0xb38), bare; the sum of these two multiplied for a civic of an era before the game's by (that - era) (0x7a9f11; no +1), a later one adding PSEUDOYIELD_GOLDENAGE_POINT of the eras record +0x2c (0x2c4110). Per unit the player's version (+0x170) the cities' average City Analysis value (0x5d4cd0, uncapped, once) and per upgrade source unit max(that - the upgrade's gold, 20.0), whole; PSEUDOYIELD_UNIT_COMBAT of 100 where 0x4f2ac0 names the row and 0x536da0 fails; per building the player's version 0.5, a wonder PSEUDOYIELD_WONDER of 0.5; per district the player may have PSEUDOYIELD_DISTRICT of 0.5; its policies: the best of its cards' scores (0x623b90, 0 at least) less the weakest slotted card's, at least 20.0 (0x7aacb1); the civic's modifiers (0x7a4b20) from landing to the horizon."
-  status: PARTLY
+  semantics: "the civic value (row, &discount, turns, H, player, policies, governments, ...): at or past H -9999. The own term PSEUDOYIELD_CIVIC of 1.0 (0x7a60d0) paid PV(H) - PV(turns); the governments it unlocks, each max(v - v(the current), v / 2) of the government values (culture AI +0xb38), bare; the sum of these two multiplied for a civic of an era before the game's by (that - era) (0x7a9f11; no +1), a later one adding PSEUDOYIELD_GOLDENAGE_POINT of the eras record +0x2c (0x2c4110). Per unit the player's version (+0x170) the average, over the cities whose value is above 0, of each city's unit-table value (CityBuildAI, FinalRelease 0x3e8150: the City Analysis value 0x5d4cd0 it stored; uncapped, once) and per upgrade source unit max(that - the upgrade's gold, 20.0), whole; PSEUDOYIELD_UNIT_COMBAT of 100 where 0x4f2ac0 names the row and 0x536da0 fails; per building the player's version 0.5, a wonder PSEUDOYIELD_WONDER of 0.5; per district the player may have PSEUDOYIELD_DISTRICT of 0.5; its policies: the best of its cards' scores (0x623b90, 0 at least) less the weakest slotted card's, at least 20.0 (0x7aacb1); the civic's modifiers (0x7a4b20) from landing to the horizon."
+  status: READ
   cases:
     - recording: h1_duelv1121
       turn: 44
       value: Hunza's Military Training 115.9 t44-46 on Equestrian Orders' 37.0
+    - recording: lab2_cw1121
+      turn: 196
+      value: "Antioch (player 4) CIVIC_COLD_WAR, T 2 H 50 (civlog.py): own 96.473 + the policy floor 20.0 + EFFECT_GRANT_SPY 385.0 = 501.473 at t175-t195; the units term, Rock Band's value in its city's unit table (FinalRelease 0x3e8150, at 0x52ce06), FX(-9999) skipped to t195, then 6.13 / 8.49 / 6.62 / 10.11 / 12.17 / 15.91 / 17.80 at t196-t202 (the logged score's steps); player 3 from t198 2.28 / 4.06 / 6.04"
   impl:
     - cpu/core/aiCivics.ts:civicValue
     - cpu/data/aiCivics.ts:CIVIC_AI_POLICY_FLOOR
@@ -673,6 +676,7 @@
     - cpu/core/aiPolicyValue.ts:civicPolicyBest
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-98: Cold War's growing term at the city-states is Rock Band's unit value (live, 0x7a9a10) — READ"
   context:
     - ...dded at the third level leave the entry out of reach. Else turns = max(0, sum), value = 0x7a9a10, score = value.
     - "- THE VALUE, 0x7a9a10 (row, &discount, turns, H, player, policies, governments, ...): at or past H, -9999 (th..."

@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x16e6a0
+  final: 0x3e8150
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-98: Cold War's growing term at the city-states is Rock Band's unit value (live, 0x7a9a10) — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...t Cold War unlocks, its value in Antioch's one city through CityBuildAI (FinalRelease 0x3e8150, the city's unit table; the call at 0x52ce06), taken where above 0 and averaged over su...
+  review: imported
 - addr: 0x16e7d0
   final: 0x27fe90
   kind: function
