@@ -733,6 +733,11 @@ class SimMinorAi:
             elif self.SEASIDE >= 0 and k == self.SEASIDE:
                 ok = ok | (((land & self._sr_c & bare) | (land_h & nr["_sr_c"] & bare) | (land_c & nr["_sr_c"]))
                            & appeal_ok)
+            elif self._imp_eng[k] and not self._imp_adj_plot[k]:
+                # the Military Engineer's own rows (the Fort): its land as it
+                # stands, its improvement and resource read past
+                if not standing:
+                    ok = ok | (base & ~self.water & self._imp_ground_ok(k))
             elif self._imp_adj_plot[k]:
                 # an adjacent-plot row (the Ski Resort, the Military
                 # Engineer's Mountain Tunnel): a bare mountain of its own,

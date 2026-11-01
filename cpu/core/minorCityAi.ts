@@ -213,7 +213,11 @@ function groundImprovements(state: GameState, cs: CityState, actual: Tile): Set<
   const tile = seenGround(state, cs, actual);
   const clearable = !!tile.feature && !!FEATURE_ROW.get(installFeature(tile.feature))?.removable;
   const harvestable = !!tile.resource && (RES.get(gameTypeOf('resource', tile.resource, 'RESOURCE_'))?.harvests.length ?? 0) > 0;
-  const out = new Set<string>([...validImprovementsIn(tile, opts), ...adjacentRowsOn(state, cs, tile)]);
+  // the Military Engineer's own rows too (the Fort), its improvement read
+  // past (runs/h1_duely1127 Muscat t172: the Fort on the Farmed 658 at 88.0
+  // the pick, m_bestImprovementToMake 12, its tree's reservation 88.0)
+  const out = new Set<string>([...validImprovementsIn(tile, opts), ...adjacentRowsOn(state, cs, tile),
+    ...validImprovementsIn({ ...tile, improvement: null, pillaged: false }, { ...opts, builder: 'MILITARY_ENGINEER' })]);
   for (const [harvest, clear] of [[true, false], [false, true], [true, true]]) {
     if ((harvest && !harvestable) || (clear && !clearable)) continue;
     const ground = { ...tile, resource: harvest ? null : tile.resource, feature: clear ? null : tile.feature };

@@ -7933,3 +7933,29 @@ cpu/core/units.ts, cpu/core/tactical.ts); `_bop_capture_tick`, `_tac_mate`,
   path: the path's turn 7 ends on 28:18 on the Galley 1835026 the barbarians
   moved there earlier in the pass (record order 4709..4712 before 4720), the
   only channel; what vt +0xb8 compares is unread.
+
+## C-127: the plot analysis values the Military Engineer's own rows (the Fort) — READ (records, aimem), both twins
+
+`groundImprovements` (cpu/core/minorCityAi.ts): the analysis ground adds the
+rows `validImprovementsIn` gives the Military Engineer, on the plot with its
+improvement read past. GPU `_minor_ground_imps` (gpu/core/sim_minorai.py):
+the `_imp_eng` branch.
+
+- THE RULE: the analysis (0x5ce970) values every improvement whose ground
+  the plot takes, whichever unit lays it — the Fort on a minor's own land,
+  over a Farm standing there too. The improvement pick (0x5c9a00) takes it
+  as it takes the Mountain Tunnel.
+- CONFIRMED: runs/h1_duely1127 t172 Muscat. The Farm laid on 616 at t171
+  pushes every bare Farm below 0 that turn (747 -55.7, 613 -46.6). The pick
+  m_bestImprovementToMake at the end look is 12, the Fort. The improvement
+  event's tree reserves m_reservations element 4 (658, a Farmed Grassland)
+  at 88.0 and is gone by the end look. The engines value the Fort on 658 at
+  88.0 and pick it. t173: the pick is the Farm again, and the Farm tree on
+  613 carries Builder contract 734 at 92.0 (the engines' Farm on 613 92.6).
+  Without the Fort row the engines took the Mine on 745 at 69.4 and its
+  Builder contract at t172.
+- OPEN: a pick no Builder lays (the Fort, the Tunnel) starts a tree that
+  ends the same turn: slot 3 takes a new id each turn (runs/h1_duely1124 city-state 2,
+  Tunnel pick 46, t214-t218), and 1127 t172's tree holds element 4's
+  reservation. The engines' improvement event starts none, which leaves no
+  difference in the contracts.

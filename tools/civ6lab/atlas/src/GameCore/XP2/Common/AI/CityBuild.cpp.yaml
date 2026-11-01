@@ -585,6 +585,7 @@
     - "C-95: the planning's spots and the combat prediction"
     - "C-96: the plot analysis's owner test, Build Unit's pillaged district and a unique's install type"
     - "H-1: the City Analysis runs on player signal +0x258 and reads each plot's owner live — READ (0x5c27e0, 0x5c24e0, 0x5ce970), the 1117 t44 Mine unexplained"
+    - "C-127: the plot analysis values the Military Engineer's own rows (the Fort) — READ (records, aimem), both twins"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...== f2f988?) & cond -> +5.0. Initial best FX(-9999). CITY ANALYSIS job vtable d59af0 -> 0x5ce910 -> 0x5ce970 (per PLOT eval): +0x20 districts, +0x28 buildings, +0x30 improvements, +0x38 projects, +0x40 units...."
   context:
