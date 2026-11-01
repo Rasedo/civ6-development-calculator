@@ -1225,6 +1225,7 @@ const UNIT_G: Record<string, Extractor> = {
   freeCity: overUnits((u) => u.freeCity ?? -1),
   noResourceUpkeep: overUnits((u) => (u.noResourceUpkeep ? 1 : 0)),
   alpine: overUnits((u) => (u.alpine ? 1 : 0)),
+  fionn: overUnits((u) => (u.fionn ? 1 : 0)),
 };
 
 const TILE: Record<string, Extractor> = {

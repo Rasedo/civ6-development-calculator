@@ -3174,15 +3174,26 @@ modifiers, the damage each side took; runs/h1_logs_duelw1119_1124 and
   Warrior at 51 HP on Floodplains beside a friend, 23 logged and the
   engines' 26, the log's DefenderStrMod −4 where the engines compose −6.9 —
   is some other term's, unread.
-- Not explained by this reading (C-94 ASK): a +5 a barbarian unit carries on
-  some attacks and not others (1124 t14 a Spearman and a Warrior on Rome's
-  Scout, t32, t37, t84; 1126 the Archer 2818053 on every shot t75-88; the
-  same Slinger 1124 2883596 at -12 on ships and +5 on land t44-83), and a +3
-  to +5 China's and the city-states' units carry against barbarians (1124
-  t34, t62, t72, t102-104) — no install row (the modifiers of
-  MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH, the barbarian traits, the
-  difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps'
-  promotions are empty.
+- THE SPEAR OF FIONN (READ, install): the +5 some units carry in every
+  fight is DLC/VikingsLandmarks' GIANTS_CAUSEWAY_GRANT_UNIT_ABILITY
+  (MODIFIER_ALL_UNITS_GRANT_ABILITY, Permanent, a land unit on a plot beside
+  the Giant's Causeway) granting ABILITY_SPEAR_OF_FIONN, whose
+  SPEAR_OF_FIONN_ADJUST_COMBAT_STRENGTH is a plain +5
+  (MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH, no requirement; TypeTags the land
+  combat classes and the chariots, the Warrior Monk) — read by the
+  composers' modifier walk (0x51c810 / 0x51f070), so the dumps' promotions
+  stay empty. runs/h1_duely1124: tribe 3's camp at 30:14 beside the
+  Causeway (29:15, 30:15): its Slinger 2883596 at -12 on ships (-17 + 5)
+  and +5 on land t44-83, its Crossbowman 4915219 defending at 38 against
+  city-state 4's Trebuchets t113 (30 + hills 3 + 5), its Man-at-Arms
+  4390927 on city-state 3's Knight t103 / t104 / t111, the camp's Spearman
+  458758 against Rome's Catapult t134-139; h1_duely1128 t33-37: China's
+  Scout 262146, past the Causeway at 18:8 / 19:8, +5 on each blow beside
+  Discipline. The engines: `Unit.fionn` / `unit_fionn`, granted by
+  `grantFeatureAbilities` / `_fionn_grant` as Alpine Training is, the
+  import's `History.fionn`; +5 in `chassisAbilityCS` / `_chassis_ability_cs`.
+  A recorded blow across a river logs COMBAT_RIVER_DEFENSE (5) on the
+  defender where the engines take 5 off the attacker: the same difference.
 ## H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly
 
 - ChangeResourceAmount 0x4a7560 adds the amount and rebuilds the

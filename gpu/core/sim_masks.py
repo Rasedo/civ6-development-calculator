@@ -2326,16 +2326,24 @@ class SimMasks:
                 out[b, j] = torch.tensor(ok, dtype=torch.bool, device=self.device)
         return out
 
-    def _alpine_grant(self, rows: torch.Tensor, tiles: torch.Tensor, types: torch.Tensor) -> torch.Tensor:
-        """`grantAlpine`'s test, [N] bool for games `rows`: a chassis
-        ABILITY_ALPINE_TRAINING attaches to (`_type_alpine`) on a plot beside
-        the Matterhorn"""
-        if self._alpine_feat < 0:
+    def _feature_grant(self, rows: torch.Tensor, tiles: torch.Tensor, types: torch.Tensor,
+                       feat: int, chassis: torch.Tensor) -> torch.Tensor:
+        """`grantFeatureAbilities`'s test, [N] bool for games `rows`: a chassis
+        the ability attaches to (`chassis`) on a plot beside the feature"""
+        if feat < 0:
             return torch.zeros_like(tiles, dtype=torch.bool)
         nb = self.neigh[tiles.clamp(min=0)]  # [N, 6]
         f = self.feat_id[rows.unsqueeze(1), nb.clamp(min=0)]
-        beside = ((nb >= 0) & (f == self._alpine_feat)).any(dim=1)
-        return beside & (tiles >= 0) & (types >= 0) & self._type_alpine.take(types.clamp(min=0, max=self.NU - 1))
+        beside = ((nb >= 0) & (f == feat)).any(dim=1)
+        return beside & (tiles >= 0) & (types >= 0) & chassis.take(types.clamp(min=0, max=self.NU - 1))
+
+    def _alpine_grant(self, rows: torch.Tensor, tiles: torch.Tensor, types: torch.Tensor) -> torch.Tensor:
+        """ABILITY_ALPINE_TRAINING beside the Matterhorn (`_type_alpine`)"""
+        return self._feature_grant(rows, tiles, types, self._alpine_feat, self._type_alpine)
+
+    def _fionn_grant(self, rows: torch.Tensor, tiles: torch.Tensor, types: torch.Tensor) -> torch.Tensor:
+        """ABILITY_SPEAR_OF_FIONN beside the Giant's Causeway (`_type_fionn`)"""
+        return self._feature_grant(rows, tiles, types, self._fionn_feat, self._type_fionn)
 
     def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river_mp: torch.Tensor,
                     utype: torch.Tensor | None = None, promos: torch.Tensor | None = None,
@@ -2893,6 +2901,7 @@ class SimMasks:
         self.barb_unit_levy_src[rows, slot] = -1
         self.barb_unit_no_res_upkeep[rows, slot] = False
         self.barb_unit_alpine[rows, slot] = self._alpine_grant(rows, spot[rows], self.barb_unit_type[rows, slot])
+        self.barb_unit_fionn[rows, slot] = self._fionn_grant(rows, spot[rows], self.barb_unit_type[rows, slot])
         self.barb_unit_gp_at[rows, slot] = -1
         self.barb_unit_formation[rows, slot] = 0
         self.barb_unit_escorted[rows, slot] = False
@@ -3573,8 +3582,9 @@ class SimMasks:
         getattr(self, f"{pre}_unit_levied")[rows, slot] = False  # no one's levy
         getattr(self, f"{pre}_unit_levy_src")[rows, slot] = -1
         getattr(self, f"{pre}_unit_no_res_upkeep")[rows, slot] = False  # no Meteor Site's grant
-        # born beside the Matterhorn: Alpine Training (`grantAlpine`)
+        # born beside the Matterhorn or the Giant's Causeway: Alpine Training, the Spear of Fionn (`grantFeatureAbilities`)
         getattr(self, f"{pre}_unit_alpine")[rows, slot] = self._alpine_grant(rows, spot.take(rows), type_idx.take(rows))
+        getattr(self, f"{pre}_unit_fionn")[rows, slot] = self._fionn_grant(rows, spot.take(rows), type_idx.take(rows))
         # CIV6 (Embrasure): "Military units trained in this city start with a
         # free promotion" — a unit that owes no XP for its first level, which
         # `takePromotion` then zeroes, so nothing carries into the second.

@@ -1500,8 +1500,11 @@ class SimInit:
             # fuel and is never short of it, through any upgrade
             ("no_res_upkeep", torch.bool),
             # ABILITY_ALPINE_TRAINING (`Unit.alpine`), granted for good on a
-            # plot beside the Matterhorn (`_grant_alpine`), through any upgrade
+            # plot beside the Matterhorn (`_alpine_grant`), through any upgrade
             ("alpine", torch.bool),
+            # ABILITY_SPEAR_OF_FIONN (`Unit.fionn`), granted for good on a
+            # plot beside the Giant's Causeway, through any upgrade
+            ("fionn", torch.bool),
             # its place in a city-state's or the Free Cities' unit pool (`poolSlots`,
             # the order their tactical AI walks their units in), -1 none yet
             ("pslot", torch.long),
@@ -3948,6 +3951,8 @@ class SimInit:
         self._woods_feat = int(rules.woods_feature)
         self._alpine_feat = int(rules.alpine_feature)
         self._alpine_hills_cs = int(rules.alpine_hills_cs)
+        self._fionn_feat = int(rules.fionn_feature)
+        self._fionn_cs = int(rules.fionn_cs)
         self._b_era = rules.b_era.to(device)  # [NB] long — unlock era (Heartbeat of Steam's gate) — per-building training XP (best tier over present buildings)
         # What `_building_dedications` reads besides the era: Free Inquiry pays
         # for a building that provides SCIENCE, Pen Brush and Voice for one
@@ -4506,6 +4511,7 @@ class SimInit:
             [list(x) + [-1] * (_gfw - len(x)) for x in _gf], dtype=torch.long, device=device)
         self._type_no_hill_cost = _uc("noHillCost", bool, torch.bool)
         self._type_alpine = _uc("alpine", bool, torch.bool)
+        self._type_fionn = _uc("fionn", bool, torch.bool)
         self._type_no_woods_cost = _uc("noWoodsCost", bool, torch.bool)
         self._type_ignore_shores = _uc("ignoreShores", bool, torch.bool)
         self._type_see_through = _uc("seeThrough", bool, torch.bool)

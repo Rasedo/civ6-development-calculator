@@ -5805,12 +5805,14 @@ class SimSeats:
                             foe_type: torch.Tensor | None = None,
                             vs_district: bool = False,
                             alpine: torch.Tensor | None = None,
-                            combat_tile: torch.Tensor | None = None) -> torch.Tensor:
+                            combat_tile: torch.Tensor | None = None,
+                            fionn: torch.Tensor | None = None) -> torch.Tensor:
         """`chassisAbilityCS`'s twin, [B] long — every position-dependent
         unique-unit clause, read at the tile the unit FIGHTS FROM. Each `if` below is one UnitAbilities.xml
         ability; a build whose roster carries none of a clause skips it.
         `alpine` [B]: the unit holds Alpine Training (`unit_alpine`);
-        `combat_tile` [B]: the combat's plot (an attacker's target), else `tiles`."""
+        `combat_tile` [B]: the combat's plot (an attacker's target), else `tiles`;
+        `fionn` [B]: the unit holds the Spear of Fionn (`unit_fionn`)."""
         ti = types.clamp(min=0, max=self.NU - 1)
         tl = tiles.clamp(min=0)
         out = torch.zeros_like(tiles)
@@ -5821,6 +5823,10 @@ class SimSeats:
             ct = (tiles if combat_tile is None else combat_tile).clamp(min=0)
             on_hill = live & alpine & self.hills.gather(1, ct.unsqueeze(1)).squeeze(1)
             out = out + on_hill.long() * self._alpine_hills_cs
+        # CIV6 (SPEAR_OF_FIONN_ADJUST_COMBAT_STRENGTH): the ability's Combat
+        # Strength in every fight
+        if fionn is not None:
+            out = out + (live & fionn).long() * self._fionn_cs
         # CIV6 (Khevsureti, Highlander): Combat Strength on named ground.
         if bool(self._type_ground_cs.count_nonzero()):
             g = self._type_ground_cs.take(ti)
@@ -12578,10 +12584,10 @@ class SimSeats:
         if major:
             atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
         atk_e = atk_e + self._chassis_ability_cs(a_seat, at, here, foe_type=d_type,
-                                                 alpine=self.unit_alpine.gather(1, a1).squeeze(1), combat_tile=tgt).to(atk_e.dtype)
+                                                 alpine=self.unit_alpine.gather(1, a1).squeeze(1), fionn=self.unit_fionn.gather(1, a1).squeeze(1), combat_tile=tgt).to(atk_e.dtype)
         def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
         def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(
-            d_seat, d_type, ttc, foe_type=at, alpine=self.unit_alpine.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype))
+            d_seat, d_type, ttc, foe_type=at, alpine=self.unit_alpine.gather(1, ds0.unsqueeze(1)).squeeze(1), fionn=self.unit_fionn.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype))
         # Great General / Admiral aura. Attacker keyed on its own tile `here`
         # (a CIV attacker gets its civ's aura; a BARB has none); defender
         # keyed on `tgt` — any major seat, or barb (-1). Embarked/naval →
@@ -13536,8 +13542,9 @@ class SimSeats:
         # reads the new one.
         self._occ_clear(rows, here.take(rows), gs)
         self.unit_tile[rows, gs] = dest.take(rows)
-        # a step beside the Matterhorn: Alpine Training for good (`grantAlpine`)
+        # a step beside the Matterhorn or the Giant's Causeway: Alpine Training, the Spear of Fionn, for good (`grantFeatureAbilities`)
         self.unit_alpine[rows, gs] |= self._alpine_grant(rows, dest.take(rows), u_type.take(rows))
+        self.unit_fionn[rows, gs] |= self._fionn_grant(rows, dest.take(rows), u_type.take(rows))
         self._air_carry_with(moved, gslot, here, dest)
         # One read of "is anybody riding along": `_escort_rider` hands back an
         # all -1 column set when no formation stands here, and every rider loop
@@ -13830,7 +13837,7 @@ class SimSeats:
         if major:
             atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
             atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tc).to(atk_e.dtype)
-            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], combat_tile=tile).to(atk_e.dtype)
+            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u], combat_tile=tile).to(atk_e.dtype)
             atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], atk_naval).to(atk_e.dtype)
         # the district is a CITY target to the roster's rows, as `assaultAtkCS` reads it
         atk_e = atk_e + self._roster_cs(
@@ -14554,7 +14561,7 @@ class SimSeats:
                  + self._assault_promo_cs(at0, a_promos, a_tile[:, u])
                  - self._atk_pens(at0, a_promos, a_tile[:, u], tgt, a_emb[:, u]))
         atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
-        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], combat_tile=tgt).to(atk_e.dtype)
+        atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True, alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u], combat_tile=tgt).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT, torch.full_like(a_seat[:, u], -1), a_seat[:, u])
         atk_naval = self.unit_naval[at0] | a_emb[:, u]
         atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
@@ -15161,11 +15168,11 @@ class SimSeats:
         def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
         def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(
             d_seat, d_type, ttc, def_ranged=True, foe_type=at,
-            alpine=self.unit_alpine.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype))
+            alpine=self.unit_alpine.gather(1, ds0.unsqueeze(1)).squeeze(1), fionn=self.unit_fionn.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype))
         # the attacker's own position clauses — a Varu or Toa beside the
         # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
         atk_e = atk_e + self._chassis_ability_cs(a_seat, at, a_tile, foe_type=d_type,
-                                                 alpine=self.unit_alpine.gather(1, a1).squeeze(1), combat_tile=tgt).to(atk_e.dtype)
+                                                 alpine=self.unit_alpine.gather(1, a1).squeeze(1), fionn=self.unit_fionn.gather(1, a1).squeeze(1), combat_tile=tgt).to(atk_e.dtype)
         if not hostile:
             atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
         def_civ_u = torch.where((d_slot >= 0) & ~d_barb, d_seat, neg)
@@ -15505,11 +15512,11 @@ class SimSeats:
                 self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(
                 d_seat, d_type, ttc, def_ranged=True, foe_type=at0,
-                alpine=self.unit_alpine.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype))
+                alpine=self.unit_alpine.gather(1, ds0.unsqueeze(1)).squeeze(1), fionn=self.unit_fionn.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype))
             # the attacker's own position clauses — a Varu or Toa beside the
             # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
             atk_e = atk_e + self._chassis_ability_cs(aseat, at0, a_tile[:, u], foe_type=d_type,
-                                                     alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], combat_tile=tgt).to(atk_e.dtype)
+                                                     alpine=getattr(self, f"{atk_kind}_unit_alpine")[:, u], fionn=getattr(self, f"{atk_kind}_unit_fionn")[:, u], combat_tile=tgt).to(atk_e.dtype)
             def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(
                 torch.where(ok_m & ~d_barb, d_seat, neg), tgt, def_naval).to(def_e.dtype)

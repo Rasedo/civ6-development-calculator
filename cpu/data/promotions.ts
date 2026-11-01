@@ -1302,6 +1302,33 @@ export const ALPINE_CLASSES: readonly PromoClass[] = [
 export const ALPINE_HILLS_CS = srcConst('promotions.alpineHillsCs', 3,
   xml('ModifierArguments', 'ModifierId=ALPINE_TRAINING_COMBAT_HILLS&Name=Amount', 'Value'));
 
+/** CIV6 (DLC/VikingsLandmarks/Data/VikingsLandmarks_Features.xml
+ *  GIANTS_CAUSEWAY_GRANT_UNIT_ABILITY, MODIFIER_ALL_UNITS_GRANT_ABILITY,
+ *  Permanent): every player's land unit on a plot beside the Giant's Causeway
+ *  gains ABILITY_SPEAR_OF_FIONN for good (REQUIRES_LAND_UNIT,
+ *  PLOT_ADJACENT_TO_GIANTS_CAUSEWAY_REQUIREMENT) — the feature the
+ *  requirement names */
+export const FIONN_FEATURE = srcConst('promotions.fionnFeature', 'GIANTS_CAUSEWAY',
+  xml('RequirementArguments', 'RequirementId=PLOT_ADJACENT_TO_GIANTS_CAUSEWAY_REQUIREMENT&Name=FeatureType', 'Value',
+    { expect: 'FEATURE_GIANTS_CAUSEWAY' }));
+/** the classes ABILITY_SPEAR_OF_FIONN attaches to (VikingsLandmarks_Abilities.xml
+ *  TypeTags: CLASS_RECON, CLASS_MELEE, CLASS_RANGED, CLASS_SIEGE,
+ *  CLASS_HEAVY_CAVALRY, CLASS_LIGHT_CAVALRY, CLASS_ANTI_CAVALRY,
+ *  CLASS_RANGED_CAVALRY, CLASS_HEAVY_CHARIOT, CLASS_LIGHT_CHARIOT,
+ *  CLASS_WARRIOR_MONK), as the promotion classes whose chassis carry them —
+ *  the chariots among them */
+export const FIONN_CLASSES: readonly PromoClass[] = [
+  'RECON', 'MELEE', 'RANGED', 'ANTICAV', 'LIGHT_CAV', 'HEAVY_CAV', 'SIEGE', 'MONK',
+];
+/** SPEAR_OF_FIONN_ADJUST_COMBAT_STRENGTH (MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH,
+ *  no requirement): the ability's Combat Strength in every fight
+ *  (runs/h1_duely1124: tribe 3's camp at 30:14 beside the Causeway, its
+ *  Slinger 2883596 +5 on every shot t44-83 and its Crossbowman 4915219
+ *  defending at 38 against city-state 4's Trebuchets t113; h1_duely1128 t33-37:
+ *  China's Scout 262146, past the Causeway at 18:8, +5 on each blow) */
+export const FIONN_CS = srcConst('promotions.fionnCs', 5,
+  xml('ModifierArguments', 'ModifierId=SPEAR_OF_FIONN_ADJUST_COMBAT_STRENGTH&Name=Amount', 'Value'));
+
 /** the class BIT a chassis presents to another unit's `CS_VS_*` mask. */
 export function classBitOf(unitType: string): number {
   const c = UNIT_PROMO_CLASS[unitType];

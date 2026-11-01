@@ -50,7 +50,7 @@ import {
 import { logXpWrite, logPopWrite } from './difflog';
 import { eraMatchupCS, getModifiers, governmentUnitCS, governmentXpPct } from './effects';
 import { congressPromoClassCs, congressReligiousCs } from './congress';
-import { ALPINE_HILLS_CS, KILL_SPREAD_RANGE, UNIT_PROMO_CLASS, classBitOf } from '../data/promotions';
+import { ALPINE_HILLS_CS, FIONN_CS, KILL_SPREAD_RANGE, UNIT_PROMO_CLASS, classBitOf } from '../data/promotions';
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
 import { FREE_SEAT, civOf, isFreeSeat, seatsAllied } from './seats';
@@ -168,7 +168,7 @@ export function chassisFlankMult(u: { type: string }): number {
  */
 export function chassisAbilityCS(
   state: GameState,
-  u: { type: string; seat: number; movesLeft?: number; alpine?: boolean },
+  u: { type: string; seat: number; movesLeft?: number; alpine?: boolean; fionn?: boolean },
   atTile: number,
   ctx?: { defendingRanged?: boolean; foeType?: string; vsDistrict?: boolean; combatTile?: number },
 ): number {
@@ -182,6 +182,9 @@ export function chassisAbilityCS(
   // attacker's the target's (runs/h1_duely1124 t111: China's Courser on hills
   // strikes an Archer on flat ground, none; t112 one on hills, +3)
   if (u.alpine && state.map.tiles[ctx?.combatTile ?? atTile]?.elevation === 'HILLS') out += ALPINE_HILLS_CS;
+  // CIV6 (SPEAR_OF_FIONN_ADJUST_COMBAT_STRENGTH): the ability's Combat Strength
+  // in every fight
+  if (u.fionn) out += FIONN_CS;
   // CIV6 (Khevsureti, Highlander): Combat Strength on named ground.
   if (def.groundCS) {
     const g = def.groundCS;

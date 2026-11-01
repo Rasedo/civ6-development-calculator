@@ -1399,6 +1399,7 @@ UNIT = {
     "freeCity": _unit("unit_free_city"),
     "noResourceUpkeep": _unit("unit_no_res_upkeep"),
     "alpine": _unit("unit_alpine"),
+    "fionn": _unit("unit_fionn"),
 }
 
 

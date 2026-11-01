@@ -517,6 +517,8 @@ class Rules:
     woods_feature: int  # the Woods feature itself — the Stave Church's adjacency source
     alpine_feature: int  # the feature whose neighbours grant ABILITY_ALPINE_TRAINING, -1 none
     alpine_hills_cs: int  # ALPINE_TRAINING_COMBAT_HILLS: the ability's Combat Strength on hills
+    fionn_feature: int  # the feature whose neighbours grant ABILITY_SPEAR_OF_FIONN, -1 none
+    fionn_cs: int  # SPEAR_OF_FIONN_ADJUST_COMBAT_STRENGTH: the ability's Combat Strength
     worship_bidx: list  # per Worship belief (WORSHIP_BELIEFS order): the building row it unlocks
     temple_bidx: int  # TEMPLE row (worship prerequisite), -1 if absent
     worship_faith_cost: float  # a worship building's faith price: its row's scaled Cost x the faith rate
@@ -784,6 +786,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         woods_feature=int(_P["woodsFeature"]),
         alpine_feature=int(_P["alpineFeature"]),
         alpine_hills_cs=int(_P["alpineHillsCs"]),
+        fionn_feature=int(_P["fionnFeature"]),
+        fionn_cs=int(_P["fionnCs"]),
         worship_bidx=[int(x) for x in r["worshipBidx"]],
         temple_bidx=int(r["templeBidx"]),
         worship_faith_cost=float(r["worshipFaithCost"]),
@@ -1289,7 +1293,7 @@ _MUTABLE = [
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_levy_src", "unit_patrol", "unit_free_city", "unit_no_res_upkeep", "unit_alpine", "unit_pslot",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_levy_src", "unit_patrol", "unit_free_city", "unit_no_res_upkeep", "unit_alpine", "unit_fionn", "unit_pslot",
     "unit_escorted", "unit_defender", "military_at", "civilian_at", "support_at", "embarked_at", "war", "ww", "ww_turn",
     "civ_best_melee", "civ_best_ranged", "civ_builders_trained", "civ_settlers_trained", "civ_discount_districts", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_research_project_pct", "civ_influence", "civ_tech_prog", "civ_tech_ovf", "civ_civic_ovf", "civ_road_tier", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_beliefs_earned", "civ_follower", "civ_founder", "civ_worship", "civ_next_city_id",

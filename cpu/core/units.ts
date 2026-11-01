@@ -38,7 +38,7 @@ import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
 import { civUnitAllowed, civUpgradeTarget, GDR_UPGRADES, GDR_ENHANCED_MOVES, UNITS, UNIT_HP, UNIT_TYPE_IDX, ENCAMPMENT_HP, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, type UnitDef } from '../data/units';
 import {
-  ALPINE_CLASSES, ALPINE_FEATURE, BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE,
+  ALPINE_CLASSES, ALPINE_FEATURE, FIONN_CLASSES, FIONN_FEATURE, BAND_VENUE_BIT, BAND_VENUE_DISTRICTS, CONCERT_SHARE_RANGE,
   ROCK_BAND_MAX_PROMOTIONS, UNIT_PROMO_CLASS,
 } from '../data/promotions';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
@@ -1002,17 +1002,28 @@ export function alpineChassis(type: string): boolean {
     && unitDomain(type) === 'military';
 }
 
-/** MATTERHORN_ADJACENT_UNITS_GRANT_ABILITY (Permanent): a land unit whose
- *  chassis takes the ability, standing on a plot beside the Matterhorn —
- *  stepped onto or born there — holds ABILITY_ALPINE_TRAINING from then on
- *  (runs/h1_duely1124: Cardiff's Warrior 196610 on 8:9 at record 30, hills
- *  (1/1) in AI_Planning.csv from t32, (1/0) at t26-27; its Swordsman,
- *  Man-at-Arms and t130 upgrade keep it) */
-export function grantAlpine(state: GameState, unit: Unit): void {
-  if (unit.alpine || !alpineChassis(unit.type)) return;
+/** does ABILITY_SPEAR_OF_FIONN attach to this chassis (its TypeTags,
+ *  `FIONN_CLASSES`, the chariots among them; a land chassis) */
+export function fionnChassis(type: string): boolean {
+  const def = UNITS[type];
+  const cls = UNIT_PROMO_CLASS[type];
+  return !!def && !def.naval && cls !== undefined && FIONN_CLASSES.includes(cls)
+    && unitDomain(type) === 'military';
+}
+
+/** the abilities a natural wonder grants for good (Permanent) to a land unit
+ *  standing on a plot beside it — stepped onto or born there — whose chassis
+ *  takes them: MATTERHORN_ADJACENT_UNITS_GRANT_ABILITY's
+ *  ABILITY_ALPINE_TRAINING (runs/h1_duely1124: Cardiff's Warrior 196610 on 8:9
+ *  at record 30, hills (1/1) in AI_Planning.csv from t32, (1/0) at t26-27; its
+ *  Swordsman, Man-at-Arms and t130 upgrade keep it) and
+ *  GIANTS_CAUSEWAY_GRANT_UNIT_ABILITY's ABILITY_SPEAR_OF_FIONN */
+export function grantFeatureAbilities(state: GameState, unit: Unit): void {
   const at = state.map.tiles[unit.tileIndex];
   if (!at) return;
-  if (neighbors(state.map, at).some((n) => n.feature === ALPINE_FEATURE)) unit.alpine = true;
+  const near = neighbors(state.map, at);
+  if (!unit.alpine && alpineChassis(unit.type) && near.some((n) => n.feature === ALPINE_FEATURE)) unit.alpine = true;
+  if (!unit.fionn && fionnChassis(unit.type) && near.some((n) => n.feature === FIONN_FEATURE)) unit.fionn = true;
 }
 
 /** CITY_MOVEMENT_COST (GlobalParameters), in MP_SCALE units */
@@ -1058,7 +1069,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   carryAirWith(state, unit, from.index);
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
-  grantAlpine(state, unit);
+  grantFeatureAbilities(state, unit);
   // the transfer cap: what carries over can never exceed the NEW mode's
   // pool — which becomes the granted pool every later afford this turn reads
   if (transition) {
@@ -1900,7 +1911,7 @@ export function spawnUnit(
     unit.xp = owed;
     logXpWrite(state, unit, 'fp');
   }
-  grantAlpine(state, unit);
+  grantFeatureAbilities(state, unit);
   state.units.push(unit);
   // the player's knowledge base records the unit it made at once (player
   // signal +0xc0 -> 0x7874a0, no sight asked): a Trader, which no look

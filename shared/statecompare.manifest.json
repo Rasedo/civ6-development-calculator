@@ -3996,7 +3996,18 @@
           "planes": [
             "unit_alpine"
           ],
-          "note": "ABILITY_ALPINE_TRAINING, granted for good beside the Matterhorn: hills cost a plain move and +3 Combat Strength on hills, through any upgrade."
+          "note": "ABILITY_ALPINE_TRAINING, granted for good beside the Matterhorn: hills cost a plain move and +3 Combat Strength where the combat's plot is hills, through any upgrade."
+        },
+        {
+          "name": "fionn",
+          "compare": "exact",
+          "covers": [
+            "Unit.fionn"
+          ],
+          "planes": [
+            "unit_fionn"
+          ],
+          "note": "ABILITY_SPEAR_OF_FIONN, granted for good beside the Giant's Causeway: +5 Combat Strength in every fight, through any upgrade."
         }
       ]
     },
