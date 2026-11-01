@@ -12282,3 +12282,19 @@ Heal in `_minor_pass` / `_free_tactics` (gpu/core/sim_tactics.py);
   fortified on 8:6 under an Upgrade Units tree, its planning holding its
   centre 11:5 at (1/0) (AI_Planning.csv), stays there t80-112 (the engines
   still take it in: their danger or planning at 11:5, unread).
+
+## H-1: a minor's repair in the per-turn world — its progress and its locked price (importer), its rest as the step's price
+
+- The game's queue shows a repair's progress with the share it resumed at
+  inside it, against the item's full price: runs/h1_duely1124 Granada's
+  Encampment repair 80 + 24 + 24 of 107, done t166 (City_BuildQueue t165
+  104 / 107, t166 128 / 107); runs/h1_duely1117 Valletta's Lighthouse 45 ->
+  56. The engines' step prices the rest past MINOR_REPAIR_RESUME_PCT from 0,
+  so the importer takes `minorRepairResumed` off the record's progress of a
+  repair in hand (a pillaged building's, a district on its own pillaged
+  plot).
+- A pillaged district's repair is priced at its locked price, which the
+  city's buy row quotes while it stands pillaged (Granada's Encampment D
+  row 107 at t165, the fresh price 165), so the importer locks it as it
+  does an unfinished district's. The engines completed the repair at t165,
+  the game at t166 (1124 p3 contract 674).

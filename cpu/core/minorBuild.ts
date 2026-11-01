@@ -1737,10 +1737,28 @@ export function minorItemPct(state: GameState, cityState: CityState, item: Minor
  *  `MINOR_REPAIR_RESUME_PCT` as a building's (runs/h1_duelw1127 Muscat t168:
  *  the Commercial Hub resumed at 85 of 114) */
 function minorDistrictCost(state: GameState, cityState: CityState, district: DistrictId, site: number): number {
+  return minorDistrictFull(cityState, district, site) - minorRepairResumed(state, cityState, { district, site });
+}
+
+/** a minor's district's full price: the price it locked at its placement on
+ *  the plot, else the row's own base at its research now */
+function minorDistrictFull(cityState: CityState, district: DistrictId, site: number): number {
   const placed = site >= 0 ? (cityState.districts ?? []).find((d) => d.type === district && d.tileIndex === site) : undefined;
-  const full = placed?.cost ?? districtScaledBase(cityState.research, district);
-  if (site < 0 || state.map.tiles[site].district !== district || !minorRepairsDistrictAt(state, cityState, site)) return full;
-  return full - Math.floor((full * MINOR_REPAIR_RESUME_PCT) / 100);
+  return placed?.cost ?? districtScaledBase(cityState.research, district);
+}
+
+/** The progress a repair resumes at, `MINOR_REPAIR_RESUME_PCT` of the
+ *  item's full price, which the game's queue shows within the item's
+ *  progress (runs/h1_duely1124 Granada t165: its Encampment's repair at
+ *  80 + 24 of 107, done t166; runs/h1_duely1117 Valletta t144-148: its
+ *  Lighthouse's 45 -> 56): a pillaged building's repair, a district on the
+ *  plot of its own pillaged one; 0 for any other item */
+export function minorRepairResumed(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): number {
+  if ('repair' in item) return Math.floor((minorBuildingCost(state, cityState, item.repair) * MINOR_REPAIR_RESUME_PCT) / 100);
+  if (!('district' in item)) return 0;
+  const { district, site } = item;
+  if (site < 0 || state.map.tiles[site].district !== district || !minorRepairsDistrictAt(state, cityState, site)) return 0;
+  return Math.floor((minorDistrictFull(cityState, district, site) * MINOR_REPAIR_RESUME_PCT) / 100);
 }
 
 /** A minor's item's price: a unit's Production cost (a Builder's and a
@@ -1756,8 +1774,7 @@ export function minorItemCost(state: GameState, cityState: CityState, item: Excl
       // districts too and the install prices an Aqueduct at 36
       : 'district' in item ? minorDistrictCost(state, cityState, item.district, item.site)
         : 'project' in item ? projectCost(state, cityState.seat, item.project, minorCity(cityState))
-          : minorBuildingCost(state, cityState, item.repair)
-            - Math.floor((minorBuildingCost(state, cityState, item.repair) * MINOR_REPAIR_RESUME_PCT) / 100);
+          : minorBuildingCost(state, cityState, item.repair) - minorRepairResumed(state, cityState, item);
 }
 
 /** THE MINOR'S BUILDING RISES (its production's completion or its purchase):

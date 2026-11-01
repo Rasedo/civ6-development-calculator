@@ -28,7 +28,7 @@
  */
 import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
 import { NO_SEAT } from '../core/types';
-import { minorItemKey, type MinorItem } from '../core/minorBuild';
+import { minorItemKey, minorRepairResumed, type MinorItem } from '../core/minorBuild';
 import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, isBarbSeat, startMeleeCS, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, majorsAlive, setMetTurnWith } from '../core/seats';
 import { routeOriginCenter, stampTradingPost, tradeRouteMinDuration } from '../core/trade';
@@ -62,7 +62,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { GOVERNMENTS, POLICIES, type SlotKind } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { AGE_GOLDEN } from '../data/seats';
-import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, LEVY_TURNS, MINOR_CATCHUP_PCT, MINOR_REPAIR_RESUME_PCT } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES, LEVY_TURNS, MINOR_CATCHUP_PCT } from '../data/cityStates';
 import { researchCost } from '../core/economy';
 import { ALPINE_FEATURE, PROMO_CLASSES } from '../data/promotions';
 import { unitPromoRows } from '../core/promotions';
@@ -2325,6 +2325,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const cityByKey = new Map<string, City>();
   const dumpOfCity = new Map<City, DumpCity>();
   const dumpOfMinor = new Map<CityState, DumpCity>();
+  const repairsInHand: [CityState, MinorItem | undefined][] = [];
   const cities = [...rec.cities].sort((a, b) => a.owner - b.owner || a.id - b.id);
   for (const c of cities) {
     ctx.scopeCity = `${c.owner}:${c.id}`;
@@ -2375,8 +2376,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       // a district under construction keeps the price locked at its
       // placement, which the city's cost reader quotes (its buy row): the
       // minor's item cost (`minorDistrictCost`; runs/h1_duely1124 Granada's
-      // Harbor at 53 through t44's civic, which took the fresh price to 58)
-      if (id !== 'CITY_CENTER' && complete !== true) {
+      // Harbor at 53 through t44's civic, which took the fresh price to 58);
+      // a pillaged one its repair's full price (runs/h1_duely1124 Granada's
+      // Encampment quoted at 107 while pillaged, its repair 80 + 24 + 24 of
+      // 107, the fresh price 165)
+      if (id !== 'CITY_CENTER' && (complete !== true || dpil === true)) {
         const locked = num(c.buy.find((b) => b[0] === 'D' && b[1] === ti)?.[2]);
         if (locked > 0) lockedDistrictCost.set(at, locked);
       }
@@ -2435,17 +2439,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       if (key) {
         minor.prodItem = key;
         minor.prodProgress = num(c.queueProgress?.[0]) || 0;
-        // a repair's queue progress counts its building's whole cost, the
-        // resumed part with it (runs/h1_duely1117 Valletta t144: its
-        // Lighthouse's repair at 45 of 60), the engine's the rest past it
-        if (item && 'repair' in item) {
-          const cost = BUILDINGS[item.repair].cost;
-          minor.prodProgress = Math.max(0, minor.prodProgress - Math.floor((cost * MINOR_REPAIR_RESUME_PCT) / 100));
-        }
       }
       // a district in hand stands at the record's queued Location
       if (item && 'district' in item) minor.prodSite = item.site;
       else delete minor.prodSite;
+      repairsInHand.push([minor, item]);
       dumpOfMinor.set(minor, c);
       for (const q of c.plots) setTileOwner(tiles[q], seat);
       // its citizens pinned as a major's are: the minor's walk works the
@@ -2754,6 +2752,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   state.riverNamed = history?.riverNamed ? [...history.riverNamed] : undefined;
   nameRivers(state);
   if (history && history.last === rec && state.riverNamed) history.riverNamed = [...state.riverNamed];
+  // a repair in hand: the record's progress holds the share it resumed at,
+  // which the minor's step prices out of the repair (`minorRepairResumed`)
+  for (const [minor, item] of repairsInHand) {
+    if (item && !('none' in item)) minor.prodProgress = Math.max(0, (minor.prodProgress ?? 0) - minorRepairResumed(state, minor, item));
+  }
   // A MINOR'S CATCH-UP as the record leaves it: the record shows no item's
   // progress but the one in hand, so every row the minor lacks that its
   // catch-up has set (at least `need` of the record's majors hold it) stands
