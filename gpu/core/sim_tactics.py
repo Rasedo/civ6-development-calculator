@@ -583,6 +583,12 @@ class SimTactics:
             waive_cliff = self._promo_flag(utype, getattr(self, f"{pre}_unit_promos")[rows, slots], "CLIFFS")
         zp = (torch.where(naval.unsqueeze(1), self._tac_zoc(seat, naval=True)[rows], self._tac_zoc(seat, naval=False)[rows])
               & ~self._tac_zoc_ignored(utype).unsqueeze(1)) if zoc else None
+        if stand and not zoc:
+            # the danger map's search (flags 0x311): a step into a zone of
+            # control the player sees spends everything (`search`)
+            sn_d = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
+            zp = (torch.where(naval.unsqueeze(1), self._tac_zoc(seat, sn_d, True)[rows], self._tac_zoc(seat, sn_d, False)[rows])
+                  & ~self._tac_zoc_ignored(utype).unsqueeze(1))
         # the planning's search (no flag 0x200: 0x26e570 at 0x26e83e) moves on
         # from no plot of a zone of control the player sees but the unit's
         # own; an attack it strikes from there all the same (`groundOf`'s

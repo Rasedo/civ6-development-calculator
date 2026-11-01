@@ -7150,7 +7150,10 @@ opened in gpu/core.
   Man-at-Arms 50 likewise. With the rule the rows equal 10 -> 12 of 14
   (1117 unchanged); the ZOC read as a move order's (flags without 0x800)
   equals the same rows but takes 2-3 barbarian moves off on 1128 / 1117, so
-  the search keeps the planning's ZOC-free walk. Ported (`dangerPlane`,
+  the search pays the cost's ZOC (0x200 skips the planning's refusal, no
+  0x800 keeps the spend-everything step) on the zones its player sees now
+  (runs/h1_duely1124 t53: the Archer 3473429 stops on 39:8, 36:7 holds no
+  danger, city-state 4's Warrior 327683 Heals). Ported (`dangerPlane`,
   `_danger_plane`).
 - runs/h1_duelv1128 t20, city-state 4's Operation Protect Units (the hurt
   Warrior at 31:7, Attack Barb Camp): the game sends it to 33:8, ours to

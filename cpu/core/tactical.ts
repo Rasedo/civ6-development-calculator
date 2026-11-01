@@ -476,10 +476,14 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // Movement it leaves (0x26e570: the cost adds it)
       cost += moves;
       moves = 0;
-    } else if (zoc && moves > 0 && ground.zoc(to)) {
+    } else if (moves > 0 && (zoc ? ground.zoc(to) : standToAttack && ground.seenZoc(to.index))) {
       // a zone of control's step costs at least the Movement it starts with
       // (0x26f980's minimum), the parent's carry on top: with one, the step
-      // is left short (0x26ed00)
+      // is left short (0x26ed00). The danger map's search (flags 0x311: no
+      // 0x800) pays it on a zone its player sees (runs/h1_duely1124 t53:
+      // the barbarian Archer on 40:8 stops on 39:8 beside city-state 4's
+      // Warrior on 38:8, so 36:7 holds no danger and its Warrior 327683
+      // Heals there)
       cost = pm;
       moves = 0;
       carry = 0;
