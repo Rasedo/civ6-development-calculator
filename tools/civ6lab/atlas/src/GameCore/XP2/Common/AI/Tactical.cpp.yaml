@@ -739,7 +739,7 @@
 - addr: 0x77b9a0
   final: 0x50d830
   kind: function
-  semantics: "the Free Cities' / barbarians' Wander Near Camp: a unit with a group (+0x11d0 >= 0) whose camp the player's signals answer (0x771250); after its move order its moves end (0x56d6f0 at 0x77bedd: its formation moves no more) and its turn (0x570b40)."
+  semantics: "the Free Cities' / barbarians' Wander Near Camp: a unit with a group (+0x11d0 >= 0) whose camp the player's signals answer (0x771250). Its Wander moves with flags 0 (0x77bce4), its move to the camp with 0x1000 (0x77be0b, Wander Back to Camp at 0x77bec7); after its move order its moves end (0x56d6f0 at 0x77bedd: its formation moves no more) and its turn (0x570b40)."
   status: READ
   cases:
     - recording: h1_duelw1114
@@ -748,12 +748,14 @@
     - recording: 1123
       value: 1123's eight are Attack Units.
   impl:
+    - gpu/core/sim_tactics.py:_free_pass
     - cpu/core/tactical.ts:WANDER_CAMP_RANGE
     - cpu/core/tactical.ts:wanderNearCamp
     - cpu/harness/drawSites.ts:DRAW_SITES
     - gpu/core/sim_tactics.py:_AI_DEFENDER
     - cpu/core/tactical.ts:keptOut
   readings:
+    - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
@@ -790,6 +792,7 @@
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
     - "C-99: the stacking count holds other players' units, the wanders' kept-out plots, a Harbor's water no shore — READ (0x585d90, 0x585eb0, 0x2720a0, 0x77bf50, 0x77b9a0, 0x530240), both twins"
+    - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ore): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190),   f2e164 Wander Near City (0x77bf50). - WANDER NEAR CITY (0x77bf50): nothing for a player with no city ([+0x12f0]   +0xc0, so a city-st..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...2e12c Make Military Formation (0x77a190),   f2e164 Wander Near City (0x77bf50). - WANDER NEAR CITY (0x77bf50): nothing for a player with no city ([+0x12f0]   +0xc0, so a city-state's first turn, its Settler f..."

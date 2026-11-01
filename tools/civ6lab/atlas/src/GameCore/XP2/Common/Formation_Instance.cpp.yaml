@@ -96,6 +96,16 @@
   context:
     - ".... How the cost's \"spend everything\" leaves the Movement is unread (the walk's deduction 0x265d80 of [rsp+0x60]). The engines: a walk halts on a plot of an enemy's zone with its Movemen..."
   review: imported
+- addr: 0x266250
+  final: 0x1a3b10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...n) refuses the crossing unless either plot is a city or the formation may cross cliffs (0x266250); else the TO plot's location test 0x586900 under flag 1 (0x81 with path flag 0x2000) a...
+  review: imported
 - addr: 0x266470
   final: 0x1a3d30
   kind: function

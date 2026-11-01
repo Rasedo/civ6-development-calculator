@@ -7963,3 +7963,54 @@ the `_imp_eng` branch.
 ## C-130: the Free Cities' city subjects and space race projects on the GPU — both twins
 
 A city subject carries its own city's facts on the GPU as in TS (COLLECTION_PLAYER_CITIES' next 0x69ea00 writes the city to +0x70): `_cv_subjects` / `city_subjects()`, a Free City's siblings each its own `_FreeFacts`, a city-state's one city; no city in the context gives the player subject or none. EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION (0x6be2d0) scores each SpaceRace project on a Free City subject (`_FreeFacts.project_turns`, the twin of TS `projectTurns`); the Free Cities' trade capacity and Traders read the seat's own (`_trade_capacity(FREE_ROW)`). This closes the open line of the section "C-98 / C-130: the player tourism analyzer, the city subject's context, the dark trade buildings". Open: Online Communities' 0x6a1380.
+
+## C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins
+
+`search`'s cliff test, `pathTo`'s destination count, `wanderNearCamp`
+(cpu/core/tactical.ts); `price6`'s `cliff6`, `_tac_move_to`'s `crowd_d`, the
+Wander Near Camp moves of the barbarians' and the Free Cities' passes
+(gpu/core/sim_tactics.py).
+
+- THE CLIFF (0x52fb90, the disembark test; its embark twin 0x52fe90): the
+  water plot's cliff bit toward the land plot (plot +0x39, bit by the step's
+  direction) refuses the crossing unless either plot is a city or the
+  formation may cross cliffs (0x266250); else the TO plot's location test
+  0x586900 under flag 1 (0x81 with path flag 0x2000) answers. The validity
+  0x2720a0 calls both only where the child is revealed (0x272380: +0x51 bit
+  0), the cost 0x270dd0 likewise (0x270f24: [rsp+0xa8], the child's +0x51 bit
+  0): a shore crossing onto a plot the player never revealed passes whatever
+  its cliffs, the FROM plot revealed or not.
+- WANDER BACK TO CAMP (0x77b9a0): the Wander move goes out with flags 0
+  (0x77bce4), the move to the camp with 0x1000 (0x77be0b, logged "Wander
+  Back to Camp" at 0x77bec7), as Wander Back to City's (0x77c505): the
+  path's turns after its first may end on its own stacking unit.
+- THE DESTINATION'S COUNT (0x2720a0's chain walk, 0x272230..0x27229e): the
+  child itself is tested where it is the path's destination (the instance's
+  +0xd8 / +0xdc, r9b), any other node where the next node begins a turn. On
+  a plot the player sees now (+0x50 & 2), a count +0x54 at the stacking
+  limit (+0x1b0) refuses the link (+0xe9 set for the destination): at any
+  turn without flag 0x1000, at turn 1 alone with it (0x27229b); flag 4 (the
+  planning) none. The count (0x271be0 at 0x271d03..0x271d18) is 0x585eb0
+  over the plot's units, less one on the formation's own plot. So a move
+  order has no path to a destination its own stacking unit, or another
+  player's unit at peace it sees, holds — but an attack's, whose unit at war
+  counts none — at whatever turn without 0x1000, within the first under it.
+  The engines' rule "a first turn ending on the destination its own
+  stacking unit holds is no path" is its 0x1000 half.
+- CONFIRMED (one-seed aimem traces to t230, the five duels, against the head
+  without the rule): runs/h1_duely1124 t182-t196 the rampaging Galleys
+  1966102 / 1179665 hold for China's Water Park 19:8, the Galley 720906 on it
+  (30 rows); 1121 t154 the rampaging Crossbowman 3801114 for 17:15, t181 /
+  t191 3866651 for 17:14 / 16:12; 1128 t211-212 Pike and Shot 6815748 (Camp
+  Defense). The cliff: 1121 t82 city-state 4's embarked Man-At-Arms 1048577
+  on 38:18 plans 40:17 / 40:16 (2/0) past 39:17's cliffs, both never
+  revealed, AI_Planning.csv's 9 plots as logged; t83 on 40:18 42:20 (2/0)
+  past 41:20's, 15 of 15.
+- OPEN (C-99): 1121 4:1048577 t81-98 (Wander Back to City for 32:21, flag
+  0x1000): from 36:19 the engines' path lands on 37:17 at its turn-2 end
+  (player 0's Warrior 1507343 there in sight) and walks the north; the game
+  sails to 38:18. A turn end after the first on another player's unit is
+  not refused under 0x1000 (0x27229b): 1121 4:589828 t68 (Upgrade Units,
+  0x1001) steps to 33:17 as logged, its path's turn 2 ending on player 0's
+  Warrior on 33:18. What else closes the land way to the game's path is
+  unread.

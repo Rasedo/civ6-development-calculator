@@ -2266,14 +2266,23 @@
 - addr: 0x52fb90
   final: 0x377790
   kind: function
-  semantics: the disembark test (+1e6 where refused).
-  status: PARTLY
+  semantics: "the disembark test (the validity's and the cost's, +1e6 where refused in the cost): off a water plot adjacent to land (IsWater, IsAdjacentToLand) for a formation that may embark (+0x338): the water plot's cliff bit toward the land plot (plot +0x39, the bit by the step's direction) refuses it unless either plot is a city or 0x266250 lets the formation cross; else the TO plot's location test 0x586900 under flag 1 (0x81 with path flag 0x2000) answers (== 1). Its callers run it on a revealed child alone (0x2720a0 at 0x272380, 0x270dd0 at 0x270f24)."
+  status: READ
   cases:
+    - recording: h1_duely1121
+      turn: 82
+      value: city-state 4's embarked Man-At-Arms 1048577 on 38:18 plans 40:17 / 40:16 (2/0) past 39:17's cliffs (bits 6), both never revealed, AI_Planning.csv's 9 plots as logged
     - recording: AI_Planning.csv
       turn: 69
       value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
-  impl: [cpu/core/tactical.ts:from]
+  impl:
+    - cpu/core/tactical.ts:from
+    - cpu/core/tactical.ts:search
+    - gpu/core/sim_tactics.py:_tac_search
+    - cpu/core/tactical.ts:blind
+    - gpu/core/sim_tactics.py:price6
   readings:
+    - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"
@@ -2289,8 +2298,9 @@
     - recording: AI_Planning.csv
       turn: 69
       value: "So an AI land unit's reach and path take   water as one Movement dearer a plot (runs/h1_duely1117 t69: Valletta's   Archer on 13:8 closes its Harbor's 14:7 (1/0) and the coast's 12:7 after   the land'"
-  impl: [cpu/core/tactical.ts:from]
+  impl: [cpu/core/tactical.ts:from, cpu/core/tactical.ts:blind, gpu/core/sim_tactics.py:price6]
   readings:
+    - "C-99 / C-128: a shore crossing's cliff onto a revealed plot alone, Wander Back to Camp's path flag 0x1000, the path's destination count — READ (0x52fb90, 0x2720a0 at 0x272230..0x27229e / 0x272380, 0x270dd0 at 0x270f24, 0x271be0 at 0x271d03..0x271d18, 0x77b9a0 at 0x77be0b), both twins"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-99: an embarked unit passes no other player's passenger — the step's flag-1 test READ (0x2720a0 at 0x272372, 0x271be0, 0x586360 at 0x586542, 0x208b80 under 0x108, 0x20a2a0), both twins"
     - "C-124: a path enters a plot the player never revealed whatever it is — READ (0x2720a0 at 0x272372..0x27242e, 0x271be0's +0x50 bit 0x20, 0x26e920), both twins"

@@ -542,9 +542,15 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       // a plot the player never revealed is entered whatever it holds: the
       // step's validity (0x2720a0 at 0x272372..0x27242e) tests the location
       // (+0x50 bit 0x40, the domain, the embarking) on a revealed plot alone;
-      // between two such plots no movement rule runs (0x26e920)
+      // between two such plots no movement rule runs (0x26e920). A cliff
+      // bars a shore crossing onto a revealed plot alone: the embark and
+      // disembark tests (0x52fe90 / 0x52fb90, the water plot's cliff bit
+      // toward the land) run on a revealed child, in the validity (0x272380)
+      // and in the cost (0x270f24) alike (runs/h1_duely1121 t82: city-state
+      // 4's embarked Man-At-Arms on 38:18 plans 40:17 / 40:16 (2/0) past
+      // 39:17's cliffs, both never revealed, AI_Planning.csv)
       const blind = blindStep(best, to);
-      if (!blind && cliffBlocksStep(state, from, to, unit)) continue;
+      if (ground.revealed(to.index) && cliffBlocksStep(state, from, to, unit)) continue;
       // a move order's path passes a unit at war with it out of its sight
       // (`pass`)
       const attack = ground.revealed(to.index) && !(zoc ? ground.pass(to) : ground.enter(to));
@@ -772,16 +778,23 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
   if (dest !== unit.tileIndex && foreignAt(state, unit, dest)
     && plotsSeenNow(state, new Set([unit.seat]))[dest] !== 1) return [];
   let found = null as PNode | null;
-  search(state, unit, Infinity, true, (n) => {
+  let crowded = false;
+  search(state, unit, Infinity, true, (n, ground) => {
     if (n.tile !== dest) return false;
     found = n;
+    crowded = ground.crowded(dest);
     return true;
   }, undefined, false, laterTurns, false, explore, danger, mates, dest);
-  // the path's first turn may not end on the destination its own stacking
-  // unit holds, under flag 0x1000 or not (runs/h1_duely1124 t182-t196: the
-  // barbarian Ironclad 5701639 on 19:3 holds for China's Water Park 19:8
-  // while the rampaging Galley 720906 stands on it)
-  if (found && (found as PNode).turns <= 1 && stackedWith(state, unit, mates, dest)) return [];
+  // the destination's count against the stacking limit (the validity
+  // 0x2720a0 tests the destination node itself, 0x272230..0x27229e): its own
+  // stacking unit there, or another player's unit at peace on it in its
+  // sight, is no path, at any turn without flag 0x1000 and within the first
+  // under it; a unit at war counts none (runs/h1_duely1124 t182-t196: the
+  // rampaging Galleys 1966102 / 1179665 hold for China's Water Park 19:8 and
+  // the Ironclad 5701639 on 19:3 likewise, the Galley 720906 on it; 1121 t154
+  // the rampaging Crossbowman 3801114 holds for 17:15)
+  if (found && dest !== unit.tileIndex && !(found as PNode).attack && crowded
+    && (!laterTurns || (found as PNode).turns <= 1)) return [];
   const out: number[] = [];
   for (let n: PNode | null = found; n && n.parent; n = n.parent) out.push(n.tile);
   return out.reverse();
@@ -793,8 +806,9 @@ export function pathTo(state: GameState, unit: Unit, dest: number, laterTurns = 
  *  but stops short of a plot of its own unit that stacks with it, and short
  *  of a unit at war with it its path passed out of its sight. A path
  *  ending on a plot it attacks into stops at its side, and with `strike`
- *  the unit strikes it there. A destination its own stacking unit holds,
- *  reached in the first turn, is no path, nor one another player's unit
+ *  the unit strikes it there. A destination its own stacking unit or
+ *  another player's unit at peace in its sight holds is no path (with
+ *  `laterTurns`, reached in the first turn), nor one another player's unit
  *  holds out of its sight. With `laterTurns` (the order's
  *  path flag 0x1000) the path's turns after its first may end on a plot its
  *  own stacking unit holds, its first not; with no `explore` (its flag 1) the
@@ -2466,10 +2480,10 @@ function chaseTarget(state: GameState, pass: Pass): void {
  * it out (0x585eb0, `keptOut`), within 5 of the camp and, where the camp's
  * plot is a city's, of that city's; ONE "Random Direction" draw over their
  * count picks the plot it moves to ("Wander"); with none it heads for its
- * camp ("Wander Back to Camp"). Its moves end (0x56d6f0 at 0x77bedd: its
- * formation moves no more, runs/h1_duely1128 t40 the Warrior 1114128's
- * Wander leaves its Settler 3014684 one Movement it cannot spend) and its
- * turn is done.
+ * camp ("Wander Back to Camp", its path's later turns free to end on its own
+ * stacking unit). Its moves end (0x56d6f0 at 0x77bedd: its formation moves no
+ * more, runs/h1_duely1128 t40 the Warrior 1114128's Wander leaves its Settler
+ * 3014684 one Movement it cannot spend) and its turn is done.
  */
 function wanderNearCamp(state: GameState, pass: Pass, homeOf: (u: Unit) => number): void {
   for (const u of pass.units) {
@@ -2487,7 +2501,9 @@ function wanderNearCamp(state: GameState, pass: Pass, homeOf: (u: Unit) => numbe
     drawing = u;
     const to = cands.length ? cands[randRange(state, cands.length, 'Random Direction')].tile : home;
     drawing = null;
-    moveTo(state, u, to, pass.strike);
+    // the Wander under the order's path flags 0 (0x77bce4), the move back to
+    // the camp under 0x1000 (0x77be0b)
+    moveTo(state, u, to, pass.strike, !cands.length);
     pass.ended.add(u.id);
     finish(pass, u, cands.length ? 'Wander' : 'Wander Back to Camp', to);
   }

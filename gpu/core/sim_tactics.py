@@ -885,7 +885,10 @@ class SimTactics:
                 tcost = tcost + torch.where(dock | ign_shore.unsqueeze(1), 0, self._embark_transition_mp)
                 tcost = torch.where(ctr_n.gather(1, nbc), tcost.clamp(max=self._mp_scale), tcost)
                 cst = torch.where(fw & tw, self._mp_scale, torch.where(tr, tcost, cst))
-                cliff6 = cliffs_b[rows, best][:, cols] & tr & ~waive_cliff.unsqueeze(1) & ~blind6 & ~naval.unsqueeze(1)
+                # a cliff bars a shore crossing onto a revealed plot alone (the
+                # embark and disembark tests 0x52fe90 / 0x52fb90 run on a
+                # revealed child, `search`)
+                cliff6 = cliffs_b[rows, best][:, cols] & tr & ~waive_cliff.unsqueeze(1) & ~unrev6 & ~naval.unsqueeze(1)
             # a hull's step costs one Movement; its strike ashore, or its step
             # onto land it never revealed, the plot's own cost (`stepCost`: no
             # transition for a hull)
@@ -1249,7 +1252,7 @@ class SimTactics:
         rank = torch.where(stand, rank, torch.full_like(rank, -1))
         rturn = torch.where(stand, rturn, torch.full_like(rturn, -1))
         out = {"rank": rank, "turns": rturn, "parent": par, "found": found, "start": start, "attack": atk_n,
-               "moves": mv[:, :T], "closed": closed, "fits": fits}
+               "moves": mv[:, :T], "closed": closed, "fits": fits, "crowd": crowd_n}
         if plan is not None:
             out.update(plan["spots"])
         return out
@@ -1456,9 +1459,10 @@ class SimTactics:
         that stacks with it, and stops short of a unit at war with it its
         path passed out of its sight. A path ending on a plot it attacks into
         stops at its side, and with `strike` (the barbarians') it strikes
-        there. A destination its own stacking unit holds, reached in the
-        first turn, is no path, nor one another player's unit holds out of
-        its sight. With
+        there. A destination its own stacking unit or another player's unit
+        at peace in its sight holds is no path (within the first turn under
+        `later_turns`), nor one another player's unit holds out of its
+        sight. With
         `later_turns` (the order's path flag 0x1000) the path's turns after
         its first may end on a plot its own stacking unit holds, its first
         not; with no `explore` (its flag 1) the path leaves no plot the player
@@ -1603,9 +1607,13 @@ class SimTactics:
             if not bool(back_off.count_nonzero()):
                 break
             stop = stop - back_off.long()
-        # its first turn may not end on the destination its own stacking unit
-        # holds, under flag 0x1000 or not: no path
-        first = res["found"] & (res["closed"][ar, dr] <= 1) & own_same[ar, dr]
+        # the destination's count against the stacking limit (`pathTo`): its
+        # own stacking unit, or another player's unit at peace in sight, there
+        # is no path, at any turn without flag 0x1000, within the first under it
+        crowd_d = res["crowd"][ar, dr] & ~res["attack"][ar, dr] & (dr != start)
+        if later_turns:
+            crowd_d = crowd_d & (res["closed"][ar, dr] <= 1)
+        first = res["found"] & crowd_d
         stop = torch.where(first, torch.zeros_like(stop), stop)
         gslot = torch.zeros(B, dtype=torch.long, device=dev)
         gslot[rows] = sr + self.POOL_LO[pre]
@@ -3568,7 +3576,9 @@ class SimTactics:
             pick = self._rand_range(ok & (count > 0), count)
             by_rank = torch.where(cand, rku, torch.full_like(rku, BIG)).argsort(dim=1, stable=True)
             dest = torch.where(count > 0, by_rank.gather(1, pick.clamp(max=T - 1).unsqueeze(1)).squeeze(1), camp)
-            self._tac_move_to(ok, u_b, dest)
+            self._tac_move_to(ok & (count > 0), u_b, dest)
+            # Wander Back to Camp moves under the order's path flag 0x1000
+            self._tac_move_to(ok & (count == 0), u_b, dest, later_turns=True)
             # its moves end (0x56d6f0, `wanderNearCamp`)
             self._tac_moves_ended[bidx[ok], u_b[ok] + self.POOL_LO["barb"]] = True
             done[bidx[ok], u_b[ok]] = True
@@ -4723,7 +4733,9 @@ class SimTactics:
             by_rank = torch.where(cand, rk, torch.full_like(rk, 1 << 40)).argsort(dim=1, stable=True)
             dest = torch.where(count > 0, by_rank.gather(1, pick.clamp(min=0, max=T - 1).unsqueeze(1)).squeeze(1),
                                camp)
-            self._tac_move_to(ok, u_b, dest, pre, seat, False)
+            self._tac_move_to(ok & (count > 0), u_b, dest, pre, seat, False)
+            # Wander Back to Camp moves under the order's path flag 0x1000
+            self._tac_move_to(ok & (count == 0), u_b, dest, pre, seat, False, later_turns=True)
             # its moves end (0x56d6f0, `wanderNearCamp`)
             self._tac_moves_ended[bidx[ok], u_b[ok] + self.POOL_LO[pre]] = True
             done[bidx[ok], u_b[ok]] = True
