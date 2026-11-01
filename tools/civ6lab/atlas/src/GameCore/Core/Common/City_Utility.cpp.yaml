@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x5cc00
   kind: function
+  semantics: "a city plot by its hexspace index (the tables 0xefedf0 / 0xefeef0): q = x - floor(y/2) + dq, y' = y + dr, x' = q + floor(y'/2), x wrapped."
   status: PARTLY
   impl:
     - cpu/core/citizens.ts:hexPlot
@@ -14,9 +15,10 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the new population. One entry per free slot of each plot of the city's 37-plot hexspace (0x5cc00 over the tables 0xefedf0 / 0xefeef0: axial dq, dr per index — the centre, then rings 1, 2..."
-  review: imported
+  review: reviewed
 - addr: 0x5d000
   kind: function
+  semantics: the plot at a ring index around a centre.
   status: READ
   cases:
     - recording: h1_duelv1128
@@ -28,4 +30,4 @@
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   context:
     - ...count 0x5cbc0(2) + 18 = 37, f(0) = 1, f(n) = f(n-1) + 6n; each plot through 0x5d1e0 -> 0x5d000, off the map or off any region skipped, one equal to the centre's skipped; each added t...
-  review: imported
+  review: reviewed

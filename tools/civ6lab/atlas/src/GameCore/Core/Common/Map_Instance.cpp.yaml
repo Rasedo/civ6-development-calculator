@@ -6,6 +6,7 @@
 - addr: 0x6fe50
   final: 0x52cc0
   kind: function
+  semantics: the plot owner's route rung count (+0x12e0).
   status: PARTLY
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
@@ -13,4 +14,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...OnlyWithUnit ones (the Railroad) only with a unit; then the plot owner's +0x12e0 count (0x6fe50) raises the value by that many rungs — UNREAD which effect sets it (0 in every recorded..."
-  review: imported
+  review: reviewed

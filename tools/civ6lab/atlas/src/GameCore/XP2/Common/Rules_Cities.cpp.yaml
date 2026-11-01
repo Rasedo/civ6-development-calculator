@@ -7,6 +7,7 @@
   final: 0x363770
   kind: function
   name: Rules_Cities
+  semantics: "Rules_Cities: the city spacing test (CITY_MIN_RANGE on the plot's area, 3 off it)."
   status: PARTLY
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -14,4 +15,4 @@
     - ".claude/scratchpad/st1/reading.md: ...s own, no city within CITY_MIN_RANGE 3 on the plot's area nor   closer than 3 off it — Rules_Cities 0x515910), or within   CITY_MIN_DISTANCE_FOR_INCURSION of a known promise's plot   (PROMISE_DONT_SETTLE_NEAR..."
   context:
     - "...city within CITY_MIN_RANGE 3 on the plot's area nor closer than 3 off it — Rules_Cities 0x515910), or within CITY_MIN_DISTANCE_FOR_INCURSION of a known promise's plot (PROMISE_DONT_S..."
-  review: imported
+  review: reviewed

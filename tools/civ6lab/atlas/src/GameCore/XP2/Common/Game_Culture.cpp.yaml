@@ -6,8 +6,12 @@
 - addr: 0x296c00
   kind: function
   name: Game_Culture
+  semantics: "ONE \"Choosing a Relic\" draw over the 24 GREATWORK_RELIC rows not yet created; none left, no Relic (a martyred Apostle, a village, Jeanne d'Arc alike). Game_Culture: \"Choosing a Relic\"."
   status: READ
   cases:
+    - recording: h1_duelw1119
+      turn: 13
+      value: over 24 after the village's Culture / One Relic
     - recording: h1_duelw1119
       turn: 13
       value: "A Relic, however it comes — a martyred Apostle, a village, Jeanne d'Arc — is created by Game_Culture 0x296c00: ONE \"Choosing a Relic\" draw over the 24 GREATWORK_RELIC rows not yet created, none left n"
@@ -28,4 +32,4 @@
   context:
     - "...wever it comes — a martyred Apostle, a village, Jeanne d'Arc — is created by Game_Culture 0x296c00: ONE \"Choosing a Relic\" draw over the 24 GREATWORK_RELIC rows not yet created, none left..."
     - "..., for i below the player's count (+0x1340 → +0x7f0), creates a Relic through 0x495860 → 0x296c00 (\"Choosing a Relic\") with the player's capital (0x36f460). No record shows it (no Kandy..."
-  review: imported
+  review: reviewed

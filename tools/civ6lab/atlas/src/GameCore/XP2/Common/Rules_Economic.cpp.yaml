@@ -6,6 +6,7 @@
 - addr: 0x524e30
   final: 0x36f140
   kind: function
+  semantics: a culture bomb (-> AnnexPlot 0x1a8b70).
   status: READ
   cases:
     - recording: 1108
@@ -21,10 +22,11 @@
   context:
     - "...n) (0x1a8a30: n picker draws, each annexed), the plot swap (0x1ac910), the culture bombs (0x524e30), the Trader's tiles en route (0x558510) and the Gold purchase (0x977aa0: the price spent..."
     - "...tiles, a founding, a city-state's envoy annex —, the purchase 0x1a7710, a culture bomb 0x524e30) raises the annexed count (+0xc), clears the stored next plot (+0x1c) and runs the full..."
-  review: imported
+  review: reviewed
 - addr: 0x525400
   final: 0x36f620
   kind: function
+  semantics: the game speed's scaling in 1/256 (truncated).
   status: READ
   cases:
     - recording: h1_duelw1112
@@ -50,7 +52,7 @@
     - "...VEST_IMPROVED_DEGRADATION 50 − 30 more pillaged, +0x4d bit 0)/100; then the game speed (0x525400 in 1/256, truncated: half online); then the plot's city's harvest percent (+0x1e08, t..."
     - "..., \"iNetProduction >= 0\"), in 24.8: UPGRADE_BASE_COST (GP +0x740, 10) at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUC..."
     - "...peed(100), speed(200), 50], speed(x) = x x GameSpeeds.CostMultiplier / 100 (0x5254d0 -> 0x525400): the tables' valueHorizons[1] is 50 online."
-  review: imported
+  review: reviewed
 - addr: 0x5254d0
   final: 0x36f6f0
   kind: function
@@ -113,13 +115,14 @@
 - addr: 0x525500
   final: 0x36f720
   kind: function
+  semantics: "the SCALING_SLIGHT speed scale (0x50b150fa): x GameSpeed_Scalings.DefaultCostMultiplier / 100 truncated (ONLINE_SLIGHT 80; 100 where the speed has no SLIGHT row)."
   status: PARTLY
   impl: [cpu/data/seats.ts:AGE_SLIGHT_PCT]
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...LDEN_AGE_SCORE_BASE_THRESHOLD 28) and s + scale_SLIGHT(DARK_AGE_SCORE_BASE_THRESHOLD 14) (0x525500 with SCALING_SLIGHT 0x50b150fa: × GameSpeed_Scalings.DefaultCostMultiplier / 100 truncate..."
-  review: imported
+  review: reviewed
 - addr: 0x525590
   final: 0x36f7b0
   kind: function
@@ -143,8 +146,12 @@
 - addr: 0x5256d0
   final: 0x36f860
   kind: function
+  semantics: "a harvest's lump: A = base + (base x GAME_COST_ESCALATION(1000) / 100 - base) x P / 100 in integers, P = max(tech %, civic %) (0x4c9cf0 / 0x399810); on a plot holding an improvement (+0x44) A x (100 - HARVEST_IMPROVED_DEGRADATION 50 - 30 more pillaged, +0x4d bit 0) / 100; then the game speed (0x525400 in 1/256, truncated: half online); then the plot's city's harvest percent (+0x1e08)."
   status: READ
   cases:
+    - recording: h1_duelw1112
+      turn: 49
+      value: Xi'an's Rainforest (Food 10, Production 10) cleared t49 +11 Food at P 15, t64 +14 at P 20; its Marsh t74 +31 at P 24
     - recording: h1_duelw1112
       turn: 49
       value: "Records: runs/h1_duelw1112 Xi'an's Rainforest   (Food 10 and Production 10, Features.xml) cleared t49 and t64, +11 and +14   Food at P 15 and 20, its Marsh (Food 20) t74 +31 at P 24 — each landing   i"
@@ -153,10 +160,11 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "- A harvest's or feature removal's lump: the harvest 0x95fbf0 calls 0x5256d0 once per yield row (`Resource_Harvests.Amount`, `Feature_Removes.Yield`): A = base + (b..."
-  review: imported
+  review: reviewed
 - addr: 0x525b90
   final: 0x36fc00
   kind: function
+  semantics: a trade route's destination yields per yield (into +0x140).
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -172,7 +180,7 @@
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
   context:
     - "...e0a0 (per known city of the knowledge base +0xe0 entries, the routes' yields 0x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the unit table: that is 0x7989e0 (the sect..."
-  review: imported
+  review: reviewed
 - addr: 0x526330
   final: 0x3700f0
   kind: function
@@ -267,6 +275,7 @@
 - addr: 0x5276c0
   final: 0x371060
   kind: function
+  semantics: a population's Food consumption.
   status: READ
   cases:
     - recording: 1124
@@ -277,7 +286,7 @@
   context:
     - "...) << 8) / 256)), food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption 0x5276c0 of the new population. One entry per free slot of each plot of the city's 37-plot hexspac..."
     - "...ousing, T, H): S = the Food surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left) = 0 below CITY_HOUSING_LEF..."
-  review: imported
+  review: reviewed
 - addr: 0x5276e0
   final: 0x371080
   kind: function
@@ -315,6 +324,7 @@
   final: 0x371260
   kind: function
   name: luxuryAmenities
+  semantics: a resource's per-copy amenity reach.
   status: PARTLY
   impl: [cpu/core/aiResource.ts:luxuryAmenities]
   readings:

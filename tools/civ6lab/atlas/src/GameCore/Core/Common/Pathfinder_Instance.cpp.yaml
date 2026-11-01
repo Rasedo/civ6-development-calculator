@@ -6,16 +6,18 @@
 - addr: 0x77a50
   final: 0x57d30
   kind: function
+  semantics: "makes a node's children: the six neighbours from the axial tables, then the callback's extra neighbours (a portal)."
   status: PARTLY
   readings: ["H-1: the trade path's search, its score and the Canal — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the axial tables, then the callback's extra neighbours, a port..."
-  review: imported
+  review: reviewed
 - addr: 0x77d10
   final: 0x57ff0
   kind: function
   name: GeneratePath
+  semantics: "GeneratePath (Pathfinder_Instance): Dijkstra — the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair null), so a node's key is its cost; repeats the step 0x793f0."
   status: PARTLY
   impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
   readings:
@@ -28,11 +30,12 @@
     - ...f no region, not impassable (byte +0x3a bit 3) and not water seeds a region, and a flood (0x77d10, the visitor 0x886dd0 counting and stamping each plot it closes, m_area its area) takes e...
     - "...s the generic CvAStar (Pathfinder_Instance.cpp, the base vtable 0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's he..."
     - "- The pathfinder (Pathfinder_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (t..."
-  review: imported
+  review: reviewed
 - addr: 0x781e0
   final: 0x58440
   kind: function
   name: GetBest
+  semantics: "GetBest: pops the open list's head (+0xf0), NotifyList 2 then 3, closes it."
   status: PARTLY
   readings:
     - "H-1: the trade path's search, its score and the Canal — READ"
@@ -41,7 +44,7 @@
   context:
     - "...0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the..."
     - "...n walks toward the head past strictly greater keys (0x79560). The step pops the head (0x781e0: NotifyList 2 then 3, closed) and links its neighbours in DirectionTypes order (0xeff73..."
-  review: imported
+  review: reviewed
 - addr: 0x78750
   final: 0x588e0
   kind: function
@@ -61,6 +64,7 @@
   final: 0x58f30
   kind: function
   name: SearchStep
+  semantics: "one search step: pops the head (0x781e0: NotifyList 2 then 3, closed) and links its neighbours in DirectionTypes order (0xeff730), each the valid callback admits (LinkChild 0x78750)."
   status: PARTLY
   impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
   readings:
@@ -70,7 +74,7 @@
   context:
     - "...the base vtable 0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six ne..."
     - "- The pathfinder (Pathfinder_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair..."
-  review: imported
+  review: reviewed
 - addr: 0x79560
   final: 0x590a0
   kind: function
@@ -90,7 +94,11 @@
 - addr: 0x79660
   kind: function
   name: UpdateParents
-  status: PARTLY
+  semantics: "UpdateParents, from LinkChild where a CLOSED child is made strictly cheaper: a stack (+0x110, empty at entry) from the child; each node popped has its children (+0x38, count +0x4a, six inline) priced again from it by the cost callback (+0x48: the step's cost onto the child's +0x1c known cost, saturating), the node's own parent skipped (\"parent->m_pParent != kid\"); a child strictly cheaper takes the new known cost and total (+0x1c / +0x18, the heuristic +0x24 << 8 none here), the node as its parent (+0), an open one re-keyed (UpdateOpenNode 0x79560), the notify callback (+0x68, type 3) told, and it is pushed once. The validity callback is not asked again."
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      value: "--aiscore --to 60 over eight duels: cityState.move.plot 3112 -> 3139 of 4021 with the re-parenting"
   impl:
     - cpu/core/tactical.ts:search
     - cpu/core/tactical.ts:from
@@ -102,4 +110,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ICTLY cheaper cost (UpdateOpenNode 0x79560), a closed one likewise with UpdateParents 0x79660, a new one opened. The trade path's callbacks (0x557e40): the destination test 0x271490..."
-  review: imported
+  review: reviewed

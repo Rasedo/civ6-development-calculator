@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0xa18f20
   kind: function
+  semantics: a natural wonder's volcano list.
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -22,12 +23,16 @@
   readings: ["H-1: the volcano roll's branches and order — READ"]
   context:
     - "...> 0xa1e370 -> 0xa19360 appends an entry (a natural wonder's volcano goes to its own list, 0xa18f20) — the continent-boundary pass column by column (x outer, y inner), then the lone mountai..."
-  review: imported
+  review: reviewed
 - addr: 0xa190d0
   final: 0x720ee0
   kind: function
+  semantics: "After the floater, the plot's sparse yield slot takes add [slot], amount (0xa192ea / 0xa19337): no clamp, a plot's event yields have no cap. Callers: the flood 0xa2ed80, the storms 0x2867f0 / 0x286f80, the eruption soil 0xa219e0 and 0xa21680. Adds a yield row's Amount to the plot."
   status: READ
   cases:
+    - recording: h1_duelw1108
+      turn: 217
+      value: plot 609 (Plains, Volcanic Soil) reads 5 Food after four Food draws
     - recording: h1_duelw1108
       turn: 217
       value: "Records: runs/h1_duelw1108   plot 609 (Plains, Volcanic Soil) reads 5 Food at t217 after four Food   draws."
@@ -41,9 +46,10 @@
     - "...Feature (true on every eruption row) paints Volcanic Soil and the row's yield gains +1 (0xa190d0) — no district, city-centre or wonder gate (the feature goes on through the raw setter..."
     - "- An event's yield gain 0xa190d0 (from the flood 0xa2ed80 \"Boosted Yield Chance\", the storms 0x2867f0 / 0x286f80, the er..."
     - "...: roll ≤ Percentage; 100 always) — ReplaceFeature (+0x50 bit 0) paints the row's feature, 0xa190d0 adds its Amount; then each `RandomEvent_Damages` row whose MinTurn / MaxTurn (+0x48 / +0x..."
-  review: imported
+  review: reviewed
 - addr: 0xa19360
   kind: function
+  semantics: appends a volcano entry to the vector in the map script's placement order (the continent-boundary pass column by column, x outer, y inner, then the lone mountains shuffled per continent); a natural wonder's volcano goes to its own list (0xa18f20).
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -62,12 +68,16 @@
   readings: ["H-1: the volcano roll's branches and order — READ"]
   context:
     - "...nerator.lua's SetFeatureType (FEATURE_VOLCANO) -> Terrain_Builder 0x896c40 -> 0xa1e370 -> 0xa19360 appends an entry (a natural wonder's volcano goes to its own list, 0xa18f20) — the contin..."
-  review: imported
+  review: reviewed
 - addr: 0xa19bd0
   final: 0x721ab0
   kind: function
+  semantics: "\"Remove Fertility Chance\": per yield type, where the plot's event fertility c (the random-events map +0x110) is above 0, x = min(chance, 100) x c, ONE rand(100) under x mod 100 removes x // 100 + 1, else x // 100. A fire's Turn 2 and Turn 6 rows add to c."
   status: READ
   cases:
+    - recording: h1_duelw1122
+      turn: 248
+      value: the t245 fire at 158, burnt at t247, takes the second removal draw
     - recording: 1122
       turn: 248
       value: "A fire's Turn 2 (burnt, Food 1) and Turn 6 (regrown, Production 1) rows add to c (1122 t248: the t245 fire at 158, burnt at t247, takes the second removal draw)."
@@ -83,10 +93,11 @@
   context:
     - "...lity-loss value (+0x750) is above 0, 0xa1c0c0: per yield type, \"Remove Fertility Chance\" (0xa19bd0) — on a plot holding that yield's event fertility c > 0, x = min(value, 100) × c, one ran..."
     - "...) runs 0xa1c0c0 on each plot after its rows whenever the removal is above 0. 0xa1c0c0 → 0xa19bd0 \"Remove Fertility Chance\": per yield type, where the plot's event fertility c (the random..."
-  review: imported
+  review: reviewed
 - addr: 0xa1c0c0
   final: 0x722bb0
   kind: function
+  semantics: removes fertility from a plot (-> 0xa19bd0).
   status: READ
   cases:
     - recording: 1123
@@ -111,10 +122,11 @@
     - "...ne draw a plot or two. Then, when the climate's fertility-loss value (+0x750) is above 0, 0xa1c0c0: per yield type, \"Remove Fertility Chance\" (0xa19bd0) — on a plot holding that yield's ev..."
     - "...plot off water and impassable, draws no yield row; where the removal is above 0 it runs 0xa1c0c0 instead and takes the removed count off the event's FertilityAdded (1123 t243: the hu..."
     - "- a drought's strike (0x286530) runs 0xa1c0c0 on each plot after its rows whenever the removal is above 0. 0xa1c0c0 → 0xa19bd0 \"Remov..."
-  review: imported
+  review: reviewed
 - addr: 0xa1c1a0
   final: 0x722c30
   kind: function
+  semantics: "an eruption's damage: each row, each neighbour in DirectionTypes order not impassable and bare / Removable / Volcanic Soil, a bonus resource removed, one rand(100)."
   status: READ
   cases:
     - recording: h1_duelw1119
@@ -137,9 +149,10 @@
     - "- Eruption 0xa22000: damage 0xa1c1a0 (each row, each neighbour in DirectionTypes order not impassable and bare / Removable /..."
     - The volcano's eruption 0xa22000 runs the damage pass 0xa1c1a0 FIRST, then the soil pass 0xa219e0. The natural-wonder eruption 0xa22150 runs 0xa1c760 th...
     - "0xa22150 (a natural wonder) runs 0xa1c760 then 0xa21680, where a volcano's 0xa22000 runs 0xa1c1a0 then 0xa219e0 (\"Fertility Gain Chance\"): for each of the wonder's plots in turn, for each..."
-  review: imported
+  review: reviewed
 - addr: 0xa1c760
   kind: function
+  semantics: "a natural wonder's eruption damage: per plot, per damage row, the plot and its six."
   status: READ
   cases:
     - recording: h1_duelw1119
@@ -156,7 +169,7 @@
   context:
     - ...ss 0xa1c1a0 FIRST, then the soil pass 0xa219e0. The natural-wonder eruption 0xa22150 runs 0xa1c760 then 0xa21680 over EACH wonder plot's six neighbours (a plot two wonder plots share is ta...
     - "0xa22150 (a natural wonder) runs 0xa1c760 then 0xa21680, where a volcano's 0xa22000 runs 0xa1c1a0 then 0xa219e0 (\"Fertility Gain Ch..."
-  review: imported
+  review: reviewed
 - addr: 0xa1cc70
   kind: function
   semantics: "the XP2 feature manager (+0x28 / +0x98): a volcano beside the plot (cuts the value's horizon)."
@@ -173,6 +186,7 @@
 - addr: 0xa1d130
   final: 0x723a90
   kind: function
+  semantics: the active volcanoes.
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -181,10 +195,11 @@
   readings: ["C-74: the volcano roll's gate — READ"]
   context:
     - "...active percent over the volcanoes and the volcanic wonders (+0x218), 100 with none; +0x58 0xa1d130 the active volcanoes; +0x60 0xa1d450 the total. With N the game's turns (0x339020): no dr..."
-  review: imported
+  review: reviewed
 - addr: 0xa1d2b0
   final: 0x723c10
   kind: function
+  semantics: "(b): counts the volcano entries (+0x1a0, stride 0xa0), with b true only those whose name field (+8) is set."
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -194,10 +209,11 @@
   readings: ["C-74: the volcano roll's gate — READ"]
   context:
     - "0x335040 reads the volcano component's counts (vtable 0xdb11b8): +0x68(b) 0xa1d2b0 counts the volcano entries (+0x1a0, stride 0xa0), with b true only those whose name field..."
-  review: imported
+  review: reviewed
 - addr: 0xa1d310
   final: 0x723c70
   kind: function
+  semantics: the active percent over the volcanoes and the volcanic wonders (+0x218), 100 with none.
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -206,10 +222,11 @@
   readings: ["C-74: the volcano roll's gate — READ"]
   context:
     - ...entries (+0x1a0, stride 0xa0), with b true only those whose name field (+8) is set; +0x50 0xa1d310 the active percent over the volcanoes and the volcanic wonders (+0x218), 100 with none; +...
-  review: imported
+  review: reviewed
 - addr: 0xa1d450
   final: 0x723d90
   kind: function
+  semantics: the volcano total.
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -218,10 +235,11 @@
   readings: ["C-74: the volcano roll's gate — READ"]
   context:
     - "...the volcanic wonders (+0x218), 100 with none; +0x58 0xa1d130 the active volcanoes; +0x60 0xa1d450 the total. With N the game's turns (0x339020): no draw when the named count N' is 0 or N..."
-  review: imported
+  review: reviewed
 - addr: 0xa1e370
   final: 0x724a80
   kind: function
+  semantics: a volcano feature set (-> 0xa19360).
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -239,10 +257,11 @@
   readings: ["H-1: the volcano roll's branches and order — READ"]
   context:
     - "...e: TerrainGenerator.lua's SetFeatureType (FEATURE_VOLCANO) -> Terrain_Builder 0x896c40 -> 0xa1e370 -> 0xa19360 appends an entry (a natural wonder's volcano goes to its own list, 0xa18f20)..."
-  review: imported
+  review: reviewed
 - addr: 0xa1e470
   final: 0x724b80
   kind: function
+  semantics: "an eruption's weight, per ACTIVE volcano: trunc(10 x Occ) x (100 + 30 while the site has had no event of that severity) // 100, no map scaling. Walks the same volcano vector (+0x1b8)."
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -264,12 +283,16 @@
   context:
     - "...14; N 0x339020; families: storms 0x28f490 (map-size 0x28d0f0), floods 0xa2cfc0, eruptions 0xa1e470, warming 0x28da10."
     - ...(x outer, y inner), then the lone mountains shuffled per continent. The eruption weights (0xa1e470) walk the same vector (+0x1b8). 1118 t53 woke 803 at index 0 of [803, 534], 1117 t154 827...
-  review: imported
+  review: reviewed
 - addr: 0xa20f20
   final: 0x7271e0
   kind: function
+  semantics: "Draws rand(N' - active) and walks the entries skipping the active and the unnamed. \"Choose Active Volcano Roll\" (the wake): over the entries of the volcano vector (+0x160, stride 0xa0) not active and named; the chosen one's +0x14 takes the turn. The wake's gate is the named count less the active."
   status: READ
   cases:
+    - recording: h1_duelw1118
+      turn: 53
+      value: woke 803 at index 0 of [803, 534] over 2
     - recording: h1_duelw1116
       turn: 6
       value: "On runs/h1_duelw1116 t6 and t8 the replay needed no roll: no volcano named yet."
@@ -290,12 +313,16 @@
   context:
     - "...is ≥ 200; at or above it, no draw without an active volcano. \"Choose Active Volcano Roll\" 0xa20f20 draws rand(N' − active) and walks the entries skipping the active and the unnamed. On run..."
     - "0x335040: the wake branch (active share under 70) draws \"Choose Active Volcano Roll\" (0xa20f20: the entries of the volcano vector +0x160, stride 0xa0, not active and named; the chosen..."
-  review: imported
+  review: reviewed
 - addr: 0xa212d0
   final: 0x727540
   kind: function
+  semantics: "\"Choose Inactive Volcano Roll\" (the sleep): over the active named volcanoes; +0x14 = -1."
   status: READ
   cases:
+    - recording: h1_duelw1118
+      turn: 152
+      value: slept over 2 with both active
     - recording: h1_duelw1118
       turn: 53
       value: "+0x14 = -1) — runs/h1_duelw1118 t53 woke over 2, t152 slept over 2 with both active;"
@@ -311,9 +338,10 @@
   readings: ["H-1: the volcano roll's branches and order — READ"]
   context:
     - "...the chosen one's +0x14 takes the turn), the sleep branch \"Choose Inactive Volcano Roll\" (0xa212d0: active and named; +0x14 = -1) — runs/h1_duelw1118 t53 woke over 2, t152 slept over 2 wit..."
-  review: imported
+  review: reviewed
 - addr: 0xa21680
   kind: function
+  semantics: an eruption's yield gain (-> 0xa190d0).
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -334,10 +362,11 @@
     - ...RST, then the soil pass 0xa219e0. The natural-wonder eruption 0xa22150 runs 0xa1c760 then 0xa21680 over EACH wonder plot's six neighbours (a plot two wonder plots share is taken twice). Ch...
     - "...the storms 0x2867f0 / 0x286f80, the eruption soil 0xa219e0 \"Fertility Gain Chance\" and 0xa21680): after the floater, the plot's sparse yield slot takes `add [slot], amount` (0xa192ea..."
     - "0xa22150 (a natural wonder) runs 0xa1c760 then 0xa21680, where a volcano's 0xa22000 runs 0xa1c1a0 then 0xa219e0 (\"Fertility Gain Chance\"): for ea..."
-  review: imported
+  review: reviewed
 - addr: 0xa219e0
   final: 0x727bb0
   kind: function
+  semantics: "an eruption's soil: each yield row, each such neighbour off water, one \"Fertility Gain Chance\" rand(100)."
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -367,12 +396,15 @@
     - "...d bare / Removable / Volcanic Soil, a bonus resource removed, one rand(100)), then soil 0xa219e0 (each yield row, each such neighbour off water, one \"Fertility Gain Chance\" rand(100)..."
     - The volcano's eruption 0xa22000 runs the damage pass 0xa1c1a0 FIRST, then the soil pass 0xa219e0. The natural-wonder eruption 0xa22150 runs 0xa1c760 then 0xa21680 over EACH wonder plot's...
     - "...lood 0xa2ed80 \"Boosted Yield Chance\", the storms 0x2867f0 / 0x286f80, the eruption soil 0xa219e0 \"Fertility Gain Chance\" and 0xa21680): after the floater, the plot's sparse yield slo..."
-  review: imported
+  review: reviewed
 - addr: 0xa22000
   final: 0x728110
   kind: function
+  semantics: "an eruption: damage 0xa1c1a0, then soil 0xa219e0."
   status: READ
   cases:
+    - recording: h1_duelw1116
+      value: 13 of 14 eruptions reproduce the painted plots and yields
     - recording: h1_duelw1119
       turn: 120
       value: "**This reverses the engines' walk** of every row over the joined ring of all the wonder's plots (one plot's eruption reads the same either way): runs/h1_duelw1119 t120, Eyjafjallajokull's two plots: t"
@@ -388,12 +420,16 @@
     - "- Eruption 0xa22000: damage 0xa1c1a0 (each row, each neighbour in DirectionTypes order not impassable and b..."
     - The volcano's eruption 0xa22000 runs the damage pass 0xa1c1a0 FIRST, then the soil pass 0xa219e0. The natural-wonder erup...
     - "0xa22150 (a natural wonder) runs 0xa1c760 then 0xa21680, where a volcano's 0xa22000 runs 0xa1c1a0 then 0xa219e0 (\"Fertility Gain Chance\"): for each of the wonder's plots in..."
-  review: imported
+  review: reviewed
 - addr: 0xa22150
   final: 0x728260
   kind: function
+  semantics: "a natural wonder's eruption: 0xa1c760 then 0xa21680 — for each of the wonder's plots in turn, for each damage row, the plot itself (impassable: no draw) and its six (0xeff670 / 0xeff688); the soil likewise, plot by plot, its draws labelled \"Pillage Improvement Chance\"."
   status: READ
   cases:
+    - recording: h1_duelw1119
+      turn: 120
+      value: "Eyjafjallajokull's two plots: the unit rolls after the 31st draw and the 32nd and 34th, the soil laid (11) the record's"
     - recording: h1_duelw1119
       turn: 120
       value: "**This reverses the engines' walk** of every row over the joined ring of all the wonder's plots (one plot's eruption reads the same either way): runs/h1_duelw1119 t120, Eyjafjallajokull's two plots: t"
@@ -410,4 +446,4 @@
   context:
     - ...the damage pass 0xa1c1a0 FIRST, then the soil pass 0xa219e0. The natural-wonder eruption 0xa22150 runs 0xa1c760 then 0xa21680 over EACH wonder plot's six neighbours (a plot two wonder plo...
     - 0xa22150 (a natural wonder) runs 0xa1c760 then 0xa21680, where a volcano's 0xa22000 runs 0xa1c1a0...
-  review: imported
+  review: reviewed

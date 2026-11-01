@@ -18,6 +18,7 @@
   review: imported
 - addr: 0xb48710
   kind: function
+  semantics: "EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES' apply: registers the yield type and Amount on the city's +0x1da8 table (0xc705d0)."
   status: PARTLY
   cases:
     - recording: h1_duelw1123
@@ -25,7 +26,7 @@
   readings: ["H-1: Johannesburg's yield per resource type — PARTLY READ"]
   context:
     - "...D_BY_NUMBER_OF_RESOURCES (the factory 0xc2e490, the instance vtable 0xdece90): its apply (0xb48710) registers the yield type and Amount on the city's +0x1da8 table (0xc705d0); the count th..."
-  review: imported
+  review: reviewed
 - addr: 0xb7e0d0
   kind: function
   name: EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION
@@ -47,6 +48,7 @@
 - addr: 0xbb9de0
   kind: function
   name: EFFECT_ADJUST_VALID_FEATURES_DISTRICTS
+  semantics: "EFFECT_ADJUST_VALID_FEATURES_DISTRICTS: writes the city's (district, feature) pairs (-> 0x183b30)."
   status: READ
   cases:
     - recording: h1_duely1124

@@ -7,6 +7,7 @@
   final: 0x254340
   kind: function
   name: GetVictoryProgressForTeam
+  semantics: "GetVictoryProgressForTeam: the two outputs a, b of a victory's progress for a team; a victory is near where b x CriticalPercentage <= a x 100."
   status: PARTLY
   cases:
     - recording: 1127
@@ -16,10 +17,11 @@
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   context:
     - "...ticalPercentage (+0x1c) is below 100 and p's team's progress (GetVictoryProgressForTeam 0x357e60: the two outputs a, b) meets b x pct <= a x 100. Which progress the duels' victories re..."
-  review: imported
+  review: reviewed
 - addr: 0x357ff0
   final: 0x2544d0
   kind: function
+  semantics: a team has won the game (the near-victory flags are set only while none has).
   status: PARTLY
   cases:
     - recording: 1127
@@ -29,4 +31,4 @@
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   context:
     - "...ach turn): where the alliance level 0x3d7e20 toward p is at most 2 and no team has won (0x357ff0), any enabled victory whose CriticalPercentage (+0x1c) is below 100 and p's team's pr..."
-  review: imported
+  review: reviewed

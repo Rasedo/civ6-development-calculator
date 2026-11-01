@@ -6,6 +6,7 @@
 - addr: 0x56c480
   final: 0x3a23e0
   kind: function
+  semantics: the unit can embark.
   status: PARTLY
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
@@ -13,7 +14,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...r with it; +0x4c not above 0, taken as no unit on it; its own area unless it embarks (0x56c480), a hull on water; no city centre but its player's); its two counts over its sight (0x5...
-  review: imported
+  review: reviewed
 - addr: 0x56c690
   final: 0x3a25f0
   kind: function
@@ -41,12 +42,13 @@
 - addr: 0x56cb00
   final: 0x3a2980
   kind: function
+  semantics: sets a unit's build charges (+0xed0).
   status: PARTLY
   readings: ["H-1: a civilian stepped on — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...mover's player on the victim's plot with the victim's build charges (+0xed0, through 0x56cb00) and damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0...."
-  review: imported
+  review: reviewed
 - addr: 0x56d6c0
   final: 0x3a30f0
   kind: function
@@ -362,9 +364,10 @@
 - addr: 0x5705f0
   final: 0x3a5a60
   kind: function
+  semantics: sets a unit's damage (+0xcf0).
   status: PARTLY
   readings: ["H-1: a civilian stepped on — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...m's plot with the victim's build charges (+0xed0, through 0x56cb00) and damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0. Nothing in it reads the barb..."
-  review: imported
+  review: reviewed

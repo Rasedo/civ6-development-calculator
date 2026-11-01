@@ -144,6 +144,7 @@
 - addr: 0x6a44b0
   final: 0x47b220
   kind: function
+  semantics: "EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS' parser: the class +8, its pseudo-yield +0xc, Amount +0x10 kept whole."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -153,11 +154,12 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...MBAT (@0xf2e254), the same. EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4680 (parser 0x6a44b0: the class +8, its pseudo-yield +0xc, Amount +0x10 kept whole): the Amount read raw a..."
-  review: imported
+  review: reviewed
 - addr: 0x6a4680
   final: 0x47b3f0
   kind: function
   name: EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS
+  semantics: "EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS' analyzer: the Amount read raw as the class's pseudo-yield, between; slot 2 0x6a4750."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -168,11 +170,12 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...EUDOYIELD_UNIT_COMBAT (@0xf2e254), the same. EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4680 (parser 0x6a44b0: the class +8, its pseudo-yield +0xc, Amount +0x10 kept whole): the Am..."
-  review: imported
+  review: reviewed
 - addr: 0x6a4750
   final: 0x47b4c0
   kind: function
   name: EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS
+  semantics: "EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS' slot 2 (no subject): half the Amount as fx."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -187,7 +190,7 @@
   context:
     - ...nalyzer's slot 2 (0xbe4aa0, nothing, but for EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4750).
     - "...0xc, Amount +0x10 kept whole): the Amount read raw as the pseudo-yield, between; slot 2 0x6a4750 half the Amount as fx. EFFECT_GRANT_UNIT_IN_CITY 0x6abe40: the greater of the unit's cu..."
-  review: imported
+  review: reviewed
 - addr: 0x6a49e0
   kind: function
   name: _FOR_DOMESTIC
@@ -241,6 +244,7 @@
 - addr: 0x6a6d20
   kind: function
   name: EFFECT_ADJUST_PLAYER_HEALING_FROM_DISPERSAL
+  semantics: "EFFECT_ADJUST_PLAYER_HEALING_FROM_DISPERSAL's analyzer: min(the knowledge base's camps +0x648, 5) x ceil(Amount / 10) as PSEUDOYIELD_UNIT_COMBAT (@0xf2e254), discounted from the start."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -251,7 +255,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...hted, discounted from the start (0x7a1240); EFFECT_ADJUST_PLAYER_HEALING_FROM_DISPERSAL 0x6a6d20: the camps x ceil(Amount / 10) as PSEUDOYIELD_UNIT_COMBAT (@0xf2e254), the same. EFFE..."
-  review: imported
+  review: reviewed
 - addr: 0x6a7510
   kind: function
   name: EFFECT_ADJUST_CITY_ATTACKS_PER_TURN
@@ -264,6 +268,7 @@
 - addr: 0x6a7bd0
   final: 0x59eda0
   kind: function
+  semantics: "returns 0 (Not's decorator update: its child runs)."
   status: PARTLY
   impl:
     - cpu/core/behaviorTree.ts:h
@@ -272,7 +277,7 @@
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...e 0x7eb210 clears failures and the last good child), Not 0x7f15f0 (its decorator update 0x6a7bd0 returns 0: its child runs; the handler tables at 0x7cbca0 store it at Not's index @f2ee..."
-  review: imported
+  review: reviewed
 - addr: 0x6a7d70
   kind: function
   name: EFFECT_ADJUST_PLAYER_YIELD_CHANGE
@@ -375,6 +380,7 @@
 - addr: 0x6ab400
   final: 0x4819a0
   kind: function
+  semantics: "EFFECT_ATTACH_MODIFIER's parser: ModifierId."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -384,14 +390,17 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...yzer adds to it. EFFECT_ATTACH_MODIFIER 0x6ab630 analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of the context (0x142650) on the subject and SETS +0xc0 to that..."
-  review: imported
+  review: reviewed
 - addr: 0x6ab630
   final: 0x481bd0
   kind: function
   name: EFFECT_ATTACH_MODIFIER
-  semantics: EFFECT_ATTACH_MODIFIER's analyzer object (EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE shares it).
+  semantics: "EFFECT_ATTACH_MODIFIER's analyzer object (EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE shares it). Analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of the context (0x142650) on the subject and SETS +0xc0 to that analysis's total: an attach over many subjects is worth its last admitted subject's."
   status: PARTLY
   cases:
+    - recording: h1_duelw1124
+      turn: 2
+      value: "Rome: Feed the World 68 = Shrine 34 + Temple 34, one city's whatever the cities known"
     - recording: h1_duelw1124
       turn: 2
       value: "EFFECT_ATTACH_MODIFIER 0x6ab630   analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of   the context (0x142650) on the subject and SETS +0xc0 to that analysis's   total — an attac"
@@ -405,6 +414,7 @@
 - addr: 0x6ab8a0
   final: 0x481e40
   kind: function
+  semantics: "EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION's parser: Amount as fx(x 0.01f)."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -414,7 +424,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...t, span. EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION 0x6abc40 (Amount as fx(x 0.01f), 0x6ab8a0): the city's Culture x it, weighted, + 0.5 (0x16eb20), span. EFFECT_ADJUST_CITY_GROWTH..."
-  review: imported
+  review: reviewed
 - addr: 0x6abc40
   kind: function
   name: EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION
@@ -434,6 +444,7 @@
 - addr: 0x6abe40
   kind: function
   name: EFFECT_GRANT_UNIT_IN_CITY
+  semantics: "EFFECT_GRANT_UNIT_IN_CITY's analyzer: the greater of the unit's current cost (0x4f2b20) and its value 0x7b62c0, x Amount, added whole."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -444,7 +455,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...pseudo-yield, between; slot 2 0x6a4750 half the Amount as fx. EFFECT_GRANT_UNIT_IN_CITY 0x6abe40: the greater of the unit's current cost (0x4f2b20) and its value 0x7b62c0, x Amount, ad..."
-  review: imported
+  review: reviewed
 - addr: 0x6ac440
   kind: function
   name: EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_START_MOVEMENT
@@ -563,8 +574,12 @@
 - addr: 0x6aee30
   kind: function
   name: EFFECT_FEATURE_ADJACENCY
+  semantics: "EFFECT_FEATURE_ADJACENCY's analyzer (Amount, YieldType, FeatureType, DistrictType): gated on the city AI's plot evaluations holding the feature (0x5d2df0, +0xcf8, 0x78 each); a city with the district counts the district's plot and its six neighbours of the feature (plot +0x3c), without one the plots within 3 of the centre (0x6c78a0, the offset taken as axial); Amount x the count at the player's weight, span."
   status: PARTLY
   cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "China: three Jungle within 3 of (8,10), Sacred Path 17"
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
@@ -573,7 +588,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "..., \"between\" 0x7a2140): EFFECT_TERRAIN_ADJACENCY 0x6b76f0 and EFFECT_FEATURE_ADJACENCY 0x6aee30 (Amount, YieldType, Terrain/FeatureType, DistrictType): a city with the district counts..."
-  review: imported
+  review: reviewed
 - addr: 0x6af1e0
   kind: function
   name: EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE
@@ -811,7 +826,7 @@
   final: 0x467720
   kind: function
   name: EFFECT_GRANT_ABILITY
-  semantics: "EFFECT_GRANT_ABILITY's analyzer: per subject the ability's UnitAbilityModifiers analysed in a copy of the context (0x142650), their sums added (each its whole part)."
+  semantics: "EFFECT_GRANT_ABILITY's analyzer: per subject the ability's UnitAbilityModifiers analysed in a copy of the context (0x142650), their sums added (each its whole part). Adds each ability modifier's analysis."
   status: PARTLY
   cases:
     - recording: 1124
@@ -836,6 +851,7 @@
   final: 0x467940
   kind: function
   name: EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION
+  semantics: "EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION's analyzer (Amount, StartEra, EndEra): the player's era (0x467eb0) in the window, the city's Production x fx(Amount x 0.01), weighted, between, halved (sar 9)."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -846,7 +862,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...fx(Amount x 0.01), bare Food, between. EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION 0x6b5d50 (Amount, StartEra, EndEra): the player's era (0x467eb0) in the window, the city's Pro..."
-  review: imported
+  review: reviewed
 - addr: 0x6b5eb0
   final: 0x467aa0
   kind: function
@@ -901,8 +917,11 @@
 - addr: 0x6b6610
   final: 0x468190
   kind: function
+  semantics: "the Mountain Portal's analyzer: with the context's plot (+0x88) and player (+0x80), the ring of radius 1 (0x6b1b0, functor @0xd64018 0x6c8fb0): a neighbour with a route (plot +0x47 not 0xff) counts, one without a route holding a portal (0x88680) refuses the term, one of the five mountain terrains (+0x2c in 0x4924) must stand among them; then count x K (the knowledge base +0x6d8, 0x7a2df0) x 0.5, PV(H) - PV(T) at the context's rate (0x7a2140), its whole part."
   status: READ
   cases:
+    - recording: h1_duelv1124
+      value: Cardiff 12:13 239.34 (three roads, K 6.87); the Tunnel's rows 402 of 414 exact
     - recording: h1_duelv1124
       value: "runs/h1_duelv1124   (its K from AI_Knowledge.csv's TRADE row of the turn before): Cardiff   12:13 239.34 (three roads beside, K 6.87), 12:12 170.34 (two), Bologna   32:9 135.34 (two, K 5.16), 129.34 a"
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
@@ -915,8 +934,12 @@
   final: 0x469010
   kind: function
   name: EFFECT_TERRAIN_ADJACENCY
+  semantics: "EFFECT_TERRAIN_ADJACENCY's analyzer (Amount, YieldType, TerrainType, DistrictType): a city with the district counts the district's plot and its six neighbours of the terrain (plot +0x2c), without one the plots within 3 of the centre (0x6c7690); Amount x the count at the player's weight, span. The walk takes the plot's offset (x, y) as axial, standing on the plot at column x + y/2 of the row."
   status: PARTLY
   cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "China's capital at (3,10): four Desert within 3 of (8,10); Desert Folklore 22 = whole(4 x 0.25 x 22.89)"
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
@@ -925,7 +948,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...the parser's order; \"span\" PV(H) - PV(T), \"between\" 0x7a2140): EFFECT_TERRAIN_ADJACENCY 0x6b76f0 and EFFECT_FEATURE_ADJACENCY 0x6aee30 (Amount, YieldType, Terrain/FeatureType, Distri..."
-  review: imported
+  review: reviewed
 - addr: 0x6b8150
   final: 0x4698a0
   kind: function
@@ -1035,6 +1058,7 @@
   final: 0x46c620
   kind: function
   name: EFFECT_ADD_RELIGIOUS_BUILDING
+  semantics: "EFFECT_ADD_RELIGIOUS_BUILDING's analyzer: the greatest over the player's cities of the building's value 0x7a7590 from the start to the horizon."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -1044,7 +1068,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...(0x4f2b20) and its value 0x7b62c0, x Amount, added whole. EFFECT_ADD_RELIGIOUS_BUILDING 0x6bb1f0: the greatest over the player's cities of the building's value 0x7a7590 from the start..."
-  review: imported
+  review: reviewed
 - addr: 0x6bc050
   kind: function
   name: EFFECT_ADJUST_PLAYER_BAN_RESOURCE
@@ -1074,6 +1098,7 @@
   final: 0x46ee40
   kind: function
   name: EFFECT_ADJUST_PLAYER_FAITH_FROM_DISPERSAL
+  semantics: "EFFECT_ADJUST_PLAYER_FAITH_FROM_DISPERSAL's analyzer: min(the knowledge base's camps +0x648, 5) x Amount, Faith weighted, discounted from the start (0x7a1240)."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -1084,7 +1109,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...t x 0.01), weighted, between, halved (sar 9). EFFECT_ADJUST_PLAYER_FAITH_FROM_DISPERSAL 0x6bdd40: min(the knowledge base's camps +0x648, 5) x Amount, Faith weighted, discounted from th..."
-  review: imported
+  review: reviewed
 - addr: 0x6be2d0
   final: 0x46f310
   kind: function
@@ -1214,6 +1239,7 @@
   final: 0x471230
   kind: function
   name: _BUILDING_HOUSING
+  semantics: "EFFECT_ADJUST_BUILDING_HOUSING's analyzer: CityBuildAI's housing value 0x7a3d70."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -1223,7 +1249,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "..._DISTRICT_AMENITY 0x6a1170 (0x79f7c0), _DISTRICT_HOUSING 0x6a5d20 and _BUILDING_HOUSING 0x6c0490 (0x7a3d70, CityBuildAI's). Unregistered, worth 0: EFFECT_ADD_RELIGIOUS_BELIEF_YIELD (ev..."
-  review: imported
+  review: reviewed
 - addr: 0x6c0590
   final: 0x471320
   kind: function

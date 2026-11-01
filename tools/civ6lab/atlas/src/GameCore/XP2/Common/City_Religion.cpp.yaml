@@ -6,16 +6,18 @@
 - addr: 0x1f20e0
   final: 0x1491e0
   kind: function
+  semantics: adds pressure to a city's religion entry (found or appended).
   status: PARTLY
   readings: ["C-94: the religious spread — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...y player's every city other than the source and adds 0x496980's amount when positive (0x1f20e0, the entry found or appended), then recomputes the target (0x1f6480). A player with no...
-  review: imported
+  review: reviewed
 - addr: 0x1f3050
   final: 0x149b80
   kind: function
   name: CityReligion
+  semantics: "CityReligion's population change (from City ChangePopulation 0x1c79b0): a gain of n adds ATHEISM_PRESSURE_PER_POP (gp +0x5d8) x n << 8 to the entry of the current majority (+8: -1 when none), then recomputes; a loss only recomputes."
   status: PARTLY
   impl:
     - cpu/data/religion.ts:ROUTE_PRESSURE_DESTINATION
@@ -25,12 +27,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The population change 0x1f3050 (called from City ChangePopulation 0x1c79b0): a gain of n adds ATHEISM_PRESSURE_PER_POP..."
-  review: imported
+  review: reviewed
 - addr: 0x1f33e0
   final: 0x149e50
   kind: function
+  semantics: "a city's spread step: ADJACENT_PER_TURN_PRESSURE (gp +0x5d4); x HOLY_CITY_PRESSURE_MULTIPLIER (+0x5e0) on the religion's Holy City plot, or when the OWNER's religion object counts TREAT_HOLY_SITE_AS_HOLY_CITY (+0xce0) and the city has a Holy Site, or the owner counts TREAT_CAPITAL_AS_HOLY_CITY (+0xc80) and its +0x1368 player founded the religion; else HOLY_SITE_PRESSURE_MULTIPLIER (+0x5e8) with a Holy Site; then x (100 + 0x4975a0 + the city's +0xd4 (the Bishop) + the queue term) / 100, the percents summed, then the game speed (0x525590). The queue term: the build queue's (+0x2170, head 0x179650) item's Projects row (0xad5f10) Projects_XP2 ReligiousPressureModifier (0xad5fb0 / 0x28a940, +0x24: Holy Site Prayers 100)."
   status: READ
   cases:
+    - recording: h1_duelw1118
+      turn: 68
+      value: Armagh reads GetPressureFromCity 8 while Prayers heads its queue, 4 otherwise
     - recording: h1_duelw1118
       turn: 68
       value: "Recorded: runs/h1_duelw1118   Armagh, a city-state with a Holy Site, reads GetPressureFromCity 8 on every   record whose queue Prayers heads (t68–85, t116–130, t139–156, t212 on) and   4 on the rest ("
@@ -46,4 +52,4 @@
   context:
     - ...1225de check) or a Citadel-of-God city of another founder (+0x19e8); the source's step (0x1f33e0) when the target is within the range and the source follows the religion; then the trad...
     - "- The step 0x1f33e0: ADJACENT_PER_TURN_PRESSURE (gp +0x5d4); x HOLY_CITY_PRESSURE_MULTIPLIER (+0x5e0) on th..."
-  review: imported
+  review: reviewed

@@ -6,31 +6,34 @@
 - addr: 0x84d630
   final: 0x5a6f80
   kind: function
+  semantics: "Trigger Tech Boost's validity: neither held nor boosted (0x4cb290), with a boost, of the actor's era."
   status: PARTLY
   impl: [cpu/core/quests.ts:boostTargets]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Trigger Tech / Civic Boost (0x84d630, 0x84cb90): neither held nor boosted (0x4cb290 / 0x39d190), with a boost, of the acto..."
-  review: imported
+  review: reviewed
 - addr: 0x84d750
   final: 0x5a70a0
   kind: function
   name: id
+  semantics: Trigger Tech Boost done on the boost.
   status: PARTLY
   impl: [cpu/core/quests.ts:questBoosted]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e pickers over them in the tables' order (0x84d870, 0x84ce50); done on the boost (0x84d750, 0x84ccb0), failed when the actor researches it (0x84cd40).
-  review: imported
+  review: reviewed
 - addr: 0x84d870
   final: 0x5a71c0
   kind: function
+  semantics: Trigger Tech Boost's picker over the valid techs in the table's order.
   status: PARTLY
   impl: [cpu/harness/drawSites.ts:DRAW_SITES]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...9d190), with a boost, of the actor's era; the pickers over them in the tables' order (0x84d870, 0x84ce50); done on the boost (0x84d750, 0x84ccb0), failed when the actor researches...
-  review: imported
+  review: reviewed

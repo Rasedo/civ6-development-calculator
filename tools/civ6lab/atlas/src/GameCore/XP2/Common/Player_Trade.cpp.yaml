@@ -6,6 +6,7 @@
 - addr: 0x4d8220
   final: 0x33cdc0
   kind: function
+  semantics: writes the per-path-tile trade bonus (EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_PATH_TILE).
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -13,7 +14,7 @@
   readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
   context:
     - "...de vector +0xeb8 that EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_PATH_TILE writes through 0x4d8220): floor(n x a + a / 2) in 24.8 fixed point (`and ebx, 0xffffff00`), a = Hunza's 0.2 held..."
-  review: imported
+  review: reviewed
 - addr: 0x4d9320
   final: 0x743c0
   kind: function
@@ -48,6 +49,7 @@
 - addr: 0x4d9620
   final: 0x33e010
   kind: function
+  semantics: the per-path-tile trade bonus (the player trade vector +0xeb8).
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -55,10 +57,11 @@
   readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
   context:
     - ...e player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-tile bonus (0x4d9620, the player trade vector +0xeb8 that EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_PATH_TILE...
-  review: imported
+  review: reviewed
 - addr: 0x4d9670
   final: 0x33e050
   kind: function
+  semantics: the player's foreign trading post bonus.
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -66,10 +69,11 @@
   readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
   context:
     - ...e posts counted on it (0x5500b0) times the player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-tile bonus (0x4d9620, the player trade vector +0xeb8 that EFFECT_ADJU...
-  review: imported
+  review: reviewed
 - addr: 0x4d9750
   final: 0x33e0a0
   kind: function
+  semantics: the player's own trading post bonus.
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -77,7 +81,7 @@
   readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
   context:
     - ...luded); the posts counted on it (0x5500b0) times the player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-tile bonus (0x4d9620, the player trade vector +0xeb8 that E...
-  review: imported
+  review: reviewed
 - addr: 0x4d9830
   final: 0x33e0f0
   kind: function
@@ -95,6 +99,7 @@
 - addr: 0x4d9a70
   final: 0x33e250
   kind: function
+  semantics: Player_Trade's era handler (-> the roads' upgrade 0x5134c0).
   status: PARTLY
   impl: [cpu/core/eras.ts:upgradeRoads, cpu/core/minorBuild.ts:minorPhase]
   readings:
@@ -103,4 +108,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The upgrade (0x5134c0, called only from Player_Trade's era handler 0x4d9a70 with LOC_NOTIFICATION_ROADS_UPGRADED): when a player's era becomes one some Routes.Prer..."
-  review: imported
+  review: reviewed

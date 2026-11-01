@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x8ffac0
   kind: function
+  semantics: a hero made (raises the best strengths through 0x4c1a30).
   status: READ
   cases:
     - recording: 1112
@@ -17,4 +18,4 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - ...30, called as a unit is made (the city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), raises it to 0x56dc90(unit...
-  review: imported
+  review: reviewed

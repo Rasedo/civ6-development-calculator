@@ -18,9 +18,12 @@
 - addr: 0x598270
   kind: function
   name: congressSessionSetup
-  semantics: "The session's slate, drawn when it sits: the resolutions in the game era's window (row +0x68 / +0x98) that CanUseResolutions allows, the InjectionOnly ones apart (+0xb8); min(3, n) 'World Congress Resolutions' draws (0x59a680), each over what is left removing its pick, the first two the slate; then one draw over the InjectionOnly rows (the Diplomatic Victory resolution from Modern); then 0x596b40."
+  semantics: "The session's slate, drawn when it sits: the resolutions in the game era's window (row +0x68 / +0x98) that CanUseResolutions allows, the InjectionOnly ones apart (+0xb8); min(3, n) 'World Congress Resolutions' draws (0x59a680), each over what is left removing its pick, the first two the slate; then one draw over the InjectionOnly rows (the Diplomatic Victory resolution from Modern); then 0x596b40. The World Congress session setup: lists the resolutions in their era (EarliestEra / LatestEra at row +0x68 / +0x98 against the game era) the Lua CanUseResolutions allows, split by InjectionOnly (row +0xb8): of the rest, in the database's order, min(3, n) \"World Congress Resolutions\" draws, each over what is left and removing its pick (0x59a680), the first two the slate voted, the third drawn and dropped; then ONE draw over the InjectionOnly rows."
   status: READ
   cases:
+    - recording: h1_duelv1127
+      turn: 61
+      value: "10, 9, 8 -> 1, 1, 5: the Trade Treaty, World Religion voted, Sovereignty dropped"
     - recording: h1_duelv1127
       turn: 121
       value: 12, 11, 10 -> Military Advisory, Mercenary Companies (the slate at t101 held Mercenary Companies too)
@@ -33,6 +36,7 @@
   review: reviewed
 - addr: 0x59a540
   kind: function
+  semantics: "draws one \"World Congress Resolutions\" pick over the competitions and appends it at +0x310."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -44,9 +48,10 @@
   readings: ["H-1: the World Congress slate (0x598270) — READ"]
   context:
     - "...— not in play —, weighs each 1 and draws ONE \"World Congress Resolutions\" pick over them (0x59a540), appending the pick at +0x310. The scored competitions fit it: 1117 / 1118 / 1121 all dr..."
-  review: imported
+  review: reviewed
 - addr: 0x59a680
   kind: function
+  semantics: draws one resolution over the slate's list and removes it.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -58,7 +63,7 @@
   readings: ["H-1: the World Congress slate (0x598270) — READ"]
   context:
     - "...n(3, n) \"World Congress Resolutions\" draws, each over what is left and removing its pick (0x59a680); with three drawn, the first two the previous session did not hold stand, else all drawn..."
-  review: imported
+  review: reviewed
 - addr: 0x59bc40
   final: 0x3c0ba0
   kind: function

@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x3057a0
   kind: function
+  semantics: "the religion moment: FIRST_IN_WORLD while no player has recorded it, else the plain row."
   status: READ
   cases:
     - recording: 1103
@@ -13,12 +14,16 @@
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   context:
     - "...14840: FIRST_IN_WORLD when no other player holds a pantheon, else the plain row; religion 0x3057a0: FIRST_IN_WORLD while no player has recorded it, else the plain row. A world wonder 0x311..."
-  review: imported
+  review: reviewed
 - addr: 0x3060b0
   final: 0x2160c0
   kind: function
+  semantics: "MITIGATED_RIVER_FLOOD's handler: records the moment unless the player's history holds it (hash 0x978039a6 and the player, any river): once a game."
   status: READ
   cases:
+    - recording: h1_duelw1128
+      turn: 160
+      value: "climate log FLOOD MITIGATED on the Amur: China +1"
     - recording: 1128
       turn: 160
       value: "1128 t160 (climate log FLOOD MITIGATED   on the Amur): China +1."
@@ -26,10 +31,11 @@
   readings: ["H-1: a pillaged building's specialist, the centre's defence, three moments — READ"]
   context:
     - ...eat Bath's (0xa2c280); a mitigating player fires the game signal (+0xbd0) whose handler 0x3060b0 records the moment unless the player's history holds it (hash 0x978039a6 and the play...
-  review: imported
+  review: reviewed
 - addr: 0x306640
   final: 0x216c80
   kind: function
+  semantics: "the moments' improvement type table: Beach Resort +8, Mountain Tunnel +0xc, Geothermal Plant +0x10, Solar Farm +0x14, Wind Farm +0x18, Offshore Wind Farm +0x1c, Industry +0x20, Corporation +0x24."
   status: READ
   cases:
     - recording: 1127
@@ -39,12 +45,15 @@
   readings: ["H-1: a pillaged building's specialist, the centre's defence, three moments — READ"]
   context:
     - "...FIRST: the improvement handler 0x311ed0 compares the improvement with a table of types (0x306640: Beach Resort +8, Mountain Tunnel +0xc, Geothermal Plant +0x10, Solar Farm +0x14, Win..."
-  review: imported
+  review: reviewed
 - addr: 0x306b40
   kind: function
   name: MOMENT_NEAR_CIV_RANGE
+  semantics: "the city-founded moments, for a founding with no plain founding moment: BECAME_LARGEST_CIV_BY_MARGIN when its cities - 3 >= every other major's (once a game); NEAR_NATURAL_WONDER within 2 (once per wonder); NEAR_OTHER_CIV_CITY within 5 (0x312b00, every time); NEAR_FLOODABLE_RIVER and NEAR_VOLCANO within 2 (once a game); NEW_CONTINENT when none of its other cities stands on the plot's continent (every time, not the first city); ON_DESERT / ON_SNOW / ON_TUNDRA by the centre's terrain, flat or hills (every time)."
   status: READ
   cases:
+    - recording: h1_duelw1103
+      value: "step.eraScore 394 / 482 (1104: 372 / 480)"
     - recording: 1103
       value: "Fit: `step.eraScore` 394 / 482 (1103) and 372 / 480 (1104), from 382 and 365;"
   impl:
@@ -56,9 +65,10 @@
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   context:
     - "...s the player ever recorded this moment type (the whole history). The city-founded handler 0x306b40 records, for a founding with no plain founding moment: BECAME_LARGEST_CIV_BY_MARGIN when..."
-  review: imported
+  review: reviewed
 - addr: 0x3088a0
   kind: function
+  semantics: "a city transferred (paid to the new owner): TO_ORIGINAL_OWNER when its original owner (+0x218) is the new owner and the reason is not BY_CULTURAL_IDENTITY, once per city and player (0x315b50); then, the old owner a full civ, PLAYER_DEFEATED when its city count is <= 1, else FOREIGN_CAPITAL when the city is an original capital (+0x648) of the old owner. A city-state's or a Free City's city records neither."
   status: READ
   cases:
     - recording: 1103
@@ -67,10 +77,11 @@
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   context:
     - "...n the wonder's era is the game era or later, else PAST_ERA_WONDER (3). A city transferred 0x3088a0 (paid to the new owner): TO_ORIGINAL_OWNER when its original owner (+0x218) is the new ow..."
-  review: imported
+  review: reviewed
 - addr: 0x3110a0
   kind: function
   name: PAST_ERA
+  semantics: "a world wonder's moment: GAME_ERA_WONDER (4) when the wonder's era is the game era or later, else PAST_ERA_WONDER (3)."
   status: READ
   cases:
     - recording: 1103
@@ -79,12 +90,16 @@
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   context:
     - "...057a0: FIRST_IN_WORLD while no player has recorded it, else the plain row. A world wonder 0x3110a0: GAME_ERA_WONDER (4) when the wonder's era is the game era or later, else PAST_ERA_WONDER..."
-  review: imported
+  review: reviewed
 - addr: 0x311ed0
   final: 0x21f1f0
   kind: function
+  semantics: "the improvement moments' handler: compares the improvement with 0x306640's types; the four renewables record IMPROVEMENT_CONSTRUCTED_RENEWABLE_ENERGY_FIRST's plain row for the player once, FIRST_IN_WORLD where no one holds it."
   status: READ
   cases:
+    - recording: h1_duelw1127
+      turn: 246
+      value: China (3)
     - recording: 1127
       turn: 246
       value: 1127 China t246 (3).
@@ -92,9 +107,10 @@
   readings: ["H-1: a pillaged building's specialist, the centre's defence, three moments — READ"]
   context:
     - "- IMPROVEMENT_CONSTRUCTED_RENEWABLE_ENERGY_FIRST: the improvement handler 0x311ed0 compares the improvement with a table of types (0x306640: Beach Resort +8, Mountain Tun..."
-  review: imported
+  review: reviewed
 - addr: 0x312b00
   kind: function
+  semantics: "the other-civ city test: the plot holds a city whose owner is not the founder, is a full civ (0x469db0), the founder has met (0x3daaf0), on a plot revealed to the founder."
   status: READ
   cases:
     - recording: 1103
@@ -102,21 +118,23 @@
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   context:
     - "...SNOW / ON_TUNDRA by the centre's terrain, flat or hills (every time). The other-civ test (0x312b00): the plot holds a city whose owner is not the founder, is a full civ (0x469db0, CIVILIZA..."
-  review: imported
+  review: reviewed
 - addr: 0x312c00
   final: 0x21fde0
   kind: function
+  semantics: "the high-adjacency moments at a district's completion: per district type (Campus 0x675dbc7a, Commercial Hub, Harbor, Holy Site, Industrial Zone, Theater Square) GetYield(that district, its yield, no percent) >= 3 / 4 / 4 / 3 / 4 / 3, once per player and type."
   status: PARTLY
   impl: [cpu/core/moments.ts:adj]
   readings: ["H-1: the district adjacency — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The high-adjacency moments, handler 0x312c00 at a district's completion: per district type (Campus 0x675dbc7a, Commercial Hub, Har..."
-  review: imported
+  review: reviewed
 - addr: 0x3142a0
   final: 0x220cd0
   kind: function
   name: GAME_ERA
+  semantics: "a great person's moment: GAME_ERA / PAST_ERA, both 1."
   status: READ
   cases:
     - recording: 1103
@@ -125,10 +143,11 @@
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   context:
     - "...648) of the old owner. A city-state's or a Free City's city records neither. Great People 0x3142a0: GAME_ERA / PAST_ERA, both 1. Fit: `step.eraScore` 394 / 482 (1103) and 372 / 480 (1104),..."
-  review: imported
+  review: reviewed
 - addr: 0x314840
   final: 0x2210b0
   kind: function
+  semantics: "the pantheon moment: FIRST_IN_WORLD when no other player holds a pantheon, else the plain row."
   status: READ
   cases:
     - recording: 1103
@@ -137,12 +156,16 @@
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   context:
     - "...LL_CIV), the founder has met (0x3daaf0) and the plot is revealed to the founder. Pantheon 0x314840: FIRST_IN_WORLD when no other player holds a pantheon, else the plain row; religion 0x305..."
-  review: imported
+  review: reviewed
 - addr: 0x315980
   final: 0x221db0
   kind: function
+  semantics: "WORLD_CIRCUMNAVIGATED's handler: FIRST_IN_WORLD (0x17cd04dd) unless another player holds the flag, else the plain row (0x2ada545a)."
   status: READ
   cases:
+    - recording: h1_duelw1127
+      turn: 157
+      value: Rome t157 (5), China t183 (3)
     - recording: 1127
       turn: 157
       value: 1127 Rome t157 (5), China t183 (3).
@@ -150,10 +173,11 @@
   readings: ["H-1: a pillaged building's specialist, the centre's defence, three moments — READ"]
   context:
     - ...loop over the team's revealed bytes +0x2f0) sets it and signals (+0x1728); the handler 0x315980 records FIRST_IN_WORLD (0x17cd04dd) unless another player holds the flag, else the pl...
-  review: imported
+  review: reviewed
 - addr: 0x315af0
   final: 0x221ec0
   kind: function
+  semantics: the player has ever recorded the moment type (the whole history).
   status: READ
   cases:
     - recording: 1103
@@ -161,10 +185,11 @@
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   context:
     - "...the same moment for the same player lies within RepeatTurnCooldown (speed-scaled) turns. 0x315af0: has the player ever recorded this moment type (the whole history). The city-founded hand..."
-  review: imported
+  review: reviewed
 - addr: 0x315b50
   final: 0x221f20
   kind: function
+  semantics: the moment is held for the city and player.
   status: READ
   cases:
     - recording: 1103
@@ -172,4 +197,4 @@
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   context:
     - ...8) is the new owner and the reason is not BY_CULTURAL_IDENTITY, once per city and player (0x315b50); then, when the old owner is a full civ, PLAYER_DEFEATED when the old owner's city count...
-  review: imported
+  review: reviewed

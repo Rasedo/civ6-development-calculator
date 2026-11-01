@@ -6,7 +6,7 @@
 - addr: 0x6cede0
   final: 0x48e9e0
   kind: function
-  semantics: "a modifier's analysis: refuses a fourth nesting; over at most 51 subjects of the collection, each whose requirement set 0x6cf3c0 admits to the analyzer's slot 1, none to slot 2; clears the context's +0xc0 first."
+  semantics: "a modifier's analysis: refuses a fourth nesting; over at most 51 subjects of the collection, each whose requirement set 0x6cf3c0 admits to the analyzer's slot 1, none to slot 2; clears the context's +0xc0 first. Clears the context's whole number (+0xc0) as it starts; each subject's analyzer adds to it; where no subject passes, the analyzer's slot 2."
   status: READ
   cases:
     - recording: h1_duelw1124

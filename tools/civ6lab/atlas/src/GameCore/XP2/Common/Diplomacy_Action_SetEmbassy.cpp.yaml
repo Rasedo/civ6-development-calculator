@@ -5,8 +5,12 @@
 # set `review: reviewed`.
 - addr: 0x238330
   kind: function
+  semantics: "the Embassy's handler at the receiver: an AI receiver answers by 0x653f60; on acceptance the cost moves from sender to receiver and the embassy is set; then the sender's AI records the answer (0x6543a0)."
   status: PARTLY
   cases:
+    - recording: h1_duelv1127
+      turn: 191
+      value: refused 117 ... 186 in Unfriendly, accepted 191 at Rome's Neutral
     - recording: h1_duelv1127
       value: "Confirmed on every answer   of the five verbose duels (20 / 20): accepted exactly where the   receiver's own logged cost of the action toward the sender is <= 0 —   every refusal in Unfriendly (Cost 7"
   readings:
@@ -16,4 +20,4 @@
     - ".claude/scratchpad/dp2/readings_dp2.md: ...lowers the balance by the amount. - THE RECEIVER (the Delegation's handler 0x237c60, the Embassy's 0x238330):   an AI receiver answers by 0x653f60: an action outside its state's lists   toward the sender ref..."
   context:
     - "- THE RECEIVER (the Delegation's handler 0x237c60, the Embassy's 0x238330): an AI receiver answers by 0x653f60: an action outside its state's lists toward the..."
-  review: imported
+  review: reviewed

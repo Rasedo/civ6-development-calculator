@@ -6,9 +6,12 @@
 - addr: 0x4a6110
   kind: function
   name: Player_Resources
-  semantics: "rebuilds m_aLuxuryAllocations (+0x460): a city entry per city, a resource entry per held resource (reach 0x527a50, a no-cap one x copies with a wrap flag); resources stable-sorted by reach descending, cities by their non-luxury amenities less need ascending before each resource; each resource one amenity to the first `reach` cities."
+  semantics: "rebuilds m_aLuxuryAllocations (+0x460): a city entry per city, a resource entry per held resource (reach 0x527a50, a no-cap one x copies with a wrap flag); resources stable-sorted by reach descending, cities by their non-luxury amenities less need ascending before each resource; each resource one amenity to the first `reach` cities. Callers 0x4a7560, the import/export setter, 0x4a8ed0; serialized at 0x4a3d46. A city entry per city of the player's list (+0x12f0 -> +0xd8, in order): {id +0xf8, population +0x588, the city's amenities 0x1b4af0 less its luxury amenities 0x1b5210, granted 0}; a resource entry per resource held (0x510960), resource index order: reach = the per-copy reach (0x527a50); a no-cap resource (m_aiNoCapResources > 0) multiplies it by its copies (0x4a93c0) and carries a wrap flag; an owned luxury adds +0x160, a bonus resource +0x1c0; reach 0 dropped. The resources insertion-sorted (0x4a1eb0 -> 0x4a0e90, stable) by reach descending; the cities (0x4a1fd0 -> 0x4a0f60, stable) ascending by non-luxury + granted - amenities needed (0x5275a0), once before the first resource and again after each; each resource grants one amenity to each of the first reach cities, stopping at the list's end — a wrapping one runs on from the start (0x4a6b74)."
   status: READ
   cases:
+    - recording: h1_duelw1112
+      turn: 83
+      value: "China's Amber under Luxury Policy A (2 copies) reaches 8 in one pass: Xi'an, Guangzhou, Beijing, Taiyuan, Chengdu read 3, 5, 4, 5, 3"
     - recording: 1122
       turn: 200
       value: "both give the   same answer on the recorded cases: 1122 t200, Reyna established in   Changsha (Civil Prestige's amenity) leaves the ranking standing to t201   (the rebuild precedes her clock), and the"
@@ -42,27 +45,30 @@
 - addr: 0x4a6d90
   final: 0x31e5f0
   kind: function
+  semantics: hands a city-state's owned resources to its new suzerain (-> 0x4a7560).
   status: PARTLY
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - "...city-state's owned resources off the old suzerain (0x4a91a0) and hands them to the new (0x4a6d90 -> 0x4a7560): a rebuild for the new one. A city-state's own resource change re-hands it..."
-  review: imported
+  review: reviewed
 - addr: 0x4a70c0
   final: 0x31e780
   kind: function
+  semantics: the effect's extra amenities per owned bonus resource (+0x1c0); rebuilds the allocation.
   status: PARTLY
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - ...amenities per owned luxury / bonus resource (+0x160 / +0x1c0, the effects' 0x4a7100 / 0x4a70c0) rebuild too.
-  review: imported
+  review: reviewed
 - addr: 0x4a7100
   final: 0x31e7c0
   kind: function
+  semantics: the effect's extra amenities per owned luxury resource (+0x160); rebuilds the allocation.
   status: PARTLY
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - ...The extra amenities per owned luxury / bonus resource (+0x160 / +0x1c0, the effects' 0x4a7100 / 0x4a70c0) rebuild too.
-  review: imported
+  review: reviewed
 - addr: 0x4a72c0
   final: 0x31e910
   kind: function
@@ -81,19 +87,24 @@
   review: reviewed
 - addr: 0x4a7400
   kind: function
+  semantics: reserves a strategic resource amount.
   status: PARTLY
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - ...t the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it (0x4aa790), else leaves the...
-  review: imported
+  review: reviewed
 - addr: 0x4a7560
   final: 0x31e9b0
   kind: function
   name: ChangeResourceAmount
+  semantics: "ChangeResourceAmount (resource, ownership, amount): rebuilds the luxury allocation at once (0x4a77d4, unless the game's flag +0x45e) for any ownership-0 change and any non-accumulated import / export. Callers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0), the copies 0x44eff0 hands a resource's recipients, the power ledger 0x4a7cc0, the turn end's cap (0x4a8f10). An amount of 0 rebuilds too; an accumulated resource's import or export returns before the rebuild. A unit's strategic cost (0x1856b3 / 0x185a2a) calls it: the cards re-slotted mid-walk reach the ranking then."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 196
+      value: Big Ben re-slots Xi'an's cards mid-walk and the Line Infantry it buys after re-ranks them on the new cards
     - recording: 1121
       turn: 243
       value: "Player_Resources' DoTurn step 0x4a8ed0 runs the holdings 0x4ab6e0, the   allocation, then the parks 0x32deb0 — so a park stored at a processing   pays beside the luxuries ranked on the park amenities "
@@ -118,7 +129,7 @@
     - "Player_Resources.cpp 0x4a6110 (callers 0x4a7560, the import/export setter, and 0x4a8ed0) rebuilds `m_aLuxuryAllocations` (Player_Resource..."
     - "- ChangeResourceAmount 0x4a7560 (resource, ownership, amount) rebuilds the allocation at once (0x4a77d4, unless the gam..."
     - "...owned resources off the old suzerain (0x4a91a0) and hands them to the new (0x4a6d90 -> 0x4a7560): a rebuild for the new one. A city-state's own resource change re-hands its copies to..."
-  review: imported
+  review: reviewed
 - addr: 0x4a79e0
   final: 0x31eb90
   kind: function
@@ -150,8 +161,12 @@
 - addr: 0x4a8ed0
   final: 0x31f520
   kind: function
+  semantics: "the player's resources turn: the holdings recomputed (0x4ab6e0), then the luxury allocation rebuilt (0x4a6110). Then the parks (0x32deb0): a park stored at a processing pays beside the luxuries ranked on the park amenities before it."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 243
+      value: Chengdu's 3 from its park with its 4 luxuries; the next rebuild hands it 2
     - recording: 1122
       turn: 200
       value: "both give the   same answer on the recorded cases: 1122 t200, Reyna established in   Changsha (Civil Prestige's amenity) leaves the ranking standing to t201   (the rebuild precedes her clock), and the"
@@ -178,11 +193,12 @@
     - "Player_Resources.cpp 0x4a6110 (callers 0x4a7560, the import/export setter, and 0x4a8ed0) rebuilds `m_aLuxuryAllocations` (Player_Resources +0x460, serialized at 0x4a3d46):"
     - "...in order: the culture (+0x1310, 0x396860: the civic progress), the resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the holdings recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation..."
     - ...TY_CITIES (+0x51c) others. Its only caller is the tail of Player_Resources' DoTurn step 0x4a8ed0 (the holdings 0x4ab6e0, the allocation 0x4a6110, then the parks), reached from Player D...
-  review: imported
+  review: reviewed
 - addr: 0x4a8f10
   final: 0x31f560
   kind: function
   name: Player_Resources
+  semantics: "the turn end's stockpile cap: for each accumulated resource, the stockpile less the player's reserved amount (0x4aa530) where above 0 is tested strictly over the cap (0x4aabe0) and handed back through ChangeResourceAmount (ownership 0, amount cap - (stock - reserved)) — a rebuild; a bank at the cap is not over it."
   status: PARTLY
   impl:
     - cpu/core/stockpile.ts:capStockpiles
@@ -192,19 +208,21 @@
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - "...::Processor::DoTurnDeactivate 0x7eb60 -> 0x4e4ad0, which tail-jumps to Player_Resources 0x4a8f10): for each accumulated resource, the stockpile less the player's reserved amount (0x4..."
-  review: imported
+  review: reviewed
 - addr: 0x4a91a0
   final: 0x31f700
   kind: function
+  semantics: takes a city-state's owned resources off its old suzerain.
   status: PARTLY
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - "...old != new or it returns) takes the city-state's owned resources off the old suzerain (0x4a91a0) and hands them to the new (0x4a6d90 -> 0x4a7560): a rebuild for the new one. A city-..."
-  review: imported
+  review: reviewed
 - addr: 0x4a93c0
   final: 0x31f820
   kind: function
   name: Player_Resources copies held
+  semantics: the copies of a resource the player holds.
   status: READ
   cases:
     - recording: h1_duelv1121
@@ -242,14 +260,16 @@
 - addr: 0x4aa0e0
   final: 0x31fed0
   kind: function
+  semantics: the luxury allocation entries naming a city id.
   status: PARTLY
   readings: ["H-1: a National Park's amenities, stored at the owner's turn — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...Allocations` (Player_Resources +0x460; data +0x4b8, count +0x4c8) naming the city's id, 0x4aa0e0 — a city the last rebuild did not list holds none), the entertainment 0x1b4c10, and sto..."
-  review: imported
+  review: reviewed
 - addr: 0x4aa530
   kind: function
+  semantics: the player's reserved amount of a resource (m_aiReservedResources +0x528).
   status: PARTLY
   impl: [cpu/harness/import.ts:reserved, cpu/core/stockpile.ts:stockReserved]
   readings:
@@ -257,19 +277,21 @@
     - "C-96: the improvement value's resource copies, a minor's strategic copies, the district count — READ (0x7a58f0's count, 0x4a93c0, 0x1ae8a0, 0x1ae8f0), a LAB (a city-state's Great General weight)"
   context:
     - "...f10): for each accumulated resource, the stockpile less the player's reserved amount (0x4aa530, m_aiReservedResources +0x528), where that is above 0, is tested strictly over the cap..."
-  review: imported
+  review: reviewed
 - addr: 0x4aa700
   kind: function
+  semantics: "Player_Resources +0x350 (fx): read as the turn's strategic income."
   status: PARTLY
   impl: [cpu/core/stockpile.ts:stockpileIncome]
   readings:
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "- PARTLY READ: the strategic stockpile terms — Player_Resources +0x350 (0x4aa700) against 0x4ab270 (the player's +0x12e8 +0x1168) where their difference is negative, th..."
-  review: imported
+  review: reviewed
 - addr: 0x4aa790
   final: 0x3201d0
   kind: function
+  semantics: the player's count of a resource by ownership type (0 taken as the improved plots of the resource in the player's territory).
   status: READ
   cases:
     - recording: h1_duelw1119
@@ -318,13 +340,17 @@
     - ...reserves its cost (0x4a7400) where the player's amount less its reservations covers it (0x4aa790), else leaves the front; the completion (0x1856b3 / 0x185a2a) releases the reservation...
     - "...ECLASS_STRATEGIC resource whose condition the player meets (0x4ac140) with its stockpile (0x4aa790) below the cap (0x4aabe0). The engines take CityState, StrategicResources and Relic (`goo..."
     - ...on class weight, a strategic resource the player lacks and no city of its holds near (0x4aa790, 0x5d45c0) -> 0, the pseudo-yield, the Gold maintenance below handicap 3, the PV over T...
-  review: imported
+  review: reviewed
 - addr: 0x4aa8e0
   final: 0x320270
   kind: function
   name: Player_Resources
+  semantics: "Callers the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua IsResourceExtractableAt 0x4ac120: takes the plot's improvement (+0x44, none while pillaged, +0x4d bit 0) and, when the plot's district (0x810d0) is complete (+0xb08) and not pillaged (0x24c3a0), that district's type; then 0x4aaa70. A district on the resource accrues once complete (the plot's district complete 0x811b0, not pillaged)."
   status: READ
   cases:
+    - recording: h1_duelw1116
+      turn: 193
+      value: China's Coal under a Campus (plot 411) powers Beijing's Coal Power Plant from t193
     - recording: h1_duelw1116
       turn: 120
       value: "Record: runs/h1_duelw1116 China — Coal at plot 411 under a Campus placed t120 before the Coal was revealed, plot 322 under a Great Wall, no mine anywhere — powers Beijing's Coal Power Plant (Factory +"
@@ -339,12 +365,16 @@
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
   context:
     - "Player_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourc..."
-  review: imported
+  review: reviewed
 - addr: 0x4aaa70
   final: 0x320400
   kind: function
+  semantics: "answers the plot's resource (+0x40, count +0x42 > 0) when the plot's owner is the player, the resource's condition holds (0x4ac140), and EITHER a district stands there — any type, the city centre included — OR the improvement's valid-resource list holds it (a Great Wall on Coal extracts nothing)."
   status: READ
   cases:
+    - recording: h1_duelw1116
+      turn: 193
+      value: China's Coal under a Campus (plot 411) powers Beijing's Coal Power Plant from t193
     - recording: h1_duelw1116
       turn: 120
       value: "Record: runs/h1_duelw1116 China — Coal at plot 411 under a Campus placed t120 before the Coal was revealed, plot 322 under a Great Wall, no mine anywhere — powers Beijing's Coal Power Plant (Factory +"
@@ -356,10 +386,11 @@
   readings: ["H-1: a plot's resource for its owner (strategic access) — READ"]
   context:
     - "...ct:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers the plot's resource (+0x40, count +0x42 > 0) when the plot's owner is the pl..."
-  review: imported
+  review: reviewed
 - addr: 0x4aabe0
   final: 0x320560
   kind: function
+  semantics: "a resource's stockpile cap: speed(StockpileCap of the Resource_Consumption row) (0x5254d0) plus the player's per-resource extra +0x858 the Encampment buildings' modifiers raise; 25 online before the buildings."
   status: READ
   cases:
     - recording: h1_duelw1119
@@ -385,10 +416,11 @@
   context:
     - "...m_aiReservedResources +0x528), where that is above 0, is tested strictly over the cap (0x4aabe0: 0x5254d0, the game speed's scaling, of the Resource_Consumption row's StockpileCap, pl..."
     - "...whose condition the player meets (0x4ac140) with its stockpile (0x4aa790) below the cap (0x4aabe0). The engines take CityState, StrategicResources and Relic (`goodyEligible` / `_goody_eli..."
-  review: imported
+  review: reviewed
 - addr: 0x4aafd0
   final: 0x320900
   kind: function
+  semantics: "the per-city accumulation: an accumulating resource pays BaseExtractionRate (+0x1c) plus ImprovedExtractionRate (+0x24) when an unpillaged improvement stands, else when a complete unpillaged district stands; a pillaged improvement pays the base alone."
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -401,7 +433,7 @@
   readings: ["H-1: a plot's resource for its owner (strategic access) — READ"]
   context:
     - "Player_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourceExtractableAt` 0x4ac120) takes the plot's im..."
-  review: imported
+  review: reviewed
 - addr: 0x4ab270
   final: 0x320ba0
   kind: function
@@ -420,6 +452,7 @@
 - addr: 0x4ab4b0
   final: 0x320d20
   kind: function
+  semantics: the player sees the plot's resource.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -442,10 +475,11 @@
     - "...y (owner and city id): cost = d * DISTANCE_MULTIPLIER * 2; a resource the player can see (0x4ab4b0, the reveal condition) adds RESOURCE_COST when d <= 3, any other plot adds WATER_COST if..."
     - "0x4ac140 (a player's resource condition, 0x4ab4b0's): the player's own reveal bit (+0xf0), then — where its influence component's suzerain..."
     - ...al, at 1 into the inner ring; a feature within 2 counted; a resource the player sees (0x4ab4b0) counted by its plot's amount, and at distance 1 one the player holds none of (0x4aa790...
-  review: imported
+  review: reviewed
 - addr: 0x4ab4d0
   final: 0x320d40
   kind: function
+  semantics: a plot's extracted resource changing (from the city, district and plot handlers 0x4ac2e0..0x4ad0d0) -> ChangeResourceAmount; an accumulated resource skips it.
   status: READ
   cases:
     - recording: 1121
@@ -461,7 +495,7 @@
   context:
     - ...g, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0 from the city, district and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource s...
     - ...56b3 / 0x185a2a) calls 0x4a7560. A Builder's improvement on a resource rebuilds through 0x4ab4d0 (non-accumulated resources only). The harness ranks each major's record allocation on t...
-  review: imported
+  review: reviewed
 - addr: 0x4ab6c0
   kind: function
   status: PARTLY
@@ -479,6 +513,7 @@
 - addr: 0x4ab6e0
   final: 0x320ec0
   kind: function
+  semantics: recomputes the player's resource holdings.
   status: READ
   cases:
     - recording: 1122
@@ -500,10 +535,11 @@
     - "...vic progress), the resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the holdings recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation), the governors' clocks (0x432980 at 0x4e46df),..."
     - ...rs. Its only caller is the tail of Player_Resources' DoTurn step 0x4a8ed0 (the holdings 0x4ab6e0, the allocation 0x4a6110, then the parks), reached from Player DoTurn 0x4e46c0 alone;...
     - "...t or export returns before it. Player_Resources' DoTurn step 0x4a8ed0 runs the holdings 0x4ab6e0, the allocation, then the parks 0x32deb0 — so a park stored at a processing pays besi..."
-  review: imported
+  review: reviewed
 - addr: 0x4abfe0
   kind: function
   name: resourceHeld
+  semantics: the player holds the resource (Player_Resources +0x598[r] > 0).
   status: PARTLY
   impl: [cpu/core/aiResource.ts:ResourceFacts]
   readings:
@@ -515,6 +551,7 @@
   final: 0x3215b0
   kind: function
   name: IsResourceExtractableAt
+  semantics: Lua IsResourceExtractableAt (-> 0x4aa8e0).
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -527,13 +564,16 @@
   readings: ["H-1: a plot's resource for its owner (strategic access) — READ"]
   context:
     - "...er-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourceExtractableAt` 0x4ac120) takes the plot's improvement (+0x44, read as none while pillaged, +0x4d bit 0) and, when..."
-  review: imported
+  review: reviewed
 - addr: 0x4ac140
   final: 0x3215d0
   kind: function
-  semantics: the suzerain sees the resource (the plot test's reading of an unrevealed resource).
+  semantics: "the suzerain sees the resource (the plot test's reading of an unrevealed resource). A player's resource condition: its own reveal bit (+0xf0), then — where its influence component's suzerain (+0x1368 -> 0x44c850) is a player — the SUZERAIN's condition, recursively; then the reveal modifiers, then the tech (+0xc8) and civic (+0xc0): a city-state sees every resource its suzerain sees."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 85
+      value: Antananarivo counts the Niter from the turn China holds Military Engineering (t85-90)
     - recording: h1_duelw1116
       turn: 120
       value: "Record: runs/h1_duelw1116 China — Coal at plot 411 under a Campus placed t120 before the Coal was revealed, plot 322 under a Great Wall, no mine anywhere — powers Beijing's Coal Power Plant (Factory +"
@@ -562,11 +602,12 @@
 - addr: 0x4ac2e0
   final: 0x321710
   kind: function
+  semantics: a city / district / plot handler of the extracted resources (-> 0x4ab4d0).
   status: PARTLY
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - ...plot's extracted resource changing (0x4ab4d0 from the city, district and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource skips it), the copies 0x44eff0 hands a resource's...
-  review: imported
+  review: reviewed
 - addr: 0x4ade20
   final: 0x322770
   kind: function
@@ -586,6 +627,7 @@
 - addr: 0x4ae4e0
   final: 0x322f00
   kind: function
+  semantics: the resource ownership pass (-> 0x4aa8e0).
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -598,7 +640,7 @@
   readings: ["H-1: a plot's resource for its owner (strategic access) — READ"]
   context:
     - "...layer_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourceExtractableAt` 0x4ac120) takes the plot's improvement (+0x44, read as non..."
-  review: imported
+  review: reviewed
 - addr: 0x4ae990
   final: 0x323220
   kind: function

@@ -6,17 +6,28 @@
 - addr: 0x5389b0
   final: 0x37ebb0
   kind: function
+  semantics: a plot's adjacency yield (-> 0x366df0 with the plot's owner and city).
   status: PARTLY
   readings: ["H-1: the district adjacency — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - Improvement_Yields.cpp. Lua Plot:GetAdjacencyYield (binding 0x25600 -> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0, the plot's...
-  review: imported
+  review: reviewed
 - addr: 0x538a60
   final: 0x37ec60
   kind: function
+  semantics: "The per-flood term (0x539645): when the owning city's m_aYieldPerFlood (City +0x2728) is above 0 for the yield, the plot's home river (0xa2b810) and its floods (0xa2b4f0, 0xa2b410(record, -1)): amount x count. The plot's own rows, then on a plot holding a city (0x81120) Food raised to YIELD_FOOD_CITY_TERRAIN_REPLACE 2 and Production to YIELD_PRODUCTION_CITY_TERRAIN_REPLACE 1 (GlobalParameters +0x7d4 / +0x7dc), and only then the game effects' rows and the neighbours' (the walk from 0x5391c0) — Feature_AdjacentYields among them. The plot yield: adds the game effects' per-plot rows (0xc7e9b0) AFTER the city's floors (the cmovl at 0x53916e)."
   status: READ
   cases:
+    - recording: h1_duelw1124
+      turn: 162
+      value: Shenyang, a Grassland centre in a drought's footprint, reads Food 1 (t162-163)
+    - recording: h1_duelw1121
+      turn: 221
+      value: Chengdu on Plains beside Yosemite reads Food 3 (t221-250)
+    - recording: h1_duelw1131
+      turn: 96
+      value: Beijing 534 (rivers 0 and 1) reads 1 Faith after floods of both, 2 at t122 after river 0's next
     - recording: 1117
       turn: 222
       value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
@@ -43,4 +54,4 @@
     - "...'s appeal (vcall +0x28); any other source the plot's yield of that type from 0x82280 (→ 0x538a60) with its last flag false less the same with it true, times ScalingFactor / 100 when..."
     - "- The plot yield 0x538a60 sums the plot's own rows, then, on a plot holding a city (0x81120), raises Food to YIEL..."
     - "- The plot yield 0x538a60 adds the game effects' per-plot rows (0xc7e9b0, a scan of the plot's (amount, yield) pa..."
-  review: imported
+  review: reviewed

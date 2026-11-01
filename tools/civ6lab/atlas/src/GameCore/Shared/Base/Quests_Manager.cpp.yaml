@@ -6,9 +6,11 @@
 - addr: 0x939980
   kind: function
   name: Game_Quests
-  semantics: "gives a quest to a pair (client minor, actor major): none while the pair holds one; the last completed type skipped; each logic IsValidToStartQuest (0x849110) admits; one 'Selecting a random new quest' draw over their count; the record started (0x849400) and its picker run."
+  semantics: "gives a quest to a pair (client minor, actor major): none while the pair holds one; the last completed type skipped; each logic IsValidToStartQuest (0x849110) admits; one 'Selecting a random new quest' draw over their count; the record started (0x849400) and its picker run. One draw \"Selecting a random new quest\" over the valid logics (weight 1 each, 0x152eb0), the type's record started (0x849400) and its picker (+0x48) run; the type of the pair's last COMPLETED quest (its highest completion turn) skipped."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      value: "dll_quests.py: select 335 of 341 ranges, pickers 261 of 264 over the 29 duels"
     - recording: h1_duelw1117
       turn: 13
       value: the era / meeting quests t13, t17, t31 as logged (dll_quests.py 335 / 341)
@@ -25,28 +27,34 @@
   review: reviewed
 - addr: 0x939f70
   kind: function
+  semantics: moves the completed quest records to the completed list (+0x188) and drops the failed.
   status: PARTLY
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...target. The standing list is +0x110 (data +0x168), the completed one +0x188 (data +0x1e0; 0x939f70 moves the completed records there and drops the failed). Check: `tools/civ6lab/dll_quests..."
-  review: imported
+  review: reviewed
 - addr: 0x93aaa0
   final: 0x64bf90
   kind: function
   name: Game_Quests
+  semantics: "registers the quest logics in order: Convert Capital to Religion, Send Trade Route, Clear Barbarian Camp, Train Unit Type, Zone District Type, Trigger Tech Boost, Trigger Civic Boost, Recruit Great Person Class. Each logic's vtable: +0x8 its type name, +0x10..+0x20 its texts, +0x38 its signal hooks, +0x40 its validity, +0x48 its picker, +0x50 the reward, +0x58 the failure note."
   status: PARTLY
   impl: [cpu/data/quests.ts:QUEST_TYPES]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The logics, registered in this order (0x93aaa0): Convert Capital to Religion, Send Trade Route, Clear Barbarian Camp, Train Unit Type,..."
-  review: imported
+  review: reviewed
 - addr: 0x93ac50
   final: 0x64c140
   kind: function
+  semantics: "the game era's change (registered on GameEras' signal when the game has eras): every player as client, in the players' order, with every player as actor, offered a quest. No cooldown, no expiry."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 13
+      value: quests given at t13, t17, t31 (era + a meeting), t61, t91, t151, t161 (a meeting), t238
     - recording: h1_duelw1117
       turn: 13
       value: "Nothing else gives a quest: no cooldown, no   expiry — a pair whose quest ended waits for the next era or meeting   (runs/h1_duelw1117: t13, t17, t31 era + a meeting, t61, t91, t151, t161   a meeting,"
@@ -59,10 +67,11 @@
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - "- When: the game era's change (0x93ac50, registered on GameEras' signal when the game has eras, the player era's 0x93ad80 other..."
-  review: imported
+  review: reviewed
 - addr: 0x93ad80
   final: 0x64c200
   kind: function
+  semantics: the player era's change (the quest offers when the game has no eras).
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -71,10 +80,11 @@
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - "...ange (0x93ac50, registered on GameEras' signal when the game has eras, the player era's 0x93ad80 otherwise): every player as client, in the players' order, with every player as actor;..."
-  review: imported
+  review: reviewed
 - addr: 0x93ae70
   final: 0x64c290
   kind: function
+  semantics: "a meeting: quests offered in both directions."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -84,4 +94,4 @@
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - "...every player as client, in the players' order, with every player as actor; a meeting (0x93ae70): both directions. Nothing else gives a quest: no cooldown, no expiry — a pair whose qu..."
-  review: imported
+  review: reviewed

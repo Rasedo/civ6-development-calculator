@@ -117,8 +117,12 @@
 - addr: 0x4ca470
   final: 0x3342e0
   kind: function
+  semantics: "\"Choosing random tech boost to grant based on era\": the earliest era holding a row neither researched nor boosted that carries a Boosts row; that era's rows (its own list, +0x168), weight 1 each; n draws, each erasing its pick (the goody hut's boosts)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 6
+      value: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining)
     - recording: h1_duelw1117
       turn: 6
       value: "runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of Laws carries none);"
@@ -142,11 +146,15 @@
   readings: ["H-1: the random boost and free research pickers — READ"]
   context:
     - "0x4ca470 (techs; civics 0x39c330), \"Choosing random tech / civic boost to grant based on era\" — th..."
-  review: imported
+  review: reviewed
 - addr: 0x4caa50
   kind: function
+  semantics: "techs: the same over the eras lo..hi, era by era, labelled \"..., Player: n\" (a Great Person's range, the Dynastic Cycle, Vilnius); every weight 1."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 26
+      value: Stonehenge's Dynastic Cycle over 4
     - recording: h1_duelw1117
       turn: 6
       value: "runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of Laws carries none);"
@@ -167,12 +175,16 @@
   readings: ["H-1: the random boost and free research pickers — READ"]
   context:
     - "...Boosts row), t30: 6 then 5 civics (Code of Laws carries none); 1118 t10, t25, t29 alike. 0x4caa50 (civics 0x39c930), the same over the eras lo..hi, era by era, labelled \"..., Player: n\":..."
-  review: imported
+  review: reviewed
 - addr: 0x4caeb0
   final: 0x334a00
   kind: function
+  semantics: "\"Choosing random tech to grant based on era\": ONE pool of the rows researchable before the grants (0x4c8c40), each draw erasing its pick — a row the first grant opens is not offered (Oxford, the Bolshoi, a Great Person's free tech)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 226
+      value: two draws
     - recording: h1_duelw1117
       turn: 6
       value: "runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of Laws carries none);"
@@ -194,19 +206,21 @@
   readings: ["H-1: the random boost and free research pickers — READ"]
   context:
     - "...OSTLESS`, `boostPool`, `earliestBoostEra`, `drawBoosts` / `_boost_pool`, `_draw_boosts`). 0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bols..."
-  review: imported
+  review: reviewed
 - addr: 0x4cb290
   final: 0x334c60
   kind: function
+  semantics: the technology is boosted.
   status: PARTLY
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Trigger Tech / Civic Boost (0x84d630, 0x84cb90): neither held nor boosted (0x4cb290 / 0x39d190), with a boost, of the actor's era; the pickers over them in the tables' o..."
-  review: imported
+  review: reviewed
 - addr: 0x4cb2f0
   final: 0x334cc0
   kind: function
+  semantics: the player holds the technology.
   status: READ
   cases:
     - recording: 1117
@@ -228,7 +242,7 @@
   context:
     - ...PrereqTech (+0x60, the player's techs 0x39d1f0) and its second link (+0x68, the civics 0x4cb2f0) held; source 6 (Appeal) reads the plot's appeal (vcall +0x28); any other source the...
     - "...ivilizationLevel is FULL_CIV (0x469db0, hash 0x253718b0) and the receiver lacks the item (0x4cb2f0 / 0x39d1f0) and is neither FULL_CIV nor TRIBE (0x469ce0, 0xd959ec24) — a city-state or th..."
-  review: imported
+  review: reviewed
 - addr: 0x4cb4d0
   final: 0x334ea0
   kind: function
@@ -257,8 +271,12 @@
 - addr: 0x4cb930
   final: 0x3352c0
   kind: function
+  semantics: "a minor's tech catch-up, from the handler 0x427bf0 every player's object runs when a player gains an item (player, item): where the gainer is FULL_CIV (0x469db0) and the receiver lacks the item (0x4cb2f0) and is neither FULL_CIV nor TRIBE (0x469ce0) — a city-state or the Free Cities — it counts the players of the game's list +0xb50 holding the item, and where at least max(1, (len + 1) x 50 / 100) do (the immediate 0x32), SETS the receiver's progress on the item to its cost less one ((cost << 8) - 0x100 through 0x4cc950), at the cost of the moment; a major's progress is not touched."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 4
+      value: Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10
     - recording: h1_duelw1121
       turn: 4
       value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
@@ -278,10 +296,11 @@
     - "C-60: the Free Cities' research — READ (the catch-up's receivers), ported"
   context:
     - 0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every play...
-  review: imported
+  review: reviewed
 - addr: 0x4cc950
   final: 0x335c20
   kind: function
+  semantics: sets the player's progress on a technology.
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -296,13 +315,15 @@
   readings: ["H-1: a minor's research catch-up — READ"]
   context:
     - "...ets the receiver's progress on the item to its cost less one ((cost << 8) - 0x100 through 0x4cc950 / 0x3a1fb0), the item in hand or another. Records: runs/h1_duelw1121 Rome's Code of Laws..."
-  review: imported
+  review: reviewed
 - addr: 0x4cd900
   final: 0x336940
   kind: function
-  semantics: "a tech boost lands: B = floor(Boost x cost / 100), q = (B << 16) / (cost << 8) x 100 + m_iModifiedBoost (+0xf8); amount = cost x q / 100, fraction dropped; min(cost - progress, amount) added to that tech's progress, completing it at the cost. The cost is never cut."
+  semantics: "a tech boost lands: B = floor(Boost x cost / 100), q = (B << 16) / (cost << 8) x 100 + m_iModifiedBoost (+0xf8); amount = cost x q / 100, fraction dropped; min(cost - progress, amount) added to that tech's progress, completing it at the cost. The cost is never cut. A tech boost's trigger (\"LOC_NOTIFICATION_TECH_BOOST_MESSAGE\"): past its already held / already boosted gates (0x39d190 / 0x39d1f0), marks m_abBoostTriggered, finds the item's Boosts row (0x3990d0) and, in 24.8: B = 0x161d60 = floor(Boost x cost / 100); the share q = (B << 16) / (cost << 8) (0x16e940), times 100 (0x16e7d0); plus the player's m_iModifiedBoost (+0xf8, << 8); the amount (cost << 8) x that / 25600, its fraction dropped; min(cost - progress, amount) added to THAT item's progress (0x393670 -> 0x3a1fb0), current or not; the cost is never cut."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      value: "dll_boost.py: 29 of 32 current-item boosts land exactly (Rome Astrology 25 -> 9, Writing 40 -> 15)"
     - recording: dll_boost
       turn: 0
       value: 29 / 32 current-item boosts exact (Rome Astrology 25 -> 9)

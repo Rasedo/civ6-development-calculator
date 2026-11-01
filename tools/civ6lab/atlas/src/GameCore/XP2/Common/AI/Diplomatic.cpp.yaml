@@ -6,12 +6,13 @@
 - addr: 0x64a560
   final: 0x42d1c0
   kind: function
+  semantics: a war value CanGoToWar asks at 0 or more.
   status: PARTLY
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   context:
     - ..., the military AI's war operation against p (0x723cf0), the Formal War not disfavoured, 0x64a560 at 0 or more, CanDeclareWarOn(0x73b8c966). CanOfferAlliance (0x67ca30) the friendship...
-  review: imported
+  review: reviewed
 - addr: 0x64ba90
   kind: function
   name: the diplomatic sender's pick
@@ -54,6 +55,7 @@
 - addr: 0x650270
   final: 0x431150
   kind: function
+  semantics: "the diplomatic AI's vt+0x18: the met major's entry (+0x630 its rank term for the focus)."
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
@@ -61,7 +63,7 @@
     - ".claude/scratchpad/dp2/readings_dp2.md: ...the records), the focus player +0x6780 (0x647bb0: the met   major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency   0x2a81f0 against GlobalParameters +0x268), the trust +0x6480 writer and   +..."
   context:
     - "...ds), the focus player +0x6780 (0x647bb0: the met major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency 0x2a81f0 against GlobalParameters +0x268), the trust +0x6480 writ..."
-  review: imported
+  review: reviewed
 - addr: 0x650460
   kind: function
   name: notReady
@@ -85,6 +87,7 @@
   review: reviewed
 - addr: 0x6504f0
   kind: function
+  semantics: the getter of the worth term +0x6320[p][a] (the object +0x62c8).
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
@@ -94,7 +97,7 @@
     - ".claude/scratchpad/dp2/readings_dp2.md: ...orth >= 0 and drops a   positive gold value) or else p's (+0x62b0); the worth adds +0x6320[p][a]   (0x6504f0). No other instruction of the DLL names +0x6320 than its getter   and the save's serializer: its wr..."
   context:
     - ...and drops a positive gold value) or else p's (+0x62b0); the worth adds +0x6320[p][a] (0x6504f0). No other instruction of the DLL names +0x6320 than its getter and the save's serializ...
-  review: imported
+  review: reviewed
 - addr: 0x650550
   final: 0x431430
   kind: function
@@ -174,6 +177,7 @@
 - addr: 0x652800
   final: 0x433590
   kind: function
+  semantics: "AI_Diplomacy.csv's action rows: per action and player \", %3.1f:%3.1f\" = 0x66cc40 (the evaluation record's +0x48, the desire) and 0x66b490 (+0x68, the cost) of the record m_diploActionEvaluator[p] (+0x2eb8, stride 0x88); 0.0:0.0 on an attempt turn (the record reset by the perform)."
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
@@ -181,12 +185,12 @@
     - ".claude/scratchpad/dp2/readings_dp2.md: ...Diplomacy.csv's action rows, DiplomacyManager.csv, DiplomacySummary.csv).  - THE LOG'S ACTION ROWS (0x652800): per action and player, \", %3.1f:%3.1f\"   is FIRST 0x66cc40 (the evaluation record's +0x48 vector,..."
   context:
     - "- THE LOG'S ACTION ROWS (0x652800): per action and player, \", %3.1f:%3.1f\" is FIRST 0x66cc40 (the evaluation record's +0x..."
-  review: imported
+  review: reviewed
 - addr: 0x652bb0
   final: 0x433820
   kind: function
   name: logDiplomacy
-  semantics: "AI_Diplomacy.csv's state and 'Threat and Trust' rows: ', %3.2f:%d:%3.2f' = threat +0x6480[p], rank 0x650550, +0x6560[p]."
+  semantics: "AI_Diplomacy.csv's state and 'Threat and Trust' rows: ', %3.2f:%d:%3.2f' = threat +0x6480[p], rank 0x650550, +0x6560[p]. AI_Diplomacy.csv's writer: per player and per player it has met, in player order, \"opinion:state\" from the diplomacy object's +0x330 (the opinion, 24.8 fixed point, the log's number the sum >> 8) / +0x2f58 (the state)."
   status: READ
   cases:
     - recording: h1_duelv1127
@@ -206,6 +210,9 @@
   cases:
     - recording: h1_duelv1127
       turn: 99
+      value: "the deal Qin proposed and Rome accepted: Qin's trust of Rome 2.00 in its t99 row, Rome's of Qin at t100; a mission adds none"
+    - recording: h1_duelv1127
+      turn: 99
       value: "the deal accepted at t99: Qin's trust of Rome 2.00 at t99, Rome's of Qin at t100; the Delegation accepted at t79 adds none"
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
@@ -221,28 +228,33 @@
 - addr: 0x653840
   final: 0x4343a0
   kind: function
+  semantics: "an emergency signal's handler: -150 to the state worth's +0x6320[p][Propose Trade]."
   status: PARTLY
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   context:
     - "...: written for Propose Trade alone — +AI_TRADE_VALUE_FOR_AID (150, 0x653b80) and -150 (0x653840) on the emergencies' signals. A favoured action reads it 0; the stateWorth clips a favo..."
-  review: imported
+  review: reviewed
 - addr: 0x653b80
   final: 0x434680
   kind: function
+  semantics: "an emergency signal's handler: +AI_TRADE_VALUE_FOR_AID (150) to the state worth's +0x6320[p][Propose Trade]."
   status: PARTLY
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   context:
     - "...0; the object +0x62c8): written for Propose Trade alone — +AI_TRADE_VALUE_FOR_AID (150, 0x653b80) and -150 (0x653840) on the emergencies' signals. A favoured action reads it 0; the s..."
-  review: imported
+  review: reviewed
 - addr: 0x653f60
   final: 0x434a70
   kind: function
   name: answerAction
-  semantics: "An AI receiver's answer to an incoming diplomatic action: refused when its state toward the sender lists no row for the action; else the incoming record's cost 0x66b490 above 0 refuses, at or below 0 accepts."
+  semantics: "An AI receiver's answer to an incoming diplomatic action: refused when its state toward the sender lists no row for the action; else the incoming record's cost 0x66b490 above 0 refuses, at or below 0 accepts. The answer is accepted exactly where the value 0x66b490 of the receiver's incoming record (+0xca8[sender]) is <= 0; an action outside its state's lists toward the sender refuses."
   status: PARTLY
   cases:
+    - recording: h1_duelv1127
+      turn: 79
+      value: the Delegation refused 61, 68 (Cost 75 / 100 Unfriendly), accepted 79 (20 / 20 answers of the five verbose duels)
     - recording: h1_duelv1127
       value: "Confirmed on every answer   of the five verbose duels (20 / 20): accepted exactly where the   receiver's own logged cost of the action toward the sender is <= 0 —   every refusal in Unfriendly (Cost 7"
   readings:

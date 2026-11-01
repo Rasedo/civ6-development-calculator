@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x7a630
   kind: function
+  semantics: "the A* search (with no heuristic: Dijkstra) over the instance's callbacks."
   status: READ
   cases:
     - recording: h1_duelw1128
@@ -13,4 +14,4 @@
   readings: ["C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
   context:
     - "...+0x4b8 is clear, 0x2000 for a unit +0x738 above 1 holding 0x2669d0 2 or 4; then the A* 0x7a630 over the callbacks 0x26f330 sets: the validity 0x2720a0, the cost 0x26e920), its turns..."
-  review: imported
+  review: reviewed

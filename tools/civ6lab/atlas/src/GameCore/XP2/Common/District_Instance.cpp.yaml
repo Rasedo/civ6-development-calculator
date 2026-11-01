@@ -7,7 +7,7 @@
   final: 0x1905f0
   kind: function
   name: District::GetYield
-  semantics: "District::GetYield: none where the district's +0xc88 is set; the adjacency at its plot +0x218 (0x366df0), plus 0x24acc0 and 0x249db0 of the yield, x (100 + 0x249940) / 100."
+  semantics: "District::GetYield: none where the district's +0xc88 is set; the adjacency at its plot +0x218 (0x366df0), plus 0x24acc0 and 0x249db0 of the yield, x (100 + 0x249940) / 100. (yield, percent flag): else 0x366df0's adjacency + the district's flat yield bucket (+0x2f0) + its appeal rows (+0x458: yield, minimum appeal, amount); the percent only when asked."
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -71,9 +71,12 @@
 - addr: 0x249ee0
   final: 0x190be0
   kind: function
-  semantics: the city centre's ranged strike strength.
+  semantics: the city centre's ranged strike strength. Max(+0x150, m_iMaxRangedStrengthTrained 0x4bd030, COMBAT_MINIMUM_CITY_STRIKE_STRENGTH 3) plus the city's district attack bonus (+0x1890).
   status: READ
   cases:
+    - recording: h1_duelw1120
+      turn: 50
+      value: China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 later; a city-state with no ranged unit at 3 (t217-219)
     - recording: 1120
       turn: 50
       value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
@@ -213,8 +216,12 @@
 - addr: 0x24ae80
   final: 0x191680
   kind: function
+  semantics: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. A district's GetDefenseStrength (24.8); with r8b set 0x24a180 skips the garrison term.
   status: READ
   cases:
+    - recording: h1_duelw1127
+      turn: 96
+      value: "Rome: a Warrior completed in the start window garrisons the centre (26 with no unit on the centre in the record)"
     - recording: 1127
       turn: 96
       value: "The record's unit list stands before the in-turn   player's start while the plot reads the gamecore's: a military unit that   start's production completed already garrisons the centre (1127 Rome t96, "
@@ -242,20 +249,22 @@
   context:
     - "- A district's GetDefenseStrength (Lua 0x98ca00 -> 0x24ae80) is computed live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's..."
     - "...he plots within its range. Each such city whose centre the player sees: its strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach (0x249e40) or, with none, 1 on eac..."
-  review: imported
+  review: reviewed
 - addr: 0x24af90
   final: 0x191750
   kind: function
+  semantics: "the district's building to pillage: nothing on a pillaged district or an InternalOnly one (Districts +0xe1 bit 4); otherwise over the city's buildings in that district not yet pillaged, the first with a strictly greater Buildings.Cost (+0x24)."
   status: PARTLY
   impl: [cpu/core/disasters.ts:pillageTileBuildings, gpu/core/sim_economy.py:_pillage_tile_buildings]
   readings: ["C-74: BUILDING_PILLAGED's building — CLOSED"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "The applier 0x33a780 (owned plot, the district's city) asks the district's chooser 0x24af90: nothing on a pillaged district or an InternalOnly one (Districts +0xe1 bit 4: the City C..."
-  review: imported
+  review: reviewed
 - addr: 0x24b170
   final: 0x1918e0
   kind: function
+  semantics: takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0) and, with a MilitaryFormation argument (+0x90), compares the unit's formation (+0xc90).
   status: READ
   cases:
     - recording: 1121
@@ -271,7 +280,7 @@
   readings: ["H-1: the garrison requirement — READ"]
   context:
     - "...seats a garrison (0x24b820, the districts with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ra..."
-  review: imported
+  review: reviewed
 - addr: 0x24b290
   final: 0x1919b0
   kind: function
@@ -288,6 +297,7 @@
 - addr: 0x24b4b0
   final: 0x191b50
   kind: function
+  semantics: a district's owner.
   status: READ
   cases:
     - recording: 1128
@@ -296,7 +306,7 @@
   readings: ["H-1: a pillaged building's specialist, the centre's defence, three moments — READ"]
   context:
     - "...s the damage pass 0xa2a4d0, whose out parameter is the MITIGATING player — the owner (0x24b4b0) of the first complete (+0xb08), unpillaged (0x24c3a0) Dam on the river's plot list, el..."
-  review: imported
+  review: reviewed
 - addr: 0x24b5a0
   final: 0x191c00
   kind: function
@@ -323,6 +333,7 @@
 - addr: 0x24b820
   final: 0x191e10
   kind: function
+  semantics: "the district seats a garrison (the districts with HitPoints: the centre and the Encampment)."
   status: READ
   cases:
     - recording: 1121
@@ -337,7 +348,7 @@
   readings: ["H-1: the garrison requirement — READ"]
   context:
     - "...ON_ UNIT, 0xbbb1a0) walks the city's districts (+0x1a48); for each that seats a garrison (0x24b820, the districts with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's b..."
-  review: imported
+  review: reviewed
 - addr: 0x24b960
   final: 0x191f10
   kind: function

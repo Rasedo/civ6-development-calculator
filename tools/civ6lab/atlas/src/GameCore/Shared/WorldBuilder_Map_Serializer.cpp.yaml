@@ -6,10 +6,11 @@
 - addr: 0x8cf720
   final: 0x60ff40
   kind: function
+  semantics: the save's PlotRoutes RouteEra (plot +0x48).
   status: PARTLY
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...0x47) and its route era (+0x48, PlotRoutes RouteType / RouteEra in the save, 0x8d14a0 / 0x8cf720); the bridge flag +0x4d bit 4 is copied from the route's SupportsBridges at placement...
-  review: imported
+  review: reviewed

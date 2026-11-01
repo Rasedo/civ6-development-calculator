@@ -6,6 +6,7 @@
 - addr: 0x427bf0
   final: 0x2d7de0
   kind: function
+  semantics: the player-gains-an-item handler every player's object runs (-> the catch-ups 0x4cb930 / 0x39ec60). The civic's hook into the random agenda draw (with 0x31f7f0) at Nationalism.
   status: READ
   cases:
     - recording: h1_duelw1121
@@ -25,4 +26,4 @@
   context:
     - "0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every player's object runs when a player gains an item (`player`, `item`): where the..."
     - "- The agendas (Game_Initializer 0x31d3c0; the civic's 0x31f7f0 / 0x427bf0): each major's HistoricalAgendas, then RandomAgendasInEra's Ancient draw at set-up, t..."
-  review: imported
+  review: reviewed

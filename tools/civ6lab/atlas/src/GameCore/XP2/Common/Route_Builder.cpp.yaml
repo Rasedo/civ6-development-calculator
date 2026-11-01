@@ -6,16 +6,18 @@
 - addr: 0x511700
   final: 0x360320
   kind: function
+  semantics: a route is valid on the plot.
   status: PARTLY
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...player on a plot (0x512120): the route of the highest PlacementValue valid on the plot (0x511700) whose PlacementRequiresOwnedTile is met, whose PrereqEra the player's era (GetEra 0x..."
-  review: imported
+  review: reviewed
 - addr: 0x512120
   final: 0x360920
   kind: function
+  semantics: "the best route for a player on a plot: the route of the highest PlacementValue valid on the plot (0x511700) whose PlacementRequiresOwnedTile is met, whose PrereqEra the player's era (0x467eb0, 0x93e9e0) has reached, whose Routes_XP2 PrereqTech it holds, BuildOnlyWithUnit ones only with a unit; then the plot owner's +0x12e0 count (0x6fe50) raises the value by that many rungs."
   status: PARTLY
   impl: [cpu/core/eras.ts:bestRoadTier]
   readings:
@@ -24,20 +26,22 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The best route for a player on a plot (0x512120): the route of the highest PlacementValue valid on the plot (0x511700) whose Placemen..."
-  review: imported
+  review: reviewed
 - addr: 0x512610
   final: 0x360d30
   kind: function
+  semantics: the route placement between cities (-> 0x554340).
   status: PARTLY
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- A trade route's road (0x554340, from the route placement between cities 0x512610): each path plot takes the route's player's best route where it differs or is pillaged."
-  review: imported
+  review: reviewed
 - addr: 0x513120
   final: 0x361670
   kind: function
+  semantics: "Route_Builder's place: the route type (+0x47), the era from the route's PrereqEra (+0x48), the bridge flag +0x4d bit 4 copied from its SupportsBridges."
   status: PARTLY
   impl: [cpu/core/eras.ts:layRoad]
   readings:
@@ -45,12 +49,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the bridge flag +0x4d bit 4 is copied from the route's SupportsBridges at placement (0x513120: Route_Builder's place; the era written from the route's PrereqEra)."
-  review: imported
+  review: reviewed
 - addr: 0x5134c0
   final: 0x3619b0
   kind: function
+  semantics: "the roads' upgrade (only from Player_Trade's era handler 0x4d9a70, LOC_NOTIFICATION_ROADS_UPGRADED): when a player's era becomes one some Routes.PrereqEra names, every plot it owns (+0x1c) carrying a route takes the player's best route where it differs, a pillaged one staying pillaged."
   status: PARTLY
   cases:
+    - recording: h1_duely1128
+      turn: 146
+      value: "China's era Industrial at its t145 start: its 18 owned road plots Industrial in record 146"
     - recording: h1_duely1128
       turn: 156
       value: "Hong Kong's Industrial era at its research step: its new Builder 2621440 from 9:7 to 9:9 on Industrial roads (0.75) with 0.25 Movement left lays the Farm there that turn (record t157 roads Industrial)"

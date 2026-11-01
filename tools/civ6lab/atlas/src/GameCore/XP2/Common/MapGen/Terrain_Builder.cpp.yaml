@@ -7,6 +7,7 @@
   final: 0x5dce20
   kind: function
   name: Terrain_Builder
+  semantics: Terrain_Builder's SetFeatureType (-> 0xa1e370 for FEATURE_VOLCANO).
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -28,4 +29,4 @@
   context:
     - "...) — no district, city-centre or wonder gate (the feature goes on through the raw setter 0x896c40; the records' city centres gained the rows' yields and all 105 district plots in the..."
     - "...ano's feature: TerrainGenerator.lua's SetFeatureType (FEATURE_VOLCANO) -> Terrain_Builder 0x896c40 -> 0xa1e370 -> 0xa19360 appends an entry (a natural wonder's volcano goes to its own list..."
-  review: imported
+  review: reviewed

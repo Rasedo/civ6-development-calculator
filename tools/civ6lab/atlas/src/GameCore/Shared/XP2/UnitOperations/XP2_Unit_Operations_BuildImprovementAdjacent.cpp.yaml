@@ -6,6 +6,7 @@
 - addr: 0xa4e7a0
   final: 0x74a680
   kind: function
+  semantics: "an improvement laid: runs the full citizen reassign 0x196320."
   status: READ
   cases:
     - recording: 1121
@@ -17,4 +18,4 @@
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
   context:
     - "...favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy annex re-places before its growth (1121 Hunza t41: 2..."
-  review: imported
+  review: reviewed

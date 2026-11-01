@@ -32,6 +32,7 @@
 - addr: 0x449cc0
   final: 0x2e9200
   kind: function
+  semantics: "the player receives Influence (a minor: a quest's client)."
   status: PARTLY
   readings:
     - "H-1: the city-states' quests — READ"
@@ -39,15 +40,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ient != actor, both alive (+0x728), the client a minor and the actor a major (Influence 0x449cc0 / 0x449940), the client has met the actor (0x3daaf0) and is not at war with it (0x3dc...
-  review: imported
+  review: reviewed
 - addr: 0x44a040
   final: 0x2e94c0
   kind: function
+  semantics: an envoy setter (-> the suzerain update 0x451b20).
   status: PARTLY
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - "- A suzerain CHANGE (Player_Influence 0x451b20, reached from the envoy setters 0x44a040 / 0x450fb0 / 0x451460; old != new or it returns) takes the city-state's owned resources..."
-  review: imported
+  review: reviewed
 - addr: 0x44a440
   kind: function
   semantics: the player's envoys placed.
@@ -72,7 +74,7 @@
   review: reviewed
 - addr: 0x44c4b0
   kind: function
-  semantics: "GetMostTokensReceived: over the player list (+0x4a0), the greatest of the store +0x5d0[p] plus 0x44caa0(p) (a posted governor's share), 0 with none — the city centre's envoy term (0x24a180)."
+  semantics: "GetMostTokensReceived: over the player list (+0x4a0), the greatest of the store +0x5d0[p] plus 0x44caa0(p) (a posted governor's share), 0 with none — the city centre's envoy term (0x24a180). The envoys a city-state holds (every giver)."
   status: READ
   cases:
     - recording: 1128
@@ -170,8 +172,12 @@
   final: 0x2eb040
   kind: function
   name: Player_Influence
+  semantics: "Player_Influence: the minor's levy counter (m_iLevyTurnCounter +0xc90) +1 at its own turn start, then against 0x5254d0(LEVY_MILITARY_TURN_DURATION, GP +0x450 = 30) — 15 online — and at it the levied units go home (0x4502b0)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 42
+      value: the t28 levy came home 14 turns on (1121 t42 -> t56)
     - recording: h1_duelw1117
       value: "The counter ticks at the minor's own turn   starts, the first the one after the levy in the same game turn: every   recorded levy that ran its term came home 14 turns on (   runs/h1_duelw1117-1131, th"
     - recording: 1117
@@ -181,7 +187,7 @@
   readings: ["H-1: the levy's term — READ"]
   context:
     - "- Player_Influence 0x44da30 (the minor's levy counter, m_iLevyTurnCounter +0xc90): +1, then against 0x5254d0(LEVY_M..."
-  review: imported
+  review: reviewed
 - addr: 0x44eaa0
   final: 0x2ebbb0
   kind: function
@@ -195,6 +201,7 @@
 - addr: 0x44eff0
   final: 0x2ebe60
   kind: function
+  semantics: "the signal handler that re-hands a city-state's resource copies to its recipients (Player_Influence: the luxury and strategic recipient counts +0x8a0 / +0x918 per player) -> ChangeResourceAmount. A city-state's owned-resource change passes to its suzerain — an accumulated resource as owned (+n to the suzerain, -n to the city-state), any other as an import — each a 0x4a7560 on the suzerain: a city-state's strategic accumulation re-ranks its suzerain at the city-state's turn."
   status: READ
   cases:
     - recording: 1121
@@ -209,9 +216,10 @@
     - ...ict and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource skips it), the copies 0x44eff0 hands a resource's recipients, the power ledger 0x4a7cc0.
     - "...y-state's own resource change re-hands its copies to its recipients (the signal handler 0x44eff0, Player_Influence.cpp: the luxury and strategic recipient counts +0x8a0 / +0x918 per pl..."
     - ...ke its turn between the founding and the record; 10 of the 16 that read none did too. 0x44eff0 (Player_Influence, a signal on 0x4a7560) passes a city-state's owned-resource change to...
-  review: imported
+  review: reviewed
 - addr: 0x4501c0
   kind: function
+  semantics: resets the levy counter at the levy.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -222,10 +230,11 @@
   readings: ["H-1: the levy's term — READ"]
   context:
     - "...online, not GameSpeed_Durations' 21 — and at it the levied units go home (0x4502b0); 0x4501c0 resets it at the levy. The counter ticks at the minor's own turn starts, the first the..."
-  review: imported
+  review: reviewed
 - addr: 0x4502b0
   final: 0x2ed1b0
   kind: function
+  semantics: the levied units go home.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -236,28 +245,30 @@
   readings: ["H-1: the levy's term — READ"]
   context:
     - "...ultiplier, 15 online, not GameSpeed_Durations' 21 — and at it the levied units go home (0x4502b0); 0x4501c0 resets it at the levy. The counter ticks at the minor's own turn starts, t..."
-  review: imported
+  review: reviewed
 - addr: 0x450fb0
   final: 0x2ed850
   kind: function
+  semantics: an envoy setter (-> the suzerain update 0x451b20).
   status: PARTLY
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - ...A suzerain CHANGE (Player_Influence 0x451b20, reached from the envoy setters 0x44a040 / 0x450fb0 / 0x451460; old != new or it returns) takes the city-state's owned resources off the ol...
-  review: imported
+  review: reviewed
 - addr: 0x451460
   final: 0x2edbd0
   kind: function
+  semantics: an envoy setter (-> the suzerain update 0x451b20).
   status: PARTLY
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - ...CHANGE (Player_Influence 0x451b20, reached from the envoy setters 0x44a040 / 0x450fb0 / 0x451460; old != new or it returns) takes the city-state's owned resources off the old suzerain...
-  review: imported
+  review: reviewed
 - addr: 0x451b20
   final: 0x2edf10
   kind: function
   name: Player_Influence
-  semantics: "the suzerain's update (\"Attempting to update the suzerain\"): a major sees what each city-state it is suzerain of sees (0x508330)."
+  semantics: "the suzerain's update (\"Attempting to update the suzerain\"): a major sees what each city-state it is suzerain of sees (0x508330). A suzerain CHANGE (old != new or it returns) takes the city-state's owned resources off the old suzerain (0x4a91a0) and hands them to the new (0x4a6d90 -> 0x4a7560): a rebuild for the new one."
   status: PARTLY
   impl: [cpu/core/barbarians.ts:plotsSeenNow]
   readings:

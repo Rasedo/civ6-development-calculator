@@ -17,6 +17,7 @@
   final: 0x11b000
   kind: function
   name: AnnexPlots
+  semantics: "AnnexPlots: a picker draw per plot (0x1ab1c0); callers the wonder (0x17f870), the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1abe90."
   status: READ
   cases:
     - recording: 1108
@@ -45,13 +46,17 @@
     - "...rs: the culture turn (0x1a9bc0, which then draws and stores a fresh plot), AnnexPlots(n) (0x1a8a30: n picker draws, each annexed), the plot swap (0x1ac910), the culture bombs (0x524e30), t..."
     - ...ONDER_FREE_TILES_UPON_COMPLETION (2) plots (0x17f870, building info +0x158 bit 0x40, -> 0x1a8a30), one picker draw each, before the wonder's own grants (China's Dynastic Cycle boost, O...
     - "...7f0: unowned plots, byte +0x1c 0xff). Its three callers are the border turn's two and 0x1a8a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1..."
-  review: imported
+  review: reviewed
 - addr: 0x1a8b70
   final: 0x11b100
   kind: function
   name: AnnexPlot
+  semantics: "AnnexPlot: clears the city's stored next plot (+0x1c = -1) and counts no culture claim. Raises the annexed count (+0xc) and runs the full citizen reassign 0x196320 on the gaining city (0x1a8f4c) and on a losing one (0x1a903c). Callers: the border turn 0x1a9bc0, AnnexPlots 0x1a8a30, the purchase 0x1a7710, a culture bomb 0x524e30."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 41
+      value: "Hunza: 229 annexed, the growth on surplus 3 where the record's set read 4"
     - recording: 1108
       turn: 159
       value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
@@ -79,12 +84,16 @@
     - "0x1a8b70 annexes one plot to a city (City_Culture.cpp): it writes the city culture's stored next p..."
     - "...(China's Dynastic Cycle boost, Oxford's techs: runs/h1_duelw1117 t44, t226); the annex 0x1a8b70 clears the city's stored next plot (+0x1c = -1) and counts no culture claim (+0x10 is t..."
     - "- AnnexPlot 0x1a8b70 (the border turn 0x1a9bc0's claim, AnnexPlots 0x1a8a30 — a wonder's free tiles, a found..."
-  review: imported
+  review: reviewed
 - addr: 0x1a9bc0
   final: 0x11bcb0
   kind: function
+  semantics: "the city's border turn: taking a plot draws afresh (0x1ab1c0) when the stored plot (+0x1c) is -1 or owned (0x1a9e74), then every turn the closing pick; +0x10 its culture claim count. Banks the city's culture c (1/256 raw, 0x1ab060) scaled by the border percent [+0x14] when not 0: ((c x ((pct + 100) << 8)) >> 8) / (100 << 8), the shift and the divide (0x16e940) each truncating (0x1a9d25..0x1a9e16)."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 40
+      value: "Taiyuan: 153/256 a turn banking 175/256 at +15% (t40-45)"
     - recording: 1108
       turn: 159
       value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
@@ -108,10 +117,11 @@
     - "...is non-empty. BASE_MULTIPLIER and DISTANCE_DIVISOR are not read here. The turn's handler 0x1a9bc0 (City_Culture.cpp) banks culture × (100 + percent) / 100 when the civ level annexes with..."
     - "...stored next plot (+0x1c) to -1 and counts the plot (+0xc). Its callers: the culture turn (0x1a9bc0, which then draws and stores a fresh plot), AnnexPlots(n) (0x1a8a30: n picker draws, each..."
     - "...xt-plot tie list is not empty (\"GetNextBuyablePlot picker\", 0x1ab1c0 from the border turn 0x1a9bc0; turn_order_civ6.md A8): on runs/h1_duelw1116 player 0's starts take exactly its city cou..."
-  review: imported
+  review: reviewed
 - addr: 0x1a9f10
   final: 0x11be40
   kind: function
+  semantics: a founding's annex (-> 0x1a8a30).
   status: PARTLY
   cases:
     - recording: 1115
@@ -121,7 +131,7 @@
   readings: ["H-1: every draw of a player's start (witnesses, RandCalls.csv)"]
   context:
     - ...ff). Its three callers are the border turn's two and 0x1a8a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1abe90); no jump or pointer reaches...
-  review: imported
+  review: reviewed
 - addr: 0x1aa7f0
   final: 0x11bf20
   kind: function
@@ -149,6 +159,7 @@
 - addr: 0x1ab060
   final: 0x11c5d0
   kind: function
+  semantics: the city's culture toward its border (1/256 raw).
   status: READ
   cases:
     - recording: 1121
@@ -157,12 +168,15 @@
   readings: ["H-1: the border bank in fixed point — READ"]
   context:
     - "- The border turn 0x1a9bc0 banks the city's culture c (1/256 raw, 0x1ab060) scaled by the border percent [+0x14] when not 0: ((c x ((pct + 100) << 8)) >> 8) / (..."
-  review: imported
+  review: reviewed
 - addr: 0x1ab1c0
   final: 0x11c6e0
   kind: function
+  semantics: "GetNextBuyablePlot picker: draws only over a non-empty list (0x1aa7f0); its callers the border turn's two and 0x1a8a30."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      value: the resolved start choices are the game's logged ones on 630 of 631 starts (1117 / 1118)
     - recording: h1_duelw1116
       value: "turn_order_civ6.md A8): on runs/h1_duelw1116 player 0's starts take exactly its city count 248 of 249 turns, the three city-states theirs 222, 217 and 248 of 249 (the rest one more: a quest's draw aft"
     - recording: h1_duelw1116
@@ -183,7 +197,7 @@
     - "...e more if such a wonder lies within 3 of the centre. The lowest cost collects a tie list; 0x1ab1c0 draws one (\"GetNextBuyablePlot picker\") whenever the list is non-empty. BASE_MULTIPLIER a..."
     - "...e draws once per city whose next-plot tie list is not empty (\"GetNextBuyablePlot picker\", 0x1ab1c0 from the border turn 0x1a9bc0; turn_order_civ6.md A8): on runs/h1_duelw1116 player 0's st..."
     - "- the picker 0x1ab1c0 draws only over a non-empty list (0x1aa7f0: unowned plots, byte +0x1c 0xff). Its three..."
-  review: imported
+  review: reviewed
 - addr: 0x1ab2a0
   final: 0x11c770
   kind: function
@@ -196,6 +210,7 @@
 - addr: 0x1ab460
   final: 0x11c890
   kind: function
+  semantics: StartingTilesForCity's count.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -207,7 +222,7 @@
   readings: ["H-1: the envoy annex — READ (settles the extra border picks)"]
   context:
     - "...holds (0x44c4b0, every giver) and A its annexed count past its starting tiles (+0xc less 0x1ab460, StartingTilesForCity's), E > A annexes E − A plots (AnnexPlots 0x1a8a30, one \"GetNextBuy..."
-  review: imported
+  review: reviewed
 - addr: 0x1ab5f0
   final: 0x11c940
   kind: function
@@ -237,14 +252,16 @@
 - addr: 0x1abe50
   final: 0x11cf80
   kind: function
+  semantics: the city's tourism percent (+0x1ac8).
   status: PARTLY
   readings: ["H-1: a wonder's and an improvement's tourism — PARTLY READ"]
   context:
     - "...0 → +0xc8), else 1 — where the owner's is later; then times the city's tourism percent (0x1abe50 on +0x1ac8) over 100 when not 100 (`wonderTourism`, `WONDER_TOURISM_BASE`)."
-  review: imported
+  review: reviewed
 - addr: 0x1abe90
   final: 0x11cfb0
   kind: function
+  semantics: a unit signal's annex (-> 0x1a8a30).
   status: PARTLY
   cases:
     - recording: 1115
@@ -254,12 +271,16 @@
   readings: ["H-1: every draw of a player's start (witnesses, RandCalls.csv)"]
   context:
     - "...a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1abe90); no jump or pointer reaches any of them. Replayed (`startDraws`, `resolveStart`, the har..."
-  review: imported
+  review: reviewed
 - addr: 0x1abf40
   final: 0x11d010
   kind: function
+  semantics: "the minors' envoy annex (-> 0x1a8a30). A city-state's culture reacting to influence received: where its civilization level CanAnnexTilesWithReceivedInfluence (+0x28 bit 4), with E the envoys it holds (0x44c4b0, every giver) and A its annexed count past its starting tiles (+0xc less 0x1ab460), E > A annexes E - A plots (0x1a8a30, one picker draw each)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: Caguana's two picks for China's two envoys
     - recording: 1115
       value: "Replayed (`startDraws`, `resolveStart`, the harness's `start.draws`): of the witnessed starts, the count lands exactly with no AI choice in it on 1115 81.1%, 1116 81.5%, 1117 80.4%, 1118 82.2% (of the"
     - recording: 1117
@@ -277,10 +298,11 @@
   context:
     - "...r turn's two and 0x1a8a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1abe90); no jump or pointer reaches any of them. Replayed (`startDraws`,..."
     - "0x1abf40, a city-state's culture reacting to influence received: where its civilization level CanA..."
-  review: imported
+  review: reviewed
 - addr: 0x1ac910
   final: 0x11d590
   kind: function
+  semantics: the plot swap (-> AnnexPlot 0x1a8b70).
   status: READ
   cases:
     - recording: 1108
@@ -289,4 +311,4 @@
   readings: ["H-1: the annex, the purchase and the stored next plot — READ"]
   context:
     - "...res a fresh plot), AnnexPlots(n) (0x1a8a30: n picker draws, each annexed), the plot swap (0x1ac910), the culture bombs (0x524e30), the Trader's tiles en route (0x558510) and the Gold purch..."
-  review: imported
+  review: reviewed

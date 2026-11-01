@@ -113,15 +113,18 @@
 - addr: 0x328de0
   final: 0x232460
   kind: function
+  semantics: "a city whose founder holds a CapitalName for it (its first) takes it with no draw; else the civilization's CityNames rows less the names used, the first max (10, unless the row 0x28a940 returns sets +0x1c) kept, weighted n, n - 1, ... 1: ONE draw over n(n + 1) / 2."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      value: 21 of 21 foundings past a capital draw over 55 (1117, 1118)
     - recording: h1_duelw1117
       value: "runs/h1_duelw1117 and 1118:   21 of 21 foundings past a capital draw over 55, each followed by one   picker draw (unread)."
   impl: [cpu/core/game.ts:foundCityAt, cpu/data/constants.ts:CITY_NAME_CHOICES]
   readings: ["H-1: a city's name, a citizen's name — READ"]
   context:
     - "- \"Choosing a City Name\" (0x327c30 -> 0x327a70 -> 0x328de0): a city whose founder holds a CapitalName for it (its first) takes it with no draw;..."
-  review: imported
+  review: reviewed
 - addr: 0x35e320
   kind: function
   semantics: the governor holds the promotion.
@@ -265,13 +268,14 @@
   review: reviewed
 - addr: 0x69f340
   kind: function
+  semantics: COLLECTION_ALL_CITIES' second slot (the knowledge base's cities).
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ValueTerms, cpu/core/aiModifiers.ts:subjects]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "- The collections: COLLECTION_ALL_CITIES 0x69f320 / 0x69f340 walks the player's KNOWLEDGE BASE's cities (player +0x12b8, its entries, setting +0x7..."
-  review: imported
+  review: reviewed
 - addr: 0x6ed060
   kind: function
   name: "GAP lambda: the move"
@@ -288,6 +292,7 @@
 - addr: 0x6f93a0
   final: 0x4b0120
   kind: function
+  semantics: "the settle evaluation's ring callback, per revealed ring plot: one owned by another player is skipped (a city there sets \"enemy\" to the min of 0 and its distance, always 0); at distance 1..CITY_MIN_RANGE every yield (0x82280 -> 0x538a60) into the total, at 1 into the inner ring; a feature within 2 counted; a resource the player sees (0x4ab4b0) counted by its plot's amount, and at distance 1 one the player holds none of (0x4aa790, ownership 0) and not a bonus (0xadd080) is a new resource."
   status: PARTLY
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -295,10 +300,11 @@
     - ".claude/scratchpad/st1/reading.md: ...lots within 2 of the Matterhorn score as without it). - The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots   within 5, 0x6b000): invalid where the player has not revealed the plot or   may no..."
   context:
     - "- The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots within 5, 0x6b000): invalid where the player has not revealed the plot o..."
-  review: imported
+  review: reviewed
 - addr: 0x6f9630
   final: 0x4b03a0
   kind: function
+  semantics: a settle condition evaluator (of the table 0xf2e740).
   status: PARTLY
   cases:
     - recording: AI_SiteEval.csv
@@ -309,10 +315,11 @@
     - ".claude/scratchpad/st1/reading.md: ...d or a value, the   evaluator the table at 0xf2e740 holds for its condition (0x6f3420..   0x6f37b0, 0x6f9630..0x6fa060), each a whole number << 8: Nearest Enemy /   Friendly City and New Resources — with a th..."
   context:
     - "...ue, the evaluator the table at 0xf2e740 holds for its condition (0x6f3420.. 0x6f37b0, 0x6f9630..0x6fa060), each a whole number << 8: Nearest Enemy / Friendly City and New Resources —..."
-  review: imported
+  review: reviewed
 - addr: 0x6fd1d0
   final: 0x4b25d0
   kind: function
+  semantics: "a plot's settle evaluation (ring callback 0x6f93a0 over the plots within 5 via 0x6b000): invalid where the player has not revealed the plot or may not found there (0x1eaa30), or within CITY_MIN_DISTANCE_FOR_INCURSION of a known promise's plot (PROMISE_DONT_SETTLE_NEAR_ME, 0xfadf5055). Then the continent (+0x30), coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min, 0 with none); the danger (0x716a90); the Loyalty pressure (0x19d470 >> 8)."
   status: PARTLY
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -320,7 +327,7 @@
     - ".claude/scratchpad/st1/reading.md: ...ns/h1_duelv1124 t40: the   plots within 2 of the Matterhorn score as without it). - The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots   within 5, 0x6b000): invalid where the player has not r..."
   context:
     - "- The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots within 5, 0x6b000): invalid where the player..."
-  review: imported
+  review: reviewed
 - addr: 0x6fde70
   kind: function
   semantics: "applies the leader's and the civilization's trait lists (AiLists LeaderType one of their traits; a row kept when the player's handicap, player +0x908, is within its MinDifficulty..MaxDifficulty) to the list systems' arrays. A major's DefaultYieldBias (TRAIT_LEADER_MAJOR_CIV): Production +25, Gold +20, Science +10, Culture +10, Faith -25; no city-state trait has a Yields list."
@@ -333,22 +340,24 @@
   review: reviewed
 - addr: 0x6fe240
   kind: function
+  semantics: the regions across a region's chokepoints (the secondary list).
   status: PARTLY
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...dd70, through 0x6fa5e0), the secondary the regions across those regions' chokepoints (0x6fe240 / 0x6febc0) not already primary — a player with no city holds neither. The tertiary: th..."
-  review: imported
+  review: reviewed
 - addr: 0x6febc0
   kind: function
+  semantics: the regions across a region's chokepoints (the secondary list; not already primary).
   status: PARTLY
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ough 0x6fa5e0), the secondary the regions across those regions' chokepoints (0x6fe240 / 0x6febc0) not already primary — a player with no city holds neither. The tertiary: the tactical..."
-  review: imported
+  review: reviewed
 - addr: 0x6fece0
   final: 0x4b39a0
   kind: function
@@ -364,9 +373,12 @@
   final: 0x4b5160
   kind: function
   name: settleRegionLists
-  semantics: a city's settle values (SETTLEMENT_ADDITIONAL_VALUE_PER_CITY x cities + SETTLEMENT_MIN_VALUE_NEEDED), and the region of its plot and, that plot in a region, of each of its 37 city plots to the primary region list (0x6fa5e0)
+  semantics: "a city's settle values (SETTLEMENT_ADDITIONAL_VALUE_PER_CITY x cities + SETTLEMENT_MIN_VALUE_NEEDED), and the region of its plot and, that plot in a region, of each of its 37 city plots to the primary region list (0x6fa5e0) The primary region list: the region of a city's plot and, where that plot has a region (plot +0x18), the region of each of its city plots 0..36 (from the city analysis 0x5cdd70: the count 0x5cbc0(2) + 18 = 37; each plot through 0x5d1e0 -> 0x5d000, off the map or off any region skipped, one equal to the centre's skipped; each added through 0x6fa5e0) — every region within three of the centre."
   status: READ
   cases:
+    - recording: h1_duelv1128
+      turn: 5
+      value: "Bologna: its two Warriors on region 0, its centre on region 4, Regional Strength 40 as AI_Military.csv logs"
     - recording: h1_duelv1128
       turn: 5
       value: "Bologna's two Warriors on region 0 beside its centre's region 4: Regional Strength 40, Combat Desire 0.0 (AI_Military.csv), its UNITS table as logged"
@@ -469,9 +481,11 @@
 - addr: 0x71fb80
   kind: function
   name: the military AI's regional strengths
-  semantics: "the military AI's turn (a city-state from 0x7204bc). The strengths: the yardstick B = max(1, PlayerUnits +0xf0 (the best melee Combat made), 0x4bd030); per player in the players list (0x483b50 +0x50) the strength summed over the military AI's primary region list (+0x1290 +0x2f0, every region within three of its cities) of the records 0x5eb430 returns (no area; the record's +0x1c, its plot's region, against the region's id; age at most 2), each unit's max(Combat, RangedCombat) where it plus 20 exceeds B; the player itself adds each city's unit at the head of its queue (0x179860) of such strength — Regional (+0x398); a player at war (0x469cd0) or flagged (+0xd18) gives Enemy (+0x3f8) its max and, not a tribe (0x469ce0), raises the floor M (from -0.5, 0xd5fed0) by 0.5 (0xd20458); any other gives Other (+0x458) its max and, flagged at +0xc58, raises M by 0.25 (0xd2f324). The Combat Desire (0x721302; PSEUDOYIELD_UNIT_COMBAT, +0x790): W := 0; Regional below Enemy: (Enemy - Regional) x 0.05 (0xd55ff0); else below the target, the cities (player +0x12f0 +0xc0) times B: (target - Regional) / B, whole; else Regional - 20 above Enemy: where Regional + 60 is below Other, (Other - Regional - 60) x 0.025 (0xd6ced0) capped at 2.0, else (Enemy - max(Other - 60, Regional)) x 0.025 capped at 3.0. W below -M is 0, else at least M; with no war footing (+0x4b8) and no city's CityBuildAI +0x1b8 at or above 0 at most 2.0; plus PSEUDOYIELD_STANDING_ARMY_VALUE (@0xf2e2b4, 0x7a60d0) of the cities' CityBuildAI +0x2d8 summed. Logged as AI_Military.csv Regional / Enemy / Other Strength and Combat Desire. Also PSEUDOYIELD_UNIT_EXPLORER (desired +0x930 - held +0x9f0) - 1.0 and NAVAL_COMBAT (+0x990 - +0xa50) - 1.0 (0x7204c3..0x7205ae); +0x7e8 for UNIT_COMBAT, NAVAL, EXPLORER, NUCLEAR, STANDING_ARMY."
+  semantics: "the military AI's turn (a city-state from 0x7204bc). The strengths: the yardstick B = max(1, PlayerUnits +0xf0 (the best melee Combat made), 0x4bd030); per player in the players list (0x483b50 +0x50) the strength summed over the military AI's primary region list (+0x1290 +0x2f0, every region within three of its cities) of the records 0x5eb430 returns (no area; the record's +0x1c, its plot's region, against the region's id; age at most 2), each unit's max(Combat, RangedCombat) where it plus 20 exceeds B; the player itself adds each city's unit at the head of its queue (0x179860) of such strength — Regional (+0x398); a player at war (0x469cd0) or flagged (+0xd18) gives Enemy (+0x3f8) its max and, not a tribe (0x469ce0), raises the floor M (from -0.5, 0xd5fed0) by 0.5 (0xd20458); any other gives Other (+0x458) its max and, flagged at +0xc58, raises M by 0.25 (0xd2f324). The Combat Desire (0x721302; PSEUDOYIELD_UNIT_COMBAT, +0x790): W := 0; Regional below Enemy: (Enemy - Regional) x 0.05 (0xd55ff0); else below the target, the cities (player +0x12f0 +0xc0) times B: (target - Regional) / B, whole; else Regional - 20 above Enemy: where Regional + 60 is below Other, (Other - Regional - 60) x 0.025 (0xd6ced0) capped at 2.0, else (Enemy - max(Other - 60, Regional)) x 0.025 capped at 3.0. W below -M is 0, else at least M; with no war footing (+0x4b8) and no city's CityBuildAI +0x1b8 at or above 0 at most 2.0; plus PSEUDOYIELD_STANDING_ARMY_VALUE (@0xf2e2b4, 0x7a60d0) of the cities' CityBuildAI +0x2d8 summed. Logged as AI_Military.csv Regional / Enemy / Other Strength and Combat Desire. Also PSEUDOYIELD_UNIT_EXPLORER (desired +0x930 - held +0x9f0) - 1.0 and NAVAL_COMBAT (+0x990 - +0xa50) - 1.0 (0x7204c3..0x7205ae); +0x7e8 for UNIT_COMBAT, NAVAL, EXPLORER, NUCLEAR, STANDING_ARMY. THE FAV TECH (at 0x720676 / 0x721ad4): the tracked \"Fav Tech\" (+0xd30, value +0xd88) set to -1, then over the unit production table ([player+0x1290]+0x268, 0x168-byte entries in the Units' database order, 0x7989e0) — an entry with +0x0e clear (0x798cc2), +0x0a clear (its domain DOMAIN_SEA, 0x798c83), +0x2c (the sum over the players at war with it, 0x469cd0, of the knowledge base's count of each opposing type 0x5eb650 times the efficiency M[opposing][entry], 0x7992b0..0x7994af) above the best so far (0 from 0x7204b1), and the unit's PrereqTech (+0x280) researchable now (0x4c8c40) — the tech set (0x731d10) and its sum the best; NO_TECH where none."
   status: READ
   cases:
+    - recording: h1_duely1127
+      value: 466 of 513 city-state and Free Cities turns' Fav Tech as logged (t1-t130)
     - recording: h1_duelv1124
       turn: 43
       value: "minor 3: 20/30 -> 0.5 + 0.2 = 0.7; t50 20/50 -> 1.7; t56 0/0 -> 1.0 + 0.2"
@@ -516,7 +530,7 @@
   final: 0x4ceb70
   kind: function
   name: the operation candidates (manager +0x328)
-  semantics: "the war gate, per player of the game's list +0x4a0 but the seat: at war (0x469cd0), or flagged in m_prepareForWarWith (+0xbb0 autovariable, data +0xc58) or +0xd18: each allowed definition whose EnemyType is WAR (the +0x178 list, 0x80 each) is a candidate; else allied (0x3da560 / 0x3de4e0): the ALLY ones."
+  semantics: "the war gate, per player of the game's list +0x4a0 but the seat: at war (0x469cd0), or flagged in m_prepareForWarWith (+0xbb0 autovariable, data +0xc58) or +0xd18: each allowed definition whose EnemyType is WAR (the +0x178 list, 0x80 each) is a candidate; else allied (0x3da560 / 0x3de4e0): the ALLY ones. One per running operation (0x747f30 + 0x747fa0: its definition and enemy, its target as the fixed rally +0x40, its teams' strength +0x4b0 as ours +0x48, its id +0x4c); then per other player — a WAR definition where at war (0x469cd0 = diplomacy 0x3dcec0) or flagged (+0xc58 m_prepareForWarWith, +0xd18), an ALLY one where allied (0x3da560, 0x3de4e0); then each allowed definition with EnemyType NONE (one with ActiveEmergency, +0x18, only where the player has that emergency). The allowed list: Leaders.OperationList, else Default_List, AllowedOperations by rowid."
   status: READ
   cases:
     - recording: h1_duelv1117
@@ -561,8 +575,12 @@
 - addr: 0x727510
   final: 0x4d26e0
   kind: function
-  semantics: "the military AI's operations log (AI_Operation.csv \"%s running\" lines): walks its operation list. At 0x7277d0: the manager's CITY VALUES lines: each known city of another player, \"%d, %d, -1, CITY VALUES, %3.1f, %s\"; a turn's evaluation reads what the turn before logged."
+  semantics: "the military AI's operations log (AI_Operation.csv \"%s running\" lines): walks its operation list. At 0x7277d0: the manager's CITY VALUES lines: each known city of another player, \"%d, %d, -1, CITY VALUES, %3.1f, %s\"; a turn's evaluation reads what the turn before logged. Sets the operations' backups at 0x72763d, before the strengths (0x73eb60 / 0x73f7d0 at 0x727c74): a running operation's candidate is named its backup (0x73e610) at the strength the last refresh left (none on the turn after the start). The pick: a running operation's valid candidate sets its backup (0x73e610); of the new ones that start themselves the highest Priority (+0x40), then the larger odds (+0x54), where the running operations of its OperationType are fewer than base + perWar x wars (AiOperationTypes / PerWarOperationTypes lists: TRAIT_LEADER_MAJOR_CIV's, those of the strategies followed); a type of none has no limit. The running lines, the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470)."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1127
+      turn: 23
+      value: at strength 0 both odds below 0 and the farther camp 14:13 reads the higher, the game's backup
   impl:
     - cpu/core/barbarianOps.ts:barbarianTrees
     - cpu/core/barbarianOps.ts:barbarianOpsTurn
@@ -585,9 +603,12 @@
   final: 0x4e67f0
   kind: function
   name: the operation target walk
-  semantics: "the district walk (COMBAT_DISTRICT / PASSIVE): an enemy needed; each known city of the enemy with a valid plot; TargetParameter 0 skips a city whose districts' defenses and walls (0x5eb600) outnumber its districts; the running operation's own target and any active operation's (0x724dd0) skipped; one of the player's cities must list it (CityBuildAI +0x870, 0x78e010); MustHaveNukes asks 0x2d1f20 / 0x2d2090; the value 0x79fef0(fifth MustHaveNukes, sixth 1); the enemy strength — where the player's best combat strength passes the enemy's by more than 30 — the enemy's known units within 3 (0x5eadb0); above MaxTargetDefense (+0x70) skipped."
+  semantics: "the district walk (COMBAT_DISTRICT / PASSIVE): an enemy needed; each known city of the enemy with a valid plot; TargetParameter 0 skips a city whose districts' defenses and walls (0x5eb600) outnumber its districts; the running operation's own target and any active operation's (0x724dd0) skipped; one of the player's cities must list it (CityBuildAI +0x870, 0x78e010); MustHaveNukes asks 0x2d1f20 / 0x2d2090; the value 0x79fef0(fifth MustHaveNukes, sixth 1); the enemy strength — where the player's best combat strength passes the enemy's by more than 30 — the enemy's known units within 3 (0x5eadb0); above MaxTargetDefense (+0x70) skipped. SETTLE — the best region top but the running operation's target, value its score's whole part << 8 (0x6fe2b0); NAVAL_SUPERIORITY — of the player's coastal cities (0x1c77c0) the most populous (+0x588, strictly, the first of equals) whose ring walk within 4 holds a sea plot not a lake (callback @d6e100: 0x834d0, 0x82e80), value 100, enemy strength the largest best combat strength of the game's majors; BARBARIAN_CAMP — each camp of the knowledge base (+0x638), value 50 x the camps known, enemy strength 6 (@d26898), + the barbarians' army within 3 only for an evaluating player not the barbarians with no enemy (0x7476f9..0x747745); FRIENDLY_CITY — the player's own cities (TargetParameter > 0 needs the city AI's +0x1b8 above -1), value 0, enemy strength 0x5eb2c0 x 1.5 per 0x5eb600 > 1 and +0x58 > 1."
   status: READ
   cases:
+    - recording: h1_duelv1124
+      turn: 32
+      value: the Attack Barb Camp start at 6:3 with value 50
     - recording: h1_duelv1117
       turn: 20
       value: Attack Enemy City 442.9 at Caguana, the city value
@@ -610,12 +631,13 @@
   review: reviewed
 - addr: 0x74d320
   kind: function
+  semantics: a religious unit's target (from 0x74ea60's list +0x4a0).
   status: PARTLY
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - ...h boost's unit choice, the religious units' targets (0x74ea60's list +0x4a0, 0x74cf50 / 0x74d320) and moves, the faith purchases.
-  review: imported
+  review: reviewed
 - addr: 0x75d3d0
   kind: function
   semantics: "the research AI's listener on player signal +0x168 (functor vt 0xd6f258 bound in 0x761d30): answers where m_turnsToResearchUnit (+0x388, data +0x3e0) at the unit is not 0; a unit locked by a civic alone never answers."
@@ -632,7 +654,7 @@
   final: 0x4fa9a0
   kind: function
   name: researchChoice
-  semantics: "the research choice (key): the comparator 0x75d530 over the entries; a best row with turns > 0 and a researchable next step: goal := row, research := next; else a goal still unowned stays; else one \"BT Research Choice\" draw over the researchable rows in table order."
+  semantics: "the research choice (key): the comparator 0x75d530 over the entries; a best row with turns > 0 and a researchable next step: goal := row, research := next; else a goal still unowned stays; else one \"BT Research Choice\" draw over the researchable rows in table order. \"BT Research Choice\" at a city-state's start: the AI plan's tech, no draw, else ONE uniform draw over every researchable tech."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -675,12 +697,13 @@
   review: reviewed
 - addr: 0x78f5d0
   kind: function
+  semantics: drops a gone city from the rejected list.
   status: PARTLY
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   context:
     - ...y itself passes; a city no longer standing (0x57960 null) leaves the list (0x78d6d0 / 0x78f5d0); the destination's plot asked of the player (0x2d2220); with the list holding a city a...
-  review: imported
+  review: reviewed
 - addr: 0x7963a0
   final: 0x51ff60
   kind: function
@@ -714,7 +737,12 @@
 - addr: 0x7ec7b0
   final: 0x554b10
   kind: function
+  semantics: "Find Available Unit's update. Upgradeable Units: the tree's units of a desired type or, upgradeable, each whose upgrade passes the visible test (0x58fff0 r8 1) are found; found none, or upgradeable, the evaluator (0x60a8c0, the tree's priority 0x723b90) offers the free units with their turn not done, then those of its unlocked operations of a lower priority, each the test (@d74188) passes joining the tree (0x737e80). None found: FAILURE."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1121
+      turn: 89
+      value: city-state 3's Galley leaves Naval Superiority (priority 2) as Cartography lands
   impl:
     - cpu/core/aiCityTrees.ts:findAvailableUnit
     - cpu/core/operations/nodes.ts:findAvailableUnit
@@ -726,7 +754,7 @@
     - "C-99: the upgrade trees — READ (the trigger, Find Available Unit's upgradeable offer, Find Unit Targets' job, Upgrade Units, the economic AI's upgrade, Move Unit with no Location), ported; the deletion of an excess obsolete unit unported"
   context:
     - "...rength gates over 0x723ab0 — WEAK to the backup, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the f..."
-  review: imported
+  review: reviewed
 - addr: 0x7f4e00
   final: 0x55c550
   kind: function

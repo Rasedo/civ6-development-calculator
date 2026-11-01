@@ -42,7 +42,7 @@
   final: 0x570bf0
   kind: function
   name: Garrison City (execution)
-  semantics: "Garrison City's execution: the unit on the city — the operation's garrison, or with none a military unit of the seat standing there (0x81100a: formation class 0 or 3 takes the garrison's branch at 0x811129) — has its turn ended (0x570b40 with dl 1) before the swap and fortify tests; a candidate it moves in (0x811038) or beside the city (0x8111d7) likewise."
+  semantics: "Garrison City's execution: the unit on the city — the operation's garrison, or with none a military unit of the seat standing there (0x81100a: formation class 0 or 3 takes the garrison's branch at 0x811129) — has its turn ended (0x570b40 with dl 1) before the swap and fortify tests; a candidate it moves in (0x811038) or beside the city (0x8111d7) likewise. Over the operation's units in order, the one on the city its garrison (its ranged strength or its Bombard less 5, its Combat); of those whose planning reaches the city in a turn (0x791300) the candidate by ranged, then Bombard less 5, then Combat strength above the garrison's; with no garrison and no military unit of the seat on the city (formation class neither 0 nor 3), the candidate moves in and fortifies (0x56d6f0) unless ranged; with a garrison and a stronger candidate, the candidate moves to its planning's spot by the city and swaps in (0x972880); else the garrison fortifies (0x95eae0) where it has no range and the teams' +0x98 - +0x94 is at most 10."
   status: PARTLY
   cases:
     - recording: h1_dueldA1117
@@ -146,6 +146,7 @@
   final: 0x572e70
   kind: function
   name: Is City Threatened (decision)
+  semantics: "IS CITY THREATENED: the target gone (0x73a8e0) or the city on the target threatened (+0x1b8 above -1): SUCCESS, else FAILURE."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES
@@ -193,6 +194,7 @@
 - addr: 0x8133c0
   kind: function
   name: Garrison City (update)
+  semantics: "GARRISON CITY's update: the target gone SUCCESS; the operation's units (0x6092c0) any RUNNING, none FAILURE."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:ASSAULT_NODES

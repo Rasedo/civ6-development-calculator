@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x237c60
   kind: function
+  semantics: "the Delegation's handler at the receiver: an AI receiver answers by 0x653f60; on acceptance the cost moves from sender to receiver and the mission is set; then the sender's AI records the answer (0x6543a0)."
   status: PARTLY
   cases:
     - recording: h1_duelv1127

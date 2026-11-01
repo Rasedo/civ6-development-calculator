@@ -6,10 +6,11 @@
 - addr: 0x91e590
   final: 0x63d1f0
   kind: function
+  semantics: "game init: sets the path finder pool's count (-> 0x26f7d0) to max(1, the engine's value under hash 0xc181eb6e, MaxGameCoreUnitMovementThreads)."
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The pool's count is set at game init (0x91e590 -> 0x26f7d0) to max(1, the engine's value under hash 0xc181eb6e); the trade-route pool'..."
-  review: imported
+  review: reviewed

@@ -5,12 +5,13 @@
 # set `review: reviewed`.
 - addr: 0x194d90
   kind: function
+  semantics: assigns the picked citizens (the last row's backtrack).
   status: PARTLY
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ier entry keeps a tie. The N = unassigned count of the last row's backtrack are assigned (0x194d90).
-  review: imported
+  review: reviewed
 - addr: 0x194f80
   final: 0x10fa20
   kind: function
@@ -26,6 +27,7 @@
   final: 0x10fa50
   kind: function
   name: ChangeNumUnassigned
+  semantics: "ChangeNumUnassigned (called with the population change by City::ChangePopulation 0x1c79b0): adds to m_iNumUnassignedCitizens (+0x68); a negative count runs the full reassign 0x196320, else 0x197230 places the unassigned ones beside the citizens already working."
   status: PARTLY
   impl:
     - cpu/harness/citizens.ts:replaceAllCitizens
@@ -38,7 +40,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "City_Citizens.cpp. `ChangeNumUnassigned` (0x194fb0, called with the population change by City::ChangePopulation 0x1c79b0) adds to m_iNumUnas..."
-  review: imported
+  review: reviewed
 - addr: 0x1956b0
   final: 0x10fe70
   kind: function
@@ -51,8 +53,12 @@
 - addr: 0x195940
   final: 0x10fff0
   kind: function
+  semantics: "A district's specialist slots: its row's base (+0x54 behind +0x50) plus each building of the district not pillaged (0x18fe60). Only a placement reads the capacity: nothing evicts a citizen at the pillage. A plot's citizen capacity: 0 on the centre, 0 where no yield is above 0, a district's specialist slots, else 1."
   status: READ
   cases:
+    - recording: h1_duelw1128
+      turn: 105
+      value: "Xi'an: the Shrine pillaged t104, the district's specialist kept, Faith 5; China's turn re-places it (t106: Faith 3)"
     - recording: 1128
       turn: 105
       value: "Recorded: 1128 Xi'an t105, the barbarians' UNITOPERATION_PILLAGE on the   Holy Site at t104, the Shrine pillaged, the record's worked plots keep the   district's specialist and the city's Faith 5 = 1 "
@@ -63,17 +69,19 @@
   context:
     - ...= x - floor(y/2) + dq, y' = y + dr, x' = q + floor(y'/2), x wrapped), the plot's capacity 0x195940 (0 on the centre, 0 where no yield is above 0, a district's specialist slots, else 1) les...
     - "- A plot's capacity (0x195940) counts a district's specialist slots as its row's base (+0x54 behind +0x50) plus each..."
-  review: imported
+  review: reviewed
 - addr: 0x195f90
   kind: function
+  semantics: "a placement entry's score: food (+0x08) the plot's Food; each yield not disfavored (+0x50) counted twice, Gold once (0xf2f97c), into favored (+0x0c, the yields m_favoredYields +0x38 holds) or other (+0x10)."
   status: PARTLY
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ld is above 0, a district's specialist slots, else 1) less its workers. An entry's score (0x195f90): food (+0x08) the plot's Food; each yield not disfavored (+0x50) counted twice, Gold onc..."
-  review: imported
+  review: reviewed
 - addr: 0x1962a0
   kind: function
+  semantics: IsFavoredYield.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -89,9 +97,10 @@
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   context:
     - "...0) below 1.0 with its Housing (0x1b5840) above the population (+0x588): Food not favored (0x1962a0 on +0x1ba8) is set favored; otherwise a favored Food is cleared — each through the SET_FO..."
-  review: imported
+  review: reviewed
 - addr: 0x196320
   kind: function
+  semantics: "the full reassign: save the forced counts (+0x08), unassign all (0x196440), assign (0x197230), lay the forced counts back (0x196e30)."
   status: READ
   cases:
     - recording: h1_duelw1129
@@ -123,26 +132,29 @@
     - "...1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced cou..."
     - "...nd writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the event (hash 0xe808a01e) — the city command 0x975920..."
     - ...count (+0xc), clears the stored next plot (+0x1c) and runs the full citizen reassign 0x196320 on the gaining city (0x1a8f4c) and on a losing one (0x1a903c). Other callers of 0x19632...
-  review: imported
+  review: reviewed
 - addr: 0x196440
   kind: function
+  semantics: unassigns every citizen.
   status: PARTLY
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...egative count runs the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced counts back 0x196e30), else 0x197230 places the unassign...
-  review: imported
+  review: reviewed
 - addr: 0x196e30
   final: 0x110990
   kind: function
+  semantics: lays the forced counts back after a reassign.
   status: PARTLY
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced counts back 0x196e30), else 0x197230 places the unassigned ones beside the citizens already working. Growth (0...
-  review: imported
+  review: reviewed
 - addr: 0x196f90
   kind: function
+  semantics: "SetDisfavoredYield: asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); runs the full reassign 0x196320 whatever the value was and fires the event (hash 0xe808a01e)."
   status: READ
   cases:
     - recording: h1_duelw1129
@@ -161,9 +173,10 @@
   context:
     - "...d (`favored`, `disfavored`) and on each CityFocusChanged row (one letter per Yields row). 0x196f90 asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); 0x1970e0..."
     - "...ng one (0x1a903c). Other callers of 0x196320: the favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy an..."
-  review: imported
+  review: reviewed
 - addr: 0x1970e0
   kind: function
+  semantics: "SetFavoredYield: asserts the yield is not disfavored and writes the favored byte (+0x38); runs the full reassign 0x196320 and fires the event (hash 0xe808a01e): every CityFocusChanged row is a full re-place."
   status: READ
   cases:
     - recording: h1_duelw1129
@@ -182,12 +195,14 @@
   context:
     - ...0x196f90 asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the e...
     - "...0x1a903c). Other callers of 0x196320: the favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy annex re-pla..."
-  review: imported
+  review: reviewed
 - addr: 0x197230
   kind: function
-  semantics: "places the unassigned citizens: one entry per free slot of the 37-plot hexspace, scored food / favored / other; a DP table over entries x count, better = need met, then favored, then other, strict; the backtrack's N assigned (0x194d90)."
+  semantics: "places the unassigned citizens: one entry per free slot of the 37-plot hexspace, scored food / favored / other; a DP table over entries x count, better = need met, then favored, then other, strict; the backtrack's N assigned (0x194d90). Need = max(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached food yield (0x1cb8b0, m_bIsCached), consumption 0x5276c0 of the new population; one entry per free slot of each plot of the 37-plot hexspace (0x5cc00), the plot's capacity 0x195940 less its workers; scored by 0x195f90, picked by 0x193dc0; the N = unassigned count of the last row's backtrack assigned (0x194d90)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      value: the worked non-district plots 1,133 of 1,284 city-turns with no favored yield; the growth pick 186 of 203 (1117, 1118)
     - recording: 1124
       turn: 13
       value: "Records: 1124 t13 a barbarian Warrior at 8 HP (32 taken, 24 over) on a   city-state Warrior at 19 (31 drawn, 12 over): CombatLog 18 / 32, the   Warrior stands at 1;"

@@ -56,9 +56,11 @@
   final: 0x4bb410
   kind: function
   name: exploreUnrevealedCount
-  semantics: the plots within the unit's sight from a plot the player never revealed; a revealed plot's +0x47 flag unread
-  status: PARTLY
+  semantics: the plots within the unit's sight from a plot the player never revealed; a revealed plot's +0x47 flag unread Over the look, a plot not revealed counts; a revealed one whose route byte (+0x47) is not -1 sets the second flag; a goody hut on the revealed plot itself sets the first and counts nothing (the first wins at once for a full civilization alone, 0x82d90).
+  status: READ
   cases:
+    - recording: h1_duelw1117
+      value: "the HL: Explore rows of the 5-seed replay end on the game's plot 419 -> 490 of 1,056 with the tertiary list"
     - recording: h1_duelv1124
       value: "- PARTLY READ: the region lists' writer (the engines carry none: 36 of the   barbarians' 223 Explore rows of runs/h1_duelv1124 are \"tertiary regions\");"
   impl:
@@ -93,7 +95,7 @@
 - addr: 0x70aa40
   kind: function
   name: exploreTarget
-  semantics: "HL Explore: the reach plot whose sight holds the most unrevealed; cur region / cur area; the region lists (writer unread); the unseen-now fallback"
+  semantics: "HL Explore: the reach plot whose sight holds the most unrevealed; cur region / cur area; the region lists (writer unread); the unseen-now fallback The unit's one-turn breadth-first search (0x7921e0 -> 0x26df90, flags 0x40 / 0x42) on its Movement left; per plot closed, in order: no danger (0x716a90), not chosen, one it may go to (0x70bd40); its two counts over its sight (0x58b1d0, within the unit's sight +0x1998): never revealed (0x70a6c0) and not visible now (0x70a8b0, [player +0x290] <= 0). The first plot of the largest first count above 0 wins (\"HL: Explore\"); the first plot in closing order with the route flag and a count above 0 takes the lead once (0x70abe6..0x70ac15), after it a plot leads only with a strictly larger count. Else, on the first round: the unit's region (plot +0x18) where the player's region record holds less than all of it revealed (0x7861d0: +0x28 / +0x24 < 1.0) — the nearest unrevealed plot of the region (0x70b6f0) with a path to it (0x272a60), not chosen (\"cur region\"); off any region the nearest of its area (0x70b550, \"cur area\"); then the primary, secondary and tertiary region lists (+0x1290 +0x2f0 / +0x360 / +0x3d0); else the first plot of the largest second count (\"HL: Explore fallback\"). The unit's plot joins the chosen."
   status: PARTLY
   impl: [cpu/core/tactical.ts:exploreTarget, gpu/core/sim_tactics.py:_tac_explore]
   readings:
@@ -146,7 +148,7 @@
   final: 0x4bca20
   kind: function
   name: exploreOk
-  semantics: "may the explorer go to the plot: revealed, ownership, +0x4c, area, city; the turn test on a plot at war unread"
+  semantics: "may the explorer go to the plot: revealed, ownership, +0x4c, area, city; the turn test on a plot at war unread Not its own plot; revealed; another player's ground only at war with it (and the game turn below the regions record's +0x128); +0x4c not above 0 (no unit on it); its own area unless it embarks (0x56c480), a hull on water; no city centre but its player's."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -178,7 +180,7 @@
   final: 0x4bdb20
   kind: function
   name: exploreLand
-  semantics: "Explore Land: up to three rounds of HL Explore over EXPLORE units with Movement left and at most half their health lost, each round's moves together"
+  semantics: "Explore Land: up to three rounds of HL Explore over EXPLORE units with Movement left and at most half their health lost, each round's moves together Each unit not done (+0x770) with Movement left (+0xdb0), of AI type EXPLORE (+0x1c0 == 2), its damage at most half its health (0x56e0d0 >> 1), in a later round not still on its way (0x26f830), takes HL Explore (0x70aa40, the region fallbacks on the first round alone); the round's move orders (0x962030) carried out together as it ends (0x70a440); another round only where one moved."
   status: READ
   cases:
     - recording: h1_duelw1117-1128
@@ -198,8 +200,12 @@
 - addr: 0x70d250
   final: 0x4bdf90
   kind: function
+  semantics: "the first turn settler (the player with no city): of the settler's planning reach (unit +0x1fc0) the plots of this turn (turns <= 1), the one whose region list scores best above 0 (0x6fec50), the first in the reach's order on a tie; the settler moves there and founds (\"HL: First turn settler\"). With none it founds where it stands if it may, else the weighted draw \"First Turn Settler Fallback\" (the plots of this turn weighted by distance, x5 unowned; later ones 100 / turns where it may found)."
   status: PARTLY
   cases:
+    - recording: h1_duelv1124
+      turn: 1
+      value: the pick founds or stands where record t+1 shows it, 7 of 7 over 1117-1128
     - recording: AI_Planning.csv
       value: "- The first turn settler (0x70d250, the player with no city): of the   settler's planning reach (unit +0x1fc0, AI_Planning.csv) the plots of   this turn (turns <= 1), the one whose region list scores "
   readings:
@@ -208,7 +214,7 @@
     - ".claude/scratchpad/st1/reading.md: ...s none (\"TARGET   -9999:-9999\", \"INVALID, No backup\": the log, not read). - The first turn settler (0x70d250, the player with no city): of the   settler's planning reach (unit +0x1fc0, AI_Planning.csv) the pl..."
   context:
     - "- The first turn settler (0x70d250, the player with no city): of the settler's planning reach (unit +0x1fc0, AI_Planning.c..."
-  review: imported
+  review: reviewed
 - addr: 0x70f3b0
   kind: function
   name: homelandSafety
@@ -261,9 +267,10 @@
 - addr: 0x710f40
   final: 0x4c1f40
   kind: function
+  semantics: "\"HL: Rock Band Move\" (names its unit through 0x327d50 / 0x327de0)."
   status: PARTLY
   impl: [cpu/harness/drawSites.ts:DRAW_SITES]
   readings: ["H-1: draws the AI takes, draws the engines lack"]
   context:
     - "...lled only through 0x327d50 / 0x327de0 from the behaviour tree — \"HL: Rock Band Move\" (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a unit's name for its log (th..."
-  review: imported
+  review: reviewed

@@ -5,9 +5,12 @@
 # set `review: reviewed`.
 - addr: 0x42bdd0
   kind: function
-  semantics: "the goody hut's kind: each kind's Weight x the row count in 24.8, halved per time the player had it, floored at 1.0, rounded half up, only with an eligible subtype; one draw over the sum, then one over the kind's eligible subtypes."
+  semantics: "the goody hut's kind: each kind's Weight x the row count in 24.8, halved per time the player had it, floored at 1.0, rounded half up, only with an eligible subtype; one draw over the sum, then one over the kind's eligible subtypes. The goody hut's kind (Player_Goody_Hut.cpp): over the GoodyHuts rows whose ImprovementType is the popped one (row +0x38 -> +0x14), each kind weighs its Weight (+0x1c) x the count of ALL GoodyHuts rows (800) in 24.8, halved once per time the player has had that kind (+0x100[kind], bumped after the pick at 0x42c875), floored at 1.0 below 2.0, rounded half up; a kind counts only with an eligible subtype (0x42c980). ONE \"Choosing a Goody Hut Type\" draw over the sum, then \"Choosing a Sub Type\" over the kind's eligible subtypes' weights."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 5
+      value: 4,000 (five kinds, the first village); t7 3,600, t13 4,400, t16 / t27 4,800
     - recording: h1_duelw1117
       turn: 5
       value: "runs/h1_duelw1117: t5 4,000 (five kinds, the first village), t7 3,600, t13 4,400, t16 / t27 4,800;"
@@ -29,8 +32,12 @@
 - addr: 0x42c980
   final: 0x2dad40
   kind: function
+  semantics: "a goody subtype's eligibility: MinOneCity, Turn (at the game speed through 0x5254d0: Turn 20 is turn 10 online), RequiresUnit (a village a culture claim takes has no unit), CityState, StrategicResources... Per subtype row (+0x50 flags): bit 3 RequiresUnit; bit 1 MinOneCity (0x4bd370 >= 1); bit 2 Relic — 0x497030 finds a slot for a GREATWORKOBJECT_RELIC in the claimer's cities; +0x1c the Turn at the speed; then the XP2 row (+0x18): +0x28 bit 0 CityState — a city-state in the minor list the player has met (0x3daaf0); bit 1 StrategicResources — a RESOURCECLASS_STRATEGIC resource whose condition the player meets (0x4ac140) with its stockpile (0x4aa790) below the cap (0x4aabe0)."
   status: READ
   cases:
+    - recording: h1_duelw1118
+      turn: 189
+      value: "a claim's village: Resources alone, over 20"
     - recording: h1_duelw1117
       turn: 5
       value: "runs/h1_duelw1117: t5 4,000 (five kinds, the first village), t7 3,600, t13 4,400, t16 / t27 4,800;"
@@ -53,4 +60,4 @@
   context:
     - "..., floored at 1.0 below 2.0, rounded half up; a kind counts only with an eligible subtype (0x42c980: MinOneCity, Turn, RequiresUnit, CityState, StrategicResources...). ONE \"Choosing a Goody..."
     - "0x42c980 per subtype row (+0x50 flags): bit 3 RequiresUnit — no unit (a culture claim), not eligib..."
-  review: imported
+  review: reviewed

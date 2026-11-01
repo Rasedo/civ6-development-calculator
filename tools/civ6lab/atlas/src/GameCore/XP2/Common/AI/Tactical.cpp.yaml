@@ -29,6 +29,7 @@
 - addr: 0x7704e0
   final: 0x502660
   kind: function
+  semantics: the attack results' comparator (EASTL merge sort).
   status: PARTLY
   impl: [cpu/core/tactical.ts:assignTo, cpu/core/tactical.ts:assignedBefore]
   readings:
@@ -37,7 +38,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...at capacity 1 (the first largest positive), the move λ 0x770710. The results sorted by 0x7704e0 through EASTL's merge sort (halves n / 2)."
-  review: imported
+  review: reviewed
 - addr: 0x770710
   kind: function
   name: attackMove
@@ -58,12 +59,13 @@
 - addr: 0x770ce0
   final: 0x502dc0
   kind: function
+  semantics: "runs one tactical move by its AllowedMoves global (0x5bbf80): f2e0f4 Move to Safety, f2e100/104/108 Attack High/Medium/Low (0x7784b0), f2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e134 Wander (0x77b580), f2e138 / f2e13c Pillage Improvement / District (0x77a810), f2e140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage (0x778b40)."
   status: PARTLY
   readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list (Tactics.xml \"Default Barbar..."
-  review: imported
+  review: reviewed
 - addr: 0x7710f0
   kind: function
   name: tacticalUnit
@@ -111,7 +113,7 @@
   final: 0x503520
   kind: function
   name: TacticalAI
-  semantics: the tactical pass job (the second list's last); an operation's units leave the pass.
+  semantics: "the tactical pass job (the second list's last); an operation's units leave the pass. TacticalAI's pass (a vtable slot): the unit list (+0x240, 0x77d100), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list; each move walks the units left, and the units a move used (+0x258) leave the list after it; the homeland list takes what is left."
   status: PARTLY
   impl: [cpu/core/tactical.ts:cityStateTactics, cpu/core/tactical.ts:barbarianTactics]
   readings:
@@ -158,9 +160,12 @@
   final: 0x503f70
   kind: function
   name: carryOutAttacks
-  semantics: the moves, bombard strikes, ranged strikes (unless a melee one is stronger and reaches), move-and-attack; turns end
+  semantics: "the moves, bombard strikes, ranged strikes (unless a melee one is stronger and reaches), move-and-attack; turns end THE MOVES (0x771ff0..0x77219b): per entry (stride 0x38) valid (+0x2c >= 0) whose unit lives (+0x770 clear) and stands off its spot: UNITOPERATION_SWAP_UNITS to the spot (0x972880, hash 0x7fa205d1, through the unit's operation queue +0x60); still off it: nothing where a unit at war holds the spot (0x5862e0) or one of its own stacking with it (0x585eb0, itself not counted), else UNITOPERATION_MOVE_TO (0x962030, hash 0x580f2f68)."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 15
+      value: the Horse Archer 983054 on 34:11 holds the Horseman 720906's spot, which stays on 31:9; the Horse Archer 1048591 ends on 34:10 as recorded
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
@@ -299,13 +304,14 @@
 - addr: 0x774380
   final: 0x5063d0
   kind: function
+  semantics: the unit stands on a plot of the target's kind.
   status: PARTLY
   impl: [cpu/core/tactical.ts:pillage]
   readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...is turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it until one stands on it and pillages it.
-  review: imported
+  review: reviewed
 - addr: 0x7746a0
   final: 0x5066f0
   kind: function
@@ -339,6 +345,7 @@
 - addr: 0x774e90
   final: 0x506ec0
   kind: function
+  semantics: the units of an AI type within a number of turns of a plot.
   status: PARTLY
   impl:
     - cpu/core/tactical.ts:WANDER_CAMP_RANGE
@@ -348,7 +355,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...9010): each TARGET_BARBARIAN_CAMP target, the units of AI type DEFENDER within 3 turns (0x774e90), the nearest moved to the camp (\"Barb. Camp Defense\", AT the camp). The engines take t..."
-  review: imported
+  review: reviewed
 - addr: 0x775170
   final: 0x5071a0
   kind: function
@@ -419,9 +426,12 @@
 - addr: 0x776140
   kind: function
   name: assignAttacks
-  semantics: the claims (unit, target, spot), the MEDIUM / LOW exchange filter, one Generalized Assignment pass, the merge-sorted results
+  semantics: "the claims (unit, target, spot), the MEDIUM / LOW exchange filter, one Generalized Assignment pass, the merge-sorted results The filters (0x776780..0x7767fa), per spot i of a claim unless the target is HIGH or the unit info's +0x1ba bit 0x20 (UseMaxMeleeTrainedStrength) is set: with the fifth argument, dropped where taken + back taken (+0x7c, +0x94) tops dealt + back dealt (+0x64, +0xac); with the sixth (Operation Attack Units passes it always, 0x80d63a), dropped where taken + back taken tops the unit's health (0x56e0d0 less +0xcf0). A target's health is floor(100 x 281 / 256) less its damage (1.1 in 24.8). A unit that moved with turns 1 takes only its own plot. The stacking block (0x776890..0x776909): a unit on the spot not the target, of the mover's formation class, blocks unless it is the player's, in the mover's job (unit +0x7d0: the pass's, an operation's) with Movement left (+0xdb0); a unit raised this turn, in no job, blocks. Claims in target, unit, spot order (the outer loop 0x776244..0x7766f3 walks the targets, 0x28 each, the inner the units); ONE pass of 0x8b5bf0; the results sorted by 0x7704e0 through EASTL's merge sort (halves n / 2)."
   status: READ
   cases:
+    - recording: h1_duelw1124
+      turn: 11
+      value: the camp at 40:21's new Slinger on 41:22 keeps the Warrior at 41:21 off its spot
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
@@ -471,12 +481,13 @@
 - addr: 0x778910
   final: 0x50a870
   kind: function
+  semantics: Attack Camps.
   status: PARTLY
   readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e134 Wander (0x77b580), f2e138 / f2e1...
-  review: imported
+  review: reviewed
 - addr: 0x778b40
   final: 0x50aa90
   kind: function
@@ -500,6 +511,7 @@
 - addr: 0x779010
   final: 0x50af60
   kind: function
+  semantics: "Defend Camps: each TARGET_BARBARIAN_CAMP target, the units of AI type DEFENDER within 3 turns (0x774e90), the nearest moved to the camp (\"Barb. Camp Defense\", AT the camp)."
   status: PARTLY
   impl: [cpu/core/tactical.ts:WANDER_CAMP_RANGE, cpu/core/tactical.ts:defendCamps]
   readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
@@ -507,7 +519,7 @@
   context:
     - ...IGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e13...
     - "- Defend Camps (0x779010): each TARGET_BARBARIAN_CAMP target, the units of AI type DEFENDER within 3 turns (0x77..."
-  review: imported
+  review: reviewed
 - addr: 0x779240
   final: 0x50b170
   kind: function
@@ -612,6 +624,7 @@
 - addr: 0x77a810
   final: 0x50c6c0
   kind: function
+  semantics: "Pillage District / Improvement: each target of the kind in the tactical target list (0x783980) on the ground of a player at war with them — a complete district but a city centre or an Encampment, else an unpillaged improvement — the units of AI type EXPLORE or above whose planning reaches it this turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it until one stands on it and pillages it."
   status: PARTLY
   impl: [cpu/core/tactical.ts:pillage, cpu/harness/replay.ts:cur]
   readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
@@ -619,7 +632,7 @@
   context:
     - ...0x773030), f2e134 Wander (0x77b580), f2e138 / f2e13c Pillage Improvement / District (0x77a810), f2e140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal...
     - "- Pillage District / Pillage Improvement (0x77a810): each target of the kind in the tactical target list (0x783980, PARTLY READ: the visib..."
-  review: imported
+  review: reviewed
 - addr: 0x77aa20
   final: 0x50c8b0
   kind: function
@@ -674,12 +687,13 @@
 - addr: 0x77b580
   final: 0x50d400
   kind: function
+  semantics: Wander.
   status: PARTLY
   readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...4 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e134 Wander (0x77b580), f2e138 / f2e13c Pillage Improvement / District (0x77a810), f2e140 Plunder Trader (0x7...
-  review: imported
+  review: reviewed
 - addr: 0x77b9a0
   final: 0x50d830
   kind: function

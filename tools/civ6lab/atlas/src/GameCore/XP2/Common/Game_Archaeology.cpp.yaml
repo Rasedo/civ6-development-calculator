@@ -6,8 +6,12 @@
 - addr: 0x27f640
   kind: function
   name: Game_Archaeology
+  semantics: "Game_Archaeology: lays a kind's dig sites once a game (RESOURCE_ANTIQUITY_SITE / RESOURCE_SHIPWRECK, a done flag each at +0x180 / +0x1e0) when a player first completes its revealing civic (Natural History, Cultural Heritage): candidate plots from the game's history of events (100 each, their neighbours 50), filled out by random plots with no history (index -1)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 217
+      value: "China's Cultural Heritage in its start: four Shipwrecks laid, three draws"
     - recording: h1_duelw1117
       turn: 217
       value: "- \"Random Era for Antiquity Site\" (0x280140, from 0x2805f0): with n the era   row's +0x1c, era i < n weighs n − i + 1, one draw over n(n + 3) / 2:   runs/h1_duelw1117 t217's three draws over 35, 44 an"
@@ -21,10 +25,11 @@
   readings: ["H-1: a city's name, a citizen's name — READ"]
   context:
     - "...7 t217's three draws over 35, 44 and 9 are n = 7, 8 and 3. The caller: Game_Archaeology 0x27f640 lays a kind's dig sites once a game (RESOURCE_ANTIQUITY_SITE / RESOURCE_SHIPWRECK, a do..."
-  review: imported
+  review: reviewed
 - addr: 0x27fe90
   final: 0x1b4960
   kind: function
+  semantics: the player whose era a history-less dig site's draw reads.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -39,12 +44,16 @@
   readings: ["H-1: a city's name, a citizen's name — READ"]
   context:
     - "...only for a site with none (the js at 0x280664 → 0x280752; n from the era of a player 0x27fe90 names). 1117 t217: four Shipwrecks laid, three draws. The history is in no record: the..."
-  review: imported
+  review: reviewed
 - addr: 0x280140
   final: 0x1b4b20
   kind: function
+  semantics: "\"Random Era for Antiquity Site\": with n the era row's +0x1c, era i < n weighs n - i + 1, one draw over n(n + 3) / 2."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 217
+      value: "three draws over 35, 44 and 9: n = 7, 8, 3"
     - recording: h1_duelw1117
       turn: 217
       value: "- \"Random Era for Antiquity Site\" (0x280140, from 0x2805f0): with n the era   row's +0x1c, era i < n weighs n − i + 1, one draw over n(n + 3) / 2:   runs/h1_duelw1117 t217's three draws over 35, 44 an"
@@ -58,10 +67,11 @@
   readings: ["H-1: a city's name, a citizen's name — READ"]
   context:
     - "- \"Random Era for Antiquity Site\" (0x280140, from 0x2805f0): with n the era row's +0x1c, era i < n weighs n − i + 1, one draw over..."
-  review: imported
+  review: reviewed
 - addr: 0x2805f0
   final: 0x1b4df0
   kind: function
+  semantics: "a dig site's era: from its history event; a draw (0x280140) only for a site with none (the js at 0x280664 -> 0x280752; n from the era of a player 0x27fe90 names)."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -77,4 +87,4 @@
   readings: ["H-1: a city's name, a citizen's name — READ"]
   context:
     - "- \"Random Era for Antiquity Site\" (0x280140, from 0x2805f0): with n the era row's +0x1c, era i < n weighs n − i + 1, one draw over n(n + 3) / 2:..."
-  review: imported
+  review: reviewed

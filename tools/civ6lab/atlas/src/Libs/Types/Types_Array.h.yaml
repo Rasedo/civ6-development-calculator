@@ -6,10 +6,14 @@
 - addr: 0x3ffdd0
   final: 0x2bf270
   kind: function
+  semantics: "the diplomacy object's constructor: every player slot in use, in player order, draws one value over 100 toward each of the 64 slots (\"Random Diplomatic Value\") into +0x7bc[slot]; the object is built twice at set-up and the second pass is kept (896 draws = 7 slots x 2 x 64 in a duel; player 0's value toward 1 is draw 65, player 1's toward 0 draw 192)."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1110
+      value: both draws monotone with the logged first impression over all 26 meetings
   readings:
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
     - "C-96: the promotion class weight's vectors and the event building's pillaged prerequisite — PARTLY READ (AI::Military +0x708 / +0x778), ported (the prerequisite) both twins"
   context:
     - "- The set-up draws (\"Random Diplomatic Value\", the diplomacy object's constructor 0x3ffdd0): every player slot in use, in player order, draws one value over 100 toward each of th..."
-  review: imported
+  review: reviewed

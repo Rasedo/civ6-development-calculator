@@ -38,9 +38,12 @@
   final: 0x37dd10
   kind: function
   name: Unit_Upgrade_Manager
-  semantics: "the upgrade's Gold: speed(UPGRADE_BASE_COST 10) + max(0, new - old cost) x 2; x2 Corps, x3 Army; less the player's discount; at least speed(15); a levy's percent and floor; down to a multiple of 5."
+  semantics: "the upgrade's Gold: speed(UPGRADE_BASE_COST 10) + max(0, new - old cost) x 2; x2 Corps, x3 Army; less the player's discount; at least speed(15); a levy's percent and floor; down to a multiple of 5. Unit_Upgrade_Manager's cost (via 0x590520), in 24.8: UPGRADE_BASE_COST (GP +0x740, 10) at the game's speed (0x525400); net = (the new chassis' production cost - the old one's, 0x4f2b20) x UPGRADE_NET_PRODUCTION_PERCENT_COST (+0x74c, 100) / 100, never below 0; cost = base + net x GOLD_EQUIVALENT_OTHER_YIELDS (+0x380, 2), less an argument; a Corps x2, an Army x3; less the player's discount percent (+0x398); below UPGRADE_MINIMUM_COST (+0x744, 15, unscaled) it is that at the speed (0x5254d0); a levied unit less its percent (+0x458) and the levy floor (+0x748); then down to a multiple of PURCHASE_DIVISOR (+0x5b0)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 25
+      value: "China's Slinger (17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30"
     - recording: h1_duelw1117
       turn: 25
       value: "Check: runs/h1_duelw1117 China t25, Slinger (17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30."

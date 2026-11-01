@@ -6,8 +6,12 @@
 - addr: 0x76cee0
   final: 0x4ffaa0
   kind: function
+  semantics: "adds a keyed PlotEvaluations row's value to its yield, resource, feature or resource class weight. A natural wonder row adds its value to ITS OWN feature once per natural wonder in the database (the loop over the features indexes the row's feature, [r15+0x14], not the loop's): FEATURE_DEAD_SEA weighs 6 x the natural wonders, the other wonders nothing."
   status: PARTLY
   cases:
+    - recording: h1_duelv1124
+      turn: 40
+      value: the plots within 2 of the Matterhorn score as without it
     - recording: h1_duelv1124
       turn: 40
       value: "A natural wonder row adds its   value to ITS OWN feature once per natural wonder in the database (the loop   over the features indexes the row's feature, [r15+0x14], not the loop's):   FEATURE_DEAD_SE"
@@ -17,7 +21,7 @@
     - ".claude/scratchpad/st1/reading.md: ...value, and a keyed row (StringVal) also to its yield, resource,   feature or resource class weight (0x76cee0). A natural wonder row adds its   value to ITS OWN feature once per natural wonder in the database..."
   context:
     - ...a keyed row (StringVal) also to its yield, resource, feature or resource class weight (0x76cee0). A natural wonder row adds its value to ITS OWN feature once per natural wonder in the...
-  review: imported
+  review: reviewed
 - addr: 0x76e070
   final: 0x500800
   kind: function

@@ -6,9 +6,10 @@
 - addr: 0x849400
   final: 0x5a3c70
   kind: function
+  semantics: "starts a quest record: state 1, the client and actor ids, the start turn."
   status: PARTLY
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...Selecting a random new quest\" over their count (0x152eb0), the type's record started (0x849400: state 1, the ids, the turn) and its picker (+0x48) run."
-  review: imported
+  review: reviewed

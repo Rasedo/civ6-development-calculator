@@ -19,7 +19,7 @@
   final: 0x556c30
   kind: function
   name: moveUnitExec
-  semantics: "Move Unit's execution: the kept unit, else each of its units, moves — the unit's planned walk (0x791300, one turn), the location aside taking none ending on a plot of danger (0x7eed65 -> 0x7ef0bb)."
+  semantics: "Move Unit's execution: the kept unit, else each of its units, moves — the unit's planned walk (0x791300, one turn), the location aside taking none ending on a plot of danger (0x7eed65 -> 0x7ef0bb). The held unit's turn ends; it goes for the plot at To Range its planning reaches this turn, else the location (a plot of danger only where Allow Danger), woken (0x53e20) and moved (0x972880 / 0x962030)."
   status: PARTLY
   impl:
     - cpu/core/barbarianOps.ts:SCOUT_NODES
@@ -52,7 +52,7 @@
 - addr: 0x7ef0e0
   final: 0x557180
   kind: function
-  semantics: Protect Unit's execution.
+  semantics: Protect Unit's execution. Where the update counted one, each such unit to its safe plot (0x716b90) and the move (0x962030), its turn ended (0x570b40) either way.
   status: PARTLY
   impl: [cpu/core/barbarianOps.ts:SCOUT_NODES]
   readings:
@@ -67,16 +67,18 @@
 - addr: 0x7ef530
   final: 0x5575f0
   kind: function
+  semantics: Settle's execution.
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:settle]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...0 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the target is gon...
-  review: imported
+  review: reviewed
 - addr: 0x7ef850
   final: 0x557910
   kind: function
   name: Upgrade Units execution
+  semantics: "Upgrade Units' execution (a player no human drives), over the tree's units in the player's order (0x6092c0): the full test (0x58fff0 r8 0) passing, the economic AI's upgrade (0x68c940); else, with Can Delete, the deletion (UNITCOMMAND_DELETE 0x73cd1698) of an excess obsolete unit (0x591000 -1, or at most one promotion and more than 10 of its type 0x4f2c90); the full and visible tests failing: released (+0x778 -1, turn done 0x570b40) and, Can Delete, deleted; the visible one passing: Can Delete, on its own ground and no resource asked, deleted."
   status: READ
   cases:
     - recording: h1_duelu1128
@@ -112,9 +114,12 @@
   final: 0x5580a0
   kind: function
   name: moveUnitUpdate
-  semantics: "Move Unit's update: its kept unit (+0x50, kept across turns; an id of 0 or -1 none) alive with a planning: SUCCESS where the planning reaches the location within one turn (0x791300, the flag clear), else RUNNING. None kept: over its units in order, the first reaching it this turn with Movement left (the flag set) is kept and it SUCCEEDS; else the first reaching it this turn, where none is kept yet, or the one whose path (0x272a60) takes the fewest turns, is kept, RUNNING; none FAILURE. \"Allow Danger\" 0 (every city tree's): the location read on the player's danger map (0x7f040d: 0x716a60 on player +0x12d8, x + y x width into 0x716a90); a location of danger lets the kept unit that reaches it go (+0x50 -1, SUCCESS), and a unit is kept by its path only where the location is clear (0x7f057e). With no Location (0x7f067c) SUCCESS where every tree unit with a target is done."
+  semantics: "Move Unit's update: its kept unit (+0x50, kept across turns; an id of 0 or -1 none) alive with a planning: SUCCESS where the planning reaches the location within one turn (0x791300, the flag clear), else RUNNING. None kept: over its units in order, the first reaching it this turn with Movement left (the flag set) is kept and it SUCCEEDS; else the first reaching it this turn, where none is kept yet, or the one whose path (0x272a60) takes the fewest turns, is kept, RUNNING; none FAILURE. \"Allow Danger\" 0 (every city tree's): the location read on the player's danger map (0x7f040d: 0x716a60 on player +0x12d8, x + y x width into 0x716a90); a location of danger lets the kept unit that reaches it go (+0x50 -1, SUCCESS), and a unit is kept by its path only where the location is clear (0x7f057e). With no Location (0x7f067c) SUCCESS where every tree unit with a target is done. No Location SUCCESS, no unit SUCCESS; the unit it holds (the node's memory): its planning reaching a plot at To Range of the location this turn (0x791300) SUCCESS, else RUNNING, a held unit with no planning FAILURE; none held, the unit whose planning reaches the location this turn — one with Movement left there first —, else the one whose path (0x272a60 on the unit's path finder +0x1fb8, flag 0x1000, at 0x7f05a0) takes the fewest turns (above 0, fewer than the best so far) is held: SUCCESS where it reaches it with Movement left, else RUNNING; none FAILURE. A camp its own defender holds is such a goal. With no Location (from 0x7f067c): over the tree's units, each with a target (+0x830) reaching it within a turn with Movement left (0x791300) or whose target holds danger (0x716a60, Allow Danger false) passes; one with no planning (+0x1fc0) or none reaching it RUNNING, else SUCCESS."
   status: PARTLY
   cases:
+    - recording: h1_duelw1121
+      turn: 64
+      value: camp 12:14's Scout reports 6:12 at t64 and walks home round the mountains, home at t73
     - recording: h1_duely1128
       turn: 151-156
       value: Bologna's Upgrade Units tree 5963782 holds four units at 0 Gold t151-153, gone at t154 once they reach the centre; the units wander from t156
@@ -139,7 +144,7 @@
   final: 0x558870
   kind: function
   name: protectUnitUpdate
-  semantics: "Protect Unit's update: over the tag's units, else the tree's job's (0x6092c0), each damaged (+0xcf0) at least its Damage Percentage of its hit points (COMBAT_MAX_HIT_POINTS; every city tree's 0) on a plot of danger counts (+0x20): RUNNING with one, SUCCESS with none, FAILURE with no unit."
+  semantics: "Protect Unit's update: over the tag's units, else the tree's job's (0x6092c0), each damaged (+0xcf0) at least its Damage Percentage of its hit points (COMBAT_MAX_HIT_POINTS; every city tree's 0) on a plot of danger counts (+0x20): RUNNING with one, SUCCESS with none, FAILURE with no unit. None FAILURE; each unit whose damage (+0xcf0) is at least Damage Percentage of its health (0x56e0d0; the percentage in 8.8) on a plot the influence map rates dangerous (player +0x12d8, 0x716a90 above 0) counts; any counted RUNNING, else SUCCESS; the units the Unit List, else the tree's (0x6092c0 on player +0x12d0)."
   status: PARTLY
   cases:
     - recording: 1121
@@ -165,9 +170,10 @@
 - addr: 0x7f0b30
   final: 0x558b50
   kind: function
+  semantics: Settle's update (execution 0x7ef530).
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:settle]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...d70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the...
-  review: imported
+  review: reviewed

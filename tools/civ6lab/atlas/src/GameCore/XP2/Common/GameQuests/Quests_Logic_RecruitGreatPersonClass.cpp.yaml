@@ -6,31 +6,37 @@
 - addr: 0x84ab50
   final: 0x5a4f30
   kind: function
+  semantics: "Recruit Great Person Class's validity: a class the actor can earn (0x2f1ed0: on offer, not barred by its civilization's or leader's ExcludedGreatPersonClasses, below MaxPlayerInstances, a plot for the person to arrive on, 0x2f6500) whose offer's era (0x2f64d0) is at most the actor's or its next."
   status: PARTLY
   impl: [cpu/core/quests.ts:gpTargets, cpu/data/quests.ts:QUEST_GP_CLASSES]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Recruit Great Person Class (0x84ab50): a class the actor can earn (0x2f1ed0: on offer, not barred by its civilization's or..."
-  review: imported
+  review: reviewed
 - addr: 0x84ac50
   final: 0x5a5030
   kind: function
   name: seat
+  semantics: Recruit Great Person Class done when the actor recruits one; failed when the class has no offer at another's recruit (nothing fails while a replacement stands).
   status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      value: 335 against 320 for the variant failing at another's recruit
   impl: [cpu/core/quests.ts:questRecruited]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...r over the classes in the table's order (0x84b130); done when the actor recruits one (0x84ac50), failed when the class has no offer at another's recruit. Another's recruit of the c...
-  review: imported
+  review: reviewed
 - addr: 0x84b130
   final: 0x5a51a0
   kind: function
+  semantics: Recruit Great Person Class's picker over the classes in the table's order.
   status: PARTLY
   impl: [cpu/harness/drawSites.ts:DRAW_SITES]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...is at most the actor's or its next; the picker over the classes in the table's order (0x84b130); done when the actor recruits one (0x84ac50), failed when the class has no offer...
-  review: imported
+  review: reviewed

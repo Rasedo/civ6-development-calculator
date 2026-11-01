@@ -6,9 +6,10 @@
 - addr: 0x82dff0
   final: 0x58aa10
   kind: function
+  semantics: the deal AI (Propose Trade's desire).
   status: PARTLY
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   context:
     - "...ns (0x723db0 / 0x723cf0) and GoToWar's preparation, Propose Trade's desire (the deal AI 0x82dff0 / 0x64d320) and its can-do (0x673460: the last action + AI_TURNS_BETWEEN_TRADES), the a..."
-  review: imported
+  review: reviewed

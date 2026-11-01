@@ -6,12 +6,13 @@
 - addr: 0x7bb3e0
   final: 0x536530
   kind: function
+  semantics: "the victory strategies' apply: the first victory strategy marked exclusive that follows or changes makes every other followed victory strategy change and voids the others' changes; then each change flips the strategy (a disqualified one stays off) and stamps +0x90 = turn + 20 (0x7bf160 on, 0x7bb870 off). The log prints Forbidden / Following / Stopped, and Exclusive for the forced stops."
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "- The apply (0x7bb3e0): the first victory strategy marked exclusive that follows or changes makes every other..."
-  review: imported
+  review: reviewed
 - addr: 0x7bb870
   final: 0x5366c0
   kind: function
@@ -29,30 +30,36 @@
 - addr: 0x7bc580
   final: 0x536b00
   kind: function
-  status: PARTLY
+  semantics: "the victory strategies' evaluation (vtable 0xd71c30 slot 1, at the player's activation): a strategy disqualified for good is skipped; a victory strategy whose victory is off, or whose ConditionsNeeded + bias exceeds its conditions, is disqualified. Else each StrategyConditions row in order through the registry 0x7bd310: a true Exclusive row marks it exclusive, a true Disqualifier disqualifies it, sets its change and stops the walk, a true Forbidden row makes its change = following and skips it this turn, any other true row counts. Before +0x90 nothing changes; else count >= need changes a strategy not followed, count < need one followed."
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      value: AI_Victories 120 of 163 lines equal on the record's state over the five verbose duels
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "- The evaluation (0x7bc580, vtable 0xd71c30 slot 1, at the player's activation): a strategy disqualified for good..."
-  review: imported
+  review: reviewed
 - addr: 0x7bcd60
   final: 0x536ee0
   kind: function
+  semantics: "Good Faith / Tech / Culture City: some city's yield advantage (0x5d83c0, flag 0) >= threshold << 8."
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "...nformation (0x7bea40: the player's era >= the row's); Good Faith / Tech / Culture City (0x7bcd60: some city's yield advantage 0x5d83c0, flag 0, >= threshold << 8); Fewer Cities (citi..."
-  review: imported
+  review: reviewed
 - addr: 0x7bce30
   final: 0x536f60
   kind: function
+  semantics: "Good Culture: the player and the met majors whose Culture is at most its own >= trunc(n x thr / 100)."
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "...fered now 0x2f7eb0, none earned 0x2f30c0); Religion Destroyed (0x7bf080); Good Culture (0x7bce30: the player and the met majors whose Culture is at most its own >= trunc(n x thr / 100)..."
-  review: imported
+  review: reviewed
 - addr: 0x7bd020
   final: 0x537150
   kind: function
@@ -62,51 +69,57 @@
 - addr: 0x7bd1c0
   final: 0x5372f0
   kind: function
+  semantics: "Has Taken Capital (also registered for the three \"Diplomatic Victory Points\" names)."
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "...ng tourists from met majors, 0x39bee0, >= trunc(max x thr x 0.01f)); Has Taken Capital (0x7bd1c0, also registered for the three \"Diplomatic Victory Points\" names); Leads Military (0x..."
-  review: imported
+  review: reviewed
 - addr: 0x7bd210
   final: 0x537340
   kind: function
+  semantics: Has Tech Lead.
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - ...count; Leads Score; Next Lower Score (0x7bebc0); Has Science Wonders; Has Tech Lead (0x7bd210); Finished Space Project; Is Not Major (0x469db0, CIVILIZATION_LEVEL_FULL_CIV; 0x469ce0...
-  review: imported
+  review: reviewed
 - addr: 0x7bd310
   final: 0x537440
   kind: function
+  semantics: the strategy conditions' registry (name -> function).
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "...tions, is disqualified. Else each StrategyConditions row in order, through the registry 0x7bd310 (name -> function): a true Exclusive row marks it exclusive, a true Disqualifier disqua..."
-  review: imported
+  review: reviewed
 - addr: 0x7bea40
   final: 0x538b10
   kind: function
+  semantics: "Is Ancient .. Is Information: the player's era >= the row's."
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "- The conditions READ: Is Ancient .. Is Information (0x7bea40: the player's era >= the row's); Good Faith / Tech / Culture City (0x7bcd60: some cit..."
-  review: imported
+  review: reviewed
 - addr: 0x7bebc0
   final: 0x538c20
   kind: function
+  semantics: Next Lower Score.
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "...t x 0.01f + 0.5), read only inside the \"stronger\" count; Leads Score; Next Lower Score (0x7bebc0); Has Science Wonders; Has Tech Lead (0x7bd210); Finished Space Project; Is Not Major (..."
-  review: imported
+  review: reviewed
 - addr: 0x7bec80
   final: 0x538ce0
   kind: function
+  semantics: "AI_Victories.csv's writer: \"%d, %d, %s, %s\" — the turn, the player, the strategy, Following / Exclusive / Stopped / Forbidden; one line per strategy changed."
   status: PARTLY
   cases:
     - recording: AI_Victories.csv
@@ -115,16 +128,17 @@
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "...robe (`cpu/harness/strategyAi.ts`) against AI_Victories.csv (\"%d, %d, %s, %s\", the writer 0x7bec80: the turn, the player, the strategy, Following / Exclusive / Stopped / Forbidden; one lin..."
-  review: imported
+  review: reviewed
 - addr: 0x7bf080
   final: 0x538f20
   kind: function
+  semantics: Religion Destroyed.
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "...ne founded, no Prophet offered now 0x2f7eb0, none earned 0x2f30c0); Religion Destroyed (0x7bf080); Good Culture (0x7bce30: the player and the met majors whose Culture is at most its ow..."
-  review: imported
+  review: reviewed
 - addr: 0x7bf160
   final: 0x538fb0
   kind: function

@@ -68,6 +68,7 @@
 - addr: 0x530650
   final: 0x3781e0
   kind: function
+  semantics: the nearest of the victim's player's districts (the list at the player's +0x1308 -> +0xd8) other than its own plot where it may be placed (0x586360), a city centre only for a unit of a domain other than land; the first strictly nearest in the list's order.
   status: PARTLY
   impl: [cpu/core/combat.ts:seizeCivilian, cpu/core/combat.ts:retreatPlot]
   readings: ["H-1: a civilian stepped on — READ"]
@@ -75,7 +76,7 @@
   context:
     - "...ured: the Great People, the Archaeologist, the Naturalist, the Rock Band) retreats to 0x530650's plot and returns 2, or returns 0 where none is valid; otherwise the type the unit inf..."
     - "- 0x530650: the nearest of the victim's player's districts (the list at the player's +0x1308 -> +0..."
-  review: imported
+  review: reviewed
 - addr: 0x530880
   final: 0x378410
   kind: function
@@ -93,6 +94,7 @@
 - addr: 0x530e80
   final: 0x3789d0
   kind: function
+  semantics: "the route bridges: +0x4d & 6 == 4."
   status: PARTLY
   impl: [cpu/core/units.ts:routeApplies]
   readings:
@@ -100,7 +102,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...unpillaged route; where the step crosses a river (0x531510) both routes must bridge it (0x530e80: +0x4d & 6 == 4) or no route term applies (the terrain and the river pay); the step cos..."
-  review: imported
+  review: reviewed
 - addr: 0x530f50
   final: 0x378a70
   kind: function

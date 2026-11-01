@@ -6,47 +6,54 @@
 - addr: 0x54ad70
   final: 0x38a860
   kind: function
+  semantics: a domestic destination's rating (>= 5 sets the entry's +8).
   status: PARTLY
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
   context:
     - "...jected list. A listed city of the owner's own (a domestic route) rates its destination (0x54ad70 >= 5: +8 set) — a city-state holds one city. 0x78e010 is the list's lookup."
-  review: imported
+  review: reviewed
 - addr: 0x54ae60
   final: 0x38a950
   kind: function
+  semantics: a trade route's religious pressure toward the destination.
   status: PARTLY
   readings: ["C-94: the religious spread — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e and the source follows the religion; then the trade manager's route source -> target (0x54ae60, TRADE_ROUTE_PRESSURE_FOR_DESTINATION at gp +0x5f8) and target -> source (0x54bae0, _FO...
-  review: imported
+  review: reviewed
 - addr: 0x54bae0
   final: 0x38b0e0
   kind: function
+  semantics: a trade route's religious pressure toward the origin.
   status: PARTLY
   readings: ["C-94: the religious spread — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...get (0x54ae60, TRADE_ROUTE_PRESSURE_FOR_DESTINATION at gp +0x5f8) and target -> source (0x54bae0, _FOR_ORIGIN at +0x5fc).
-  review: imported
+  review: reviewed
 - addr: 0x54bdb0
   final: 0x38b310
   kind: function
   name: Trade_Manager
+  semantics: "Trade_Manager: a route's yield of one type — the route's path from the cache (0x541ae0; else a fresh path, 0x5526a0), n its plots (both ends included); the posts counted on it (0x5500b0) times the own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-tile bonus (0x4d9620): floor(n x a + a / 2) in 24.8 (and ebx, 0xffffff00)."
   status: READ
   cases:
+    - recording: h1_duelw1108
+      value: "Hunza's 0.2 (51): Aquileia -> Rome (5 plots) +1, -> Hunza (10) +2, Rome -> Shenyang (21) +4"
     - recording: h1_duelw1108
       value: Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza (10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108;
   impl: [cpu/core/trade.ts:routeLengthGold]
   readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
   context:
     - "Trade_Manager 0x54bdb0 (a route's yield of one type): the route's path from the trade manager's cache (0x541ae0;..."
-  review: imported
+  review: reviewed
 - addr: 0x54c630
   final: 0x38b0a0
   kind: function
+  semantics: a potential route's origin yield term.
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -59,13 +66,17 @@
   context:
     - "...(0x526330(origin, dest, out, -1, 1): CalculateOriginYieldsFromPotentialRoute 0x54eb90, 0x54c630, the path term CalculateOriginYieldsFromPath 0x54e160 skipped on the last argument 1,..."
     - "...tes by id, then the majors' cities) and 0x2d2220 (taken as true: a minor holds no fog); 0x54c630's term."
-  review: imported
+  review: reviewed
 - addr: 0x54c6c0
   final: 0x38b870
   kind: function
   name: Trade_Manager
+  semantics: "Trade_Manager: a potential route's origin yields. Adds TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE (gp +0x6ec, 4) to a route whose origin's owner dominates the destination's. Per yield: X = the DESTINATION city's route-to-others row (city +0x1ee0, its vector +0x28 read by 0x1f9650); a major's city adds X; a minor's city with a bonus type (0x469de0, 0x467f50) adds X x (100 + a) / 100, a the ORIGIN player's Congress entry for that type (0x37b7a0 -> 0x552d40, 24.8), nothing when a <= 0 or X <= 0."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 62
+      value: Xi'an -> Caguana Culture 1 -> 3 under Cultural (t62-81)
     - recording: 1108
       turn: 200
       value: 1108 Jiaodong -> Rome +4 from its first record t200.
@@ -88,13 +99,17 @@
   context:
     - "...yer: visiting > the other's domestic sets the pair's flag, < clears it, equal keeps it. 0x54c6c0 adds TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE (gp +0x6ec, 4) to a route whose origin's own..."
     - "- Trade_Manager 0x54c6c0, per yield of a route: X = the DESTINATION city's route-to-others row of that yield (ci..."
-  review: imported
+  review: reviewed
 - addr: 0x54e160
   final: 0x38c900
   kind: function
   name: CalculateOriginYieldsFromPath
+  semantics: "CalculateOriginYieldsFromPath: the path term, the destination's trading posts through 0x5500b0 from the plot past the origin through the destination (0x526330 skips it on its last argument 1)."
   status: PARTLY
   cases:
+    - recording: h1_duely1117
+      turn: 59
+      value: China's post at the city-state on plot 614 leaves its route there at six Gold (K 5.29)
     - recording: AI_Knowledge.csv
       value: "TO (+0x688) is the reset's -1: AI_Knowledge.csv   prints \"TRADE, TO -1, VAL K\" (0x5ed280)."
     - recording: h1_duelv1117
@@ -105,11 +120,12 @@
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), PARTLY READ (the city-states' meetings with each other, the majors' weights)"
   context:
     - ...ieldsFromPotentialRoute 0x54eb90, 0x54c630, the path term CalculateOriginYieldsFromPath 0x54e160 skipped on the last argument 1, Trade_Manager 0x54c6c0); a domestic one adds the dest...
-  review: imported
+  review: reviewed
 - addr: 0x54eb90
   final: 0x38ccf0
   kind: function
   name: CalculateOriginYieldsFromPotentialRoute
+  semantics: CalculateOriginYieldsFromPotentialRoute.
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -121,18 +137,21 @@
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   context:
     - "...oute there (0x526330(origin, dest, out, -1, 1): CalculateOriginYieldsFromPotentialRoute 0x54eb90, 0x54c630, the path term CalculateOriginYieldsFromPath 0x54e160 skipped on the last a..."
-  review: imported
+  review: reviewed
 - addr: 0x54eeb0
   kind: function
+  semantics: "the route's path score weights: MULTIPLE_DOMAINS (gp +0x708, 15), PORTAL (+0x70c, 15), BEST_ROUTE (+0x704, 2), WATER (+0x710, 2)."
   status: READ
   cases:
+    - recording: h1_duelw1124
+      value: "Cardiff -> Xiurong through Shenyang's Canal, 11 plots, 4 water: score 23 >= 11, 12 Gold"
     - recording: h1_duelw1124
       value: "A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->   Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold   district rows twice over (score 23 >= 11) — 12 Gold, which water al"
   impl: [cpu/core/trade.ts:ROUTE_PATH_MULTI_DOMAIN]
   readings: ["H-1: the trade path's search, its score and the Canal — READ"]
   context:
     - "...120, the district row's hash). The route's path score (Trade_Manager 0x5500b0 counting, 0x54eeb0 weighing): past the origin, a centre counts its Trading Post (foreign, own); any other..."
-  review: imported
+  review: reviewed
 - addr: 0x54efc0
   final: 0x38cf50
   kind: function
@@ -170,6 +189,7 @@
   final: 0x38dd40
   kind: function
   name: Trade_Manager
+  semantics: "Trade_Manager: the trading posts along a path. Counts past the origin: a centre's Trading Post (foreign, own); any other plot whose district word holds both masks MULTIPLE_DOMAINS; a step of more than one plot a PORTAL; the best route unpillaged (+0x4d bit 1) BEST_ROUTE; a water plot WATER (weighed by 0x54eeb0)."
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -189,7 +209,7 @@
     - "- Trade_Manager 0x5500b0 counts the Trading Posts on a route's path from index 1 through the destination, own an..."
     - ...th, 0x5526a0), n its plots (4-byte entries, both ends included); the posts counted on it (0x5500b0) times the player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-ti...
     - "...a city centre (0x81120, the district row's hash). The route's path score (Trade_Manager 0x5500b0 counting, 0x54eeb0 weighing): past the origin, a centre counts its Trading Post (foreig..."
-  review: imported
+  review: reviewed
 - addr: 0x5520a0
   final: 0x38f6c0
   kind: function
@@ -217,6 +237,7 @@
 - addr: 0x5526a0
   final: 0x38f2c0
   kind: function
+  semantics: answers a city pair from the path cache before any search.
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -230,7 +251,7 @@
   context:
     - "...one type): the route's path from the trade manager's cache (0x541ae0; else a fresh path, 0x5526a0), n its plots (4-byte entries, both ends included); the posts counted on it (0x5500b0) ti..."
     - ...41ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x5526a0); whether an edge holds the reverse route's path is unread.
-  review: imported
+  review: reviewed
 - addr: 0x552bc0
   final: 0x38f720
   kind: function
@@ -256,14 +277,16 @@
 - addr: 0x552d40
   final: 0x392150
   kind: function
+  semantics: the Congress entry for a city-state bonus type (+0x4b8).
   status: PARTLY
   readings: ["C-94: Sovereignty's route yield — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...100 + a) / 100 where a is the ORIGIN player's Congress entry for that type (0x37b7a0 -> 0x552d40, shifted to 24.8), and nothing when a <= 0 or X <= 0: a minor's row is paid only unde..."
-  review: imported
+  review: reviewed
 - addr: 0x552dd0
   kind: function
+  semantics: the player's Trader unit type.
   status: READ
   cases:
     - recording: 1112
@@ -273,7 +296,7 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "...58ba0) sets +0x1a1 from 0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0): a game flag, the player's embark list, or a researched technology with EmbarkAll (T..."
-  review: imported
+  review: reviewed
 - addr: 0x552fb0
   kind: function
   name: a trade route joins two players
@@ -295,6 +318,7 @@
   review: imported
 - addr: 0x553680
   kind: function
+  semantics: the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0).
   status: READ
   cases:
     - recording: 1112
@@ -305,10 +329,11 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "- The Trader's sea: the trade path's context (0x558ba0) sets +0x1a1 from 0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0): a game flag, the play..."
-  review: imported
+  review: reviewed
 - addr: 0x554340
   final: 0x390a70
   kind: function
+  semantics: "a trade route's road (from 0x512610): each path plot takes the route's player's best route where it differs or is pillaged."
   status: PARTLY
   impl: [cpu/core/eras.ts:layRoad]
   readings:
@@ -316,7 +341,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- A trade route's road (0x554340, from the route placement between cities 0x512610): each path plot takes the route's pl..."
-  review: imported
+  review: reviewed
 - addr: 0x5545e0
   kind: function
   semantics: "the plunder payout: V = sum over yields of (origin + destination) x (1 Gold, else 2); base = max(50, V x speed(TRADE_ROUTE_TURN_DURATION_BASE) // 2); + base x the plundering unit's +0x1858 percent // 100; Gold, no draw."

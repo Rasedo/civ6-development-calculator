@@ -37,6 +37,7 @@
   review: imported
 - addr: 0xc705d0
   kind: function
+  semantics: adds a (yield, amount) entry to the city's per-resource-type yield table (+0x1da8).
   status: PARTLY
   cases:
     - recording: h1_duelw1123
@@ -44,4 +45,4 @@
   readings: ["H-1: Johannesburg's yield per resource type — PARTLY READ"]
   context:
     - "...0): its apply (0xb48710) registers the yield type and Amount on the city's +0x1da8 table (0xc705d0); the count that table is multiplied by is read where the city's yields sum (unread). The..."
-  review: imported
+  review: reviewed

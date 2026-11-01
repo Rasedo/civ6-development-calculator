@@ -6,6 +6,7 @@
 - addr: 0x5579b0
   final: 0x392900
   kind: function
+  semantics: the trade path's range callback, memoised on the (parent, child) node pair.
   status: PARTLY
   impl: [cpu/core/tradePath.ts:TRADE_DEST_REFUEL, cpu/core/tradePath.ts:TRADE_COST_SWITCH]
   readings:
@@ -17,10 +18,11 @@
     - "...fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_tradepath.py`."
     - "The range callback 0x5579b0, per edge: r = the from-node's range; a switch (0x558300) caps r at 1; a from-plot holdin..."
     - ...e range callback), neighbours 0x558d60 / 0x271b50, context 0x558ba0. The range callback 0x5579b0 memoises its answer on the (parent, child) node pair.
-  review: imported
+  review: reviewed
 - addr: 0x557e40
   final: 0x392ba0
   kind: function
+  semantics: "the trade-route path pool's sizing (the engine's value under hash 0xe09781a7, MaxGameCoreTradeRouteThreads). The trade path's callbacks: the destination test 0x271490, destination-valid 0x629460 (1), no heuristic, cost 0x558970, valid 0x558db0, notify 0x558900, neighbours 0x558d60 / 0x271b50, context 0x558ba0."
   status: PARTLY
   readings:
     - "C-20: the Trader's path and range"
@@ -31,17 +33,18 @@
     - "XP2 Trade_Movement.cpp: the pathfinder's callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5..."
     - "...one likewise with UpdateParents 0x79660, a new one opened. The trade path's callbacks (0x557e40): the destination test 0x271490, destination-valid 0x629460 (1), no heuristic (both s..."
     - ...x26f7d0) to max(1, the engine's value under hash 0xc181eb6e); the trade-route pool's (0x557e40 / 0x5582a0) under 0xe09781a7.
-  review: imported
+  review: reviewed
 - addr: 0x5582a0
   final: 0x393000
   kind: function
+  semantics: the trade-route path pool's sizing (hash 0xe09781a7).
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...max(1, the engine's value under hash 0xc181eb6e); the trade-route pool's (0x557e40 / 0x5582a0) under 0xe09781a7.
-  review: imported
+  review: reviewed
 - addr: 0x558300
   final: 0x393060
   kind: function
@@ -59,6 +62,7 @@
   final: 0x3930d0
   kind: function
   name: IsLand
+  semantics: "IsLand: a district plot's info word +0x14 & 4 (both masks, or neither, is neither land nor water)."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -70,11 +74,12 @@
   context:
     - "IsLand 0x5583a0 / IsWater 0x558460 (Trade_Movement.cpp): when the plot's virtual +0x40 holds (a district..."
     - "- IsLand 0x5583a0 / IsWater 0x558460 read a district plot's info word +0x14 (masks 4 and 1): both, or nei..."
-  review: imported
+  review: reviewed
 - addr: 0x558460
   final: 0x393150
   kind: function
   name: IsWater
+  semantics: "IsWater: a district plot's info word +0x14 & 1."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -86,10 +91,11 @@
   context:
     - "IsLand 0x5583a0 / IsWater 0x558460 (Trade_Movement.cpp): when the plot's virtual +0x40 holds (a district stands there), they..."
     - "- IsLand 0x5583a0 / IsWater 0x558460 read a district plot's info word +0x14 (masks 4 and 1): both, or neither, is neither la..."
-  review: imported
+  review: reviewed
 - addr: 0x558510
   final: 0x3931c0
   kind: function
+  semantics: the Trader's tiles en route (-> AnnexPlot 0x1a8b70).
   status: READ
   cases:
     - recording: 1108
@@ -98,10 +104,11 @@
   readings: ["H-1: the annex, the purchase and the stored next plot — READ"]
   context:
     - "...ed), the plot swap (0x1ac910), the culture bombs (0x524e30), the Trader's tiles en route (0x558510) and the Gold purchase (0x977aa0: the price spent through 0x4e02e0, then the annex). A pu..."
-  review: imported
+  review: reviewed
 - addr: 0x558900
   final: 0x393400
   kind: function
+  semantics: "the trade path's notify: type 5 a no-op; 1, 2, 4 store the child's range off the range callback 0x5579b0."
   status: PARTLY
   readings:
     - "C-20: the Trader's path and range"
@@ -110,10 +117,11 @@
   context:
     - "...s callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_tradepath.py`."
     - "...(both slots null: the total is the known cost), cost 0x558970, valid 0x558db0, notify 0x558900 (type 5 a no-op; 1, 2, 4 store the child's range off the range callback), neighbours 0x..."
-  review: imported
+  review: reviewed
 - addr: 0x558970
   final: 0x393470
   kind: function
+  semantics: "the trade path's cost: adds nothing onto a plot whose district word holds both masks (0x810a0 mask 5) or onto a city centre (0x81120)."
   status: PARTLY
   impl:
     - cpu/core/tradePath.ts:COST_LAB
@@ -128,4 +136,4 @@
     - "XP2 Trade_Movement.cpp: the pathfinder's callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_t..."
     - ...city to 3 (+0x1b0); a refuel sets the context's flag +0x1cc. left = r - 1. The step cost 0x558970 swaps its 100 for 10100 (0x558a08) when 0x558300 answers a switch and the flag is clear....
     - "...n-valid 0x629460 (1), no heuristic (both slots null: the total is the known cost), cost 0x558970, valid 0x558db0, notify 0x558900 (type 5 a no-op; 1, 2, 4 store the child's range off..."
-  review: imported
+  review: reviewed

@@ -6,6 +6,7 @@
 - addr: 0x106660
   final: 0x14dd50
   kind: function
+  semantics: the plot's owner.
   status: READ
   cases:
     - recording: h1_duelw1130
@@ -14,4 +15,4 @@
   readings: ["C-94: trade posts and cultural dominance — READ"]
   context:
     - ...al, age); where the city's owner dominates the plot's owner (+0x1b8 against the plot's, 0x106660) that product x (100 + 25) / 100, then the distance falloff (gp +0xf0). runs/h1_duelw11...
-  review: imported
+  review: reviewed

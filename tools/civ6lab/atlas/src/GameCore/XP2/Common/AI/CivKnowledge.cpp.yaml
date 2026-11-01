@@ -29,9 +29,15 @@
   final: 0x3f15c0
   kind: function
   name: tradeRouteValue
-  semantics: "the knowledge base's route value K (+0x680 + 0x58): the best summed yield value of a route from the player's cities to a listed, not-at-war known city"
+  semantics: "the knowledge base's route value K (+0x680 + 0x58): the best summed yield value of a route from the player's cities to a listed, not-at-war known city Called at the tail of the knowledge base's ageing 0x5ebb30: the best record reset (0x5ea780; TO +0x688 -1), then per city of the player and per knowledge-base city entry in the city's trade list (0x78e010): an international destination not at war (0x469cd0) takes the origin's yields (0x526330(origin, dest, out, -1, 1): 0x54eb90, 0x54c630, the path term 0x54e160 skipped, 0x54c6c0); a sum above the best (+0x58 = +0x6d8) kept; AI_Knowledge.csv prints \"TRADE, TO -1, VAL K\" (0x5ed280). A turn's builds read the K of the turn before. It walks the LAST MET player's cities (+0x6e0, set by 0x5ecb50; init 0x5ec951 the owner +0x6e8): its +0x12f0 +0xd8 list, each city's trade list (CityBuildAI +0x870), that player's knowledge base's city entries, its wars (0x469cd0) and its weights (0x7a6690 with r9 that player). A domestic destination (owner the player, 0x5e9f9c) values the origin yields (0x526330 into +0x108) and the destination's (0x525b90 into +0x140), both summed."
   status: READ
   cases:
+    - recording: h1_duely1127
+      turn: 3
+      value: the Free Cities' K 2.10 from t3 (major 1's route value); city-state 4 2.10 at t3-t4, 0.00 from t5 after meeting city-state 3
+    - recording: h1_duelv1117
+      turn: 14
+      value: Valletta's K 2.10 from t14, its Trader trained at t33
     - recording: h1_duelv1117
       turn: 14
       value: Valletta's TRADE, TO -1, VAL 2.10 (0.00 before t14)
@@ -53,6 +59,7 @@
 - addr: 0x5ea780
   final: 0x3f1d40
   kind: function
+  semantics: resets the knowledge base's best trade record (TO -1).
   status: PARTLY
   cases:
     - recording: AI_Knowledge.csv
@@ -64,7 +71,7 @@
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   context:
     - "...; called at the tail of the knowledge base's ageing 0x5ebb30): the best record reset (0x5ea780), then per city of the player (its +0x12f0 list) and per city entry of its knowledge ba..."
-  review: imported
+  review: reviewed
 - addr: 0x5eab80
   kind: function
   name: the knowledge base's enemy unit counts
@@ -75,7 +82,7 @@
   review: reviewed
 - addr: 0x5eadb0
   kind: function
-  semantics: an enemy's known units within a distance of a plot at least a threshold strong (the knowledge base's army records).
+  semantics: an enemy's known units within a distance of a plot at least a threshold strong (the knowledge base's army records). Per unit type max(Combat, RangedCombat) x the known units in range, each less its damage x COMBAT_WOUNDED_DAMAGE_MULTIPLIER x -0.01f cut toward 0; the entries' kinds 1 / 2 add gp +0x198 / +0x17c and 0x4f2b50 terms.
   status: PARTLY
   impl:
     - cpu/core/operations/evaluate.ts:armyStrength
@@ -440,7 +447,7 @@
   final: 0x3f5ca0
   kind: function
   name: the knowledge base adds a camp
-  semantics: "the knowledge base adds a camp (m_barbarians +0x638: the plot, an age, the camp's unit); the look adds each camp on a seen plot or one revealed (+0x2f0, 0x787bee..0x787cd5); the update drops one whose plot is seen or revealed with no camp."
+  semantics: "the knowledge base adds a camp (m_barbarians +0x638: the plot, an age, the camp's unit); the look adds each camp on a seen plot or one revealed (+0x2f0, 0x787bee..0x787cd5); the update drops one whose plot is seen or revealed with no camp. Camps are any player's: the update drops a camp whose plot the barbarians see or have revealed with none there (0x5ebb30), the look (0x7877e0) adds each camp on a plot seen or revealed, in plot order behind those held — a camp joins at the look after its plot is revealed and the list keeps the join order."
   status: PARTLY
   cases:
     - recording: h1_duelv1124

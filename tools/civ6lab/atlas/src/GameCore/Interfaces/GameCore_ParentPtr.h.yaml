@@ -6,12 +6,13 @@
 - addr: 0xa7b10
   final: 0x74010
   kind: function
+  semantics: "the city-growth cache copy (its data 8 bytes into the cache): +0x28 from 0x1b62d0, housing 0x1b5f70 (+0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c), occupation 0x1b6120 (+0x20)."
   status: PARTLY
   readings: ["C-94: the growth modifier — READ (the accumulator's writer unread)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...g 0x9876b0) reads the city-growth cache's +0x28, a 24.8 fixed-point value; the cache copy 0xa7b10 (its data 8 bytes into the cache) fills it from CityGrowth 0x1b62d0, beside housing 0x1b5...
-  review: imported
+  review: reviewed
 - addr: 0x198310
   final: 0x111920
   kind: function
@@ -37,12 +38,13 @@
 - addr: 0x1f6360
   final: 0x14b720
   kind: function
+  semantics: "a city religion's reset: one entry, {religion, pop x 50}."
   status: PARTLY
   readings: ["C-94: the religious spread — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...8: -1 when none, the unconverted), then recomputes; a loss only recomputes. The reset 0x1f6360 leaves one entry, {religion, pop x 50}; a recompute with no positive pressure leaves {-..."
-  review: imported
+  review: reviewed
 - addr: 0x276bc0
   final: 0x1ada70
   kind: function

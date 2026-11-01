@@ -70,6 +70,7 @@
 - addr: 0x4e02e0
   final: 0x3432e0
   kind: function
+  semantics: spends Gold from the player's treasury.
   status: READ
   cases:
     - recording: 1108
@@ -80,7 +81,7 @@
     - "C-130: the Economic AI's Gold boost on the treasury's banked net income — READ (0x4e08f0, PlayerTreasury +0x1b8), both twins"
   context:
     - "...ader's tiles en route (0x558510) and the Gold purchase (0x977aa0: the price spent through 0x4e02e0, then the annex). A purchase made after the turn's culture step so leaves the city with n..."
-  review: imported
+  review: reviewed
 - addr: 0x4e08f0
   final: 0x343780
   kind: function

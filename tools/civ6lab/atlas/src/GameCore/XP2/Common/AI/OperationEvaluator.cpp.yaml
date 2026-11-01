@@ -6,9 +6,12 @@
 - addr: 0x746920
   final: 0x4e6130
   kind: function
-  semantics: "the operation candidate evaluation: walks m_operationStartPoints as the candidate's rallies."
+  semantics: "the operation candidate evaluation: walks m_operationStartPoints as the candidate's rallies. The job \"Op Evaluation\": MustBeAtWar, MustHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each target of the walk 0x747230 (an enemy's target needs a value above 0) against each staging plot (m_operationStartPoints, player +0x12b8 +0xb58; the fixed rally for a running one): the distance 0 refused but for TARGET_FRIENDLY_CITY; MaxTargetDistInRegion / InArea / InWorld by the rally's and target's region (+0x18) and area (+8), -1 none; ours = the fixed strength, else the knowledge base's army strength within 10 of the rally (0x5eadb0); the odds min(0.9, ((ours - theirs) / min(best ours, best theirs) + 1) x 0.5) x 0.97 ^ (max(0, theirs - ours) - trunc(d x -0.75)) (the best combat strengths 0x4d9320, at least 1, 1 for no enemy; with an enemy theirs above ours caps the odds at 1 - lead x 0.75 / 25, ours above raises them to min(1, lead x 0.75 / 25)); MinOddsOfSuccess above 0 needs odds above it; the best value x odds in 24.8 (0x16e7d0), the later of equals. The candidate is valid with a target; the eval line logs value +0x58."
   status: PARTLY
   cases:
+    - recording: h1_duelv1124
+      turn: 3-15
+      value: every eval line equal (Settle New City 27 / 48 / 72 ... 114, Civilian Builder Capture 0.0, Naval Superiority 100.0)
     - recording: h1_duely1117
       turn: 69
       value: "city-state 4's Heavy Chariot 589825 bought: no Attack Barb Camp candidate until t70 (weighed before the purchases, which come after the look)"

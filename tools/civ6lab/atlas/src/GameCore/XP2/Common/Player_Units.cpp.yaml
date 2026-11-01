@@ -27,8 +27,12 @@
   final: 0x34c950
   kind: function
   name: CanEmbark
+  semantics: "CanEmbark: a game flag, the player's embark list, or a researched technology with EmbarkAll (Technologies +0x70 bit 4: Shipbuilding) or an EmbarkUnitType naming the unit (Celestial Navigation's UNIT_TRADER)."
   status: READ
   cases:
+    - recording: h1_duelw1112
+      turn: 68
+      value: China's Trader to Preslav at sea t68-72 with Shipbuilding and no Celestial Navigation
     - recording: 1112
       turn: 68
       value: "Record: 1112 China's Trader to   Preslav at sea t68–72 with Shipbuilding and no Celestial Navigation, the   route paying the water path's 11.4375 from t64."
@@ -37,13 +41,16 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "...the trade path's context (0x558ba0) sets +0x1a1 from 0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0): a game flag, the player's embark list, or a researched..."
-  review: imported
+  review: reviewed
 - addr: 0x4eeb70
   final: 0x34d020
   kind: function
-  semantics: "a unit's creation: raises player signal +0x60."
+  semantics: "a unit's creation: raises player signal +0x60. Calls 0x486bf0 -> 0x486c20 where the unit info's Spy (+0x1ba bit 2) or ExtractsArtifacts (+0x1b9 bit 1) is set and the player's +0x1458 is clear: the Spy and the Archaeologist take a citizen name."
   status: READ
   cases:
+    - recording: h1_duelw1118
+      turn: 231
+      value: an Archaeologist trained in China's start, one name drawn
     - recording: 1117
       turn: 102
       value: A Spy takes   one at its birth (1117 t102, t118, t199 in China's start;
@@ -81,7 +88,12 @@
 - addr: 0x4f23a0
   final: 0x34ef70
   kind: function
+  semantics: "the random promotion offer: every row of the player's promotion list (+0x940) whose class is the unit's (0x524010) goes in a weight-1 vector drawn OUT (\"Random Promotion\", one draw over what is left, the drawn row erased: a full shuffle); the shuffled list stably sorted by the entries' second word (0x4e6d70, the Level), the first NumRandomChoices make the offer. No held-row filter."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1118
+      turn: 218
+      value: a Spy's 17 draws 17..1 after its Choosing a Citizen Name
   impl:
     - cpu/core/promotions.ts:drawPromoOffer
     - cpu/data/units.ts:PROMO_OFFER_UNITS
@@ -90,7 +102,7 @@
   readings: ["H-1: the random promotion offer (0x4f23a0) — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context: ["## H-1: the random promotion offer (0x4f23a0) — READ"]
-  review: imported
+  review: reviewed
 - addr: 0x4f2ac0
   final: 0x34f4f0
   kind: function
@@ -189,6 +201,7 @@
 - addr: 0x4f2d50
   final: 0x34f770
   kind: function
+  semantics: a gate before the random promotion offer.
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -197,7 +210,7 @@
   readings: ["H-1: the random promotion offer (0x4f23a0) — READ"]
   context:
     - "...ts type's `NumRandomChoices` (unit info +0x60: Apostle, Spy, Rock Band 3) is above 0 (and 0x4f2d50 refuses): every row of the player's promotion list (+0x940) whose class is the unit's (0x..."
-  review: imported
+  review: reviewed
 - addr: 0x4f2df0
   final: 0x34f810
   kind: function

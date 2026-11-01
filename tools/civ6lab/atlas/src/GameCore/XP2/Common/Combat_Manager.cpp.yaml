@@ -6,7 +6,12 @@
 - addr: 0x1fb680
   final: 0x14efa0
   kind: function
+  semantics: "war weariness per side of a combat, the attacker logged \"Attacking\": loc = 1 in lands allied to the unit (GP +0x76c), else 2 (+0x770), +3 killed (+0x774), +10 a WMD (+0x778); base = WAR_WEARINESS_WARMONGER_BASE 16 (+0x780) + Eras.WarmongerPoints of the era row (+0x30) x X / 100, X = min(the war's DiplomaticActions WarmongerPercent, the player's cap +0x1a48) (0x3d1450); amount = loc x base x (100 + the player's +0x18c8 + the foe's +0x1808 [+ +0x1868 in allied land]) / 100."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1119
+      turn: 216
+      value: "Rome 104 / 260 / 52 / 208 = (2 / 5 / 1 / 4) x 52, 52 = 16 + 24 x 150%"
   impl: [cpu/core/combat.ts:interceptFight]
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
@@ -14,10 +19,11 @@
   context:
     - "- War weariness (0x1fb680, from the combat log 0x20d280): it reads only the struct's [+0] and [+8] and the combat..."
     - "- 0x1fb680, per side, the attacker logged \"Attacking\": loc = 1 in lands allied to the unit (GP +0x..."
-  review: imported
+  review: reviewed
 - addr: 0x1fbae0
   final: 0x14f400
   kind: function
+  semantics: "an attack ends the attacker's fortification: sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0)."
   status: PARTLY
   impl: [cpu/core/combat.ts:spendAttack]
   readings:
@@ -26,7 +32,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- An attack ends the attacker's fortification: 0x1fbae0 sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0)...."
-  review: imported
+  review: reviewed
 - addr: 0x1fc100
   final: 0x14fa10
   kind: function
@@ -43,13 +49,14 @@
   review: reviewed
 - addr: 0x200e10
   kind: function
+  semantics: raises an AI event on the player's signals (+0x2b8).
   status: PARTLY
   readings:
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...always) — raised as AI_EVENT_UNIT_CAPTURED (@f2e088) on the player's signals (+0x2b8, 0x200e10). The barbarians' triggered trees (BarbarianTriggeredTrees: TRIGGER_CAPTURE_BARBARIAN,..."
-  review: imported
+  review: reviewed
 - addr: 0x202440
   final: 0x1541a0
   kind: function
@@ -84,6 +91,7 @@
 - addr: 0x204b10
   final: 0x156120
   kind: function
+  semantics: "a unit's ranged attack on a city: two draws (0x519440 on the hit points, then the defense), nothing for the attacker."
   status: READ
   cases:
     - recording: 1117
@@ -93,13 +101,16 @@
   readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
   context:
     - ...E_DAMAGE_PERCENT_MELEE 15 (RANGED 50, BOMBARD 100; +0x1a4, +0x1a8, +0x1a0). The ranged (0x204b10) and bombard (0x2074b0) attacks draw twice (hit points, defense) and nothing for the at...
-  review: imported
+  review: reviewed
 - addr: 0x205720
   final: 0x156ae0
   kind: function
-  semantics: "a combat simulation off the map (the efficiencies' two per pair): the damage each side takes (+0x7c / +0xc4 words)."
+  semantics: "a combat simulation off the map (the efficiencies' two per pair): the damage each side takes (+0x7c / +0xc4 words). 0x205720(combat, 1, 1) resolves by the combat's kind (0x206f40 the melee one) on the units as they stand — their damage, promotions and fortification untouched by a forward result: the blow back reads the unit's own fortification."
   status: PARTLY
   cases:
+    - recording: h1_duelw1117
+      turn: 9
+      value: "city-state 2's Warrior 131073 at 60 health, fortified 2 on 14:10: 30 taken + 26 back, the spot kept, the attack fought"
     - recording: AI_UnitEfficiency.csv
       value: "Logged once a game as   AI_UnitEfficiency.csv (\", %3.2f\"), the same in every recording;"
   impl: [cpu/core/aiViewTypes.ts:AiView]
@@ -113,17 +124,22 @@
   review: reviewed
 - addr: 0x205da0
   kind: function
+  semantics: makes an attack's result.
   status: PARTLY
   readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...: 0x1fbae0 sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0). Fortification grows only in the Fortify operation's tick (0x95ebb0, 0x960800, 0x959..."
-  review: imported
+  review: reviewed
 - addr: 0x206080
   final: 0x156f20
   kind: function
+  semantics: "a unit's melee attack on a city: three draws, 0x519370 the attacker's damage, then 0x519440 the district's hit points (hash 0x5e97d629) and 0x519440 its outer defense (0x6da56a3d), each its own \"Unit Combat Damage\" draw; the defense's damage scaled by COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE 15 (RANGED 50, BOMBARD 100; GlobalParameters +0x1a4, +0x1a8, +0x1a0). The log carries one UnitDamageChanged for the three."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 14
+      value: "a barbarian Warrior at 27 HP on Valletta: the three RandCalls seeds are the replay's three draws"
     - recording: 1117
       turn: 14
       value: "The log carries   one UnitDamageChanged for the three (1117 t14: a barbarian Warrior at 27 HP   on Valletta;"
@@ -137,12 +153,16 @@
   readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
   context:
     - "- A unit's attack on a city (0x206080, melee) draws three times: 0x519370 the attacker's damage, then 0x519440 the district's..."
-  review: imported
+  review: reviewed
 - addr: 0x206960
   final: 0x157510
   kind: function
+  semantics: "the melee result (Combat_Manager): the defender's damage drawn first (0x51a240); the counter (the attacker's damage) is never drawn where the defender is embarked (0x8be30, byte +0x6b0) and does not fight embarked (+0x18c3, m_bFightWhileEmbarked). Both totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is left at max - 1 damage (1 HP) — the attacker on a tie (0x206d01: jle). The experience reads the result after it (0x1975e0 at 0x206e98 / 0x206ee2)."
   status: READ
   cases:
+    - recording: h1_duelw1124
+      turn: 13
+      value: "a barbarian Warrior at 8 HP (32 taken, 24 over) on a city-state Warrior at 19 (31 drawn, 12 over): CombatLog 18 / 32, the Warrior stands at 1"
     - recording: 1124
       turn: 13
       value: "Records: 1124 t13 a barbarian Warrior at 8 HP (32 taken, 24 over) on a   city-state Warrior at 19 (31 drawn, 12 over): CombatLog 18 / 32, the   Warrior stands at 1;"
@@ -162,10 +182,11 @@
     - "C-98: the unit efficiencies — READ (0x79a440, its simulated combats 0x205720 off the map), ported: every entry the logged table's"
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the at..."
-  review: imported
+  review: reviewed
 - addr: 0x206f40
   final: 0x157af0
   kind: function
+  semantics: the melee combat's simulation.
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -174,10 +195,11 @@
   readings: ["C-95: Attack Units — READ, ported"]
   context:
     - "...ender, still on its own plot). 0x205720(combat, 1, 1) resolves it by the combat's kind (0x206f40 the melee one) on the units as they stand — their damage, promotions and fortification..."
-  review: imported
+  review: reviewed
 - addr: 0x207080
   final: 0x157bb0
   kind: function
+  semantics: a city's strike (-> 0x249ee0).
   status: READ
   cases:
     - recording: 1120
@@ -189,10 +211,11 @@
   context:
     - "...e layered install; the district-defender strength 0x520270 (called by the district attack 0x207080) carries the diplomatic-visibility (\"ESPIONAGE\") bonus."
     - "- A city's strike strength (0x207080 → 0x249ee0): max(PlayerStats +0x150, m_iMaxRangedStrengthTrained (0x4bd030), COMBAT_MIN..."
-  review: imported
+  review: reviewed
 - addr: 0x2074b0
   final: 0x157ef0
   kind: function
+  semantics: "a unit's bombard attack on a city: two draws (0x519440 on the hit points, then the defense), nothing for the attacker."
   status: READ
   cases:
     - recording: 1117
@@ -202,7 +225,7 @@
   readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
   context:
     - ...15 (RANGED 50, BOMBARD 100; +0x1a4, +0x1a8, +0x1a0). The ranged (0x204b10) and bombard (0x2074b0) attacks draw twice (hit points, defense) and nothing for the attacker. The log carries...
-  review: imported
+  review: reviewed
 - addr: 0x207a80
   final: 0x158320
   kind: function
@@ -218,8 +241,12 @@
 - addr: 0x208b80
   final: 0x159250
   kind: function
+  semantics: "the plot's best defender. Flag 0x10: among the plot's units in its own order the comparator 0x523d60 keeps the first whose unwounded strength (0x56dc90 with the formation's) is strictly greater, and only then takes its wounds off (0x522630): ONE unit."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 191
+      value: "Guangzhou: a Line Infantry Corps (75, 16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 - 2150/256 - 60"
     - recording: 1121
       turn: 191
       value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
@@ -335,6 +362,7 @@
 - addr: 0x20a3c0
   final: 0x15a8a0
   kind: function
+  semantics: a path's destination test.
   status: READ
   cases:
     - recording: h1_duelw1128
@@ -345,7 +373,7 @@
     - "C-123: Operation Move's danger flags, the MoveTo execution and m_blockedTurns — READ (0x816cb0 at 0x816e70 / 0x817839, 0x962380, 0x73e610), both twins"
   context:
     - "...s): the unit's own plot 0; a plot off the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0x398, bit 8 where the..."
-  review: imported
+  review: reviewed
 - addr: 0x20bae0
   final: 0x15bd50
   kind: function
@@ -372,6 +400,7 @@
 - addr: 0x20e720
   final: 0x15e6b0
   kind: function
+  semantics: a combat kill (-> 0x493f80 with the capture flag).
   status: READ
   cases:
     - recording: 1121
@@ -381,7 +410,7 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
   context:
     - "...player's +0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian on China's Missionary b..."
-  review: imported
+  review: reviewed
 - addr: 0x211f80
   final: 0x161b50
   kind: function
@@ -395,8 +424,12 @@
 - addr: 0x212500
   kind: function
   name: Combat_Manager
-  semantics: a retreat (sets the turn done).
+  semantics: "a retreat (sets the turn done). A unit info with the +0x1b8 bit 8 (CanRetreatWhenCaptured: the Great People, the Archaeologist, the Naturalist, the Rock Band) retreats to 0x530650's plot and returns 2, or 0 where none is valid; otherwise the type the unit info's UnitCaptures collection names first (+0x208, BecomesUnitType) — or, where the mover may capture combat units, its own type after the \"Unit Capture Chance\" draw — is created under the mover's player on the victim's plot with the victim's build charges (+0xed0, 0x56cb00), damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0. A civilian captured: the payload's units — the captive (r14 +0x100), then the captor (rsi +0x100; where its +0x7d0 is -1 or 0x56ee80 answers) — raised as AI_EVENT_UNIT_CAPTURED (@f2e088) on the player's signals (+0x2b8, 0x200e10); the barbarians' triggered tree (TRIGGER_CAPTURE_BARBARIAN: \"Escort Worker To Camp\", the operation \"Barbarian Builder Capture\") runs it."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1121
+      turn: 133
+      value: a Builder captured keeps its 3 charges
   impl:
     - cpu/core/combat.ts:seizeCivilian
     - cpu/core/barbarianOps.ts:barbarianCaptures
@@ -416,6 +449,7 @@
 - addr: 0x212c30
   final: 0x1628f0
   kind: function
+  semantics: a combat kill (-> 0x493f80 with the capture flag).
   status: READ
   cases:
     - recording: 1121
@@ -425,4 +459,4 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
   context:
     - "...+0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian on China's Missionary beside Taiy..."
-  review: imported
+  review: reviewed

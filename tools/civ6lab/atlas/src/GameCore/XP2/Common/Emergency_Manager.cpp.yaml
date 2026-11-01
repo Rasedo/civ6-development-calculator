@@ -7,9 +7,12 @@
   final: 0x199290
   kind: function
   name: aidRequestGate
-  semantics: "EMERGENCY_TRIGGER_PLAYER_LOSES_POP_TO_RANDOM_EVENT's handler (subscribed by 0x25c460, called through 0x261ce0 with one event's tally for a player): a living full civilization (0x484a10, 0x4848c0) whose a x 0.5 + b + c (0x3388e0, rec+0x18, 0x339270 of 0x33b350) is at least GlobalParameters +0x7c4, WORLD_CONGRESS_REQUEST_FOR_AID_DAMAGE_MIN (4), reaches the trigger 0x260760; below it nothing."
+  semantics: "EMERGENCY_TRIGGER_PLAYER_LOSES_POP_TO_RANDOM_EVENT's handler (subscribed by 0x25c460, called through 0x261ce0 with one event's tally for a player): a living full civilization (0x484a10, 0x4848c0) whose a x 0.5 + b + c (0x3388e0, rec+0x18, 0x339270 of 0x33b350) is at least GlobalParameters +0x7c4, WORLD_CONGRESS_REQUEST_FOR_AID_DAMAGE_MIN (4), reaches the trigger 0x260760; below it nothing. The aid request's gate: the player a living full civilization (0x484a10, 0x4848c0), and a x 0.5 + b + c >= GlobalParameters +0x7c4 (WORLD_CONGRESS_REQUEST_FOR_AID_DAMAGE_MIN 4, loader 0x2d58f0 at 0x2d9870); at or above it the trigger 0x260760 queues the emergency."
   status: READ
   cases:
+    - recording: h1_duelw1128
+      turn: 46
+      value: "the fire on plot 542 takes Xi'an's one citizen: 1 point of 4, no SEND_AID (0 of the 29 duels raise one)"
     - recording: h1_duelw1128
       turn: 46
       value: "the fire on plot 542 takes Xi'an's one citizen: 1 point of 4, no SEND_AID in Game_Emergencies.csv (0 of 29 duels raise one)"
@@ -22,9 +25,10 @@
 - addr: 0x25afc0
   final: 0x19a7b0
   kind: function
+  semantics: the diplomatic victory is on (the project's diplomatic-victory rows).
   status: PARTLY
   readings:
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "- A diplomatic-victory row (+0xe8 bit 4, or the Projects_XP2 row's +0x60 bit 1, with 0x25afc0): per its rows PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT of the era's points."
-  review: imported
+  review: reviewed

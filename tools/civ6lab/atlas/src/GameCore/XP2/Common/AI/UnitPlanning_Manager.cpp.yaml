@@ -76,7 +76,7 @@
   final: 0x51c4b0
   kind: function
   name: predictCombat
-  semantics: "the planning's combat simulation: the blow from where the attacker stands at the expected roll (COMBAT_MAX_EXTRA_DAMAGE/2); dealt +0x64, taken +0x7c, per spot the target's blow back +0x94 / +0xac; a kill sets +0x60"
+  semantics: "the planning's combat simulation: the blow from where the attacker stands at the expected roll (COMBAT_MAX_EXTRA_DAMAGE/2); dealt +0x64, taken +0x7c, per spot the target's blow back +0x94 / +0xac; a kill sets +0x60 At 0x79174a: per spot dealt = the larger of the simulation's two results ([rbp-0xc], [rbp-8]; 150 a civilian), the kill byte (+0xc4) dealt >= the target's health, `wins` (+0x60) dealt > it; the blow back per spot re-simulated (0x205720 with the sides swapped through 0x213e00, the location the spot) into +0x94 / +0xac."
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -117,6 +117,7 @@
 - addr: 0x791e00
   kind: function
   name: UnitPlanning
+  semantics: plans one unit (AI Unit Planning's chunk body).
   status: PARTLY
   impl:
     - cpu/core/tactical.ts:reachPlots
@@ -131,7 +132,7 @@
   context:
     - ...h finder pool's count) chunks; N <= 1 plans each unit serially on the calling thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then the wait. The pool (0xf01920, count at +...
     - "- The planning's reach (AI Unit Planning 0x792c90 -> 0x791e00 -> the breadth-first search 0x26dcd0 for 2 turns, flags 0x115 | 0x800 | 0x100 where t..."
-  review: imported
+  review: reviewed
 - addr: 0x7920d0
   kind: function
   status: PARTLY
@@ -159,7 +160,7 @@
   review: reviewed
 - addr: 0x792c90
   kind: function
-  semantics: the planning's turn-start read of the revealed plots (once at the AI's turn start).
+  semantics: "the planning's turn-start read of the revealed plots (once at the AI's turn start). \"AI Unit Planning\": a fork-join over N = min(units, the path finder pool's count) chunks; N <= 1 plans each unit serially on the calling thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then the wait."
   status: PARTLY
   impl:
     - cpu/core/tactical.ts:barbarianTactics

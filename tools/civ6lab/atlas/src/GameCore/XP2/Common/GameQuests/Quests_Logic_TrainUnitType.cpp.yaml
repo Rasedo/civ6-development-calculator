@@ -13,6 +13,7 @@
 - addr: 0x84bc70
   final: 0x5a5a80
   kind: function
+  semantics: "the unit's upgrade unlocked: its PrereqTech and PrereqCivic held, the upgrade the actor's own."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -22,10 +23,11 @@
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - "...civilization's table maps the unit to itself), no upgrade the actor has unlocked (0x84bc70: the upgrade's PrereqTech and PrereqCivic held, the upgrade the actor's own), its era..."
-  review: imported
+  review: reviewed
 - addr: 0x84bdc0
   final: 0x5a5bd0
   kind: function
+  semantics: Train Unit Type's per-unit test (with 0x84be90).
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -38,22 +40,26 @@
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - "- Train Unit Type (0x84be90 / 0x84bdc0): a unit with CanTrain and a Combat, RangedCombat or Bombard, the actor's own (its ci..."
-  review: imported
+  review: reviewed
 - addr: 0x84be90
   final: 0x5a5ca0
   kind: function
+  semantics: "Train Unit Type's validity: a unit with CanTrain and a Combat, RangedCombat or Bombard, the actor's own (its civilization's table maps the unit to itself), no upgrade the actor has unlocked (0x84bc70), its era (0x93e6c0) the actor's era (0x467eb0)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      value: "dll_quests.py: select 335 of 341 ranges, pickers 261 of 264 over the 29 duels"
     - recording: h1_duelw1117
       turn: 24
       value: "runs/h1_duelw1117 t24: China's Slinger     upgraded to an Archer in its start, the envoy to Caguana annexing 702);"
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - "- Train Unit Type (0x84be90 / 0x84bdc0): a unit with CanTrain and a Combat, RangedCombat or Bombard, the actor's..."
-  review: imported
+  review: reviewed
 - addr: 0x84bf00
   final: 0x5a5d10
   kind: function
+  semantics: Train Unit Type failed when the actor unlocks its upgrade (on a tech or civic).
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -62,12 +68,16 @@
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - ...start, the envoy to Caguana annexing 702); failed when the actor unlocks its upgrade (0x84bf00 on a tech or civic).
-  review: imported
+  review: reviewed
 - addr: 0x84bf90
   final: 0x5a5da0
   kind: function
+  semantics: "Train Unit Type done when a unit of the type is added to the actor — an upgrade too."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 24
+      value: China's Slinger upgraded to an Archer in its start, the envoy to Caguana
     - recording: h1_duelw1117
       turn: 24
       value: "runs/h1_duelw1117 t24: China's Slinger     upgraded to an Archer in its start, the envoy to Caguana annexing 702);"
@@ -75,10 +85,11 @@
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - "...rder (0x84c1e0); done when a unit of the type is added to the actor — an upgrade too (0x84bf90; runs/h1_duelw1117 t24: China's Slinger upgraded to an Archer in its start, the envoy..."
-  review: imported
+  review: reviewed
 - addr: 0x84c1e0
   final: 0x5a5eb0
   kind: function
+  semantics: "Train Unit Type's picker: \"Choosing random unit type for Train Unit quest\" over the valid units in the Units table's order."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -88,4 +99,4 @@
   readings: ["H-1: the city-states' quests — READ"]
   context:
     - "...sing random unit type for Train Unit quest\" over them in the Units table's order (0x84c1e0); done when a unit of the type is added to the actor — an upgrade too (0x84bf90; runs..."
-  review: imported
+  review: reviewed

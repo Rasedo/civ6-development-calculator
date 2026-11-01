@@ -13,6 +13,7 @@
 - addr: 0x84e030
   final: 0x5a7830
   kind: function
+  semantics: Zone District Type's per-district test (with 0x84e120).
   status: PARTLY
   impl:
     - cpu/core/quests.ts:zoneTargets
@@ -22,33 +23,39 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Zone District Type (0x84e120 / 0x84e030): the actor's own district (0x406c00) with RequiresPopulation (+0xe1 bit 6), its era..."
-  review: imported
+  review: reviewed
 - addr: 0x84e120
   final: 0x5a7920
   kind: function
+  semantics: "Zone District Type's validity: the actor's own district (0x406c00) with RequiresPopulation (+0xe1 bit 6), its era known and at most the actor's (0x93e580, 0x93e9e0), below MaxPerPlayer counting every one it holds (0x4bdd70)."
   status: PARTLY
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Zone District Type (0x84e120 / 0x84e030): the actor's own district (0x406c00) with RequiresPopulation (+0xe1 bit 6..."
-  review: imported
+  review: reviewed
 - addr: 0x84e190
   final: 0x5a7990
   kind: function
+  semantics: Zone District Type done when the actor COMPLETES a district of the type.
   status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      value: 335 against 332 for the placement variant
   impl: [cpu/core/quests.ts:questDistrictBuilt]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...picker over them in the table's order (0x84e3e0); done when the actor COMPLETES one (0x84e190; the variant done at the district's placement scores worse on the records, 332 ag...
-  review: imported
+  review: reviewed
 - addr: 0x84e3e0
   final: 0x5a7aa0
   kind: function
+  semantics: Zone District Type's picker over the valid districts in the table's order.
   status: PARTLY
   impl: [cpu/harness/drawSites.ts:DRAW_SITES]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ounting every one it holds (0x4bdd70); the picker over them in the table's order (0x84e3e0); done when the actor COMPLETES one (0x84e190; the variant done at the district's pla...
-  review: imported
+  review: reviewed

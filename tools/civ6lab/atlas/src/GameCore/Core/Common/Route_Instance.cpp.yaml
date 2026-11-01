@@ -6,6 +6,7 @@
 - addr: 0x88680
   final: 0x63cb0
   kind: function
+  semantics: the route manager's per-plot portal.
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -15,4 +16,4 @@
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   context:
     - ...ghbour with a route (plot +0x47 not 0xff) counts, one without a route holding a portal (0x88680, the route manager's per-plot portal) refuses the term, and one of the five mountain...
-  review: imported
+  review: reviewed

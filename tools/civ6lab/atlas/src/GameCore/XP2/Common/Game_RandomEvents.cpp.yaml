@@ -6,6 +6,7 @@
 - addr: 0x334d30
   final: 0x23b320
   kind: function
+  semantics: "the random event after \"Random Event Roll\" (the family's handler)."
   status: READ
   cases:
     - recording: 1116
@@ -23,11 +24,18 @@
     - "...mEvents order, the empty slot appended last for 10N − Σ), \"Random Event Roll\", the event (0x334d30). On 1116 39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the flood..."
     - "...l\" (0x287c00, over the vector at +0x128, never empty: the empty slot rides it), the event 0x334d30, then the history's update 0x2910d0 (no draw). Before the start turn nothing draws, the v..."
     - "...Woods, a Jungle Fire Rainforest) and the spacing 0x290030 — starts the SAME event there (0x334d30), its own record and clock, its own birth strike straight away. So one 50% roll a fire-tu..."
-  review: imported
+  review: reviewed
 - addr: 0x335040
   kind: function
+  semantics: "The gate (the volcano component's vtable 0xdb11b8): no draw when the named count N' or N is 0; D = N // (2 x all volcanoes); below PercentVolcanoesActive, no draw unless N' - active > 0, then D //= (target - pct) x N' // 100 when that is >= 200; at or above it, no draw without an active volcano. ONE roll a turn for the map: pct = the active share over the volcanoes AND volcanic wonders; D = N // (2V), N the event draw's (250 online); below PercentVolcanoesActive (MODERATE 70): D //= ((70 - pct) x V' // 100) when that is >= 2, V' the NAMED volcanoes, and rand(D) = 0 wakes one dormant named volcano drawn uniformly (\"Choose Active Volcano Roll\"); at or above 70 the same roll puts one ACTIVE volcano to sleep (\"Choose Inactive Volcano Roll\"). The volcano roll: one \"Active Volcano Roll\", a choice after a 0; its gate counts the NAMED volcanoes (it does not run every turn)."
   status: READ
   cases:
+    - recording: h1_duelw1118
+      turn: 152
+      value: every Active Volcano Roll draws over 62 with two volcanoes; t152's Choose Inactive Volcano Roll over 2 with both active
+    - recording: h1_duelw1116
+      turn: 6
+      value: "no roll at t6 and t8: no volcano named yet"
     - recording: 1116
       value: "On 1116 39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the flood's draws ending on the witness (after the units and districts that spend draws: see below);"
     - recording: 1116
@@ -53,10 +61,11 @@
     - "...turn's step 0x338710 (gate: turn ≥ start + RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weights 0x335260, \"Random Event Roll\" at 0x338814; N 0x339020; families: storms 0x28..."
     - "...hing to draw there. Its order: the storms' walks (0x288f40 → 0x28ecd0), the volcano roll (0x335040: one \"Active Volcano Roll\", a choice after a 0), the weights (0x335260, no draw; entries..."
     - "...the droughts' tick and the storms' walk (0x288f40: 0x2876c0, 0x28ecd0), the volcano roll 0x335040, the weights and \"Random Event Roll\" — and only then the climate component's turn (0x2d1f..."
-  review: imported
+  review: reviewed
 - addr: 0x335260
   final: 0x23b8b0
   kind: function
+  semantics: "the random events' weights (no draw): entries in RandomEvents order, the empty slot appended last for 10N - the sum."
   status: READ
   cases:
     - recording: 1116
@@ -79,10 +88,11 @@
     - "...gate: turn ≥ start + RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weights 0x335260, \"Random Event Roll\" at 0x338814; N 0x339020; families: storms 0x28f490 (map-size 0x28d0f..."
     - "...the volcano roll (0x335040: one \"Active Volcano Roll\", a choice after a 0), the weights (0x335260, no draw; entries in RandomEvents order, the empty slot appended last for 10N − Σ), \"Rand..."
     - "...(a tail jump) every live one-off's turn 0x289430 — the volcano roll 0x335040, the weights 0x335260 (no draw), 0x33a280, \"Random Event Roll\" (0x287c00, over the vector at +0x128, never empt..."
-  review: imported
+  review: reviewed
 - addr: 0x336000
   final: 0x23c3b0
   kind: function
+  semantics: a complete district with garrison hit points (the CITY_GARRISON roll's gate).
   status: READ
   cases:
     - recording: 1116
@@ -97,10 +107,11 @@
   readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116"]
   context:
     - ...ce per land unit, CITY_GARRISON once on a complete district with garrison hit points (0x336000), CITY_WALLS once while the walls stand (0x336170); then each RandomEvent_Yields row ov...
-  review: imported
+  review: reviewed
 - addr: 0x336170
   final: 0x23c520
   kind: function
+  semantics: the walls stand (the CITY_WALLS roll's gate).
   status: READ
   cases:
     - recording: 1116
@@ -115,10 +126,11 @@
   readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116"]
   context:
     - "...te district with garrison hit points (0x336000), CITY_WALLS once while the walls stand (0x336170); then each RandomEvent_Yields row over the plots, one \"Boosted Yield Chance\" rand(100)..."
-  review: imported
+  review: reviewed
 - addr: 0x3366a0
   final: 0x23ca50
   kind: function
+  semantics: "UNIT_DAMAGE_LAND / NAVAL's applier: the units the damage KILLS (damage >= COMBAT_MAX_HIT_POINTS)."
   status: PARTLY
   impl:
     - cpu/core/disasters.ts:unitDamageDraws
@@ -137,10 +149,11 @@
   context:
     - ...GED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and UNIT_KILLED_CIVILIAN 0x33a070 do not (the owner only sets the damage percent). Fl...
     - "The unit applier 0x3366a0 takes \"Random Event Unit Damage Roll\" for every unit that passes the alive / domain gates..."
-  review: imported
+  review: reviewed
 - addr: 0x336a50
   final: 0x23ce00
   kind: function
+  semantics: "Adds each landed row's return to the owner's record field its out-parameter names: +0x0 IMPROVEMENT_PILLAGED (0x33aba0), +0x4 IMPROVEMENT_DESTROYED, +0x8 SPECIFIC_IMPROVEMENT_PILLAGED, +0xc SPECIFIC_IMPROVEMENT_DESTROYED, +0x10 BUILDING_PILLAGED, +0x14 DISTRICT_PILLAGED, +0x18 POPULATION_LOSS (0x33a6e0), +0x1c UNIT_KILLED_CIVILIAN (0x33a070), +0x20 UNIT_DAMAGE_LAND, +0x24 UNIT_DAMAGE_NAVAL (0x3366a0), +0x38 / +0x40 / +0x44 / +0x48 hashes no install row names. Lands an event damage row (each land unit its own roll); its last arm SPREAD (-> 0x33b580)."
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -159,7 +172,7 @@
     - ..., any owner; one draw rand(100) < Percentage applies the row through the shared applier 0x336a50.
     - "...the plot, through the city's building pillage 0x193190 directly — not the damage applier 0x336a50 — when the plot's district is owned and not already pillaged. So the plant goes with no d..."
     - ...illage-false ones, then the district; every event reaches both through the shared applier 0x336a50, so a flood's, an eruption's, a fire's and an accident's act as a storm's.
-  review: imported
+  review: reviewed
 - addr: 0x337210
   final: 0x23d300
   kind: function
@@ -173,8 +186,14 @@
   final: 0x23b7f0
   kind: function
   name: Game_RandomEvents
+  semantics: "Gated whole: turn >= [0x5b8] - 1 + the start turn, a game option 0x72ce2afb first. Order: 0x288f40 (the droughts' tick 0x2876c0, every live storm's walk 0x28ecd0, then a tail jump to every live one-off's turn 0x289430), the volcano roll 0x335040, the weights 0x335260, 0x33a280, \"Random Event Roll\" (0x287c00 over the vector +0x128, the empty slot riding it), the event 0x334d30, then the history's update 0x2910d0 (no draw). Gate: turn >= start + RANDOM_EVENT_START_TURN - 1; \"Random Event Roll\" at 0x338814 over 10N (0x339020), the remainder the empty slot. The random-event step: the LAST thing to draw between the barbarians' completed start of turn T-1 and player 0's start of turn T. Its order: the storms' walks (0x288f40 -> 0x28ecd0), the volcano roll (0x335040), the weights (0x335260, no draw), \"Random Event Roll\", the event (0x334d30)."
   status: READ
   cases:
+    - recording: h1_duelw1116
+      value: "39 of 39 floods reproduce the recorded silt (1115: 25 of 25)"
+    - recording: h1_duelw1117
+      turn: 40
+      value: the barbarians' draws close t40, then t41's volcano and event rolls, then player 0's t41 start
     - recording: 1116
       value: "On 1116 39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the flood's draws ending on the witness (after the units and districts that spend draws: see below);"
     - recording: 1116
@@ -194,11 +213,11 @@
     - "Game_RandomEvents: the turn's step 0x338710 (gate: turn ≥ start + RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weight..."
     - "...barians' completed start of turn T-1 to player 0's start of turn T; the random-event step 0x338710 is the LAST thing to draw there. Its order: the storms' walks (0x288f40 → 0x28ecd0), the..."
     - "The turn's world step 0xa55190 calls the random-event step 0x338710 — the droughts' tick and the storms' walk (0x288f40: 0x2876c0, 0x28ecd0), the volcano rol..."
-  review: imported
+  review: reviewed
 - addr: 0x3388e0
   kind: function
   name: eventHalfDamage
-  semantics: "A player's half-weight damage of one event: rec+0x0 IMPROVEMENT_PILLAGED + 0x4 IMPROVEMENT_DESTROYED + 2 x 0x8 SPECIFIC_IMPROVEMENT_PILLAGED + 0x10 BUILDING_PILLAGED + 0x14 DISTRICT_PILLAGED + 0x2c + 0x3c + 0x44."
+  semantics: "A player's half-weight damage of one event: rec+0x0 IMPROVEMENT_PILLAGED + 0x4 IMPROVEMENT_DESTROYED + 2 x 0x8 SPECIFIC_IMPROVEMENT_PILLAGED + 0x10 BUILDING_PILLAGED + 0x14 DISTRICT_PILLAGED + 0x2c + 0x3c + 0x44. The aid tally's a = +0x0 + +0x4 + 2 x +0x8 + +0x10 + +0x14 + +0x2c + +0x3c + +0x44."
   status: READ
   cases:
     - recording: h1_duelw1128
@@ -215,6 +234,7 @@
 - addr: 0x339020
   final: 0x23e460
   kind: function
+  semantics: "the random events' N: the game's last turn - its start turn (else the speed's GameSpeed_Turns total: Online 250, Standard 500; else 500)."
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -232,7 +252,7 @@
   context:
     - "...− 1), the volcano roll 0x335040, the weights 0x335260, \"Random Event Roll\" at 0x338814; N 0x339020; families: storms 0x28f490 (map-size 0x28d0f0), floods 0xa2cfc0, eruptions 0xa1e470, warm..."
     - "...; +0x58 0xa1d130 the active volcanoes; +0x60 0xa1d450 the total. With N the game's turns (0x339020): no draw when the named count N' is 0 or N is 0; D = N // (2 × all volcanoes); below Per..."
-  review: imported
+  review: reviewed
 - addr: 0x339140
   final: 0x23e520
   kind: function
@@ -256,7 +276,7 @@
 - addr: 0x339270
   kind: function
   name: eventUnitsKilled
-  semantics: "A player's units one event killed: rec+0x1c UNIT_KILLED_CIVILIAN + 0x20 UNIT_DAMAGE_LAND + 0x24 UNIT_DAMAGE_NAVAL (0x3366a0 counts the units its damage kills) + 0x40."
+  semantics: "A player's units one event killed: rec+0x1c UNIT_KILLED_CIVILIAN + 0x20 UNIT_DAMAGE_LAND + 0x24 UNIT_DAMAGE_NAVAL (0x3366a0 counts the units its damage kills) + 0x40. The aid tally's c = +0x1c + +0x20 + +0x24 + +0x40."
   status: READ
   cases:
     - recording: h1_duelw1128
@@ -271,6 +291,7 @@
 - addr: 0x339960
   final: 0x23eb10
   kind: function
+  semantics: "a one-off's spread test: the event's own start test 0x28ec10 and the spacing 0x290030."
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -284,12 +305,12 @@
   context:
     - "...336a50's last arm → 0x33b580): the plot's neighbours within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, the event's own start test 0x28ec10 (its RandomEvent_Features row: a For..."
     - "...THEAST, WEST, NORTHEAST, NORTHWEST, EAST, SOUTHWEST (`RING_DIRS`). Each neighbour passing 0x339960 (the start test 0x28ec10 and 0x290030 with the row's Hexes) is born at once with its age-..."
-  review: imported
+  review: reviewed
 - addr: 0x33a070
   final: 0x23f040
   kind: function
   name: UNIT_KILLED_CIVILIAN
-  semantics: the plot's units of the unit container's layer 0 (0x75c50 with r9d 0) not dead (+0x770), of formation class CIVILIAN (GetFormationClass 2), without CanRetreatWhenCaptured (unit info +0x1b8 bit 8), whose owner is not immune to the event (0x468100, m_aRandomEventNoUnitDamage) are collected and killed; a Trader (its own layer) is not among them; the layers' assignment unread
+  semantics: "the plot's units of the unit container's layer 0 (0x75c50 with r9d 0) not dead (+0x770), of formation class CIVILIAN (GetFormationClass 2), without CanRetreatWhenCaptured (unit info +0x1b8 bit 8), whose owner is not immune to the event (0x468100, m_aRandomEventNoUnitDamage) are collected and killed; a Trader (its own layer) is not among them; the layers' assignment unread UNIT_KILLED_CIVILIAN's applier: the civilians killed."
   status: PARTLY
   cases:
     - recording: h1_duelw1127
@@ -303,6 +324,7 @@
   review: reviewed
 - addr: 0x33a280
   kind: function
+  semantics: "a random-event step call between the weights and the roll (no labelled draw). Writes Game_RandomEvents.csv's sixteen-number row: the turn, the realism, then 0x28db00 (\"Total CO2\"), the categories after."
   status: READ
   cases:
     - recording: 1115
@@ -322,21 +344,23 @@
   context:
     - "...live one-off's turn 0x289430 — the volcano roll 0x335040, the weights 0x335260 (no draw), 0x33a280, \"Random Event Roll\" (0x287c00, over the vector at +0x128, never empty: the empty slot ri..."
     - "The random-event step writes Game_RandomEvents.csv's sixteen-number row (0x33a280): the turn, the realism, then 0x28db00, the climate's world CO2 (\"Total CO2\"), the catego..."
-  review: imported
+  review: reviewed
 - addr: 0x33a6e0
   final: 0x23f5e0
   kind: function
   name: POPULATION_LOSS
+  semantics: "POPULATION_LOSS's applier: 1 per citizen."
   status: PARTLY
   readings:
     - "C-41: the eruption's soil, the ring and the gates"
     - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - ...YED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and UNIT_KILLED_CIVILIAN 0x33...
-  review: imported
+  review: reviewed
 - addr: 0x33a780
   kind: function
   name: BUILDING_PILLAGED
+  semantics: "BUILDING_PILLAGED's applier (owned plot, the district's city): asks the district's chooser 0x24af90, then refuses a building whose Buildings_XP2 row has Pillage false (+0x48 bit 16: BUILDING_DAR_E_MEHR, BUILDING_FLOOD_BARRIER). No draw."
   status: PARTLY
   impl: [cpu/core/disasters.ts:pillageTileBuildings, gpu/core/sim_economy.py:_pillage_tile_buildings]
   readings:
@@ -346,11 +370,12 @@
   context:
     - ...0x33aba0, IMPROVEMENT_DESTROYED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and...
     - "The applier 0x33a780 (owned plot, the district's city) asks the district's chooser 0x24af90: nothing on a pill..."
-  review: imported
+  review: reviewed
 - addr: 0x33a910
   final: 0x23f880
   kind: function
   name: DISTRICT_PILLAGED
+  semantics: "DISTRICT_PILLAGED's applier: every building of the district but the Pillage-false ones, then the district; every event reaches both through the shared applier 0x336a50."
   status: PARTLY
   readings:
     - "C-41: the eruption's soil, the ring and the gates"
@@ -359,11 +384,12 @@
   context:
     - "...ily: IMPROVEMENT_PILLAGED 0x33aba0, IMPROVEMENT_DESTROYED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMA..."
     - ...o a Dar-e Mehr atop its Holy Site spares the Temple under it. No draw. DISTRICT_PILLAGED (0x33a910) takes every building of the district but the Pillage-false ones, then the district; ever...
-  review: imported
+  review: reviewed
 - addr: 0x33aba0
   final: 0x23fb20
   kind: function
   name: IMPROVEMENT_PILLAGED
+  semantics: "IMPROVEMENT_PILLAGED's applier: 1 on any improvement of an owned plot, pillaged already or not."
   status: PARTLY
   impl: [cpu/core/disasters.ts:scorch, gpu/core/sim_economy.py:_scorch]
   readings:
@@ -371,13 +397,16 @@
     - "C-94: the aid request's gate — READ (0x2597d0 over the event tally 0x33b350), both twins"
   context:
     - "- The owned-plot gate belongs to the damage TYPE, not the family: IMPROVEMENT_PILLAGED 0x33aba0, IMPROVEMENT_DESTROYED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780..."
-  review: imported
+  review: reviewed
 - addr: 0x33b350
   kind: function
   name: eventDamageSignal
-  semantics: "The end of ONE event's application (the drought strike 0x286530, the one-off strike 0x2867f0, the storm strike 0x286f80, the accident 0x2d33a0, the eruption passes 0xa1c1a0 / 0xa1c760, the flood 0xa2a4d0): for each affected player of the caller's stack record (0x4c bytes per player, filled by the applier 0x336a50), the game signal at GameSignals +0xc48 with (player, 0x3388e0, rec+0x18 the citizens lost, 0x339270) — the aid request's gate 0x2597d0 listens."
+  semantics: "The end of ONE event's application (the drought strike 0x286530, the one-off strike 0x2867f0, the storm strike 0x286f80, the accident 0x2d33a0, the eruption passes 0xa1c1a0 / 0xa1c760, the flood 0xa2a4d0): for each affected player of the caller's stack record (0x4c bytes per player, filled by the applier 0x336a50), the game signal at GameSignals +0xc48 with (player, 0x3388e0, rec+0x18 the citizens lost, 0x339270) — the aid request's gate 0x2597d0 listens. Raises the aid signal once per affected player at the end of ONE event's application, over a per-player record the caller keeps on its stack (0x4c bytes per player, zeroed by 0x3338d0): a = 0x3388e0, b = rec+0x18, c = 0x339270. Callers: the drought strike 0x286530, the one-off strike 0x2867f0, the storm strike 0x286f80, the accident 0x2d33a0, the eruption passes 0xa1c1a0 / 0xa1c760, the flood 0xa2a4d0."
   status: READ
   cases:
+    - recording: h1_duelw1128
+      turn: 46
+      value: "the fire on plot 542 takes Xi'an's one citizen: 1 point of 4, no SEND_AID (0 of the 29 duels raise one)"
     - recording: h1_duelw1128
       turn: 46
       value: "the fire on plot 542: China's record holds 1 citizen lost (rec+0x18 = 1), no pillage or kill: 1 point, under the gate's 4; no SEND_AID raised"
@@ -391,8 +420,12 @@
 - addr: 0x33b580
   final: 0x240390
   kind: function
+  semantics: "SPREAD: the plot's neighbours within 1 (0x6b1b0, the ring 0x691f0's order), each that passes 0x339960, start the SAME event there (0x334d30), its own record and clock and birth strike: one 50% roll lights every eligible neighbour at once. Units and cities it skips: a city whose established governor's +0xc8 holds keeps the fire off its plots."
   status: READ
   cases:
+    - recording: h1_duelw1118
+      turn: 22
+      value: Rainforest 665's spread lit 664 (its WEST) before 621 (its NORTHWEST); at t23 664's tick came first
     - recording: h1_duelw1118
       turn: 22
       value: "Each neighbour passing 0x339960 (the start test 0x28ec10 and 0x290030 with the row's Hexes) is born at once with its age-0 strike, in that order, and the births tick in it: runs/h1_duelw1118 t22, Rain"
@@ -404,4 +437,4 @@
   context:
     - "SPREAD (0x336a50's last arm → 0x33b580): the plot's neighbours within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, th..."
     - "...res (`replayEvents`; 1117 t222-229, 1118 t20-29 replayed draw for draw). Units and cities 0x33b580 skips: a city whose established governor's +0xc8 holds (unread which) keeps the fire off..."
-  review: imported
+  review: reviewed

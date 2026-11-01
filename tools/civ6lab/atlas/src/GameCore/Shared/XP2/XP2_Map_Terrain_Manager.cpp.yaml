@@ -6,21 +6,23 @@
 - addr: 0xa36400
   final: 0x736900
   kind: function
+  semantics: "\"Random Lake Range\": one draw over the lake names left."
   status: PARTLY
   impl: [cpu/harness/drawSites.ts:DRAW_SITES]
   readings: ["H-1: draws the AI takes, draws the engines lack"]
   context:
     - "...ts territory (0xa36ff0: \"Random Desert\", \"Sea\", \"Ocean\", \"Mountain Range\", \"Volcano\"; 0xa36400 \"Random Lake Range\") — one draw over the names left. The engines name no region (AUDIT..."
-  review: imported
+  review: reviewed
 - addr: 0xa36ff0
   final: 0x7373f0
   kind: function
+  semantics: "names a plot's territory: \"Random Desert\", \"Sea\", \"Ocean\", \"Mountain Range\", \"Volcano\" — one draw over the names left."
   status: PARTLY
   impl: [cpu/harness/drawSites.ts:DRAW_SITES]
   readings: ["H-1: draws the AI takes, draws the engines lack"]
   context:
     - "...te 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\") and its territory (0xa36ff0: \"Random Desert\", \"Sea\", \"Ocean\", \"Mountain Range\", \"Volcano\"; 0xa36400 \"Random Lake Ra..."
-  review: imported
+  review: reviewed
 - addr: 0xa39110
   final: 0x738470
   kind: function

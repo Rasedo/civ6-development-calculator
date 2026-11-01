@@ -16,6 +16,7 @@
 - addr: 0x1c5350
   final: 0x12ff20
   kind: function
+  semantics: "the city's Production (with an item id: toward the item; with none: the plain Production)."
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -39,7 +40,7 @@
   context:
     - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0x1108 of the city's yield component) a...
     - "...'s step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Production toward the item), B with none (the city's plain P..."
-  review: imported
+  review: reviewed
 - addr: 0x1c64d0
   final: 0x130df0
   kind: function
@@ -95,8 +96,12 @@
   final: 0x131b80
   kind: function
   name: ChangePopulation
+  semantics: City::ChangePopulation (-> ChangeNumUnassigned 0x194fb0 with the change). A growth does not rebuild the luxury allocation (its two callers are 0x4a7560 and 0x4a8ed0).
   status: READ
   cases:
+    - recording: h1_duelw1128
+      turn: 182
+      value: Taiyuan grown to 7 on its two luxuries, Displeased
     - recording: h1_duelw1128
       turn: 182
       value: "Recorded:   runs/h1_duelw1128 Taiyuan t182 (grown to 7 on its two luxuries, Displeased,   banks 1175/256 x 1.35;"
@@ -111,15 +116,16 @@
     - "- The population change 0x1f3050 (called from City ChangePopulation 0x1c79b0): a gain of n adds ATHEISM_PRESSURE_PER_POP (gp +0x5d8) x n, `<< 8`, to the entry of th..."
     - "...angeNumUnassigned` (0x194fb0, called with the population change by City::ChangePopulation 0x1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x1963..."
     - "...d the resources step 0x4a8ed0 in Player DoTurn. A city's growth (City::ChangePopulation 0x1c79b0) is neither: the culture its border banks after the growth reads its new size's amenity..."
-  review: imported
+  review: reviewed
 - addr: 0x1cb000
   kind: function
+  semantics: a city's great person points of a class.
   status: PARTLY
   readings:
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
   context:
     - ...over the cities the city build AI's +0x10f8[class] where it has one and the city's own 0x1cb000 on its amenities, the player's bonus a turn +0x1d8[class] whole, x (1 + 0x43c340 / 100:...
-  review: imported
+  review: reviewed
 - addr: 0x1cb0f0
   final: 0x132ad0
   kind: function
@@ -144,12 +150,13 @@
 - addr: 0x1cb470
   final: 0x132cb0
   kind: function
+  semantics: "the player's modifier-added adjacencies (MODIFIER_PLAYER_CITIES_TERRAIN_ADJACENCY and kin): 0x30-byte entries — terrain, feature, river +8, adjacent district +9, appeal +0xc, TilesRequired +0x14, amount +0x18."
   status: PARTLY
   readings: ["H-1: the district adjacency — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...h through 0x365ae0, SUMMED AS INTEGERS; then the player's modifier-added adjacencies (0x1cb470: MODIFIER_PLAYER_CITIES_TERRAIN_ADJACENCY and kin, entries of 0x30 bytes: terrain, feat..."
-  review: imported
+  review: reviewed
 - addr: 0x1cb8b0
   kind: function
   name: City::GetYield
@@ -190,8 +197,11 @@
   review: reviewed
 - addr: 0x1cbd10
   kind: function
+  semantics: "a citizen's yield share: population << 8 times SCIENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed-point divide by 100 << 8 (0x16e940): floor(pop x pct x 256 / 100) / 256."
   status: READ
   cases:
+    - recording: h1_duelw1116
+      value: Xi'an Culture 1.296875, 1.59765625, 1.8984375, 4.19921875
     - recording: 1115
       value: "- A citizen's yield share (0x1cbd10): population << 8 times   SCIENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed-point divide   by 100 << 8 (0x16e940): floor(pop · pct · 256 / 100) / 256 "
     - recording: 1108
@@ -202,4 +212,4 @@
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
   context:
     - "- A citizen's yield share (0x1cbd10): population << 8 times SCIENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed..."
-  review: imported
+  review: reviewed

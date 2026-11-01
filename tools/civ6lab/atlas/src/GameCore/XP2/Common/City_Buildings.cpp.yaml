@@ -30,11 +30,12 @@
 - addr: 0x18e160
   final: 0x10be50
   kind: function
+  semantics: "a wonder's tourism: TOURISM_BASE_FROM_WONDER (2, GP +0x6c4); when TOURISM_ADVANCED_ERA_WONDER (GP +0x6c0) is set, plus the owner's era index (0x467eb0) less the wonder's — its PrereqTech's era (+0x210 -> +0xc0), else its PrereqCivic's (+0x220 -> +0xc8), else 1 — where the owner's is later; then times the city's tourism percent (0x1abe50 on +0x1ac8) over 100 when not 100."
   status: PARTLY
   readings: ["H-1: a wonder's and an improvement's tourism — PARTLY READ"]
   context:
     - "- A wonder (0x18e160, and the city walk 0x18ffe0 over the city's wonders): TOURISM_BASE_FROM_WONDER (2, GP +..."
-  review: imported
+  review: reviewed
 - addr: 0x18e570
   final: 0x10c0e0
   kind: function
@@ -90,6 +91,7 @@
   review: imported
 - addr: 0x18fe60
   kind: function
+  semantics: a building of the city is pillaged (the city's buildings +0x1c78 byte array).
   status: READ
   cases:
     - recording: 1128
@@ -108,15 +110,16 @@
     - "C-96: a city-state's City Center projects, Build Unit's pillaged building, the pick's pillaged district and the war footing's writer — READ (0x7f50e9, 0x71fb80 at 0x721158 / 0x72118a), the pick's district test PARTLY (0x170450 at 0x17071d), both twins"
   context:
     - "...its row's base (+0x54 behind +0x50) plus each building of the district not pillaged (0x18fe60 on the city's buildings +0x1c78: the byte array the Lua IsPillaged binding 0x9847b0 ->..."
-  review: imported
+  review: reviewed
 - addr: 0x18ffe0
   final: 0x10cd90
   kind: function
+  semantics: the city's walk over its wonders' tourism (0x18e160).
   status: PARTLY
   readings: ["H-1: a wonder's and an improvement's tourism — PARTLY READ"]
   context:
     - "- A wonder (0x18e160, and the city walk 0x18ffe0 over the city's wonders): TOURISM_BASE_FROM_WONDER (2, GP +0x6c4); when TOURISM_ADVANCE..."
-  review: imported
+  review: reviewed
 - addr: 0x193190
   final: 0x10e8b0
   kind: function

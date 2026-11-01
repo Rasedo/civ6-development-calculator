@@ -6,19 +6,21 @@
 - addr: 0x84a120
   final: 0x5a4810
   kind: function
+  semantics: "Convert's validity: the actor founded a religion the minor's capital does not follow (+0x1910); target the religion."
   status: PARTLY
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Convert (0x84a120): the actor founded a religion the minor's capital does not follow (+0x1910); target..."
-  review: imported
+  review: reviewed
 - addr: 0x84a200
   final: 0x5a4890
   kind: function
+  semantics: Convert done when the minor's capital comes to follow the religion.
   status: PARTLY
   impl: [cpu/core/quests.ts:questReligion]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...low (+0x1910); target the religion; done when the minor's capital comes to follow it (0x84a200).
-  review: imported
+  review: reviewed

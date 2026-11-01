@@ -7,9 +7,12 @@
   final: 0x32a6f0
   kind: function
   name: m_iMilitaryStrength
-  semantics: m_iMilitaryStrength (the AI's combat strength, flag 0).
+  semantics: "m_iMilitaryStrength (the AI's combat strength, flag 0). Computed at each player's turn start, before its production, into PlayerStats +0x210: per unit max(Combat, RangedCombat) x HP left / max HP in 24.8, truncated, plus the treasury's whole Gold as trunc((gold x 256 / 6) / 512), the sum >> 8. A player reads this turn's values for the players up to itself and last turn's for those after it."
   status: PARTLY
   cases:
+    - recording: h1_duelw1124
+      turn: 6
+      value: Rome, first to move, reads China's of t-1
     - recording: h1_duelw1124
       value: "A player   reads, as its last turn start before its own activation left them, this   turn's values for the players up to itself and last turn's for the   players after it (runs/h1_duelw1124: Rome, fir"
   impl:
@@ -37,6 +40,7 @@
   final: 0x32b6e0
   kind: function
   name: PlayerStats
+  semantics: "PlayerStats: the average district count (the district discount's)."
   status: READ
   cases:
     - recording: 1112
@@ -49,7 +53,7 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "...'s under-average models): the type's count 0x4bdd70 (placed districts included) against 0x4bca20's average, the completed specialty districts over the unlocked specialty types, both li..."
-  review: imported
+  review: reviewed
 - addr: 0x4bcd30
   final: 0x32b990
   kind: function
@@ -113,6 +117,7 @@
   final: 0x32be10
   kind: function
   name: MinOneCity
+  semantics: the player's city count (MinOneCity).
   status: READ
   cases:
     - recording: h1_duelw1119
@@ -127,10 +132,11 @@
   readings: ["H-1: the goody hut's other gates and the Relic — READ"]
   context:
     - "...0 flags): bit 3 RequiresUnit — no unit (a culture claim), not eligible; bit 1 MinOneCity (0x4bd370 ≥ 1); bit 2 Relic — 0x497030 finds a slot for a GREATWORKOBJECT_RELIC in the claimer's ci..."
-  review: imported
+  review: reviewed
 - addr: 0x4bdd70
   final: 0x32c710
   kind: function
+  semantics: the count of a district type the player holds.
   status: READ
   cases:
     - recording: 1112
@@ -145,10 +151,11 @@
   context:
     - "- The district discount (0x409870's under-average models): the type's count 0x4bdd70 (placed districts included) against 0x4bca20's average, the completed specialty distric..."
     - ...ost the actor's (0x93e580, 0x93e9e0), below MaxPerPlayer counting every one it holds (0x4bdd70); the picker over them in the table's order (0x84e3e0); done when the actor COMPLETES...
-  review: imported
+  review: reviewed
 - addr: 0x4be720
   final: 0x32d0c0
   kind: function
+  semantics: the count of plots the player owns.
   status: PARTLY
   cases:
     - recording: 1114
@@ -157,7 +164,7 @@
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
     - "...CY_AGENDA_OPTIMUS_PRINCEPS: compute 0xb4d2b0, arguments 0xb50250): the subject's plots (0x4be720, the plots it owns) against the owner's beyond EquivalentTerritoryPercentage (20) eithe..."
-  review: imported
+  review: reviewed
 - addr: 0x4be7b0
   kind: function
   name: PlayerStats m_aiNumProjectsAdvanced
@@ -213,6 +220,7 @@
 - addr: 0x4bffa0
   final: 0x32e560
   kind: function
+  semantics: "the unit row raises the best melee: its domain (row +0x1c) not 1, no tag 0x36c125c9 and its row +0x24 entry's flag +0x48 bit 4."
   status: READ
   cases:
     - recording: 1112
@@ -225,4 +233,4 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "...o 0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in it — where 0x4bffa0 passes the unit row: its domain (row +0x1c) not 1, no tag 0x36c125c9 (no install or DLL..."
-  review: imported
+  review: reviewed

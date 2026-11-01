@@ -167,6 +167,7 @@
 - addr: 0x79cb30
   final: 0x524ed0
   kind: function
+  semantics: the unit carries a tag (Operation Move's Leader Tag).
   status: PARTLY
   cases:
     - recording: 1124
@@ -175,7 +176,7 @@
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...0 for a unit in a formation (+0x1fb8 +0x738 above 1) or carrying the node's Leader Tag (0x79cb30); at least 1 where the goal is barred — no path (0x586360), a visible enemy unit there..."
-  review: imported
+  review: reviewed
 - addr: 0x79cba0
   final: 0x524f50
   kind: function

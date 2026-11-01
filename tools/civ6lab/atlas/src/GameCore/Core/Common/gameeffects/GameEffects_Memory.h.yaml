@@ -17,9 +17,10 @@
 - addr: 0xc97780
   final: 0x96b760
   kind: function
+  semantics: "\"Policy Retracted - Detaching\": the policy removed signal's handler (GameSignals +0x11b8)."
   status: PARTLY
   readings: ["C-94: the slot rebuild — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...xc97410, \"Policy Enacted - Attaching modifiers\") and detach on \"policy removed\" (+0x11b8, 0xc97780, \"Policy Retracted - Detaching\")."
-  review: imported
+  review: reviewed

@@ -6,15 +6,17 @@
 - addr: 0x93e8a0
   final: 0x64e730
   kind: function
+  semantics: the last chronological era.
   status: PARTLY
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Short of the last chronological era (0x93e8a0): with the countdown idle and 0x2c4c80 true, the countdown is set to NEXT_ERA_TURN_COUN..."
-  review: imported
+  review: reviewed
 - addr: 0x93e9e0
   final: 0x64e7a0
   kind: function
+  semantics: an era is known (the district's era test).
   status: PARTLY
   readings:
     - "H-1: the city-states' quests — READ"
@@ -22,13 +24,14 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...th RequiresPopulation (+0xe1 bit 6), its era known and at most the actor's (0x93e580, 0x93e9e0), below MaxPerPlayer counting every one it holds (0x4bdd70); the picker over them in...
-  review: imported
+  review: reviewed
 - addr: 0x93eaa0
   final: 0x64e810
   kind: function
+  semantics: the next era.
   status: PARTLY
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ented the same call; when it falls below 0 it is reset to -1 and the next era begins (0x93eaa0 next era; ages 0x2c0e80; 0x2c6d70 sets the era and its turn). So the era begins 10 turn...
-  review: imported
+  review: reviewed

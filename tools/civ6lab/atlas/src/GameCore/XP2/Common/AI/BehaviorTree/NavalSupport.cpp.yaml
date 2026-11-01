@@ -6,8 +6,12 @@
 - addr: 0x803590
   final: 0x566a50
   kind: function
+  semantics: "NAVAL CHOOSE TARGET: the tree's operation (none: 4, an assert); the node's Fail for no target (TreeData +0x10, unset: true) and Target Domain (the string's hash to the DomainTypes index, 0xadd590, cached at +0x20; unset: 2). Of the list (0x802ea0) the nearest the operation's target (op +0x2a8 / +0x2ac), strictly nearer replacing, the first of equals kept: the operation's target and rally set to it with each team's goals (0x73e7d0), the cursor to the node's first child (+0x10 <- +8), SUCCESS; none: the cursor to the node's end (+0x10 <- +4), FAILURE with Fail for no target, else SUCCESS."
   status: READ
   cases:
+    - recording: h1_duelv1121
+      turn: 54
+      value: city-state 3's Galley logs Operation Move from t54 (36:23 -> 0:19 ...), the move node running only on a find
     - recording: h1_duelv1121
       turn: 54
       value: "city-state 3's Galley: Operation Move from t54 under Naval Choose Target"

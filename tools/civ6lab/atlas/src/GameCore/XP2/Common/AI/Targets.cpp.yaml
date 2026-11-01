@@ -33,7 +33,7 @@
 - addr: 0x783980
   final: 0x512ac0
   kind: function
-  semantics: "the targets update after the ageing and the look in 0x785f30; writes AI_Knowledge.csv's lines (0x7858b7 -> 0x5ed280 -> 0x5eceb0). The target list: the plots in index order, a plot the player sees (+0x290 > 0) giving, by its district (0x810d0): the player's own FRIENDLY_CITY; an ally's (0x3da560) ALLY_SUPPORT; a player's at war (0x469cd0) COMBAT_DISTRICT where it defends (0x24c2f0), then nothing else of the plot, and PASSIVE_DISTRICT where it counts toward the limit (0x527e30), complete (+0xb08) and not pillaged (0x24c3a0); else NEUTRAL_CITY; each where the player's type flags (+0xb0) take it. Else its defender (0x208b80) LOW (an aircraft AIR_UNIT); else a CAMP, a goody hut, a Trader at war (one entry each), the plot's one civilian (CIVILIAN at war, else NEUTRAL_CIVILIAN; a fighter in that layer LOW), its religious unit, an unpillaged improvement of a player at war. A plot only revealed gives its camp, goody hut, improvement and districts. Then 0x786d50, and the player's priorities hook (+0xa8)."
+  semantics: "the targets update after the ageing and the look in 0x785f30; writes AI_Knowledge.csv's lines (0x7858b7 -> 0x5ed280 -> 0x5eceb0). The target list: the plots in index order, a plot the player sees (+0x290 > 0) giving, by its district (0x810d0): the player's own FRIENDLY_CITY; an ally's (0x3da560) ALLY_SUPPORT; a player's at war (0x469cd0) COMBAT_DISTRICT where it defends (0x24c2f0), then nothing else of the plot, and PASSIVE_DISTRICT where it counts toward the limit (0x527e30), complete (+0xb08) and not pillaged (0x24c3a0); else NEUTRAL_CITY; each where the player's type flags (+0xb0) take it. Else its defender (0x208b80) LOW (an aircraft AIR_UNIT); else a CAMP, a goody hut, a Trader at war (one entry each), the plot's one civilian (CIVILIAN at war, else NEUTRAL_CIVILIAN; a fighter in that layer LOW), its religious unit, an unpillaged improvement of a player at war. A plot only revealed gives its camp, goody hut, improvement and districts. Then 0x786d50, and the player's priorities hook (+0xa8). Gathers into a set every region of a plot its player sees (+0x290 count above 0, 0x783d5c) or revealed (+0x2f0, 0x7852db), plots off any region left out; stored as the tertiary region list (0x6fad50, ascending) after its plot walk."
   status: READ
   cases:
     - recording: 1124
@@ -118,6 +118,7 @@
   review: reviewed
 - addr: 0x786080
   kind: function
+  semantics: "a landmass's revealed share: the knowledge base's +0x2e8 map's +0x28 / +0x24, keyed by the plot's +8 id (the map refreshed by 0x783980 from a per-plot visibility word > 0)."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -127,7 +128,7 @@
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "...entry of the player +0x12f0 list, the share of its landmass the knowledge base counts (0x786080: the +0x2e8 map's +0x28 / +0x24, keyed by the plot's +8 id; the map refreshed by the..."
-  review: imported
+  review: reviewed
 - addr: 0x786160
   final: 0x2a6aa0
   kind: function
@@ -144,13 +145,14 @@
   review: reviewed
 - addr: 0x7861d0
   kind: function
+  semantics: "the region record's revealed fraction: +0x28 / +0x24 (< 1.0: not all revealed)."
   status: PARTLY
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...egion (plot +0x18) where the player's region record holds less than all of it revealed (0x7861d0: +0x28 / +0x24 < 1.0) — the nearest unrevealed plot of the region (0x70b6f0: plots in i..."
-  review: imported
+  review: reviewed
 - addr: 0x7864c0
   final: 0x514a60
   kind: function

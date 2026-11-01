@@ -18,6 +18,7 @@
 - addr: 0x6dd310
   final: 0x49c460
   kind: function
+  semantics: "the PlotEvaluations item handler: the AiFavoredItems rows of the lists AiLists binds to a trait of the leader's chain (LeaderTraits through Leaders.InheritFrom: StandardSettlePlot on TRAIT_LEADER_MAJOR_CIV), of its civilization, of its historical agenda and of each strategy the AI follows (Strategy_Priorities: STRATEGY_NAVAL's NavalSettlementPreferences, STRATEGY_RAPID_EXPANSION's ExpansionSettlementPreferences). One entry per PlotEvalConditions row (by its Value; Expansion2 adds 11 Cultural Pressure); a row's Value adds to the entry's threshold where Favored, else to its value; a keyed row (StringVal) also to its yield, resource, feature or resource class weight (0x76cee0)."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -29,7 +30,7 @@
     - ".claude/scratchpad/st1/reading.md: ...layer.  - The lists (the generic list loader 0x6d6c80, system \"PlotEvaluations\",   its item handler 0x6dd310): the AiFavoredItems rows of the lists AiLists   binds to a trait of the leader's chain (LeaderTrai..."
   context:
     - "...The lists (the generic list loader 0x6d6c80, system \"PlotEvaluations\", its item handler 0x6dd310): the AiFavoredItems rows of the lists AiLists binds to a trait of the leader's chain (..."
-  review: imported
+  review: reviewed
 - addr: 0x6dd9a0
   final: 0x49c7c0
   kind: function
@@ -75,6 +76,7 @@
 - addr: 0x6e2980
   final: 0x4a10b0
   kind: function
+  semantics: "EXP_JobManager_SpawnList: spawns the global AI's job list (flag +0x3afc) and returns (the engine hands the list to TBB, 0x985bf0). FinalRelease: spawn 0x4a10b0 (flags +0x38ac / +0x38ad); the lab's `game.py patch apply` jumps 0x4a10ed's tail to a stub in the .text section's file slack (0x9b6630, VirtualSize raised to the raw size) that spawns the list and tail-jumps to the wait 0x4a16e0."
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
@@ -83,10 +85,11 @@
     - "...): push 0x6e29d0 (EXP_JobManager_PushJobOntoList, list +0x660, job set +0x648), spawn 0x6e2980 (EXP_JobManager_SpawnList; flag +0x3afc), wait 0x6e3020 (EXP_JobManager_Wait), called f..."
     - "- The FinalRelease DLL the game loads: the AI's spawn 0x4a10b0 (flags +0x38ac / +0x38ad, job list +0x410, job set +0x400), push 0x4a1100, wait 0x4a1..."
     - "...ap is one chunk), and `patch apply` patches the FinalRelease DLL so the AI's spawn waits: 0x4a10ed's tail jumps to a stub in the .text section's file slack (0x9b6630, VirtualSize raised to..."
-  review: imported
+  review: reviewed
 - addr: 0x6e29d0
   final: 0x4a1100
   kind: function
+  semantics: "EXP_JobManager_PushJobOntoList: pushes a job onto the global AI's job list (global AI at game +0x408: list +0x660, job set +0x648). FinalRelease: push 0x4a1100, list +0x410, job set +0x400."
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
@@ -94,10 +97,11 @@
   context:
     - "- The AI's job list (the global AI at game +0x408): push 0x6e29d0 (EXP_JobManager_PushJobOntoList, list +0x660, job set +0x648), spawn 0x6e2980 (EXP_Jo..."
     - ...he AI's spawn 0x4a10b0 (flags +0x38ac / +0x38ad, job list +0x410, job set +0x400), push 0x4a1100, wait 0x4a16e0 (called from Game::Processor::Update 0x4b72a). Spawned with no wait in...
-  review: imported
+  review: reviewed
 - addr: 0x6e3020
   final: 0x4a16e0
   kind: function
+  semantics: "EXP_JobManager_Wait: waits on the global AI's job list; called from Game::Processor::Update at 0x6540f (asserting !GetGlobalAi().IsProcessingAi()). FinalRelease: wait 0x4a16e0, called from 0x4b72a."
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
@@ -106,7 +110,7 @@
     - "...+0x660, job set +0x648), spawn 0x6e2980 (EXP_JobManager_SpawnList; flag +0x3afc), wait 0x6e3020 (EXP_JobManager_Wait), called from Game::Processor::Update at 0x6540f (asserting `!Ge..."
     - ...a10b0 (flags +0x38ac / +0x38ad, job list +0x410, job set +0x400), push 0x4a1100, wait 0x4a16e0 (called from Game::Processor::Update 0x4b72a). Spawned with no wait in the spawning fun...
     - ...6630, VirtualSize raised to the raw size) that spawns the list and tail-jumps to the wait 0x4a16e0. The spawn's flag protocol is unchanged (set before the spawn, cleared by the wait); ever...
-  review: imported
+  review: reviewed
 - addr: 0x6e3e20
   final: 0x4a2310
   kind: function

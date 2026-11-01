@@ -6,6 +6,7 @@
 - addr: 0x972880
   final: 0x67c690
   kind: function
+  semantics: UNITOPERATION_SWAP_UNITS (hash 0x7fa205d1) pushed through the unit's operation queue (+0x60); its CanStart unread.
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:garrisonExecute
@@ -27,4 +28,4 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ..., the candidate moves to its planning's spot by the city and swaps in (the swap command 0x972880, unported); else the garrison fortifies (0x95eae0) where it has no range and the team...
-  review: imported
+  review: reviewed

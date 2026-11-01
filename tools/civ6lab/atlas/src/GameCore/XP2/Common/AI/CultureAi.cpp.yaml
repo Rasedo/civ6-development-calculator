@@ -147,12 +147,13 @@
   review: reviewed
 - addr: 0x622e90
   kind: function
+  semantics: "the leader's AiLists query (the Strategies-system rows: the victory manager's bias)."
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - ...Value, within MinDifficulty / MaxDifficulty of the player's handicap; the leader query 0x622e90).
-  review: imported
+  review: reviewed
 - addr: 0x623910
   kind: function
   status: READ
@@ -255,7 +256,7 @@
   final: 0x418860
   kind: function
   name: civicChoice
-  semantics: "the civic choice (key): the comparator 0x6182e0; the best's next step, researchable (0x3932d0), queued; else one \"Random Civic Choice\" draw over the rows neither held nor unresearchable, in table order (\"RANDOMLY CHOSEN CIVIC\")."
+  semantics: "the civic choice (key): the comparator 0x6182e0; the best's next step, researchable (0x3932d0), queued; else one \"Random Civic Choice\" draw over the rows neither held nor unresearchable, in table order (\"RANDOMLY CHOSEN CIVIC\"). \"Random Civic Choice\": the AI plan's civic, no draw, else ONE uniform draw over every researchable civic."
   status: PARTLY
   cases:
     - recording: AI_GovtPolicies.csv

@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x95fbf0
   kind: function
+  semantics: "a harvest / feature removal: calls 0x5256d0 once per yield row (Resource_Harvests.Amount, Feature_Removes.Yield)."
   status: READ
   cases:
     - recording: h1_duelw1112
@@ -15,4 +16,4 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "- A harvest's or feature removal's lump: the harvest 0x95fbf0 calls 0x5256d0 once per yield row (`Resource_Harvests.Amount`, `Feature_Removes.Yield..."
-  review: imported
+  review: reviewed

@@ -6,6 +6,7 @@
 - addr: 0x7ed200
   final: 0x5554e0
   kind: function
+  semantics: "Find Unit Targets' update (\"Nearest City Search\"): a job per tree unit (vtable @d741d8, run 0x7eba40); a plot found becomes the unit's target (+0x7d8 -> +0x830, 0x7eb220). SUCCESS where some unit has a target, else FAILURE."
   status: PARTLY
   impl: [cpu/core/minorOps.ts:upgradeTreesTick]
   readings:
@@ -14,4 +15,4 @@
   context:
     - "...ored at the mov after the next name's lea; 0x7cbca0's tables): Find Unit Targets update 0x7ed200, Upgrade Units update 0x7f0ea0 / execution 0x7ef850."
     - "- FIND UNIT TARGETS (0x7ed200, \"Nearest City Search\"): a job per tree unit (its vtable @d741d8, run 0x7eba40); a plot..."
-  review: imported
+  review: reviewed

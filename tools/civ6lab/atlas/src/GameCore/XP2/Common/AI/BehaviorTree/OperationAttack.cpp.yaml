@@ -82,12 +82,13 @@
 - addr: 0x80ec10
   final: 0x56ed80
   kind: function
+  semantics: "Operation Attack's update: SUCCESS once the target is gone (0x73a8e0); RUNNING with units, else FAILURE."
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:operationAttack, gpu/core/sim_minorops.py:_u_operation_attack]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...0 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the target is gone, 0x73a8e0; RUNNING with units, else FAILURE); Operat...
-  review: imported
+  review: reviewed
 - addr: 0x80ecf0
   final: 0x56ee20
   kind: function

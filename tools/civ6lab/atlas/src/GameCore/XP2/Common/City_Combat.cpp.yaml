@@ -6,8 +6,12 @@
 - addr: 0x197ff0
   final: 0x111800
   kind: function
+  semantics: over the city's districts (+0x1a50, count +0x1a60, 0x1ae510) with outer defences (district +0xb08 set) the most GetDamage (0x24ae50, hash 0x6da56a3d).
   status: READ
   cases:
+    - recording: h1_duelv1124
+      turn: 127
+      value: "Granada: the centre's 108 over its Encampment's 99, x 7 x 3: 21971.3"
     - recording: h1_duelv1124
       turn: 89
       value: Cardiff Repair Outer Defenses 3255.0 = 42 x 8 x 1 x 10 x 248/256; t107 4708.1 (54 x 9 x 1); t158 10656.3 (55 x 10 x 2); Granada t127 21971.3 (108 over the Encampment 99, x 7 x 3)

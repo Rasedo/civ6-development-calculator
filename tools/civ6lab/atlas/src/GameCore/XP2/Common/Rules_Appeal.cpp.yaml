@@ -7,8 +7,12 @@
   final: 0x361e30
   kind: function
   name: Rules_Appeal
+  semantics: "Rules_Appeal for a plot (Lua Plot:GetAppeal reads the cached value through the plot's vtable +0x28): the owning city's appeal term (+0x1800, EFFECT_ADJUST_CITY_APPEAL) first; a natural wonder (0x82e90) returns that + 5, a water terrain (0x834d0) 0, a mountain (terrain 2/5/8/11/14) that + 4; else +1 for its own river (+0x37) or 0x82e80, -1 for its own complete district while pillaged, -1 for its own pillaged improvement (+0x4d bit 0), then the ring of radius 1 (0x6b1b0 -> 0x691f0) through 0x513780, and last +1 when the plot's owner holds the civic its feature's row names (feature def +0xc8 -> Features.AddCivic: Woods with Conservation; the owner's tree at player +0x1310)."
   status: READ
   cases:
+    - recording: h1_duelw1116
+      turn: 167
+      value: Woods +1 from China's Conservation; 4,700 mismatching plot-turns -> 156
     - recording: h1_duelw1116
       value: "Records (land plots, game `GetAppeal` against the engine, per record): runs/h1_duelw1116 4,700 mismatching plot-turns -> 156, the rest one-turn readings and the cases below;"
     - recording: 1116
@@ -22,4 +26,4 @@
   readings: ["H-1: the plot's Appeal — READ"]
   context:
     - "Rules_Appeal 0x513d70 (Lua `Plot:GetAppeal` reads the cached value through the plot's vtable +0x28) for a plot:..."
-  review: imported
+  review: reviewed

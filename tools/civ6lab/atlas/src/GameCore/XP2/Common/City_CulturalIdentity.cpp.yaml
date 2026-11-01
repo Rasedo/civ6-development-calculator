@@ -6,6 +6,7 @@
 - addr: 0x19b090
   final: 0x113990
   kind: function
+  semantics: the citizen pressure walk's per-plot functor (the distance falloff).
   status: PARTLY
   cases:
     - recording: h1_duelw1112
@@ -16,7 +17,7 @@
   readings: ["H-1: the citizen pressure term — PARTLY READ"]
   context:
     - "...f0 over CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF, gp +0xf0 = 10, with the per-plot functor 0x19b090) into its loyalty term: both 0 → 0; own 0 → −MAX_LOYALTY; foreign 0 → +MAX_LOYALTY; else..."
-  review: imported
+  review: reviewed
 - addr: 0x19b5f0
   final: 0x113e00
   kind: function
@@ -179,6 +180,7 @@
 - addr: 0x1a1370
   final: 0x116f80
   kind: function
+  semantics: "the per-citizen identity pressure term: base, capital, age."
   status: READ
   cases:
     - recording: h1_duelw1130
@@ -189,12 +191,16 @@
     - "H-1: the AI memory reader — READ (the hooks, the pointer paths, the contracts, the knowledge base, the operations, the trees), PARTLY READ (the religious AI's holder)"
   context:
     - "...per-work pressure no install row writes), shifted to 24.8, times the per-citizen term (0x1a1370: base, capital, age); where the city's owner dominates the plot's owner (+0x1b8 again..."
-  review: imported
+  review: reviewed
 - addr: 0x1a1640
   final: 0x117160
   kind: function
+  semantics: "a city's citizen pressure at a plot (the one reader of gp +0xec): the city's citizens (+0x588) plus Great Works x +0x1aec, shifted to 24.8, times the per-citizen term (0x1a1370: base, capital, age); where the city's owner dominates the plot's owner (+0x1b8 against 0x106660) that product x (100 + 25) / 100 (CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE); then the distance falloff (gp +0xf0)."
   status: READ
   cases:
+    - recording: h1_duelw1130
+      turn: 95
+      value: Rome reads 18.671875 with China's Taiyuan (8 at 9 tiles) and Handan (3 at 7) at 1.875 a citizen
     - recording: h1_duelw1130
       turn: 95
       value: "runs/h1_duelw1130   Rome t95 reads 18.671875 and t100 18.4375 with China's Taiyuan (8 at 9   tiles) and Handan (3, then 4, at 7) at 1.875 a citizen, the unraised term   reading the full 20 (`citizenPr"
@@ -202,11 +208,11 @@
   readings: ["C-94: trade posts and cultural dominance — READ"]
   context:
     - "- CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE (gp +0xec, 25): 0x1a1640 is a city's citizen pressure at a plot (City_CulturalIdentity.cpp, the one reader of..."
-  review: imported
+  review: reviewed
 - addr: 0x1a1ae0
   final: 0x117460
   kind: function
-  semantics: the citizens' identity pressure at a plot (own - foreign) over the radius cutoff.
+  semantics: "the citizens' identity pressure at a plot (own - foreign) over the radius cutoff. Turns a city's own and foreign citizen pressure (24.8, gathered by the plot walk 0x6aef0 over CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF gp +0xf0 = 10 with the functor 0x19b090) into its loyalty term: both 0 -> 0; own 0 -> -MAX_LOYALTY; foreign 0 -> +MAX_LOYALTY; else r = hi / lo in 24.8 (0x16e940), clamped into [NEUTRAL_RATIO, MAX_RATIO] (gp +0x480 / +0x478); t = (r - NEUTRAL_RATIO) / (MAX_RATIO - NEUTRAL_RATIO); the term NEUTRAL_LOYALTY + (MAX_LOYALTY - NEUTRAL_LOYALTY) x t >> 8 (gp +0x474 / +0x47c), clamped into [NEUTRAL, MAX], times -1.0 when the foreign side is larger. A byte argument returns the raw own - foreign instead."
   status: PARTLY
   cases:
     - recording: h1_duelw1112

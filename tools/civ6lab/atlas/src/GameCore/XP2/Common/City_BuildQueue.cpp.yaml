@@ -102,8 +102,12 @@
   final: 0xf5080
   kind: function
   name: City_BuildQueue
+  semantics: "reads the city's Production twice through 0x1c5350: A with the head's id (toward the item), B with none (the plain Production). With an item at the head it adds A plus the stored overflow (m_xProductionOverflow +0x1f4, 0x16f1db) and clears the overflow (0x16f31b); on a completion the overflow becomes min(A, B) - (cost - progress before the step) (0x16f3bf: B under the remainder -> 0, else the smaller less the remainder), the carried overflow not counted. With nothing queued the step adds B to the overflow (0x16f62d -> 0xac650)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 15
+      value: "Rome: a Warrior at 12 + 9 of 20 with one Militaristic envoy's +1 leaves 0, the next Warrior reading 9 on 8 + 1"
     - recording: h1_duelw1108
       turn: 112
       value: "Records: runs/h1_duelw1108 Aquileia t112-125 7.625 Science = (7 + 9.9 x 38/256) x 0.9, t169-176 16.75 Gold = 12 + 16 x 76/256;"
@@ -132,7 +136,7 @@
     - ...e city's yield component) and its project id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Pro...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
     - "City_BuildQueue 0x16f050 → 0x1853d0: an item's progress takes (A + the stored overflow) × the item's percent multi..."
-  review: imported
+  review: reviewed
 - addr: 0x16f6e0
   final: 0xf5520
   kind: function
@@ -273,6 +277,7 @@
 - addr: 0x177d10
   kind: function
   name: City_BuildQueue
+  semantics: reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0x1108 of the city's yield component) and its project id (+0x1360 = -1), then applies the Production (0x16f050). The build queue's step (-> 0x16f050).
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -294,10 +299,11 @@
   context:
     - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (t..."
-  review: imported
+  review: reviewed
 - addr: 0x178250
   final: 0xfc5d0
   kind: function
+  semantics: "the queue process: runs the front check 0x17f070 where the queue changed (+0x3ac)."
   status: PARTLY
   impl: [cpu/core/minorBuild.ts:minorSetItem]
   readings:
@@ -305,7 +311,7 @@
     - "C-96: the queue's strategic charge, a placed district's resource, the minors' resource turn — READ (0x17c2e0, 0x186460's names), a fit for the district, both twins"
   context:
     - "...s strategic queue (City_BuildQueue 0x17f3a0, the front check 0x17f070 the queue process 0x178250 runs where the queue changed, +0x3ac): the front unit not CanTrain leaves the front; a..."
-  review: imported
+  review: reviewed
 - addr: 0x178310
   kind: function
   status: PARTLY
@@ -341,6 +347,7 @@
 - addr: 0x179510
   final: 0xfd020
   kind: function
+  semantics: the queue item's full cost.
   status: READ
   cases:
     - recording: h1_duelw1108
@@ -349,7 +356,7 @@
   readings: ["H-1: a district project's yield conversion — READ"]
   context:
     - "...loader 0xa98af0): for each, amount = min(the Production passed in, the item's full cost (0x179510)) x (PercentOfProductionRate << 8) / 100 — fixed point, so the rate is the percent trunca..."
-  review: imported
+  review: reviewed
 - addr: 0x1795d0
   final: 0xfd0e0
   kind: function
@@ -363,6 +370,7 @@
 - addr: 0x179650
   final: 0xfd160
   kind: function
+  semantics: the build queue's head item (-1 when empty).
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -376,7 +384,7 @@
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "..., then the game speed (0x525590). The queue term: the city's build queue (+0x2170, head 0x179650; -1 when empty) names an item whose Projects row (0xad5f10, +0x1c its index) has a Pr..."
-  review: imported
+  review: reviewed
 - addr: 0x179860
   final: 0xfd370
   kind: function
@@ -622,8 +630,12 @@
   final: 0xff1b0
   kind: function
   name: Cache_City_BuildQueue
+  semantics: "Cache_City_BuildQueue: fills m_aiUnitCost per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x4f2b20, m_aCurrentUnitCost); where c > 0, the row's +0x20 class does not read 2 through 0xadd5e0 and the player's +0x1048 equals the global 0xf2f978, the quote is c - ((c << 8) x x >> 8 >> 8), x the player's +0x10a8 in 24.8 (Mercenary Companies' percent off): c - floor(c x x / 256)."
   status: READ
   cases:
+    - recording: h1_duelw1104
+      turn: 242
+      value: "Outcome B's -50%: Biplane 215 -> 108, Mechanized Infantry 325 -> 163"
     - recording: h1_duelw1104
       turn: 242
       value: "Outcome B's −50% (x = 128) quotes 215 → 108, 325 → 163, 227 → 114, 45 → 23 (runs/h1_duelw1104 t242 Biplane, Mechanized Infantry, Anti-Air Gun;"
@@ -634,7 +646,7 @@
   readings: ["H-1: a unit's Production cost in the queue — READ"]
   context:
     - "...n int from the city build queue cache's `m_aiUnitCost` (Cache_City_BuildQueue.cpp), which 0x17c790 fills per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x..."
-  review: imported
+  review: reviewed
 - addr: 0x17cb00
   kind: function
   semantics: the district keeps the feature.
@@ -731,6 +743,7 @@
 - addr: 0x17f070
   final: 0x100e80
   kind: function
+  semantics: the build queue's front check (-> 0x17f3a0).
   status: PARTLY
   impl:
     - cpu/core/minorBuild.ts:minorBuild
@@ -741,11 +754,12 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserv..."
-  review: imported
+  review: reviewed
 - addr: 0x17f3a0
   final: 0x101170
   kind: function
   name: City_BuildQueue
+  semantics: "the strategic reservation (from the front check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it (0x4aa790), else leaves the front; the completion (0x1856b3 / 0x185a2a) releases the reservation and charges the stockpile together."
   status: PARTLY
   impl:
     - cpu/harness/import.ts:reserved
@@ -760,12 +774,16 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070): a unit at the queue's front with a strategic cost and n..."
-  review: imported
+  review: reviewed
 - addr: 0x17f870
   final: 0x101500
   kind: function
+  semantics: a WONDER the production completes (building info +0x158 bit 0x40) annexes WONDER_FREE_TILES_UPON_COMPLETION (2) plots (-> 0x1a8a30), one picker draw each, before the wonder's own grants and its WonderCompleted row; the list emptied, no draw.
   status: PARTLY
   cases:
+    - recording: h1_duelw1117
+      turn: 44
+      value: China's Dynastic Cycle boost after the annex t44, t226
     - recording: h1_duelw1117
       turn: 44
       value: "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0:   production, growth, the border turn 0x1a9bc0, loyalty): a WONDER its   production completes annexes WONDER_FREE_TILES_UPON_COMPLETI"
@@ -790,7 +808,7 @@
   context:
     - ...WONDER its production completes annexes WONDER_FREE_TILES_UPON_COMPLETION (2) plots (0x17f870, building info +0x158 bit 0x40, -> 0x1a8a30), one picker draw each, before the wonder's...
     - "- A wonder's annex (0x17f870 → AnnexPlots 0x1a8a30) fires its CityTileOwnershipChanged rows BEFORE the WonderComplet..."
-  review: imported
+  review: reviewed
 - addr: 0x180cb0
   final: 0x1020b0
   kind: function
@@ -812,6 +830,7 @@
 - addr: 0x183b30
   final: 0x1047b0
   kind: function
+  semantics: adds a (district, feature) pair to the city's +0x2170 +0x378 list.
   status: READ
   cases:
     - recording: h1_duely1124
@@ -834,8 +853,12 @@
   final: 0x105270
   kind: function
   name: City_BuildQueue
+  semantics: "ORDER_ADVANCE: walks the project's Project_YieldConversions rows (Project +0x168, loader 0xa98af0): amount = min(the Production passed in, the item's full cost 0x179510) x (PercentOfProductionRate << 8) / 100 — the rate truncated to 256ths (15% 38/256, 30% 76/256) — plus a player attribute's percent of that (hash 0xbcfe99b8), added into +0x1108 at the row's yield; a completion pays no lump."
   status: READ
   cases:
+    - recording: h1_duelw1108
+      turn: 112
+      value: Aquileia 7.625 Science = (7 + 9.9 x 38/256) x 0.9 (t112-125)
     - recording: h1_duelw1108
       turn: 112
       value: "Records: runs/h1_duelw1108 Aquileia t112-125 7.625 Science = (7 + 9.9 x 38/256) x 0.9, t169-176 16.75 Gold = 12 + 16 x 76/256;"
@@ -850,10 +873,11 @@
   context:
     - "...roject id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Project +0x168, loader 0xa98af0): for..."
     - "...rt / export. Its callers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0 fr..."
-  review: imported
+  review: reviewed
 - addr: 0x1853d0
   final: 0x105850
   kind: function
+  semantics: "an item's progress takes (A + the stored overflow) x the item's percent multiplier — 0x1856ed multiplies the SUM; on completion the stored overflow is min(A, B) - what the item lacked, A the turn's Production unmultiplied (0x16f3cb), B the plain Production."
   status: READ
   cases:
     - recording: 1121
@@ -877,4 +901,4 @@
     - "...lers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0 from the city, distric..."
     - ...nt less its reservations covers it (0x4aa790), else leaves the front; the completion (0x1856b3 / 0x185a2a) releases the reservation and charges the stockpile together.
     - "City_BuildQueue 0x16f050 → 0x1853d0: an item's progress takes (A + the stored overflow) × the item's percent multiplier — 0x1..."
-  review: imported
+  review: reviewed

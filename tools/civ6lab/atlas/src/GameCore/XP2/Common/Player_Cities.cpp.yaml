@@ -6,6 +6,7 @@
 - addr: 0x36f420
   final: 0x265410
   kind: function
+  semantics: called from Player DoTurn at 0x4e4665 (not the city turn).
   status: PARTLY
   cases:
     - recording: 1122
@@ -14,7 +15,7 @@
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - ...'s turn (0x1fa1d0 at 0x4e4813, in the loop over Player_Cities +0x12f0 from 0x4e47bc). 0x36f420 at 0x4e4665 is not the city turn. This REVERSES the earlier reading (cities at 0x4e4665...
-  review: imported
+  review: reviewed
 - addr: 0x36f460
   final: 0x265450
   kind: function
@@ -55,6 +56,7 @@
 - addr: 0x36f6c0
   final: 0x265510
   kind: function
+  semantics: a player's nearest city to a plot (the distance).
   status: READ
   cases:
     - recording: 1117
@@ -72,4 +74,4 @@
   readings: ["H-1: a city's name, a citizen's name — READ"]
   context:
     - "...f0): the major owning its plot (0x469db0), else the major whose city stands nearest it (0x36f6c0 per player, the first at the least distance); none, no draw. China's pool falls 40, 39,..."
-  review: imported
+  review: reviewed

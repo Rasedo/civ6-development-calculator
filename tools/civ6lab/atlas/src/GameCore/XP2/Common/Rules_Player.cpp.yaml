@@ -6,6 +6,7 @@
 - addr: 0x534950
   final: 0x37ba80
   kind: function
+  semantics: "Also names its territory (0xa36ff0, 0xa36400): one draw over the names left. A plot first revealed: names its rivers (0xa29730)."
   status: READ
   cases:
     - recording: h1_duelw1118

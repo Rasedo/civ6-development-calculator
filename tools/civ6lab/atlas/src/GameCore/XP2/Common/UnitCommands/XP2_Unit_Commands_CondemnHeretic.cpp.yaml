@@ -5,6 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x89cc00
   kind: function
+  semantics: the condemn command (-> 0x493f80 with the capture flag).
   status: READ
   cases:
     - recording: 1121
@@ -15,4 +16,4 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
   context:
     - "...off the victim's religion, scaled by its player's +0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t1..."
-  review: imported
+  review: reviewed

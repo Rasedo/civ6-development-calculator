@@ -6,6 +6,7 @@
 - addr: 0x975550
   final: 0x67ee60
   kind: function
+  semantics: the SET_FOCUS city command (the food focus's).
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -23,4 +24,4 @@
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
   context:
     - "...is set favored; otherwise a favored Food is cleared — each through the SET_FOCUS command (0x975550), a full re-place. The H-1 harness places by it (`cpu/core/citizens.ts`, no favored yield..."
-  review: imported
+  review: reviewed

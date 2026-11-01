@@ -5,9 +5,10 @@
 # set `review: reviewed`.
 - addr: 0x33fb70
   kind: function
+  semantics: founds the pantheon with the belief.
   status: PARTLY
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...E PICKS. The pantheon (0x74e2b0, from the AI turn while m_mustFoundPantheon holds, then 0x33fb70): the first strictly highest pantheon entry not taken. A belief for the religion (0x751..."
-  review: imported
+  review: reviewed

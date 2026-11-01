@@ -6,39 +6,43 @@
 - addr: 0x84cb90
   final: 0x5a6630
   kind: function
+  semantics: "Trigger Civic Boost's validity: neither held nor boosted (0x39d190), with a boost, of the actor's era."
   status: PARTLY
   impl: [cpu/core/quests.ts:boostTargets]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Trigger Tech / Civic Boost (0x84d630, 0x84cb90): neither held nor boosted (0x4cb290 / 0x39d190), with a boost, of the actor's era; t..."
-  review: imported
+  review: reviewed
 - addr: 0x84ccb0
   final: 0x5a6750
   kind: function
+  semantics: Trigger Civic Boost done on the boost.
   status: PARTLY
   impl: [cpu/core/quests.ts:questBoosted]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ers over them in the tables' order (0x84d870, 0x84ce50); done on the boost (0x84d750, 0x84ccb0), failed when the actor researches it (0x84cd40).
-  review: imported
+  review: reviewed
 - addr: 0x84cd40
   final: 0x5a67e0
   kind: function
+  semantics: a boost quest failed when the actor researches its tech / civic.
   status: PARTLY
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...50); done on the boost (0x84d750, 0x84ccb0), failed when the actor researches it (0x84cd40).
-  review: imported
+  review: reviewed
 - addr: 0x84ce50
   final: 0x5a68f0
   kind: function
+  semantics: Trigger Civic Boost's picker over the valid civics in the table's order.
   status: PARTLY
   impl: [cpu/harness/drawSites.ts:DRAW_SITES]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...th a boost, of the actor's era; the pickers over them in the tables' order (0x84d870, 0x84ce50); done on the boost (0x84d750, 0x84ccb0), failed when the actor researches it (0x...
-  review: imported
+  review: reviewed

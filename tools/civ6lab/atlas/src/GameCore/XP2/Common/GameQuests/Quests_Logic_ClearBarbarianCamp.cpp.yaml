@@ -6,31 +6,34 @@
 - addr: 0x849a70
   final: 0x5a42f0
   kind: function
+  semantics: "Clear Barbarian Camp's validity: a camp within 5 of the minor's capital (0x6aef0); no target."
   status: PARTLY
   impl: [cpu/data/quests.ts:QUEST_CAMP_RADIUS]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Clear Barbarian Camp (0x849a70): a camp within 5 of the minor's capital (the plots in range 5, 0x6aef0); no target;..."
-  review: imported
+  review: reviewed
 - addr: 0x849c00
   final: 0x5a4440
   kind: function
+  semantics: Clear Barbarian Camp done when the actor clears a camp within 5 (distance <= 5).
   status: PARTLY
   impl: [cpu/data/quests.ts:QUEST_CAMP_RADIUS]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...he plots in range 5, 0x6aef0); no target; done when the actor clears a camp within 5 (0x849c00: distance <= 5); a camp another clears fails the quest when none is left in range (0x..."
-  review: imported
+  review: reviewed
 - addr: 0x849d60
   final: 0x5a4540
   kind: function
   name: seat
+  semantics: Clear Barbarian Camp failed when a camp another clears leaves none in range.
   status: PARTLY
   impl: [cpu/core/quests.ts:questCampCleared]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...00: distance <= 5); a camp another clears fails the quest when none is left in range (0x849d60)."
-  review: imported
+  review: reviewed

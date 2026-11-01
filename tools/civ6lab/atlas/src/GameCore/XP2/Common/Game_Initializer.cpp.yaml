@@ -6,6 +6,7 @@
 - addr: 0x31d3c0
   kind: function
   name: Game_Initializer
+  semantics: "Game_Initializer: assigns each major its HistoricalAgendas, then RandomAgendasInEra's Ancient draw at set-up. The pool walks the draw's tags in their table's order (EARLY then ANY) and within a tag the Agendas table's order; one uniform draw over it (\"Choose random agenda\"); an agenda exclusive with one the major holds is drawn again over the same pool."
   status: PARTLY
   cases:
     - recording: h1_duelw1112
@@ -25,6 +26,7 @@
 - addr: 0x31f7f0
   final: 0x2298e0
   kind: function
+  semantics: "RandomAgendasForCivic's draw at Nationalism: the pool LATE then ANY tags, each in the Agendas table's order, one uniform draw, redrawn on an exclusive agenda; an agenda every major holds is left out of the pool."
   status: PARTLY
   cases:
     - recording: h1_duelw1112
@@ -33,4 +35,4 @@
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
     - "- The agendas (Game_Initializer 0x31d3c0; the civic's 0x31f7f0 / 0x427bf0): each major's HistoricalAgendas, then RandomAgendasInEra's Ancient draw at..."
-  review: imported
+  review: reviewed

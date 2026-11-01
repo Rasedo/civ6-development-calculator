@@ -32,9 +32,12 @@
 - addr: 0x816cb0
   kind: function
   name: opMoveExec
-  semantics: "Operation Move's execution: none where the operation is ready, arrived and the node names no Leader Tag (+0x7c, the tag's AiType, -1 skips); each member alive with Movement left (+0x770, +0xdb0; its turn done or not) nearest first: the radius, barred at least 1 off the goal (a member on the goal skips the test), its planning's plot at the radius in the goal's region, else the ring walk, the move order; its danger flags: op +0x4b0 below +0x510 (0x816e70), flag 8 for a unit with no combat or in a formation holding a civilian (0x266950(2)), else for one with no combat in no formation; 0x8000 for a land unit in no formation with a ship"
+  semantics: "Operation Move's execution: none where the operation is ready, arrived and the node names no Leader Tag (+0x7c, the tag's AiType, -1 skips); each member alive with Movement left (+0x770, +0xdb0; its turn done or not) nearest first: the radius, barred at least 1 off the goal (a member on the goal skips the test), its planning's plot at the radius in the goal's region, else the ring walk, the move order; its danger flags: op +0x4b0 below +0x510 (0x816e70), flag 8 for a unit with no combat or in a formation holding a civilian (0x266950(2)), else for one with no combat in no formation; 0x8000 for a land unit in no formation with a ship Radius = min(Unit distance (the node's slot 3; 1 where it names none), the unit's Range +0x19f8), 0 where the path finder's +0x1fb8 +0x738 is above 1 or the unit carries the node's Leader Tag (0x79cb30); at least 1 where the goal is barred — no path or an attack into it (0x586360 under flag 0x40), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90) — and, the goal open, for a unit outside the tag and any formation where the node names a Leader Tag and Range above 0. With a radius the ring walk 0x6aef0 (0x69010's order) around the goal with the test 0x815d50; none, the goal."
   status: READ
   cases:
+    - recording: h1_duelw1124
+      turn: 17
+      value: 3:9 -> 3:9, 3:13 -> 3:11 around a held rally 3:10
     - recording: h1_duely1121
       turn: 158
       value: "runs/h1_duely1121 t158-t160: Builder Capture 983046 (Builder 4522014, Line Infantry 4128797 on 9:12), strength 62-65 below 66, holds; t161 steps to 8:13"
@@ -73,11 +76,12 @@
   review: reviewed
 - addr: 0x817f60
   kind: function
+  semantics: Naval Escort's execution.
   status: PARTLY
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the city assault nodes (Ca...
-  review: imported
+  review: reviewed
 - addr: 0x8189f0
   final: 0x578920
   kind: function
@@ -98,7 +102,7 @@
 - addr: 0x8196d0
   final: 0x579560
   kind: function
-  semantics: Operation Change Target's update (execution 0x8163a0).
+  semantics: "Operation Change Target's update (execution 0x8163a0). INVALID -> the backup of the same kind, else \"No backup\" FAILURE; Always Swap; Fail on Invalid Team; Required Tag; the strength gates over 0x723ab0 — WEAK to the backup, TOO WEAK FAILURE."
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:changeTarget, gpu/core/sim_minorops.py:_u_change_target]
   readings:

@@ -30,12 +30,13 @@
   review: imported
 - addr: 0xd02108
   kind: global
+  semantics: the generic CvAStar's base vtable (Pathfinder_Instance.cpp).
   status: PARTLY
   readings: ["H-1: the trade path's search, its score and the Canal — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The path search is the generic CvAStar (Pathfinder_Instance.cpp, the base vtable 0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0..."
-  review: imported
+  review: reviewed
 - addr: 0xd136f0
   kind: global
   status: READ
@@ -86,6 +87,7 @@
   review: reviewed
 - addr: 0xd267d0
   kind: global
+  semantics: the one-off start predicate's functor.
   status: READ
   cases:
     - recording: h1_duelw1115
@@ -94,7 +96,7 @@
   readings: ["C-74: the one-off start — READ"]
   context:
     - "...nt's +0x30 (1 for the one-offs: the plot alone) under the predicate 0x28ec10 (the functor 0xd267d0's call, 0x292e10): with AvoidTerritory (+0xc8 bit 1) the plot unowned (its info +0x1c is..."
-  review: imported
+  review: reviewed
 - addr: 0xd2f320
   kind: global
   semantics: "0.1: pseudoYieldValue's magnitude where |q| > |f| and f q < 0."
@@ -340,6 +342,7 @@
   review: imported
 - addr: 0xd632c8
   kind: global
+  semantics: the Mountain Portal analyzer's vtable (slot 1 0x6b6610).
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -348,7 +351,7 @@
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   context:
     - "- THE MOUNTAIN PORTAL'S ANALYZER (EFFECT_MOUNTAIN_PORTAL -> the static 0xf04278, vtable 0xd632c8, slot 1 0x6b6610), the Mountain Tunnel's ImprovementModifiers row in 0x7b1320's modifie..."
-  review: imported
+  review: reviewed
 - addr: 0xd63400
   kind: global
   status: PARTLY
@@ -408,6 +411,7 @@
   review: imported
 - addr: 0xd64018
   kind: global
+  semantics: the Mountain Portal ring's functor (0x6c8fb0).
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -416,7 +420,7 @@
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   context:
     - "...xt's plot (+0x88) and player (+0x80), the ring of radius 1 (0x6b1b0 with the functor @0xd64018, 0x6c8fb0): a neighbour with a route (plot +0x47 not 0xff) counts, one without a route..."
-  review: imported
+  review: reviewed
 - addr: 0xd64048
   kind: global
   status: PARTLY
@@ -453,6 +457,7 @@
   review: imported
 - addr: 0xd70418
   kind: global
+  semantics: the vtable of the meeting delegate 0x787f50 (bound at 0x7869f0 on game signal +0xc78).
   status: PARTLY
   readings:
     - "H-1: the trade record's player — READ (0x5ecb50, 0x787f50, 0x5e9b20's walk), not ported"
@@ -460,7 +465,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...onstructor 0x7864c0 binds on game signal +0xc78, every AI player's, at 0x7869f0 vtable @0xd70418): a meeting's two players; where one is the knowledge base's owner, 0x5ecb50 (the kno..."
-  review: imported
+  review: reviewed
 - addr: 0xd70c98
   kind: global
   status: PARTLY
@@ -474,12 +479,13 @@
   review: imported
 - addr: 0xd71b28
   kind: global
+  semantics: the space-race chain functor's vtable (+0x10 -> 0x79f030).
   status: PARTLY
   readings:
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "- SpaceRace (+0xe8 bit 1): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared (functor vt 0xd71b28 +0x10 -> 0x79f030: the project's chain through its ProjectPrereqs, itself counted, READ..."
-  review: imported
+  review: reviewed
 - addr: 0xd71b58
   kind: global
   status: PARTLY
@@ -509,21 +515,23 @@
   review: reviewed
 - addr: 0xd71c24
   kind: global
+  semantics: "250.0f: PSEUDOYIELD_NUCLEAR_WEAPON's amount in the project value."
   status: PARTLY
   impl: [cpu/core/aiProjectValue.ts:NUCLEAR_OWN, gpu/core/sim_cityvalue.py:_AQUEDUCT_BOOST]
   readings:
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - ...least 200.0, summed; a WMD one (+0x148) adds PSEUDOYIELD_NUCLEAR_WEAPON terms (one at @0xd71c24, the difference of 1000.0's at the player and none).
-  review: imported
+  review: reviewed
 - addr: 0xd71c30
   kind: global
+  semantics: the victory manager's vtable (slot 1 the evaluation 0x7bc580).
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
     - "- The evaluation (0x7bc580, vtable 0xd71c30 slot 1, at the player's activation): a strategy disqualified for good is skipped; a vic..."
-  review: imported
+  review: reviewed
 - addr: 0xd74c88
   kind: global
   status: PARTLY
@@ -550,6 +558,7 @@
   review: imported
 - addr: 0xdb11b8
   kind: global
+  semantics: "the volcano component's vtable: +0x68 0xa1d2b0, +0x50 0xa1d310, +0x58 0xa1d130, +0x60 0xa1d450."
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -558,17 +567,19 @@
   readings: ["C-74: the volcano roll's gate — READ"]
   context:
     - "0x335040 reads the volcano component's counts (vtable 0xdb11b8): +0x68(b) 0xa1d2b0 counts the volcano entries (+0x1a0, stride 0xa0), with b true only th..."
-  review: imported
+  review: reviewed
 - addr: 0xdecb08
   kind: global
+  semantics: "the city-state bonus type trade modifier's vtable: apply 0xb468d0 / remove 0xb47620."
   status: PARTLY
   readings: ["C-94: Sovereignty's route yield — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...RADE_ROUTE_BY_CITY_STATE_BONUS_TYPE_MODIFIER (the factory 0xc27d10, the effect's vtable 0xdecb08: apply 0xb468d0 / remove 0xb47620) adds its Amount (WC_RES_MODIFY_CITY_STATE_TRADE_YIEL..."
-  review: imported
+  review: reviewed
 - addr: 0xdece90
   kind: global
+  semantics: EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES' instance vtable (apply 0xb48710).
   status: PARTLY
   cases:
     - recording: h1_duelw1123
@@ -576,7 +587,7 @@
   readings: ["H-1: Johannesburg's yield per resource type — PARTLY READ"]
   context:
     - "EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES (the factory 0xc2e490, the instance vtable 0xdece90): its apply (0xb48710) registers the yield type and Amount on the city's +0x1da8 table (0..."
-  review: imported
+  review: reviewed
 - addr: 0xdf78a8
   kind: global
   status: PARTLY
@@ -591,6 +602,7 @@
   review: imported
 - addr: 0xdf85f8
   kind: global
+  semantics: EFFECT_ADJUST_PLAYER_ERA_SCORE_PER_DISTRICT_CONSTRUCTED's vtable (player apply 0xb83b00).
   status: PARTLY
   cases:
     - recording: 1109
@@ -600,7 +612,7 @@
     - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
   context:
     - "...tality's COMMEMORATION_INFRASTRUCTURE_QUEST): the factory 0xc25910, the effect vtable 0xdf85f8, its player apply 0xb83b00 → 0x2bf3e0 adds the Amount to the era manager's player entry..."
-  review: imported
+  review: reviewed
 - addr: 0xe261e0
   kind: string
   status: PARTLY
@@ -625,24 +637,27 @@
   review: reviewed
 - addr: 0xefedf0
   kind: global
+  semantics: "the hexspace's axial dq per index (with 0xefeef0 dr): the centre, then rings 1, 2, 3 — (0,0) (0,1) (1,0) (1,-1) (0,-1) (-1,0) (-1,1), ring 2 from (0,2) clockwise to (-1,2), ring 3 from (0,3) to (-1,3)."
   status: PARTLY
   impl: [gpu/core/simbase.py:CITIZEN_HEXSPACE]
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...entry per free slot of each plot of the city's 37-plot hexspace (0x5cc00 over the tables 0xefedf0 / 0xefeef0: axial dq, dr per index — the centre, then rings 1, 2, 3; the order the DP wal..."
-  review: imported
+  review: reviewed
 - addr: 0xefeef0
   kind: global
+  semantics: the hexspace's axial dr per index (with 0xefedf0).
   status: PARTLY
   impl: [gpu/core/simbase.py:CITIZEN_HEXSPACE]
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...free slot of each plot of the city's 37-plot hexspace (0x5cc00 over the tables 0xefedf0 / 0xefeef0: axial dq, dr per index — the centre, then rings 1, 2, 3; the order the DP walks: (0,0) (..."
-  review: imported
+  review: reviewed
 - addr: 0xeff670
   kind: global
+  semantics: "DirectionTypes' dx (with 0xeff688 dy): NE (0,+1), E (+1,0), SE (+1,-1), SW (0,-1), W (-1,0), NW (-1,+1) axial, y north."
   status: READ
   cases:
     - recording: 1115
@@ -661,9 +676,10 @@
   context:
     - "...) whose latitude band holds the plot and whose neighbour exists (DirectionTypes offsets 0xeff670 / 0xeff688: NE (0,+1), E (+1,0), SE (+1,−1), SW (0,−1), W (−1,0), NW (−1,+1) axial, y..."
     - "...ach damage row, the plot itself (r12 = −1, impassable: no draw) and its six (the table at 0xeff670 / 0xeff688) — and the soil likewise, plot by plot, its draws labelled \"Pillage Improvemen..."
-  review: imported
+  review: reviewed
 - addr: 0xeff688
   kind: global
+  semantics: DirectionTypes' dy (with 0xeff670).
   status: READ
   cases:
     - recording: 1115
@@ -682,7 +698,7 @@
   context:
     - "...itude band holds the plot and whose neighbour exists (DirectionTypes offsets 0xeff670 / 0xeff688: NE (0,+1), E (+1,0), SE (+1,−1), SW (0,−1), W (−1,0), NW (−1,+1) axial, y north), co..."
     - "...row, the plot itself (r12 = −1, impassable: no draw) and its six (the table at 0xeff670 / 0xeff688) — and the soil likewise, plot by plot, its draws labelled \"Pillage Improvement Chance\"...."
-  review: imported
+  review: reviewed
 - addr: 0xeff6a0
   kind: global
   semantics: |
@@ -699,24 +715,27 @@
   review: reviewed
 - addr: 0xeff730
   kind: global
+  semantics: "DirectionTypes' offsets: (0,1) (1,0) (1,-1) (0,-1) (-1,0) (-1,1) in the game's (x - y//2, y) — NE, E, SE, SW, W, NW."
   status: PARTLY
   impl: [cpu/core/tactical.ts:search, cpu/core/tactical.ts:PathDanger]
   readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x781e0: NotifyList 2 then 3, closed) and links its neighbours in DirectionTypes order (0xeff730: (0,1) (1,0) (1,-1) (0,-1) (-1,0) (-1,1) in the game's (x - y//2, y) — NE, E, SE, SW, W..."
-  review: imported
+  review: reviewed
 - addr: 0xf01920
   kind: global
+  semantics: "the path finder pool (count at +8, read by 0xb2f410): bounds AI Unit Planning's chunks and the influence map's split (0x7176dd); serves the units' path searches (\"Unable to acquire a path finder, all %d are busy\")."
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ing thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then the wait. The pool (0xf01920, count at +8, read by 0xb2f410) also bounds the influence map's split (0x7176dd) and se...
-  review: imported
+  review: reviewed
 - addr: 0xf02c70
   kind: global
+  semantics: the 3d6 counts table.
   status: PARTLY
   impl: [cpu/core/espionage.ts:DICE_COUNTS, gpu/core/sim_init.py:__init__]
   readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
@@ -724,7 +743,7 @@
   context:
     - "...pe 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_escape.py`."
     - "...16), a2 = clamp(T − 5, 5, 15), a1 = clamp(T − 7, 4, 14); the weights are the 3d6 counts (0xf02c70, of 216; summed by 0x52b5c0) over 3..a1−1 (killed), a1..a2−1 (captured), a2..a3−1 (fail,..."
-  review: imported
+  review: reviewed
 - addr: 0xf03650
   kind: global
   status: PARTLY
@@ -772,6 +791,7 @@
   review: imported
 - addr: 0xf04278
   kind: global
+  semantics: EFFECT_MOUNTAIN_PORTAL's static analyzer (vtable 0xd632c8).
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -780,7 +800,7 @@
     - "C-100: a district on a feature it may not stand on, and the Mountain Portal's analyzer — READ"
   context:
     - "- THE MOUNTAIN PORTAL'S ANALYZER (EFFECT_MOUNTAIN_PORTAL -> the static 0xf04278, vtable 0xd632c8, slot 1 0x6b6610), the Mountain Tunnel's ImprovementModifiers row in 0..."
-  review: imported
+  review: reviewed
 - addr: 0xf04cb0
   kind: global
   semantics: "-9999: a value past the horizon."
@@ -794,6 +814,7 @@
   review: reviewed
 - addr: 0xf0bf40
   kind: global
+  semantics: "the ring walk's six steps: (0, 1), (-1, 0), (1, -1), (0, -1), (1, 0), (-1, 1) in (x - y // 2, y) — SOUTHEAST, WEST, NORTHEAST, NORTHWEST, EAST, SOUTHWEST (the fire spread's order)."
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -805,7 +826,7 @@
   readings: ["C-74: the fire's spread — READ (the order)"]
   context:
     - "...0x691f0 is the ring walk: from the plot's cube coordinates, the six steps of the table at 0xf0bf40 — (0, 1), (-1, 0), (1, -1), (0, -1), (1, 0), (-1, 1) in (x - y // 2, y) — this grid's SOU..."
-  review: imported
+  review: reviewed
 - addr: 0xf28c80
   kind: global
   status: PARTLY
@@ -817,12 +838,13 @@
   review: imported
 - addr: 0xf2dc70
   kind: global
+  semantics: the Trade_Movement path finder.
   status: PARTLY
   readings:
     - "C-96: the trade AI's route value — READ (0x5e9b20, 0x78f210, 0x78e010, 0x559140's use), PARTLY READ (0x526330's terms, the knowledge base's city order)"
   context:
     - "...n (r13 > 2 skips); the try is the trade pathfinder (0x559140: the Trade_Movement finder 0xf2dc70 from the city's plot +0x158 to the destination's, GeneratePath 0x77d10) — reached: appe..."
-  review: imported
+  review: reviewed
 - addr: 0xf2e080
   kind: global
   name: AI_EVENT_GAIN_TECH
@@ -1531,6 +1553,7 @@
 - addr: 0xf2e254
   kind: global
   name: PSEUDOYIELD_UNIT_COMBAT
+  semantics: the PSEUDOYIELD_UNIT_COMBAT index.
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -1552,7 +1575,7 @@
     - ...the unit's pseudo-yield (Units +0x290, PSEUDOYIELD_UNIT_COMBAT by default; the globals @0xf2e254 COMBAT, 258 NAVAL, 25c AIR, 26c TRADE, 268 RELIGIOUS, 250 ARCHAEOLOGIST, 260 EXPLORER,...
     - ...nalysis value (0x5d4cd0) and the upgrades' gold (0x5376d0, 20.0 at least); PSEUDOYIELD [0xf2e254] of 100 where 0x4f2ac0 names the row; per building the player's version 0.5, a wonder...
     - "...ING_FROM_DISPERSAL 0x6a6d20: the camps x ceil(Amount / 10) as PSEUDOYIELD_UNIT_COMBAT (@0xf2e254), the same. EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4680 (parser 0x6a44b0: the..."
-  review: imported
+  review: reviewed
 - addr: 0xf2e258
   kind: global
   name: PSEUDOYIELD_UNIT_NAVAL_COMBAT
@@ -1727,6 +1750,7 @@
   review: imported
 - addr: 0xf2e740
   kind: global
+  semantics: "the settle evaluators' table by PlotEvalConditions (0x6f3420..0x6f37b0, 0x6f9630..0x6fa060): Nearest Enemy / Friendly City and New Resources — with a threshold above 0 a gate (at least it, else invalid), else count x value; Inner Ring / Total Yield Sum(weight x yield) over the keyed yields; Coastal — gate, else the value where coastal and not fresh water; Fresh Water — gate, else the value; Specific Resource / Feature Sum(weight x count); Resource Class Sum(count x the class's weight); Foreign Continent — the threshold where the player has no city on the plot's continent, plus the value off its home continent; Cultural Pressure — a threshold below 0 a gate (pressure above it), else pressure x value."
   status: PARTLY
   cases:
     - recording: AI_SiteEval.csv
@@ -1737,7 +1761,7 @@
     - ".claude/scratchpad/st1/reading.md: ...source. - The score (0x702380): per entry with a threshold or a value, the   evaluator the table at 0xf2e740 holds for its condition (0x6f3420..   0x6f37b0, 0x6f9630..0x6fa060), each a whole number << 8: Near..."
   context:
     - "...The score (0x702380): per entry with a threshold or a value, the evaluator the table at 0xf2e740 holds for its condition (0x6f3420.. 0x6f37b0, 0x6f9630..0x6fa060), each a whole number..."
-  review: imported
+  review: reviewed
 - addr: 0xf2ed70
   kind: global
   status: PARTLY
@@ -1755,6 +1779,7 @@
   review: imported
 - addr: 0xf2f978
   kind: global
+  semantics: the yield index the Mercenary Companies discount names (Production).
   status: READ
   cases:
     - recording: h1_duelw1104
@@ -1766,9 +1791,10 @@
   readings: ["H-1: a unit's Production cost in the queue — READ"]
   context:
     - "...s does not read 2 through 0xadd5e0 (unread) and the player's +0x1048 equals the global at 0xf2f978 (the currency the resolution names; Production fits the records), the quote is c − ((c <<..."
-  review: imported
+  review: reviewed
 - addr: 0xf2f97c
   kind: global
+  semantics: the YIELD_GOLD index.
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
@@ -1777,7 +1803,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...food (+0x08) the plot's Food; each yield not disfavored (+0x50) counted twice, Gold once (0xf2f97c = YIELD_GOLD), into favored (+0x0c, the yields m_favoredYields +0x38 holds) or other (+0x...
-  review: imported
+  review: reviewed
 - addr: 0xf2f988
   kind: global
   status: PARTLY

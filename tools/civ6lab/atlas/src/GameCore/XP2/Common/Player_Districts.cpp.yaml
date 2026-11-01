@@ -73,6 +73,7 @@
 - addr: 0x409870
   final: 0x2c4f10
   kind: function
+  semantics: "the district discount's under-average models: the type's count 0x4bdd70 (placed districts included) against 0x4bca20's average, the completed specialty districts over the unlocked specialty types."
   status: READ
   cases:
     - recording: 1112
@@ -85,4 +86,4 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
     - "- The district discount (0x409870's under-average models): the type's count 0x4bdd70 (placed districts included) against..."
-  review: imported
+  review: reviewed

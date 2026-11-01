@@ -6,6 +6,7 @@
 - addr: 0x4580b0
   final: 0x2ef560
   kind: function
+  semantics: "the player's start: UpdateMaxMeleeStrengthTrained (0x4c1c10) to the start era's row +0x40 or +0x44 (StartEras StartingMeleeStrengthMajor 20 / StartingMeleeStrengthMinor 25 in the Ancient era), the ranged at +0x50 / +0x54."
   status: READ
   cases:
     - recording: 1112
@@ -20,4 +21,4 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "...0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), raises it to 0x56dc90(unit, 0) — the unit's strength as it stands, i..."
-  review: imported
+  review: reviewed

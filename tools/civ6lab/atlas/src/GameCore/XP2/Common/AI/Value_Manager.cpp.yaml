@@ -131,6 +131,7 @@
   final: 0x528700
   kind: function
   name: resourceValue
+  semantics: "(out, player, resource, count, &rate, T, H): no resource 0. BONUS 0. LUXURY: v = PSEUDOYIELD_RESOURCE_LUXURY of 1.0 from T to H (0x7a2140); where the player holds it (0x4abfe0) and count > 0, 0; else for a full civilization or a city-state the amenities a copy gives (0x527a50), the player's cities with their amenities less those required (0x5275a0) sorted (0x79ea80), the first min(cities, amenities) each one Amenity more from T to H (0x79f7c0), at least v; at most 200.0. STRATEGIC: the need, the most of ResourceCost + 10 x ResourceMaintenanceAmount over the resource's units in the military AI's production table (0x79d340); have = 0x4a93c0(r, 1); where have is below twice the need, T = H (or H = 0) and count not positive, FX(-9999); a positive count held to twice the need less have; with a unit asking it each copy worth the era's chronology x 25.0 over the need (x2 with none had), discounted to T, times the copies; at most 800.0. The stockpile terms (0x7a2850..0x7a2d61): where Player_Resources +0x350 (0x4aa700) less +0x12e8 +0x1168 (0x4ab270) is below 0 and 0.5 x the need is above have, the need at least the shortfall's whole part; at T = H a positive count held to the cap (0x4aabe0) less the stock less its reservations; a resource with a +0xd0 list adds 50.0. ARTIFACT and LEY_LINE 0."
   status: PARTLY
   impl:
     - cpu/core/aiResearch.ts:researchAnalysis
@@ -163,6 +164,7 @@
 - addr: 0x7a2df0
   final: 0x528ef0
   kind: function
+  semantics: the knowledge base's trade route value K (+0x6d8).
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -405,9 +407,12 @@
   final: 0x52a440
   kind: function
   name: valueDistrictAtPlot
-  semantics: "a district's value at a plot (out, district, &rate, T, H, plot, city, ...; from 0x5ce970's district loop 0x5ced80..0x5cefed: the verdict 0x5d2ae0 -1 writes FX(-9999) first, 1 takes the value x1.5 0xd2f32c; T = 0x17b5a0 + max(tech, civic turns)): T past H FX(-9999). A plot without an owner pays its price (0x1b1cb0, city +0x1688; -1 beyond GlobalParameters +0x124 or no plot beside it the city owner's) at the yield value with no player, discounted T, taken off. A feature the district does not keep (0x17cb00) and may not clear: 0; else 0x7a3010. A resource seen with no harvest row: 0; else 0x7a37d0. An unpillaged improvement: its yields (0x7b1320) and the resource's value at count -1 off. The plot's own district pillaged: the repair, +12500.0 at the city centre, the whole x2. Then 0x7aaf80."
+  semantics: "a district's value at a plot (out, district, &rate, T, H, plot, city, ...; from 0x5ce970's district loop 0x5ced80..0x5cefed: the verdict 0x5d2ae0 -1 writes FX(-9999) first, 1 takes the value x1.5 0xd2f32c; T = 0x17b5a0 + max(tech, civic turns)): T past H FX(-9999). A plot without an owner pays its price (0x1b1cb0, city +0x1688; -1 beyond GlobalParameters +0x124 or no plot beside it the city owner's) at the yield value with no player, discounted T, taken off. A feature the district does not keep (0x17cb00) and may not clear: 0; else 0x7a3010. A resource seen with no harvest row: 0; else 0x7a37d0. An unpillaged improvement: its yields (0x7b1320) and the resource's value at count -1 off. The plot's own district pillaged: the repair, +12500.0 at the city centre, the whole x2. Then 0x7aaf80. The district's feature (0x7a5335..0x7a5412): one the city keeps under the district (0x17cb00 over the city's pairs +0x2170 +0x378, or the district row's list +0x218) is left; else a Removable one (Features +0xc1 bit 7) is cleared (0x7a3010), a ValidDistrictPlacement one (Features_XP2 +0x28 bit 2) stood on, any other values the plot 0 (0x7a540a)."
   status: READ
   cases:
+    - recording: h1_duely1124
+      turn: 85
+      value: "Bologna: the Harbor's choice 30:7 over 29:8 (a Reef), 463.37 against 466.77"
     - recording: h1_duelv1127
       turn: 2
       value: the Campus rows exact on every plot, T 15 = 2 + 13
@@ -591,14 +596,19 @@
 - addr: 0x7a7400
   final: 0x52b7d0
   kind: function
-  status: PARTLY
+  semantics: "a belief's value: FX(-9999) where start >= horizon; else the modifiers' sum 0x7a4b20 in a context of the player (+0x40 its id, +0x80 it) and a religion (+0x48): the one it founded (0x497520), else its majority religion (0x497240)."
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 2
+      value: "Rome: Feed the World 68 = Shrine 34 + Temple 34; Choral Music 75 = 25 + 50"
   impl: [cpu/core/aiModifiers.ts:ValueTerms]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...n does (0x340950), or where the player's own religion holds a belief of its class; else 0x7a7400(belief, the rate, start 0, `m_valueHorizons`[2] = speed(200) = 100 online). A player..."
     - "- THE VALUE (0x7a7400): FX(-9999) where start >= horizon; else the modifiers' sum 0x7a4b20 in a context of th..."
-  review: imported
+  review: reviewed
 - addr: 0x7a7590
   final: 0x52b900
   kind: function
@@ -668,7 +678,7 @@
   final: 0x52d500
   kind: function
   name: the district value body
-  semantics: "the district value body: T at or past H FX(-9999); a Coast row on a lake FX(-9999); a flood (unless Districts_XP2 PreventsFloods) or an eruption sooner cuts H. A turn: PSEUDOYIELD_DISTRICT 1.0; per yield the whole adjacency 0x366df0 -> 0x365720, 0 at a plot without an owner; the district's own rows and, where a district the player may build, the city lacks and the plot takes (0x406c00, 0x1aec20, 0x35f2d0) earns more by its rows, that best off (not an Aqueduct, +0xe0 bit 2); HitPoints (+0x58 / +0x5c) x 0.02 x ((d - d f) / d + 1) of PSEUDOYIELD_CITY_DEFENSES; 0.5 x the era's ChronologyIndex x the district pseudo-yield while the city may add a district (not RequiresPopulation +0xe1 bit 6, or 0x1ae8a0 above 0x1ae8f0); a regional reach (the largest RegionalRange of its buildings, +0x130) x (the player's other cities within it holding no such district + 1) x 0.5; Appeal x 0.5 Food beside a district with Housing; its domain (0xadd590: sea 0, air 1, land 2) where 0x1c77c0 says the city does not train it PSEUDOYIELD_UNIT_NAVAL / AIR_COMBAT 5.0, twice where no city of the player's does, then the domain's units' values (0x5d4cd0) once where none does; Maintenance Gold off; District_GreatPersonPoints. PV(H) - PV(T) plus the units' lump; Housing (an Aqueduct's 2, globals +0x13c) plus the AppealHousingChanges band (0x1b4450) at 0x7a3d70; the claimed plots (0x39dd20 -> 0x7a10c0); a Dam (Districts_XP2 +0x28 bit 3) 100.0 an improved and 300.0 a districted plot of the owner's along its rivers (0xa2bf20); a Canal (bit 0) 100.0 x 0x4d9320; its projects (+0x1d0) each 0x7b28c0 x 0.1, x3.0 a favoured one (0x7a48d0), shared by (0x408b60 all + 1); the modifiers (0x7a4b20); at the top level the neighbours (0x79f280)."
+  semantics: "the district value body: T at or past H FX(-9999); a Coast row on a lake FX(-9999); a flood (unless Districts_XP2 PreventsFloods) or an eruption sooner cuts H. A turn: PSEUDOYIELD_DISTRICT 1.0; per yield the whole adjacency 0x366df0 -> 0x365720, 0 at a plot without an owner; the district's own rows and, where a district the player may build, the city lacks and the plot takes (0x406c00, 0x1aec20, 0x35f2d0) earns more by its rows, that best off (not an Aqueduct, +0xe0 bit 2); HitPoints (+0x58 / +0x5c) x 0.02 x ((d - d f) / d + 1) of PSEUDOYIELD_CITY_DEFENSES; 0.5 x the era's ChronologyIndex x the district pseudo-yield while the city may add a district (not RequiresPopulation +0xe1 bit 6, or 0x1ae8a0 above 0x1ae8f0); a regional reach (the largest RegionalRange of its buildings, +0x130) x (the player's other cities within it holding no such district + 1) x 0.5; Appeal x 0.5 Food beside a district with Housing; its domain (0xadd590: sea 0, air 1, land 2) where 0x1c77c0 says the city does not train it PSEUDOYIELD_UNIT_NAVAL / AIR_COMBAT 5.0, twice where no city of the player's does, then the domain's units' values (0x5d4cd0) once where none does; Maintenance Gold off; District_GreatPersonPoints. PV(H) - PV(T) plus the units' lump; Housing (an Aqueduct's 2, globals +0x13c) plus the AppealHousingChanges band (0x1b4450) at 0x7a3d70; the claimed plots (0x39dd20 -> 0x7a10c0); a Dam (Districts_XP2 +0x28 bit 3) 100.0 an improved and 300.0 a districted plot of the owner's along its rivers (0xa2bf20); a Canal (bit 0) 100.0 x 0x4d9320; its projects (+0x1d0) each 0x7b28c0 x 0.1, x3.0 a favoured one (0x7a48d0), shared by (0x408b60 all + 1); the modifiers (0x7a4b20); at the top level the neighbours (0x79f280). Shifts each adjacency row's integer back to fixed point and applies the adjacency percent per row (0x7a6690) before adding it; calls 0x365ae0 per row itself."
   status: PARTLY
   cases:
     - recording: h1_duelv1127
@@ -821,8 +831,12 @@
   final: 0x531290
   kind: function
   name: valueProject
+  semantics: "the project value (out, project, &rate, T, H, player, city, ...): FX(-9999) at T at or past H or a MaxPlayerInstances project completed (0x4be7b0). The projects it opens (+0xf0..+0xf8) each valued recursively at T plus its build turns (0x17b890), at least 200.0, summed; a weapon one (+0x148, written by 0xa99160) adds PSEUDOYIELD_NUCLEAR_WEAPON 250.0 (@0xd71c24). SpaceRace (+0xe8 bit 1): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared (functor vt 0xd71b28 +0x10 -> 0x79f030) and 1.0 per space-race project completed. Project_GreatPersonPoints (+0x108..+0x110): each class's pseudo-yield of its Points escalated by 0x5267a0 type 1 at PointProgressionParam1, x4. OuterDefenseRepair (+0xe8 bit 0), where 0x197ff0 > 0: that damage x the population (+0x588) x 0x1ae8f0 x 10.0. A diplomatic-victory row (+0xe8 bit 4, or Projects_XP2 +0x60 bit 1, with 0x25afc0): PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT of the era's points. The sum paid once, discounted to T (0x7a1240); then the Projects_XP2 row's +0x1c x the population from T to H where the city's +0x2a78 check is negative; the CreateBuilding through 0x7a7590 less each consumed building (Project_BuildingCosts); the project's modifiers (GlobalAI +0x3a38) through 0x7a4b20."
   status: PARTLY
   cases:
+    - recording: h1_duelv1124
+      turn: 89
+      value: "Cardiff's Repair Outer Defenses 42 x 8 x 1 x 10 discounted a turn: 3255.0 as logged"
     - recording: h1_duely1124
       turn: 89
       value: "Cardiff's Repair Outer Defenses 3255.0 as logged: 42 outer hit points down x population 8 x 1 district x 10, discounted a turn; Granada t127 21971.3"
@@ -862,9 +876,12 @@
 - addr: 0x7b3e50
   final: 0x531f20
   kind: function
-  semantics: "the research value's TechnologyModifiers term: the row's modifiers analysed from landing (-> 0x7a4b20)."
+  semantics: "the research value's TechnologyModifiers term: the row's modifiers analysed from landing (-> 0x7a4b20). The resources (0x7b556f..0x7b5758): per improvement of the technology's list (row +0xd0..+0xd8) the player may build (0x35f100), per resource of its valid list (+0x1e8): the copies its cities count (0x5d45c0, summed); where above 0, the resource value (0x7a21e0, count 1, turns, H) added. The value so far x1.5 where the row is the Fav Tech (+0xd88) and 0x3dcf50 holds (at 0x7b5b22); the military turn runs after the research AI's, so the analysis reads the Fav Tech of the turn before."
   status: PARTLY
   cases:
+    - recording: h1_duely1127
+      turn: 34
+      value: "the Free Cities: Fav Tech Archery at t33, Archery 83.7 -> 125.6 at t34"
     - recording: h1_duely1124
       turn: 189
       value: Rocketry's own value 10.0 a turn; Satellites 679.2 at 4 turns

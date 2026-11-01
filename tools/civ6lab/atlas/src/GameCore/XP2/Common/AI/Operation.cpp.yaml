@@ -147,6 +147,7 @@
 - addr: 0x73a120
   final: 0x4ddd60
   kind: function
+  semantics: "an operation's start (\"Started\" line)."
   status: PARTLY
   impl: [cpu/core/operations/manager.ts:startOperation, gpu/core/sim_minorops.py:_mops_start]
   readings:
@@ -157,7 +158,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...(0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
-  review: imported
+  review: reviewed
 - addr: 0x73a840
   final: 0x4de360
   kind: function
@@ -184,7 +185,7 @@
   final: 0x4de400
   kind: function
   name: an operation's target gone
-  semantics: "an operation's target gone: no city on its plot."
+  semantics: "an operation's target gone: no city on its plot. By kind: a camp off the knowledge base's camps, a district target off its city records, a friendly city or a settle plot never, any other kind always."
   status: PARTLY
   impl:
     - cpu/core/operations/assault.ts:isCityThreatened
@@ -236,8 +237,12 @@
   final: 0x4de710
   kind: function
   name: an operation's target still valid
+  semantics: "TARGET_ENEMY_COMBAT_DISTRICT: the knowledge base's record of the city on the target (owner +0, city id +4, kind 2 at +2) — none, invalid; its defenses and walls (0x5eb600) at most its defensible districts (+0x58), valid; op +0x124 at 1 valid; else per member of its teams alive (+0x770 clear): one the walls do not hold back (unit +0x18b8 / +0x18b9, the counts +0xb94 / +0xc14), valid, unless the city's flag (an owner major: city +0x158's lookup +0x1c above 0; else player +0x12f0 +0xf4 above 0); else the combat simulation's blow (0x213e00 .. 0x205720, dealt +0x24, taken +0x28) against COMBAT_HEAL_CITY_GARRISON (20, GlobalParameters +0x1b8): either at 20 or more valid; both below 10: the taken sum above 40 or the dealt sum above 20 valid; else a second such member valid; none, invalid. The camp branch: no camp the seat knows on the target."
   status: READ
   cases:
+    - recording: h1_duelv1128
+      turn: 76
+      value: China's Attack Enemy City of t73 on a city that raised its defenses turns INVALID at t76 with no team member
     - recording: h1_duelv1128
       turn: 76
       value: Attack Enemy City, Operation Change Target INVALID, No backup
@@ -277,20 +282,22 @@
 - addr: 0x73b6c0
   final: 0x4df100
   kind: function
+  semantics: Make Formation's pairing (-> 0x73b8a0).
   status: PARTLY
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation...
-  review: imported
+  review: reviewed
 - addr: 0x73b8a0
   final: 0x4df2e0
   kind: function
+  semantics: forms a pair of units into a formation.
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:planFormations]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x...
-  review: imported
+  review: reviewed
 - addr: 0x73be10
   kind: function
   status: PARTLY
@@ -377,6 +384,7 @@
 - addr: 0x73e870
   final: 0x4e18f0
   kind: function
+  semantics: switches an operation to a candidate.
   status: PARTLY
   impl: [cpu/core/operations/nodes.ts:switchToBackup, gpu/core/sim_minorops.py:_switch_backup]
   readings:
@@ -385,7 +393,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870).
-  review: imported
+  review: reviewed
 - addr: 0x73ea10
   final: 0x4e1aa0
   kind: function

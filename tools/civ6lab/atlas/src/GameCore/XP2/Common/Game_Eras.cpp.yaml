@@ -6,6 +6,7 @@
 - addr: 0x2bf3e0
   final: 0x1e2800
   kind: function
+  semantics: adds the Amount to the era manager's player entry +0x34 (the +0x560 vector, stride 0x78).
   status: PARTLY
   cases:
     - recording: 1109
@@ -15,30 +16,38 @@
     - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
   context:
     - "...E_QUEST): the factory 0xc25910, the effect vtable 0xdf85f8, its player apply 0xb83b00 → 0x2bf3e0 adds the Amount to the era manager's player entry +0x34 (the +0x560 vector, stride 0x78..."
-  review: imported
+  review: reviewed
 - addr: 0x2c0e80
   final: 0x1e34d0
   kind: function
   name: Game_Eras
+  semantics: "the ages at the era change, per player in the game's list: s = the sum of the era-score vector (+0x5b8, 22 types, never reset); Golden when s >= 0x2c3b60, Dark when s < 0x2c3a70, Heroic when Golden out of a Dark age; then the next thresholds (0x2c6be0, 0x2c55d0) and PER_PAST_GOLDEN_AGE 5 to shift [7] for a Golden or Heroic age entered, PER_PAST_DARK_AGE -5 to [8] for a Dark one (cumulative)."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1103
+      value: every age and both bars of both majors at every era change of the H-1 Duels, 16 / 16
   impl: [cpu/data/seats.ts:ERA_DARK_T]
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...hen it falls below 0 it is reset to -1 and the next era begins (0x93eaa0 next era; ages 0x2c0e80; 0x2c6d70 sets the era and its turn). So the era begins 10 turns after the countdown st...
     - "The ages, 0x2c0e80 at the era change, per player in the game's list: the score s = the sum of the player's e..."
-  review: imported
+  review: reviewed
 - addr: 0x2c2dc0
   final: 0x1e4ca0
   kind: function
   name: Game_Eras
+  semantics: "Game_Eras' per-turn update (gated by a game option, hash 0xf10572be), with the game's other end-of-turn steps after the counter moves: short of the last chronological era (0x93e8a0), with the countdown idle and 0x2c4c80 true, the countdown (+0x170, value +0x1c8, -1 idle) is set to NEXT_ERA_TURN_COUNTDOWN (GlobalParameters +0x524, 10); a running countdown is decremented the same call; below 0 it is reset to -1 and the next era begins (0x93eaa0; ages 0x2c0e80; 0x2c6d70 sets m_eCurrentGameEra +0x108 and its first turn +0x168)."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1103
+      value: "era starts 31, 61, 91, 121, 151, 181, 201, 231 (1104: ... 173, 193, 223), 16 of 16"
   impl: [cpu/data/seats.ts:ERA_MIN_TURNS]
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - Game_Eras.cpp. The per-turn update 0x2c2dc0 (gated by a game option, hash 0xf10572be) runs with the game's other end-of-turn steps af...
-  review: imported
+  review: reviewed
 - addr: 0x2c3660
   final: 0x1e5460
   kind: function
@@ -57,58 +66,64 @@
   final: 0x1e54c0
   kind: function
   name: MaxTurn
+  semantics: MaxTurn = start + scale(GameEraMaximumTurns, row +0x2c) (online 30).
   status: PARTLY
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...total − ahead). MinTurn 0x2c3870 = start + scale(Eras_XP1 GameEraMinimumTurns), MaxTurn 0x2c37c0 = start + scale(GameEraMaximumTurns) (Eras_XP1 row +0x24 / +0x2c), scale 0x5254d0 = x ×..."
-  review: imported
+  review: reviewed
 - addr: 0x2c3870
   final: 0x1e5570
   kind: function
   name: MinTurn
+  semantics: "MinTurn = start + scale(Eras_XP1 GameEraMinimumTurns, row +0x24) (0x5254d0: online 20)."
   status: PARTLY
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...s (0x2c3940 counts them; 0x2c3900 the rest; the test is ahead ≥ total − ahead). MinTurn 0x2c3870 = start + scale(Eras_XP1 GameEraMinimumTurns), MaxTurn 0x2c37c0 = start + scale(GameEra..."
-  review: imported
+  review: reviewed
 - addr: 0x2c3900
   final: 0x1e5600
   kind: function
+  semantics: counts the majors not ahead of the game's era.
   status: PARTLY
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...alive test) stand in a chronologically later era than the game's (0x2c3940 counts them; 0x2c3900 the rest; the test is ahead ≥ total − ahead). MinTurn 0x2c3870 = start + scale(Eras_XP1..."
-  review: imported
+  review: reviewed
 - addr: 0x2c3940
   final: 0x1e5640
   kind: function
+  semantics: counts the majors in a chronologically later era than the game's.
   status: PARTLY
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ted ones counted — no alive test) stand in a chronologically later era than the game's (0x2c3940 counts them; 0x2c3900 the rest; the test is ahead ≥ total − ahead). MinTurn 0x2c3870 =..."
-  review: imported
+  review: reviewed
 - addr: 0x2c3a70
   final: 0x1e5720
   kind: function
+  semantics: "the Dark threshold: max(0, base + the shifts' sum)."
   status: PARTLY
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...tScore`); Golden when s ≥ the Golden threshold 0x2c3b60, Dark when s < the Dark threshold 0x2c3a70 (each = max(0, base + Σ shifts)), Heroic when Golden out of a Dark age (the copied previo..."
-  review: imported
+  review: reviewed
 - addr: 0x2c3b60
   final: 0x1e5800
   kind: function
+  semantics: "the Golden threshold: max(0, base + the shifts' sum)."
   status: PARTLY
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...reset — the whole game's, `GetPlayerCurrentScore`); Golden when s ≥ the Golden threshold 0x2c3b60, Dark when s < the Dark threshold 0x2c3a70 (each = max(0, base + Σ shifts)), Heroic when..."
-  review: imported
+  review: reviewed
 - addr: 0x2c3ed0
   final: 0x1e5ac0
   kind: function
@@ -232,47 +247,56 @@
 - addr: 0x2c4c80
   final: 0x1e65f0
   kind: function
+  semantics: "the era countdown's start test: false when turn < MinTurn - 10; true when turn >= MaxTurn - 10; else true when at least half the game's players vector (+0xb50; eliminated majors counted) stand in a chronologically later era than the game's (0x2c3940 ahead, 0x2c3900 the rest; ahead >= total - ahead)."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1103
+      turn: 191
+      value: the countdown started by the half-ahead clause (1104 t163, t183)
   impl: [cpu/data/seats.ts:ERA_MIN_TURNS]
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Short of the last chronological era (0x93e8a0): with the countdown idle and 0x2c4c80 true, the countdown is set to NEXT_ERA_TURN_COUNTDOWN (GlobalParameters +0x524, 10); a..."
     - "- 0x2c4c80: false when turn < MinTurn − 10; true when turn ≥ MaxTurn − 10; else true when at least..."
-  review: imported
+  review: reviewed
 - addr: 0x2c55d0
   final: 0x1e6e00
   kind: function
+  semantics: "the eleven threshold shifts: THRESHOLD_SHIFT_PER_CITY x max(0, cities - 1) (the city count read at the change); MISSING_AMENITY and the four INCOMPLETE_* (0 in GS); [10] the entered era's Eras_XP2 EraScoreThresholdShift (Ancient -3)."
   status: PARTLY
   impl: [cpu/data/seats.ts:ERA_DARK_T]
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...lier / 100 truncated, ONLINE_SLIGHT 80 → 22 / 11; 100 where the speed has no SLIGHT row); 0x2c55d0 the eleven shifts: THRESHOLD_SHIFT_PER_CITY × max(0, cities − 1); MISSING_AMENITY and the..."
-  review: imported
+  review: reviewed
 - addr: 0x2c69c0
   kind: function
+  semantics: "the game's start: the first age bars off s = 0 (8 / 19 online)."
   status: PARTLY
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ge entered and PER_PAST_DARK_AGE −5 to [8] for a Dark one (cumulative). The game's start (0x2c69c0) fixes the first bars off s = 0: 8 / 19 online. Thresholds never move mid-era (the city c..."
-  review: imported
+  review: reviewed
 - addr: 0x2c6be0
   kind: function
+  semantics: "sets the age bases to s + scale_SLIGHT(GOLDEN_AGE_SCORE_BASE_THRESHOLD 28) and s + scale_SLIGHT(DARK_AGE_SCORE_BASE_THRESHOLD 14) (0x525500): 22 / 11 online."
   status: PARTLY
   impl: [cpu/data/seats.ts:ERA_DARK_T, cpu/data/seats.ts:AGE_SLIGHT_PCT]
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...eroic when Golden out of a Dark age (the copied previous flag). Then the next thresholds: 0x2c6be0 sets the bases to s + scale_SLIGHT(GOLDEN_AGE_SCORE_BASE_THRESHOLD 28) and s + scale_SLIG..."
-  review: imported
+  review: reviewed
 - addr: 0x2c6d70
   final: 0x1e7eb0
   kind: function
+  semantics: sets the game era (+0x108) and its first turn (+0x168).
   status: PARTLY
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ls below 0 it is reset to -1 and the next era begins (0x93eaa0 next era; ages 0x2c0e80; 0x2c6d70 sets the era and its turn). So the era begins 10 turns after the countdown starts.
-  review: imported
+  review: reviewed

@@ -20,6 +20,7 @@
 - addr: 0x35f100
   final: 0x25a230
   kind: function
+  semantics: the player may build the improvement (its trait against the player's civilization and leader).
   status: PARTLY
   impl: [cpu/core/aiResource.ts:TECH_IMPROVEMENT_RESOURCES]
   readings:
@@ -30,7 +31,7 @@
 - addr: 0x35f2d0
   final: 0x25a360
   kind: function
-  semantics: the plot takes the district.
+  semantics: "the plot takes the district. The placement test (0x35f6ad..0x35f7b0): a district row with a +0x218 list needs the plot's feature on it; else a feature neither Removable nor ValidDistrictPlacement refuses the plot (the Reef, the Oasis, the Geothermal Fissure, the fires')."
   status: PARTLY
   impl:
     - cpu/core/aiCityTrees.ts:CityTreeWorld
@@ -97,6 +98,7 @@
 - addr: 0x363080
   final: 0x25d430
   kind: function
+  semantics: an improvement's placement (-> 0x362ec0 the owner set).
   status: READ
   cases:
     - recording: h1_duelw1124
@@ -107,4 +109,4 @@
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   context:
     - "...territory: none for the barbarians), an improvement's owner (0x84340 from the placement 0x363080 -> 0x362ec0: the plot and the six beside it, no line of sight), the scripted operatio..."
-  review: imported
+  review: reviewed

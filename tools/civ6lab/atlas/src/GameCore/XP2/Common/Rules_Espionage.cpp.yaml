@@ -5,12 +5,13 @@
 # set `review: reviewed`.
 - addr: 0x528560
   kind: function
+  semantics: "the police's guess: one offered route weighted by 5 - TravelTime (City Centre 1, Commercial Hub 2, Harbor 3, Aerodrome 4; \"Police Exit Covered\")."
   status: PARTLY
   impl: [cpu/core/espionage.ts:policeCover, cpu/data/espionage.ts:SPY_ESCAPE_BASE]
   readings: ["C-16: the counterspy and the escape"]
   context:
     - "...c80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_escape.py`."
-  review: imported
+  review: reviewed
 - addr: 0x529450
   kind: function
   status: PARTLY
@@ -20,16 +21,18 @@
 - addr: 0x529ab0
   final: 0x372b40
   kind: function
+  semantics: the escape's target v = ESCAPE_BASE 10 - LEVEL_BOOST x (level - 1) - the spy's escape boost + 4 on a right police guess.
   status: PARTLY
   impl: [cpu/data/espionage.ts:SPY_ESCAPE_BASE]
   readings: ["C-16: the counterspy and the escape"]
   context:
     - "...rspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_escape.py`."
-  review: imported
+  review: reviewed
 - addr: 0x529b60
   final: 0x372bf0
   kind: function
   name: ComputeNeededDieRoll
+  semantics: "ComputeNeededDieRoll (Rules_Espionage): the mission's needed roll; the counterspy term += EnemyProbChange (3) + EnemyLevelProbChange (1) x (counterspy level - 1) + the counterspy's promotion terms, its level + ADJACENT_LEVEL_BOOST when within 1 of the target."
   status: PARTLY
   impl:
     - cpu/core/espionage.ts:post
@@ -40,18 +43,20 @@
   context:
     - "Rules_Espionage: mission target `ComputeNeededDieRoll` 0x529b60, outcome table 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: R..."
     - "...six weights in index order. A mission (0x52b2a0, table 0x52b8f0) with the needed roll T (0x529b60, the pursuing counterspy's term in it): a5 = clamp(T, 8, 18), a4 = clamp(T − 2, 7, 17), a..."
-  review: imported
+  review: reviewed
 - addr: 0x52ac80
   final: 0x373920
   kind: function
+  semantics: "the counterspy finder: the FIRST unit in the target owner's unit list that is a spy on a counterspy operation, in a city, within hex distance 1 of the target plot — any district, any city — or anywhere in its own city with the ENTIRE_CITY effect."
   status: PARTLY
   impl: [cpu/core/espionage.ts:counterspyPursuing, gpu/core/sim_spy.py:_counterspy_pursuing]
   readings: ["C-16: the counterspy and the escape"]
   context:
     - "...edDieRoll` 0x529b60, outcome table 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x5..."
-  review: imported
+  review: reviewed
 - addr: 0x52aea0
   kind: function
+  semantics: the escape's resolution (-> 0x52b090).
   status: PARTLY
   impl: [cpu/core/espionage.ts:spyEscape, gpu/core/sim_spy.py:_spy_escape]
   readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
@@ -59,10 +64,11 @@
   context:
     - "..., mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_..."
     - "...of 256; base 16: 11/29/24/61/61/66) are these bands' floor(count × 256 / 216). An escape (0x52aea0, table 0x52b090): killed 3..v−3, caught v−2..v−1, away v..18, the other three weights 0...."
-  review: imported
+  review: reviewed
 - addr: 0x52b090
   final: 0x373c30
   kind: function
+  semantics: "the escape table: ONE weighted draw over the 3d6 counts — escaped P(3d6 >= v), captured P(v-2 <= 3d6 <= v-1), killed P(3d6 <= v-3)."
   status: PARTLY
   impl:
     - cpu/core/espionage.ts:escapeWeights
@@ -74,9 +80,10 @@
   context:
     - "...52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_escape.py`."
     - "...11/29/24/61/61/66) are these bands' floor(count × 256 / 216). An escape (0x52aea0, table 0x52b090): killed 3..v−3, caught v−2..v−1, away v..18, the other three weights 0. Before this read..."
-  review: imported
+  review: reviewed
 - addr: 0x52b2a0
   kind: function
+  semantics: "the espionage mission roll (\"Rolling Espionage Result\")."
   status: PARTLY
   impl: [cpu/core/espionage.ts:missionDraw, gpu/core/sim_spy.py:_mission_draw]
   readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
@@ -84,7 +91,7 @@
   context:
     - "...age: mission target `ComputeNeededDieRoll` 0x529b60, outcome table 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b0..."
     - "...ge Result\" draws ONE weighted pick (0x287c00) over six weights in index order. A mission (0x52b2a0, table 0x52b8f0) with the needed roll T (0x529b60, the pursuing counterspy's term in it):..."
-  review: imported
+  review: reviewed
 - addr: 0x52b5c0
   final: 0x373f10
   kind: function
@@ -98,6 +105,7 @@
 - addr: 0x52b8f0
   final: 0x374180
   kind: function
+  semantics: the espionage mission's outcome table.
   status: PARTLY
   impl: [cpu/core/espionage.ts:missionWeights, gpu/core/sim_spy.py:_mission_weights]
   readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
@@ -105,7 +113,7 @@
   context:
     - "Rules_Espionage: mission target `ComputeNeededDieRoll` 0x529b60, outcome table 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 →..."
     - "...ONE weighted pick (0x287c00) over six weights in index order. A mission (0x52b2a0, table 0x52b8f0) with the needed roll T (0x529b60, the pursuing counterspy's term in it): a5 = clamp(T, 8..."
-  review: imported
+  review: reviewed
 - addr: 0x52bf50
   final: 0x374580
   kind: function
@@ -116,6 +124,7 @@
 - addr: 0x52ce40
   kind: function
   name: ResolveEscape
+  semantics: "ResolveEscape (-> 0x52aea0 -> the table 0x52b090 -> the target 0x529ab0); passes no counterspy (0x52cf77 xor r8d, r8d): the COUNTERSPY_LEVEL_MODIFIER term is dead code."
   status: PARTLY
   impl:
     - cpu/core/espionage.ts:spyEscape
@@ -126,7 +135,7 @@
   context:
     - "...le 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. C..."
     - "...ure becomes a kill for one civ/district pairing). **ResolveEscape passes no counterspy (0x52cf77 `xor r8d, r8d`): the COUNTERSPY_LEVEL_MODIFIER term is dead code.**"
-  review: imported
+  review: reviewed
 - addr: 0x52d420
   kind: function
   status: PARTLY

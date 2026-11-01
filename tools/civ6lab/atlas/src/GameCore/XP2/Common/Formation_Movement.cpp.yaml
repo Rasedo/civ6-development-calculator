@@ -5,7 +5,7 @@
 # set `review: reviewed`.
 - addr: 0x26dcd0
   kind: function
-  semantics: "the planning's breadth-first search: keeps the pool's heuristic (+0x30/+0x38, null in the pool 0x26f330 sets) and zeroes the destination test (+0x20/+0x28); the destination (-9999, -9999), so it runs out. A node's key (+0x18 f, +0x1c g), f = g."
+  semantics: "the planning's breadth-first search: keeps the pool's heuristic (+0x30/+0x38, null in the pool 0x26f330 sets) and zeroes the destination test (+0x20/+0x28); the destination (-9999, -9999), so it runs out. A node's key (+0x18 f, +0x1c g), f = g. AI Unit Planning's search: 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved (0x800 skips the zone of control); the valid wrapper 0x26e570 refuses a node past the turn limit."
   status: PARTLY
   impl:
     - cpu/core/tactical.ts:reachPlots
@@ -79,7 +79,7 @@
 - addr: 0x26e920
   final: 0x1a7150
   kind: function
-  semantics: "the step's cost rules (0x531660..0x530240): into a city at most CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1 bit 2) stands at the FROM or the TO plot, the completion (0x811b0) read off the FROM plot's district in both cases; a land unit whose player may embark it takes water (a turn on the domain's pool: [r9 + 0x180 + domain*4])."
+  semantics: "the step's cost rules (0x531660..0x530240): into a city at most CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1 bit 2) stands at the FROM or the TO plot, the completion (0x811b0) read off the FROM plot's district in both cases; a land unit whose player may embark it takes water (a turn on the domain's pool: [r9 + 0x180 + domain*4]). A step's turns and Movement (24.8): a parent with no Movement starts the next turn at the domain's full Movement; a step costing more than the Movement left waits for the next turn (turns + 1, Movement 0), unless the parent is the unit's own plot and the unit has not moved (flag 0x100) or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) save under flag 0x800. Between two plots the player never revealed (node +0x51 & 1, 0x154c0) the step costs the parent's or 1 and no rule runs."
   status: READ
   cases:
     - recording: h1_duelw1117
@@ -145,7 +145,7 @@
   final: 0x1a7510
   kind: function
   name: formation path request
-  semantics: a formation's path (more than one member, not embarked, a member of domain 2 or 4 by 0x2669d0) carries flag 0x2000, which the move 0x26fe20 turns into 0x80 for each member's placement
+  semantics: "a formation's path (more than one member, not embarked, a member of domain 2 or 4 by 0x2669d0) carries flag 0x2000, which the move 0x26fe20 turns into 0x80 for each member's placement Sets path flag 0x2000 for a formation of more than one member (+0x738), not embarked (+0x278 0), with a member of domain 2 (land) or 4 (0x2669d0 on each member's +0x650); the move 0x26fe20 turns it into 0x80 for each member's placement (0x587ca0 -> 0x586d40 -> 0x586360), read only in the sea-domain branch (a hull's district test): 0x2000 does not by itself bar a land escort's step."
   status: PARTLY
   readings:
     - "C-95: the barbarians' Builder Capture — READ (the event, the start, the tree's walk), ported"
@@ -154,6 +154,7 @@
 - addr: 0x26f1d0
   final: 0x1a76a0
   kind: function
+  semantics: "generates a path: the flags to the instance's +0x398, bit 8 where the finder's +0x4b8 is clear, 0x2000 for a unit +0x738 above 1 holding 0x2669d0 2 or 4; then the A* 0x7a630 over the callbacks 0x26f330 sets (the validity 0x2720a0, the cost 0x26e920)."
   status: READ
   cases:
     - recording: h1_duelw1128
@@ -163,7 +164,7 @@
   readings: ["C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
   context:
     - "...f the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0: the flags to the instance's +0x398, bit 8 where the finder's +0x4b8 is clear, 0x2000 f..."
-  review: imported
+  review: reviewed
 - addr: 0x26f330
   final: 0x1a7840
   kind: function
@@ -186,23 +187,25 @@
 - addr: 0x26f7d0
   final: 0x1a7ce0
   kind: function
+  semantics: sizes the path finder pool.
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The pool's count is set at game init (0x91e590 -> 0x26f7d0) to max(1, the engine's value under hash 0xc181eb6e); the trade-route pool's (0x557e4..."
-  review: imported
+  review: reviewed
 - addr: 0x26f830
   final: 0x1a7d40
   kind: function
+  semantics: the unit is still on its way (a move order in progress).
   status: PARTLY
   readings:
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...damage at most half its health (0x56e0d0 >> 1), in a later round not still on its way (0x26f830), takes HL Explore (0x70aa40, the region fallbacks on the first round alone) and its ta...
-  review: imported
+  review: reviewed
 - addr: 0x26f980
   final: 0x1a7e90
   kind: function
@@ -234,6 +237,7 @@
   review: reviewed
 - addr: 0x26fe20
   kind: function
+  semantics: "Walks the destination plot's units from the last to the first; for each not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's is at war with (0x469cd0), calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 with the capture flag 1), a 1 or a 2 leaves it be; then the mover completes its step. A formation's move: the path flag 0x2000 becomes 0x80 for each member's placement (0x587ca0); the formation moves only if every member's placement succeeds."
   status: READ
   cases:
     - recording: 1121
@@ -260,7 +264,7 @@
     - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
     - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."
     - "...'s destination) from the path cost 0x26e920, the move's step cost 0x270980 and the walk 0x26fe20 at 0x270800, which stores the answer on the formation +0x518): the plot entered (the..."
-  review: imported
+  review: reviewed
 - addr: 0x270980
   final: 0x1a8da0
   kind: function
@@ -291,7 +295,7 @@
 - addr: 0x270dd0
   final: 0x1a9060
   kind: function
-  semantics: "a step's path cost: an unrevealed plot's step +3 with no +3 off the territory, a revealed one +2 and +3 more off it where it ends the turn; at 0x2712be, on a revealed water plot for a formation of the land domain (finder +0x1f2 = 0x2669d0(formation, 2)) +1000 (0x3e800) where its player is not human (+0x1f6 clear) or one of its units holds +0x590 (the path and the planning's lists alike); the embark / disembark tests (0x52fe90 / 0x52fb90, +1e6 where refused), mountain and canyon +1e6."
+  semantics: "a step's path cost: an unrevealed plot's step +3 with no +3 off the territory, a revealed one +2 and +3 more off it where it ends the turn; at 0x2712be, on a revealed water plot for a formation of the land domain (finder +0x1f2 = 0x2669d0(formation, 2)) +1000 (0x3e800) where its player is not human (+0x1f6 clear) or one of its units holds +0x590 (the path and the planning's lists alike); the embark / disembark tests (0x52fe90 / 0x52fb90, +1e6 where refused), mountain and canyon +1e6. 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no Movement +4, and on a revealed plot then the 1e6 penalties (mountain, impassable) and +3 off the player's territory; then +2 on a revealed plot, +3 on an unrevealed one."
   status: READ
   cases:
     - recording: h1_duely1117
@@ -318,6 +322,7 @@
 - addr: 0x271490
   final: 0x30c70
   kind: function
+  semantics: a path search's destination test.
   status: PARTLY
   readings:
     - "C-20: the Trader's path and range"
@@ -326,7 +331,7 @@
   context:
     - "- The path is the least-cost path within that budget (A*, heuristic 0x271490), not a greedy step, and the range is the budget, not a hex distance between the ends."
     - "...0x79660, a new one opened. The trade path's callbacks (0x557e40): the destination test 0x271490, destination-valid 0x629460 (1), no heuristic (both slots null: the total is the known..."
-  review: imported
+  review: reviewed
 - addr: 0x2715a0
   final: 0x1a94b0
   kind: function
@@ -350,12 +355,13 @@
 - addr: 0x271b50
   final: 0x1a99b0
   kind: function
+  semantics: a path's extra neighbours callback.
   status: PARTLY
   readings: ["H-1: the trade path's search, its score and the Canal — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...a no-op; 1, 2, 4 store the child's range off the range callback), neighbours 0x558d60 / 0x271b50, context 0x558ba0. The range callback 0x5579b0 memoises its answer on the (parent, chil...
-  review: imported
+  review: reviewed
 - addr: 0x271be0
   final: 0x1a9a40
   kind: function
@@ -383,9 +389,12 @@
 - addr: 0x2720a0
   final: 0x1a9f00
   kind: function
-  semantics: "the path validity: flag 1 lets no step leave a plot the player never revealed but the unit's own; 0x1000 lets a later turn end on its own stacking unit."
+  semantics: "the path validity: flag 1 lets no step leave a plot the player never revealed but the unit's own; 0x1000 lets a later turn end on its own stacking unit. Each node records (0x271be0) whether its player sees its plot (+0x50 & 2) and the count of the unit's own stacking units on it, the unit itself not counted (0x585eb0, +0x54); the walk back through the parents refuses the link, at each node after which a turn begins, where the plot is seen and the count reaches the stacking limit (+0x1b0), search flags +4 / +0x1000 clear. The other turn-end tests (0x272262..0x272313) on a seen node after which a turn begins: a mountain (+0x50 & 4, terrain bits 0x4924) or an impassable feature (+0x50 & 8) unless the finder's +0x1f6 lets it, water under flag 0x80 (+0x50 & 0x10), a city not at war (+0x51 & 2) — the stacking, mountain and city tests off under flag +4 (the planning's search carries it). After the walk (0x272372..0x272692): the embarking tests under the unit's +0x1f2 / +0x1f1 bytes on a revealed child; flag 2: a child owned by a player at war refused; a clans' tribe test (0x151550, 0x147c20); under the finder's +0x1f7 byte or flag 8, a child whose danger (0x716a90) is above 0 refused from a parent of turn 1 or less, under flag 0x8000 the same for a water child; flag 1: a parent not revealed refused unless it is the unit's own plot, and a child in a major's territory not at war refused unless the player may enter it (0x3dab70). The chain walk (0x272230..0x27235a): each node, its parent +0x0, its turn +0x2c, the newest from the instance's +0x1dc; a node ending a turn (+0x50 & 2) whose stacking count (+0x54) reaches the limit (+0x1b0) is refused unless +0x51 & 4 with +0x1f8, or flags & 4; with flags & 0x1000 (the validity's flag word +0xe0, 0x2721df) only where that node's turn is 1 or less (0x27229b): a turn after the first free to end on the unit's own stacking unit."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 11
+      value: the Horse Archer at 34:8 for 30:7 takes the path whose turn ends on the free 33:6, not through 33:7 / 32:7 held by its own units
     - recording: h1_duelw1121
       turn: 11
       value: "runs/h1_duelw1121 t11: the   Horse Archer at 34:8 for 30:7 takes the path whose turn ends on the free   33:6, not the one through 33:7 / 32:7, both held by its own units."
@@ -451,6 +460,7 @@
 - addr: 0x272880
   final: 0x1aa680
   kind: function
+  semantics: the unit's own plot 0; a plot off the map 0; the plot tested (0x2669d0 / 0x586900 / 0x20a3c0) and the path generated (0x26f1d0), its turns.
   status: READ
   cases:
     - recording: h1_duelw1128
@@ -459,4 +469,4 @@
   readings: ["C-95: the scout's tree \"Barbarian Found City\" — READ, ported"]
   context:
     - "- THE PATH 0x272a60 (READ): 0x272a60(path finder, plot, flags) -> 0x272880(0, finder, plot, flags): the unit's own plot 0; a plot off the map 0; the plot tested (..."
-  review: imported
+  review: reviewed

@@ -6,12 +6,13 @@
 - addr: 0x6690a0
   final: 0x43f0c0
   kind: function
+  semantics: registers the Formal War family's functors.
   status: PARTLY
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   context:
     - ...threat's (c), Request Assistance, Joint War, Third Party War, the Formal War family (0x6690a0), the -10 trust signal's event, the doubling.
-  review: imported
+  review: reviewed
 - addr: 0x669310
   kind: function
   name: registerSurpriseWar

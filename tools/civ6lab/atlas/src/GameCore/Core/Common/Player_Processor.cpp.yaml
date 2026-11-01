@@ -7,12 +7,13 @@
   final: 0x5cb00
   kind: function
   name: Player::Processor::DoTurnDeactivate
+  semantics: Player::Processor::DoTurnDeactivate (-> 0x4e4ad0, which tail-jumps to the resources' cap 0x4a8f10).
   status: PARTLY
   impl: [cpu/core/stockpile.ts:capStockpiles, cpu/harness/import.ts:importPower]
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - "- The turn end's cap (Player::Processor::DoTurnDeactivate 0x7eb60 -> 0x4e4ad0, which tail-jumps to Player_Resources 0x4a8f10): for each accumulated res..."
-  review: imported
+  review: reviewed
 - addr: 0x7ecc0
   final: 0x5cbc0
   kind: function

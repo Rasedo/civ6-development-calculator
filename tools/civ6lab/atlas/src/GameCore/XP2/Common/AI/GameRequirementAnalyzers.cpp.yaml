@@ -26,33 +26,36 @@
 - addr: 0x6cfbd0
   kind: function
   name: PLAYER_HAS_PANTHEON
+  semantics: "REQUIREMENT PLAYER_HAS_PANTHEON in the analysis: the context's player is +0x40's (the evaluating player)."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:EVALUATORS]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...ith no religion in the context, else its religion +0x1910 is it); PLAYER_HAS_PANTHEON 0x6cfbd0 (the context's player is +0x40's — the evaluating player); PLAYER_IS_RELIGION_FOUNDER 0..."
-  review: imported
+  review: reviewed
 - addr: 0x6cfbf0
   kind: function
   name: CITY_FOLLOWS_PANTHEON
+  semantics: "REQUIREMENT CITY_FOLLOWS_PANTHEON in the analysis: the city's owner (+0x1b8) is the context's player."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:EVALUATORS]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "- The requirements: CITY_FOLLOWS_PANTHEON 0x6cfbf0 (the city's owner +0x1b8 is the context's player); CITY_FOLLOWS_RELIGION 0x6cfcb0 (any..."
-  review: imported
+  review: reviewed
 - addr: 0x6cfcb0
   kind: function
   name: CITY_FOLLOWS_RELIGION
+  semantics: "REQUIREMENT CITY_FOLLOWS_RELIGION in the analysis: any city with no religion in the context, else its religion (+0x1910) is it."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:EVALUATORS]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - ...THEON 0x6cfbf0 (the city's owner +0x1b8 is the context's player); CITY_FOLLOWS_RELIGION 0x6cfcb0 (any city with no religion in the context, else its religion +0x1910 is it); PLAYER_H...
-  review: imported
+  review: reviewed
 - addr: 0x6cfcd0
   final: 0x492160
   kind: function
@@ -220,13 +223,14 @@
   final: 0x48fc00
   kind: function
   name: PLAYER_IS_RELIGION_FOUNDER
+  semantics: "REQUIREMENT PLAYER_IS_RELIGION_FOUNDER in the analysis: no religion in the context, held; else 0x497cc0. A requirement the registry lacks (PLAYER_HAS_AT_LEAST_NUMBER_CITIES) is left out of the set."
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:EVALUATORS]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...0 (the context's player is +0x40's — the evaluating player); PLAYER_IS_RELIGION_FOUNDER 0x6d27a0 (no religion: held; else 0x497cc0). A requirement the registry lacks (PLAYER_HAS_AT_L..."
-  review: imported
+  review: reviewed
 - addr: 0x6d3830
   final: 0x490c90
   kind: function

@@ -6,7 +6,7 @@
 - addr: 0x8b6c10
   final: 0x5fa040
   kind: function
-  semantics: "the synchronous generator: state' = 0x41c64e6d x state + 0x3039 (mod 2^32), value = ((state' >> 16) x (max & 0xffff)) >> 16, the state stored every call (0x8b6dd9), the old state logged (0x8b6da9); max 0 steps and returns 0; no lock."
+  semantics: "the synchronous generator: state' = 0x41c64e6d x state + 0x3039 (mod 2^32), value = ((state' >> 16) x (max & 0xffff)) >> 16, the state stored every call (0x8b6dd9), the old state logged (0x8b6da9); max 0 steps and returns 0; no lock. Takes no lock: reads the state at 0x8b6c98, logs the old state (the RandCalls seed column) through a virtual call at 0x8b6da9 and stores the new state only at 0x8b6dd9; its guards are logical: !IsLocked() (+0x14) and the engine-utility check \"App side is accessing the synchronous random number generator while the game core is running\" (vtable +0x50 / +0x58). A max of 0 steps the state and returns 0 (Lua's GetRandNum returns early)."
   status: READ
   cases:
     - recording: h1_duelw1117

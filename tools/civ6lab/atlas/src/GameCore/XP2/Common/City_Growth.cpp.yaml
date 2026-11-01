@@ -6,6 +6,7 @@
 - addr: 0x1b41e0
   final: 0x123160
   kind: function
+  semantics: "a city's growth: box - threshold, then the box clamped to the new threshold - 1; places one citizen incrementally (starvation re-places every citizen)."
   status: PARTLY
   impl:
     - cpu/core/seatTurn.ts:lumpGrowth
@@ -16,7 +17,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0), else 0x197230 places the unassigned ones beside the citizens already working. Growth (0x1b41e0: box - threshold, then the box clamped to the new threshold - 1) places one citizen incre..."
-  review: imported
+  review: reviewed
 - addr: 0x1b4450
   final: 0x1232c0
   kind: function
@@ -42,6 +43,7 @@
   final: 0x123860
   kind: function
   name: City::GetAmenities
+  semantics: "City::GetAmenities: the luxury amenities 0x1b5210, the entertainment 0x1b4c10, and stored per-city counts, among them +0x54 of the city's +0x1730 object (the parks')."
   status: PARTLY
   readings:
     - "H-1: the luxury allocation — READ"
@@ -50,19 +52,21 @@
   context:
     - "...(+0x12f0 -> +0xd8, walked in order): {id +0xf8, population +0x588, the city's amenities 0x1b4af0 less its luxury amenities 0x1b5210 (its non-luxury amenities), granted 0};"
     - "- City::GetAmenities 0x1b4af0 sums the luxury amenities 0x1b5210 (a COUNT of the entries of `m_aLuxuryAllocations` (P..."
-  review: imported
+  review: reviewed
 - addr: 0x1b4c10
   final: 0x1239a0
   kind: function
+  semantics: a city's entertainment amenities.
   status: PARTLY
   readings: ["H-1: a National Park's amenities, stored at the owner's turn — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ty's id, 0x4aa0e0 — a city the last rebuild did not list holds none), the entertainment 0x1b4c10, and stored per-city counts, among them +0x54 of the city's +0x1730 object."
-  review: imported
+  review: reviewed
 - addr: 0x1b5210
   final: 0x123d90
   kind: function
+  semantics: "a city's luxury amenities: a COUNT of the entries of m_aLuxuryAllocations (Player_Resources +0x460; data +0x4b8, count +0x4c8) naming the city's id (0x4aa0e0) — a city the last rebuild did not list holds none."
   status: PARTLY
   readings:
     - "H-1: the luxury allocation — READ"
@@ -71,10 +75,11 @@
   context:
     - "...: {id +0xf8, population +0x588, the city's amenities 0x1b4af0 less its luxury amenities 0x1b5210 (its non-luxury amenities), granted 0};"
     - "- City::GetAmenities 0x1b4af0 sums the luxury amenities 0x1b5210 (a COUNT of the entries of `m_aLuxuryAllocations` (Player_Resources +0x460; data +0x4..."
-  review: imported
+  review: reviewed
 - addr: 0x1b55d0
   final: 0x124010
   kind: function
+  semantics: "the city's feature appeal modifier (city +0x1788: the Amazon's)."
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -89,10 +94,11 @@
   readings: ["H-1: the plot's Appeal — READ"]
   context:
     - "...nder construction lends nothing; then `Features.Appeal` plus the city's feature modifier (0x1b55d0 on city +0x1788: Amazon), `Terrains.Appeal`, -1 for a pillaged improvement, `Improvements..."
-  review: imported
+  review: reviewed
 - addr: 0x1b5620
   final: 0x124060
   kind: function
+  semantics: the city growth object's surplus Food.
   status: PARTLY
   cases:
     - recording: 1124
@@ -112,18 +118,20 @@
   context:
     - "...+0x1788, the rate, population, Housing, T, H): S = the Food surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(le..."
     - "...span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth object's surplus (0x1b5620), 2.0 with no city, x fx(Amount x 0.01), bare Food, between. EFFECT_ADJUST_CITY_ALL_MIL..."
-  review: imported
+  review: reviewed
 - addr: 0x1b5800
   kind: function
+  semantics: CityGrowth's happiness term.
   status: PARTLY
   readings: ["C-94: the growth modifier — READ (the accumulator's writer unread)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...cache) fills it from CityGrowth 0x1b62d0, beside housing 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c) and occupation 0x1b6120 (+0x20). 0x1b62d0:"
-  review: imported
+  review: reviewed
 - addr: 0x1b5840
   final: 0x124190
   kind: function
+  semantics: the city growth object's Housing.
   status: PARTLY
   cases:
     - recording: 1124
@@ -135,10 +143,11 @@
     - "C-127: the improvement loop's housing — EFFECT_ADJUST_IMPROVEMENT_HOUSING READ (0x6ad2b0), the growth forecast as the last analysis read it (a LAB fit), the water arm's resource rows, the Mountain Tunnel's analysis rows"
   context:
     - "...d surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left) = 0 below CITY_HOUSING_LEFT_ZERO_GROWTH (-4), 0.25 t..."
-  review: imported
+  review: reviewed
 - addr: 0x1b5f70
   final: 0x1245e0
   kind: function
+  semantics: CityGrowth's housing factor.
   status: READ
   cases:
     - recording: 1124
@@ -150,25 +159,27 @@
     - ...a7b10 (its data 8 bytes into the cache) fills it from CityGrowth 0x1b62d0, beside housing 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c) and occupation 0x1b6120 (...
     - "- r < 0 → 0; r ×= the housing factor (0x1b5f70), then ×= 0x1b6040 (1 in every record), each a fixed-point multiply."
     - "...ns, +0x738 withheld, +0x7a8 population; each turn's full update): the current factor g (0x1b5f70); where g < 1 a step (0, S(1 - g), pop); the turns to the next citizen 0x1b6390 (the..."
-  review: imported
+  review: reviewed
 - addr: 0x1b6040
   final: 0x124660
   kind: function
+  semantics: CityGrowth's last growth factor (1 in every record).
   status: PARTLY
   readings: ["C-94: the growth modifier — READ (the accumulator's writer unread)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- r < 0 → 0; r ×= the housing factor (0x1b5f70), then ×= 0x1b6040 (1 in every record), each a fixed-point multiply."
-  review: imported
+  review: reviewed
 - addr: 0x1b6120
   final: 0x1246f0
   kind: function
+  semantics: CityGrowth's occupation term.
   status: PARTLY
   readings: ["C-94: the growth modifier — READ (the accumulator's writer unread)"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...g 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c) and occupation 0x1b6120 (+0x20). 0x1b62d0:"
-  review: imported
+  review: reviewed
 - addr: 0x1b6180
   final: 0x124750
   kind: function
@@ -186,8 +197,12 @@
 - addr: 0x1b62d0
   kind: function
   name: CityGrowth
+  semantics: "CityGrowth's overall growth modifier: r = 1.0 (0x100); r += the amenity tier's Happinesses.GrowthModifier as (percent << 8) / 100 through 0x16e940 (-15% -38, -30% -76); r += other (0x1b6180): a game-configuration percent turned to fixed point through float plus CityGrowth +0x84 m_iOtherGrowthModifier (the accumulator EFFECT_ADJUST_CITY_GROWTH feeds); r < 0 -> 0; r x= the housing factor (0x1b5f70), then x= 0x1b6040, each a fixed-point multiply."
   status: READ
   cases:
+    - recording: h1_duelw1108
+      turn: 142
+      value: Jiaodong 89 -> 37 when the Migration Treaty ends (a detach adds floor(-p x 256/100))
     - recording: 1124
       value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
   impl:
@@ -200,7 +215,7 @@
   context:
     - ...value; the cache copy 0xa7b10 (its data 8 bytes into the cache) fills it from CityGrowth 0x1b62d0, beside housing 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c)...
     - ...390 (the threshold 0x5276e0 less the store +0x80 over S x the overall growth multiplier 0x1b62d0, rounded up; -1 with no surplus); then per next citizen while the turn is below 100 (+0...
-  review: imported
+  review: reviewed
 - addr: 0x1b6390
   final: 0x1249b0
   kind: function

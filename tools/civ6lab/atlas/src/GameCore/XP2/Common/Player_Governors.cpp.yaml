@@ -69,8 +69,12 @@
 - addr: 0x432980
   final: 0x2de6a0
   kind: function
+  semantics: "the governors' clocks (a player's turn). Walks the roster: 0x35df30(location, 1) raises the posting's count (+0x28) and, on reaching the type's EstablishTurns (0x433180), raises \"Governor Established\" (0x35e5f0); then the neutralize clock (0x35e1f0 > 0 -> 0x35d220(-1), \"returning to service\" at 0); every governor logs GovernorChanged (0x8b9120, hash 0xcb6c9e05). From Player DoTurn 0x4e46df, after the culture and the resources, before the city turns."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 100
+      value: "Reyna seated in Handan in China's t94 start, established at record 100, the border +20% in the t99 -> t100 processing"
     - recording: 1122
       turn: 200
       value: "both give the   same answer on the recorded cases: 1122 t200, Reyna established in   Changsha (Civil Prestige's amenity) leaves the ranking standing to t201   (the rebuild precedes her clock), and the"
@@ -79,7 +83,7 @@
   context:
     - ...recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation), the governors' clocks (0x432980 at 0x4e46df), and only then each city's turn (0x1fa1d0 at 0x4e4813, in the loop over Pl...
     - "- 0x432980 (from Player DoTurn 0x4e46df, after the culture and the resources, before the city turn..."
-  review: imported
+  review: reviewed
 - addr: 0x432d80
   final: 0x2de990
   kind: function
@@ -98,12 +102,13 @@
   final: 0x2ded40
   kind: function
   name: EstablishTurns
+  semantics: a governor type's EstablishTurns.
   status: PARTLY
   readings: ["H-1: the governors' clocks — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...on, 1) raises the posting's count (+0x28) and, on reaching the type's EstablishTurns (0x433180), raises \"Governor Established\" (0x35e5f0); then the neutralize clock (0x35e1f0 > 0 ->..."
-  review: imported
+  review: reviewed
 - addr: 0x433450
   final: 0x2def90
   kind: function

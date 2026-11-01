@@ -5,20 +5,22 @@
 # set `review: reviewed`.
 - addr: 0x193dc0
   kind: function
+  semantics: "the placement pick: a table over entries x count; an entry taken where better(cand, old) — old's food below the need and the candidate's at or above it, else favored greater, else (favored equal) other greater, strict — so an earlier entry keeps a tie."
   status: PARTLY
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...into favored (+0x0c, the yields m_favoredYields +0x38 holds) or other (+0x10). The pick (0x193dc0) is a table over entries x count: an entry taken where better(cand, old) — old's food bel..."
-  review: imported
+  review: reviewed
 - addr: 0x340490
   kind: function
+  semantics: the religion is founded.
   status: PARTLY
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...he job): the leader's FavoredReligions, then the civilization's, the first not founded (0x340490), else \"Random Religion Choice\" over the religions not founded but the pantheon's row a..."
-  review: imported
+  review: reviewed
 - addr: 0x535830
   kind: function
   status: PARTLY
@@ -37,13 +39,14 @@
   review: imported
 - addr: 0x69f6e0
   kind: function
+  semantics: COLLECTION_ALL_PLAYERS' second slot.
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:subjects]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - ...cities (player +0x12b8, its entries, setting +0x70); COLLECTION_ALL_PLAYERS 0x69f6c0 / 0x69f6e0 stands once on the context as it is (the evaluating player); COLLECTION_OWNER 0x69fc90...
-  review: imported
+  review: reviewed
 - addr: 0x6a00f0
   kind: function
   name: collectionMajorPlayersNext
@@ -72,12 +75,13 @@
   review: reviewed
 - addr: 0x74de60
   kind: function
+  semantics: a religion AI turn step before the Faith patronage.
   status: PARTLY
   readings:
     - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
   context:
     - "- THE FAITH PATRONAGE (0x751590, the religion AI's turn 0x74fbf0 after 0x74de60, not for a human): the cheapest person it may patronize with Faith (0x2f26c0) whose pri..."
-  review: imported
+  review: reviewed
 - addr: 0x80f9d0
   kind: function
   name: Siege City's assignment start
@@ -90,10 +94,11 @@
   review: reviewed
 - addr: 0x8d14a0
   kind: function
+  semantics: the save's PlotRoutes RouteType (plot +0x47).
   status: PARTLY
   readings:
     - "C-95: the roads' type per plot — READ (Route_Builder, Player_Trade, Trade_Manager, Rules_Movement), both twins"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ute type (+0x47) and its route era (+0x48, PlotRoutes RouteType / RouteEra in the save, 0x8d14a0 / 0x8cf720); the bridge flag +0x4d bit 4 is copied from the route's SupportsBridges at...
-  review: imported
+  review: reviewed

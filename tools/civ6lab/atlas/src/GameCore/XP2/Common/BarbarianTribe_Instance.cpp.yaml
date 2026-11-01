@@ -176,6 +176,7 @@
   review: reviewed
 - addr: 0x147c20
   kind: function
+  semantics: a clans' tribe test of the path validity (with 0x151550).
   status: PARTLY
   readings:
     - "C-95: the barbarians' operations on the manager — READ (the starts, Notify Owner, the assault's walk), ported"
@@ -183,7 +184,7 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...r the assault (+0x60); the assault's tree lists nothing but where the tribe was bribed (0x147c20's turns).
-  review: imported
+  review: reviewed
 - addr: 0x147e70
   final: 0xdbd50
   kind: function
@@ -241,8 +242,12 @@
 - addr: 0x1485c0
   kind: function
   name: barbFoundCityStart
-  semantics: "the scout's tree started: \"Barbarian Found City\" on the scout, the camp its Home Camp and the tribe its index"
+  semantics: "the scout's tree started: \"Barbarian Found City\" on the scout, the camp its Home Camp and the tribe its index From the scout's look 0x153ef0 once the player's throttle allows and the tribe's scout walks none yet: the tree \"Barbarian Found City\" (\"Barbarian Behavior\", 0x7ff9a0) on the scout alone, the trigger's Location its tribe's camp (\"Home Camp\") and Value the tribe's index (\"Tribe Index\"); the game signals BARBARIAN_SPOTTED_CITY and BARBARIAN_RAID_STARTED linked (0x1808c4af0). The tree: Sequence 0 (JumpTo 6) — Decode Trigger 1, Concurrent 2 (JumpTo 5) over Protect Unit 3 (Damage Percentage 0.25) and Move Unit 4 (Location \"Home Camp\", Release when done true, Allow Danger true, To Range 1), Notify Owner 5 (Data Payload \"Tribe Index\", 0x7c6fa0 -> 0x148270)."
   status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 6
+      value: "the first trees: 1117 t6, 1121 t4, 1124 t6 and t20, 1128 t6 and t8, 1127 t27, each the engines' start turn"
   impl:
     - cpu/core/barbarians.ts:barbScoutLook
     - cpu/core/barbarianOps.ts:barbScoutTreeStart

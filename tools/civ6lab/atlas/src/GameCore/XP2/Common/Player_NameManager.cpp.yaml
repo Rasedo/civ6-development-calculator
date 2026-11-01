@@ -6,6 +6,7 @@
 - addr: 0x486bf0
   final: 0x309610
   kind: function
+  semantics: a unit's citizen name (-> 0x486c20).
   status: READ
   cases:
     - recording: 1117
@@ -23,11 +24,15 @@
   readings: ["H-1: a city's name, a citizen's name — READ"]
   context:
     - "...8 ... as storms and Spies take names. Which units: the unit's creation 0x4eeb70 calls 0x486bf0 → 0x486c20 where the unit info's Spy (+0x1ba bit 2) or ExtractsArtifacts (+0x1b9 bit 1,..."
-  review: imported
+  review: reviewed
 - addr: 0x486c20
   kind: function
+  semantics: "\"Choosing a Citizen Name\": one draw over the civilization's CivilizationCitizenNames rows not yet given, the name given."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 102
+      value: a Spy's name in China's start t102, t118, t199
     - recording: 1117
       turn: 102
       value: A Spy takes   one at its birth (1117 t102, t118, t199 in China's start;
@@ -48,4 +53,4 @@
   readings: ["H-1: a city's name, a citizen's name — READ"]
   context:
     - "- \"Choosing a Citizen Name\" (0x486c20): one draw over the civilization's CivilizationCitizenNames rows not yet given, the nam..."
-  review: imported
+  review: reviewed

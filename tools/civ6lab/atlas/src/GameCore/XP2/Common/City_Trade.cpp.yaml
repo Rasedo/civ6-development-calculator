@@ -6,12 +6,13 @@
 - addr: 0x1f9650
   final: 0x14e020
   kind: function
+  semantics: a city's route-to-others yield row (+0x1ee0 vector +0x28).
   status: PARTLY
   readings: ["C-94: Sovereignty's route yield — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...TION city's route-to-others row of that yield (city +0x1ee0, its vector +0x28 read by 0x1f9650 — MODIFIER_PLAYER_CITIES_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS writes it). A major's city..."
-  review: imported
+  review: reviewed
 - addr: 0x1f99d0
   final: 0x14e100
   kind: function

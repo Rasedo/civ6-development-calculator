@@ -7,10 +7,11 @@
   final: 0x5a5530
   kind: function
   name: csId
+  semantics: Send Trade Route done when the actor starts a route to the minor.
   status: PARTLY
   impl: [cpu/core/quests.ts:questRouteStarted]
   readings: ["H-1: the city-states' quests — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...tor runs no route to the minor (0x54ff90 == 0); done when the actor starts one to it (0x84b570).
-  review: imported
+  review: reviewed

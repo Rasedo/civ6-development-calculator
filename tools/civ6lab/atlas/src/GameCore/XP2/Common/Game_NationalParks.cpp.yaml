@@ -6,18 +6,23 @@
 - addr: 0x32dc40
   final: 0x235480
   kind: function
+  semantics: a park's nearest other cities (1 amenity each).
   status: PARTLY
   readings: ["H-1: a National Park's amenities, stored at the owner's turn — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...adds NATIONAL_PARK_AMENITIES_OWNING_CITY (GlobalParameters +0x514) to its city and, via 0x32dc40, 1 to the nearest NATIONAL_PARK_NUM_OTHER_AMENITY_CITIES (+0x51c) others. Its only call...
-  review: imported
+  review: reviewed
 - addr: 0x32deb0
   final: 0x2356a0
   kind: function
   name: Game_NationalParks
+  semantics: "(player): zeroes +0x54 on every city of the player, then per park of that player adds NATIONAL_PARK_AMENITIES_OWNING_CITY (GlobalParameters +0x514) to its city and, via 0x32dc40, 1 to the nearest NATIONAL_PARK_NUM_OTHER_AMENITY_CITIES (+0x51c) others. Its only caller is the tail of 0x4a8ed0: a park designated in the action phase pays from its owner's next turn processing. Game_NationalParks: the parks' amenities stored at the owner's resources turn (after the luxury allocation)."
   status: READ
   cases:
+    - recording: h1_duelw1117
+      turn: 245
+      value: the park lands in the record t244, its cities' amenity part at t245
     - recording: 1121
       turn: 243
       value: "Player_Resources' DoTurn step 0x4a8ed0 runs the holdings 0x4ab6e0, the   allocation, then the parks 0x32deb0 — so a park stored at a processing   pays beside the luxuries ranked on the park amenities "
@@ -28,4 +33,4 @@
   context:
     - "- Game_NationalParks 0x32deb0 (player) zeroes +0x54 on every city of the player, then per park of that player adds NA..."
     - "...ources' DoTurn step 0x4a8ed0 runs the holdings 0x4ab6e0, the allocation, then the parks 0x32deb0 — so a park stored at a processing pays beside the luxuries ranked on the park amenitie..."
-  review: imported
+  review: reviewed

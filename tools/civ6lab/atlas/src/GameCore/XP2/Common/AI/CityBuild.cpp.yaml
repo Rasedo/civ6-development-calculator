@@ -139,8 +139,12 @@
   final: 0x3e05a0
   kind: function
   name: the city's threat (m_cityThreat)
+  semantics: "the city's threat (CityBuildAI m_cityThreat +0x160, data +0x1b8, set by the city's update 0x5ce680): per player of the game's list (+0x4a0) but the owner and a declared friend (0x3da770): a full civ the owner fights (0x469cd0) or that has denounced it (0x3da5e0) or that it denounced (0x3da8e0), and the barbarians, are hostile (margin 5.0); another full civ, margin 20.0 or the centre's garrison term where higher (0x5cc088: 0x24a180(centre, out, 0, 0)); a city-state the owner does not fight is skipped. An undamaged city with an operation of the owner against the player whose target lies within 5 of it (0x723cf0) skips the player. The knowledge base's units of the player within 5 (a full civ's) or 3 (0x5eadb0) each by its unit row: s = max(Combat +0x48, RangedCombat +0x6c, Bombard + 20 where +0x40 is above 0), counted where it bombards, where ranged and s above D - 15.0, or s above D - 5.0 (D the centre's GetDefenseStrength, 24.8, without its garrison: 0x5cbd72 calls 0x24ae80 with r8b set), an explorer never, nor a barbarian's (0x484910) of a type in the barbarian manager's list (+0x298, vector +0x2f0; 0x153e40); their sum at D plus the margin or more threatens the city, at level 2 (+1 above 2 of city +0x1a60, +2 with +0x5e8, +1 with +0x1c78's list, + +0x588 / 5), at most 1 for a player not hostile; the first such player decides, else -1. The units within 2 above 5.0 strength (a second 0x5eadb0) set the autovariable +0x1c0."
   status: READ
   cases:
+    - recording: h1_duelw1121
+      turn: 13
+      value: "Hunza: its Attack Barb Camp's target 10:2 three from the city, the barbarian Quadrireme at 11:2 starts City Defense"
     - recording: h1_duelv1128
       turn: 15
       value: "Xi'an threatened by the barbarians' Warrior and Scout: City Defense, Started"
@@ -260,6 +264,9 @@
   semantics: "City Defense's start (slot 5): first the defensive cancel 0x5d7640; a threat (CityBuildAI +0x1b8) above -1 with slot 5 free starts the list's CITY_UNDER_THREAT operation (\"City Defense\") at the city's plot through the player's operation manager (0x7265b0), slot 5 holding its tree (+0x780), its target the city, its worth the city's (0x7a0ac0), its threat CityBuildAI +0x1b8."
   status: READ
   cases:
+    - recording: h1_duelv1128
+      turn: 15
+      value: Xi'an's City Defense started on the log's turn
     - recording: h1_duelv1124
       turn: 19
       value: "player 3 \"City Defense, Started\""
@@ -321,6 +328,7 @@
 - addr: 0x5cdae0
   final: 0x3e1da0
   kind: function
+  semantics: "THE CITY AI'S FOOD FOCUS (the city update's call before its events, an AI player's city only): the growth object's Food surplus (0x1b5620) below 1.0 with its Housing (0x1b5840) above the population (+0x588): Food not favored (0x1962a0 on +0x1ba8) is set favored; otherwise a favored Food is cleared — each through the SET_FOCUS command (0x975550), a full re-place."
   status: PARTLY
   impl:
     - cpu/core/cityStates.ts:minorFoodFocus
@@ -335,7 +343,7 @@
     - "C-112: the citizen manager has no turn of its own — READ (the event's raisers), the records' counts"
   context:
     - "...ned with no wait, \"H-1: why a seed does not replay\"). Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150 (tree \"Build City..."
-  review: imported
+  review: reviewed
 - addr: 0x5cdc50
   final: 0x3e1f10
   kind: function
@@ -397,7 +405,7 @@
 - addr: 0x5ce3f0
   final: 0x3e2590
   kind: function
-  semantics: "spawns the City Analysis job (object at CityBuildAI +0xcc0, vtable 0xd59af0 -> 0x5ce910 -> 0x5ce970 once per plot evaluation, 0x78 bytes each, m_plotEvaluations at +0xcf8 / +0xd08, the city centre's first) with no wait: it runs on a worker thread beside the turn."
+  semantics: "spawns the City Analysis job (object at CityBuildAI +0xcc0, vtable 0xd59af0 -> 0x5ce910 -> 0x5ce970 once per plot evaluation, 0x78 bytes each, m_plotEvaluations at +0xcf8 / +0xd08, the city centre's first) with no wait: it runs on a worker thread beside the turn. Pushes and SPAWNS \"City Analysis\" with no wait in the function: AI::CityBuild's analysis runs beside the game-core thread until the processor's next wait (FinalRelease 0x3e2590)."
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
@@ -475,7 +483,7 @@
 - addr: 0x5ce970
   final: 0x3e2aa0
   kind: function
-  semantics: "a plot evaluation's tables (BUILDINGS +0x28, PROJECTS +0x38, UNITS +0x40). A building other than a wonder is valued on the city centre only: T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0) + 10 while the city builds something else (city +0x2350 set and the current item not this one) + each missing prerequisite building's turns; value = 0x7a4d40(building, T, no plot, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot with valueHorizons[2]. T beyond the horizon values FX(-9999). The building loop (0x5cfb10..0x5cfca5) values a row CanConstruct (0x170450 on the queue +0x2170) does not refuse for good (its result's second byte [rbp-0x1f]): a pillaged building the city holds is valued as unbuilt."
+  semantics: "a plot evaluation's tables (BUILDINGS +0x28, PROJECTS +0x38, UNITS +0x40). A building other than a wonder is valued on the city centre only: T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0) + 10 while the city builds something else (city +0x2350 set and the current item not this one) + each missing prerequisite building's turns; value = 0x7a4d40(building, T, no plot, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot with valueHorizons[2]. T beyond the horizon values FX(-9999). The building loop (0x5cfb10..0x5cfca5) values a row CanConstruct (0x170450 on the queue +0x2170) does not refuse for good (its result's second byte [rbp-0x1f]): a pillaged building the city holds is valued as unbuilt. The city build AI's PROJECTS table gates: MaxPlayerInstances (+0x30 / +0x34) above the player's completions and the other cities' builds (0x179650); UnlocksFromEffect (+0xe8 bit 2, or Projects_XP2 +0x60 bit 0) the player's unlock (0x468260); the civic (+0x120), tech (+0x150), district in the city (+0x128, 0x1aea60), RequiredBuilding (+0x158) held; its ProjectPrereqs (+0x130) each completed. T = the build turns (0x17b890), H valueHorizons[1]; x1.5 (@0xd2f32c) where the player's list +0x6e8 holds it."
   status: PARTLY
   cases:
     - recording: h1_duelv1124
@@ -747,6 +755,7 @@
 - addr: 0x5d2df0
   final: 0x3e6480
   kind: function
+  semantics: the city AI's plot evaluations hold a feature (+0xcf8, 0x78 each).
   status: PARTLY
   cases:
     - recording: h1_duelw1124
@@ -757,7 +766,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - ...Path 17); the feature's is gated on the city AI's plot evaluations holding the feature (0x5d2df0, +0xcf8 0x78 each); Amount x the count at the player's weight, span. EFFECT_ADJUST_CI...
-  review: imported
+  review: reviewed
 - addr: 0x5d4030
   final: 0x3e75e0
   kind: function
@@ -774,6 +783,7 @@
   final: 0x416510
   kind: function
   name: cityResourceCount
+  semantics: "+0x978[r] (filled by 0x5c9700): the city's plot evaluations (+0xcf8, the 37 plots within three of the centre) whose resource (the plot's where the player sees it, 0x4ab4b0 -> 0x4ac140) is r, owned by the player (+0x5a) and unimproved (+0x50)."
   status: PARTLY
   cases:
     - recording: h1_duelv1124

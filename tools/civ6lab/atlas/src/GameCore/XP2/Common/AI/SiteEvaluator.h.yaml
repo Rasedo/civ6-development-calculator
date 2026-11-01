@@ -6,6 +6,7 @@
 - addr: 0x6fd510
   final: 0x4b2990
   kind: function
+  semantics: "a region's settle job: every plot of the region scored in plot order."
   status: PARTLY
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -13,4 +14,4 @@
     - ".claude/scratchpad/st1/reading.md: ...ion of the regions list, run and waited): each job scores every plot   of its region in plot order (0x6fd510) and sorts them best first, a   stable merge sort (0x6f5fb0); a region holds a site where one score..."
   context:
     - "...regions list, run and waited): each job scores every plot of its region in plot order (0x6fd510) and sorts them best first, a stable merge sort (0x6f5fb0); a region holds a site where..."
-  review: imported
+  review: reviewed

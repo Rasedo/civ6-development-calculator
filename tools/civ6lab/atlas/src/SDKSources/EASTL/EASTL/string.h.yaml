@@ -223,7 +223,7 @@
 - addr: 0x74af30
   final: 0x4e9d60
   kind: function
-  semantics: "the religious AI's constructor (made by the religious manager, not reached from the Player): holds the Warrior Monk contracts."
+  semantics: "the religious AI's constructor (made by the religious manager, not reached from the Player): holds the Warrior Monk contracts. Members: m_isInitialized, m_priority, m_favoredReligion +0x168 (data +0x1c0), m_mustFoundPantheon +0x1c8 (+0x220), m_isReligionComplete +0x228 (+0x280), m_onlyConvertOwnCities +0x288 (+0x2e0), m_yieldPriorityBoost +0x2e8 (+0x340), m_beliefAnalyzers, m_managedContracts, m_religiousUnitContract."
   status: PARTLY
   cases:
     - recording: AI_Religious.csv

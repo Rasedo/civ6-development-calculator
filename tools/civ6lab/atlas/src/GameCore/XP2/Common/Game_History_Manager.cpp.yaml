@@ -13,12 +13,15 @@
   review: imported
 - addr: 0x3004e0
   kind: function
+  semantics: "records a moment: pays the row's EraScore unless the game era is before its MinimumGameEra or after its MaximumGameEra, the game's START era is at or past its ObsoleteEra, or the same moment for the same player lies within RepeatTurnCooldown (speed-scaled) turns."
   status: READ
   cases:
+    - recording: h1_duelw1103
+      value: "step.eraScore 394 / 482 (1104: 372 / 480)"
     - recording: 1103
       value: "Fit: `step.eraScore` 394 / 482 (1103) and 372 / 480 (1104), from 382 and 365;"
   impl: [cpu/data/seats.ts:moment]
   readings: ["C-94: the game era, the ages and the founding moments — READ"]
   context:
     - Moments (Game_History_MomentHandlers.cpp, Game_History_Manager.cpp). Recording 0x3004e0 pays the row's EraScore unless the game era is before its MinimumGameEra or after its Max...
-  review: imported
+  review: reviewed

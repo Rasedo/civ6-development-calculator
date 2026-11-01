@@ -6,6 +6,7 @@
 - addr: 0x67aff0
   final: 0x44cd70
   kind: function
+  semantics: builds the diplomatic state turn's transition entries.
   status: PARTLY
   cases:
     - recording: h1_duelv1127
@@ -20,7 +21,7 @@
     - ".claude/scratchpad/dp2/readings_dp2.md: ...used 117 ... 186, accepted 191 at Rome's Neutral). - THE STATE TURN (0x67b6e0, the entries built by 0x67aff0, their terms by   0x67aaf0). Each DiplomaticStateTransitions row out of the state, in table   order..."
   context:
     - "- THE STATE TURN (0x67b6e0, the entries built by 0x67aff0, their terms by 0x67aaf0). Each DiplomaticStateTransitions row out of the state, in tab..."
-  review: imported
+  review: reviewed
 - addr: 0x67b410
   kind: function
   name: runTransitionAction

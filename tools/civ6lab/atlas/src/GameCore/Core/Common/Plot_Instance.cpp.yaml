@@ -6,15 +6,17 @@
 - addr: 0x81b90
   final: 0x5efd0
   kind: function
+  semantics: Plot:GetAdjacencyYield's plot call (-> 0x5389b0).
   status: PARTLY
   readings: ["H-1: the district adjacency — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - Improvement_Yields.cpp. Lua Plot:GetAdjacencyYield (binding 0x25600 -> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0,...
-  review: imported
+  review: reviewed
 - addr: 0x82280
   final: 0x5f6d0
   kind: function
+  semantics: the plot's yield for a player (-> 0x538a60).
   status: READ
   cases:
     - recording: 1117
@@ -30,11 +32,11 @@
     - ..._COST; a natural wonder (0x82e90) NW_COST; YIELD_POINT_COST per yield point to the owner (0x82280); then over its six neighbours, each UNOWNED one with a seen resource -1 and with a natur...
     - "...ds the plot's appeal (vcall +0x28); any other source the plot's yield of that type from 0x82280 (→ 0x538a60) with its last flag false less the same with it true, times ScalingFactor /..."
     - ...always 0); at distance 1..CITY_MIN_RANGE every yield (the plot's yield for the player, 0x82280 -> 0x538a60) into the total, at 1 into the inner ring; a feature within 2 counted; a re...
-  review: imported
+  review: reviewed
 - addr: 0x82a10
   final: 0x5fe00
   kind: function
-  semantics: the city has water (a NAVAL unit's exit with no Harbor).
+  semantics: the city has water (a NAVAL unit's exit with no Harbor). The plot is beside an ocean-sized water body.
   status: PARTLY
   cases:
     - recording: 1124
@@ -57,6 +59,7 @@
 - addr: 0x82c20
   final: 0x60010
   kind: function
+  semantics: the plot has fresh water.
   status: PARTLY
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
@@ -64,10 +67,11 @@
     - ".claude/scratchpad/st1/reading.md: ...DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30),   coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence map below, 0x716a90); the..."
   context:
     - "...E_NEAR_ME, 0xfadf5055). Then: the continent (+0x30), coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min, 0 with none); the danger (the influence map below, 0x716..."
-  review: imported
+  review: reviewed
 - addr: 0x82d90
   final: 0x60180
   kind: function
+  semantics: the plot holds a goody hut (taken at once by a full civilization; no barbarian).
   status: READ
   cases:
     - recording: h1_duelv1124
@@ -76,10 +80,11 @@
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   context:
     - "...d's +0x128; taken as passing); a goody hut's plot taken at once by a full civilization (0x82d90: no barbarian)."
-  review: imported
+  review: reviewed
 - addr: 0x82e80
   final: 0x60270
   kind: function
+  semantics: the plot is a lake.
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -98,10 +103,11 @@
   context:
     - ...eturns 0, a mountain (terrain 2/5/8/11/14) that + 4; else +1 for its own river (+0x37) or 0x82e80, -1 for its own complete district while pillaged, -1 for its own pillaged improvement (+0...
     - "...quals) whose ring walk within 4 holds a sea plot not a lake (callback @d6e100: 0x834d0, 0x82e80), value 100, enemy strength the largest best combat strength of the game's majors; BA..."
-  review: imported
+  review: reviewed
 - addr: 0x82e90
   final: 0x60280
   kind: function
+  semantics: the plot is a natural wonder.
   status: READ
   cases:
     - recording: h1_duelw1116
@@ -121,7 +127,7 @@
     - ...ING_COST if it is the barbarian camp (0x362130), else IMPROVEMENT_COST; a natural wonder (0x82e90) NW_COST; YIELD_POINT_COST per yield point to the owner (0x82280); then over its six neig...
     - "...hen for each of the six neighbours YieldChange per clause it answers: a natural wonder (0x82e90); the resource AS THE PLAYER SEES IT (0x50a690 with the player's team; artifacts exclud..."
     - "...0x1800, EFFECT_ADJUST_CITY_APPEAL: Aalto, Correa, the park rows) first; a natural wonder (0x82e90) returns that + 5, a water terrain (0x834d0, the terrain row's water bit) returns 0, a mo..."
-  review: imported
+  review: reviewed
 - addr: 0x834d0
   final: 0x60820
   kind: function

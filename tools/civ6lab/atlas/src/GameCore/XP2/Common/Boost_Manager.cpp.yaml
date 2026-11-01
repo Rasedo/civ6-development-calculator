@@ -6,10 +6,11 @@
 - addr: 0x161d60
   final: 0xeb5c0
   kind: function
+  semantics: a boost's B = floor(Boost x cost / 100) (the row's +0x18 times the item's cost 0x29a010 / 0x353a70, sar 8).
   status: PARTLY
   impl: [cpu/core/boosts.ts:boostAmount]
   readings: ["H-1: a boost lands as progress — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...bBoostTriggered, finds the item's Boosts row (0x3990d0) and, in the 24.8 fixed point: B = 0x161d60 = floor(Boost x cost / 100) (the row's +0x18 times the item's cost 0x29a010 / 0x353a70, s..."
-  review: imported
+  review: reviewed

@@ -7,8 +7,11 @@
   final: 0x25f570
   kind: function
   name: the district's whole adjacency
+  semantics: "(player, city, district type, yield, plot): the district row's vector of Adjacency_YieldChanges rows (+0x100), each through 0x365ae0, SUMMED AS INTEGERS; then the player's modifier-added adjacencies (0x1cb470), each entry's count x amount truncated by idiv TilesRequired on its own and added."
   status: READ
   cases:
+    - recording: h1_duelw1104
+      value: Xian's Campus (1 Mountain, 3 Rainforest, its centre) 1 + floor(3/2) + floor(1/2) = 2, the game's 2 (pooling would give 3)
     - recording: h1_duelv1127
       turn: 2
       value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
@@ -24,7 +27,7 @@
 - addr: 0x365ae0
   final: 0x25f890
   kind: function
-  semantics: "one adjacency row: admitted by 0x367010; YieldChange for Self and the plot's river, then per neighbour per clause it answers; floor(n x YieldChange / TilesRequired)."
+  semantics: "one adjacency row: admitted by 0x367010; YieldChange for Self and the plot's river, then per neighbour per clause it answers; floor(n x YieldChange / TilesRequired). The row's columns (the loader 0xa57930's SELECT): flag byte +0xc0 = AdjacentNaturalWonder 1, AdjacentResource 2, AdjacentRiver 4, AdjacentSeaResource 8, AdjacentWonder 0x10, OtherDistrictAdjacent 0x20, Self 0x40; +0x1c YieldChange, +0x18 TilesRequired, +0xc8 AdjacentDistrict, +0xd0 AdjacentFeature, +0xd8 AdjacentImprovement, +0x100 AdjacentTerrain, +0x20 AdjacentResourceClass. A 24.8 accumulator takes YieldChange once for Self and once for a river on the district's own plot (+0x37), then for each of the six neighbours per clause it answers: a natural wonder (0x82e90); the resource AS THE PLAYER SEES IT (0x50a690 with the player's team; artifacts excluded) for AdjacentResource, on water for AdjacentSeaResource, by class name for AdjacentResourceClass; a wonder (0x81330); OtherDistrictAdjacent: the neighbour's owner (+0x1c) the player, its district (0x810d0) not InternalOnly (Districts +0xe1 bit 4), complete (District +0xb08) and not pillaged (+0xc88, 0x24c3a0); AdjacentTerrain the plot's terrain (+0x2c) alone; AdjacentFeature (+0x3c); AdjacentImprovement (+0x44) not pillaged (+0x4d bit 0); AdjacentDistrict that type complete (0x811b0) and not pillaged (0x811f0), WHOEVER OWNS IT. After the six: divided by TilesRequired when over 1 (0x3640e0) and sar 8 — floor(n x YieldChange / TilesRequired) per row."
   status: READ
   cases:
     - recording: h1_duelw1118
@@ -55,19 +58,24 @@
 - addr: 0x3664d0
   final: 0x25fe30
   kind: function
+  semantics: "an improvement's adjacency (improvementDef != nullptr): walks the improvement's Improvement_Adjacencies rows (+0x110..+0x118) through 0x365ae0 with the player it is handed."
   status: READ
   cases:
+    - recording: h1_duelw1118
+      turn: 208
+      value: China's Monastery on plot 781 beside Longxi's Campus and Armagh's Neighborhood reads 2 Faith t208-249
     - recording: h1_duelw1118
       turn: 208
       value: "Recorded (runs/h1_duelw1118): China's Monastery on plot 781 beside Longxi's Campus and Armagh's Neighborhood reads 2 Faith t208–249 (counting both would pay 3);"
   readings: ["H-1: the district adjacency — READ"]
   context:
     - "An improvement's adjacency runs the same row evaluator: 0x3664d0 (`improvementDef != nullptr`) walks the improvement's Improvement_Adjacencies rows (+0x11..."
-  review: imported
+  review: reviewed
 - addr: 0x366df0
   final: 0x260510
   kind: function
   name: the district's adjacency at an owned plot
+  semantics: "the district's adjacency at a plot: 0x365720 with the plot's owner and city."
   status: READ
   cases:
     - recording: h1_duelv1127
@@ -89,9 +97,10 @@
 - addr: 0x367010
   final: 0x260720
   kind: function
+  semantics: "admits an adjacency row: YieldChange != 0, PrereqTech / PrereqCivic held, ObsoleteTech / ObsoleteCivic not, the row not in the civ's or leader's ExcludedAdjacencies."
   status: PARTLY
   readings: ["H-1: the district adjacency — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...tTerrain, +0x20 AdjacentResourceClass): 0 unless the row's yield is the one asked and 0x367010 admits it (YieldChange ≠ 0, PrereqTech / PrereqCivic held, ObsoleteTech / ObsoleteCivic..."
-  review: imported
+  review: reviewed
